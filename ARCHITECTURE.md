@@ -110,7 +110,7 @@ Every handler runs against the vessel's scoped adapter. The
 org rides the VERIFIED token claim, never the path; a flat
 (un-exchanged) token has none and resolves via
 `identityDefaultOrg`: the identity's SET default org
-(`identity_default_orgs` ledger, latest wins), else its
+(`identity_default_organizations` ledger, latest wins), else its
 PRIMARY membership org, else a 403 — there is no global
 default to fall back on. Two covenants bound the vessel:
 it never carries the bearer token (authentication reads the

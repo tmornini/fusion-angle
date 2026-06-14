@@ -8,7 +8,7 @@ import {
     validateIdentityPiiEntity,
     validateIdentityCredentialEntity,
     validateIdentityTokenRevocationEntity,
-    validateIdentityDefaultOrgEntity,
+    validateIdentityDefaultOrganizationEntity,
     validateRoleGrantEntity,
     validateIdentityTokenEntity,
     validateClientEntity,
@@ -72,8 +72,8 @@ function validateSnapshotRow(
             case 'identity_token_revocations':
                 validateIdentityTokenRevocationEntity(body);
                 break;
-            case 'identity_default_orgs':
-                validateIdentityDefaultOrgEntity(body);
+            case 'identity_default_organizations':
+                validateIdentityDefaultOrganizationEntity(body);
                 break;
             case 'role_grants':
                 validateRoleGrantEntity(body);

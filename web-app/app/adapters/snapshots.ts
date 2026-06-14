@@ -75,6 +75,7 @@ export const RETIRED_KEYS_PER_TABLE:
 export const RETIRED_TABLES: readonly string[] = [
     'activities',
     'activity_actors',
+    'identity_default_orgs',
     'organization',
 ];
 

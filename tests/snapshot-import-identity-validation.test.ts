@@ -65,7 +65,7 @@ const VALID_ROWS: Record<
     identity_token_revocations: {
         id: 'r1', identity_id: 'i1', at: AT,
     },
-    identity_default_orgs: {
+    identity_default_organizations: {
         id: 'd1', identity_id: 'i1',
         organization_id: '1', at: AT,
     },
@@ -105,7 +105,7 @@ const BAD_OVERRIDE: Record<
     identity_pii: { rogue_field: 'x' },
     identity_credentials: { status: 'pending' },
     identity_token_revocations: { at: 'not-a-date' },
-    identity_default_orgs: { at: 'not-a-date' },
+    identity_default_organizations: { at: 'not-a-date' },
     role_grants: { action: 'maybe' },
     identity_tokens: { action: 'minted' },
     clients: { status: 'paused' },

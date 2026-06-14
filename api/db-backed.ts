@@ -20,7 +20,7 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
-    IdentityDefaultOrgEntity,
+    IdentityDefaultOrganizationEntity,
     RoleGrantEntity,
     IdentityTokenEntity,
     ClientEntity,
@@ -64,7 +64,7 @@ import {
     validateIdentityPiiEntity,
     validateIdentityCredentialEntity,
     validateIdentityTokenRevocationEntity,
-    validateIdentityDefaultOrgEntity,
+    validateIdentityDefaultOrganizationEntity,
     validateRoleGrantEntity,
     validateIdentityTokenEntity,
     validateClientEntity,
@@ -117,8 +117,8 @@ export class BackedDbAdapter
         GuardedEntityStore<IdentityCredentialEntity>;
     readonly identityTokenRevocations!:
         GuardedEntityStore<IdentityTokenRevocationEntity>;
-    readonly identityDefaultOrgs!:
-        GuardedEntityStore<IdentityDefaultOrgEntity>;
+    readonly identityDefaultOrganizations!:
+        GuardedEntityStore<IdentityDefaultOrganizationEntity>;
     readonly roleGrants!: GuardedEntityStore<RoleGrantEntity>;
     readonly identityTokens!:
         GuardedEntityStore<IdentityTokenEntity>;
@@ -326,9 +326,9 @@ export class BackedDbAdapter
                 'identity_token_revocations', run,
                 validateIdentityTokenRevocationEntity,
             ),
-            identityDefaultOrgs: new HistoryEntityStore(
-                'identity_default_orgs', run,
-                validateIdentityDefaultOrgEntity,
+            identityDefaultOrganizations: new HistoryEntityStore(
+                'identity_default_organizations', run,
+                validateIdentityDefaultOrganizationEntity,
             ),
             roleGrants: new HistoryEntityStore(
                 'role_grants', run,

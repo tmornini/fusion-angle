@@ -13,7 +13,7 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
-    IdentityDefaultOrgEntity,
+    IdentityDefaultOrganizationEntity,
     IdentityTokenEntity,
     ClientEntity,
     IdentityProviderEntity,
@@ -814,16 +814,16 @@ const IDENTITY_DEFAULT_ORG_BODY_KEYS:
     'identity_id', 'organization_id', 'at',
 ];
 
-export function validateIdentityDefaultOrgEntity(
+export function validateIdentityDefaultOrganizationEntity(
     body: Record<string, unknown>,
-): Omit<IdentityDefaultOrgEntity, 'id'> {
+): Omit<IdentityDefaultOrganizationEntity, 'id'> {
     assertOnlyKeys(
         body,
         IDENTITY_DEFAULT_ORG_BODY_KEYS,
-        'IdentityDefaultOrgEntity',
+        'IdentityDefaultOrganizationEntity',
     );
     const at = validateTimestampField(
-        body, 'at', 'IdentityDefaultOrgEntity',
+        body, 'at', 'IdentityDefaultOrganizationEntity',
     );
     return {
         identity_id: pickString(body, 'identity_id'),

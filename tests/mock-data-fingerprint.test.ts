@@ -37,7 +37,7 @@ const EXPECTED: Record<string, TableFingerprint> = {
     'identity_pii': { count: 11, hash: 'd8852be1' },
     'identity_credentials': { count: 12, hash: '4990628d' },
     'identity_token_revocations': { count: 0, hash: '811c9dc5' },
-    'identity_default_orgs': { count: 11, hash: 'ab3efde4' },
+    'identity_default_organizations': { count: 11, hash: 'ab3efde4' },
     'role_grants': { count: 12, hash: '4b2311dd' },
     'identity_tokens': { count: 0, hash: '811c9dc5' },
     'clients': { count: 0, hash: '811c9dc5' },

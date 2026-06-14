@@ -491,7 +491,7 @@ export interface IdentityTokenRevocationEntity {
 // identity, and no row means unset (never a nullable column —
 // an identity is born org-less). The chosen org must be one
 // of the identity's memberships, fenced at the write.
-export interface IdentityDefaultOrgEntity {
+export interface IdentityDefaultOrganizationEntity {
     id: Id;
     identity_id: Id;
     organization_id: Id;

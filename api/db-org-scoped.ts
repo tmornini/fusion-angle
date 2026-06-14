@@ -133,7 +133,7 @@ export function orgScopedAdapter(
         identities: base.identities,
         identityTokenRevocations:
             base.identityTokenRevocations,
-        identityDefaultOrgs: base.identityDefaultOrgs,
+        identityDefaultOrganizations: base.identityDefaultOrganizations,
         identityTokens: base.identityTokens,
         clients: base.clients,
         identityProviders: base.identityProviders,

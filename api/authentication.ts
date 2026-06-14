@@ -113,7 +113,7 @@ export async function identityDefaultOrg(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
-    const events = await adapter.identityDefaultOrgs
+    const events = await adapter.identityDefaultOrganizations
         .getAllWhere('identity_id', identityId);
     const chosen = currentDefaultOrgFor(events, identityId);
     if (chosen !== null) return chosen;

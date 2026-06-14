@@ -89,7 +89,7 @@ test('PUT the same org twice appends one event', async () => {
         db, putDefaultOrg(token, 'current', '1'));
     await handleRequest(
         db, putDefaultOrg(token, 'current', '1'));
-    const rows = await db.identityDefaultOrgs.getAll();
+    const rows = await db.identityDefaultOrganizations.getAll();
     assert.equal(rows.length, 1);
 });
 

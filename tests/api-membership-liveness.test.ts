@@ -52,7 +52,7 @@ async () => {
     // Pin the default org in the ledger, then revoke the
     // membership: the SET default now dangles, and the
     // fence — not the default-org resolution — must deny.
-    await db.identityDefaultOrgs.put('do-current', {
+    await db.identityDefaultOrganizations.put('do-current', {
         identity_id: 'current',
         organization_id: '1',
         at: '2020-01-02T00:00:00.000000Z',

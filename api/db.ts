@@ -7,7 +7,7 @@ import type {
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
-    IdentityDefaultOrgEntity,
+    IdentityDefaultOrganizationEntity,
     RoleGrantEntity,
     IdentityTokenEntity,
     ClientEntity,
@@ -303,8 +303,8 @@ export interface DbStores {
         EntityStore<IdentityCredentialEntity>;
     identityTokenRevocations:
         EntityStore<IdentityTokenRevocationEntity>;
-    identityDefaultOrgs:
-        EntityStore<IdentityDefaultOrgEntity>;
+    identityDefaultOrganizations:
+        EntityStore<IdentityDefaultOrganizationEntity>;
     roleGrants:
         EntityStore<RoleGrantEntity>;
     identityTokens:
@@ -430,7 +430,7 @@ export const TABLE_NAMES = [
     'identity_pii',
     'identity_credentials',
     'identity_token_revocations',
-    'identity_default_orgs',
+    'identity_default_organizations',
     'role_grants',
     'identity_tokens',
     'clients',
@@ -471,7 +471,7 @@ export const TABLE_INDEXES:
     identity_pii: ['email'],
     identity_credentials: ['identity_id'],
     identity_token_revocations: ['identity_id'],
-    identity_default_orgs: ['identity_id'],
+    identity_default_organizations: ['identity_id'],
     role_grants: ['organization_id', 'identity_id'],
     identity_tokens: ['jti', 'chain_id', 'identity_id'],
     identity_providers: ['identity_id'],

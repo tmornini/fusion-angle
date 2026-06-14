@@ -41,7 +41,7 @@ async function enumerateMyOrgs(
 }
 
 // PUT/GET /identities/:id/default-org — the read/write face of
-// the identity_default_orgs ledger. Authorized by tree ownership
+// the identity_default_organizations ledger. Authorized by tree ownership
 // (caller === :id), not the admin role policy: an identity owns
 // its own subtree. PUT appends a NEW event only when the org
 // changes (an idempotent repeat writes nothing), and only if the
@@ -105,11 +105,11 @@ export async function identityDefaultOrgRequest(
             );
         }
         const rows =
-            await ctx.base.identityDefaultOrgs.getAll();
+            await ctx.base.identityDefaultOrganizations.getAll();
         if (currentDefaultOrgFor(rows, identityId) === org) {
             return new Response(null, { status: 204 });
         }
-        await ctx.base.identityDefaultOrgs.put(
+        await ctx.base.identityDefaultOrganizations.put(
             generateCryptoSafeBase62(), {
                 identity_id: identityId,
                 organization_id: org,

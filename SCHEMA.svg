@@ -149,7 +149,7 @@
   <g class="table">
     <rect class="box" x="648" y="914" width="208" height="98" rx="6" />
     <rect class="head" x="648" y="914" width="208" height="26" rx="6" />
-    <text class="thead" x="658" y="932">identity_default_orgs</text>
+    <text class="thead" x="658" y="932">identity_default_organizations</text>
     <text class="pk" x="658" y="953">id</text>
     <text class="type" x="846" y="953">id</text>
     <text class="col" x="658" y="971">identity_id</text>

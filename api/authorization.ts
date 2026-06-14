@@ -2,7 +2,7 @@ import type {
     Id,
     RoleGrantAction,
     RoleGrantEntity,
-    IdentityDefaultOrgEntity,
+    IdentityDefaultOrganizationEntity,
 } from './types.ts';
 import { latestByKey } from './ledger-reduction.ts';
 
@@ -60,7 +60,7 @@ export function currentRolesForInOrg(
 // it has none. The default (at, id) total order decides a
 // same-`at` tie deterministically on every backend.
 export function currentDefaultOrgFor(
-    rows: readonly IdentityDefaultOrgEntity[],
+    rows: readonly IdentityDefaultOrganizationEntity[],
     identityId: Id,
 ): Id | null {
     const chosen = latestByKey(rows, row => row.identity_id)

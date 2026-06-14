@@ -218,7 +218,7 @@ before any further write.
 | identity_id | TEXT (FK → identities) |
 | at | TEXT |
 
-### identity_default_orgs
+### identity_default_organizations
 
 Append-only set-default-org ledger
 (`HistoryEntityStore`). Each row records a moment an

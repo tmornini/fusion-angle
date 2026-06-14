@@ -220,7 +220,7 @@ async function postMockDataLoadIn(
                             identity_id: member.id,
                             at: MOCK_SEED_TIMESTAMP,
                         })),
-                adapter.identityDefaultOrgs.put(
+                adapter.identityDefaultOrganizations.put(
                     'seed-default-org-' + member.id, {
                         identity_id: member.id,
                         organization_id: orgs[0]!,
@@ -3784,7 +3784,7 @@ async function postBootstrapIn(
                 identity_id: 'current',
                 at: MOCK_SEED_TIMESTAMP,
             }),
-        adapter.identityDefaultOrgs.put(
+        adapter.identityDefaultOrganizations.put(
             'bootstrap-default-org-current', {
                 identity_id: 'current',
                 organization_id: STARK_ORG,

@@ -104,7 +104,7 @@ is HTTP-only.
   bound to the org from the VERIFIED token claim (never the
   path). A flat (un-exchanged) token resolves its org via
   `identityDefaultOrg`: the identity's SET default org
-  (`identity_default_orgs` ledger, latest wins), else its
+  (`identity_default_organizations` ledger, latest wins), else its
   PRIMARY membership org, else a 403 — there is no global
   default. `organizations` is the tenant root; `memberships`
   joins identity↔org; the members roster is derived from that

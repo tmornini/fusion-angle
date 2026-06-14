@@ -4,7 +4,7 @@ import {
     currentDefaultOrgFor,
 } from '../api/authorization.ts';
 import type {
-    IdentityDefaultOrgEntity,
+    IdentityDefaultOrganizationEntity,
 } from '../api/types.ts';
 
 const AT1 = '2026-01-01T00:00:00.000000Z';
@@ -15,7 +15,7 @@ function ev(
     identityId: string,
     organizationId: string,
     at: string,
-): IdentityDefaultOrgEntity {
+): IdentityDefaultOrganizationEntity {
     return {
         id,
         identity_id: identityId,

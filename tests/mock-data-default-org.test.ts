@@ -22,7 +22,7 @@ async () => {
         .map(i => i.id);
     const memberships = await db.memberships.getAll();
     const haveDefault = new Set(
-        (await db.identityDefaultOrgs.getAll())
+        (await db.identityDefaultOrganizations.getAll())
             .map(d => d.identity_id));
     for (const id of persons) {
         if (!memberships.some(m => m.identity_id === id)) {
@@ -46,7 +46,7 @@ async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
-    const defaults = await db.identityDefaultOrgs.getAll();
+    const defaults = await db.identityDefaultOrganizations.getAll();
     assert.ok(
         defaults.some(
             d => d.identity_id === 'current'

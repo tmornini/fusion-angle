@@ -22,7 +22,7 @@ test(
         await db.memberships.put('m2', {
             organization_id: '2', identity_id: 'me', at: T2,
         });
-        await db.identityDefaultOrgs.put('d1', {
+        await db.identityDefaultOrganizations.put('d1', {
             identity_id: 'me', organization_id: '2', at: T2,
         });
         assert.equal(await identityDefaultOrg(db, 'me'), '2');

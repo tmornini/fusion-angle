@@ -51,7 +51,7 @@ async () => {
     const db = await freshDb();
     await join(db, 'current', '2');
     await grantAdmin(db, 'current', '2');
-    await db.identityDefaultOrgs.put('d1', {
+    await db.identityDefaultOrganizations.put('d1', {
         identity_id: 'current',
         organization_id: '2',
         at: AT,
