@@ -11,7 +11,7 @@ import {
     latestPerPair,
     formatSigned,
 } from '../scoring-format.ts';
-import { iconTrendingUp } from '../icons.ts';
+import { ICON_SIZE, iconTrendingUp } from '../icons.ts';
 import { buildBipolarGaugeSvg } from './gauge.ts';
 import { formatDate } from '../format.ts';
 
@@ -89,7 +89,7 @@ export class ProjectObjectivesPresenter {
                     + ' gap-3 mb-5'
                 }">
                     <div class="icon-box">
-                        ${iconTrendingUp(20, '')}
+                        ${iconTrendingUp(ICON_SIZE.xl, '')}
                     </div>
                     <h3 class="${
                         'text-sm font-semibold'

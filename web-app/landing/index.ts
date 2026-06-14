@@ -5,6 +5,7 @@ import {
     type SafeHtml,
 } from '../app/safe-html.ts';
 import {
+    ICON_SIZE,
     iconLogo,
     iconSparkles,
     iconArrowRight,
@@ -145,7 +146,7 @@ function buildNavbar(): SafeHtml {
                     class="navbar-logo">
                     <div class="${
                         'navbar-logo-icon'
-                    }">${iconLogo(28, '')}</div>
+                    }">${iconLogo(ICON_SIZE['3xl'], '')}</div>
                     <span class="${
                         'navbar-logo-text'
                     }">Fusion AI</span>
@@ -191,7 +192,7 @@ function buildNavbar(): SafeHtml {
                     aria-label="${
                         'Toggle menu'
                     }">
-                    ${iconMenu(24, '')}
+                    ${iconMenu(ICON_SIZE['2xl'], '')}
                 </button>
             </div>
             <div class="${
@@ -252,7 +253,7 @@ function buildHero(): SafeHtml {
         <div class="container">
             <div class="hero-content">
                 <div class="hero-badge">
-                    ${iconSparkles(16, '')}
+                    ${iconSparkles(ICON_SIZE.base, '')}
                     <span>${
                         'Human-Intelligence'
                         + ' First'
@@ -291,7 +292,7 @@ function buildHero(): SafeHtml {
                         'btn btn-accent btn-xl'
                     }" data-goto-auth>
                         Start Free Trial ${
-                            iconArrowRight(20, '')
+                            iconArrowRight(ICON_SIZE.xl, '')
                         }
                     </button>
                     <button class="${
@@ -353,7 +354,7 @@ function buildFeatures(): SafeHtml {
                     <div class="${
                         'feature-icon'
                     }">${
-                        feature.icon(24, '')
+                        feature.icon(ICON_SIZE['2xl'], '')
                     }</div>
                     <h3>${
                         feature.title
@@ -419,7 +420,7 @@ function buildHowItWorks(): SafeHtml {
                                     'step-point'
                                     + '-icon'
                                 }">${
-                                    iconCheck(12, '')
+                                    iconCheck(ICON_SIZE.xs, '')
                                 }</div>
                                 <span>${
                                     point
@@ -465,7 +466,7 @@ function buildCTA(): SafeHtml {
                         'btn btn-accent btn-xl'
                     }" data-goto-auth>
                         Start Free Trial ${
-                            iconArrowRight(20, '')
+                            iconArrowRight(ICON_SIZE.xl, '')
                         }
                     </button>
                 </div>
@@ -486,7 +487,7 @@ function buildFooter(): SafeHtml {
                     }">
                         <div class="${
                             'navbar-logo-icon'
-                        }">${iconLogo(28, '')}</div>
+                        }">${iconLogo(ICON_SIZE['3xl'], '')}</div>
                         <span class="${
                             'navbar-logo-text'
                         }">Fusion AI</span>
@@ -542,8 +543,8 @@ export async function init(): Promise<void> {
                 setHtml(
                     toggle,
                     nowHidden
-                        ? iconMenu(24, '')
-                        : iconX(24, ''),
+                        ? iconMenu(ICON_SIZE['2xl'], '')
+                        : iconX(ICON_SIZE['2xl'], ''),
                 );
             },
         );

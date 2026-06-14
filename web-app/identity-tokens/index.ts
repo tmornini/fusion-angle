@@ -5,7 +5,7 @@ import {
     buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
 import { navigateTo } from '../app/core.ts';
-import { iconArrowLeft } from '../app/icons.ts';
+import { ICON_SIZE, iconArrowLeft } from '../app/icons.ts';
 import {
     sessionContext,
     getTokenChainsFor,
@@ -27,7 +27,7 @@ export async function init(
     populateIcons([
         [
             '#identity-tokens-back-icon',
-            iconArrowLeft(20, ''),
+            iconArrowLeft(ICON_SIZE.xl, ''),
         ],
     ]);
     $('#identity-tokens-back', document)

@@ -9,6 +9,7 @@ import {
     buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
 import {
+    ICON_SIZE,
     iconPersonPlus, iconSend,
 } from '../app/icons.ts';
 import {
@@ -38,9 +39,9 @@ export async function init(): Promise<void> {
     );
 
     populateIcons([
-        ['#add-identity-btn-icon', iconPersonPlus(16, '')],
-        ['#add-identity-dialog-icon', iconPersonPlus(20, '')],
-        ['#add-identity-submit-icon', iconSend(16, '')],
+        ['#add-identity-btn-icon', iconPersonPlus(ICON_SIZE.base, '')],
+        ['#add-identity-dialog-icon', iconPersonPlus(ICON_SIZE.xl, '')],
+        ['#add-identity-submit-icon', iconSend(ICON_SIZE.base, '')],
     ]);
     bindAddIdentityDialog();
 

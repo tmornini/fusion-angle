@@ -5,6 +5,7 @@ import {
     displayText,
 } from '../core.ts';
 import {
+    ICON_SIZE,
     iconDollarSign,
     iconArrowRight,
     iconArrowLeft,
@@ -161,7 +162,7 @@ export class IdeaConversionPresenter {
             data-ready="${
                 isSet ? 'true' : 'false'
             }">
-            ${iconCheckCircle2(16, '')}
+            ${iconCheckCircle2(ICON_SIZE.base, '')}
         </span>`;
     }
 
@@ -176,7 +177,7 @@ export class IdeaConversionPresenter {
             data-ready="${
                 isSet ? 'true' : 'false'
             }">
-            ${iconCheckCircle2(16, '')}
+            ${iconCheckCircle2(ICON_SIZE.base, '')}
         </span>`;
     }
 
@@ -211,7 +212,7 @@ export class IdeaConversionPresenter {
                     id=${'convert'
                         + '-back-to'
                         + '-ideas'}>
-                    ${iconArrowLeft(20, '')}
+                    ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div class="flex
                     items-center gap-3">
@@ -224,7 +225,7 @@ export class IdeaConversionPresenter {
                             + ' justify-center'
                             + ' convert-icon'
                         }">
-                        ${iconRocket(20, '')}
+                        ${iconRocket(ICON_SIZE.xl, '')}
                     </div>
                     <span class="${
                         'text-xl'
@@ -420,7 +421,7 @@ export class IdeaConversionPresenter {
                     items-center
                     gap-2 mb-6">
                     ${iconTarget(
-                        20,
+                        ICON_SIZE.xl,
                         'text-primary',
                     )}
                     <span class="${
@@ -478,7 +479,7 @@ export class IdeaConversionPresenter {
                                 + '-days'
                             }">
                             ${iconClock(
-                                16,
+                                ICON_SIZE.base,
                                 'text-muted',
                             )}
                             Time
@@ -528,7 +529,7 @@ export class IdeaConversionPresenter {
                         }"
                             for="convert-cost">
                             ${iconDollarSign(
-                                16,
+                                ICON_SIZE.base,
                                 'text-muted',
                             )}
                             Cost
@@ -623,7 +624,7 @@ export class IdeaConversionPresenter {
                     items-center
                     gap-2 mb-6">
                     ${iconTrendingUp(
-                        20,
+                        ICON_SIZE.xl,
                         'text-primary',
                     )}
                     <span class="${
@@ -646,7 +647,7 @@ export class IdeaConversionPresenter {
                     items-center
                     gap-2 mb-6">
                     ${iconTrendingUp(
-                        20,
+                        ICON_SIZE.xl,
                         'text-primary',
                     )}
                     <span class="${
@@ -769,7 +770,7 @@ export class IdeaConversionPresenter {
                                 ? 'true'
                                 : 'false'
                         }">
-                        ${iconRocket(24, '')}
+                        ${iconRocket(ICON_SIZE['2xl'], '')}
                     </div>
                     <div class="flex-1">
                         <h3
@@ -832,7 +833,7 @@ export class IdeaConversionPresenter {
                                     + '-ideas-2'
                                 }>
                                 ${iconArrowLeft(
-                                    16, '',
+                                    ICON_SIZE.base, '',
                                 )}
                                 ${'Back to'
                                     + ' Ideas'}
@@ -856,7 +857,7 @@ export class IdeaConversionPresenter {
                                 ${'Create'
                                     + ' Project'}
                                 ${iconArrowRight(
-                                    16, '',
+                                    ICON_SIZE.base, '',
                                 )}
                             </button>
                         </div>

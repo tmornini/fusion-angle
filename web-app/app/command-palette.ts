@@ -9,6 +9,7 @@ import {
     escapeForHtml,
 } from './safe-html.ts';
 import {
+    ICON_SIZE,
     iconSearch,
     iconLightbulb,
     iconFolderKanban,
@@ -64,8 +65,6 @@ interface PalettePageEntry {
 }
 
 const DEBOUNCE_MS = 100;
-const PALETTE_ICON_SIZE_SM = 16;
-const PALETTE_ICON_SIZE_LG = 20;
 const PALETTE_DEFAULT_RESULT_COUNT = 12;
 
 function buildPageList(
@@ -83,10 +82,10 @@ function buildPageList(
             title: entry.title,
             icon: iconFn
                 ? iconFn(
-                    PALETTE_ICON_SIZE_SM, '',
+                    ICON_SIZE.base, '',
                 )
                 : iconSearch(
-                    PALETTE_ICON_SIZE_SM, '',
+                    ICON_SIZE.base, '',
                 ),
             href: buildPageUrl(name),
             keywords: entry.keywords,
@@ -184,7 +183,7 @@ export function ideaToSearchItem(
             .replace(/-/g, ' '),
         category: 'ideas',
         icon: iconLightbulb(
-            PALETTE_ICON_SIZE_SM, '',
+            ICON_SIZE.base, '',
         ),
         href: buildPageUrl('idea-convert', {
             ideaId: tuple.idea.idForLink(),
@@ -207,7 +206,7 @@ export function projectToSearchItem(
                 .replace(/-/g, ' '),
         category: 'projects',
         icon: iconFolderKanban(
-            PALETTE_ICON_SIZE_SM, '',
+            ICON_SIZE.base, '',
         ),
         href: buildPageUrl('project-detail', {
             projectId: project.idForLink(),
@@ -234,7 +233,7 @@ export function humanMemberToSearchItem(
             + member.departmentLabel(),
         category: 'members',
         icon: iconPerson(
-            PALETTE_ICON_SIZE_SM, '',
+            ICON_SIZE.base, '',
         ),
         href: buildPageUrl('members'),
         keywords: member.titleLabel()
@@ -614,7 +613,7 @@ posIndex === state.activeIndex
         'command-palette-input-wrapper'
     }">
         ${iconSearch(
-            PALETTE_ICON_SIZE_LG, '',
+            ICON_SIZE.xl, '',
         )}
         <input
             class="command-palette-input"
@@ -636,7 +635,7 @@ posIndex === state.activeIndex
             }"
             aria-label="Close"
             id="command-palette-close">${
-            iconX(16, '')}</button>
+            iconX(ICON_SIZE.base, '')}</button>
     </div>
     <div class="command-palette-list"
         id="command-palette-listbox"

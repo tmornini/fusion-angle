@@ -17,6 +17,7 @@ import {
 } from '../app/loading-states.ts';
 import { log } from '../app/logger.ts';
 import {
+    ICON_SIZE,
     iconPersonPlus, iconSearch,
     iconSend, iconMail,
 } from '../app/icons.ts';
@@ -62,13 +63,13 @@ export async function init(): Promise<void> {
     );
 
     populateIcons([
-        ['#add-member-btn-icon', iconPersonPlus(16, '')],
-        ['#member-search-icon', iconSearch(16, '')],
-        ['#add-member-dialog-icon', iconPersonPlus(20, '')],
-        ['#add-member-submit-icon', iconSend(16, '')],
-        ['#invite-member-btn-icon', iconMail(16, '')],
-        ['#invite-member-dialog-icon', iconMail(20, '')],
-        ['#invite-member-submit-icon', iconSend(16, '')],
+        ['#add-member-btn-icon', iconPersonPlus(ICON_SIZE.base, '')],
+        ['#member-search-icon', iconSearch(ICON_SIZE.base, '')],
+        ['#add-member-dialog-icon', iconPersonPlus(ICON_SIZE.xl, '')],
+        ['#add-member-submit-icon', iconSend(ICON_SIZE.base, '')],
+        ['#invite-member-btn-icon', iconMail(ICON_SIZE.base, '')],
+        ['#invite-member-dialog-icon', iconMail(ICON_SIZE.xl, '')],
+        ['#invite-member-submit-icon', iconSend(ICON_SIZE.base, '')],
     ]);
     initMemberListFilters();
     bindAddMemberDialog();

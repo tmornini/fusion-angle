@@ -1,5 +1,5 @@
 import { html, type SafeHtml } from '../safe-html.ts';
-import { iconCopy } from '../icons.ts';
+import { ICON_SIZE, iconCopy } from '../icons.ts';
 import type {
     SeededCredentials,
 } from '../../../api/mock-data.ts';
@@ -44,7 +44,7 @@ export function credentialRevealPanel(
                 <button class="btn btn-outline btn-sm gap-2"
                     id="credential-copy-all-btn"
                     type="button">
-                    ${iconCopy(14, '')} Copy all
+                    ${iconCopy(ICON_SIZE.sm, '')} Copy all
                 </button>
             </div>
             <p class="credential-reveal-note">

@@ -5,7 +5,7 @@ import { initials } from '../core.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
 import { mutedEmptyNote } from './empty-note.ts';
-import { iconShield } from '../icons.ts';
+import { ICON_SIZE, iconShield } from '../icons.ts';
 import {
     IDENTITY_WITHOUT_PII_NAME,
     UNNAMED_SERVICE_NAME,
@@ -31,7 +31,7 @@ function buildPersonAvatar(name: string): SafeHtml {
 function buildServiceAvatar(): SafeHtml {
     return html`
         <div class="avatar avatar-tinted">
-            ${iconShield(16, 'text-primary')}
+            ${iconShield(ICON_SIZE.base, 'text-primary')}
         </div>`;
 }
 

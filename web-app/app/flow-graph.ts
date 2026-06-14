@@ -14,6 +14,7 @@ import {
 import { pluralize } from './format.ts';
 import { findCycleEdgeIds } from './flow-cycle-edges.ts';
 import {
+    ICON_SIZE,
     iconAlertTriangle,
     iconNoEntry,
 } from './icons.ts';
@@ -555,7 +556,7 @@ function buildNode(
             + '<title>'
             + 'Single member assigned (no backup)'
             + '</title>'
-            + iconAlertTriangle(16, '')
+            + iconAlertTriangle(ICON_SIZE.base, '')
                 .toString()
             + '</g>';
     } else if (hazardLevel === 'danger') {
@@ -569,7 +570,7 @@ function buildNode(
             + '<title>'
             + dangerTitle
             + '</title>'
-            + iconNoEntry(16, '')
+            + iconNoEntry(ICON_SIZE.base, '')
                 .toString()
             + '</g>';
     }

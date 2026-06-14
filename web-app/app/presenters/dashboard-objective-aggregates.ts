@@ -3,7 +3,7 @@ import type {
     Objective,
     ObjectiveId,
 } from '../../../api/types.ts';
-import { iconTrendingUp } from '../icons.ts';
+import { ICON_SIZE, iconTrendingUp } from '../icons.ts';
 import { buildBipolarGaugeSvg } from './gauge.ts';
 import type { TrendPoint } from
     '../adapters/project-scoring.ts';
@@ -74,7 +74,7 @@ export class DashboardObjectiveAggregatesPresenter {
                     'flex items-center gap-3 mb-5'
                 }">
                     <div class="icon-box">
-                        ${iconTrendingUp(20, '')}
+                        ${iconTrendingUp(ICON_SIZE.xl, '')}
                     </div>
                     <h3 class="${
                         'text-sm font-semibold'

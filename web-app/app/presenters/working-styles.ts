@@ -1,5 +1,7 @@
 import { html, SafeHtml } from '../safe-html.ts';
 import {
+    type IconSize,
+    ICON_SIZE,
     iconZap,
     iconTarget,
     iconMessageSquare,
@@ -20,7 +22,7 @@ const LABELS: Record<DimensionKey, string> = {
 const ICONS: Record<
     DimensionKey,
     (
-        size: number,
+        size: IconSize,
         cssClass: string,
     ) => SafeHtml
 > = {
@@ -108,7 +110,7 @@ export class WorkingStylesPresenter {
                         'flex items-center gap-2'
                     }">
                         ${icon(
-                            16,
+                            ICON_SIZE.base,
                             'text-primary',
                         )}
                         <span class="${

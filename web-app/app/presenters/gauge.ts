@@ -3,6 +3,8 @@ import {
     SafeHtml,
 } from '../safe-html.ts';
 import {
+    type IconSize,
+    ICON_SIZE,
     iconDollarSign,
     iconClock,
     iconZap,
@@ -30,7 +32,7 @@ const THEME_TONE: Record<
 const ICON_FNS: Record<
     GaugeIcon,
     (
-        size: number,
+        size: IconSize,
         cssClass: string,
     ) => SafeHtml
 > = {
@@ -416,7 +418,7 @@ export class GaugePresenter {
             <div class="icon-box"
                 data-tone="${tone}">
                 ${iconFn(
-                    20,
+                    ICON_SIZE.xl,
                     data.iconCssClass,
                 )}
             </div>

@@ -9,6 +9,7 @@ import {
     loadInto,
 } from '../app/loading-states.ts';
 import {
+    ICON_SIZE,
     iconPlus, iconLightbulb,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
@@ -49,13 +50,13 @@ export async function init(): Promise<void> {
         fetch: () => getIdeas(ctx),
         retry: init,
         emptyState: {
-            icon: iconLightbulb(24, ''),
+            icon: iconLightbulb(ICON_SIZE['2xl'], ''),
             title: 'No Ideas Yet',
             description:
                 'Start innovating by creating'
                 + ' your first idea.',
             action: {
-                label: html`${iconPlus(16, '')}
+                label: html`${iconPlus(ICON_SIZE.base, '')}
                     Create Your First Idea`,
                 href: 'create.html',
             },
@@ -71,7 +72,7 @@ export async function init(): Promise<void> {
     });
 
     populateIcons([
-        ['#create-btn-icon', iconPlus(16, '')],
+        ['#create-btn-icon', iconPlus(ICON_SIZE.base, '')],
     ]);
 
     $('#create-idea-btn', document)

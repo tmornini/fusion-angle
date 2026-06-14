@@ -5,6 +5,7 @@ import { mutateSlot } from '../dom.ts';
 import { initials } from '../core.ts';
 import { displayText } from '../format.ts';
 import {
+    ICON_SIZE,
     iconArrowLeft,
     iconExternalLink,
     iconMail,
@@ -54,7 +55,7 @@ function buildShell(container: HTMLElement): void {
                     id="identity-back-btn"
                     data-identity-action="back"
                     aria-label="Back">
-                    ${iconArrowLeft(20, '')}
+                    ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div class="identity-title-slot">
                 </div>
@@ -164,10 +165,10 @@ function buildPersonalInfoCard(
                 'grid grid-cols-2 gap-4 mb-4'
             }">
                 ${buildField(
-                    'Email', email, iconMail(16, ''),
+                    'Email', email, iconMail(ICON_SIZE.base, ''),
                 )}
                 ${buildField(
-                    'Phone', phone, iconPhone(16, ''),
+                    'Phone', phone, iconPhone(ICON_SIZE.base, ''),
                 )}
             </div>
             ${buildBio(bio)}
@@ -184,7 +185,7 @@ function buildCredentialsCard(
                 'font-display font-semibold mb-4'
                 + ' flex items-center gap-2'
             }">${
-                iconShield(20, 'text-primary')
+                iconShield(ICON_SIZE.xl, 'text-primary')
             } Credentials</h3>
             ${
                 kinds.length === 0
@@ -216,14 +217,14 @@ function buildLinksCard(
                     class="btn btn-outline gap-2"
                     data-identity-link="providers"
                     data-identity-id="${id}">
-                    ${iconExternalLink(16, '')}
+                    ${iconExternalLink(ICON_SIZE.base, '')}
                     Identity Providers
                 </button>
                 <button
                     class="btn btn-outline gap-2"
                     data-identity-link="tokens"
                     data-identity-id="${id}">
-                    ${iconExternalLink(16, '')}
+                    ${iconExternalLink(ICON_SIZE.base, '')}
                     Tokens
                 </button>
             </div>

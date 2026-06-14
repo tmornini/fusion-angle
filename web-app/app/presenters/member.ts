@@ -3,6 +3,8 @@ import {
 } from '../safe-html.ts';
 import { initials } from '../core.ts';
 import {
+    type IconSize,
+    ICON_SIZE,
     iconCheckCircle2,
     iconClock,
     iconPersonX,
@@ -29,7 +31,7 @@ import {
 const STATE_ICONS: Record<
     MemberState,
     (
-        size: number,
+        size: IconSize,
         cssClass: string,
     ) => SafeHtml
 > = {
@@ -188,7 +190,7 @@ export class AIMemberRowPresenter {
                 'avatar avatar-tinted'
             }">
                 ${iconBrain(
-                    16,
+                    ICON_SIZE.base,
                     'text-primary',
                 )}
             </div>

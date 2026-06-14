@@ -74,6 +74,7 @@ import type {
     SavedViewBox,
 } from '../flow-designer-actions.ts';
 import {
+    ICON_SIZE,
     iconArrowLeft,
     iconBarChart,
 } from '../icons.ts';
@@ -544,13 +545,13 @@ class="flow-designer">
     id="flow-back-btn"
     title="Back"
     aria-label="Back"
-    >${iconArrowLeft(20, '')}</button>
+    >${iconArrowLeft(ICON_SIZE.xl, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     id="flow-stats-btn"
     title="Stats"
     aria-label="Flow statistics"
-    >${iconBarChart(20, '')}</button>
+    >${iconBarChart(ICON_SIZE.xl, '')}</button>
 <div class="flex-1 flow-name-header-slot"
     ></div>
 <div class="flow-binding-slot"></div>

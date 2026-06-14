@@ -6,7 +6,7 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import { iconFolderKanban } from '../app/icons.ts';
+import { ICON_SIZE, iconFolderKanban } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
 import {
     createRequestContext,
@@ -68,7 +68,7 @@ export async function init(): Promise<void> {
         fetch: () => getProjects(ctx),
         retry: init,
         emptyState: {
-            icon: iconFolderKanban(24, ''),
+            icon: iconFolderKanban(ICON_SIZE['2xl'], ''),
             title: 'No Projects Yet',
             description:
                 'Ideas, when promoted, become a project.',

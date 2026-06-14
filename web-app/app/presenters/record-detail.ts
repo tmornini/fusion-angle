@@ -1,6 +1,7 @@
 import { html, trusted } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
 import {
+    ICON_SIZE,
     iconArrowLeft,
     iconEdit,
     iconCheck,
@@ -61,7 +62,7 @@ export class RecordDetailPresenter {
                             'btn btn-ghost'
                             + ' btn-icon'
                         }">
-                        ${iconArrowLeft(20, '')}
+                        ${iconArrowLeft(ICON_SIZE.xl, '')}
                     </button>
                     <div>
                         <h1 class="${
@@ -82,7 +83,7 @@ export class RecordDetailPresenter {
                 <button
                     id="record-edit-btn"
                     class="btn btn-primary">
-                    ${iconEdit(16, '')}
+                    ${iconEdit(ICON_SIZE.base, '')}
                     Edit
                 </button>
             </div>
@@ -261,7 +262,7 @@ export class RecordDetailEditPresenter {
                             'btn btn-ghost'
                             + ' btn-icon'
                         }">
-                        ${iconX(20, '')}
+                        ${iconX(ICON_SIZE.xl, '')}
                     </button>
                     <input
                         id="record-edit-name"
@@ -273,7 +274,7 @@ export class RecordDetailEditPresenter {
                 <button
                     id="record-save-btn"
                     class="btn btn-primary">
-                    ${iconCheck(16, '')}
+                    ${iconCheck(ICON_SIZE.base, '')}
                     Save
                 </button>
             </div>
@@ -331,7 +332,7 @@ export class RecordDetailEditPresenter {
                     class="${
                         'btn btn-ghost btn-sm'
                     }">
-                    ${iconPlus(14, '')}
+                    ${iconPlus(ICON_SIZE.sm, '')}
                     Add Attribute
                 </button>
             </div>
@@ -368,7 +369,7 @@ export class RecordDetailEditPresenter {
             <button
                 class="btn btn-ghost btn-xs"
                 data-action="remove-attribute">
-                ${iconTrash(14, '')}
+                ${iconTrash(ICON_SIZE.sm, '')}
             </button>
         </div>`;
     }
@@ -447,7 +448,7 @@ export class RecordDetailEditPresenter {
             <button
                 class="btn btn-ghost btn-xs"
                 data-action="remove-constraint">
-                ${iconX(12, '')}
+                ${iconX(ICON_SIZE.xs, '')}
             </button>
         </div>`;
     }

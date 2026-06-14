@@ -15,6 +15,8 @@ import {
 } from '../core.ts';
 import { buildPageUrl } from '../navigation.ts';
 import {
+    type IconSize,
+    ICON_SIZE,
     iconGripVertical,
     iconClock,
     iconTrendingUp,
@@ -42,7 +44,7 @@ import {
 const STATE_ICONS: Record<
     IdeaState,
     (
-        size: number,
+        size: IconSize,
         cssClass: string,
     ) => SafeHtml
 > = {
@@ -144,7 +146,7 @@ function buildShell(
                     id="idea-back-btn"
                     data-idea-action="back"
                     aria-label="Back">
-                    ${iconArrowLeft(20, '')}
+                    ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div class="idea-title-slot">
                 </div>
@@ -327,7 +329,7 @@ function buildSubmitConvertButtons(
                 data-idea-action="${
                     'submit-review'
                 }">
-                ${iconClipboardCheck(16, '')}
+                ${iconClipboardCheck(ICON_SIZE.base, '')}
                 Submit for Review
             </button>` : html``}
         ${idea.isConvertible()
@@ -338,7 +340,7 @@ function buildSubmitConvertButtons(
                 }"
                 id="idea-convert-btn"
                 data-idea-action="convert">
-                ${iconArrowRight(16, '')}
+                ${iconArrowRight(ICON_SIZE.base, '')}
                 Convert
             </button>` : html``}`;
 }
@@ -355,7 +357,7 @@ function buildApprovalButtons(): SafeHtml {
             data-dialog-open="${
                 'approval-send-back'
             }">
-            ${iconXCircle(16, '')}
+            ${iconXCircle(ICON_SIZE.base, '')}
             Send Back
         </button>
         <button
@@ -367,7 +369,7 @@ function buildApprovalButtons(): SafeHtml {
             data-idea-action="${
                 'approve'
             }">
-            ${iconCheckCircle(16, '')}
+            ${iconCheckCircle(ICON_SIZE.base, '')}
             Approve
         </button>`;
 }
@@ -609,7 +611,7 @@ export class IdeaPresenter {
                     'Reorder '
                     + this.#idea.titleText()
                 }">${
-                iconGripVertical(20, '')
+                iconGripVertical(ICON_SIZE.xl, '')
             }</button>` : html``}
             <div class="flex-fill">
                 ${this.#buildHeading()}
@@ -676,7 +678,7 @@ export class IdeaPresenter {
                 }"
                 data-idea-convert="${
                     this.#idea.idForLink()}">
-                ${iconArrowRight(16, '')}
+                ${iconArrowRight(ICON_SIZE.base, '')}
                 <span
                     class="${
                         'hidden-'
@@ -742,7 +744,7 @@ export class IdeaPresenter {
                 }"
                 id="idea-edit-btn"
                 data-idea-action="edit">
-                ${iconEdit(16, '')} Edit
+                ${iconEdit(ICON_SIZE.base, '')} Edit
             </button>`;
     }
 }
@@ -822,7 +824,7 @@ export class IdeaEditPresenter {
                     }"
                     id="idea-cancel-btn"
                     data-idea-action="cancel">
-                    ${iconX(16, '')} Cancel
+                    ${iconX(ICON_SIZE.base, '')} Cancel
                 </button>
                 <button
                     class="${
@@ -830,7 +832,7 @@ export class IdeaEditPresenter {
                     }"
                     id="idea-save-btn"
                     data-idea-action="save">
-                    ${iconSave(16, '')} Save
+                    ${iconSave(ICON_SIZE.base, '')} Save
                 </button>
             </div>`;
     }

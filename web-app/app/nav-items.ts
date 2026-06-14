@@ -1,4 +1,5 @@
 import { PAGE_REGISTRY } from './page-registry.ts';
+import { ICON_SIZE } from './icons.ts';
 
 export function buildSidebarNavItemsHtml(): string {
     return Object.entries(PAGE_REGISTRY)
@@ -7,7 +8,7 @@ export function buildSidebarNavItemsHtml(): string {
             const href =
                 `../${entry.sourceDir}/${entry.sourceFile}.html`;
             const icon = entry.icon
-                ? entry.icon(20, '')
+                ? entry.icon(ICON_SIZE.xl, '')
                 : '';
             return `<a class="sidebar-nav-item"`
                 + ` href="${href}"`

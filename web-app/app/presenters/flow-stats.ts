@@ -10,7 +10,7 @@ import {
     type SafeHtml,
 } from '../safe-html.ts';
 import { $, $required } from '../dom.ts';
-import { iconArrowLeft } from '../icons.ts';
+import { ICON_SIZE, iconArrowLeft } from '../icons.ts';
 import {
     buildStatsGraphSvg,
 } from '../flow-stats-graph.ts';
@@ -86,7 +86,7 @@ export class FlowStatsPresenter {
         class="btn btn-ghost btn-icon"
         title="Designer"
         aria-label="Back to Flow Designer"
-    >${iconArrowLeft(20, '')}</button>
+    >${iconArrowLeft(ICON_SIZE.xl, '')}</button>
     <div class="flow-stats-title-block">
         <h1 class="${
             'page-title'

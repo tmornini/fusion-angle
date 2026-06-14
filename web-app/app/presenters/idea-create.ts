@@ -2,6 +2,7 @@ import {
     html, SafeHtml, trusted,
 } from '../safe-html.ts';
 import {
+    ICON_SIZE,
     iconSparkles, iconArrowLeft,
     iconLightbulb, iconCheck,
 } from '../icons.ts';
@@ -63,7 +64,7 @@ export class IdeaCreatePresenter {
                 }"
                 id=${'idea-create'
                     + '-back-btn'}>
-                ${iconArrowLeft(20, '')}
+                ${iconArrowLeft(ICON_SIZE.xl, '')}
             </button>
             <div class="${
                 'flex items-center gap-3'
@@ -78,7 +79,7 @@ export class IdeaCreatePresenter {
                         + ' idea-create-icon'
                     }">
                     ${iconSparkles(
-                        20, '',
+                        ICON_SIZE.xl, '',
                     )}
                 </div>
                 <span class="${
@@ -99,7 +100,7 @@ export class IdeaCreatePresenter {
                 'flex items-center gap-3'
             }">
                 ${iconLightbulb(
-                    24, 'text-primary',
+                    ICON_SIZE['2xl'], 'text-primary',
                 )}
                 <h2 class="${
                     'text-2xl'
@@ -123,7 +124,7 @@ export class IdeaCreatePresenter {
                 }"
                 id=${'idea-create'
                     + '-step-back'}>
-                ${iconArrowLeft(16, '')}
+                ${iconArrowLeft(ICON_SIZE.base, '')}
                 Cancel
             </button>
             <button
@@ -139,7 +140,7 @@ export class IdeaCreatePresenter {
                         : 'disabled',
                 )}>
                 ${'Submit Idea'}
-                ${iconCheck(16, '')}
+                ${iconCheck(ICON_SIZE.base, '')}
             </button>
         </div>
     </div>

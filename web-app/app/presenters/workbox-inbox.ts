@@ -2,7 +2,7 @@ import {
     html, setHtml, SafeHtml,
     trusted, escapeForHtml,
 } from '../safe-html.ts';
-import { iconGripVertical } from '../icons.ts';
+import { ICON_SIZE, iconGripVertical } from '../icons.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
 import {
@@ -124,7 +124,7 @@ export class WorkboxInboxPresenter {
                     + item.flowName
                     + ' #' + item.displayId
                 }">${
-                iconGripVertical(20, '')
+                iconGripVertical(ICON_SIZE.xl, '')
             }</button>`
             : html``;
         return html`

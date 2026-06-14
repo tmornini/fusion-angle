@@ -468,18 +468,28 @@ mode. Toggle is persisted to `localStorage` and respects
 ### Style Guide
 - **Library**: Inline SVG functions in `web-app/app/icons.ts`
   (line-based, each returns a `SafeHtml` value)
-- **Default size**: 16px (inline), 20px (buttons), 24px (standalone)
 - **Stroke width**: 2px
 - **Color**: Inherit from parent or use `text-muted-foreground`
 
 ### Icon Sizing
-| Context | Size |
-|---------|------|
-| Inline text | 16px |
-| Buttons | 16px |
-| Cards | 20px |
-| Feature icons | 24px |
-| Empty states | 48px |
+Sizes are a named tier scale — `ICON_SIZE` in `icons.ts` —
+sharing the tier names of the `--text-*` typography tokens.
+The `IconFn` size argument is typed `IconSize`, so a call
+passing an off-scale pixel value fails the type-check.
+
+| Tier | Size | Typical use |
+|--------|------|------------------------------------|
+| `2xs` | 10px | Smallest inline markers |
+| `xs` | 12px | Small labels and metadata |
+| `sm` | 14px | Inline chips and status |
+| `base` | 16px | Inline text and buttons (default) |
+| `lg` | 18px | Emphasised inline icons |
+| `xl` | 20px | Nav, cards, toolbar actions |
+| `2xl` | 24px | Feature and section icons |
+| `3xl` | 28px | Prominent standalone icons |
+| `4xl` | 32px | Large state icons |
+| `5xl` | 40px | Avatar and brand marks |
+| `6xl` | 48px | Empty states and full-page errors |
 
 ## 10. Content Guidelines
 

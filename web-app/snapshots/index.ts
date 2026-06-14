@@ -41,6 +41,7 @@ import type {
     SeededCredentials,
 } from '../../api/mock-data.ts';
 import {
+    ICON_SIZE,
     iconTrash,
     iconDownload,
     iconUpload,
@@ -227,7 +228,7 @@ export async function init(
         }">
             <div class="icon-box"
                 data-tone="success">${
-                iconDownload(20, '')
+                iconDownload(ICON_SIZE.xl, '')
             }</div>
             <div>
                 <h3 class="${
@@ -254,7 +255,7 @@ export async function init(
         }">
             <div class="icon-box"
                 data-tone="success">${
-                iconUpload(20, '')
+                iconUpload(ICON_SIZE.xl, '')
             }</div>
             <div>
                 <h3 class="${
@@ -288,7 +289,7 @@ export async function init(
         }">
             <div class="icon-box"
                 data-tone="warning">${
-                iconDatabase(20, '')
+                iconDatabase(ICON_SIZE.xl, '')
             }</div>
             <div>
                 <h3 class="${
@@ -319,7 +320,7 @@ export async function init(
         }">
             <div class="icon-box"
                 data-tone="error">${
-                iconTrash(20, '')
+                iconTrash(ICON_SIZE.xl, '')
             }</div>
             <div>
                 <h3 class="${
@@ -545,7 +546,7 @@ function mutateMissingTableBanner(
         banner,
         html`<span
             class="empty-banner-icon"
-            >${iconInfo(20, '')}</span>
+            >${iconInfo(ICON_SIZE.xl, '')}</span>
         <p class="text-sm m-0">The schema is missing the "${
             missing
         }" table. Recreate the schema below to continue.</p>`,
@@ -572,7 +573,7 @@ async function mutateEmptyBanner(
                 banner,
                 html`<span
                     class="empty-banner-icon"
-                    >${iconInfo(20, '')}</span>
+                    >${iconInfo(ICON_SIZE.xl, '')}</span>
                 <p class="text-sm m-0">${
                     'Your database is'
                     + ' empty.'

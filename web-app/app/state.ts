@@ -19,6 +19,7 @@ import {
     STORAGE_KEY_SIDEBAR,
 } from './storage-keys.ts';
 import {
+    type IconSize,
     iconSun,
     iconMoon,
     iconMonitor,
@@ -58,7 +59,7 @@ function computeTheme(): 'light' | 'dark' {
 }
 
 function getThemeIcon(
-    size: number,
+    size: IconSize,
     cssClass: string,
 ): SafeHtml {
     if (state.theme === 'dark') {

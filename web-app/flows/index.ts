@@ -12,6 +12,7 @@ import {
 } from '../app/loading-states.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
 import {
+    ICON_SIZE,
     iconGitBranch,
 } from '../app/icons.ts';
 import {
@@ -91,7 +92,7 @@ export async function init(
         ),
         retry: init,
         emptyState: {
-            icon: iconGitBranch(24, ''),
+            icon: iconGitBranch(ICON_SIZE['2xl'], ''),
             title: 'No Flows Yet',
             description:
                 'Flows are created'

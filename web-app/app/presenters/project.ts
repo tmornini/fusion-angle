@@ -2,6 +2,8 @@ import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import {
+    type IconSize,
+    ICON_SIZE,
     iconClock,
     iconDollarSign,
     iconGripVertical,
@@ -46,7 +48,7 @@ type ScoreRow = {
 const STATE_ICONS: Record<
     ProjectState,
     (
-        size: number,
+        size: IconSize,
         cssClass: string,
     ) => SafeHtml
 > = {
@@ -121,7 +123,7 @@ export class ProjectPresenter {
                     'Reorder ' + this
                         .#project.titleText()
                 }">${
-                iconGripVertical(20, '')
+                iconGripVertical(ICON_SIZE.xl, '')
             }</button>` : html``}
             <div class="flex-fill">
                 <h3 class="${
@@ -261,7 +263,7 @@ export class ProjectPresenter {
         }">
             <div class="metric-icon-box">${
                 iconClock(
-                    16, 'text-primary',
+                    ICON_SIZE.base, 'text-primary',
                 )
             }</div>
             <div>
@@ -283,7 +285,7 @@ export class ProjectPresenter {
         }">
             <div class="metric-icon-box">${
                 iconDollarSign(
-                    16, 'text-primary',
+                    ICON_SIZE.base, 'text-primary',
                 )
             }</div>
             <div>
@@ -307,7 +309,7 @@ export class ProjectPresenter {
         }">
             <div class="metric-icon-box">${
                 iconTrendingUp(
-                    16, 'text-primary',
+                    ICON_SIZE.base, 'text-primary',
                 )
             }</div>
             <div>

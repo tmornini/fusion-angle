@@ -3,6 +3,7 @@ import {
 } from '../safe-html.ts';
 import type { SafeHtml } from '../safe-html.ts';
 import {
+    ICON_SIZE,
     iconUndo,
     iconRedo,
     iconTrash,
@@ -93,11 +94,11 @@ export function buildFlowNameHeader(
 <button class="${
     'btn btn-ghost btn-icon'
 }" id="flow-name-save-btn"
-    >${iconCheck(16, '')}</button>
+    >${iconCheck(ICON_SIZE.base, '')}</button>
 <button class="${
     'btn btn-ghost btn-icon'
 }" id="flow-name-cancel-btn"
-    >${iconX(16, '')}</button>
+    >${iconX(ICON_SIZE.base, '')}</button>
 </div>`;
     }
     return html`<div class="${
@@ -111,7 +112,7 @@ export function buildFlowNameHeader(
     'btn btn-ghost btn-icon'
     + ' flow-name-edit-btn'
 }" id="flow-name-edit-btn"
-    >${iconEdit(14, '')}</button>
+    >${iconEdit(ICON_SIZE.sm, '')}</button>
 </div>`;
 }
 
@@ -136,7 +137,7 @@ class="flow-props-panel">
     class="btn btn-ghost btn-icon btn-xs"
     data-action="close-panel"
     aria-label="Close"
-    >${iconX(14, '')}</button>
+    >${iconX(ICON_SIZE.sm, '')}</button>
 </div>
 <div class="mb-2">
 <div class="text-xs text-muted"
@@ -232,7 +233,7 @@ class="flow-props-panel">
     class="btn btn-ghost btn-icon btn-xs"
     data-action="close-panel"
     aria-label="Close"
-    >${iconX(14, '')}</button>
+    >${iconX(ICON_SIZE.sm, '')}</button>
 </div>
 <fieldset class="member-select-fieldset"
     id="prop-node-members">
@@ -339,7 +340,7 @@ class="flow-props-panel">
     class="btn btn-ghost btn-icon btn-xs"
     data-action="close-panel"
     aria-label="Close"
-    >${iconX(14, '')}</button>
+    >${iconX(ICON_SIZE.sm, '')}</button>
 </div>
 <div class="mb-2">
 <label class="text-xs text-muted"
@@ -376,14 +377,14 @@ class="flow-toolbar">
     title="Undo"
     aria-label="Undo"${
     trusted(canUndo ? '' : ' disabled')
-    }>${iconUndo(18, '')}</button>
+    }>${iconUndo(ICON_SIZE.lg, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     data-action="redo"
     title="Redo"
     aria-label="Redo"${
     trusted(canRedo ? '' : ' disabled')
-    }>${iconRedo(18, '')}</button>
+    }>${iconRedo(ICON_SIZE.lg, '')}</button>
 </div>
 <div class="flow-toolbar-spacer"></div>
 <div class="flow-toolbar-group">
@@ -392,13 +393,13 @@ class="flow-toolbar">
     data-action="zoom-out"
     title="Zoom out"
     aria-label="Zoom out"
-    >${iconMinus(18, '')}</button>
+    >${iconMinus(ICON_SIZE.lg, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     data-action="zoom-in"
     title="Zoom in"
     aria-label="Zoom in"
-    >${iconPlus(18, '')}</button>
+    >${iconPlus(ICON_SIZE.lg, '')}</button>
 </div>
 <div class="flow-toolbar-spacer"></div>
 <div class="flow-toolbar-group">
@@ -407,13 +408,13 @@ class="flow-toolbar">
     data-action="copy-mermaid"
     title="Copy Mermaid"
     aria-label="Copy Mermaid"
-    >${iconCopy(18, '')}</button>
+    >${iconCopy(ICON_SIZE.lg, '')}</button>
 <button
     class="btn btn-ghost btn-icon"
     data-action="export-zip"
     title="Export ZIP"
     aria-label="Export ZIP"
-    >${iconDownload(18, '')}</button>
+    >${iconDownload(ICON_SIZE.lg, '')}</button>
 </div>
 <div class="flow-toolbar-spacer"></div>
 <div class="flow-toolbar-group">
@@ -423,7 +424,7 @@ class="flow-toolbar">
     title="Delete"
     aria-label="Delete"${
     trusted(canDelete ? '' : ' disabled')
-    }>${iconTrash(18, '')}</button>
+    }>${iconTrash(ICON_SIZE.lg, '')}</button>
 </div>
 </div>`;
 }

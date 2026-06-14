@@ -8,6 +8,8 @@ import {
     filteredSortedList,
 } from './list-choreography.ts';
 import {
+    type IconSize,
+    ICON_SIZE,
     iconGripVertical,
     iconCheckCircle2,
     iconClock,
@@ -25,7 +27,7 @@ import {
 const STATE_ICONS: Record<
     RecordState,
     (
-        size: number,
+        size: IconSize,
         cssClass: string,
     ) => SafeHtml
 > = {
@@ -135,7 +137,7 @@ export class RecordPresenter {
                     'Reorder '
                     + this.#record.nameText()
                 }">${
-                iconGripVertical(20, '')
+                iconGripVertical(ICON_SIZE.xl, '')
             }</button>` : html``}
             <div class="flex-fill min-w-0">
                 ${this.#buildHeading()}

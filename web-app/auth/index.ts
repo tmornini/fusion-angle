@@ -8,6 +8,7 @@ import {
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
+    ICON_SIZE,
     iconLogo,
     iconArrowRight,
     iconLoader,
@@ -92,7 +93,7 @@ export async function init(): Promise<void> {
                         <div class="${
                             'auth-brand-icon'
                         }">
-                            ${iconLogo(24, '')}
+                            ${iconLogo(ICON_SIZE['2xl'], '')}
                         </div>
                         <span class="${
                             'text-3xl '
@@ -178,7 +179,7 @@ export async function init(): Promise<void> {
                         + 'justify-center '
                         + 'auth-mobile-logo'
                     }">
-                        ${iconLogo(20, '')}
+                        ${iconLogo(ICON_SIZE.xl, '')}
                     </div>
                     <span class="${
                         'text-2xl font-display '
@@ -335,7 +336,7 @@ export async function init(): Promise<void> {
                                 + ' auth-submit-btn'
                             }" id="submit-btn">
                             Sign in ${
-                                iconArrowRight(20, '')
+                                iconArrowRight(ICON_SIZE.xl, '')
                             }
                         </button>
                     </form>
@@ -464,7 +465,7 @@ export async function init(): Promise<void> {
                 isLogin
                     ? 'Sign in'
                     : 'Create account'
-            } ${iconArrowRight(20, '')}`,
+            } ${iconArrowRight(ICON_SIZE.xl, '')}`,
         );
         emailInput.setAttribute(
             'autocomplete',
@@ -571,7 +572,7 @@ export async function init(): Promise<void> {
         setHtml(
             submitBtn,
             iconLoader(
-                20,
+                ICON_SIZE.xl,
                 'animate-spin-slow',
             ),
         );

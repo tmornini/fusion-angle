@@ -12,6 +12,7 @@ import {
     type SafeHtml,
 } from '../app/safe-html.ts';
 import {
+    ICON_SIZE,
     iconCheck,
     iconX,
     iconAlertTriangle,
@@ -592,19 +593,21 @@ export function buildDesignSystemPage(): SafeHtml {
                 }">
                     <button class="${
                         'btn btn-primary gap-2'
-                        }">${iconPlus(16, '')} Create</button>
+                        }">${iconPlus(ICON_SIZE.base, '')} Create</button>
                     <button class="${
                         'btn btn-outline gap-2'
-                        }">${iconSearch(16, '')} Search</button>
+                        }">${iconSearch(ICON_SIZE.base, '')} Search</button>
                     <button class="${
                         'btn btn-outline gap-2'
-                        }">Continue ${iconArrowRight(16, '')}</button>
+                        }">Continue ${
+                            iconArrowRight(ICON_SIZE.base, '')
+                        }</button>
                     <button class="${
                         'btn btn-destructive gap-2'
-                        }">${iconTrash(16, '')} Delete</button>
+                        }">${iconTrash(ICON_SIZE.base, '')} Delete</button>
                     <button class="${
                         'btn btn-primary btn-icon'
-                        }">${iconPlus(20, '')}</button>
+                        }">${iconPlus(ICON_SIZE.xl, '')}</button>
                 </div>
             </div>
         </section>
@@ -633,16 +636,18 @@ export function buildDesignSystemPage(): SafeHtml {
                 <div class="flex flex-wrap gap-3 mb-4">
                     <span class="${
                         'badge badge-success'
-                        }">${iconCheck(12, '')} Approved</span>
+                        }">${iconCheck(ICON_SIZE.xs, '')} Approved</span>
                     <span class="${
                         'badge badge-warning'
-                        }">${iconAlertTriangle(12, '')} Pending</span>
+                        }">${
+                            iconAlertTriangle(ICON_SIZE.xs, '')
+                        } Pending</span>
                     <span class="${
                         'badge badge-error'
-                        }">${iconX(12, '')} Rejected</span>
+                        }">${iconX(ICON_SIZE.xs, '')} Rejected</span>
                     <span class="${
                         'status-badge-info'
-                        }">${iconInfo(12, '')} Info</span>
+                        }">${iconInfo(ICON_SIZE.xs, '')} Info</span>
                 </div>
                 <h3 class="font-semibold mb-4">Soft Accent</h3>
                 <div class="${
@@ -830,7 +835,10 @@ export function buildDesignSystemPage(): SafeHtml {
             </div>
             <div class="card p-6">
                 <div class="flex items-end gap-8">
-                    ${[16, 20, 24, 48].map(
+                    ${[
+                        ICON_SIZE.base, ICON_SIZE.xl,
+                        ICON_SIZE['2xl'], ICON_SIZE['6xl'],
+                    ].map(
                         size => html`
                     <div class="icon-size-col">
                         <div class="text-primary"
@@ -1048,7 +1056,7 @@ export function buildDesignSystemPage(): SafeHtml {
                             <p class="${
                                     'text-xs mt-1 flex '
                                     + 'items-center gap-1 text-error'
-                                    }">${iconAlertCircle(12, '')} ${
+                                    }">${iconAlertCircle(ICON_SIZE.xs, '')} ${
                                     'Please enter a valid '
                                     + 'email address'
                                     }</p>
@@ -1065,7 +1073,9 @@ export function buildDesignSystemPage(): SafeHtml {
                             <p class="${
                                     'text-xs mt-1 flex items-center '
                                     + 'gap-1 text-success'
-                                    }">${iconCheck(12, '')} Looks good!</p>
+                                    }">${
+                                        iconCheck(ICON_SIZE.xs, '')
+                                    } Looks good!</p>
                         </div>
                     </div>
                 </div>
@@ -1073,7 +1083,7 @@ export function buildDesignSystemPage(): SafeHtml {
                     <h3 class="font-semibold mb-3">Upload Failed</h3>
                     <div class="ds-upload-fail">
                         ${iconUpload(
-                            32, 'text-error',
+                            ICON_SIZE['4xl'], 'text-error',
                         )}
                         <p class="${
                             'font-medium text-sm mt-2 '
@@ -1091,7 +1101,7 @@ export function buildDesignSystemPage(): SafeHtml {
                     <h3 class="font-semibold mb-3">Save Failed</h3>
                     <div class="ds-soft-row" data-tone="error">
                         ${iconAlertCircle(
-                            20,
+                            ICON_SIZE.xl,
                             'text-error',
                         )}
                         <div class="flex-1">
@@ -1111,7 +1121,7 @@ export function buildDesignSystemPage(): SafeHtml {
                     <h3 class="font-semibold mb-3">Connection Issue</h3>
                     <div class="ds-soft-row" data-tone="warning">
                         ${iconAlertTriangle(
-                            20,
+                            ICON_SIZE.xl,
                             'text-warning',
                         )}
                         <div class="flex-1">
@@ -1130,7 +1140,7 @@ export function buildDesignSystemPage(): SafeHtml {
                 <h3 class="font-semibold mb-3">Inline System Error</h3>
                 <div class="ds-soft-row" data-tone="error">
                     ${iconAlertCircle(
-                        20,
+                        ICON_SIZE.xl,
                         'text-error',
                     )}
                     <div class="flex-1">
@@ -1155,7 +1165,7 @@ export function buildDesignSystemPage(): SafeHtml {
                 <h3 class="font-semibold mb-3">Full Page Error</h3>
                 <div class="p-8">
                     ${iconAlertTriangle(
-                        48,
+                        ICON_SIZE['6xl'],
                         'text-error',
                     )}
                     <h3 class="${
@@ -1197,29 +1207,29 @@ export function buildDesignSystemPage(): SafeHtml {
                     <h3 class="${
                         'font-semibold text-success '
                         + 'flex items-center gap-2 mb-4'
-                        }">${iconCheck(20, '')} Do</h3>
+                        }">${iconCheck(ICON_SIZE.xl, '')} Do</h3>
                     <div class="text-sm flex flex-col gap-2">
                         <p>${iconCheck(
-                            14,
+                            ICON_SIZE.sm,
                             'text-success',
                         )} Use semantic color tokens, not raw hex values</p>
                         <p>${iconCheck(
-                            14,
+                            ICON_SIZE.sm,
                             'text-success',
                         )} Maintain consistent spacing with the 8pt grid</p>
                         <p>${iconCheck(
-                            14,
+                            ICON_SIZE.sm,
                             'text-success',
                         )} ${
                             'Ensure all interactive elements '
                             + 'have focus states'
                             }</p>
                         <p>${iconCheck(
-                            14,
+                            ICON_SIZE.sm,
                             'text-success',
                         )} Use the proper typography scale for hierarchy</p>
                         <p>${iconCheck(
-                            14,
+                            ICON_SIZE.sm,
                             'text-success',
                         )} Test contrast ratios for accessibility</p>
                     </div>
@@ -1228,26 +1238,26 @@ export function buildDesignSystemPage(): SafeHtml {
                     <h3 class="${
                         'font-semibold text-error '
                         + 'flex items-center gap-2 mb-4'
-                        }">${iconX(20, '')} Don't</h3>
+                        }">${iconX(ICON_SIZE.xl, '')} Don't</h3>
                     <div class="text-sm flex flex-col gap-2">
                         <p>${iconX(
-                            14,
+                            ICON_SIZE.sm,
                             'text-error',
                         )} Use pure black (#000) for text</p>
                         <p>${iconX(
-                            14,
+                            ICON_SIZE.sm,
                             'text-error',
                         )} Create custom colors outside the system</p>
                         <p>${iconX(
-                            14,
+                            ICON_SIZE.sm,
                             'text-error',
                         )} Use decorative animations</p>
                         <p>${iconX(
-                            14,
+                            ICON_SIZE.sm,
                             'text-error',
                         )} Skip focus states on interactive elements</p>
                         <p>${iconX(
-                            14,
+                            ICON_SIZE.sm,
                             'text-error',
                         )} Mix typography scales inconsistently</p>
                     </div>

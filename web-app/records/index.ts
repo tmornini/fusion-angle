@@ -7,6 +7,7 @@ import {
     loadInto,
 } from '../app/loading-states.ts';
 import {
+    ICON_SIZE,
     iconPlus, iconDatabase,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
@@ -49,7 +50,7 @@ export async function init(): Promise<void> {
         fetch: () => getRecords(ctx),
         retry: init,
         emptyState: {
-            icon: iconDatabase(24, ''),
+            icon: iconDatabase(ICON_SIZE['2xl'], ''),
             title: 'No Records Yet',
             description:
                 'Define a data shape to bind'
@@ -71,7 +72,7 @@ export async function init(): Promise<void> {
     });
 
     populateIcons([
-        ['#create-btn-icon', iconPlus(16, '')],
+        ['#create-btn-icon', iconPlus(ICON_SIZE.base, '')],
     ]);
 
     $('#create-record-btn', document)

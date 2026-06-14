@@ -2,6 +2,7 @@ import {
     html, SafeHtml,
 } from '../safe-html.ts';
 import {
+    ICON_SIZE,
     iconBuilding,
     iconPeople,
     iconFolderKanban, iconLightbulb,
@@ -137,7 +138,7 @@ function buildOverviewCard(
             >
                 <div class="icon-box-lg"
                     data-tone="primary"
-                >${iconBuilding(28, '')}</div>
+                >${iconBuilding(ICON_SIZE['3xl'], '')}</div>
                 <div>${identity}</div>
             </div>
 
@@ -146,26 +147,26 @@ function buildOverviewCard(
                        lg:grid-cols-4 gap-4"
             >
                 ${buildStatCell(
-                    iconPeople(16, ''),
+                    iconPeople(ICON_SIZE.base, ''),
                     'Active People',
                     html`${stats
                         .activePeopleCount}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
-                    iconFolderKanban(16, ''),
+                    iconFolderKanban(ICON_SIZE.base, ''),
                     'Projects',
                     html`${stats.projectsCurrent}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
-                    iconLightbulb(16, ''),
+                    iconLightbulb(ICON_SIZE.base, ''),
                     'Ideas',
                     html`${stats.ideasCurrent}`,
                     STAT_VALUE_2XL,
                 )}
                 ${buildStatCell(
-                    iconCalendar(16, ''),
+                    iconCalendar(ICON_SIZE.base, ''),
                     'Next Billing',
                     html`${org
                         .nextBillingDate()}`,
@@ -240,7 +241,7 @@ function buildUsageCard(
                        font-semibold mb-4
                        flex items-center gap-2"
             >
-                ${iconTrendingUp(20, '')}
+                ${iconTrendingUp(ICON_SIZE.xl, '')}
                 Usage Overview
             </h3>
             <div class="flex flex-col gap-4">
@@ -297,7 +298,7 @@ export class OrganizationPresenter {
                 'btn btn-outline gap-2'
             }" id="org-edit-btn"
                 data-org-action="edit">
-                ${iconEdit(16, '')} Edit
+                ${iconEdit(ICON_SIZE.base, '')} Edit
             </button>`;
         return buildPage(
             org, this.#stats, actions,
@@ -328,13 +329,13 @@ export class OrganizationEditPresenter {
                     'btn btn-outline gap-2'
                 }" id="org-cancel-btn"
                     data-org-action="cancel">
-                    ${iconX(16, '')} Cancel
+                    ${iconX(ICON_SIZE.base, '')} Cancel
                 </button>
                 <button class="${
                     'btn btn-primary gap-2'
                 }" id="org-save-btn"
                     data-org-action="save">
-                    ${iconSave(16, '')} Save
+                    ${iconSave(ICON_SIZE.base, '')} Save
                 </button>
             </div>`;
         return buildPage(

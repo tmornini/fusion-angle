@@ -11,6 +11,7 @@ import {
     buildSkeleton, buildErrorState,
 } from '../app/loading-states.ts';
 import {
+    ICON_SIZE,
     iconArrowRight, iconLoader,
 } from '../app/icons.ts';
 import { navigateTo } from '../app/core.ts';
@@ -451,7 +452,7 @@ export async function init(
                 setHtml(
                     btn,
                     html`${
-                        iconLoader(16, '')
+                        iconLoader(ICON_SIZE.base, '')
                     } Creating Project...`,
                 );
                 if (
@@ -491,7 +492,7 @@ export async function init(
                         html`${'Create'
                             + ' Project'}
                             ${iconArrowRight(
-                                16, '',
+                                ICON_SIZE.base, '',
                             )}`,
                     );
                     if (

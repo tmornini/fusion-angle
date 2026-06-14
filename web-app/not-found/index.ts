@@ -1,6 +1,6 @@
 import { $required } from '../app/dom.ts';
 import { html, setHtml } from '../app/safe-html.ts';
-import { iconSparkles } from '../app/icons.ts';
+import { ICON_SIZE, iconSparkles } from '../app/icons.ts';
 
 export async function init(): Promise<void> {
     const root = $required(
@@ -19,7 +19,7 @@ export async function init(): Promise<void> {
             <div class="icon-box-lg mb-6"
                 data-tone="primary">
                 ${iconSparkles(
-                    28, 'text-primary',
+                    ICON_SIZE['3xl'], 'text-primary',
                 )}
             </div>
             <h1 class="${

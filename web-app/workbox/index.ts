@@ -13,6 +13,7 @@ import {
     type EmptyStateConfig,
 } from '../app/loading-states.ts';
 import {
+    ICON_SIZE,
     iconMail, iconArchive, iconPlus,
     iconNoEntry,
 } from '../app/icons.ts';
@@ -96,7 +97,7 @@ function emptyStateFor(
 ): EmptyStateConfig {
     if (mode === 'active') {
         return {
-            icon: iconMail(24, ''),
+            icon: iconMail(ICON_SIZE['2xl'], ''),
             title: 'No Active Work Orders Yet',
             description:
                 'Create a work order to get'
@@ -104,7 +105,7 @@ function emptyStateFor(
         };
     }
     return {
-        icon: iconMail(24, ''),
+        icon: iconMail(ICON_SIZE['2xl'], ''),
         title: 'No Archived Work Orders Yet',
         description:
             'Completed work orders will'
@@ -146,13 +147,13 @@ function renderTabs(): void {
             'badge badge-success'
             + ' text-xs cursor-pointer active'
         }" data-tab="active">${
-            iconMail(14, '')
+            iconMail(ICON_SIZE.sm, '')
         } Active</span>
         <span class="${
             'badge badge-default'
             + ' text-xs cursor-pointer'
         }" data-tab="archive">${
-            iconArchive(14, '')
+            iconArchive(ICON_SIZE.sm, '')
         } Archive</span>`);
 }
 
@@ -343,7 +344,7 @@ async function initCreateDropdown(
     populateIcons([
         [
             '#create-work-order-btn-icon',
-            iconPlus(16, ''),
+            iconPlus(ICON_SIZE.base, ''),
         ],
     ]);
 
@@ -407,7 +408,7 @@ function buildNotReadyRow(f: NotReadyFlowEntry) {
         aria-disabled="true"
     ><span
         class="not-ready-icon"
-    >${iconNoEntry(16, '')}</span><span
+    >${iconNoEntry(ICON_SIZE.base, '')}</span><span
         class="not-ready-body"
     ><span
         class="not-ready-name"

@@ -1,4 +1,4 @@
-import { iconAlertTriangle } from './icons.ts';
+import { ICON_SIZE, iconAlertTriangle } from './icons.ts';
 import { $ } from './dom.ts';
 import {
     extractErrorMessage,
@@ -140,7 +140,7 @@ export function buildErrorState(
     class="state-container">
     <div class="state-icon
         state-icon-error">${
-        iconAlertTriangle(24, '')}</div>
+        iconAlertTriangle(ICON_SIZE['2xl'], '')}</div>
     <p class="state-title"
         >Something went wrong</p>
     <p class="state-description">${

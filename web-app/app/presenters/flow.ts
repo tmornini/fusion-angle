@@ -3,6 +3,7 @@ import {
     SafeHtml,
 } from '../safe-html.ts';
 import {
+    ICON_SIZE,
     iconBarChart,
     iconCircle,
     iconShare,
@@ -52,7 +53,7 @@ export class FlowPresenter {
                                 + ' text-xs'
                             }">${
                             iconFolderKanban(
-                                12, '',
+                                ICON_SIZE.xs, '',
                             )
                         } ${
                             projectName
@@ -79,7 +80,7 @@ export class FlowPresenter {
                         + ' items-center'
                         + ' gap-1'
                     }">${
-                        iconCircle(14, '')
+                        iconCircle(ICON_SIZE.sm, '')
                     } ${
                         f.nodeCount
                     } ${
@@ -92,7 +93,7 @@ export class FlowPresenter {
                         + ' items-center'
                         + ' gap-1'
                     }">${
-                        iconShare(14, '')
+                        iconShare(ICON_SIZE.sm, '')
                     } ${
                         f.edgeCount
                     } ${
@@ -114,10 +115,10 @@ export class FlowPresenter {
                 title="Stats"
                 aria-label="Flow statistics"
                 >${
-                iconBarChart(16, '')
+                iconBarChart(ICON_SIZE.base, '')
             }</button>${
                 iconChevronRight(
-                    20,
+                    ICON_SIZE.xl,
                     'text-muted',
                 )
             }</div>

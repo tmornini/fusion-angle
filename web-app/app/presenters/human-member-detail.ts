@@ -8,6 +8,7 @@ import {
 import { initials } from '../core.ts';
 import { displayText } from '../format.ts';
 import {
+    ICON_SIZE,
     iconArrowLeft,
     iconEdit,
     iconSave,
@@ -138,7 +139,7 @@ function buildShell(
                     id="member-back-btn"
                     data-member-action="back"
                     aria-label="Back">
-                    ${iconArrowLeft(20, '')}
+                    ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div class="member-title-slot">
                 </div>
@@ -410,12 +411,12 @@ function buildReadonlyPersonalInfoBody(
             ${buildReadonlyField(
                 'Email',
                 email,
-                iconMail(16, ''),
+                iconMail(ICON_SIZE.base, ''),
             )}
             ${buildReadonlyField(
                 'Phone',
                 phone,
-                iconPhone(16, ''),
+                iconPhone(ICON_SIZE.base, ''),
             )}
         </div>
         <div class="${
@@ -424,7 +425,7 @@ function buildReadonlyPersonalInfoBody(
             ${buildReadonlyField(
                 'Title',
                 member.titleLabel(),
-                iconBriefcase(16, ''),
+                iconBriefcase(ICON_SIZE.base, ''),
             )}
             ${buildReadonlyField(
                 'Department',
@@ -468,7 +469,7 @@ function buildEditablePersonalInfoBody(
                 'Email',
                 draft.email,
                 'email',
-                iconMail(16, ''),
+                iconMail(ICON_SIZE.base, ''),
             )}
             ${buildEditableField(
                 'member-phone',
@@ -476,7 +477,7 @@ function buildEditablePersonalInfoBody(
                 'Phone',
                 draft.phone,
                 'text',
-                iconPhone(16, ''),
+                iconPhone(ICON_SIZE.base, ''),
             )}
         </div>
         <div class="${
@@ -488,7 +489,7 @@ function buildEditablePersonalInfoBody(
                 'Title',
                 draft.title,
                 'text',
-                iconBriefcase(16, ''),
+                iconBriefcase(ICON_SIZE.base, ''),
             )}
             ${buildEditableDepartment(
                 draft.department,
@@ -511,7 +512,7 @@ function buildStrengthsCard(
                 'font-display font-semibold'
                 + ' mb-4 flex items-center gap-2'
             }">${
-                iconStar(20, 'text-primary')
+                iconStar(ICON_SIZE.xl, 'text-primary')
             } Strengths</h3>
             <div class="${
                 'flex flex-wrap gap-2'
@@ -529,7 +530,7 @@ function buildSelectedStrengthChips(
             'pill-tag'
             + ' pill-tag-strength'
         }">${
-            iconStar(10, '')
+            iconStar(ICON_SIZE['2xs'], '')
         } ${name}</span>`,
     )}`;
 }
@@ -550,7 +551,7 @@ function buildEditableStrengthChips(
         }" data-strength="${name}">${
             isActive
                 ? html`${
-                    iconCheckCircle2(12, '')
+                    iconCheckCircle2(ICON_SIZE.xs, '')
                 } `
                 : html``
         }${name}</button>`;
@@ -566,7 +567,7 @@ function buildReadonlyActionButtons(
             }"
             id="member-edit-btn"
             data-member-action="edit">
-            ${iconEdit(16, '')} Edit
+            ${iconEdit(ICON_SIZE.base, '')} Edit
         </button>`;
 }
 
@@ -579,7 +580,7 @@ function buildEditableActionButtons(
             }"
             id="member-cancel-btn"
             data-member-action="cancel">
-            ${iconX(16, '')} Cancel
+            ${iconX(ICON_SIZE.base, '')} Cancel
         </button>
         <button
             class="${
@@ -587,7 +588,7 @@ function buildEditableActionButtons(
             }"
             id="member-save-btn"
             data-member-action="save">
-            ${iconSave(16, '')} Save
+            ${iconSave(ICON_SIZE.base, '')} Save
         </button>`;
 }
 

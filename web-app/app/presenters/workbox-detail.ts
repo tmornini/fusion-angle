@@ -20,6 +20,7 @@ import {
 import type { Member } from '../adapters/index.ts';
 import type { Id } from '../../../api/types.ts';
 import {
+    ICON_SIZE,
     iconArrowLeft,
     iconClock,
 } from '../icons.ts';
@@ -273,7 +274,7 @@ export class WorkboxDetailPresenter {
                     id="work-order-back-btn"
                     class="btn btn-ghost
                         btn-icon">
-                    ${iconArrowLeft(20, '')}
+                    ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div>
                     <h1 class="text-2xl
@@ -428,7 +429,7 @@ export class WorkboxDetailPresenter {
                     gap-3"
             >
                 <span class="text-muted">
-                    ${iconClock(14, '')}
+                    ${iconClock(ICON_SIZE.sm, '')}
                 </span>
                 <span
                     class="font-semibold"

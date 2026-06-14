@@ -4,6 +4,7 @@ import type {
     ObjectiveId,
 } from '../../../api/types.ts';
 import {
+    ICON_SIZE,
     iconEdit, iconArchive, iconPlus, iconUndo,
 } from '../icons.ts';
 import { formatDate } from '../format.ts';
@@ -56,7 +57,7 @@ export class OrganizationObjectivesPresenter {
                     type="button"
                     data-action="add-objective"
                     class="btn btn-primary">
-                    ${iconPlus(16, '')} Add objective
+                    ${iconPlus(ICON_SIZE.base, '')} Add objective
                 </button>
             </div>
         `;
@@ -146,7 +147,7 @@ export class OrganizationObjectivesPresenter {
                                 + ' btn-sm gap-2'
                             }"
                             data-action="reactivate">
-                            ${iconUndo(14, '')}
+                            ${iconUndo(ICON_SIZE.sm, '')}
                             Reactivate
                           </button>`
                         : html`
@@ -156,7 +157,7 @@ export class OrganizationObjectivesPresenter {
                                     + ' btn-sm gap-2'
                                 }"
                                 data-action="edit">
-                                ${iconEdit(14, '')}
+                                ${iconEdit(ICON_SIZE.sm, '')}
                                 Edit
                             </button>
                             <button
@@ -165,7 +166,7 @@ export class OrganizationObjectivesPresenter {
                                     + ' btn-sm gap-2'
                                 }"
                                 data-action="archive">
-                                ${iconArchive(14, '')}
+                                ${iconArchive(ICON_SIZE.sm, '')}
                                 Archive
                             </button>
                         `}

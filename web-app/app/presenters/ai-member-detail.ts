@@ -7,6 +7,7 @@ import {
 } from '../field-key-validator.ts';
 import { DISPLAY_ABSENT, displayText } from '../format.ts';
 import {
+    ICON_SIZE,
     iconArrowLeft,
     iconEdit,
     iconSave,
@@ -94,7 +95,7 @@ function buildShell(
                     id="member-back-btn"
                     data-member-action="back"
                     aria-label="Back">
-                    ${iconArrowLeft(20, '')}
+                    ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div class="member-title-slot">
                 </div>
@@ -114,7 +115,7 @@ function buildShell(
 function buildAvatar(): SafeHtml {
     return html`
         <div class="member-avatar">
-            ${iconBrain(40, 'text-primary')}
+            ${iconBrain(ICON_SIZE['5xl'], 'text-primary')}
         </div>`;
 }
 
@@ -469,7 +470,7 @@ function buildReadonlyActionButtons(
             }"
             id="member-edit-btn"
             data-member-action="edit">
-            ${iconEdit(16, '')} Edit
+            ${iconEdit(ICON_SIZE.base, '')} Edit
         </button>`;
 }
 
@@ -482,7 +483,7 @@ function buildEditableActionButtons(
             }"
             id="member-cancel-btn"
             data-member-action="cancel">
-            ${iconX(16, '')} Cancel
+            ${iconX(ICON_SIZE.base, '')} Cancel
         </button>
         <button
             class="${
@@ -490,7 +491,7 @@ function buildEditableActionButtons(
             }"
             id="member-save-btn"
             data-member-action="save">
-            ${iconSave(16, '')} Save
+            ${iconSave(ICON_SIZE.base, '')} Save
         </button>`;
 }
 
