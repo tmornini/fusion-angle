@@ -35,8 +35,8 @@ function indexByObjective<T extends {
 
 function baselineEditable(state: ProjectState): boolean {
     return state === 'submitted'
-        || state === 'under-review'
-        || state === 'sent-back';
+        || state === 'under_review'
+        || state === 'sent_back';
 }
 
 // The Actual slider supersedes Baseline only once the project

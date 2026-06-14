@@ -381,7 +381,7 @@ filters on read.
 
 Lifecycle state lives in `states` (alphabet
 `IDEA_STATES`): 7 single-dimension values — `active`,
-`in-review`, `approved`, `promoted`, `sent-back`,
+`in_review`, `approved`, `promoted`, `sent_back`,
 `archived`, `deleted`. Readiness is derived from the
 required-field set (`title`, `problem_statement`,
 `proposed_solution`, `expected_outcome`) at domain-
@@ -413,8 +413,8 @@ project "starts on June 4" in every timezone; an
 instant would shift the rendered day across zones.
 
 Lifecycle state lives in `states` (alphabet
-`PROJECT_STATES`): `submitted`, `under-review`,
-`sent-back`, `approved`, `declined`, `archived`,
+`PROJECT_STATES`): `submitted`, `under_review`,
+`sent_back`, `approved`, `declined`, `archived`,
 `deleted`.
 
 ## Tools
@@ -796,10 +796,10 @@ State alphabets by entity kind:
 
 - **ideas** — `IDEA_STATES` (7 values, lifecycle only;
   readiness is derived from required-field presence):
-  `active`, `in-review`, `approved`, `promoted`,
-  `sent-back`, `archived`, `deleted`
+  `active`, `in_review`, `approved`, `promoted`,
+  `sent_back`, `archived`, `deleted`
 - **projects** — `PROJECT_STATES` (7 values):
-  `submitted`, `under-review`, `sent-back`, `approved`,
+  `submitted`, `under_review`, `sent_back`, `approved`,
   `declined`, `archived`, `deleted`
 - **members** (all kinds share one alphabet) —
   `MEMBER_STATES` (3 values): `active`, `pending`,

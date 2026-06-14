@@ -103,8 +103,8 @@ function makeProject(overrides: {
     title?: string;
     description?: string;
     state?:
-        | 'submitted' | 'under-review'
-        | 'sent-back' | 'approved'
+        | 'submitted' | 'under_review'
+        | 'sent_back' | 'approved'
         | 'declined' | 'archived' | 'deleted';
     progress?: number;
     estimatedCost?: number;
@@ -197,12 +197,12 @@ test(
     + ' state and dimmed data attributes',
     () => {
         const p = new ProjectPresenter(
-            makeProject({ state: 'under-review' }),
+            makeProject({ state: 'under_review' }),
         );
         const dimmed = p.buildStateBadge(false)
             .toString();
         assert.match(
-            dimmed, /data-state="under-review"/,
+            dimmed, /data-state="under_review"/,
         );
         assert.match(dimmed, /data-dimmed="true"/);
         const lit = p.buildStateBadge(true)
@@ -210,7 +210,7 @@ test(
         assert.match(lit, /data-dimmed="false"/);
         assert.equal(p.idForLink(), 'pr-1');
         assert.equal(
-            p.stateGroup(), 'under-review',
+            p.stateGroup(), 'under_review',
         );
         assert.equal(p.positionSortKey(), 0);
     },
@@ -297,7 +297,7 @@ test(
         new ProjectDetailPresenter(
             new ProjectView(
                 makeProject({
-                    state: 'under-review',
+                    state: 'under_review',
                 }),
                 [], [], [],
             ),

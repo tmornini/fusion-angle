@@ -88,6 +88,12 @@ export const RETIRED_STATE_VALUES_PER_ENTITY:
         'active:incomplete',
         'active:needs-info',
         'active:ready',
+        'in-review',
+        'sent-back',
+    ],
+    projects: [
+        'under-review',
+        'sent-back',
     ],
 };
 

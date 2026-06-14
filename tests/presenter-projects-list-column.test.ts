@@ -45,7 +45,7 @@ function makeProject(id: string): InstanceType<
         estimated_cost: 0,
         actual_cost: 0,
         position: 0,
-    }, 'under-review');
+    }, 'under_review');
 }
 
 test(

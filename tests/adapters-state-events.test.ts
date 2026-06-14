@@ -155,7 +155,7 @@ test('getProjectStates keeps the later event on a tie',
         const at = '2026-01-01T00:00:00.000000Z';
         await db.states.put('ev-1', {
             entity_id: 'p1',
-            state: 'under-review',
+            state: 'under_review',
             member_id: 'system',
             at,
         });

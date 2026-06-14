@@ -20,7 +20,7 @@ test('renders one row per active objective', () => {
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
-        'under-review',
+        'under_review',
     );
     const html = p.buildSection().toString();
     assert.ok(html.includes('Revenue'));
@@ -37,7 +37,7 @@ test('shows "none yet" when no actuals',
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
-        'under-review',
+        'under_review',
     );
     const html = p.buildSection().toString();
     assert.ok(html.toLowerCase()
@@ -65,11 +65,11 @@ test('shows latest actual with sign', () => {
 });
 
 test(
-    'baseline sliders enabled while under-review',
+    'baseline sliders enabled while under_review',
     () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs, [], [],
-        'under-review',
+        'under_review',
     );
     const html = p.buildSection().toString();
     assert.ok(
@@ -113,7 +113,7 @@ test(
            score: 50,
            at: '2026-05-14T00:00:00.000000Z' }],
         [],
-        'under-review',
+        'under_review',
     );
     const html = p.buildSection().toString();
     assert.ok(
@@ -213,7 +213,7 @@ test('renders Save button when any slider is editable',
     () => {
     const p = new ProjectObjectivesPresenter(
         activeObjs, defs, [], [],
-        'under-review',
+        'under_review',
     );
     const html = p.buildSection().toString();
     assert.ok(html.includes(

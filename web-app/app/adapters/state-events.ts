@@ -54,7 +54,7 @@ export async function buildStateEventOp(
 
 // The states log is shared across entity types and the
 // alphabets overlap ('active', 'archived', 'approved',
-// 'sent-back', 'deleted'), so identity — not the state
+// 'sent_back', 'deleted'), so identity — not the state
 // value — is the discriminator: an event counts only when
 // its entity_id is in `ids`. Each id belongs to one entity
 // type, so every surviving event speaks that type's

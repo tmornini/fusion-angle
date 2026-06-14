@@ -27,7 +27,7 @@ presence: `title`, `problem_statement`,
 not stored in the states log; `Idea.readinessValue()` /
 `Idea.isReady()` derive per call.
 `canBeSubmittedForReview()` gates on lifecycle
-(`active` or `sent-back`) AND `isReady()`.
+(`active` or `sent_back`) AND `isReady()`.
 
 The terminal state for both human and AI members is
 `'archived'`. Both kinds change lifecycle through the

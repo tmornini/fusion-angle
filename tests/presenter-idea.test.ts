@@ -319,7 +319,7 @@ test(
     + ' badge dimmed when isActive is false',
     () => {
         const presenter = new IdeaPresenter(
-            makeIdea({}, 'in-review'),
+            makeIdea({}, 'in_review'),
             'X', 'y',
         );
         const dimmed = presenter
@@ -336,7 +336,7 @@ test(
             neutral, /data-dimmed="false"/,
         );
         assert.match(
-            dimmed, /data-state="in-review"/,
+            dimmed, /data-state="in_review"/,
         );
         assert.match(dimmed, /In Review/);
     },
@@ -347,17 +347,17 @@ test(
     + ' wrapped idea state',
     () => {
         const review = new IdeaPresenter(
-            makeIdea({}, 'in-review'),
+            makeIdea({}, 'in_review'),
             'X', 'y',
         );
         assert.equal(review.isReviewable(), true);
         assert.equal(review.isConvertible(), false);
         assert.equal(review.canSubmit(), false);
         assert.equal(
-            review.stateGroup(), 'in-review',
+            review.stateGroup(), 'in_review',
         );
         assert.equal(
-            review.matchesState('in-review'), true,
+            review.matchesState('in_review'), true,
         );
         assert.equal(
             review.matchesState('active'), false,
@@ -434,11 +434,11 @@ test(
                 expected: true },
             { state: 'active', ready: false,
                 expected: false },
-            { state: 'sent-back', ready: true,
+            { state: 'sent_back', ready: true,
                 expected: true },
-            { state: 'sent-back', ready: false,
+            { state: 'sent_back', ready: false,
                 expected: false },
-            { state: 'in-review', ready: true,
+            { state: 'in_review', ready: true,
                 expected: false },
             { state: 'approved', ready: true,
                 expected: false },
@@ -477,7 +477,7 @@ test(
         );
         const review = new IdeaPresenter(
             makeIdea(
-                { expected_outcome: '' }, 'in-review',
+                { expected_outcome: '' }, 'in_review',
             ),
             'X', 'y',
         );
@@ -570,11 +570,11 @@ test(
     () => {
         const base = buildInitialIdeaListState([]);
         const on = applyIdeaFilterToggle(
-            base, 'in-review',
+            base, 'in_review',
         );
         assert.deepEqual(
             on.filter,
-            { kind: 'filtered', status: 'in-review' },
+            { kind: 'filtered', status: 'in_review' },
         );
         const switched = applyIdeaFilterToggle(
             on, 'approved',
@@ -603,11 +603,11 @@ test(
         const filtered = new IdeaListPresenter(
             applyIdeaFilterToggle(
                 buildInitialIdeaListState([]),
-                'sent-back',
+                'sent_back',
             ),
         );
         assert.equal(
-            filtered.activeFilter(), 'sent-back',
+            filtered.activeFilter(), 'sent_back',
         );
     },
 );
@@ -658,7 +658,7 @@ test(
                     position: 2,
                 },
                 'Ada', '2026-01-15T10:00:00Z',
-                'in-review',
+                'in_review',
             ),
             makeWithSubmitter(
                 {
@@ -672,7 +672,7 @@ test(
         const presenter = new IdeaListPresenter(
             applyIdeaFilterToggle(
                 buildInitialIdeaListState(ideas),
-                'in-review',
+                'in_review',
             ),
         );
         const slot = makeStubEl();
@@ -704,7 +704,7 @@ test(
             makeWithSubmitter(
                 { id: 'i3' },
                 'Ada', '2026-01-15T10:00:00Z',
-                'in-review',
+                'in_review',
             ),
         ];
         const presenter = new IdeaListPresenter(
@@ -724,7 +724,7 @@ test(
         );
         assert.match(
             slot.captured,
-            /data-state="in-review"/,
+            /data-state="in_review"/,
         );
     },
 );

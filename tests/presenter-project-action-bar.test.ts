@@ -5,10 +5,10 @@ import { ProjectActionBarPresenter } from
 
 const PROJECT_ID = 'p1';
 
-test('under-review with no scores: Approve disabled',
+test('under_review with no scores: Approve disabled',
     () => {
         const p = new ProjectActionBarPresenter(
-            PROJECT_ID, 'under-review',
+            PROJECT_ID, 'under_review',
             {
                 ready: false,
                 problems: [
@@ -27,10 +27,10 @@ test('under-review with no scores: Approve disabled',
         );
     });
 
-test('under-review with full scoring: Approve enabled',
+test('under_review with full scoring: Approve enabled',
     () => {
         const p = new ProjectActionBarPresenter(
-            PROJECT_ID, 'under-review',
+            PROJECT_ID, 'under_review',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
             new Map(),
@@ -107,10 +107,10 @@ test('submitted project: Score button hidden, other review actions shown',
         );
     });
 
-test('sent-back project: Score button hidden, other review actions shown',
+test('sent_back project: Score button hidden, other review actions shown',
     () => {
         const p = new ProjectActionBarPresenter(
-            PROJECT_ID, 'sent-back',
+            PROJECT_ID, 'sent_back',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
             new Map(),
@@ -119,11 +119,11 @@ test('sent-back project: Score button hidden, other review actions shown',
         assert.equal(
             html.includes('data-action="score"'),
             false,
-            'Score button must NOT render on sent-back',
+            'Score button must NOT render on sent_back',
         );
         assert.ok(
             html.includes('data-action="approve"'),
-            'Approve button must render on sent-back',
+            'Approve button must render on sent_back',
         );
     });
 
@@ -134,7 +134,7 @@ test('Approve tooltip enumerates unscored objective names',
             ['o2', 'Raise customer NPS'],
         ]);
         const p = new ProjectActionBarPresenter(
-            PROJECT_ID, 'under-review',
+            PROJECT_ID, 'under_review',
             {
                 ready: false,
                 problems: [
@@ -206,10 +206,10 @@ test('review actions empty on approved (lifecycle in header)',
         assert.equal(html.trim(), '');
     });
 
-test('lifecycle actions empty on under-review',
+test('lifecycle actions empty on under_review',
     () => {
         const p = new ProjectActionBarPresenter(
-            PROJECT_ID, 'under-review',
+            PROJECT_ID, 'under_review',
             { ready: true, problems: [] },
             { ready: true, problems: [] },
             new Map(),

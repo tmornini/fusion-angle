@@ -68,9 +68,9 @@ function isFieldKey(
 }
 
 type IdeaTransition =
-    | 'in-review'
+    | 'in_review'
     | 'approved'
-    | 'sent-back';
+    | 'sent_back';
 
 interface TransitionConfig {
     failureToast: string;
@@ -80,7 +80,7 @@ interface TransitionConfig {
 
 const TRANSITION_CONFIG:
     Record<IdeaTransition, TransitionConfig> = {
-    'in-review': {
+    'in_review': {
         failureToast: 'Failed to submit',
         successToast:
             'Submitted for review',
@@ -92,7 +92,7 @@ const TRANSITION_CONFIG:
             'Idea approved successfully',
         successVariant: 'success',
     },
-    'sent-back': {
+    'sent_back': {
         failureToast: 'Failed to send back',
         successToast:
             'Idea sent back for revision',
@@ -285,7 +285,7 @@ function handleIdeaActions(
             return true;
         case 'submit-review':
             void transitionIdea(
-                ideaId, 'in-review',
+                ideaId, 'in_review',
             );
             return true;
         case 'approve':
@@ -306,7 +306,7 @@ async function handleSendBackConfirm(
 ): Promise<void> {
     closeDialog('approval-send-back');
     await transitionIdea(
-        ideaId, 'sent-back',
+        ideaId, 'sent_back',
     );
 }
 

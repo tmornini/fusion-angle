@@ -3145,7 +3145,7 @@ async function postMockDataLoadIn(
         {
             id: 'qJoFXyzUUaq0vEpHL5e34l',
             entity_id: 'eT5xdKjzLDmuRn3r7XMX4R',
-            state: 'in-review',
+            state: 'in_review',
             member_id: 'LhfaUUf4IumVsCSGB4xjdK',
             at: daysFromNow(-75, 9, 30),
         },
@@ -3166,7 +3166,7 @@ async function postMockDataLoadIn(
         {
             id: 'BvBRvDQ8b5l5Tg7iZSGyHF',
             entity_id: 'ojOEXtdzdtTZtpM81TxVca',
-            state: 'in-review',
+            state: 'in_review',
             member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             at: daysFromNow(-55, 9, 0),
         },
@@ -3180,42 +3180,42 @@ async function postMockDataLoadIn(
         {
             id: 'XX2EXrIUcQVTnzGo0YO2Iw',
             entity_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
-            state: 'sent-back',
+            state: 'sent_back',
             member_id: 'zyTbfbjcGEfbpCsNTP0XjX',
             at: daysFromNow(-45, 9, 0),
         },
         {
             id: 'fxlbcnsAmCWp4j8B2NkDKM',
             entity_id: 'MCxK0hzT9CPjJx1ZV5unfr',
-            state: 'in-review',
+            state: 'in_review',
             member_id: 'LhfaUUf4IumVsCSGB4xjdK',
             at: daysFromNow(-75, 10, 0),
         },
         {
             id: 'JjkkkkrZw4FvOWBpJYE2J7',
             entity_id: 'SUb4gKXsZ1OsEauzqszg0t',
-            state: 'in-review',
+            state: 'in_review',
             member_id: 'WxQn4LVWb76YkmqK5B0EPp',
             at: daysFromNow(-35, 9, 0),
         },
         {
             id: '4nzdNB97hgD1GZ7CjA2EwS',
             entity_id: 'gxa84W9KvEgD0wT1F4TOM9',
-            state: 'in-review',
+            state: 'in_review',
             member_id: '53J8h9dr76XFqCjYcNVwIR',
             at: daysFromNow(-30, 9, 0),
         },
         {
             id: 'wmCY9xZdrk0XlydyABZqXY',
             entity_id: '1Z68gROMrlTAfPEGiyJJAY',
-            state: 'in-review',
+            state: 'in_review',
             member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
             at: daysFromNow(-25, 9, 0),
         },
         {
             id: 'OWGsZqEi1bnWUetzS2sURr',
             entity_id: 'Q2On2xwMpFdzOklBQJXrni',
-            state: 'in-review',
+            state: 'in_review',
             member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
             at: daysFromNow(-20, 9, 0),
         },
@@ -3256,7 +3256,7 @@ async function postMockDataLoadIn(
         {
             id: 'pSe04PredMa1ntRev04AB',
             entity_id: 'P04PredMa1ntzyXY010203',
-            state: 'under-review',
+            state: 'under_review',
             member_id: SYSTEM_MEMBER_ID,
             at: daysFromNow(-18, 9, 0),
         },
@@ -3270,14 +3270,14 @@ async function postMockDataLoadIn(
         {
             id: 'pSe06SmInvOptSnt06EF',
             entity_id: 'P06SmInvOptZyXY010203A',
-            state: 'sent-back',
+            state: 'sent_back',
             member_id: SYSTEM_MEMBER_ID,
             at: daysFromNow(-38, 9, 0),
         },
         {
             id: 'pSe07Empl0yTraRev07GH',
             entity_id: 'P07Empl0yTrainZyXY00B0',
-            state: 'under-review',
+            state: 'under_review',
             member_id: SYSTEM_MEMBER_ID,
             at: daysFromNow(-12, 9, 0),
         },
@@ -3319,7 +3319,7 @@ async function postMockDataLoadIn(
         {
             id: 'pSe13W0rk4rcRev13TU',
             entity_id: 'P13W0rk4rcF0r3castsXY1',
-            state: 'under-review',
+            state: 'under_review',
             member_id: SYSTEM_MEMBER_ID,
             at: daysFromNow(-22, 9, 0),
         },
@@ -3657,8 +3657,8 @@ async function postMockDataLoadIn(
             new Date(p.start_date).getTime();
         // Committed work (approved + archived) is
         // expected to advance objectives; baselines
-        // skew positive. Drafts (under-review +
-        // sent-back) can dip negative — a flagged
+        // skew positive. Drafts (under_review +
+        // sent_back) can dip negative — a flagged
         // risk worth surfacing on the dashboard.
         const baselineMin =
             state === 'approved'

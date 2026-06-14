@@ -76,7 +76,7 @@ test('postProjectApproval moves state to approved',
         await seedCurrentMember(db);
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.postEvent(
-            'st-init', 'p1', 'under-review', 'current',
+            'st-init', 'p1', 'under_review', 'current',
         );
         await db.objectives.put('o1', {
             organization_id: '1', position: 0,

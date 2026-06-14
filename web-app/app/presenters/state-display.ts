@@ -42,7 +42,7 @@ export const IDEA_STATE_CONFIG: Record<
         label: 'Active',
         className: 'badge-success',
     },
-    'in-review': {
+    'in_review': {
         label: 'In Review',
         className: 'badge-warning',
     },
@@ -54,7 +54,7 @@ export const IDEA_STATE_CONFIG: Record<
         label: 'Promoted',
         className: 'badge-primary',
     },
-    'sent-back': {
+    'sent_back': {
         label: 'Sent Back',
         className: 'badge-error',
     },
@@ -94,11 +94,11 @@ export const PROJECT_STATE_CONFIG: Record<
         label: 'Submitted',
         className: 'badge-default',
     },
-    'under-review': {
+    'under_review': {
         label: 'In Review',
         className: 'badge-warning',
     },
-    'sent-back': {
+    'sent_back': {
         label: 'Sent Back',
         className: 'badge-error',
     },

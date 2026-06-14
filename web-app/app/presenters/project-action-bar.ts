@@ -38,8 +38,8 @@ export class ProjectActionBarPresenter {
     buildReviewActions(): SafeHtml {
         const state = this.#state;
         const isReview = state === 'submitted'
-            || state === 'under-review'
-            || state === 'sent-back';
+            || state === 'under_review'
+            || state === 'sent_back';
         if (!isReview) return html``;
         return html`
             <div class="action-bar"

@@ -53,8 +53,8 @@ const STATE_ICONS: Record<
     ) => SafeHtml
 > = {
     'submitted': iconClock,
-    'under-review': iconClipboardCheck,
-    'sent-back': iconArrowLeft,
+    'under_review': iconClipboardCheck,
+    'sent_back': iconArrowLeft,
     'approved': iconCheckCircle2,
     'declined': iconXCircle,
     'archived': iconLightbulb,
@@ -443,7 +443,7 @@ export class ProjectListPresenter {
         return buildStateFilterBadges(
             this.#projects,
             p => p.stateGroup(),
-            ['archived', 'under-review', 'sent-back', 'approved'],
+            ['archived', 'under_review', 'sent_back', 'approved'],
             this.activeFilter(),
             (item, isActive) =>
                 item.buildStateBadge(isActive),

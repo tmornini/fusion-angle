@@ -612,14 +612,14 @@ on. Run these in order.
 ### AA5. Submit Ideas for Review
 
 - [ ] **AA15** Navigate to idea #1 detail (status: active). Click "Submit for Review". PASS: status changes to "In Review", button disappears.
-- [ ] **AA16** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in-review.
+- [ ] **AA16** Submit ideas 1, 4, 7, 8, 9, 10, 11 for review (matching mock data statuses). PASS: each transitions from active to in_review.
 - [ ] **AA17** Navigate to Ideas list and filter by "In Review" status badge. PASS: the 7 submitted ideas appear.
 
 ### AA7. Approve Ideas & Convert to Projects
 
 - [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with Send Back / Approve buttons in the header next to Edit.
 - [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
-- [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in-review/active).
+- [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in_review/active).
 - [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time (days), Cost, Success Criteria) — there is no Impact field — plus a Scores box holding one required baseline slider per active objective.
 - [ ] **AA22** Fill the 4 required fields (Project Name, Time (days), Cost, Success Criteria) and drag every objective baseline slider in the Scores box. PASS: Create Project stays disabled until all required fields AND all baselines are set, then enables; clicking it navigates to project detail for the new project (the baselines commit atomically with project creation).
 - [ ] **AA22a** On the Convert form before scoring, every baseline slider in the Scores box reads as pending, not zero: the slider is dimmed (~50% opacity) and its value shows an em-dash "—" in muted text (unscored is genuine absence — no score row is written — not a measured 0). PASS: dragging a slider clears only that row's pending styling (full opacity, a signed value such as "+51", a green check by the label) while untouched rows stay dimmed, and Create Project stays disabled until all four objectives are scored.
@@ -628,7 +628,7 @@ on. Run these in order.
 
 ### AA8. Score and Approve Projects
 
-- [ ] **AA24a** From the Projects list, click into project #1 (the first converted project, status `submitted`). Click Edit, change Status to `under-review`, Save. PASS: toast confirms. The objectives section's baseline sliders are now editable INLINE (no Score button, no modal); because this project was converted through the UI its baselines were committed at convert time, so the Approve button is already enabled. (To exercise the unscored→score flow, use a project created WITHOUT baselines: move each baseline slider off its initial value and click Save, watching Approve enable only once every objective is scored.) Click Approve; confirm. PASS: status flips to `approved`; the action bar re-renders with `Archive` / `View history`, and the per-objective actual sliders become editable. The project is now eligible for the New Flow gate in AA25. (Without approving, projects remain at `submitted` and the New Flow button stays hidden behind the `Approve to add flows` info badge.)
+- [ ] **AA24a** From the Projects list, click into project #1 (the first converted project, status `submitted`). Click Edit, change Status to `under_review`, Save. PASS: toast confirms. The objectives section's baseline sliders are now editable INLINE (no Score button, no modal); because this project was converted through the UI its baselines were committed at convert time, so the Approve button is already enabled. (To exercise the unscored→score flow, use a project created WITHOUT baselines: move each baseline slider off its initial value and click Save, watching Approve enable only once every objective is scored.) Click Approve; confirm. PASS: status flips to `approved`; the action bar re-renders with `Archive` / `View history`, and the per-objective actual sliders become editable. The project is now eligible for the New Flow gate in AA25. (Without approving, projects remain at `submitted` and the New Flow button stays hidden behind the `Approve to add flows` info badge.)
 
 ### AA9. Create Flows
 
@@ -960,7 +960,7 @@ on. Run these in order.
 
 ### Idea Detail — Sent Back Re-Submit
 
-- [ ] **D20** Navigate to an idea with status "sent-back" (after a reviewer sends it back). PASS: "Submit for Review" button is visible, allowing re-submission.
+- [ ] **D20** Navigate to an idea with status "sent_back" (after a reviewer sends it back). PASS: "Submit for Review" button is visible, allowing re-submission.
 - [ ] **D21** Click "Edit", modify a field, click "Save". PASS: idea updates. Click "Submit for Review". PASS: status changes to "In Review".
 
 ### Idea Convert (`ideas/convert.html`)
@@ -978,11 +978,11 @@ on. Run these in order.
 
 ### Idea Detail — Approval Actions
 
-- [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in-review idea (entity ids are base62 tokens, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and Send Back / Approve buttons in the header next to Edit.
+- [ ] **D29** Navigate to `ideas/detail.html?ideaId=<id>` for an in_review idea (entity ids are base62 tokens, not sequential integers — copy a real id from the Ideas list). PASS: page loads with idea details and Send Back / Approve buttons in the header next to Edit.
 - [ ] **D30** Click "Approve". PASS: success toast, navigates to ideas list, idea status is now "approved".
-- [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent-back", navigates to ideas list.
-- [ ] **D32** Navigate to idea detail for a non-in-review idea. PASS: no Send Back / Approve buttons are shown.
-- [ ] **D32a** On an in-review idea, click "Edit". PASS: the header shows only Cancel / Save — no Send Back, Approve, Submit, or Convert. Click Cancel: the read header (Send Back / Approve / Edit) returns.
+- [ ] **D31** Click "Send Back". PASS: confirm dialog opens. Confirm. PASS: idea status changes to "sent_back", navigates to ideas list.
+- [ ] **D32** Navigate to idea detail for a non-in_review idea. PASS: no Send Back / Approve buttons are shown.
+- [ ] **D32a** On an in_review idea, click "Edit". PASS: the header shows only Cancel / Save — no Send Back, Approve, Submit, or Convert. Click Cancel: the read header (Send Back / Approve / Edit) returns.
 
 ### Ideas Workflow Integration
 
@@ -2340,9 +2340,9 @@ seeded directly).
 
 **K9.** Open a `submitted` project; confirm the action bar
 shows Edit / View history and the objective rows' baseline
-sliders are disabled (not editable until under-review).
+sliders are disabled (not editable until under_review).
 
-**K10.** Transition status to `under-review` via the edit
+**K10.** Transition status to `under_review` via the edit
 form. PASS if the baseline sliders become editable inline —
 there is NO Score button and NO modal.
 
@@ -2377,7 +2377,7 @@ if status flips to `approved` and the action bar re-renders
 with `Archive` / `View history`; the row `.actual-slider`s
 become editable inline.
 
-**K17.** Negative-score path: on an under-review project,
+**K17.** Negative-score path: on an under_review project,
 drag a baseline slider to the far left (-100). Save. PASS if
 the saved value renders in red and View history (once
 approved) shows the negative score.
@@ -2425,7 +2425,7 @@ text.
 **K25.** Sort by Projected Impact descending; PASS if rows
 re-order accordingly (most-positive first).
 
-**K26.** Filter to `under-review` status + sort by Projected
+**K26.** Filter to `under_review` status + sort by Projected
 Impact descending; PASS if the result is the "review queue
 ranked by impact" workflow we designed.
 

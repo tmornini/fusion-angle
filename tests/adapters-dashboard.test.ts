@@ -124,7 +124,7 @@ test(
     async () => {
         const { db, ctx } = await adminContext();
         await seedIdea(db, 'i1', 'active');
-        await seedIdea(db, 'i2', 'in-review');
+        await seedIdea(db, 'i2', 'in_review');
         await seedProject(db, 'p1', 'approved');
         await db.flows.put('f1', buildFlow('f1'));
         await db.flows.put('f2', buildFlow('f2'));

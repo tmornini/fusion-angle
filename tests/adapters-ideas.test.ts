@@ -209,7 +209,7 @@ test(
         await db.ideas.put(
             'i1', buildIdea('i1', 'Original'),
         );
-        await seedIdeaState(db, 'i1', 'in-review');
+        await seedIdeaState(db, 'i1', 'in_review');
         const before =
             await db.ideas.getById('i1');
 

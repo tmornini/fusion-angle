@@ -61,10 +61,10 @@ export type MemberState = typeof MEMBER_STATES[number];
 
 export const IDEA_STATES = [
     'active',
-    'in-review',
+    'in_review',
     'approved',
     'promoted',
-    'sent-back',
+    'sent_back',
     'archived',
     'deleted',
 ] as const;
@@ -102,8 +102,8 @@ export function isDimensionKey(
 
 export const PROJECT_STATES = [
     'submitted',
-    'under-review',
-    'sent-back',
+    'under_review',
+    'sent_back',
     'approved',
     'declined',
     'archived',
@@ -1245,7 +1245,7 @@ export class Idea {
     }
 
     isReviewable(): boolean {
-        return this.#state === 'in-review';
+        return this.#state === 'in_review';
     }
 
     isConvertible(): boolean {
@@ -1255,7 +1255,7 @@ export class Idea {
     canBeSubmittedForReview(): boolean {
         return (
             this.#state === 'active'
-            || this.#state === 'sent-back'
+            || this.#state === 'sent_back'
         ) && this.isReady();
     }
 

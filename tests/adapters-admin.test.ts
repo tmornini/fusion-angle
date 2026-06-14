@@ -95,7 +95,7 @@ test(
         const { db, ctx } = await adminContext();
         await seedProject(db, 'p1', 'submitted');
         await seedProject(
-            db, 'p2', 'under-review',
+            db, 'p2', 'under_review',
         );
         await seedProject(db, 'p3', 'approved');
         await seedProject(db, 'p4', 'archived');
@@ -117,7 +117,7 @@ test(
             db, 'i1', 'active', 'u1',
         );
         await seedIdea(
-            db, 'i2', 'in-review', 'u1',
+            db, 'i2', 'in_review', 'u1',
         );
         await seedIdea(db, 'i3', 'approved', 'u1');
         await seedIdea(db, 'i4', 'promoted', 'u1');

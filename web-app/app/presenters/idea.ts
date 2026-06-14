@@ -49,10 +49,10 @@ const STATE_ICONS: Record<
     ) => SafeHtml
 > = {
     'active': iconLightbulb,
-    'in-review': iconClipboardCheck,
+    'in_review': iconClipboardCheck,
     'approved': iconCheckCircle2,
     'promoted': iconTrendingUp,
-    'sent-back': iconArrowLeft,
+    'sent_back': iconArrowLeft,
     'archived': iconClock,
     'deleted': iconXCircle,
 };
@@ -912,7 +912,7 @@ export class IdeaListPresenter {
         return buildStateFilterBadges(
             this.#ideas,
             i => i.stateGroup(),
-            ['active', 'in-review', 'sent-back', 'approved'],
+            ['active', 'in_review', 'sent_back', 'approved'],
             this.activeFilter(),
             (item, isActive) =>
                 item.buildStateBadge(isActive),
