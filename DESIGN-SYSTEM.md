@@ -85,9 +85,9 @@ relative luminance); every pair clears the 4.5:1 AA floor.
 
 Components apply semantic variants through `data-*` attributes
 on a base class rather than distinct class names. Presenters
-emit the attribute value; the attribute selectors in
-`components.css` bind it to the matching token set. The
-TypeScript enum returned by `toneFor*()` / `levelFor*()`
+emit the attribute value; the attribute selectors in the
+`components-*.css` files bind it to the matching token set.
+The TypeScript enum returned by `toneFor*()` / `levelFor*()`
 helpers and the CSS selectors share a single source of truth.
 
 ```html
@@ -107,7 +107,7 @@ Applied to: `.progress-bar` fill regions.
 
 **Exception — the credential-reveal panel.** The snapshots-
 page demo-credentials panel (`.credential-reveal`,
-`credential-reveal.ts` + `pages-snapshots.css`) carries a
+`presenters/credential-reveal.ts` + `pages-snapshots.css`) carries a
 `data-tone="warning"` attribute for semantics, but its
 warning border color is applied by the `.credential-reveal`
 class itself (`border: 1px solid hsl(var(--warning))`), NOT
@@ -219,7 +219,7 @@ Cmd+K (or Ctrl+K) overlay for quick navigation and search.
 Implemented in `web-app/app/command-palette.ts`.
 
 - Full keyboard navigation (arrow keys, Enter to select, Escape to close)
-- Searches across pages, ideas, and projects
+- Searches across pages, ideas, projects, and members
 - Renders categorized results with icons
 - Focus trap while open
 
@@ -286,9 +286,10 @@ perimeters, rendered with the unified `flow-edge` class.
 | Cycle   | Dashed  |
 
 Forward edges stroke `hsl(var(--primary))`; cycle edges
-add a warning-color stroke and CSS dashes. The
-arrowhead's `fill: context-stroke` tracks each line's
-own stroke so default and cycle arrows match for free.
+add a warning-color stroke and CSS dashes. Each edge
+references a pre-colored arrowhead marker chosen by type:
+`#flow-arrow` (primary fill) or `#flow-arrow-warn` (warning
+fill), so each head matches its own line.
 
 Edge classification at render time uses DFS
 back-edge detection in `removeCycles`: during a
@@ -430,7 +431,8 @@ mode. Toggle is persisted to `localStorage` and respects
 
 ### Easing
 - **Default**: `cubic-bezier(0.4, 0, 0.2, 1)` - Most transitions
-- **Bounce**: `cubic-bezier(0.34, 1.56, 0.64, 1)` - Success feedback
+- **Ease-in**: `cubic-bezier(0.4, 0, 1, 1)` - Accelerate
+- **Ease-out**: `cubic-bezier(0, 0, 0.2, 1)` - Decelerate
 
 ### Motion Principles
 1. Motion should be subtle and purposeful
@@ -444,7 +446,7 @@ mode. Toggle is persisted to `localStorage` and respects
 - **Library**: Inline SVG functions in `web-app/app/icons.ts`
   (line-based, each returns a `SafeHtml` value)
 - **Stroke width**: 2px
-- **Color**: Inherit from parent or use `text-muted-foreground`
+- **Color**: Inherit from parent or use `text-muted`
 
 ### Icon Sizing
 Sizes are a named tier scale — `ICON_SIZE` in `icons.ts` —
@@ -481,8 +483,6 @@ passing an off-scale pixel value fails the type-check.
 - **Singular/plural**: Use ternary grammar —
   `${count} ${count === 1 ? 'item' : 'items'}` — never
   parenthetical `item(s)` form
-- **Breadcrumb links**: Always use `class="hover-link"` for
-  breadcrumb navigation links (not `text-primary`)
 - **Section headers (h3)**: Always include `font-display`
   class on section header h3 tags to use the display
   typeface (IBM Plex Sans)
@@ -538,7 +538,7 @@ applies:
    toast)
 7. `layout.css` — sidebar, header, main-content shell
 8. `utilities.css` — single-property primitives plus
-   container widths and hover-link
+   container widths
 9. `responsive.css` — mobile breakpoint overrides
    (uses `!important` to win against earlier files)
 10. `command-palette.css` — search overlay
@@ -585,7 +585,7 @@ each page downloads less total CSS, all parallel-loaded.
 
 Caveat: very small files (under ~5KB) cost more per-request
 overhead than they save. Our per-page bundles range from
-~0.9 KB to ~9.6 KB — well above that threshold for the larger
+~0.1 KB to ~9.6 KB — well above that threshold for the larger
 bundles, and the smaller ones still amortize via HTTP/2
 multiplexing.
 

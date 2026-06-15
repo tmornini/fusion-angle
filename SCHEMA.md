@@ -179,7 +179,7 @@ splice. This is the OPPOSITE discipline from
 `password` credential, `secret` is the PBKDF2 hash
 (a `$pbkdf2-sha256$` PHC string, `api/password-hash.ts`),
 verified at login by `verifyPassword`
-(`api/authentication.ts`) — plaintext is never stored.
+(`api/password-hash.ts`) — plaintext is never stored.
 The read routes project `secret` out (`routes.ts`
 `withoutSecret`), so it never crosses the API boundary.
 
@@ -463,7 +463,8 @@ JSON document:
       "attribute_id": "...",
       "mode": "editable",
       "isRequired": true
-    }]
+    }],
+    "taskInstructions": "..."
   }],
   "edges": [{
     "id": "...",
@@ -521,9 +522,9 @@ Org-owned (org-fenced): NOT-NULL `organization_id`.
 | organization_id | TEXT | FK → organizations |
 | record_id | TEXT | FK → records |
 | name | TEXT | non-empty; unique within record_id |
-| attribute_type | TEXT | one of text, number, select, date, checkbox |
+| attribute_type | TEXT | one of text, number, select, radio, date, checkbox |
 | sort_order | REAL | author-controlled ordering |
-| options | TEXT | JSON string[] (select-typed only) |
+| options | TEXT | JSON string[]; required non-empty for select/radio |
 | constraints | TEXT | JSON Constraint[] |
 
 Constraints discriminator (`Constraint['kind']`):
