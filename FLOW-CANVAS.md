@@ -60,7 +60,9 @@ recorded as that node's id (a base62 token), distinct in
 shape from the closed claim alphabet
 (`'claimed'`, `'claim_released'`, `'claim_expired'`) on
 the same `entity_id`. The states log carries both families;
-`adapters/state-events.ts` partitions them by string shape. The
+`adapters/state-events.ts` partitions them with
+`isClaimState` (a closed-set test over the claim alphabet,
+defined in `api/work-order-claims.ts`). The
 mermaid parser does not translate either: a legacy `.mmd`
 file that names its special nodes `[Start]` / `[End]`
 imports with those literal names, surfacing the staleness
@@ -85,7 +87,8 @@ with a mode picker + Required checkbox + remove button,
 plus a picker `<select>` listing every record_attribute on
 the bound Record not yet referenced. The flow header
 carries a Record-binding `<select>` driven by
-`getRecordForFlow` / `putFlowRecord` / `deleteFlowRecord`.
+`getRecordForFlow` / `postFlowRecordBinding` /
+`deleteFlowRecordForFlow`.
 
 Hazards are two-tier and shared across the designer +
 stats canvases via the pure predicate
@@ -109,8 +112,9 @@ predicate. `validateFlowForCreation(flow)` in
 `web-app/app/adapters/flow-publish.ts` returns
 `{ ready: boolean, problems: FlowProblem[] }` —
 `zero_members(nodeId)` and `dead_end(nodeId)` variants —
-and `getFlowsForCreation(ctx)` partitions all flows into
-`{ ready, notReady }` for the workbox "Create Work Order"
+and `getFlowsForCreation(ctx)` partitions the unlocked
+flows into `{ ready, notReady }` (locked flows are
+excluded) for the workbox "Create Work Order"
 dropdown. The picker renders two sections: READY
 (clickable, carries `data-flow-id`) and NOT READY
 (disabled, no-entry icon, "N nodes need attention"
@@ -168,7 +172,8 @@ the arrowhead, the loop-back dash all live in
 `transform`, `x/y`, `class`, `data-*`) only. The one
 presentational inline attribute is the per-node
 `style="--heat-t:${t}"`; CSS computes the fill via a 4-stop
-chained `color-mix(in oklch, ...)` driven by `--heat-t`.
+ramp built from three chained `color-mix(in oklch, ...)`
+segments driven by `--heat-t`.
 Loop-back edges carry `data-cycle="true"` → CSS dashes +
 warning-colours them, mirroring the designer; the single
 `#stats-arrow` marker's head tracks each line's own stroke

@@ -71,8 +71,7 @@ end-node, no-duplicate-edge, start-node-single-outgoing, and the
 lock/noop/commit-error branches); the flow version and query
 adapters (`tests/adapters-flow-versions.test.ts`,
 `tests/adapters-flow-queries.test.ts`); the workbox inbox
-aggregation plus the visibility filter (`tests/workbox-inbox.test.ts`,
-`tests/workbox-filter.test.ts`); the mermaid round-trip
+aggregation (`tests/workbox-inbox.test.ts`); the mermaid round-trip
 (`tests/mermaid.test.ts`); the in-browser ZIP (`tests/zip-guards.test.ts`);
 snapshot import-validation, quota pre-flight, and wipe-on-fail
 (`tests/snapshot-import-validation.test.ts`,
@@ -427,22 +426,22 @@ last (they wipe the database). See `CLAUDE.md` section
 |---|--:|
 | AT. Automated Test Suite | 3 |
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 48 |
-| B. Entry Pages | 19 |
+| AA. Data Entry Workflow | 49 |
+| B. Entry Pages | 29 |
 | C. Core: Dashboard | 7 |
-| D. Core: Ideas Workflow | 37 |
-| E. Core: Projects | 11 |
-| F. Tools | 74 |
+| D. Core: Ideas Workflow | 38 |
+| E. Core: Projects | 12 |
+| F. Tools | 75 |
 | F2. Workbox | 26 |
 | FS. Flow Statistics | 9 |
-| G. Admin Pages | 40 |
+| G. Admin Pages | 44 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 30 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 19 |
 | L. IndexedDB Persistence Tier | 9 |
-| **Total** | **372** |
+| **Total** | **390** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -451,9 +450,9 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |     1559 |
-| Browser regression     |      372 |
-| **Combined TOTAL**     | **1931** |
+| CLI automated tests    |     1657 |
+| Browser regression     |      390 |
+| **Combined TOTAL**     | **2047** |
 
 CLI count = most recent `./validate` (AT2) report; the number
 grows as tests land in `tests/*.test.ts`. Browser count = the
@@ -473,8 +472,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 1931, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (1931).
+`PASS = 2047, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (2047).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -488,7 +487,7 @@ run before A1's build. The single canonical invocation is
 
 - [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
 - [ ] **AT2** Run `./test` (delegates to `node --test --strip-types tests/*.test.ts`). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0`.
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script.
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, the root `.md` files, and the build scripts, then the `generate-schema-svg --check` SCHEMA.svg-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script.
 
 ---
 
@@ -512,7 +511,7 @@ on. Run these in order.
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
 - [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts`) plus the `__schema__` marker — empty stores plus bootstrap data, including the `states` event log (with the seeded `'system'`-member and `'current'`-user 'active' bootstrap events).
-- [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`) on the "Business" plan.
+- [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
 
@@ -645,9 +644,10 @@ on. Run these in order.
   shows two nodes: "Create" (start, top-left with
   green border) and "Archive" (end, bottom-right
   with red 3-px border) connected by no edges.
-  Toolbar shows Undo, Redo, Delete (trash icon),
-  Auto Layout, Zoom −/+,
-  Copy Mermaid, Export. Changes auto-save
+  Toolbar shows Undo, Redo, Zoom −/+, Copy Mermaid,
+  Export, and Delete (trash icon); the header above
+  the canvas hosts the Locked, Auto Layout, and Auto
+  Fit switches. Changes auto-save
   (no explicit Save button).
 - [ ] **AA27** Drag the port circle on the start
   node into empty canvas past 20 pixels. PASS:
@@ -673,8 +673,8 @@ on. Run these in order.
   the right, then a `<fieldset>` labeled "Members"
   containing two groups — HUMANS and AIs — each
   with a labeled checkbox per member (no checkbox
-  ticked yet), then State Name input, Description
-  input, empty Attributes list, and outgoing
+  ticked yet), then a Name input, a Task Instructions
+  textarea, an empty Attributes list, and outgoing
   transitions. The node gets a gold glow selection
   effect on the canvas.
   (Properties panel double-click is BLOCKED per the
@@ -770,9 +770,9 @@ on. Run these in order.
   member's detail page, click Edit, change phone number,
   Save. Navigate away, return. PASS: changed phone
   persists.
-- [ ] **AA42** Edit organization: in the General
-  Information card, change Domain. Save, navigate
-  away, return. PASS: changed Domain persists.
+- [ ] **AA42** Edit organization: click the page-level
+  Edit button, change Domain in the overview card. Save,
+  navigate away, return. PASS: changed Domain persists.
 
 ### AA12. Snapshot Round-Trip
 
@@ -888,13 +888,15 @@ on. Run these in order.
   sidebar footer — see G36; the pending-invitations
   bell may appear at the top bar — see V3.)
 - [ ] **C4** Dashboard renders 4 surfaces in order: three
-  visually-equivalent arc-gauge cards (Time, Cost, Portfolio
-  Impact — each a bipolar arc; not "2 gauges + a distinct
-  card") and a full-width Aggregate Objectives box below.
-  PASS: all 4 render with baseline and current values; each
-  top card shows its bipolar arc; the Objectives box shows
-  one row per objective, each with a small bipolar arc gauge
-  and a sparkline trendline.
+  visually-equivalent arc-gauge cards (Time and Cost are
+  ratio arc-gauges — a single ratio-filled semicircle; Impact
+  is a bipolar arc — left/right split from a center apex; all
+  three share the same card chrome) and a full-width Aggregate
+  Objectives box below. PASS: all 4 render with baseline and
+  current values; the Time and Cost cards each show a ratio
+  arc and the Impact card shows a bipolar arc; the Objectives
+  box shows one row per objective, each with a small bipolar
+  arc gauge and a sparkline trendline.
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C7** Check that seed data populates all 4 dashboard
@@ -920,7 +922,7 @@ on. Run these in order.
 ### Ideas List (`ideas/`)
 
 - [ ] **D1** Navigate to `ideas/`. PASS: list shows the active org's ideas as cards (≈6 for Stark on the mock seed — the list is org-scoped, so this is a tolerant lower bound, not the global 11; note the org-scoped reads can take 5–8s to paint, so wait for the cards before asserting empty), each with a drag-handle grip, title, status badge, and (for approved ideas) a Convert button. Ideas represent the problem-and-proposed-solution shape and do not carry time/cost/impact estimates; those fields live on projects created by conversion.
-- [ ] **D2** Each idea row shows a lifecycle status badge (Active, In Review, Approved, Promoted, Sent Back, or Archived) AND a separate readiness pill (Ready or Incomplete) derived from required-field presence. PASS: both render with distinct colors.
+- [ ] **D2** Each idea row shows a lifecycle status badge (Active, In Review, Approved, Promoted, Sent Back, or Archived); an active idea missing a required field also shows a single "Incomplete" readiness pill (warning tone) derived from required-field presence — ready ideas and non-active ideas show no pill. PASS: the status badge always renders, and the Incomplete pill appears only on active, not-ready ideas.
 - [ ] **D3** Click an idea row/title. PASS: navigates to the idea's detail or scoring page with the correct `ideaId` parameter.
 - [ ] **D4** "New Idea" or "Create Idea" button is visible. PASS: clicking it navigates to `ideas/create.html`.
 
@@ -1009,7 +1011,7 @@ on. Run these in order.
 ### Projects List (`projects/`)
 
 - [ ] **E1** Navigate to `projects/`. PASS: list shows the active org's projects (≈16 for Stark on the mock seed — the list is org-scoped, so this is a tolerant lower bound, not the old fixed 6; org-scoped reads can take ~4–5s to paint, so wait for the cards before asserting empty) with title, status, and progress. Each project card shows three metrics (time, cost, impact). Em-dash ("—") substitutes for the entire metric when its **baseline (denominator) is missing**; a zero current value over a non-zero baseline renders as `0d / 213d`, `$0k / $120k`, or `0 / 85` — not em-dash. Em-dash signals "no baseline to compare against," not "zero current value." When the current is missing but the baseline is present, the half-em-dash form (e.g. `— / 46 pts`) renders the absent current side only — distinct from full em-dash (both absent) and from `0d / 213d` (zero current over present baseline).
-- [ ] **E2** Click a status filter badge (e.g. "Active"). PASS: project list filters to show only projects with that status. Click the same badge again or "All". PASS: full list returns.
+- [ ] **E2** Click a status filter badge (e.g. "Approved"). PASS: project list filters to show only projects with that status. Click the same badge again. PASS: full list returns.
 - [ ] **E3** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
 
 ### Project Detail (`projects/detail.html?projectId=1`)
@@ -1077,8 +1079,8 @@ on. Run these in order.
 dialog, the file-upload affordance, and that the imported flow
 opens and renders.)
 
-- [ ] **F4** Click "Import Flow" button on the flows list page. PASS: import dialog opens with a file upload input and a project selector dropdown.
-- [ ] **F5** Select a `.mmd` file via the file input and choose a project from the dropdown. Click "Import". PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
+- [ ] **F4** Click "Import Flow" button on the flows list page. PASS: import dialog opens with a project selector dropdown and a "Choose File" button (the file input is hidden and triggered by that button).
+- [ ] **F5** Choose a project from the dropdown, click "Choose File", and select a `.mmd` file — selecting the file imports it directly (no separate confirm button). PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
 - [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow renders with nodes, edges, and attributes visible (round-trip fidelity is covered by `tests/mermaid.test.ts` + `tests/zip-guards.test.ts`).
 
 ### Flow Designer (`flows/detail.html?flowId=...`)
@@ -1166,7 +1168,7 @@ opens and renders.)
   node. PASS: panel opens and the canvas re-fits to
   the panel-aware visible region (no toast, no
   blocking — Auto Fit handles the re-fit via
-  `withFitReconciled`'s `panelOffsetPx`). Turn Auto
+  `fitBoxToCanvas`'s `panelOffsetPx`). Turn Auto
   Fit off and double-click again. PASS: panel opens
   and the canvas pans to keep the node visible, and
   the previous viewBox is saved for restoration when
@@ -1463,16 +1465,16 @@ states, and that the canvas re-renders after each step.)
 
 ### Attribute Editor (Node Panel)
 
-- [ ] **F68** Single-select a regular node (not Create/Archive)
+- [ ] **F68** Double-click a regular node (not Create/Archive)
   to open the properties panel. In the "Attributes"
   fieldset, click the "+ Add Attribute…" dropdown. PASS:
   the picker lists available record attributes
   pre-defined in the bound Record (the picker is
   populated from `record_attributes`).
-  (Regression for the captured-presenter bug at
-  `detail.ts:1006`: this exact click used to do nothing
-  because the handler closed over a presenter captured at
-  init time, which had no selection.)
+  (Regression for the captured-presenter bug in the
+  attribute-picker handler: this exact click used to do
+  nothing because the handler closed over a presenter
+  captured at init time, which had no selection.)
 - [ ] **F69** Continuing from F68, select an attribute
   from the picker (e.g. "Email"). PASS: the row "Email"
   appears in the attributes list with mode (Editable /
@@ -1483,12 +1485,12 @@ states, and that the canvas re-renders after each step.)
   control on the "Email" attribute row. PASS: the row
   disappears from the attributes list.
 - [ ] **F71** Lock the flow via the toolbar checkbox.
-  Single-select a regular node. Click the disabled
+  Double-click a regular node. Click the disabled
   "+ Add Attribute…" dropdown in the Attributes
   fieldset. PASS: nothing happens — no panel change,
   no toast, no attribute row appended (a disabled
   `<select>` does not fire `change`).
-- [ ] **F72** Single-select a regular node. Tick one
+- [ ] **F72** Double-click a regular node. Tick one
   member checkbox in the Members fieldset. Click the
   "+ Add Attribute…" dropdown in the same panel. PASS:
   the dropdown remains functional and lists available
@@ -1626,7 +1628,8 @@ states, and that the canvas re-renders after each step.)
 ### Workbox — Completion
 
 - [ ] **WB14** Transition a work order to the
-  completion node (is_complete=true). PASS:
+  completion (Archive) node (its `isArchive` is
+  true). PASS:
   work order moves to the Archive tab. It no
   longer appears in Active.
 - [ ] **WB15** Click a completed work order in
@@ -1792,21 +1795,24 @@ the claude-in-chrome MCP.
 
 - [ ] **G9** Navigate to `organization/index.html`. PASS:
   page wears the standard sidebar + top-bar layout. Shows
-  the page header "Organization", a General Information
-  card at the top with read-only Organization Name and
-  Domain plus an Edit button, then the Overview card (org
-  identity plus a four-cell stat grid: Active People,
-  Projects, Ideas, Next Billing — no health badge), and
-  the Usage Overview card with progress bars. There is no
-  longer a Security & Administration card — Members and
+  the page header "Organization" with an Edit button, then
+  an Overview card holding the org identity (read-only
+  Organization Name and Domain) above a four-cell stat grid
+  (Active People, Projects, Ideas, Next Billing — no health
+  badge), then the Objectives box, then the Usage Overview
+  card with progress bars. There is no separate General
+  Information card — the read-only Name/Domain live in the
+  Overview card and Edit lives in the page header — and no
+  longer a Security & Administration card; Members and
   Billing are reached from the sidebar. (Overview/usage
   values are placeholders — verify the page renders
   without error; numeric accuracy arrives when wired to
   live tables.)
-- [ ] **G10** In the General Information card, click Edit.
-  PASS: page header swaps Edit for Save/Cancel; the card
-  body switches the read-only fields to two inputs
-  prefilled with the current Organization Name and Domain.
+- [ ] **G10** In the page header, click Edit.
+  PASS: page header swaps Edit for Save/Cancel; the
+  Overview card's identity region switches the read-only
+  Name/Domain to two inputs prefilled with the current
+  Organization Name and Domain.
   (There is no health score — the retired 92/"excellent"
   badge has been removed.)
 - [ ] **V8 — Organization "Sent invitations" section + Revoke
@@ -1835,7 +1841,7 @@ the claude-in-chrome MCP.
   section stays HIDDEN — the page logs at warn and surfaces no
   raw error, and no Revoke affordance is offered to a non-
   admin. (Pairs with V7's grant/revoke 403s.) Source:
-  `sentInvitations` admin guard in `api/api.ts`,
+  `sentInvitations` admin guard in `api/invitations-domain.ts`,
   `renderSentInvitations` catch.
 
 ### Members list (`members/index.html`)
@@ -1899,8 +1905,9 @@ the claude-in-chrome MCP.
 > Organization page. DEFERRED (not built): new-identity auto-
 > membership on creation, and email delivery. Sources:
 > `web-app/members/index.ts` (`handleInviteSubmit`),
-> `web-app/app/adapters/invitations.ts`, `api/api.ts`
-> (`grantInvitation` / `acceptInvitation` / `declineInvitation`
+> `web-app/app/adapters/invitations.ts`,
+> `api/invitations-domain.ts` (`grantInvitation` /
+> `acceptInvitation` / `declineInvitation`
 > / `revokeInvitation`), `web-app/invitations/`,
 > `web-app/app/invitations-indicator.ts`.
 
@@ -1922,14 +1929,17 @@ the claude-in-chrome MCP.
 - [ ] **V2 — Invite rejects empty / unknown / already-member**
   Open the Invite dialog. Submit with the Email blank → an
   "Email is required" toast and no POST. Submit an email that
-  matches NO identity → a "Failed to invite: …" toast carrying
-  the server's "no identity with that email" (404 — the server
-  resolves email→identity; unknown is rejected). Submit the
-  email of someone ALREADY a member of the active org → a
-  "Failed to invite: …" toast carrying "that identity is
-  already a member of this organization" (409). In all three
-  the dialog stays usable and no pending invitation is created.
-  Source: `grantInvitation` guards in `api/api.ts`.
+  matches NO identity → an inline email-field error "No
+  identity found for that email." (the adapter maps the 404 to
+  a 'no-identity' outcome — no toast). Submit the email of
+  someone ALREADY a member of the active org → an inline
+  email-field error "Already a member of this organization."
+  (the 409 maps to an 'already-member' outcome). The "Failed
+  to invite: …" toast fires only on an unexpected server fault.
+  In all three the dialog stays usable and no pending
+  invitation is created. Source: `setInviteEmailError` in
+  `web-app/members/index.ts`; `grantInvitation` guards in
+  `api/invitations-domain.ts`.
 - [ ] **V3 — Top-bar pending-invitations bell → invitations
   page** As an identity with ≥1 pending invitation (the V1
   invitee, signed in), confirm the top bar shows a bell
@@ -1958,7 +1968,7 @@ the claude-in-chrome MCP.
   org and Stark. Accept is idempotent — a re-accept is a 204
   no-op, no duplicate membership. Source:
   `postInvitationAcceptance`, `acceptInvitation` (atomic
-  `memberships.put` + `states.record('accepted')`).
+  `memberships.put` + `states.postEvent` 'accepted' event).
 - [ ] **V5 — Decline appends declined, writes no membership**
   As an invitee with a fresh pending invitation, on
   `invitations/` click Decline. PASS: an "Invitation declined"
@@ -2055,7 +2065,7 @@ the claude-in-chrome MCP.
 - [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar + the id (as both name and sub) + a "Service" badge. With mock data seeded, ≥11 person rows (Emily Rodriguez, David Martinez, Sarah Chen, …) and ≥5 service rows appear, including the system service identity. An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email). Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
-- [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) and accept the `window.confirm` ("Erase this identity's personal information? The identity itself survives."). PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Unknown member" (`ERASED_MEMBER_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). Declining the confirm leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`handleErase` → `deleteIdentityPii`). MCP note: stub `window.confirm` to return true before the click — a native modal blocks the extension.
+- [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
@@ -2081,7 +2091,7 @@ verify the four operation cards, the file-picker affordance, the
 post-operation redirect, and that pages render against the
 restored data.)
 
-- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot, Upload Snapshot). The Upload Snapshot card hosts a hidden `<input type="file" id="upload-input">` wrapped by a `<label>` styled as a button — the platform-primitive affordance for triggering a hidden file input (no JS click-forwarder).
+- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards (Create Pristine Environment, Wipe and Load Mock Data, Download Snapshot, Upload Snapshot). The Upload Snapshot card renders a `<button id="upload-btn">` and a separate hidden `<input type="file" id="upload-input" class="hidden">`; the button forwards its click to the input in JS (`importInput.click()`).
 - [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
 - [ ] **G32** Click "Create Pristine Environment", confirm
   the dialog. PASS: the page does NOT navigate immediately — it
@@ -2165,7 +2175,7 @@ feature is implemented.
 ### Organization General Information — Edit Cycle
 
 - [ ] **G38** On `organization/index.html`, click
-  Edit on the General Information card. Modify the
+  Edit in the page header. Modify the
   Domain to a new value. Click Cancel. PASS: card
   returns to read mode, Domain shows the original
   (unmodified) value, no toast fires.
@@ -2182,8 +2192,9 @@ feature is implemented.
   persist (round-tripped through `PUT
   /api/organization`). Inspect the `organizations`
   store (IndexedDB): the org row has the updated
-  `name` and `domain` fields alongside the
-  unchanged plan/seats/billing fields.
+  `name` and `domain` fields alongside the unchanged
+  `seats`, `projects_limit`, `ideas_limit`, and
+  `next_billing` fields.
 
 ---
 
@@ -2216,7 +2227,7 @@ feature is implemented.
 
 ### Mobile Responsive
 
-- [ ] **I10 — Mobile breakpoint** (NOT MCP-driven — `resize_window` does not change the CSS viewport). Verify by source: read `web-app/app/styles/layout.css` lines 312–323 and confirm `@media (max-width: 767px)` rules toggle the desktop sidebar (`.sidebar` → `display: none`) and reveal the mobile drawer. PASS = rules present and well-formed.
+- [ ] **I10 — Mobile breakpoint** (NOT MCP-driven — `resize_window` does not change the CSS viewport). Verify by source: read `web-app/app/styles/layout.css` and confirm the `@media (max-width: 767px)` block (lines 296–306) hides the desktop sidebar (`.sidebar` → `display: none`), and that the mobile drawer is revealed by `.mobile-header`'s default `display: flex` (line 271) being suppressed only under `@media (min-width: 768px)` (lines 285–290). PASS = both rule sets present and well-formed.
 - [ ] **I11** Tap/click the hamburger menu. PASS: mobile sidebar sheet slides in from the left with navigation links.
 - [ ] **I12** Tap/click the backdrop or a nav link. PASS: mobile sidebar closes.
 - [ ] **I13** Tap a navigation link in the mobile sidebar. PASS: navigates to the target page and mobile sidebar closes. (Note: the drawer closes implicitly via page navigation — the next page loads in default-hidden state. No explicit close-on-link-click handler is required; navigation is the close trigger.)
@@ -2259,8 +2270,8 @@ feature is implemented.
 
 ### Accessibility
 
-- [ ] **I29 — Skip link & `<main>` landmark** From a fresh load of any sidebar-layout page, press `Tab` once. PASS: the first focusable element is a "Skip to content" link (visually hidden until focused via the `.sr-only` pattern in `components-feedback.css`); pressing `Enter` moves focus past the sidebar and top-bar into the page body. Then confirm via `read_page`/`javascript_tool` that the content wrapper is a `<main id="main-content">` landmark (not a bare `<div class="page-content">`) and that the composed shell (`web-app/app/components-layout.html`) contains exactly one `<main>`. `Tab`/keyboard is MCP-driveable (see I15), so this is a PASS/FAIL case — not BLOCKED. Guards WCAG 2.4.1 Bypass Blocks (Level A).
-- [ ] **I30 — Reduced-motion view-transition guard** (behavioral drive BLOCKED — `prefers-reduced-motion` cannot be emulated via the MCP, the same class of limit as `resize_window`/I10). Structural verification is authoritative and PASS-able: read the `@media (prefers-reduced-motion: reduce)` block in `responsive.css` and the `::view-transition-*` rules in `base.css`, and confirm a rule neutralizes the page-content transition under reduced motion (e.g. `::view-transition-group(*)` / `::view-transition-old/new(*)` set `animation: none`) — the universal `*, *::before, *::after` reset does NOT reach view-transition pseudo-elements, which live in a separate tree rooted at `::view-transition`. PASS = the neutralizing rule is present and well-formed. Behavioral tier (BLOCKED): confirming `fade-in-up`'s `translateY` slide (`utilities.css:271`) is actually suppressed on navigation requires a human with OS-level reduced-motion enabled. Guards WCAG 2.3.3 Animation from Interactions (AAA).
+- [ ] **I29 — Skip link & `<main>` landmark** From a fresh load of any sidebar-layout page, press `Tab` once. PASS: the first focusable element is a "Skip to main content" link (visually hidden until focused via the `.skip-link` translateY rule in `base.css`); pressing `Enter` moves focus past the sidebar and top-bar into the page body. Then confirm via `read_page`/`javascript_tool` that the content wrapper is a `<main id="main-content">` landmark (not a bare `<div class="page-content">`) and that the composed shell (`web-app/app/components-layout.html`) contains exactly one `<main>`. `Tab`/keyboard is MCP-driveable (see I15), so this is a PASS/FAIL case — not BLOCKED. Guards WCAG 2.4.1 Bypass Blocks (Level A).
+- [ ] **I30 — Reduced-motion view-transition guard** (behavioral drive BLOCKED — `prefers-reduced-motion` cannot be emulated via the MCP, the same class of limit as `resize_window`/I10). Structural verification is authoritative and PASS-able: read the `@media (prefers-reduced-motion: reduce)` block in `responsive.css` and the `::view-transition-*` rules in `base.css`, and confirm a rule neutralizes the page-content transition under reduced motion (e.g. `::view-transition-group(*)` / `::view-transition-old/new(*)` set `animation: none`) — the universal `*, *::before, *::after` reset does NOT reach view-transition pseudo-elements, which live in a separate tree rooted at `::view-transition`. PASS = the neutralizing rule is present and well-formed. Behavioral tier (BLOCKED): confirming `fade-in-up`'s `translateY` slide (`utilities.css:138`) is actually suppressed on navigation requires a human with OS-level reduced-motion enabled. Guards WCAG 2.3.3 Animation from Interactions (AAA).
 
 ---
 
@@ -2286,7 +2297,7 @@ because it wipes the database, which is shared across the
 seven Phase 2 agents.
 
 **K1.** Open Organization page; confirm Objectives box
-renders below the existing Overview/Usage/Admin cards with
+renders between the Overview and Usage cards with
 4 seeded active objectives in position order. PASS if all
 4 names display.
 
@@ -2429,14 +2440,14 @@ re-order accordingly (most-positive first).
 Impact descending; PASS if the result is the "review queue
 ranked by impact" workflow we designed.
 
-### K27–K29 — Dashboard Portfolio Impact + Aggregates (Agent-CH)
+### K27–K29 — Dashboard Impact + Aggregates (Agent-CH)
 
 **K27.** Open dashboard; PASS if four surfaces render: three
 visually-equivalent bipolar arc-gauge cards (Time, Cost,
-Portfolio Impact) and an Aggregate Objectives box
+Impact) and an Aggregate Objectives box
 (full-width row below).
 
-**K28.** Inspect the Portfolio Impact gauge. PASS if:
+**K28.** Inspect the Impact gauge. PASS if:
 - The arc has muted background visible at all values
 - For a net-positive portfolio, value arcs sweep right and
   use green tones

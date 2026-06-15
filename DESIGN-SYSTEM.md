@@ -221,7 +221,7 @@ Implemented in `web-app/app/command-palette.ts`.
 - Full keyboard navigation (arrow keys, Enter to select, Escape to close)
 - Searches across pages, ideas, projects, and members
 - Renders categorized results with icons
-- Focus trap while open
+- Focuses the search input on open; restores focus on close
 
 ### Heat ramp (flow-stats)
 
@@ -265,15 +265,17 @@ with interactions in `flow-interactions.ts` and
 presenter in `presenters/flow-designer.ts`.
 
 **Canvas**: Dot grid pattern, 24px cell size, on
-`--color-surface` background.
+`hsl(var(--background))`.
 
 **Nodes**: 160×64 px rounded rectangles, 10 px corner
 radius. Three types, all rendered with the unified
-`flow-node` class (stroke = `hsl(var(--primary))`):
+`flow-node` class but stroked per type: Regular uses
+`hsl(var(--primary))`, Create `hsl(var(--success))`, and
+Archive `hsl(var(--error))`:
 
 | Type    | Port       | Draggable |
 |---------|------------|-----------|
-| Create  | None       | No        |
+| Create  | None       | Yes       |
 | Archive | None       | Yes       |
 | Regular | Right side | Yes       |
 
@@ -304,8 +306,9 @@ Labels render at the bezier midpoint in a pill with
 `--color-card-bg` background. Bidirectional pairs
 are separated with a perpendicular offset.
 
-**Selection**: `--accent` gold glow filter on
-selected node, thicker stroke (3 px) on selected edge.
+**Selection**: `--accent` gold glow filter on the
+selected node, and the same glow filter on the selected
+edge (edge stroke stays at the base 2 px).
 
 **Locked**: When a flow is locked, all node rectangles,
 edge paths, and edge-label backgrounds re-stroke in
@@ -388,8 +391,8 @@ mode. Toggle is persisted to `localStorage` and respects
 `prefers-color-scheme` for initial detection.
 
 ```css
-:root { --bg-primary: hsl(0 0% 100%); }
-[data-theme="dark"] { --bg-primary: hsl(217 45% 10%); }
+:root { --background: var(--gray-50); }
+[data-theme="dark"] { --background: var(--gray-900); }
 ```
 
 ## 6. Interaction States
@@ -566,7 +569,7 @@ Multiple pages can share one bundle — `idea-detail`,
 `['pages-ideas']`.
 
 At compose time, `compose.ts` reads `cssBundles` and replaces
-the `<!-- PAGE_CSS_LINKS -->` placeholder in the page's HTML
+the `{{PAGE_CSS_LINKS}}` placeholder in the page's HTML
 with one `<link rel="stylesheet" href="../assets/pages-X.css"
 />` tag per bundle. Pages without `cssBundles` get the
 placeholder removed entirely (no stray whitespace).

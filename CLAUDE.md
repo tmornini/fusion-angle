@@ -73,7 +73,8 @@ type checking (they run in Node).
 
 **Vanilla TypeScript** with zero runtime dependencies.
 Enterprise innovation management platform with modules for
-ideas, projects, members, flows, workbox, and analytics.
+ideas, projects, members, flows, and workbox, plus a
+dashboard and flow statistics.
 Every page is a standalone HTML file served via HTTP. The
 code also supports `file:///` protocol locally, but testing
 is HTTP-only.
@@ -258,7 +259,9 @@ Two layers, both zero-dependency.
 ### Automated tests
 
 Node's built-in `node:test` runner with `--strip-types`,
-no devDependencies. Tests cover
+no test-framework dependency (the only devDependencies are
+`esbuild` and `typescript`, for ./build and ./validate).
+Tests cover
 pure modules, flow-edit business logic and the connection-
 validation rules (`tests/flow-operations.test.ts`), the flow
 version/query adapters, every data adapter (including
@@ -290,7 +293,9 @@ for the SafeHtml) — see `tests/` for the current set.
 adapter and api-layer tests run without `localStorage`.
 
 Run via `./validate` (which also type-checks and lints) or
-directly: `node --test --strip-types tests/*.test.ts`.
+`./test`, which pins `TZ=UTC` for the main suite and
+`TZ=Pacific/Honolulu` for the timezone suite in `tests/tz/`
+(excluded from the non-recursive main glob).
 
 ### Manual browser regression
 

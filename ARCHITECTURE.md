@@ -7,9 +7,11 @@ in [SCHEMA.md](SCHEMA.md).
 
 ## Domain objects
 
-Domain classes wrap entity + state: `Idea(entity, state)`,
-`Project(entity, state)`, `HumanMember(entity, state)`,
-`AIMember(entity, state)` all expose `stateValue()` — the
+Domain classes wrap entity + state: `Idea(entity, state)`
+and `Project(entity, state)`; the member classes compose
+parent + detail rows: `HumanMember(parent, detail, pii,
+state)` and `AIMember(parent, detail, state)`. All expose
+`stateValue()` — the
 lifecycle stage is part of the domain object, not a
 separate fetch the presenter has to reconcile. How a state
 is displayed (badge label and class) is presentation
@@ -48,15 +50,16 @@ and the read-only stats variant — lives in
 
 A Record is a named data shape: name + description +
 ordered attributes + per-attribute constraints. A flow
-binds to one Record via `flow_records` (UNIQUE flow_id);
+binds to one Record via `flow_records` (one binding per
+flow, app-enforced — no UNIQUE index on `flow_id`);
 a Record can back many flows. Each per-node attribute
 ref (`NodeAttribute`) points at one `record_attributes.id`
 and carries a `mode` (`'editable'` or `'readonly'`) and an
 `isRequired` flag. Hidden is structural: absence from the
 node's `attributes` array.
 
-Five attribute types: `text`, `number`, `select`, `date`,
-`checkbox`. Three constraint kinds: `regex` (text only),
+Six attribute types: `text`, `number`, `select`, `radio`,
+`date`, `checkbox`. Three constraint kinds: `regex` (text only),
 `range_min` and `range_max` (number or date only). The
 applicability rule has two enforcement sites:
 `assertConstraintAppliesTo` at the row writer and the
@@ -64,7 +67,7 @@ editor filtering the kind picker.
 
 The property-test gate at work-order transitions:
 `validateRecordTransition(ctx, workOrderId, targetNodeId,
-pendingValues?)` walks work order → flow → Record →
+pendingValues)` walks work order → flow → Record →
 attributes; gathers stored values from `state_field_values`;
 overlays pending values from the form; runs requiredness
 + `validateAttributeValue`. Returns aggregated
@@ -74,9 +77,11 @@ workbox page module catches the typed error and surfaces
 the violations banner.
 
 The pure constraint runner is `record-constraints.ts`
-(`validateAttributeValue`, `formatViolation`) — three
-callers earn the abstraction: the gate, the editor live
-preview, and a future fuzz runner.
+(`validateAttributeValue`, `formatViolation`) — the gate
+(`record-transitions.ts`) runs the validation; the workbox
+presenter renders violations via `formatViolation`.
+Extracted as a pure module so a future editor live preview
+and a fuzz runner can share it too.
 
 A work order's frozen `flow_graph` references
 `record_attributes.id` directly. If a Record's attribute
@@ -124,14 +129,15 @@ handlers transport-free.
 `EntityStore` decorator bound to one org: it filters reads,
 stamps the org onto writes, and 404s a foreign id — NEVER
 403, which would confirm a foreign row exists. The write
-fence (`#assertWritable`) rejects a write that targets an id
+fence (`#assertMine`) rejects a write that targets an id
 another tenant owns, the write-side twin of the read fence.
 `orgScopedAdapter` (`api/db-org-scoped.ts`) fences the
 org-owned stores (ideas, projects, flows, work_orders,
 records, record_attributes, objectives, role_grants,
 memberships) by their stamped org, and the parent-derived
-leaves (`flow_versions`, junctions, scores, the states log,
-…) by `ParentScopedEntityStore` — a READ-time server-side
+leaves (`flow_versions`, junctions, scores, …) by
+`ParentScopedEntityStore` (the append-only states log by its
+sibling `ParentScopedStateStore`) — a READ-time server-side
 join that resolves each leaf's owning org THROUGH its
 already-fenced parent (`api/store-parent-scoped.ts`). Only
 the global identity/auth spine and the organizations
@@ -140,11 +146,12 @@ directory and the credential/PII reads. The HMAC signing
 key is client-shipped, so this is demo-grade isolation
 until the server tier.
 
-Derive-from-parent is WRITE stamping, not READ isolation:
-`OrgScopedEntityStore` stamps the parent's org on write, but
-that stamp alone does not isolate reads of the leaves that
-derive their org from it — `ParentScopedEntityStore` runs
-that derivation on READ. The two are distinct mechanisms.
+Leaf isolation is READ derivation, not a WRITE stamp:
+`OrgScopedEntityStore` stamps the BOUND org onto each
+org-owned parent row on write, but the parent-derived
+leaves carry no org column — so `ParentScopedEntityStore`
+isolates them on READ, resolving each leaf's org through
+its already-fenced parent.
 
 ### Multitenancy model
 
@@ -222,7 +229,7 @@ before first render: enumerate reachable orgs →
 the identity's default org if reachable, else the first
 reachable) → `postOrgSessionExchange` → install the scoped
 token. The
-header org-switcher (`web-app/app/org-switcher.ts`) renders
+sidebar org-switcher (`web-app/app/org-switcher.ts`) renders
 its `<select>` only at ≥2 reachable orgs and re-scopes via a
 FULL reload (boot re-exchanges from the persisted id, so no
 mixed-org view survives the switch).
@@ -232,8 +239,8 @@ mixed-org view survives the switch).
 Pages `identities` (list, `inSidebarNav`), `identity-detail`,
 `identity-providers`, `identity-tokens` share `sidebarKey:
 'identities'`. Adapters (`adapters/identities.ts` etc.):
-`getIdentities`, `getIdentityRoster` (single-pass join of
-identities + identity_pii), `postIdentityCreation` (person →
+`getIdentity`, `getIdentityRoster` (single-pass join of
+identities + identity_pii + ai_members), `postIdentityCreation` (person →
 identity + PII; service → identity + hashed `client_secret`).
 The identity stores are the GLOBAL spine — creation is a
 client-minted id + idempotent PUT, OFF the org facade.
@@ -315,7 +322,7 @@ re-verified by the automated suite:
 `GraphNode.memberIds: MemberId[]`,
 `GraphNode.attributes: NodeAttribute[]`, `RecordEntity` /
 `RecordAttributeEntity` / `FlowRecordEntity`, `Constraint`
-discriminated union, `StateEntity`, the five state
+discriminated union, `StateEntity`, the seven state
 alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
 (`DbAdapter` interface + `TABLE_NAMES` array listing every
 storage table — the entity tables plus the identity/auth
@@ -357,8 +364,8 @@ session token. Tests pass `createRequestContext` a
 five HTTP operations — `GET/PUT states/:id`, `GET states`,
 `GET entity-states/:id` (current), and
 `GET entity-states/:id/history` (ordered) — each dispatching
-to a `StateStore` method (`postEvent`, `getCurrentFor`,
-`getAllFor`).
+to a store method (`getAll`/`getById`/`put`,
+`getCurrentFor`, `getAllFor`).
 When no schema exists, non-entry pages redirect to snapshots.
 
 ## Storage tiers
@@ -441,7 +448,7 @@ AIs (the AI edit presenter renders a provider-grouped model
 pulldown and a skill-focus textarea; no token field).
 
 `presenters/index.ts` is the barrel; page modules import from
-`'../app/presenters'`. `WorkboxDetailPresenter` uses a public
+`'../app/presenters/index.ts'`. `WorkboxDetailPresenter` uses a public
 `buildPage()` orchestrating private `#build*` helpers; the rest
 expose `build*` directly.
 
@@ -452,19 +459,20 @@ pure `build*` helpers (`buildShell`, `buildStepperBar`,
 plus DOM-touching `renderShell` / `renderUpdate` / `renderCard`.
 It is flow-name-agnostic by design — the page module writes the
 flow name into the header after `renderShell`,
-keeping `buildFlowStats` independent of presentation strings.
+keeping the presenter's `buildShell` / `renderShell` output
+independent of presentation strings.
 
 ## Import Conventions
 
 Page modules import directly from source modules, not through a barrel:
 
 ```typescript
-import { $ } from '../app/dom';
-import { html, setHtml } from '../app/safe-html';
-import { showToast } from '../app/toast';
-import { buildSkeleton, buildErrorState } from '../app/loading-states';
-import { iconPlus, iconTrash } from '../app/icons';
-import { navigateTo, openDialog, closeDialog } from '../app/core';
+import { $ } from '../app/dom.ts';
+import { html, setHtml } from '../app/safe-html.ts';
+import { showToast } from '../app/toast.ts';
+import { buildSkeleton, buildErrorState } from '../app/loading-states.ts';
+import { iconPlus, iconTrash } from '../app/icons.ts';
+import { navigateTo, openDialog, closeDialog } from '../app/core.ts';
 ```
 
 `core.ts` re-exports from `format.ts`, `navigation.ts`, and
@@ -492,14 +500,15 @@ layer directly.
   type-narrowing call sites.
 - Adapter reads are two-tier, named by what they return:
   the **domain noun** read returns the domain object
-  (`getIdea` → `Idea`); where a raw stored-shape read also
-  exists it carries the **Entity** suffix (`getIdeaEntity`
-  → `IdeaEntity`). Never table vocabulary (`Row`/`Rows`).
+  (`getProject` → `Project`); where a raw stored-shape read
+  also exists it carries the **Entity** suffix
+  (`getProjectEntity` → `ProjectEntity`). Never table
+  vocabulary (`Row`/`Rows`).
 
 ## Adapter Conventions
 
 - **Member domain split.** Members are one parent table
-  (`members`: id, type, name) plus per-kind detail tables
+  (`members`: id, type) plus per-kind detail tables
   sharing the id (`human_members`, `ai_members`).
   `adapters/members.ts` composes humans (parent +
   `human_members` detail); `adapters/ai-members.ts`
@@ -529,9 +538,8 @@ layer directly.
 - **Platform-shim vs data-access adapters share `adapters/`.**
   Data-access adapters (`ideas.ts`, `flow-queries.ts`, etc.)
   fetch entity data through `ctx`. Platform shims
-  (`clipboard.ts`, `viewport.ts`, `location.ts`,
-  `crypto-safe-base62.ts`, etc.) wrap browser primitives
-  behind adapters the app owns.
+  (`clipboard.ts`, `viewport.ts`, `location.ts`, etc.)
+  wrap browser primitives behind adapters the app owns.
 - **`getFlowStats(ctx, flowId)`.** Resolves the work-order
   set via the `flow-work-orders` join table, not via each
   work order's frozen `flow_graph.flowId`. Returns
@@ -543,13 +551,14 @@ layer directly.
   `ideaChanges.notify()`), never through return values —
   callers tell the channel rather than branch on a result.
 - **Records adapters.** `adapters/records.ts` owns Record
-  lifecycle (CRUD + `archiveRecord`).
+  lifecycle (CRUD + `postRecordStateChange`).
   `adapters/record-attributes.ts` exposes
   `getRecordAttributesByRecord`, sort-ordered.
   `adapters/flow-records.ts` is the binding seam
-  (`getRecordForFlow`, `getFlowsForRecord`,
+  (`getRecordForFlow`, `getFlowSummariesForRecord`,
   `getWorkOrdersForRecord`).
   `adapters/record-transitions.ts` orchestrates the
-  property-test gate via `validateAttributeValue`;
-  `postWorkOrderTransition` runs it and throws
-  `RecordTransitionViolations` on non-empty result.
+  property-test gate via `validateRecordTransition`;
+  `postWorkOrderTransition`
+  (`adapters/work-orders-mutations.ts`) runs that gate and
+  throws `RecordTransitionViolations` on a non-empty result.

@@ -432,8 +432,8 @@ on write and filtered on read by the gate.
 | organization_id | TEXT | FK → organizations |
 | name | TEXT | |
 | is_locked | BOOLEAN | Default false |
-| is_auto_layout | BOOLEAN | Default true |
-| is_auto_fit | BOOLEAN | Default true |
+| is_auto_layout | BOOLEAN | Default false |
+| is_auto_fit | BOOLEAN | Default false |
 | lock_timeout | INTEGER | Seconds (default 28800 = 8h) |
 | graph | TEXT | JSON document (see below) |
 
@@ -521,7 +521,7 @@ Org-owned (org-fenced): NOT-NULL `organization_id`.
 | id | TEXT | PRIMARY KEY |
 | organization_id | TEXT | FK → organizations |
 | record_id | TEXT | FK → records |
-| name | TEXT | non-empty; unique within record_id |
+| name | TEXT | non-empty |
 | attribute_type | TEXT | one of text, number, select, radio, date, checkbox |
 | sort_order | REAL | author-controlled ordering |
 | options | TEXT | JSON string[]; required non-empty for select/radio |
@@ -536,14 +536,16 @@ order).
 
 ### flow_records
 
-Join table binding one flow to one Record. UNIQUE on
-`flow_id` — a flow has at most one Record; a Record may
-back many flows.
+Join table binding one flow to one Record. A flow has at
+most one Record; a Record may back many flows. The
+single-binding rule is app-enforced (the flow-detail page
+unbinds before re-binding); the schema declares no UNIQUE
+index on `flow_id`.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
-| flow_id | TEXT | FK → flows (UNIQUE) |
+| flow_id | TEXT | FK → flows |
 | record_id | TEXT | FK → records |
 | at | TEXT | RFC-3339 Zulu — moment of the binding |
 
@@ -556,7 +558,7 @@ on write and filtered on read by the gate.
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | TEXT | PRIMARY KEY (UUID) |
+| id | TEXT | PRIMARY KEY (base62 token) |
 | organization_id | TEXT | FK → organizations |
 | display_id | TEXT | 8-char hex SHA-256 |
 | flow_graph | TEXT | JSON (WorkOrderFlowGraph) |
@@ -714,7 +716,7 @@ persistent undo on the flows/detail page.
 
 | Column | Type | Notes |
 |--------|------|-------|
-| id | TEXT | PRIMARY KEY (UUID) |
+| id | TEXT | PRIMARY KEY (base62 token) |
 | flow_id | TEXT | References flows |
 | name | TEXT | Snapshot of flows.name |
 | is_locked | BOOLEAN | Snapshot of flows.is_locked |
