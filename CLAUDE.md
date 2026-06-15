@@ -84,7 +84,9 @@ is HTTP-only.
 - **HTML Composition.** `web-app/app/compose.ts` assembles
   `components-layout.html` + `component-*.html` + each page's
   `index.html` into composed standalones in a temp build dir.
-  Standalone pages are copied directly.
+  Standalone pages skip the layout wrap but still have their
+  `{{PAGE_CSS_LINKS}}` placeholder filled from `cssBundles`
+  before they are written.
 - **Navigation.** `<a href>` between pages. `navigateTo(page,
   params?)` builds relative URLs.
 - **Page Detection.** `<html data-page="dashboard">` →
@@ -211,10 +213,12 @@ Icons are ~70 inline SVG functions in
 
 ### Mobile Responsiveness
 
-CSS media queries in `web-app/app/styles/responsive.css`
-show/hide desktop vs mobile header and sidebar. Mobile
-sidebar uses Sheet (slide-in drawer) toggled by JS.
-Breakpoints: sm 640px, md 768px, lg 1024px, xl 1280px.
+CSS media queries in `web-app/app/styles/layout.css` show/hide
+desktop vs mobile header and sidebar; `responsive.css` carries
+the grid-column and visibility utility overrides plus the
+reduced-motion block. Mobile sidebar uses Sheet (slide-in
+drawer) toggled by JS. Breakpoints: sm 640px, md 768px,
+lg 1024px, xl 1280px.
 
 ## Project Structure
 
@@ -352,8 +356,10 @@ apply to it (RED is the audit's first finding).
   consults `navigator.storage.estimate()` and rejects with
   `SnapshotTooLargeError` if `file.size` exceeds half of
   `quota - usage` (the import doubles peak memory while
-  parsing). Falls back to a 5 MB hard cap when
-  `navigator.storage.estimate()` is unavailable.
+  parsing). Falls back to treating 5 MB as the available
+  quota when `navigator.storage.estimate()` is unavailable,
+  so the effective file-size cap is half of that (2.5 MB)
+  after the same 0.5 headroom ratio is applied.
 - **Snapshot import is atomic (wipe-on-fail retired).** On
   IndexedDB the clear+put runs in one `IDBTransaction` — it
   commits whole or aborts whole, so a failed import leaves

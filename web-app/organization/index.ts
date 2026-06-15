@@ -8,8 +8,12 @@ import {
 } from '../app/field-key-validator.ts';
 import { setHtml } from '../app/safe-html.ts';
 import {
-    buildSkeleton, buildErrorState,
+    buildSkeleton, buildErrorState, buildEmptyState,
 } from '../app/loading-states.ts';
+import { iconShield, ICON_SIZE } from '../app/icons.ts';
+import {
+    RequestError, HTTP_FORBIDDEN,
+} from '../../api/api.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
@@ -226,6 +230,22 @@ export async function init(): Promise<void> {
             getOrganizationStats(ctx),
         ]);
     } catch (err) {
+        if (err instanceof RequestError
+            && err.status === HTTP_FORBIDDEN) {
+            // The organization page is admin-only. A non-admin
+            // member who reaches it gets an honest notice, not a
+            // generic error whose Try Again can only 403 again.
+            setHtml(
+                container,
+                buildEmptyState(
+                    iconShield(ICON_SIZE['2xl'], ''),
+                    'Admin access required',
+                    'Organization settings are available'
+                    + ' to organization admins.',
+                ),
+            );
+            return;
+        }
         log.error(
             'organization page load failed',
             'organization',

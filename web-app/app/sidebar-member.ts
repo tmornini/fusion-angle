@@ -7,6 +7,12 @@ import {
 import {
     shouldShowOrgSwitcher,
 } from './adapters/org-session.ts';
+import {
+    RequestError, HTTP_FORBIDDEN,
+} from '../../api/api.ts';
+import type {
+    OrganizationEntity,
+} from '../../api/types.ts';
 
 const SIDEBAR_MEMBER_NAME_IDS = [
     'sidebar-member-name',
@@ -39,12 +45,22 @@ async function getSidebarMember(
     const { activeOrg } =
         await import('./adapters/shared.ts');
     const ctx = sessionContext();
-    // The chip is the caller's own row, drawn entirely from
-    // role-independent sources: id + display name from the
-    // verified token (member.id === identity.id, name resolved
-    // per identity kind at mint), orgs from the self-fenced org
-    // enumeration — so a ROLELESS member's sidebar renders.
-    const orgs = await getOrganizations(ctx);
+    // The chip is the caller's own row, drawn from role-independent
+    // sources: id + display name from the verified token
+    // (member.id === identity.id, name resolved per identity kind
+    // at mint). The org enumeration is best-effort enrichment — a
+    // zero-membership identity resolves no org context (a 403), so
+    // the chip still renders its name while the org line and
+    // switcher stay empty.
+    let orgs: OrganizationEntity[] = [];
+    try {
+        orgs = await getOrganizations(ctx);
+    } catch (err) {
+        if (!(err instanceof RequestError
+            && err.status === HTTP_FORBIDDEN)) {
+            throw err;
+        }
+    }
     const activeOrgId = activeOrg(ctx);
     const active = orgs.find(o => o.id === activeOrgId);
     return {

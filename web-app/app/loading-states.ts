@@ -151,7 +151,7 @@ export function buildErrorState(
     </div>`;
 }
 
-function buildEmptyState(
+export function buildEmptyState(
     iconHtml: SafeHtml,
     title: string,
     description: string,

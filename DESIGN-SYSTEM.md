@@ -100,7 +100,8 @@ helpers and the CSS selectors share a single source of truth.
 `error`, `info`, `muted`.
 Applied to: `.pill`, `.icon-box`, `.icon-box-lg`,
 `.legend-dot`, `.btn-outline`, `.gauge-card`, `.ds-soft-btn`,
-`.ds-soft-row`, `.spark-tip-change`.
+`.ds-soft-row`, `.spark-tip-change`, and
+`.score-history-table td` (score cells, via `toneForScore`).
 
 **`[data-level]` values**: `normal`, `warning`, `danger`.
 Applied to: `.progress-bar` fill regions.
@@ -273,11 +274,14 @@ radius. Three types, all rendered with the unified
 `hsl(var(--primary))`, Create `hsl(var(--success))`, and
 Archive `hsl(var(--error))`:
 
-| Type    | Port       | Draggable |
-|---------|------------|-----------|
-| Create  | None       | Yes       |
-| Archive | None       | Yes       |
-| Regular | Right side | Yes       |
+| Type    | Port             | Draggable |
+|---------|------------------|-----------|
+| Create  | When unconnected | Yes       |
+| Archive | When unconnected | Yes       |
+| Regular | Right side       | Yes       |
+
+A Create or Archive node shows a port only while it has no
+connections (`canShowPort`); a connected special node hides it.
 
 **Edges**: Cubic bezier curves between node
 perimeters, rendered with the unified `flow-edge` class.
@@ -376,10 +380,10 @@ whole `.sidebar-org-switcher` is hidden.
 
 ```html
 <div class="sidebar-org-switcher">
-  <div class="org-switcher-group">
+  <span class="org-switcher-group">
     <select class="org-switcher"><!-- orgs --></select>
     <button class="org-set-default">Set as default</button>
-  </div>
+  </span>
 </div>
 ```
 

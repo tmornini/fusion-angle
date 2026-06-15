@@ -541,11 +541,12 @@ layer directly.
   (`clipboard.ts`, `viewport.ts`, `location.ts`, etc.)
   wrap browser primitives behind adapters the app owns.
 - **`getFlowStats(ctx, flowId)`.** Resolves the work-order
-  set via the `flow-work-orders` join table, not via each
-  work order's frozen `flow_graph.flowId`. Returns
-  `{ model, graph }` so the page derives the canvas viewBox
-  from real laid-out coordinates — `getFlowGraph` runs
-  `computeLayout` for `is_auto_layout` or degenerate flows.
+  set via the `flow_work_orders` join table (its `flow_id`
+  column), since the frozen `flow_graph` carries no flow id
+  of its own. Returns `{ model, graph }` so the page derives
+  the canvas viewBox from real laid-out coordinates —
+  `getFlowGraph` runs `computeLayout` for `is_auto_layout`
+  or degenerate flows.
 - **Mutation adapters return `Promise<void>`.**
   Change-awareness flows through notification channels (e.g.,
   `ideaChanges.notify()`), never through return values —

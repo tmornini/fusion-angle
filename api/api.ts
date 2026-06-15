@@ -65,6 +65,7 @@ export {
     ApiError,
     UnauthorizedError,
     RequestError,
+    HTTP_FORBIDDEN,
 } from './http-errors.ts';
 export {
     unionTablesFor,

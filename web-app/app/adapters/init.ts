@@ -130,3 +130,13 @@ export function sessionHasReachableOrg(): boolean {
         principalFromToken(getSessionToken()).organizations;
     return orgs !== undefined && orgs.length > 0;
 }
+
+// True when the held token belongs to a logged-in identity rather
+// than the anonymous seed. Identity-scoped sidebar widgets (the
+// member chip name, the invitations bell) render for any logged-in
+// visitor — including a zero-membership identity on its invitations
+// page — while org-bound widgets still gate on sessionIsOrgScoped.
+export function sessionIsAuthenticated(): boolean {
+    return principalFromToken(getSessionToken()).id
+        !== ANONYMOUS_ID;
+}

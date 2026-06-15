@@ -28,6 +28,7 @@ import { navigateTo } from './navigation.ts';
 import { sessionContext } from './adapters/shared.ts';
 import {
     sessionIsOrgScoped,
+    sessionIsAuthenticated,
 } from './adapters/init.ts';
 import {
     postSessionLogout,
@@ -94,23 +95,29 @@ async function initSidebarLayout(
     initThemeAndDropdowns();
     initMobileDrawer();
     mutateThemeToggleIcon();
-    // The member chip and header read members/current and the active
-    // org — org-bound reads that require a scoped session. On an
-    // auth-exempt sidebar page with no logged-in visitor the holder
-    // is the anonymous seed, so we skip them rather than fire reads
-    // that 401 'anonymous principal' and throw 'no active org'.
-    if (hasSchema && sessionIsOrgScoped()) {
-        // Each widget settles independently: a member with no
-        // admin role is forbidden the org reads the sidebar and
-        // header strip make, but the identity-scoped invitations
-        // bell must still appear. allSettled keeps one widget's
-        // denial from suppressing the others; rejections are
-        // logged, never swallowed.
-        const results = await Promise.allSettled([
+    // The identity-scoped widgets — the member chip name and the
+    // invitations bell — render for any logged-in visitor, even a
+    // zero-membership identity on its invitations page. The header
+    // strip is org-bound, so it joins only for a scoped session. On
+    // an auth-exempt page with no logged-in visitor the holder is
+    // the anonymous seed, so we skip every read rather than fire one
+    // that 401s 'anonymous principal' or throws 'no active org'.
+    if (hasSchema && sessionIsAuthenticated()) {
+        // Each widget settles independently: a member with no admin
+        // role is forbidden the org reads the chip and header strip
+        // make, and a zero-membership identity is forbidden them
+        // all, but the identity-scoped invitations bell must still
+        // appear. allSettled keeps one widget's denial from
+        // suppressing the others; rejections are logged, never
+        // swallowed.
+        const widgets: Array<Promise<void>> = [
             mutateSidebarMember(),
-            mutateHeaderInfo(),
             mutateInvitationsBell(),
-        ]);
+        ];
+        if (sessionIsOrgScoped()) {
+            widgets.push(mutateHeaderInfo());
+        }
+        const results = await Promise.allSettled(widgets);
         for (const result of results) {
             if (result.status === 'rejected') {
                 log.warn(

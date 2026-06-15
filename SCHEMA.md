@@ -53,7 +53,9 @@ tie falls to the larger row id — one total order on every
 backend) is the entity's current state. `'deleted'` is a
 state event value, not a separate table.
 `EntityStore.getAll`/`getById` consult
-`StateStore.getDeletedIds()` / `isDeleted(id)` to filter
+`StateStore.getDeletedIdsIn(tx)` / `isDeletedIn(tx, id)` — the
+in-transaction variants that ride the SAME tx as the
+entity-row read (two reads, one truth) — to filter
 currently-deleted rows; `EntityStore.delete(id)` is
 retained for hard splice of relationship rows
 (`state_field_values`, etc.) where lifecycle event log
@@ -531,7 +533,7 @@ Constraints discriminator (`Constraint['kind']`):
 `'regex'` (pattern, applies to text), `'range_min'` and
 `'range_max'` (min/max strings, apply to number or date).
 The runner parses per `attribute_type`; date bounds are
-RFC-3339 Zulu strings (lexicographic order = chronologic
+YYYY-MM-DD calendar dates (lexicographic order = chronologic
 order).
 
 ### flow_records
