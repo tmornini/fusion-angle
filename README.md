@@ -19,7 +19,7 @@ and execution.
   (wipe, reload, upload/download snapshots)
 
 The demo is multi-organization: loading mock data seeds two
-orgs (Stark Industries and Wayne Enterprises) with a header
+orgs (Stark Industries and Wayne Enterprises) with a sidebar
 org-switcher for the multi-org user, and surfaces one-time
 demo sign-in credentials on the Snapshots page after a
 wipe-and-load.
@@ -60,7 +60,7 @@ design system: [ARCHITECTURE.md](ARCHITECTURE.md) (with
 - TypeScript on ES2024, strict mode, zero runtime dependencies
 - Build-time HTML composition (shared layout + per-page content)
 - CSS custom properties with light/dark theme support
-- SVG charts and ~100 inline SVG icons
+- SVG charts and ~70 inline SVG icons
 - Command palette (Cmd+K) with keyboard navigation
 - Self-hosted IBM Plex Sans, Inter, and IBM Plex Mono fonts
 

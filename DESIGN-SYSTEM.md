@@ -98,11 +98,12 @@ helpers and the CSS selectors share a single source of truth.
 
 **`[data-tone]` values**: `primary`, `success`, `warning`,
 `error`, `info`, `muted`.
-Applied to: `.pill`, `.icon-box`, `.status-dot`,
-`.legend-dot`, `.btn-outline`, `.action-card`, `.stat-cell`.
+Applied to: `.pill`, `.icon-box`, `.icon-box-lg`,
+`.legend-dot`, `.btn-outline`, `.gauge-card`, `.ds-soft-btn`,
+`.ds-soft-row`, `.spark-tip-change`.
 
 **`[data-level]` values**: `normal`, `warning`, `danger`.
-Applied to: `.progress-bar`, `.gauge` fill regions.
+Applied to: `.progress-bar` fill regions.
 
 **Exception — the credential-reveal panel.** The snapshots-
 page demo-credentials panel (`.credential-reveal`,
@@ -212,16 +213,6 @@ pending invitations; the badge shows that count. There is no
 empty bell — the affordance is honest, present exactly when
 there is something to act on.
 
-### Metric Widgets
-
-```html
-<div class="metric-widget">
-  <span class="metric-widget-label">Revenue</span>
-  <span class="metric-widget-value">$45,000</span>
-  <span class="metric-widget-trend-up">+12%</span>
-</div>
-```
-
 ### Command Palette
 
 Cmd+K (or Ctrl+K) overlay for quick navigation and search.
@@ -231,19 +222,6 @@ Implemented in `web-app/app/command-palette.ts`.
 - Searches across pages, ideas, and projects
 - Renders categorized results with icons
 - Focus trap while open
-
-### Charts
-
-`build*` functions in `web-app/app/charts.ts` return
-`SafeHtml` for inline SVG charts. All charts use design
-system colors and respond to dark mode.
-
-| Type | Function | Usage |
-|------|----------|-------|
-| Bar | `buildBarChart()` | Comparisons, category breakdowns |
-| Line | `buildLineChart()` | Trends over time |
-| Donut | `buildDonutChart()` | Proportions, status distribution |
-| Area | `buildAreaChart()` | Volume trends |
 
 ### Heat ramp (flow-stats)
 
@@ -342,16 +320,12 @@ primary stroke is restored when unlocked.
 - Bidirectional pairs separated with perpendicular
   offset
 
-**Properties panel header**: Regular nodes display
-the panel with a Crew `<select>` centered in the
-header (no "State Properties" title) and the close
-button on the right, via the
-`.flow-props-header-with-crew` modifier on
-`.flow-props-header`. Start/End/Edge panels keep
-the original 2-column flex layout with their title
-on the left. The Crew `<select>` uses
-`<optgroup label="Users">` and
-`<optgroup label="Models">` to group its options.
+**Properties panel header**: The node panel's
+`.flow-props-header` carries the "State Properties" title
+on the left and the close button on the right. Member
+assignment lives below it in a `.member-select-fieldset`
+(legend "Members") with two `.member-group` blocks —
+HUMANS and AIs — of checkboxes, not a `<select>`.
 
 ### Form Controls
 
@@ -363,7 +337,8 @@ department, filter selectors, etc.).
 When a select has semantically distinct option
 groups, use native `<optgroup label="...">` rather
 than disabled-option separators or custom dropdown
-components. The Crew dropdown on flow node panels
+components. The AI-member model picker
+(`buildModelOptgroups`, grouping models by provider)
 is the introducing case — `<optgroup>` is the
 codebase's standard for grouped selects from this
 point forward. Browser default styling (bold-italic

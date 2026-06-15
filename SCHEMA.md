@@ -175,10 +175,12 @@ moment of the event.
 
 Revocation is a NEW `'revoked'` event — never a
 splice. This is the OPPOSITE discipline from
-`identity_pii` (which erases by splice). `secret`
-is opaque material stored UNHASHED at this seam;
-hashing, verification, and OAuth infrastructure are
-SP-5. The read routes project `secret` out (api.ts
+`identity_pii` (which erases by splice). For a
+`password` credential, `secret` is the PBKDF2 hash
+(a `$pbkdf2-sha256$` PHC string, `api/password-hash.ts`),
+verified at login by `verifyPassword`
+(`api/authentication.ts`) — plaintext is never stored.
+The read routes project `secret` out (`routes.ts`
 `withoutSecret`), so it never crosses the API boundary.
 
 | Column | Type |
@@ -225,7 +227,7 @@ Append-only set-default-org ledger
 identity chose its default organization — the org a
 flat (un-exchanged) token lands in. The current
 default is the LATEST `at` per `identity_id`
-(`currentDefaultOrgFor` in `api/authentication.ts` is
+(`currentDefaultOrgFor` in `api/authorization.ts` is
 its single home); `identityDefaultOrg` falls through
 to the PRIMARY membership org when the ledger is
 empty, else a 403. A re-choice is a NEW row — never a
@@ -656,8 +658,8 @@ read an invitation to an org they are not yet a member of, so
 the org fence cannot apply. The invitation routes fence
 instead by the caller's identity (invitee) or admin role
 (inviter). Validator: `validateInvitationEntity`
-(`api/validators.ts`). Secondary indexes on `organization_id`
-and `identity_id` (`api/db.ts` `TABLE_INDEXES`).
+(`api/validators.ts`). No secondary index — read by full
+scan or primary key (`api/db.ts` `TABLE_INDEXES`).
 
 The lifecycle: grant (admin) appends `pending`; accept
 (invitee) appends `accepted` AND writes a `memberships` row in

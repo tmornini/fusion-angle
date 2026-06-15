@@ -65,8 +65,9 @@ For what each test layer covers, see `## Testing`.
 
 Target: **ES2024** · Strict mode with
 `noUncheckedIndexedAccess`. Config at
-`web-app/app/tsconfig.json`. The `compose.ts` build script
-is excluded from type checking (it runs in Node).
+`web-app/app/tsconfig.json`. The `compose.ts` and
+`generate-schema-svg.ts` build scripts are excluded from
+type checking (they run in Node).
 
 ## Architecture
 
@@ -193,15 +194,16 @@ closes, and light-dismisses by those attributes — one voice
 across every dialog. Submit/confirm stay page-specific (a
 `#{id}-submit` listener or a `data-*-action`).
 
-**Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel')`
-from `core.ts`. Tab buttons use `data-tab="{name}"`
-attribute, panels use `id="tab-{name}"`.
+**Tab pattern.** Use `initTabs('[data-tab]', '.tab-panel',
+'active')` from `core.ts` — the third arg is the active-state
+class. Tab buttons use `data-tab="{name}"` attribute, panels
+use `id="tab-{name}"`.
 
 ### Design System
 
 See [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md). Key invariant: do
 not use raw hex colors in CSS; use `hsl(var(--token))`.
-Icons are ~100 inline SVG functions in
+Icons are ~70 inline SVG functions in
 `web-app/app/icons.ts`.
 
 **Heat ramp.** See [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) § Heat ramp.
@@ -227,8 +229,8 @@ kinds share the folder), `presenters/` (presenter classes
 producing `SafeHtml`), and `styles/` (cascade-ordered CSS
 modules); `org-switcher.ts` is the sidebar-footer org
 `<select>` (multi-org only) and `core.ts` scopes boot to the
-active org. `invitations.ts` is the invitation adapter; the
-top-bar pending-invitations bell lives in
+active org. `adapters/invitations.ts` is the invitation
+adapter; the top-bar pending-invitations bell lives in
 `invitations-indicator.ts`.
 `web-app/{dashboard,organization,ideas,projects,flows,members,`
 `invitations,identities,...}/` — page directories registered
@@ -400,6 +402,15 @@ apply to it (RED is the audit's first finding).
 ## Commits
 
 Commit completed, tested work. Do not ask.
+
+Going-forward discipline (the Office of the Commit is the full
+doctrine):
+
+- One concern per commit — tiny, semantically contiguous.
+- Subject: a single line ≈50 chars, present-tense imperative,
+  no prose body beyond the mandated `Co-Authored-By` trailer.
+- Never move/rename and change content in the same commit.
+- Linear history — rebase and fast-forward, never merge.
 
 ## Worktrees
 

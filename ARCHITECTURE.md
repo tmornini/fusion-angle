@@ -329,10 +329,11 @@ is the authoritative list and per-column reference),
 `api/store-entity.ts` (`EntityStore` — consults `StateStore`
 for delete filtering), `api/db-indexeddb.ts` (production
 persistence tier), `api/db-localstorage.ts` (demo tier),
-`api/db-memory.ts` (test impl), `api/api.ts` (pure
-HTTP routing — `GET/PUT/DELETE/POST` helpers, **no
-module-level adapter; threaded explicitly** — plus the
-state routes for the unified states log),
+`api/db-memory.ts` (test impl), `api/api.ts` (the HTTP
+gate — `handleRequest` plus the `GET/PUT/DELETE/POST`
+helpers, **no module-level adapter; threaded
+explicitly**), `api/routes.ts` (the route table — entity
+routes plus the state routes for the unified states log),
 `api/mock-data.ts` (seeds parent `members` rows plus
 `human_members` / `ai_members` detail — the `'system'`
 member plus the human and AI rosters), `api/validators.ts`
@@ -352,7 +353,7 @@ convenience that defaults to the singleton adapter and
 session token. Tests pass `createRequestContext` a
 `MemoryDbAdapter`.
 
-`api/api.ts` defines four state-route patterns covering
+`api/routes.ts` defines four state-route patterns covering
 five HTTP operations — `GET/PUT states/:id`, `GET states`,
 `GET entity-states/:id` (current), and
 `GET entity-states/:id/history` (ordered) — each dispatching
