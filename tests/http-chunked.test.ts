@@ -105,3 +105,63 @@ test('rejects an unsupported transfer-coding', () => {
         HttpMessageError,
     );
 });
+
+test('rejects an unterminated chunk-size line', () => {
+    assert.throws(
+        () => HttpMessage.fromWire(
+            'HTTP/1.1 200 OK\r\n' +
+            'transfer-encoding: chunked\r\n' +
+            '\r\n' +
+            '5',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a chunk shorter than its declared size', () => {
+    assert.throws(
+        () => HttpMessage.fromWire(
+            'HTTP/1.1 200 OK\r\n' +
+            'transfer-encoding: chunked\r\n' +
+            '\r\n' +
+            '5\r\nhi',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects chunk data not terminated by CRLF', () => {
+    assert.throws(
+        () => HttpMessage.fromWire(
+            'HTTP/1.1 200 OK\r\n' +
+            'transfer-encoding: chunked\r\n' +
+            '\r\n' +
+            '5\r\nhelloXX0\r\n\r\n',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects an invalid hex chunk size', () => {
+    assert.throws(
+        () => HttpMessage.fromWire(
+            'HTTP/1.1 200 OK\r\n' +
+            'transfer-encoding: chunked\r\n' +
+            '\r\n' +
+            'zz\r\nhello\r\n0\r\n\r\n',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects an unterminated trailer section', () => {
+    assert.throws(
+        () => HttpMessage.fromWire(
+            'HTTP/1.1 200 OK\r\n' +
+            'transfer-encoding: chunked\r\n' +
+            '\r\n' +
+            '5\r\nhello\r\n0\r\nx-sum: z',
+        ),
+        HttpMessageError,
+    );
+});

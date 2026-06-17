@@ -90,3 +90,90 @@ test('rejects JSON with neither method nor status', () => {
         HttpMessageError,
     );
 });
+
+test('rejects a non-object JSON message', () => {
+    assert.throws(
+        () => HttpMessage.fromJson('[1,2,3]'),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON request with an invalid method', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"method":"G@T","target":"/",'
+            + '"version":"HTTP/1.1","header":[]}',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON request with a bad version', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"method":"GET","target":"/",'
+            + '"version":"HTTP/9","header":[]}',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON response with an out-of-range status', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"version":"HTTP/1.1","status":99,'
+            + '"reason":"x","header":[]}',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON response with a non-numeric status', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"version":"HTTP/1.1","status":"200",'
+            + '"reason":"OK","header":[]}',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON header that is not an array', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"method":"GET","target":"/",'
+            + '"version":"HTTP/1.1","header":{}}',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON header pair with a non-string value', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"method":"GET","target":"/",'
+            + '"version":"HTTP/1.1","header":[["host",5]]}',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON header with an invalid field name', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"method":"GET","target":"/","version":"HTTP/1.1",'
+            + '"header":[["bad name","x"]]}',
+        ),
+        HttpMessageError,
+    );
+});
+
+test('rejects a JSON response with a bad version', () => {
+    assert.throws(
+        () => HttpMessage.fromJson(
+            '{"version":"HTTP/9","status":200,'
+            + '"reason":"OK","header":[]}',
+        ),
+        HttpMessageError,
+    );
+});

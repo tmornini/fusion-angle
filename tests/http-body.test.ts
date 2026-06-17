@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { HttpMessage } from '../api/http-message/http-message.ts';
+import { HttpMessageError } from '../api/http-message/types.ts';
 
 const jsonResponse = HttpMessage.fromWire(
     'HTTP/1.1 200 OK\r\n' +
@@ -61,4 +62,23 @@ test('withBody derives content-length on the wire', () => {
         .fromWire('POST /x HTTP/1.1\r\n\r\n')
         .withBody('application/json', { a: 1 });
     assert.match(message.toWire(), /content-length: 7\r\n/);
+});
+
+test('withBody throws for an unregistered media type', () => {
+    assert.throws(
+        () => HttpMessage
+            .fromWire('POST / HTTP/1.1\r\n\r\n')
+            .withBody('text/plain', 'hi'),
+        HttpMessageError,
+    );
+});
+
+test('a malformed JSON body is absent on query', () => {
+    const message = HttpMessage.fromWire(
+        'HTTP/1.1 200 OK\r\n' +
+        'content-type: application/json\r\n' +
+        '\r\n' +
+        'not json',
+    );
+    assert.equal(message.query('body.x').exists(), false);
 });

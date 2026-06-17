@@ -183,3 +183,65 @@ test('a missing dictionary member is absent', () => {
         false,
     );
 });
+
+test('queries a boolean parameter (8941 ?1)', () => {
+    const message = HttpMessage.fromWire(
+        'GET / HTTP/1.1\r\ncontent-type: text/html;x=?1\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.content-type.x').toBoolean(),
+        true,
+    );
+});
+
+test('queries a false boolean parameter (8941 ?0)', () => {
+    const message = HttpMessage.fromWire(
+        'GET / HTTP/1.1\r\ncontent-type: text/html;x=?0\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.content-type.x').toBoolean(),
+        false,
+    );
+});
+
+test('queries a quoted-string parameter (8941 string)', () => {
+    const message = HttpMessage.fromWire(
+        'GET / HTTP/1.1\r\n'
+        + 'content-type: text/html;title="a b"\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.content-type.title').toText(),
+        'a b',
+    );
+});
+
+test('queries a string parameter with escapes', () => {
+    const message = HttpMessage.fromWire(
+        'GET / HTTP/1.1\r\n'
+        + 'content-type: text/html;t="a\\"b"\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.content-type.t').toText(),
+        'a"b',
+    );
+});
+
+test('an unterminated quoted string falls back to raw', () => {
+    const message = HttpMessage.fromWire(
+        'GET / HTTP/1.1\r\ncontent-type: "abc\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.content-type').toText(),
+        '"abc',
+    );
+});
+
+test('a list with a trailing comma falls back to raw', () => {
+    const message = HttpMessage.fromWire(
+        'GET / HTTP/1.1\r\naccept-encoding: gzip,\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.accept-encoding').toText(),
+        'gzip,',
+    );
+});

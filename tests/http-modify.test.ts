@@ -114,6 +114,51 @@ test('withStatus rejects a reason with CRLF', () => {
     );
 });
 
+test('withMethod on a response throws', () => {
+    assert.throws(
+        () => HttpMessage
+            .fromWire('HTTP/1.1 200 OK\r\n\r\n')
+            .withMethod('GET'),
+        HttpMessageError,
+    );
+});
+
+test('withMethod rejects an invalid method token', () => {
+    assert.throws(
+        () => HttpMessage
+            .fromWire('GET / HTTP/1.1\r\n\r\n')
+            .withMethod('G@T'),
+        HttpMessageError,
+    );
+});
+
+test('withTarget on a response throws', () => {
+    assert.throws(
+        () => HttpMessage
+            .fromWire('HTTP/1.1 200 OK\r\n\r\n')
+            .withTarget('/x'),
+        HttpMessageError,
+    );
+});
+
+test('withStatus rejects an out-of-range status', () => {
+    assert.throws(
+        () => HttpMessage
+            .fromWire('HTTP/1.1 200 OK\r\n\r\n')
+            .withStatus(700, 'x'),
+        HttpMessageError,
+    );
+});
+
+test('withFieldPut rejects an invalid field name', () => {
+    assert.throws(
+        () => HttpMessage
+            .fromWire('GET / HTTP/1.1\r\n\r\n')
+            .withFieldPut('bad name', 'x'),
+        HttpMessageError,
+    );
+});
+
 test('a modified message re-serializes canonically', () => {
     const message = HttpMessage
         .fromWire('GET / HTTP/1.1\r\nhost: a\r\n\r\n')

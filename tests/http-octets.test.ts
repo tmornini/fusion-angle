@@ -50,3 +50,9 @@ test('Octets.equals compares by content', () => {
     assert.ok(a.equals(b));
     assert.ok(!a.equals(c));
 });
+
+test('Octets.equals is false for different lengths', () => {
+    const a = Octets.fromBytes(new Uint8Array([1, 2, 3]));
+    const b = Octets.fromBytes(new Uint8Array([1, 2]));
+    assert.ok(!a.equals(b));
+});

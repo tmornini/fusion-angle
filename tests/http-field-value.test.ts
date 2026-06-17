@@ -74,3 +74,23 @@ test('toDate on a non-date string throws', () => {
         HttpMessageError,
     );
 });
+
+test('toString delegates to toText', () => {
+    assert.equal(FieldValue.present('abc').toString(), 'abc');
+});
+
+test('toDate on a numeric leaf throws', () => {
+    assert.throws(
+        () => FieldValue.present(5).toDate(),
+        HttpMessageError,
+    );
+});
+
+test('toDate on an invalid month name throws', () => {
+    assert.throws(
+        () => FieldValue.present(
+            'Sun, 06 Zzz 1994 08:49:37 GMT',
+        ).toDate(),
+        HttpMessageError,
+    );
+});

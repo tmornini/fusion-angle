@@ -70,3 +70,10 @@ test('rejects whitespace before a field colon', () => {
         HttpMessageError,
     );
 });
+
+test('rejects a start-line with too few spaces', () => {
+    assert.throws(
+        () => HttpMessage.fromWire('GET /\r\n\r\n'),
+        HttpMessageError,
+    );
+});
