@@ -572,7 +572,7 @@ test(
 
 const validStateFieldValue = {
     state_event_id: 'evt-1',
-    field_id: 'f-1',
+    attribute_id: 'f-1',
     value: 'Acme Corp',
 };
 
@@ -593,7 +593,7 @@ test(
     () => {
     assert.throws(
         () => validateStateFieldValueEntity({
-            field_id: 'f-1',
+            attribute_id: 'f-1',
             value: 'x',
         }),
         /missing required key "state_event_id"/,

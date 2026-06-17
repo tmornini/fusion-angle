@@ -28,7 +28,7 @@ import {
     generateCryptoSafeBase62,
 } from '../../../api/crypto-safe-base62.ts';
 import {
-    buildStateEventOp,
+    postStateEvent,
     getIdeaState,
     getIdeaStates,
 } from './state-events.ts';
@@ -72,22 +72,37 @@ export async function getIdeaEntity(
     );
 }
 
+// The submissions for ONE idea — the server filters the nested
+// collection to the parent idea, so no client filter is needed.
+async function getIdeaSubmissionsForIdea(
+    ctx: RequestContext,
+    ideaId: string,
+): Promise<IdeaSubmissionEntity[]> {
+    return ctx.GET<IdeaSubmissionEntity[]>(
+        'ideas/' + ideaId + '/submissions',
+    );
+}
+
+// The submissions across EVERY supplied idea — reassembled from
+// the nested per-idea collections, fetched in parallel and
+// concatenated. The idea ids come from the org-scoped ideas
+// list the caller already holds.
 async function getIdeaSubmissionEntities(
     ctx: RequestContext,
+    ideaIds: readonly string[],
 ): Promise<IdeaSubmissionEntity[]> {
-    return ctx.GET<
-        IdeaSubmissionEntity[]
-    >('idea-submissions');
+    const perIdea = await Promise.all(
+        ideaIds.map(id => getIdeaSubmissionsForIdea(ctx, id)),
+    );
+    return perIdea.flat();
 }
 
 async function getIdeaSubmissionEntity(
     ctx: RequestContext,
     ideaId: string,
 ): Promise<IdeaSubmissionEntity> {
-    const all = await getIdeaSubmissionEntities(ctx);
-    const found = all.find(
-        s => s.idea_id === ideaId,
-    );
+    const [found] =
+        await getIdeaSubmissionsForIdea(ctx, ideaId);
     if (!found) {
         throw new Error(
             'Idea submission not found'
@@ -111,12 +126,14 @@ export interface IdeaWithSubmitter {
 export async function getIdeas(
     ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
+    const rows = await getIdeaEntities(ctx);
     const [
-        rows, memberMap, submissions, stateMap,
+        memberMap, submissions, stateMap,
     ] = await Promise.all([
-        getIdeaEntities(ctx),
         getMemberMap(ctx),
-        getIdeaSubmissionEntities(ctx),
+        getIdeaSubmissionEntities(
+            ctx, rows.map(r => r.id),
+        ),
         getIdeaStates(ctx),
     ]);
     const submissionMap = new Map(
@@ -187,30 +204,24 @@ export async function putIdea(
     ideaChanges.notify();
 }
 
-// Idea creation: row + initial state event in one
-// ctx.commit batch. Use only at the create call site;
-// transitions of an existing idea go through
-// postIdeaStateChange. putIdea remains for entity
-// edits (title, position) that do not change state.
+// Idea creation: row + initial state event, written
+// atomically by the named POST /ideas endpoint. Use only at
+// the create call site; transitions of an existing idea go
+// through postIdeaStateChange. putIdea remains for entity
+// edits (title, position) that do not change state. The
+// idea body OMITS organization_id — the org fence stamps it
+// from the verified token before the store validates.
 export async function postIdeaCreation(
     ctx: RequestContext,
     id: string,
     entity: Omit<IdeaEntity, 'id' | 'organization_id'>,
     initialState: IdeaState,
 ): Promise<void> {
-    const ideaBody =
-        entity as unknown as Record<string, unknown>;
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource: `ideas/${id}`,
-                body: ideaBody,
-            },
-            await buildStateEventOp(
-                ctx, id, initialState,
-            ),
-        ],
+    await ctx.POST('ideas', {
+        id,
+        idea: entity,
+        initialState,
+        initialStateEventId: generateCryptoSafeBase62(),
     });
     ideaChanges.notify();
 }
@@ -220,13 +231,7 @@ export async function postIdeaStateChange(
     id: string,
     state: IdeaState,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [
-            await buildStateEventOp(
-                ctx, id, state,
-            ),
-        ],
-    });
+    await postStateEvent(ctx, id, state);
     ideaChanges.notify();
 }
 
@@ -237,7 +242,7 @@ export async function putIdeaSubmission(
 ): Promise<void> {
     const member = await getCurrentHumanMember(ctx);
     await ctx.PUT(
-        'idea-submissions/'
+        'ideas/' + ideaId + '/submissions/'
             + submissionId,
         {
             idea_id: ideaId,
@@ -264,19 +269,19 @@ function assertConversionFullyScored(
     }
 }
 
-// Idempotent: retry recovers from partial failure.
-// Inlined writes (rather than delegating to the
-// putProject / putIdea helpers) so the project, idea,
-// state events, and per-objective baseline scores
-// commit together as one logical operation. Two
-// state events land in the same batch: the idea
-// moves to 'promoted' and the new project enters at
-// its initial state — both atomic with the row
-// updates. The N baseline-score rows commit in the
-// same batch so a new project never exists without
-// its initial baselines (and vice versa). The
-// helpers stay — they have other callers whose
-// writes are genuinely independent.
+// Idea conversion (idea→project promotion): the LONE
+// cross-aggregate write, composed by the named POST
+// /ideas/:id/conversion into ONE re-entrant transaction. A
+// new project row, the promoted idea row, two state events
+// (the idea moves to 'promoted', the new project enters at
+// its initial state), and the N per-objective baseline
+// scores all commit together — a new project never exists
+// without its initial baselines, nor an idea promoted
+// without its project. The web-app derives the bodies and
+// mints every id (project, the two events, each baseline);
+// authorship of both events is stamped server-side from the
+// verified token. The project body OMITS organization_id —
+// the org fence stamps it before the store re-validates.
 export async function postIdeaConversion(
     ctx: RequestContext,
     ideaId: string,
@@ -295,46 +300,26 @@ export async function postIdeaConversion(
         baselines.map(b => b.objectiveId),
     );
     type AnyBody = Record<string, unknown>;
-    const projectBody =
-        project as unknown as AnyBody;
-    const ideaBody =
-        promotedIdea as unknown as AnyBody;
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource:
-                    `projects/${projectId}`,
-                body: projectBody,
+    await ctx.POST(`ideas/${ideaId}/conversion`, {
+        projectId,
+        project: project as unknown as AnyBody,
+        idea: promotedIdea as unknown as AnyBody,
+        ideaStateEventId: generateCryptoSafeBase62(),
+        ideaState: 'promoted',
+        projectStateEventId: generateCryptoSafeBase62(),
+        projectState,
+        baselines: baselines.map(b => ({
+            id: generateCryptoSafeBase62(),
+            fields: {
+                project_id: projectId,
+                objective_id: b.objectiveId,
+                score: b.score,
+                member_id: member.id,
+                at,
             },
-            {
-                method: 'put',
-                resource: `ideas/${ideaId}`,
-                body: ideaBody,
-            },
-            await buildStateEventOp(
-                ctx, ideaId, 'promoted',
-            ),
-            await buildStateEventOp(
-                ctx, projectId, projectState,
-            ),
-            ...baselines.map(b => ({
-                method: 'put' as const,
-                resource:
-                    'project-objective'
-                    + '-baseline-scores/'
-                    + generateCryptoSafeBase62(),
-                body: {
-                    project_id: projectId,
-                    objective_id: b.objectiveId,
-                    score: b.score,
-                    member_id: member.id,
-                    at,
-                },
-            })),
-        ],
+        })),
     });
     notifyProjectChange();
     notifyProjectScoreChange();

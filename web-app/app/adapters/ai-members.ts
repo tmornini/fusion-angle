@@ -7,10 +7,13 @@ import type {
 import { AIMember } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
+    generateCryptoSafeBase62,
+} from '../../../api/crypto-safe-base62.ts';
+import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
-    buildStateEventOp,
+    postStateEvent,
     getMemberState,
     getMemberStates,
 } from './state-events.ts';
@@ -113,54 +116,41 @@ export async function getAIMemberEntity(
     );
 }
 
-// Edits only; creation goes through
-// postAIMemberCreation.
+// Split an AI-member write across the parent (type) and the
+// detail row. Used by edits; creation goes through
+// postAIMemberCreation. The named composing POST /ai-members/:id
+// lands both facet puts in ONE transaction; no state event (an
+// edit does not move the member's lifecycle).
 export async function putAIMember(
     ctx: RequestContext,
     id: MemberId,
     input: AIMemberDraft,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource: `members/${id}`,
-                body: { type: 'ai' },
-            },
-            {
-                method: 'put',
-                resource: `ai-members/${id}`,
-                body: input as unknown as
-                    Record<string, unknown>,
-            },
-        ],
+    await ctx.POST(`ai-members/${id}`, {
+        detail: input as unknown as
+            Record<string, unknown>,
     });
     aiMemberChanges.notify();
 }
 
-// Creation also emits the initial 'active' state
-// event, so it cannot reuse putAIMember (edits only).
-// Use at every site that creates an AI member.
+// AI-member creation: parent row + detail row + initial state
+// event, composed by the named POST /ai-members into ONE
+// transaction. Use only at the create call site; transitions of
+// an existing member go through postAIMemberStateChange. The
+// initial event's author is stamped server-side from the
+// verified token; the client mints the event id, so a retry
+// hits one row.
 export async function postAIMemberCreation(
     ctx: RequestContext,
     id: MemberId,
     input: AIMemberDraft,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource: `members/${id}`,
-                body: { type: 'ai' },
-            },
-            {
-                method: 'put',
-                resource: `ai-members/${id}`,
-                body: input as unknown as
-                    Record<string, unknown>,
-            },
-            await buildStateEventOp(ctx, id, 'active'),
-        ],
+    await ctx.POST('ai-members', {
+        id,
+        detail: input as unknown as
+            Record<string, unknown>,
+        initialState: 'active',
+        initialStateEventId: generateCryptoSafeBase62(),
     });
     aiMemberChanges.notify();
 }
@@ -170,10 +160,6 @@ export async function postAIMemberStateChange(
     id: MemberId,
     state: MemberState,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [
-            await buildStateEventOp(ctx, id, state),
-        ],
-    });
+    await postStateEvent(ctx, id, state);
     aiMemberChanges.notify();
 }

@@ -64,7 +64,7 @@ async function setup(): Promise<{
 
 // Import REPLACES every table — a snapshot that omits the
 // importer's own membership and admin grant locks the session
-// out of the now-closed snapshot plane. Tests that keep using
+// out of the authenticated surfaces. Tests that keep using
 // the ctx after an import carry the admin's rows, exactly as
 // a real exported snapshot would.
 function withAdminRows(
@@ -458,19 +458,18 @@ test(
 );
 
 test(
-    'getHasAnyHumanMembers reads the closed plane as'
-    + ' data-present for an anonymous viewer',
+    'getHasAnyHumanMembers reads an admin-only schema as'
+    + ' no-data for an anonymous viewer',
     async () => {
-        // Once a schema exists the snapshot plane is bearer-
-        // closed: the anonymous viewer cannot count members,
-        // so the conservative answer is true — the page must
-        // never offer a destructive seed over data it cannot
-        // see.
+        // The snapshot plane is auth-free, so an anonymous
+        // viewer reads the schema directly and counts members
+        // honestly: an admin-only schema has no human member,
+        // so the answer is false.
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await anonToken());
         assert.equal(
-            await getHasAnyHumanMembers(ctx), true);
+            await getHasAnyHumanMembers(ctx), false);
     },
 );
 

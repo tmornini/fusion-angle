@@ -177,9 +177,9 @@ export async function postMockDataLoad(
     // mid-seed failure leaves no half-populated schema. The
     // credentials seed runs after it commits — its PBKDF2
     // hashing is async crypto and cannot run inside the tx.
-    // The schema marker stamps LAST: it closes the anonymous
-    // bootstrap plane (request-auth BOOTSTRAP_ROUTES), so a
-    // failed seed must leave the plane open for retry.
+    // The schema marker stamps LAST, so a failed seed leaves
+    // hasSchema() false: the datastore reads as empty and the
+    // seed can be retried cleanly.
     await adapter.ensureTables(TABLE_NAMES);
     await adapter.transaction(
         TABLE_NAMES,
@@ -2950,43 +2950,43 @@ async function postMockDataLoadIn(
         {
             id: '4izDJCuygAL7iqjeHdephl',
             state_event_id: 'eJEybxfXaf3sjwFilZnunU',
-            field_id: fCompanyName,
+            attribute_id: fCompanyName,
             value: 'Acme Corp',
         },
         {
             id: 'NBmVbZMOWPSMZ11zhTpzEQ',
             state_event_id: 'eJEybxfXaf3sjwFilZnunU',
-            field_id: fEmail,
+            attribute_id: fEmail,
             value: 'onboard@acme.com',
         },
         {
             id: 'lxSMfOtoXk89FTuxLj895r',
             state_event_id: 'eJEybxfXaf3sjwFilZnunU',
-            field_id: fPhone,
+            attribute_id: fPhone,
             value: '+1-555-0100',
         },
         {
             id: 'F8Cagh2PlkwHakidXqGEXq',
             state_event_id: 'eJEybxfXaf3sjwFilZnunU',
-            field_id: fIndustry,
+            attribute_id: fIndustry,
             value: 'Technology',
         },
         {
             id: '57xrfe07Pqj38qvutRJk2N',
             state_event_id: 'eJEybxfXaf3sjwFilZnunU',
-            field_id: fRevenue,
+            attribute_id: fRevenue,
             value: '5000000',
         },
         {
             id: 'juYwNY2S35qCJqT3SAnwyW',
             state_event_id: 'eJEybxfXaf3sjwFilZnunU',
-            field_id: fEmployees,
+            attribute_id: fEmployees,
             value: '250',
         },
         {
             id: 'vtXOj3CjsGIYGlnds0FSJd',
             state_event_id: 'C2xb2bbjyHD11WfLayh8Om',
-            field_id: fReviewerNotes,
+            attribute_id: fReviewerNotes,
             value: 'Approved. Strong fit.',
         },
     ];

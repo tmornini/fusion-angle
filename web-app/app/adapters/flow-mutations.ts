@@ -13,13 +13,13 @@ import {
     buildStartAndCompleteNodes,
 } from './flow-defaults.ts';
 import {
-    buildStateEventOp,
-} from './state-events.ts';
+    generateCryptoSafeBase62,
+} from '../../../api/crypto-safe-base62.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import type {
-    RequestContext, WriteOp,
+    RequestContext,
 } from './shared.ts';
 
 const flowChanges =
@@ -60,37 +60,24 @@ export async function postFlowCreation(
         edges: [],
     };
 
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource:
-                    `flows/${input.flowId}`,
-                body: {
-                    name: input.name,
-                    is_locked: false,
-                    is_auto_layout: false,
-                    is_auto_fit: false,
-                    lock_timeout:
-                        DEFAULT_LOCK_TIMEOUT,
-                    graph: storedGraphField(graph),
-                },
-            },
-            {
-                method: 'put',
-                resource:
-                    `project-flows/`
-                    + `${input.linkId}`,
-                body: {
-                    project_id: input.projectId,
-                    flow_id: input.flowId,
-                    at: now,
-                },
-            },
-            await buildStateEventOp(
-                ctx, input.flowId, 'active',
-            ),
-        ],
+    await ctx.POST('flows', {
+        id: input.flowId,
+        flow: {
+            name: input.name,
+            is_locked: false,
+            is_auto_layout: false,
+            is_auto_fit: false,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: storedGraphField(graph),
+        },
+        projectFlowId: input.linkId,
+        projectFlow: {
+            project_id: input.projectId,
+            flow_id: input.flowId,
+            at: now,
+        },
+        initialState: 'active',
+        initialStateEventId: generateCryptoSafeBase62(),
     });
 
     flowChanges.notify();
@@ -106,14 +93,14 @@ export interface FlowSaveShape {
     edges: GraphEdge[];
 }
 
-// The PUT-flow write pair — the row PUT plus its 'updated'
-// state event — as batch ops, so a caller can land them
-// atomically beside sibling ops in ONE ctx.commit.
-export async function putFlowOps(
-    ctx: RequestContext,
-    id: string,
+// The flow row body the named save/undo/redo POSTs carry —
+// the FlowSaveShape projected onto the storage columns, minus
+// the org column (the org-scoped flows store stamps it from the
+// verified token and re-validates the rest). camelCase enters,
+// snake_case exits — this builder is the divorce point.
+export function buildFlowBody(
     save: FlowSaveShape,
-): Promise<WriteOp[]> {
+): Record<string, unknown> {
     const entity: Omit<
         FlowEntity, 'id' | 'organization_id'
     > = {
@@ -127,29 +114,23 @@ export async function putFlowOps(
             edges: save.edges,
         }),
     };
-    const body =
-        entity as unknown as Record<
-            string, unknown
-        >;
-    return [
-        {
-            method: 'put',
-            resource: `flows/${id}`,
-            body,
-        },
-        await buildStateEventOp(
-            ctx, id, 'updated',
-        ),
-    ];
+    return entity as unknown as Record<string, unknown>;
 }
 
+// Save a flow with NO version snapshot: the flow row PUT plus
+// its 'updated' state event, written atomically through the
+// named POST /flows/:id/save operation (the put + the event in
+// one re-entrant transaction). The author is stamped server-
+// side from the token; the client mints the event id.
 export async function putFlow(
     ctx: RequestContext,
     id: string,
     save: FlowSaveShape,
 ): Promise<void> {
-    await ctx.commit({
-        ops: await putFlowOps(ctx, id, save),
+    await ctx.POST(`flows/${id}/save`, {
+        version: null,
+        flow: buildFlowBody(save),
+        eventId: generateCryptoSafeBase62(),
     });
     flowChanges.notify();
 }

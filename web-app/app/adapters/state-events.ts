@@ -11,7 +11,7 @@ import {
     MS_PER_SECOND,
     nowUtc,
 } from '../../../api/types.ts';
-import type { RequestContext, WriteOp } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 import {
     generateCryptoSafeBase62,
 } from '../../../api/crypto-safe-base62.ts';
@@ -19,37 +19,25 @@ import {
     latestByKey,
 } from '../../../api/ledger-reduction.ts';
 import {
-    getCurrentHumanMember,
-} from './members.ts';
-import {
     isClaimState,
 } from '../../../api/work-order-claims.ts';
 
-// Constructs a single PUT op against the states table —
-// the atomic seam between an entity-lifecycle adapter and
-// the append-only event log. Composed at the call site
-// with sibling ops inside one ctx.commit batch — every op
-// lands as one transaction. The current human member is
-// the actor; nowUtc the moment. Caller does NOT pre-
-// resolve the member — the helper owns that read so every
-// site speaks the same vocabulary.
-export async function buildStateEventOp(
+// A single state transition is one idempotent row — write it
+// straight to PUT /states/:id. The author is stamped server-
+// side from the verified token, so the body carries no
+// member_id; nowUtc stamps the moment. The client mints the
+// event id (retries hit one row).
+export async function postStateEvent(
     ctx: RequestContext,
     entityId: Id,
     state: string,
-): Promise<WriteOp> {
-    const member = await getCurrentHumanMember(ctx);
+): Promise<void> {
     const eventId = generateCryptoSafeBase62();
-    return {
-        method: 'put',
-        resource: `states/${eventId}`,
-        body: {
-            entity_id: entityId,
-            state,
-            member_id: member.id,
-            at: nowUtc(),
-        },
-    };
+    await ctx.PUT(`states/${eventId}`, {
+        entity_id: entityId,
+        state,
+        at: nowUtc(),
+    });
 }
 
 // The states log is shared across entity types and the

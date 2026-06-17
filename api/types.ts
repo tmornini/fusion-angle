@@ -714,8 +714,12 @@ export class HumanMember {
         return this.#state === 'archived';
     }
 
-    hasDepartment(): boolean {
-        return this.#department !== '';
+    department():
+        | { present: true; label: string }
+        | { present: false } {
+        return this.#department !== ''
+            ? { present: true, label: this.#department }
+            : { present: false };
     }
 
     stateValue(): MemberState {
@@ -1152,7 +1156,7 @@ export interface FlowRecordEntity {
 export interface StateFieldValueEntity {
     id: Id;
     state_event_id: Id;
-    field_id: Id;
+    attribute_id: Id;
     value: string;
 }
 

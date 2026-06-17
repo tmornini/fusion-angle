@@ -22,7 +22,9 @@ import type {
     MemberEntity,
     HumanMemberEntity,
     AIMemberEntity,
+    MemberState,
     IdeaEntity,
+    IdeaState,
     ProjectEntity,
     FlowEntity,
     FlowVersionEntity,
@@ -48,6 +50,8 @@ import type {
 import {
     assertAttributeType,
     assertConstraintAppliesTo,
+    assertIdeaState,
+    assertMemberState,
     assertRecordState,
 } from './types.ts';
 import {
@@ -1273,7 +1277,7 @@ export function validateFlowWorkOrderEntity(
 
 const STATE_FIELD_VALUE_BODY_KEYS:
     readonly string[] = [
-    'state_event_id', 'field_id', 'value',
+    'state_event_id', 'attribute_id', 'value',
 ];
 
 export function
@@ -1289,8 +1293,8 @@ validateStateFieldValueEntity(
         state_event_id: pickString(
             body, 'state_event_id',
         ),
-        field_id: pickString(
-            body, 'field_id',
+        attribute_id: pickString(
+            body, 'attribute_id',
         ),
         value: pickString(
             body, 'value',
@@ -1549,7 +1553,10 @@ export function validateActualScoreEntity(
     };
 }
 
-const STATE_BODY_KEYS: readonly string[] = [
+// The storage-edge gate: the FULL event row, member_id
+// included. The store re-validates every write through this,
+// so a direct put cannot smuggle a malformed event past it.
+const STATE_ENTITY_KEYS: readonly string[] = [
     'entity_id', 'state', 'member_id', 'at',
 ];
 
@@ -1557,7 +1564,7 @@ export function validateStateEntity(
     body: Record<string, unknown>,
 ): Omit<StateEntity, 'id'> {
     assertOnlyKeys(
-        body, STATE_BODY_KEYS, 'StateEntity',
+        body, STATE_ENTITY_KEYS, 'StateEntity',
     );
     return {
         entity_id: pickString(
@@ -1569,6 +1576,30 @@ export function validateStateEntity(
         ),
         at: validateTimestampField(
             body, 'at', 'StateEntity',
+        ),
+    };
+}
+
+// The HTTP-body gate for PUT /states/:id: NO member_id —
+// authorship is stamped from the verified token, never the
+// body. A body that names a member is malformed and 400s.
+const STATE_BODY_KEYS: readonly string[] = [
+    'entity_id', 'state', 'at',
+];
+
+export function validateStateBody(
+    body: Record<string, unknown>,
+): Omit<StateEntity, 'id' | 'member_id'> {
+    assertOnlyKeys(
+        body, STATE_BODY_KEYS, 'StateEvent',
+    );
+    return {
+        entity_id: pickString(
+            body, 'entity_id',
+        ),
+        state: pickString(body, 'state'),
+        at: validateTimestampField(
+            body, 'at', 'StateEvent',
         ),
     };
 }
@@ -1712,7 +1743,7 @@ export function validateFlowRecordEntity(
     };
 }
 
-export interface RecordMultiPutCreateBody {
+export interface RecordWriteCreateBody {
     readonly kind: 'create';
     readonly id: RecordId;
     readonly record: Omit<RecordEntity, 'id'>;
@@ -1721,7 +1752,7 @@ export interface RecordMultiPutCreateBody {
     readonly initialStateEventId: string;
 }
 
-export interface RecordMultiPutEditBody {
+export interface RecordWriteEditBody {
     readonly kind: 'edit';
     readonly id: RecordId;
     readonly record: Omit<RecordEntity, 'id'>;
@@ -1729,24 +1760,24 @@ export interface RecordMultiPutEditBody {
     readonly removedAttributeIds: readonly string[];
 }
 
-export type RecordMultiPutBody =
-    | RecordMultiPutCreateBody
-    | RecordMultiPutEditBody;
+export type RecordWriteBody =
+    | RecordWriteCreateBody
+    | RecordWriteEditBody;
 
-const RECORD_MULTI_PUT_CREATE_KEYS:
+const RECORD_WRITE_CREATE_KEYS:
     readonly string[] = [
     'kind', 'id', 'record',
     'attributes', 'initialState',
     'initialStateEventId',
 ];
 
-const RECORD_MULTI_PUT_EDIT_KEYS:
+const RECORD_WRITE_EDIT_KEYS:
     readonly string[] = [
     'kind', 'id', 'record',
     'attributes', 'removedAttributeIds',
 ];
 
-function validateMultiPutAttribute(
+function validateRecordWriteAttribute(
     value: unknown,
     recordId: string,
     label: string,
@@ -1767,37 +1798,37 @@ function validateMultiPutAttribute(
     return { id, ...validated };
 }
 
-export function validateRecordMultiPutBody(
+export function validateRecordWriteBody(
     body: Record<string, unknown>,
-): RecordMultiPutBody {
+): RecordWriteBody {
     const kind = pickString(body, 'kind');
     if (kind === 'create') {
         assertOnlyKeys(
             body,
-            RECORD_MULTI_PUT_CREATE_KEYS,
-            'RecordMultiPutCreateBody',
+            RECORD_WRITE_CREATE_KEYS,
+            'RecordWriteCreateBody',
         );
         const id = pickString(body, 'id');
         const record = validateRecordEntity(
             asObject(
                 body['record'],
-                'RecordMultiPutCreateBody.record',
+                'RecordWriteCreateBody.record',
             ),
         );
         const attrsRaw = asArray(
             body['attributes'],
-            'RecordMultiPutCreateBody.attributes',
+            'RecordWriteCreateBody.attributes',
         );
         const attributes = attrsRaw.map((a, i) =>
-            validateMultiPutAttribute(
+            validateRecordWriteAttribute(
                 a, id,
-                'RecordMultiPutCreateBody'
+                'RecordWriteCreateBody'
                 + '.attributes[' + i + ']',
             ),
         );
         const initialState = assertRecordState(
             pickString(body, 'initialState'),
-            'RecordMultiPutCreateBody.initialState',
+            'RecordWriteCreateBody.initialState',
         );
         const initialStateEventId = pickString(
             body, 'initialStateEventId',
@@ -1811,36 +1842,36 @@ export function validateRecordMultiPutBody(
     if (kind === 'edit') {
         assertOnlyKeys(
             body,
-            RECORD_MULTI_PUT_EDIT_KEYS,
-            'RecordMultiPutEditBody',
+            RECORD_WRITE_EDIT_KEYS,
+            'RecordWriteEditBody',
         );
         const id = pickString(body, 'id');
         const record = validateRecordEntity(
             asObject(
                 body['record'],
-                'RecordMultiPutEditBody.record',
+                'RecordWriteEditBody.record',
             ),
         );
         const attrsRaw = asArray(
             body['attributes'],
-            'RecordMultiPutEditBody.attributes',
+            'RecordWriteEditBody.attributes',
         );
         const attributes = attrsRaw.map((a, i) =>
-            validateMultiPutAttribute(
+            validateRecordWriteAttribute(
                 a, id,
-                'RecordMultiPutEditBody'
+                'RecordWriteEditBody'
                 + '.attributes[' + i + ']',
             ),
         );
         const removedRaw = asArray(
             body['removedAttributeIds'],
-            'RecordMultiPutEditBody'
+            'RecordWriteEditBody'
             + '.removedAttributeIds',
         );
         const removedAttributeIds = removedRaw
             .map((r, i) => asString(
                 r,
-                'RecordMultiPutEditBody'
+                'RecordWriteEditBody'
                 + '.removedAttributeIds['
                 + i + ']',
             ));
@@ -1851,7 +1882,977 @@ export function validateRecordMultiPutBody(
         };
     }
     throw new ValidationError(
-        "expected RecordMultiPutBody kind"
+        "expected RecordWriteBody kind"
         + " 'create' or 'edit', got " + kind,
     );
+}
+
+export interface IdeaCreateBody {
+    readonly id: string;
+    readonly idea: Record<string, unknown>;
+    readonly initialState: IdeaState;
+    readonly initialStateEventId: string;
+}
+
+const IDEA_CREATE_KEYS: readonly string[] = [
+    'id', 'idea', 'initialState', 'initialStateEventId',
+];
+
+// The HTTP-body gate for POST /ideas: the idea row plus its
+// initial state event, written atomically. The idea fields are
+// NOT fully validated here — the org-scoped store stamps
+// organization_id from the verified token and re-validates the
+// idea through validateIdeaEntity AFTER the stamp, so the body
+// must OMIT organization_id (the fence supplies it). Authorship
+// of the initial event is stamped from the verified caller in
+// the route, never the body.
+export function validateIdeaCreateBody(
+    body: Record<string, unknown>,
+): IdeaCreateBody {
+    assertOnlyKeys(
+        body, IDEA_CREATE_KEYS, 'IdeaCreateBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'IdeaCreateBody.id must be non-empty',
+        );
+    }
+    const idea = asObject(
+        body['idea'], 'IdeaCreateBody.idea',
+    );
+    const initialState = assertIdeaState(
+        pickString(body, 'initialState'),
+        'IdeaCreateBody.initialState',
+    );
+    const initialStateEventId = pickString(
+        body, 'initialStateEventId',
+    );
+    if (initialStateEventId === '') {
+        throw new ValidationError(
+            'IdeaCreateBody.initialStateEventId'
+            + ' must be non-empty',
+        );
+    }
+    return { id, idea, initialState, initialStateEventId };
+}
+
+export interface IdeaConversionBaseline {
+    readonly id: string;
+    readonly fields: Record<string, unknown>;
+}
+
+export interface IdeaConversionBody {
+    readonly projectId: string;
+    readonly project: Record<string, unknown>;
+    readonly idea: Record<string, unknown>;
+    readonly ideaStateEventId: string;
+    readonly ideaState: string;
+    readonly projectStateEventId: string;
+    readonly projectState: string;
+    readonly baselines: readonly IdeaConversionBaseline[];
+}
+
+const IDEA_CONVERSION_KEYS: readonly string[] = [
+    'projectId', 'project', 'idea',
+    'ideaStateEventId', 'ideaState',
+    'projectStateEventId', 'projectState', 'baselines',
+];
+
+const IDEA_CONVERSION_BASELINE_KEYS: readonly string[] = [
+    'id', 'fields',
+];
+
+// The HTTP-body gate for POST /ideas/:id/conversion: the lone
+// cross-aggregate write — a new project row, the promoted idea
+// row, TWO state events (the idea's 'promoted' and the
+// project's initial), and N baseline-score rows, written
+// atomically. The idea is the route param. The facet fields are
+// NOT fully validated here — the org-scoped projects store
+// stamps organization_id from the verified token and
+// re-validates through validateProjectEntity AFTER the stamp
+// (so the project body OMITS organization_id); the ideas store
+// re-validates the promoted idea through validateIdeaEntity, and
+// each baseline row through validateBaselineScoreEntity, as the
+// composing puts land. Authorship of both events is stamped
+// from the verified caller in the route, never the body — the
+// body carries only the event ids and the (server-fixed) state
+// values. The baseline ids are minted client-side and non-empty.
+export function validateIdeaConversionBody(
+    body: Record<string, unknown>,
+): IdeaConversionBody {
+    assertOnlyKeys(
+        body, IDEA_CONVERSION_KEYS, 'IdeaConversionBody',
+    );
+    const projectId = pickString(body, 'projectId');
+    if (projectId === '') {
+        throw new ValidationError(
+            'IdeaConversionBody.projectId must be non-empty',
+        );
+    }
+    const project = asObject(
+        body['project'], 'IdeaConversionBody.project',
+    );
+    const idea = asObject(
+        body['idea'], 'IdeaConversionBody.idea',
+    );
+    const ideaStateEventId = pickString(
+        body, 'ideaStateEventId',
+    );
+    if (ideaStateEventId === '') {
+        throw new ValidationError(
+            'IdeaConversionBody.ideaStateEventId'
+            + ' must be non-empty',
+        );
+    }
+    const ideaState = pickString(body, 'ideaState');
+    if (ideaState === '') {
+        throw new ValidationError(
+            'IdeaConversionBody.ideaState must be non-empty',
+        );
+    }
+    const projectStateEventId = pickString(
+        body, 'projectStateEventId',
+    );
+    if (projectStateEventId === '') {
+        throw new ValidationError(
+            'IdeaConversionBody.projectStateEventId'
+            + ' must be non-empty',
+        );
+    }
+    const projectState = pickString(body, 'projectState');
+    if (projectState === '') {
+        throw new ValidationError(
+            'IdeaConversionBody.projectState must be non-empty',
+        );
+    }
+    const baselines = asArray(
+        body['baselines'], 'IdeaConversionBody.baselines',
+    ).map((v, i) => {
+        const label =
+            'IdeaConversionBody.baselines[' + i + ']';
+        const row = asObject(v, label);
+        assertOnlyKeys(
+            row, IDEA_CONVERSION_BASELINE_KEYS, label,
+        );
+        const id = asString(row['id'], label + '.id');
+        if (id === '') {
+            throw new ValidationError(
+                label + '.id must be non-empty',
+            );
+        }
+        return {
+            id,
+            fields: asObject(
+                row['fields'], label + '.fields',
+            ),
+        };
+    });
+    return {
+        projectId, project, idea,
+        ideaStateEventId, ideaState,
+        projectStateEventId, projectState, baselines,
+    };
+}
+
+export interface ObjectiveCreateBody {
+    readonly id: string;
+    readonly objective: Record<string, unknown>;
+    readonly revisionId: string;
+    readonly revision: Record<string, unknown>;
+}
+
+const OBJECTIVE_CREATE_KEYS: readonly string[] = [
+    'id', 'objective', 'revisionId', 'revision',
+];
+
+// The HTTP-body gate for POST /objectives: the objective row
+// plus its FIRST revision, written atomically. Objective
+// creation writes NO state event — an objective with no event
+// reads as active, archival is a later event — so the handler
+// needs no actor. The objective fields are NOT fully validated
+// here: the org-scoped store stamps organization_id from the
+// verified token and re-validates through validateObjectiveEntity
+// AFTER the stamp, so the body OMITS it. The revision sub-object
+// is re-validated by the objective_revisions store's own
+// validator; its member_id is a row column (who authored the
+// definition), not state authorship.
+export function validateObjectiveCreateBody(
+    body: Record<string, unknown>,
+): ObjectiveCreateBody {
+    assertOnlyKeys(
+        body, OBJECTIVE_CREATE_KEYS, 'ObjectiveCreateBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'ObjectiveCreateBody.id must be non-empty',
+        );
+    }
+    const objective = asObject(
+        body['objective'], 'ObjectiveCreateBody.objective',
+    );
+    const revisionId = pickString(body, 'revisionId');
+    if (revisionId === '') {
+        throw new ValidationError(
+            'ObjectiveCreateBody.revisionId must be non-empty',
+        );
+    }
+    const revision = asObject(
+        body['revision'], 'ObjectiveCreateBody.revision',
+    );
+    return { id, objective, revisionId, revision };
+}
+
+export interface FlowCreateBody {
+    readonly id: string;
+    readonly flow: Record<string, unknown>;
+    readonly projectFlowId: string;
+    readonly projectFlow: Record<string, unknown>;
+    readonly initialState: string;
+    readonly initialStateEventId: string;
+}
+
+const FLOW_CREATE_KEYS: readonly string[] = [
+    'id', 'flow', 'projectFlowId', 'projectFlow',
+    'initialState', 'initialStateEventId',
+];
+
+// The HTTP-body gate for POST /flows: the flow row, its
+// project_flows join row, and the initial state event, written
+// atomically. The facet fields are NOT fully validated here —
+// the org-scoped flows store stamps organization_id from the
+// verified token and re-validates through validateFlowEntity
+// AFTER the stamp (so the body OMITS organization_id), and the
+// project_flows store re-validates the join through
+// validateProjectFlowEntity when the composing POST puts it.
+// Authorship of the initial event is stamped from the verified
+// caller in the route, never the body; initialState is carried
+// for symmetry with the other create endpoints (the flow
+// creation paths pin it to 'active') and validated non-empty.
+export function validateFlowCreateBody(
+    body: Record<string, unknown>,
+): FlowCreateBody {
+    assertOnlyKeys(
+        body, FLOW_CREATE_KEYS, 'FlowCreateBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'FlowCreateBody.id must be non-empty',
+        );
+    }
+    const flow = asObject(
+        body['flow'], 'FlowCreateBody.flow',
+    );
+    const projectFlowId = pickString(body, 'projectFlowId');
+    if (projectFlowId === '') {
+        throw new ValidationError(
+            'FlowCreateBody.projectFlowId must be non-empty',
+        );
+    }
+    const projectFlow = asObject(
+        body['projectFlow'], 'FlowCreateBody.projectFlow',
+    );
+    const initialState = pickString(body, 'initialState');
+    if (initialState === '') {
+        throw new ValidationError(
+            'FlowCreateBody.initialState must be non-empty',
+        );
+    }
+    const initialStateEventId = pickString(
+        body, 'initialStateEventId',
+    );
+    if (initialStateEventId === '') {
+        throw new ValidationError(
+            'FlowCreateBody.initialStateEventId'
+            + ' must be non-empty',
+        );
+    }
+    return {
+        id, flow, projectFlowId, projectFlow,
+        initialState, initialStateEventId,
+    };
+}
+
+export interface FlowVersionPublishBody {
+    readonly id: string;
+    readonly version: Record<string, unknown>;
+    readonly trimIds: readonly string[];
+}
+
+const FLOW_VERSION_PUBLISH_KEYS: readonly string[] = [
+    'id', 'version', 'trimIds',
+];
+
+// The HTTP-body gate for POST /flows/:id/versions: the version
+// snapshot row plus the ids of the over-cap versions to trim,
+// written atomically. The version fields are NOT fully validated
+// here — the flow_versions store re-validates the snapshot
+// through validateFlowVersionEntity when the composing POST puts
+// it. The web-app computes WHICH versions to trim (its own
+// cap-retention derivation), so trimIds is carried as a list of
+// non-empty version ids. No state event is written, so no actor
+// is involved.
+export function validateFlowVersionPublishBody(
+    body: Record<string, unknown>,
+): FlowVersionPublishBody {
+    assertOnlyKeys(
+        body, FLOW_VERSION_PUBLISH_KEYS,
+        'FlowVersionPublishBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'FlowVersionPublishBody.id must be non-empty',
+        );
+    }
+    const version = asObject(
+        body['version'], 'FlowVersionPublishBody.version',
+    );
+    const trimRaw = asArray(
+        body['trimIds'], 'FlowVersionPublishBody.trimIds',
+    );
+    const trimIds = trimRaw.map((t, i) => {
+        const value = asString(
+            t, 'FlowVersionPublishBody.trimIds[' + i + ']',
+        );
+        if (value === '') {
+            throw new ValidationError(
+                'FlowVersionPublishBody.trimIds[' + i + ']'
+                + ' must be non-empty',
+            );
+        }
+        return value;
+    });
+    return { id, version, trimIds };
+}
+
+// The version-snapshot sub-object shared by POST /flows/:id/save
+// (optional) and POST /flows/:id/redo (required): a new
+// flow_versions snapshot to PUT plus the ids of the over-cap
+// versions to trim. Same shape as FlowVersionPublishBody — the
+// flow_versions store re-validates the snapshot through
+// validateFlowVersionEntity when the composing POST puts it; the
+// web-app owns the cap-retention trim derivation, so trimIds is a
+// list of non-empty version ids. `label` names the offender so
+// the message reads from the enclosing body.
+export interface FlowVersionSnapshot {
+    readonly id: string;
+    readonly version: Record<string, unknown>;
+    readonly trimIds: readonly string[];
+}
+
+const FLOW_VERSION_SNAPSHOT_KEYS: readonly string[] = [
+    'id', 'version', 'trimIds',
+];
+
+function validateFlowVersionSnapshot(
+    value: unknown,
+    label: string,
+): FlowVersionSnapshot {
+    const obj = asObject(value, label);
+    assertOnlyKeys(obj, FLOW_VERSION_SNAPSHOT_KEYS, label);
+    const id = asString(obj['id'], label + '.id');
+    if (id === '') {
+        throw new ValidationError(
+            label + '.id must be non-empty',
+        );
+    }
+    const version = asObject(obj['version'], label + '.version');
+    const trimRaw = asArray(obj['trimIds'], label + '.trimIds');
+    const trimIds = trimRaw.map((t, i) => {
+        const v = asString(t, label + '.trimIds[' + i + ']');
+        if (v === '') {
+            throw new ValidationError(
+                label + '.trimIds[' + i + '] must be non-empty',
+            );
+        }
+        return v;
+    });
+    return { id, version, trimIds };
+}
+
+export interface FlowSaveBody {
+    readonly version: FlowVersionSnapshot | null;
+    readonly flow: Record<string, unknown>;
+    readonly eventId: string;
+}
+
+const FLOW_SAVE_KEYS: readonly string[] = [
+    'version', 'flow', 'eventId',
+];
+
+// The HTTP-body gate for POST /flows/:id/save: an OPTIONAL
+// version snapshot (put + trims), the flow row, and the
+// 'updated' state event, written atomically. Covers both the
+// plain save (version null) and the versioned save. The flow
+// fields are NOT fully validated here — the org-scoped flows
+// store stamps organization_id from the verified token and
+// re-validates through validateFlowEntity AFTER the stamp, so
+// the body OMITS organization_id; the version sub-object's
+// snapshot is re-validated by the flow_versions store. The
+// state is fixed to 'updated' server-side and authored by the
+// verified caller (actor), never the body — the body carries
+// only the event id.
+export function validateFlowSaveBody(
+    body: Record<string, unknown>,
+): FlowSaveBody {
+    assertOnlyKeys(body, FLOW_SAVE_KEYS, 'FlowSaveBody');
+    const rawVersion = body['version'];
+    const version = rawVersion === null
+        ? null
+        : validateFlowVersionSnapshot(
+            rawVersion, 'FlowSaveBody.version',
+        );
+    const flow = asObject(body['flow'], 'FlowSaveBody.flow');
+    const eventId = pickString(body, 'eventId');
+    if (eventId === '') {
+        throw new ValidationError(
+            'FlowSaveBody.eventId must be non-empty',
+        );
+    }
+    return { version, flow, eventId };
+}
+
+export interface FlowUndoBody {
+    readonly flow: Record<string, unknown>;
+    readonly eventId: string;
+    readonly consumedVersionId: string;
+}
+
+const FLOW_UNDO_KEYS: readonly string[] = [
+    'flow', 'eventId', 'consumedVersionId',
+];
+
+// The HTTP-body gate for POST /flows/:id/undo: the flow row, the
+// 'updated' state event, and the DELETE of the consumed version,
+// written atomically — the flow can never land reverted while
+// the version row survives unconsumed. The flow fields are
+// re-validated by the org-scoped flows store after the org
+// stamp (body OMITS organization_id). The state is fixed to
+// 'updated' server-side and authored by the verified caller
+// (actor), never the body.
+export function validateFlowUndoBody(
+    body: Record<string, unknown>,
+): FlowUndoBody {
+    assertOnlyKeys(body, FLOW_UNDO_KEYS, 'FlowUndoBody');
+    const flow = asObject(body['flow'], 'FlowUndoBody.flow');
+    const eventId = pickString(body, 'eventId');
+    if (eventId === '') {
+        throw new ValidationError(
+            'FlowUndoBody.eventId must be non-empty',
+        );
+    }
+    const consumedVersionId = pickString(
+        body, 'consumedVersionId',
+    );
+    if (consumedVersionId === '') {
+        throw new ValidationError(
+            'FlowUndoBody.consumedVersionId must be non-empty',
+        );
+    }
+    return { flow, eventId, consumedVersionId };
+}
+
+export interface FlowRedoBody {
+    readonly version: FlowVersionSnapshot;
+    readonly flow: Record<string, unknown>;
+    readonly eventId: string;
+}
+
+const FLOW_REDO_KEYS: readonly string[] = [
+    'version', 'flow', 'eventId',
+];
+
+// The HTTP-body gate for POST /flows/:id/redo: a REQUIRED
+// version snapshot (put + trims), the flow row, and the
+// 'updated' state event, written atomically — the current
+// state can never land archived as a version while the redo
+// graph is lost. The flow fields are re-validated by the
+// org-scoped flows store after the org stamp (body OMITS
+// organization_id); the version snapshot is re-validated by
+// the flow_versions store. The state is fixed to 'updated'
+// server-side and authored by the verified caller (actor),
+// never the body.
+export function validateFlowRedoBody(
+    body: Record<string, unknown>,
+): FlowRedoBody {
+    assertOnlyKeys(body, FLOW_REDO_KEYS, 'FlowRedoBody');
+    const version = validateFlowVersionSnapshot(
+        body['version'], 'FlowRedoBody.version',
+    );
+    const flow = asObject(body['flow'], 'FlowRedoBody.flow');
+    const eventId = pickString(body, 'eventId');
+    if (eventId === '') {
+        throw new ValidationError(
+            'FlowRedoBody.eventId must be non-empty',
+        );
+    }
+    return { version, flow, eventId };
+}
+
+export interface HumanMemberCreateBody {
+    readonly id: string;
+    readonly pii: Record<string, unknown>;
+    readonly detail: Record<string, unknown>;
+    readonly initialState: MemberState;
+    readonly initialStateEventId: string;
+}
+
+const HUMAN_MEMBER_CREATE_KEYS: readonly string[] = [
+    'id', 'pii', 'detail',
+    'initialState', 'initialStateEventId',
+];
+
+// The HTTP-body gate for POST /human-members: the four member
+// facets (the parent member row, the identity, the PII row, the
+// detail row) plus the initial state event, written atomically.
+// The facet fields are NOT fully validated here — each facet
+// store re-validates its own body (validateMemberEntity,
+// validateIdentityEntity, validateIdentityPiiEntity,
+// validateHumanMemberEntity) when the composing POST puts it.
+// The member parent (type) and the identity (kind) are
+// server-supplied facts the handler pins, so the body carries
+// only the PII and detail sub-objects. Authorship of the initial
+// event is stamped from the verified caller in the route, never
+// the body.
+export function validateHumanMemberCreateBody(
+    body: Record<string, unknown>,
+): HumanMemberCreateBody {
+    assertOnlyKeys(
+        body, HUMAN_MEMBER_CREATE_KEYS, 'HumanMemberCreateBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'HumanMemberCreateBody.id must be non-empty',
+        );
+    }
+    const pii = asObject(
+        body['pii'], 'HumanMemberCreateBody.pii',
+    );
+    const detail = asObject(
+        body['detail'], 'HumanMemberCreateBody.detail',
+    );
+    const initialState = assertMemberState(
+        pickString(body, 'initialState'),
+        'HumanMemberCreateBody.initialState',
+    );
+    const initialStateEventId = pickString(
+        body, 'initialStateEventId',
+    );
+    if (initialStateEventId === '') {
+        throw new ValidationError(
+            'HumanMemberCreateBody.initialStateEventId'
+            + ' must be non-empty',
+        );
+    }
+    return { id, pii, detail, initialState, initialStateEventId };
+}
+
+// Identity creation, discriminated by kind. A person carries
+// its PII sub-object; a service carries its credential sub-
+// object (a deterministic-id'd client_secret row whose secret
+// is hashed client-side before it crosses the gate). The route
+// pins the identity kind and composes the two writes.
+export interface IdentityCreatePersonBody {
+    readonly id: string;
+    readonly kind: 'person';
+    readonly pii: Record<string, unknown>;
+}
+
+export interface IdentityCreateServiceBody {
+    readonly id: string;
+    readonly kind: 'service';
+    readonly credential: Record<string, unknown>;
+}
+
+export type IdentityCreateBody =
+    | IdentityCreatePersonBody
+    | IdentityCreateServiceBody;
+
+const IDENTITY_CREATE_PERSON_KEYS: readonly string[] = [
+    'id', 'kind', 'pii',
+];
+
+const IDENTITY_CREATE_SERVICE_KEYS: readonly string[] = [
+    'id', 'kind', 'credential',
+];
+
+// The HTTP-body gate for POST /identities: a person identity +
+// its PII row, OR a service identity + its client_secret
+// credential row, written atomically. The sub-object fields are
+// NOT fully validated here — the parent-scoped identity_pii and
+// identity_credentials stores re-validate their own bodies
+// (validateIdentityPiiEntity, validateIdentityCredentialEntity)
+// when the composing put lands, and the identities store pins
+// the kind through validateIdentityEntity. The credential's
+// secret is hashed client-side; the route never touches crypto.
+// Identity creation writes NO state event — identities carry no
+// lifecycle event at creation — so the handler needs no actor.
+export function validateIdentityCreateBody(
+    body: Record<string, unknown>,
+): IdentityCreateBody {
+    const kind = validateEnumField(
+        body, 'kind', ['person', 'service'],
+        'identity kind', 'IdentityCreateBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'IdentityCreateBody.id must be non-empty',
+        );
+    }
+    if (kind === 'person') {
+        assertOnlyKeys(
+            body,
+            IDENTITY_CREATE_PERSON_KEYS,
+            'IdentityCreatePersonBody',
+        );
+        return {
+            id,
+            kind,
+            pii: asObject(
+                body['pii'], 'IdentityCreatePersonBody.pii',
+            ),
+        };
+    }
+    assertOnlyKeys(
+        body,
+        IDENTITY_CREATE_SERVICE_KEYS,
+        'IdentityCreateServiceBody',
+    );
+    return {
+        id,
+        kind,
+        credential: asObject(
+            body['credential'],
+            'IdentityCreateServiceBody.credential',
+        ),
+    };
+}
+
+export interface WorkOrderCreateBody {
+    readonly id: string;
+    readonly workOrder: Record<string, unknown>;
+    readonly flowWorkOrderId: string;
+    readonly flowWorkOrder: Record<string, unknown>;
+    readonly stateEventIds: readonly string[];
+    readonly states: readonly string[];
+}
+
+const WORK_ORDER_CREATE_KEYS: readonly string[] = [
+    'id', 'workOrder', 'flowWorkOrderId', 'flowWorkOrder',
+    'stateEventIds', 'states',
+];
+
+// The HTTP-body gate for POST /work-orders: the work_orders
+// row, its flow_work_orders join row, and THREE initial state
+// events (start, post-start, claimed), written atomically. The
+// facet fields are NOT fully validated here — the work_orders
+// store stamps organization_id from the verified token and
+// re-validates through validateWorkOrderEntity AFTER the stamp
+// (so the body OMITS organization_id), and the flow_work_orders
+// store re-validates the join through validateFlowWorkOrderEntity
+// when the composing POST puts it. The three event ids and
+// states ride parallel arrays, applied IN ORDER; authorship of
+// every event is stamped from the verified caller in the route,
+// never the body. The arrays must be equal length and exactly
+// three — the create's fixed event count.
+export function validateWorkOrderCreateBody(
+    body: Record<string, unknown>,
+): WorkOrderCreateBody {
+    assertOnlyKeys(
+        body, WORK_ORDER_CREATE_KEYS, 'WorkOrderCreateBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'WorkOrderCreateBody.id must be non-empty',
+        );
+    }
+    const workOrder = asObject(
+        body['workOrder'], 'WorkOrderCreateBody.workOrder',
+    );
+    const flowWorkOrderId = pickString(body, 'flowWorkOrderId');
+    if (flowWorkOrderId === '') {
+        throw new ValidationError(
+            'WorkOrderCreateBody.flowWorkOrderId'
+            + ' must be non-empty',
+        );
+    }
+    const flowWorkOrder = asObject(
+        body['flowWorkOrder'],
+        'WorkOrderCreateBody.flowWorkOrder',
+    );
+    const stateEventIds = asArray(
+        body['stateEventIds'],
+        'WorkOrderCreateBody.stateEventIds',
+    ).map((v, i) => {
+        const eventId = asString(
+            v, 'WorkOrderCreateBody.stateEventIds[' + i + ']',
+        );
+        if (eventId === '') {
+            throw new ValidationError(
+                'WorkOrderCreateBody.stateEventIds['
+                + i + '] must be non-empty',
+            );
+        }
+        return eventId;
+    });
+    const states = asArray(
+        body['states'], 'WorkOrderCreateBody.states',
+    ).map((v, i) => {
+        const state = asString(
+            v, 'WorkOrderCreateBody.states[' + i + ']',
+        );
+        if (state === '') {
+            throw new ValidationError(
+                'WorkOrderCreateBody.states['
+                + i + '] must be non-empty',
+            );
+        }
+        return state;
+    });
+    if (
+        stateEventIds.length !== 3
+        || states.length !== 3
+    ) {
+        throw new ValidationError(
+            'WorkOrderCreateBody expects exactly three'
+            + ' state events (stateEventIds + states),'
+            + ' got ' + stateEventIds.length + ' ids and '
+            + states.length + ' states',
+        );
+    }
+    return {
+        id, workOrder, flowWorkOrderId, flowWorkOrder,
+        stateEventIds, states,
+    };
+}
+
+export interface WorkOrderTransitionFieldValue {
+    readonly id: string;
+    readonly fields: Record<string, unknown>;
+}
+
+export interface WorkOrderTransitionRelease {
+    readonly id: string;
+    readonly state: string;
+}
+
+export interface WorkOrderTransitionBody {
+    readonly transitionEventId: string;
+    readonly targetState: string;
+    readonly fieldValues: readonly WorkOrderTransitionFieldValue[];
+    readonly release: WorkOrderTransitionRelease | null;
+}
+
+const WORK_ORDER_TRANSITION_KEYS: readonly string[] = [
+    'transitionEventId', 'targetState', 'fieldValues', 'release',
+];
+
+const TRANSITION_RELEASE_KEYS: readonly string[] = [
+    'id', 'state',
+];
+
+const TRANSITION_FIELD_VALUE_KEYS: readonly string[] = [
+    'id', 'fields',
+];
+
+// The HTTP-body gate for POST /work-orders/:id/transition: the
+// transition state event (target node), zero or more
+// state_field_values rows, and an OPTIONAL claim-release event,
+// written atomically. The web-app computes WHAT to write — the
+// target node, the field rows, and whether a live claim must be
+// released — exactly as POST /work-orders keeps graph derivation
+// client-side. The field-value `fields` are NOT fully validated
+// here: the state_field_values store re-validates each row
+// through validateStateFieldValueEntity AFTER the transition
+// event id is woven in. Authorship of the transition event AND
+// the release event is stamped from the verified caller in the
+// route, never the body — matching the old commit batch, where
+// both events flowed through PUT /states/:id and were stamped
+// with the actor.
+export function validateWorkOrderTransitionBody(
+    body: Record<string, unknown>,
+): WorkOrderTransitionBody {
+    assertOnlyKeys(
+        body,
+        WORK_ORDER_TRANSITION_KEYS,
+        'WorkOrderTransitionBody',
+    );
+    const transitionEventId = pickString(
+        body, 'transitionEventId',
+    );
+    if (transitionEventId === '') {
+        throw new ValidationError(
+            'WorkOrderTransitionBody.transitionEventId'
+            + ' must be non-empty',
+        );
+    }
+    const targetState = pickString(body, 'targetState');
+    if (targetState === '') {
+        throw new ValidationError(
+            'WorkOrderTransitionBody.targetState'
+            + ' must be non-empty',
+        );
+    }
+    const fieldValues = asArray(
+        body['fieldValues'],
+        'WorkOrderTransitionBody.fieldValues',
+    ).map((v, i) => {
+        const label =
+            'WorkOrderTransitionBody.fieldValues[' + i + ']';
+        const row = asObject(v, label);
+        assertOnlyKeys(
+            row, TRANSITION_FIELD_VALUE_KEYS, label,
+        );
+        const id = asString(row['id'], label + '.id');
+        if (id === '') {
+            throw new ValidationError(
+                label + '.id must be non-empty',
+            );
+        }
+        return {
+            id,
+            fields: asObject(
+                row['fields'], label + '.fields',
+            ),
+        };
+    });
+    const rawRelease = body['release'];
+    let release: WorkOrderTransitionRelease | null = null;
+    if (rawRelease !== null) {
+        const label = 'WorkOrderTransitionBody.release';
+        const obj = asObject(rawRelease, label);
+        assertOnlyKeys(obj, TRANSITION_RELEASE_KEYS, label);
+        const id = asString(obj['id'], label + '.id');
+        if (id === '') {
+            throw new ValidationError(
+                label + '.id must be non-empty',
+            );
+        }
+        const state = asString(obj['state'], label + '.state');
+        if (state === '') {
+            throw new ValidationError(
+                label + '.state must be non-empty',
+            );
+        }
+        release = { id, state };
+    }
+    return {
+        transitionEventId, targetState, fieldValues, release,
+    };
+}
+
+export interface AIMemberCreateBody {
+    readonly id: string;
+    readonly detail: Record<string, unknown>;
+    readonly initialState: MemberState;
+    readonly initialStateEventId: string;
+}
+
+const AI_MEMBER_CREATE_KEYS: readonly string[] = [
+    'id', 'detail',
+    'initialState', 'initialStateEventId',
+];
+
+// The HTTP-body gate for POST /ai-members: the parent member
+// row plus the ai_members detail row, plus the initial state
+// event, written atomically. The detail fields are NOT fully
+// validated here — the ai_members store re-validates its own
+// body (validateAIMemberEntity) when the composing POST puts
+// it. The member parent (type 'ai') is a server-supplied fact
+// the handler pins, so the body carries only the detail sub-
+// object (name + the AI fields). Authorship of the initial
+// event is stamped from the verified caller in the route,
+// never the body.
+export function validateAIMemberCreateBody(
+    body: Record<string, unknown>,
+): AIMemberCreateBody {
+    assertOnlyKeys(
+        body, AI_MEMBER_CREATE_KEYS, 'AIMemberCreateBody',
+    );
+    const id = pickString(body, 'id');
+    if (id === '') {
+        throw new ValidationError(
+            'AIMemberCreateBody.id must be non-empty',
+        );
+    }
+    const detail = asObject(
+        body['detail'], 'AIMemberCreateBody.detail',
+    );
+    const initialState = assertMemberState(
+        pickString(body, 'initialState'),
+        'AIMemberCreateBody.initialState',
+    );
+    const initialStateEventId = pickString(
+        body, 'initialStateEventId',
+    );
+    if (initialStateEventId === '') {
+        throw new ValidationError(
+            'AIMemberCreateBody.initialStateEventId'
+            + ' must be non-empty',
+        );
+    }
+    return { id, detail, initialState, initialStateEventId };
+}
+
+export interface AIMemberEditBody {
+    readonly detail: Record<string, unknown>;
+}
+
+const AI_MEMBER_EDIT_KEYS: readonly string[] = [
+    'detail',
+];
+
+// The HTTP-body gate for POST /ai-members/:id: the parent
+// member row plus the ai_members detail row re-put, NO state
+// event (an edit does not move the member's lifecycle), so the
+// handler needs no actor. As with create, the ai_members store
+// re-validates its own body when the composing POST puts it;
+// the id is the route param, the member type is a server-
+// supplied fact.
+export function validateAIMemberEditBody(
+    body: Record<string, unknown>,
+): AIMemberEditBody {
+    assertOnlyKeys(
+        body, AI_MEMBER_EDIT_KEYS, 'AIMemberEditBody',
+    );
+    const detail = asObject(
+        body['detail'], 'AIMemberEditBody.detail',
+    );
+    return { detail };
+}
+
+export interface HumanMemberEditBody {
+    readonly pii: Record<string, unknown>;
+    readonly detail: Record<string, unknown>;
+}
+
+const HUMAN_MEMBER_EDIT_KEYS: readonly string[] = [
+    'pii', 'detail',
+];
+
+// The HTTP-body gate for POST /human-members/:id: the four
+// member facets re-put, NO state event (an edit does not move
+// the member's lifecycle), so the handler needs no actor. As
+// with create, each facet store re-validates its own body when
+// the composing POST puts it; the id is the route param, the
+// member type and identity kind are server-supplied facts.
+export function validateHumanMemberEditBody(
+    body: Record<string, unknown>,
+): HumanMemberEditBody {
+    assertOnlyKeys(
+        body, HUMAN_MEMBER_EDIT_KEYS, 'HumanMemberEditBody',
+    );
+    const pii = asObject(
+        body['pii'], 'HumanMemberEditBody.pii',
+    );
+    const detail = asObject(
+        body['detail'], 'HumanMemberEditBody.detail',
+    );
+    return { pii, detail };
 }

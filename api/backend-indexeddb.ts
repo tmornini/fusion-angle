@@ -28,7 +28,6 @@ import {
 // awaits ONLY row ops; sync compute between them is fine.
 
 const DB_NAME = 'fusion-ai';
-const DB_VERSION = 1;
 const SCHEMA_STORE = '__schema__';
 const SCHEMA_MARKER_ID = 'schema';
 
@@ -198,14 +197,14 @@ export class IndexedDbBackend implements StorageBackend {
 
     // Open the connection, creating every object store (one
     // per table + the schema marker) in onupgradeneeded —
-    // which fires only when the DB is absent or below
-    // DB_VERSION. Resolves with the opened connection; the
-    // caller decides whether to adopt or heal it.
+    // which fires only when the DB is first created. There is
+    // no schema version (no migrations until Postgres); new
+    // indexes are adopted when a store is reborn on reset.
+    // Resolves with the opened connection; the caller decides
+    // whether to adopt or heal it.
     #openConnection(): Promise<IDBDatabase> {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(
-                DB_NAME, DB_VERSION,
-            );
+            const request = indexedDB.open(DB_NAME);
             request.onupgradeneeded = () =>
                 createSchemaStores(request.result);
             request.onsuccess = () =>
@@ -240,8 +239,9 @@ export class IndexedDbBackend implements StorageBackend {
         });
     }
 
-    // Adopt an opened connection: close it on a version
-    // change so a newer tab's upgrade is never blocked.
+    // Adopt an opened connection: close it on a versionchange
+    // event — fired when another tab deletes the database to
+    // reset — so that delete is never blocked.
     #install(db: IDBDatabase): void {
         db.onversionchange = () => db.close();
         this.#db = db;
@@ -249,7 +249,7 @@ export class IndexedDbBackend implements StorageBackend {
 
     // The open hook the adapter runs in initialize(). On
     // first open, onupgradeneeded builds every store. But a
-    // pre-existing v1 DB holding NONE of our stores never ran
+    // pre-existing DB holding NONE of our stores never ran
     // our upgrade (a bare connection some other code left
     // behind); it holds no rows, so we delete and reopen,
     // letting onupgradeneeded rebuild every store. The schema

@@ -582,12 +582,12 @@ function buildHistory(
             HistoryFieldValue[] = [];
         for (const row of rows) {
             const attribute = attributeMap.get(
-                row.fieldId,
+                row.attributeId,
             );
             if (!attribute) {
                 throw new Error(
                     'Attribute not found: '
-                        + row.fieldId,
+                        + row.attributeId,
                 );
             }
             fieldValues.push({

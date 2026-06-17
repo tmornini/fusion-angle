@@ -19,7 +19,7 @@ import {
     generateCryptoSafeBase62,
 } from '../../../api/crypto-safe-base62.ts';
 import {
-    buildStateEventOp,
+    postStateEvent,
     latestStatesForIds,
 } from './state-events.ts';
 import {
@@ -129,16 +129,30 @@ function toObjectiveRevision(
     };
 }
 
-// Every objective's revisions in ONE table read, grouped.
-// Callers walking an objective LIST batch here.
+// The revisions for ONE objective — the server filters the
+// nested collection to the parent objective, so no client filter
+// is needed.
+async function getRevisionsForObjective(
+    ctx: RequestContext,
+    objectiveId: ObjectiveId,
+): Promise<ObjectiveRevisionEntity[]> {
+    return ctx.GET<ObjectiveRevisionEntity[]>(
+        'objectives/' + objectiveId + '/revisions',
+    );
+}
+
+// The revisions for each supplied objective, grouped — reassembled
+// from the nested per-objective collections, fetched in parallel.
+// Callers walking an objective LIST pass the ids they hold.
 export async function getObjectiveRevisionsByObjective(
     ctx: RequestContext,
+    objectiveIds: readonly ObjectiveId[],
 ): Promise<Map<ObjectiveId, ObjectiveRevision[]>> {
-    const all = await ctx.GET<ObjectiveRevisionEntity[]>(
-        'objective-revisions',
+    const perObjective = await Promise.all(
+        objectiveIds.map(id => getRevisionsForObjective(ctx, id)),
     );
     return Map.groupBy(
-        all.map(toObjectiveRevision),
+        perObjective.flat().map(toObjectiveRevision),
         r => r.objectiveId,
     );
 }
@@ -155,7 +169,7 @@ export async function getCurrentObjectiveDefinitions(
     description: string;
 }>> {
     const grouped =
-        await getObjectiveRevisionsByObjective(ctx);
+        await getObjectiveRevisionsByObjective(ctx, ids);
     const defs = new Map<ObjectiveId, {
         name: string;
         description: string;
@@ -219,28 +233,24 @@ export async function postObjectiveCreation(
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
     const revisionId = generateCryptoSafeBase62();
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource: `objectives/${id}`,
-                body: {
-                    position,
-                },
-            },
-            {
-                method: 'put',
-                resource:
-                    `objective-revisions/${revisionId}`,
-                body: {
-                    objective_id: id,
-                    name,
-                    description,
-                    member_id: member.id,
-                    at,
-                },
-            },
-        ],
+    // The objective row and its first revision commit as ONE
+    // transaction server-side. The body OMITS organization_id —
+    // the org fence stamps it from the verified token. The
+    // revision's member_id is a row column (who authored the
+    // definition), supplied here; no state event is written.
+    await ctx.POST('objectives', {
+        id,
+        objective: {
+            position,
+        },
+        revisionId,
+        revision: {
+            objective_id: id,
+            name,
+            description,
+            member_id: member.id,
+            at,
+        },
     });
     notifyObjectiveChange();
 }
@@ -254,20 +264,16 @@ export async function postObjectiveRevision(
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
     const revisionId = generateCryptoSafeBase62();
-    await ctx.commit({
-        ops: [{
-            method: 'put',
-            resource:
-                `objective-revisions/${revisionId}`,
-            body: {
-                objective_id: id,
-                name,
-                description,
-                member_id: member.id,
-                at,
-            },
-        }],
-    });
+    await ctx.PUT(
+        `objectives/${id}/revisions/${revisionId}`,
+        {
+            objective_id: id,
+            name,
+            description,
+            member_id: member.id,
+            at,
+        },
+    );
     notifyObjectiveChange();
 }
 
@@ -275,13 +281,7 @@ export async function postObjectiveArchival(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [
-            await buildStateEventOp(
-                ctx, id, 'archived',
-            ),
-        ],
-    });
+    await postStateEvent(ctx, id, 'archived');
     notifyObjectiveChange();
 }
 
@@ -289,11 +289,7 @@ export async function postObjectiveReactivation(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [
-            await buildStateEventOp(ctx, id, 'active'),
-        ],
-    });
+    await postStateEvent(ctx, id, 'active');
     notifyObjectiveChange();
 }
 
@@ -302,14 +298,8 @@ export async function putObjectivePosition(
     id: ObjectiveId,
     position: number,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [{
-            method: 'put' as const,
-            resource: `objectives/${id}`,
-            body: {
-                position,
-            },
-        }],
+    await ctx.PUT(`objectives/${id}`, {
+        position,
     });
     notifyObjectiveChange();
 }

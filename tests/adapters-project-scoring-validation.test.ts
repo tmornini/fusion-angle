@@ -105,7 +105,7 @@ test('ctx.PUT rejects out-of-range baseline scores',
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.PUT(
-                    `project-objective-baseline-scores`
+                    `projects/p/objective-baseline-scores`
                     + `/p:o:${score}`,
                     {
                         project_id: 'p',
@@ -117,25 +117,20 @@ test('ctx.PUT rejects out-of-range baseline scores',
         }
     });
 
-test('ctx.commit rejects out-of-range baseline scores',
+test('ctx.PUT leaves no baseline row on a bad score',
     async () => {
         const { db, ctx } = await adminContext();
         for (const score of INVALID) {
             await assert.rejects(
-                () => ctx.commit({
-                    ops: [{
-                        method: 'put',
-                        resource:
-                            'project-objective-baseline'
-                            + '-scores/'
-                            + `p:o:${score}`,
-                        body: {
-                            project_id: 'p',
-                            objective_id: 'o',
-                            score, member_id: 'w1', at: AT,
-                        },
-                    }],
-                }),
+                () => ctx.PUT(
+                    `projects/p/objective-baseline-scores`
+                    + `/p:o:${score}`,
+                    {
+                        project_id: 'p',
+                        objective_id: 'o',
+                        score, member_id: 'w1', at: AT,
+                    },
+                ),
             );
         }
         const rows = await db
@@ -143,25 +138,20 @@ test('ctx.commit rejects out-of-range baseline scores',
         assert.equal(rows.length, 0);
     });
 
-test('ctx.commit rejects out-of-range actual scores',
+test('ctx.PUT rejects out-of-range actual scores',
     async () => {
         const { ctx } = await adminContext();
         for (const score of INVALID) {
             await assert.rejects(
-                () => ctx.commit({
-                    ops: [{
-                        method: 'put',
-                        resource:
-                            'project-objective-actual'
-                            + '-scores/'
-                            + `p:o:${score}`,
-                        body: {
-                            project_id: 'p',
-                            objective_id: 'o',
-                            score, member_id: 'w1', at: AT,
-                        },
-                    }],
-                }),
+                () => ctx.PUT(
+                    `projects/p/objective-actual-scores`
+                    + `/p:o:${score}`,
+                    {
+                        project_id: 'p',
+                        objective_id: 'o',
+                        score, member_id: 'w1', at: AT,
+                    },
+                ),
             );
         }
     });

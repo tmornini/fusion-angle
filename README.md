@@ -81,4 +81,7 @@ The maintainer starts every Claude Code session with:
 claude --effort max 'Go to Church!'
 ```
 
-Full reasoning effort, doctrine loaded first, then work.
+Full reasoning effort, doctrine loaded first, then work. The
+master reads the Full scroll; dispatched subagents read the
+Medium scroll (`Go to Medium Church!`) — see CLAUDE.md
+§ Subagents.

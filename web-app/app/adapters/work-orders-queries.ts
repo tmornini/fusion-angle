@@ -94,42 +94,56 @@ function toWorkOrder(
 // The camelCase domain shape of one field value
 // written with a transition. The parent event id is
 // the grouping key, so the pair below is all a
-// consumer needs; fieldId references the record
+// consumer needs; attributeId references the record
 // attribute that named the field.
 export interface StateFieldValue {
-    readonly fieldId: Id;
+    readonly attributeId: Id;
     readonly value: string;
 }
 
-// Group all state_field_values rows by their parent
-// state_event_id. Callers iterate the work order's
-// transition events and look up its field/values from
-// the resulting map; each event that wrote no values
-// has no entry (Map.get returns undefined, which the
-// call site treats as "no field values").
+// The field values for ONE state event — the server filters the
+// nested collection to the parent event by its state_event_id FK.
+export async function getStateFieldValuesForEvent(
+    ctx: RequestContext,
+    eventId: Id,
+): Promise<StateFieldValueEntity[]> {
+    return ctx.GET<StateFieldValueEntity[]>(
+        'states/' + eventId + '/field-values',
+    );
+}
+
+// The field values for each supplied state event, grouped by
+// parent event — reassembled from the nested per-event
+// collections, fetched in parallel. Callers pass the work
+// order's transition event ids; an event that wrote no values
+// yields an empty list and so no map entry (Map.get returns
+// undefined, which the call site treats as "no field values").
 export async function getStateFieldValuesByEvent(
     ctx: RequestContext,
+    eventIds: readonly Id[],
 ): Promise<Map<Id, StateFieldValue[]>> {
-    const all = await ctx.GET<
-        StateFieldValueEntity[]
-    >('state-field-values');
+    const perEvent = await Promise.all(
+        eventIds.map(id => getStateFieldValuesForEvent(ctx, id)),
+    );
     const byEvent = new Map<
         Id,
         StateFieldValue[]
     >();
-    for (const row of all) {
-        const value = {
-            fieldId: row.field_id,
-            value: row.value,
-        };
-        const list =
-            byEvent.get(row.state_event_id);
-        if (list) {
-            list.push(value);
-        } else {
-            byEvent.set(
-                row.state_event_id, [value],
-            );
+    for (const rows of perEvent) {
+        for (const row of rows) {
+            const value = {
+                attributeId: row.attribute_id,
+                value: row.value,
+            };
+            const list =
+                byEvent.get(row.state_event_id);
+            if (list) {
+                list.push(value);
+            } else {
+                byEvent.set(
+                    row.state_event_id, [value],
+                );
+            }
         }
     }
     return byEvent;
@@ -154,10 +168,11 @@ export async function getWorkOrders(
 
 export async function getFlowWorkOrderEntities(
     ctx: RequestContext,
+    flowId: string,
 ): Promise<FlowWorkOrderEntity[]> {
     return ctx.GET<
         FlowWorkOrderEntity[]
-    >('flow-work-orders');
+    >('flows/' + flowId + '/work-orders');
 }
 
 export async function getWorkOrder(

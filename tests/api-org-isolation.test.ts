@@ -229,7 +229,7 @@ async function seedChain(
         member_id: 'system', at: T8_AT,
     });
     await db.stateFieldValues.put('sfv' + s, {
-        state_event_id: 'se' + s, field_id: 'x', value: 'v',
+        state_event_id: 'se' + s, attribute_id: 'x', value: 'v',
     });
 }
 
@@ -286,66 +286,156 @@ async function facadeGet(
         await devToken('current')));
 }
 
+// The two entity-subordinate resources nest under their parent
+// (idea / objective). The collection is fetched at the A-org
+// parent's nested path — the SERVER filters to that parent by its
+// FK — and the org fence rides the facade re-entry, so the
+// foreign leaf bound to the B-org parent stays hidden even when
+// read through the B parent's path.
 interface LeafCase {
-    route: string;
+    name: string;
+    aPath: string;
+    bPath: string;
     store: (d: MemoryDbAdapter) => {
         getById(id: string): Promise<{ id: string }>;
     };
     a: string;
     b: string;
-    // Only some leaf routes expose a GET /:id — the rest are
-    // collection + POST only, so the foreign-id 404 is asserted
-    // only where a point read exists.
-    hasGetById?: boolean;
 }
 
 const LEAF_CASES: LeafCase[] = [
-    { route: 'flow-versions', hasGetById: true,
-        store: d => d.flowVersions, a: 'fvA', b: 'fvB' },
-    { route: 'flow-records', hasGetById: true,
-        store: d => d.flowRecords, a: 'frA', b: 'frB' },
-    { route: 'project-flows',
-        store: d => d.projectFlows, a: 'pfA', b: 'pfB' },
-    { route: 'flow-work-orders',
-        store: d => d.flowWorkOrders, a: 'fwoA', b: 'fwoB' },
-    { route: 'idea-submissions',
+    { name: 'ideas/:id/submissions',
+        aPath: '/ideas/iA/submissions',
+        bPath: '/ideas/iB/submissions',
         store: d => d.ideaSubmissions, a: 'isA', b: 'isB' },
-    { route: 'objective-revisions',
+    { name: 'objectives/:id/revisions',
+        aPath: '/objectives/oA/revisions',
+        bPath: '/objectives/oB/revisions',
         store: d => d.objectiveRevisions,
         a: 'orevA', b: 'orevB' },
-    { route: 'project-objective-baseline-scores',
-        store: d => d.projectObjectiveBaselineScores,
-        a: 'bsA', b: 'bsB' },
-    { route: 'project-objective-actual-scores',
-        store: d => d.projectObjectiveActualScores,
-        a: 'asA', b: 'asB' },
 ];
 
 for (const c of LEAF_CASES) {
-    test('leaf ' + c.route + ' lists only the bound org',
+    test('nested ' + c.name + ' lists only the bound parent',
     async () => {
         const db = await deepDb();
         // Prove the foreign row EXISTS in storage, so exclusion
         // is the fence — the test fails on a regression.
         assert.equal(
             (await c.store(db).getById(c.b)).id, c.b);
-        const res = await facadeGet(db, '/' + c.route);
+        const res = await facadeGet(db, c.aPath);
+        assert.equal(res.status, 200);
+        const rows = await res.json() as { id: string }[];
+        assert.deepEqual(rows.map(r => r.id), [c.a]);
+    });
+
+    test('nested ' + c.name + ' hides a foreign-org parent',
+    async () => {
+        const db = await deepDb();
+        // The B-org parent's collection, read through the A
+        // facade, is fenced empty — the row resolves to org B.
+        const res = await facadeGet(db, c.bPath);
+        assert.equal(res.status, 200);
+        const rows = await res.json() as { id: string }[];
+        assert.deepEqual(rows.map(r => r.id), []);
+    });
+}
+
+// The three flow-subordinate resources nest under flows/:id.
+// The collection is fetched at flows/fA/<seg> — the SERVER
+// filters to the parent flow — and the leaf at
+// flows/fA/<seg>/<id>. The org fence still rides the facade
+// re-entry, so a foreign leaf 404s through its parent flow's org.
+interface NestedFlowCase {
+    seg: string;
+    store: (d: MemoryDbAdapter) => {
+        getById(id: string): Promise<{ id: string }>;
+    };
+    a: string;
+    b: string;
+    hasGetById?: boolean;
+}
+
+const NESTED_FLOW_CASES: NestedFlowCase[] = [
+    { seg: 'versions', hasGetById: true,
+        store: d => d.flowVersions, a: 'fvA', b: 'fvB' },
+    { seg: 'records', hasGetById: true,
+        store: d => d.flowRecords, a: 'frA', b: 'frB' },
+    { seg: 'work-orders',
+        store: d => d.flowWorkOrders, a: 'fwoA', b: 'fwoB' },
+];
+
+for (const c of NESTED_FLOW_CASES) {
+    test('nested flows/:id/' + c.seg
+        + ' lists only the bound flow',
+    async () => {
+        const db = await deepDb();
+        // Prove the foreign row EXISTS in storage, so exclusion
+        // is the fence — the test fails on a regression.
+        assert.equal(
+            (await c.store(db).getById(c.b)).id, c.b);
+        const res = await facadeGet(
+            db, '/flows/fA/' + c.seg);
         assert.equal(res.status, 200);
         const rows = await res.json() as { id: string }[];
         assert.deepEqual(rows.map(r => r.id), [c.a]);
     });
 
     if (c.hasGetById) {
-        test('leaf ' + c.route + ' 404s a foreign id',
+        test('nested flows/:id/' + c.seg + ' 404s a foreign id',
         async () => {
             const db = await deepDb();
             assert.equal(
                 (await c.store(db).getById(c.b)).id, c.b);
             const res = await facadeGet(
-                db, '/' + c.route + '/' + c.b);
+                db, '/flows/fA/' + c.seg + '/' + c.b);
             assert.equal(res.status, 404);
         });
     }
+}
+
+// The three project-subordinate resources nest under
+// projects/:id. The collection is fetched at projects/pA/<seg> —
+// the SERVER filters to the parent project — so the foreign
+// row, bound to project pB, is excluded. The org fence still
+// rides the facade re-entry. None exposes a leaf GET /:id (the
+// leaves carry only PUT, or PUT+DELETE for flows), so no
+// foreign-id 404 case applies.
+interface NestedProjectCase {
+    seg: string;
+    store: (d: MemoryDbAdapter) => {
+        getById(id: string): Promise<{ id: string }>;
+    };
+    a: string;
+    b: string;
+}
+
+const NESTED_PROJECT_CASES: NestedProjectCase[] = [
+    { seg: 'flows',
+        store: d => d.projectFlows, a: 'pfA', b: 'pfB' },
+    { seg: 'objective-baseline-scores',
+        store: d => d.projectObjectiveBaselineScores,
+        a: 'bsA', b: 'bsB' },
+    { seg: 'objective-actual-scores',
+        store: d => d.projectObjectiveActualScores,
+        a: 'asA', b: 'asB' },
+];
+
+for (const c of NESTED_PROJECT_CASES) {
+    test('nested projects/:id/' + c.seg
+        + ' lists only the bound project',
+    async () => {
+        const db = await deepDb();
+        // Prove the foreign row EXISTS in storage, so exclusion
+        // is the fence — the test fails on a regression.
+        assert.equal(
+            (await c.store(db).getById(c.b)).id, c.b);
+        const res = await facadeGet(
+            db, '/projects/pA/' + c.seg);
+        assert.equal(res.status, 200);
+        const rows = await res.json() as { id: string }[];
+        assert.deepEqual(rows.map(r => r.id), [c.a]);
+    });
 }
 
 test('states lists only the bound org events', async () => {
@@ -367,18 +457,33 @@ test('states 404s a foreign event id', async () => {
     assert.equal(res.status, 404);
 });
 
-test('state-field-values fence follows the event',
+test('nested states/:id/field-values fence follows the event',
 async () => {
     const db = await deepDb();
     // Prove the foreign field value EXISTS in storage; the
-    // collection fence (via its parent state event) hides it.
+    // nested collection (server-filtered to seA, then fenced
+    // through its parent state event's org) returns only A's.
     assert.equal(
         (await db.stateFieldValues.getById('sfvB')).id,
         'sfvB');
-    const res = await facadeGet(db, '/state-field-values');
+    const res = await facadeGet(
+        db, '/states/seA/field-values');
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
     assert.deepEqual(rows.map(r => r.id), ['sfvA']);
+});
+
+test('nested states/:id/field-values hides a foreign event',
+async () => {
+    const db = await deepDb();
+    // seB is a B-org event; its field values, read through the
+    // A facade, are fenced empty (the multi-hop resolver lands
+    // org B for sfvB).
+    const res = await facadeGet(
+        db, '/states/seB/field-values');
+    assert.equal(res.status, 200);
+    const rows = await res.json() as { id: string }[];
+    assert.deepEqual(rows.map(r => r.id), []);
 });
 
 test('entity-states gates on parent ownership', async () => {
@@ -411,35 +516,70 @@ test('identity-pii lists only co-members', async () => {
     assert.equal(foreign.status, 403);
 });
 
-test('identity-credentials hide secret and non-members',
+test('nested identities/:id/credentials hide secret, members',
 async () => {
     const db = await deepDb();
-    const res = await facadeGet(db, '/identity-credentials');
+    // pa is a co-member of A — its nested collection lists the
+    // credential with the secret projected out.
+    const res = await facadeGet(
+        db, '/identities/pa/credentials');
     assert.equal(res.status, 200);
     const rows = await res.json() as Array<{
+        id: string;
         identity_id: string;
         secret?: string;
     }>;
-    const ids = new Set(rows.map(r => r.identity_id));
-    assert.ok(ids.has('pa'));
-    assert.ok(!ids.has('pb'));
+    assert.deepEqual(rows.map(r => r.id), ['cred-pa']);
     for (const r of rows) {
         assert.equal(r.secret, undefined);
     }
+    // pb is a B-only member — its nested collection is fenced
+    // empty through the A facade.
+    assert.equal(
+        (await db.identityCredentials.getById('cred-pb')).id,
+        'cred-pb');
+    const other = await facadeGet(
+        db, '/identities/pb/credentials');
+    assert.equal(other.status, 200);
+    assert.deepEqual(
+        (await other.json() as { id: string }[]).map(r => r.id),
+        []);
     // a single read projects secret out too
     const one = await facadeGet(
-        db, '/identity-credentials/cred-pa');
+        db, '/identities/pa/credentials/cred-pa');
     assert.equal(one.status, 200);
     assert.equal(
         (await one.json() as { secret?: string }).secret,
         undefined);
     // a non-member credential 404s
-    assert.equal(
-        (await db.identityCredentials.getById('cred-pb')).id,
-        'cred-pb');
     const foreign = await facadeGet(
-        db, '/identity-credentials/cred-pb');
+        db, '/identities/pb/credentials/cred-pb');
     assert.equal(foreign.status, 404);
+});
+
+// identity-credentials stays ADMIN-ONLY after nesting: the
+// /identities surface carries no member-tier entry, so the
+// nested credentials route falls to the root admin tier. Admin
+// reads it; a plain member is denied, exactly as the flat
+// /identity-credentials route was.
+test('nested credentials are admin-only (member denied)',
+async () => {
+    const db = await deepDb();
+    // Grant pa the member role in A so it resolves a non-admin
+    // role through the gate (membership alone is roleless).
+    await db.roleGrants.put('rg-pa-member-a', {
+        organization_id: 'A', identity_id: 'pa',
+        role: 'member', action: 'granted',
+        by_member_id: 'system', at: T8_AT,
+    });
+    const asAdmin = await handleRequest(db, req(
+        'GET', '/organizations/A/identities/pa/credentials',
+        await orgToken('current', 'A')));
+    assert.equal(asAdmin.status, 200);
+    const asMember = await handleRequest(db, req(
+        'GET', '/organizations/A/identities/pa/credentials',
+        await orgToken('pa', 'A')));
+    assert.equal(asMember.status, 403);
 });
 
 test('organizations/:id 404s a non-member org', async () => {
@@ -482,20 +622,22 @@ async () => {
     assert.ok(!ids.has('pb'));     // B-only → still hidden
 });
 
-test('identity-credentials show an orphan with no membership',
+test('nested credentials show an orphan with no membership',
 async () => {
     const db = await deepDb();
     await db.identityCredentials.put('cred-orphan', {
         identity_id: 'orphan', kind: 'password',
         status: 'set', secret: 'HASH-orphan', at: T8_AT,
     });
-    const res = await facadeGet(db, '/identity-credentials');
+    // orphan has no membership → null owner → visible orphan in
+    // its own nested collection, read through the A facade.
+    const res = await facadeGet(
+        db, '/identities/orphan/credentials');
     assert.equal(res.status, 200);
-    const ids = new Set((await res.json() as Array<{
+    const ids = (await res.json() as Array<{
         identity_id: string;
-    }>).map(r => r.identity_id));
-    assert.ok(ids.has('orphan'));  // no membership → visible
-    assert.ok(!ids.has('pb'));     // B-only → still hidden
+    }>).map(r => r.identity_id);
+    assert.deepEqual(ids, ['orphan']);
 });
 
 test('states show an orphan event with no owner', async () => {

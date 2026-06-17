@@ -17,6 +17,7 @@ import {
     getWorkOrders,
     type WorkOrder,
 } from './work-orders-queries.ts';
+import { getFlowEntities } from './flows.ts';
 import {
     generateCryptoSafeBase62,
 } from '../../../api/crypto-safe-base62.ts';
@@ -27,12 +28,44 @@ export type {
     FlowRecordId,
 } from '../../../api/types.ts';
 
-async function getFlowRecordEntities(
+// The bindings for ONE flow — the server filters the nested
+// collection to the parent flow, so no client filter is needed.
+async function getFlowRecordsForFlow(
     ctx: RequestContext,
+    flowId: Id,
 ): Promise<FlowRecordEntity[]> {
     return ctx.GET<FlowRecordEntity[]>(
-        'flow-records',
+        'flows/' + flowId + '/records',
     );
+}
+
+// The bindings across EVERY flow the caller's org can see —
+// reassembled from the nested per-flow collections, since a
+// record can be bound by flows the caller never named. The
+// flows list is org-scoped; each flow's records are fetched in
+// parallel and concatenated.
+async function getAllFlowRecordEntities(
+    ctx: RequestContext,
+): Promise<FlowRecordEntity[]> {
+    const flows = await getFlowEntities(ctx);
+    const perFlow = await Promise.all(
+        flows.map(f => getFlowRecordsForFlow(ctx, f.id)),
+    );
+    return perFlow.flat();
+}
+
+// The flow↔work-order joins across EVERY flow the caller's org
+// can see — same per-flow reassembly as the bindings above.
+async function getAllFlowWorkOrderEntities(
+    ctx: RequestContext,
+): Promise<FlowWorkOrderEntity[]> {
+    const flows = await getFlowEntities(ctx);
+    const perFlow = await Promise.all(
+        flows.map(f => ctx.GET<FlowWorkOrderEntity[]>(
+            'flows/' + f.id + '/work-orders',
+        )),
+    );
+    return perFlow.flat();
 }
 
 export async function putFlowRecord(
@@ -41,17 +74,18 @@ export async function putFlowRecord(
     entity: Omit<FlowRecordEntity, 'id'>,
 ): Promise<void> {
     await ctx.PUT(
-        `flow-records/${id}`, entity,
+        `flows/${entity.flow_id}/records/${id}`, entity,
     );
     notifyRecordChange();
 }
 
 export async function deleteFlowRecord(
     ctx: RequestContext,
+    flowId: Id,
     id: FlowRecordId,
 ): Promise<void> {
     await ctx.DELETE(
-        `flow-records/${id}`,
+        `flows/${flowId}/records/${id}`,
     );
     notifyRecordChange();
 }
@@ -81,22 +115,18 @@ export async function deleteFlowRecordForFlow(
     ctx: RequestContext,
     flowId: Id,
 ): Promise<void> {
-    const rows = await getFlowRecordEntities(ctx);
-    const existing = rows.find(
-        r => r.flow_id === flowId,
-    );
+    const rows = await getFlowRecordsForFlow(ctx, flowId);
+    const existing = rows[0];
     if (!existing) return;
-    await deleteFlowRecord(ctx, existing.id);
+    await deleteFlowRecord(ctx, flowId, existing.id);
 }
 
 export async function getRecordForFlow(
     ctx: RequestContext,
     flowId: Id,
 ): Promise<RecordId | null> {
-    const rows = await getFlowRecordEntities(ctx);
-    const found = rows.find(
-        r => r.flow_id === flowId,
-    );
+    const rows = await getFlowRecordsForFlow(ctx, flowId);
+    const found = rows[0];
     return found ? found.record_id : null;
 }
 
@@ -104,21 +134,17 @@ export async function getRecordForWorkOrder(
     ctx: RequestContext,
     workOrderId: Id,
 ): Promise<RecordId | null> {
-    const [links, bindings] = await Promise.all([
-        ctx.GET<FlowWorkOrderEntity[]>(
-            'flow-work-orders',
-        ),
-        getFlowRecordEntities(ctx),
-    ]);
+    const links = await getAllFlowWorkOrderEntities(ctx);
     const link = links.find(
         l => l.work_order_id === workOrderId,
     );
     if (!link) {
         return null;
     }
-    const found = bindings.find(
-        b => b.flow_id === link.flow_id,
+    const bindings = await getFlowRecordsForFlow(
+        ctx, link.flow_id,
     );
+    const found = bindings[0];
     return found ? found.record_id : null;
 }
 
@@ -136,7 +162,7 @@ export async function getFlowSummariesForRecord(
     recordId: RecordId,
 ): Promise<BoundFlowSummary[]> {
     const [rows, flows] = await Promise.all([
-        getFlowRecordEntities(ctx),
+        getAllFlowRecordEntities(ctx),
         ctx.GET<FlowEntity[]>('flows'),
     ]);
     const wanted = new Set(
@@ -154,10 +180,8 @@ export async function getWorkOrdersForRecord(
 ): Promise<WorkOrder[]> {
     const [bindings, flowWorkOrders, workOrders]
         = await Promise.all([
-            getFlowRecordEntities(ctx),
-            ctx.GET<FlowWorkOrderEntity[]>(
-                'flow-work-orders',
-            ),
+            getAllFlowRecordEntities(ctx),
+            getAllFlowWorkOrderEntities(ctx),
             getWorkOrders(ctx),
         ]);
     const flowIds = new Set(

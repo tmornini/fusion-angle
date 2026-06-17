@@ -4,7 +4,7 @@ import {
     validateRecordEntity,
     validateRecordAttributeEntity,
     validateFlowRecordEntity,
-    validateRecordMultiPutBody,
+    validateRecordWriteBody,
 } from '../api/validators.ts';
 import {
     jsonArrayField,
@@ -331,13 +331,13 @@ test(
     },
 );
 
-// validateRecordMultiPutBody — create variant
+// validateRecordWriteBody — create variant
 
 test(
-    'validateRecordMultiPutBody accepts a valid'
+    'validateRecordWriteBody accepts a valid'
     + ' create body',
     () => {
-        const out = validateRecordMultiPutBody({
+        const out = validateRecordWriteBody({
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -377,12 +377,12 @@ test(
 );
 
 test(
-    'validateRecordMultiPutBody rejects an'
+    'validateRecordWriteBody rejects an'
     + ' attribute whose record_id does not match'
     + ' the top-level id',
     () => {
         assert.throws(
-            () => validateRecordMultiPutBody({
+            () => validateRecordWriteBody({
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -415,11 +415,11 @@ test(
 );
 
 test(
-    'validateRecordMultiPutBody rejects an'
+    'validateRecordWriteBody rejects an'
     + ' invalid initialState value',
     () => {
         assert.throws(
-            () => validateRecordMultiPutBody({
+            () => validateRecordWriteBody({
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -437,11 +437,11 @@ test(
 );
 
 test(
-    'validateRecordMultiPutBody create rejects a'
+    'validateRecordWriteBody create rejects a'
     + ' missing initialStateEventId',
     () => {
         assert.throws(
-            () => validateRecordMultiPutBody({
+            () => validateRecordWriteBody({
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -457,13 +457,13 @@ test(
     },
 );
 
-// validateRecordMultiPutBody — edit variant
+// validateRecordWriteBody — edit variant
 
 test(
-    'validateRecordMultiPutBody accepts a valid'
+    'validateRecordWriteBody accepts a valid'
     + ' edit body',
     () => {
-        const out = validateRecordMultiPutBody({
+        const out = validateRecordWriteBody({
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -486,12 +486,12 @@ test(
 );
 
 test(
-    'validateRecordMultiPutBody edit rejects a'
+    'validateRecordWriteBody edit rejects a'
     + ' body that carries initialState (kind'
     + ' discriminator vs key set)',
     () => {
         assert.throws(
-            () => validateRecordMultiPutBody({
+            () => validateRecordWriteBody({
                 kind: 'edit',
                 id: 'rec-1',
                 record: {
@@ -508,14 +508,14 @@ test(
     },
 );
 
-// validateRecordMultiPutBody — discriminator
+// validateRecordWriteBody — discriminator
 
 test(
-    'validateRecordMultiPutBody rejects an'
+    'validateRecordWriteBody rejects an'
     + ' unknown kind discriminator',
     () => {
         assert.throws(
-            () => validateRecordMultiPutBody({
+            () => validateRecordWriteBody({
                 kind: 'destroy',
                 id: 'rec-1',
                 record: {
@@ -525,17 +525,17 @@ test(
                 },
                 attributes: [],
             } as never),
-            /RecordMultiPutBody kind/,
+            /RecordWriteBody kind/,
         );
     },
 );
 
 test(
-    'validateRecordMultiPutBody rejects a body'
+    'validateRecordWriteBody rejects a body'
     + ' missing the kind field',
     () => {
         assert.throws(
-            () => validateRecordMultiPutBody({
+            () => validateRecordWriteBody({
                 id: 'rec-1',
                 record: {
                     organization_id: '1',

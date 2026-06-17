@@ -30,10 +30,10 @@ interface Table {
 }
 
 // _id columns whose target table the name convention cannot
-// reach: field_id points at record_attributes (the column name
+// reach: attribute_id points at record_attributes (the column name
 // predates Records); state_event_id points at states.
 const FK_SPECIAL: Record<string, string> = {
-    field_id: 'record_attributes',
+    attribute_id: 'record_attributes',
     state_event_id: 'states',
 };
 

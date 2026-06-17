@@ -1,10 +1,6 @@
 import type { RequestContext } from './shared.ts';
 import type { SeededCredentials } from '../../../api/mock-data.ts';
 import { MissingTableError } from '../../../api/db.ts';
-import {
-    RequestError,
-    UnauthorizedError,
-} from '../../../api/api.ts';
 
 // Fallback when navigator.storage.estimate() is
 // unavailable (older browsers, Node test runtime).
@@ -263,9 +259,8 @@ export async function getHasAnyHumanMembers(
 ): Promise<boolean> {
     // The snapshots page is infrastructure-tier — it runs
     // before any session exists (it installs the datastore).
-    // The snapshot plane is bearer-exempt ONLY while no
-    // schema exists, so the pristine path works without
-    // authentication; `null` = no schema = no data.
+    // The snapshot plane is auth-free, so an anonymous viewer
+    // reads it directly; `null` = no schema = no data.
     let snapshot: string | null;
     try {
         snapshot =
@@ -275,13 +270,6 @@ export async function getHasAnyHumanMembers(
         // on export; treat it as "no usable data" so the
         // recovery page still renders its seed/import controls.
         if (err instanceof MissingTableError) return false;
-        // Once a schema exists the plane is bearer-closed: an
-        // auth denial IS the schema's existence, disclosed.
-        // Read it as "data present" so the page never offers
-        // a destructive seed over real data it cannot see.
-        if (err instanceof UnauthorizedError) return true;
-        if (err instanceof RequestError
-            && err.status === 403) return true;
         throw err;
     }
     if (snapshot === null) {

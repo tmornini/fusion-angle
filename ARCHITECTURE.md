@@ -283,6 +283,21 @@ Remaining seams — no client-tier mitigation exists:
   (below), but no ledger yet remembers a jti as spent, so a
   captured assertion replays until its `exp`. The replay
   ledger lands with the server tier.
+- **Auth-free snapshot plane.** `BOOTSTRAP_ROUTES`
+  (`api/request-auth.ts`) —
+  `snapshots/schema|mock-data|bootstrap|import` — is
+  bearer-exempt UNCONDITIONALLY: no bearer, no route policy,
+  regardless of whether a schema exists. A deliberate dev-tier
+  install/demo decision (the surface is local, ephemeral, and
+  slated for removal), so an anonymous wipe/seed/import is
+  intended, not a regression — the exemption was widened from
+  the old schema-gated window on purpose. This is the LAST
+  seam to leave standing: the whole `BOOTSTRAP_ROUTES`
+  exemption MUST be removed or re-gated the moment the
+  Postgres server tier lands, when the browser becomes an
+  untrusted client and an unauthenticated wipe of a populated
+  tenant store is catastrophic. Until then it is KNOWN and
+  accepted; do not re-raise it.
 
 Mitigated client-tier — the seam is narrowed in this codebase,
 re-verified by the automated suite:
@@ -295,11 +310,6 @@ re-verified by the automated suite:
 - **`client_assertion` JWS** (`api/client-assertion.ts`):
   really verified against the client's registered JWKS
   (RS256/ES256, WebCrypto) plus RFC 7523 claim checks.
-- **Snapshot plane** (`BOOTSTRAP_ROUTES`,
-  `api/request-auth.ts`):
-  bearer-exempt ONLY while no schema exists (the bootstrap
-  window); once a schema exists the plane closes — bearer
-  plus the admin route policy.
 - **500 fallback body** (`handleRequest`, `api/api.ts`): a
   fixed opaque `internal error` body; fault detail goes to
   the console, never the wire.

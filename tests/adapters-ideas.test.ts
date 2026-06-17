@@ -289,16 +289,13 @@ test(
             projectEvents[0]?.state, 'submitted',
         );
 
-        const baselines =
+        const mine =
             await ctx.GET<
                 ProjectObjectiveBaselineScore[]
             >(
-                'project-objective'
+                'projects/p1/objective'
                 + '-baseline-scores',
             );
-        const mine = baselines.filter(
-            b => b.project_id === 'p1',
-        );
         assert.equal(mine.length, 2);
         const byObj = new Map(
             mine.map(b => [

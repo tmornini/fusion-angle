@@ -237,17 +237,19 @@ async function loadPresenter(
 ): Promise<WorkboxDetailPresenter> {
     const workOrder =
         await getWorkOrder(ctx, workOrderId);
+    const transitions =
+        await getWorkOrderTransitionEvents(
+            ctx, workOrderId,
+        );
     const [
-        transitions,
         fieldValuesByEvent,
         activeClaim,
         memberMap,
         recordId,
     ] = await Promise.all([
-        getWorkOrderTransitionEvents(
-            ctx, workOrderId,
+        getStateFieldValuesByEvent(
+            ctx, transitions.map(t => t.id),
         ),
-        getStateFieldValuesByEvent(ctx),
         getWorkOrderActiveClaim(
             ctx, workOrderId,
             workOrder.flowGraph.lockTimeout,

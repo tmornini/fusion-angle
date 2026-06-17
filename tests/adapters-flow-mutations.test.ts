@@ -104,7 +104,7 @@ test(
                 project_id: string;
                 flow_id: string;
             }[]>(
-                'project-flows',
+                'projects/project-1/flows',
             );
         const link = links.find(
             l => l.flow_id === 'flow-1',

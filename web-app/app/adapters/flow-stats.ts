@@ -3,7 +3,6 @@ import type { FlowGraph } from './flow-queries.ts';
 import type {
     RequestContext,
 } from './shared.ts';
-import { filterByField } from './shared.ts';
 import {
     buildFlowStats,
     type FlowStatsInput,
@@ -37,13 +36,12 @@ export async function getFlowStats(
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
         getTransitionEventsByWorkOrder(ctx),
-        getFlowWorkOrderEntities(ctx),
+        getFlowWorkOrderEntities(ctx, flowId),
         getMemberMap(ctx),
     ]);
 
     const woIds = new Set(
-        filterByField(fwoRows, 'flow_id', flowId)
-            .map(r => r.work_order_id),
+        fwoRows.map(r => r.work_order_id),
     );
     const transitions: TransitionEvent[] = [];
     for (const [woId, events] of eventsByWo) {

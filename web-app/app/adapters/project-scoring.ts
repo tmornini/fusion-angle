@@ -19,6 +19,9 @@ import {
     getObjectives,
 } from './objectives.ts';
 import {
+    getProjectEntities,
+} from './projects.ts';
+import {
     getCurrentHumanMember,
 } from './members.ts';
 import {
@@ -78,38 +81,56 @@ function toObjectiveScore(
     };
 }
 
-async function getAllBaselineScores(
-    ctx: RequestContext,
-): Promise<ObjectiveScore[]> {
-    const all = await ctx.GET<
-        ProjectObjectiveBaselineScore[]
-    >('project-objective-baseline-scores');
-    return all.map(toObjectiveScore);
-}
-
-async function getAllActualScores(
-    ctx: RequestContext,
-): Promise<ObjectiveScore[]> {
-    const all = await ctx.GET<
-        ProjectObjectiveActualScore[]
-    >('project-objective-actual-scores');
-    return all.map(toObjectiveScore);
-}
-
+// The baseline scores for ONE project — the server filters the
+// nested collection to the parent project, so no client filter
+// is needed.
 export async function getBaselineScoresForProject(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<ObjectiveScore[]> {
-    const all = await getAllBaselineScores(ctx);
-    return filterByField(all, 'projectId', projectId);
+    const rows = await ctx.GET<
+        ProjectObjectiveBaselineScore[]
+    >('projects/' + projectId + '/objective-baseline-scores');
+    return rows.map(toObjectiveScore);
 }
 
+// The actual scores for ONE project — same server-side filter.
 export async function getActualScoresForProject(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<ObjectiveScore[]> {
-    const all = await getAllActualScores(ctx);
-    return filterByField(all, 'projectId', projectId);
+    const rows = await ctx.GET<
+        ProjectObjectiveActualScore[]
+    >('projects/' + projectId + '/objective-actual-scores');
+    return rows.map(toObjectiveScore);
+}
+
+// The baseline scores across EVERY project the caller's org can
+// see — reassembled from the nested per-project collections. The
+// projects list is org-scoped; each project's baseline scores
+// are fetched in parallel and concatenated.
+async function getAllBaselineScores(
+    ctx: RequestContext,
+): Promise<ObjectiveScore[]> {
+    const projects = await getProjectEntities(ctx);
+    const perProject = await Promise.all(
+        projects.map(p =>
+            getBaselineScoresForProject(ctx, p.id)),
+    );
+    return perProject.flat();
+}
+
+// The actual scores across EVERY project — same per-project
+// reassembly as the baselines above.
+async function getAllActualScores(
+    ctx: RequestContext,
+): Promise<ObjectiveScore[]> {
+    const projects = await getProjectEntities(ctx);
+    const perProject = await Promise.all(
+        projects.map(p =>
+            getActualScoresForProject(ctx, p.id)),
+    );
+    return perProject.flat();
 }
 
 export async function getProjectScoring(
@@ -406,20 +427,20 @@ export async function postProjectBaselineScoring(
 ): Promise<void> {
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
-    const ops = scores.map(s => ({
-        method: 'put' as const,
-        resource:
-            `project-objective-baseline-scores/`
+    for (const s of scores) {
+        await ctx.PUT(
+            'projects/' + projectId
+            + '/objective-baseline-scores/'
             + generateCryptoSafeBase62(),
-        body: {
-            project_id: projectId,
-            objective_id: s.objectiveId,
-            score: s.score,
-            member_id: member.id,
-            at,
-        },
-    }));
-    await ctx.commit({ ops });
+            {
+                project_id: projectId,
+                objective_id: s.objectiveId,
+                score: s.score,
+                member_id: member.id,
+                at,
+            },
+        );
+    }
     notifyProjectScoreChange();
 }
 
@@ -433,20 +454,20 @@ export async function postProjectActualMeasurement(
 ): Promise<void> {
     const at = nowUtc();
     const member = await getCurrentHumanMember(ctx);
-    const ops = scores.map(s => ({
-        method: 'put' as const,
-        resource:
-            `project-objective-actual-scores/`
+    for (const s of scores) {
+        await ctx.PUT(
+            'projects/' + projectId
+            + '/objective-actual-scores/'
             + generateCryptoSafeBase62(),
-        body: {
-            project_id: projectId,
-            objective_id: s.objectiveId,
-            score: s.score,
-            member_id: member.id,
-            at,
-        },
-    }));
-    await ctx.commit({ ops });
+            {
+                project_id: projectId,
+                objective_id: s.objectiveId,
+                score: s.score,
+                member_id: member.id,
+                at,
+            },
+        );
+    }
     notifyProjectScoreChange();
 }
 

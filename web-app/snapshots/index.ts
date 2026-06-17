@@ -40,6 +40,10 @@ import {
 import type {
     SeededCredentials,
 } from '../../api/mock-data.ts';
+import { putLocation } from '../app/adapters/location.ts';
+import {
+    putSchemaPresent,
+} from '../app/adapters/schema-marker.ts';
 import {
     ICON_SIZE,
     iconTrash,
@@ -153,11 +157,19 @@ export async function init(
     }
 
     // After wipe-and-load the seeded demo passwords exist only
-    // in this response — surface them once, then navigate only
-    // when the user acknowledges they have saved them.
+    // in this response — surface them once, then send the user
+    // through the root (which re-routes to login) so they sign
+    // in with a seeded credential rather than lingering in an
+    // anonymous, already-seeded session.
     function revealThenNavigate(
         creds: SeededCredentials,
     ): void {
+        // The wipe just installed a schema; mark it present so
+        // the root redirect routes to login, not back here.
+        function proceedToRoot(): void {
+            putSchemaPresent(true);
+            putLocation('../index.html');
+        }
         const panel = $required(
             '#snapshots-content', document,
         );
@@ -190,12 +202,13 @@ export async function init(
                 return;
             }
             showToast('Credentials copied', 'success');
+            proceedToRoot();
         });
         $required(
             '#credential-continue-btn', document,
         ).addEventListener(
             'click',
-            () => navigateTo('dashboard'),
+            proceedToRoot,
         );
     }
 

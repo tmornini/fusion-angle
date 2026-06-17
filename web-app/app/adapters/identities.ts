@@ -9,7 +9,7 @@ import {
     type MemberPii,
 } from '../../../api/types.ts';
 import { hashPassword } from '../../../api/password-hash.ts';
-import type { RequestContext, WriteOp } from './shared.ts';
+import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -217,38 +217,35 @@ export type IdentityCreationSpec =
         readonly secret: string;
     };
 
-// Mint an identity by client-minted id + idempotent PUT
-// (Commandment VII — no server INSERT). The identity
-// stores carry no organization_id, so creation rides the
-// GLOBAL spine, OFF the org facade. Person → identity +
-// PII; service → identity + a hashed client_secret
-// credential. Both halves ride one ctx.commit batch.
+// Mint an identity by client-minted id + named POST
+// (Commandment VII — no server INSERT; the composing puts
+// are idempotent). The identity stores carry no
+// organization_id, so creation rides the GLOBAL spine, OFF
+// the org facade. Person → identity + PII; service →
+// identity + a hashed client_secret credential. Both halves
+// ride one POST /identities transaction. The secret is
+// hashed HERE (client-side); the route touches no crypto.
 export async function postIdentityCreation(
     ctx: RequestContext,
     id: Id,
     spec: IdentityCreationSpec,
 ): Promise<void> {
-    const ops: WriteOp[] = [{
-        method: 'put',
-        resource: `identities/${id}`,
-        body: { kind: spec.kind },
-    }];
     if (spec.kind === 'person') {
-        ops.push({
-            method: 'put',
-            resource: `identities/${id}/pii`,
-            body: { ...spec.pii },
+        await ctx.POST('identities', {
+            id,
+            kind: 'person',
+            pii: { ...spec.pii },
         });
     } else {
         // Deterministic credential id off the identity id
         // so a retry overwrites the same row — no INSERT on
         // re-put (Commandment VII), matching the person
         // branch and the contract above.
-        const credId = `${id}-client-secret`;
-        ops.push({
-            method: 'put',
-            resource: `identity-credentials/${credId}`,
-            body: {
+        await ctx.POST('identities', {
+            id,
+            kind: 'service',
+            credential: {
+                id: `${id}-client-secret`,
                 identity_id: id,
                 kind: 'client_secret',
                 status: 'set',
@@ -257,6 +254,5 @@ export async function postIdentityCreation(
             },
         });
     }
-    await ctx.commit({ ops });
     identityChanges.notify();
 }

@@ -6,8 +6,8 @@ import { $required } from '../dom.ts';
 import { showToast } from '../toast.ts';
 import {
     sessionContext,
-    putFlowOps,
-    postFlowVersionOps,
+    buildFlowBody,
+    buildFlowVersionSnapshot,
     notifyFlowChange,
     HumanMember,
     AIMember,
@@ -219,29 +219,26 @@ export class FlowDesignerPresenter {
         );
     }
 
-    // The version snapshot and the flow write land
-    // as ONE atomic commit batch — a fault applies
-    // neither.
+    // The OPTIONAL version snapshot and the flow write
+    // land as ONE atomic transaction through the named
+    // POST /flows/:id/save — a fault applies neither.
     async #persistFlow(
         ctx: RequestContext,
         versioned: boolean,
         snap: FlowSnapshot,
     ): Promise<void> {
-        const ops = [
-            ...versioned
-                ? await postFlowVersionOps(
-                    ctx,
-                    generateCryptoSafeBase62(),
-                    snap.flowId,
-                )
-                : [],
-            ...await putFlowOps(
+        const version = versioned
+            ? await buildFlowVersionSnapshot(
                 ctx,
+                generateCryptoSafeBase62(),
                 snap.flowId,
-                this.#buildSaveShape(snap),
-            ),
-        ];
-        await ctx.commit({ ops });
+            )
+            : null;
+        await ctx.POST(`flows/${snap.flowId}/save`, {
+            version,
+            flow: buildFlowBody(this.#buildSaveShape(snap)),
+            eventId: generateCryptoSafeBase62(),
+        });
         notifyFlowChange();
     }
 

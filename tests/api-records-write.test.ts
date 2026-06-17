@@ -25,13 +25,13 @@ async function freshDb() {
 // ── Create variant ──────
 
 test(
-    'POST records-multi-put create writes the'
+    'POST records create writes the'
     + ' record, initial state event, and'
     + ' attributes in one operation',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -74,13 +74,13 @@ test(
 );
 
 test(
-    'POST records-multi-put create with empty'
+    'POST records create with empty'
     + ' attributes still writes the record and'
     + ' state event',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'create',
             id: 'rec-2',
             record: {
@@ -111,12 +111,12 @@ test(
 // ── Edit variant ──────
 
 test(
-    'POST records-multi-put edit updates the'
+    'POST records edit updates the'
     + ' record fields without touching state',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -129,7 +129,7 @@ test(
             initialState: 'active',
             initialStateEventId: 'ev-1',
         }, DEV_TOKEN);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -160,12 +160,12 @@ test(
 );
 
 test(
-    'POST records-multi-put edit removes'
+    'POST records edit removes'
     + ' attributes by id and adds new ones',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -191,7 +191,7 @@ test(
             initialState: 'active',
             initialStateEventId: 'ev-1',
         }, DEV_TOKEN);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -227,12 +227,12 @@ test(
 );
 
 test(
-    'POST records-multi-put edit updates an'
+    'POST records edit updates an'
     + ' existing attribute by upsert',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -257,7 +257,7 @@ test(
             initialState: 'active',
             initialStateEventId: 'ev-1',
         }, DEV_TOKEN);
-        await POST(db, 'records-multi-put', {
+        await POST(db, 'records', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -295,13 +295,13 @@ test(
 // ── Failure modes ──────
 
 test(
-    'POST records-multi-put rejects an empty'
+    'POST records rejects an empty'
     + ' attribute name',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -334,14 +334,14 @@ test(
 );
 
 test(
-    'POST records-multi-put rejects an'
+    'POST records rejects an'
     + ' attribute whose record_id does not'
     + ' match the top-level id',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -374,13 +374,13 @@ test(
 );
 
 test(
-    'POST records-multi-put rejects an unknown'
+    'POST records rejects an unknown'
     + ' kind discriminator',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'destroy',
                 id: 'rec-1',
                 record: {
@@ -390,19 +390,19 @@ test(
                 },
                 attributes: [],
             }, DEV_TOKEN),
-            /RecordMultiPutBody kind/,
+            /RecordWriteBody kind/,
         );
     },
 );
 
 test(
-    'POST records-multi-put rejects an invalid'
+    'POST records rejects an invalid'
     + ' initialState',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -420,13 +420,13 @@ test(
 );
 
 test(
-    'POST records-multi-put rejects a body with'
+    'POST records rejects a body with'
     + ' an unexpected key',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -445,13 +445,13 @@ test(
 );
 
 test(
-    'POST records-multi-put rejects a body with'
+    'POST records rejects a body with'
     + ' a missing required key',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'edit',
                 id: 'rec-1',
                 record: {
@@ -467,15 +467,22 @@ test(
 );
 
 test(
-    'POST records-multi-put create rolls back the'
-    + ' record when the current member is missing',
+    'POST records create rolls back the'
+    + ' record when its initial state event conflicts',
     async () => {
         const db = await freshDb();
-        // No seedCurrentMember: the create reads
-        // members/current, which 404s after the record
-        // write — the whole operation must roll back.
+        // Pre-seed a DIFFERENT event at the create's
+        // initialStateEventId. postEvent re-puts that id with
+        // a conflicting payload mid-tx (LedgerImmutability),
+        // so the record write must roll back with it.
+        await db.states.put('ev-x', {
+            entity_id: 'other',
+            state: 'active',
+            member_id: 'current',
+            at: '2020-01-01T00:00:00.000000Z',
+        });
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'create',
                 id: 'rec-rollback',
                 record: {

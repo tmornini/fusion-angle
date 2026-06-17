@@ -7,7 +7,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 
 // Verify-first (Correction C): facadeRequest forwards POST
 // bodies and re-enters the gate against the org-scoped
-// `effective` adapter, so a records-multi-put POST through
+// `effective` adapter, so a records POST through
 // the facade is org-fenced exactly like a flat PUT. These
 // pin that behavior; no facade code is added unless red.
 
@@ -27,7 +27,7 @@ function req(
     });
 }
 
-// An edit multi-put puts only the record row — the path
+// An edit record write puts only the record row — the path
 // that isolates the org stamp from the create-path member
 // and initial-state writes.
 function editBody(org: string) {
@@ -62,11 +62,11 @@ async function oneOrg(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('a facade records-multi-put stamps the bound org'
+test('a facade records write stamps the bound org'
     + ' over a forged record', async () => {
     const db = await oneOrg();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/A/records-multi-put',
+        'POST', '/organizations/A/records',
         await devToken('current'),
         editBody('B')));
     assert.equal(res.status, 204);
@@ -74,11 +74,11 @@ test('a facade records-multi-put stamps the bound org'
     assert.equal(stored.organization_id, 'A');
 });
 
-test('a facade records-multi-put into a non-member org'
+test('a facade records write into a non-member org'
     + ' is 403', async () => {
     const db = await oneOrg();
     const res = await handleRequest(db, req(
-        'POST', '/organizations/B/records-multi-put',
+        'POST', '/organizations/B/records',
         await devToken('current'),
         editBody('B')));
     assert.equal(res.status, 403);

@@ -14,8 +14,6 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
-    type Transaction,
-    type WriteOp,
 } from '../web-app/app/adapters/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -241,7 +239,7 @@ async function flowVersionCount(
     db: MemoryDbAdapter,
 ): Promise<number> {
     const rows = await createRequestContext(db, DEV_TOKEN)
-        .GET<unknown[]>('flow-versions');
+        .GET<unknown[]>('flows/' + FLOW_ID + '/versions');
     return rows.length;
 }
 
@@ -1184,29 +1182,21 @@ test(
     async () => {
         const { db, ctx } = await setupFlow();
         // Snapshot the 2-node baseline as v1.
-        await ctx.commit({
-            ops: [{
-                method: 'put',
-                resource: 'flow-versions/v1',
-                body: {
-                    flow_id: FLOW_ID,
-                    name: 'Test Flow',
-                    is_locked: false,
-                    is_auto_layout: true,
-                    is_auto_fit: true,
-                    lock_timeout:
-                        DEFAULT_LOCK_TIMEOUT,
-                    graph: JSON.stringify({
-                        nodes: [
-                            buildNode('a'),
-                            buildNode('b'),
-                        ],
-                        edges: [],
-                    }),
-                    at:
-                        '2026-01-01T00:00:00.000000Z',
-                },
-            }],
+        await ctx.PUT('flows/' + FLOW_ID + '/versions/v1', {
+            flow_id: FLOW_ID,
+            name: 'Test Flow',
+            is_locked: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: JSON.stringify({
+                nodes: [
+                    buildNode('a'),
+                    buildNode('b'),
+                ],
+                edges: [],
+            }),
+            at: '2026-01-01T00:00:00.000000Z',
         });
         // Current state has a third node.
         const snap = snapFrom(buildGraph([
@@ -1342,90 +1332,86 @@ test(
     },
 );
 
-// A ctx whose commit records the batch and then
-// fails — proving an op's writes arrive as ONE
-// transaction and a fault applies none of them.
-function failingCommitCtx(
+// A ctx whose POST to a named operation faults — the
+// composing flow-write + version-op now ride POST
+// /flows/:id/{undo,redo} (not ctx.commit), so this
+// proves the same one-transaction covenant: when the
+// named POST rejects, the underlying transaction
+// applied NOTHING. GET/PUT/DELETE pass through to the
+// real db so redo's pre-transaction snapshot read still
+// runs. POST to any OTHER resource passes through, so
+// only the operation under test is faulted.
+function faultingPostCtx(
     ctx: RequestContext,
+    faultResource: string,
 ): {
     ctx: RequestContext;
-    batches: () => number;
-    ops: () => readonly WriteOp[];
+    posts: () => number;
 } {
     let count = 0;
-    let captured: readonly WriteOp[] = [];
     const wrapped: RequestContext = {
         ...ctx,
-        commit: (tx: Transaction) => {
-            count += 1;
-            captured = tx.ops;
-            return Promise.reject(
-                new Error('injected commit fault'),
-            );
+        POST: <T>(
+            resource: string,
+            body: Record<string, unknown>,
+        ): Promise<T> => {
+            if (resource === faultResource) {
+                count += 1;
+                return Promise.reject(
+                    new Error('injected POST fault'),
+                );
+            }
+            return ctx.POST<T>(resource, body);
         },
     };
-    return {
-        ctx: wrapped,
-        batches: () => count,
-        ops: () => captured,
-    };
+    return { ctx: wrapped, posts: () => count };
 }
 
 test(
     'performUndo: restore + consume ride ONE'
-    + ' batch; an injected commit fault applies'
-    + ' nothing',
+    + ' transaction; a faulted POST /flows/:id/undo'
+    + ' applies nothing',
     async () => {
         const { db, ctx } = await setupFlow();
-        await ctx.commit({
-            ops: [{
-                method: 'put',
-                resource: 'flow-versions/v1',
-                body: {
-                    flow_id: FLOW_ID,
-                    name: 'Test Flow',
-                    is_locked: false,
-                    is_auto_layout: true,
-                    is_auto_fit: true,
-                    lock_timeout:
-                        DEFAULT_LOCK_TIMEOUT,
-                    graph: JSON.stringify({
-                        nodes: [
-                            buildNode('a'),
-                            buildNode('b'),
-                        ],
-                        edges: [],
-                    }),
-                    at:
-                        '2026-01-01T00:00:00.000000Z',
-                },
-            }],
+        await ctx.PUT('flows/' + FLOW_ID + '/versions/v1', {
+            flow_id: FLOW_ID,
+            name: 'Test Flow',
+            is_locked: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
+            lock_timeout: DEFAULT_LOCK_TIMEOUT,
+            graph: JSON.stringify({
+                nodes: [
+                    buildNode('a'),
+                    buildNode('b'),
+                ],
+                edges: [],
+            }),
+            at: '2026-01-01T00:00:00.000000Z',
         });
         const snap = snapFrom(buildGraph([
             buildNode('a'),
             buildNode('b'),
             buildNode('c'),
         ]));
-        const failing = failingCommitCtx(ctx);
+        const faulting = faultingPostCtx(
+            ctx, 'flows/' + FLOW_ID + '/undo',
+        );
         const op = await silenceConsoleError(
             () => performUndo(
-                failing.ctx, snap,
+                faulting.ctx, snap,
                 buildFlowHistorySnapshot(true),
             ),
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
         assert.match(op.toast, /undo failed/i);
-        assert.equal(failing.batches(), 1);
-        const ops = failing.ops();
-        assert.ok(ops.some(o =>
-            o.method === 'put'
-            && o.resource === 'flows/' + FLOW_ID));
-        assert.ok(ops.some(o =>
-            o.method === 'delete'
-            && o.resource === 'flow-versions/v1'));
-        // nothing applied: version row and the
-        // persisted graph both survive untouched
+        assert.equal(faulting.posts(), 1);
+        // nothing applied: the consumed version row
+        // survives AND the persisted graph keeps the
+        // seeded start + complete pair (the revert
+        // never landed; the 3-node snap was only ever
+        // the client's view, never persisted)
         assert.equal(
             await flowVersionCount(db), 1,
         );
@@ -1436,8 +1422,8 @@ test(
 
 test(
     'performRedo: snapshot + re-apply ride ONE'
-    + ' batch; an injected commit fault applies'
-    + ' nothing',
+    + ' transaction; a faulted POST /flows/:id/redo'
+    + ' applies nothing',
     async () => {
         const { db, ctx } = await setupFlow();
         const snap = snapFrom(buildGraph([
@@ -1452,25 +1438,19 @@ test(
                 ],
             }),
         );
-        const failing = failingCommitCtx(ctx);
+        const faulting = faultingPostCtx(
+            ctx, 'flows/' + FLOW_ID + '/redo',
+        );
         const op = await silenceConsoleError(
             () => performRedo(
-                failing.ctx, snap, history,
+                faulting.ctx, snap, history,
             ),
         );
         assert.equal(op.kind, 'fail');
         if (op.kind !== 'fail') return;
         assert.match(op.toast, /redo failed/i);
-        assert.equal(failing.batches(), 1);
-        const ops = failing.ops();
-        assert.ok(ops.some(o =>
-            o.method === 'put'
-            && o.resource.startsWith(
-                'flow-versions/')));
-        assert.ok(ops.some(o =>
-            o.method === 'put'
-            && o.resource === 'flows/' + FLOW_ID));
-        // nothing applied: no version row, and
+        assert.equal(faulting.posts(), 1);
+        // nothing applied: no new version row, and
         // the persisted graph stays the seeded
         // start + complete pair
         assert.equal(

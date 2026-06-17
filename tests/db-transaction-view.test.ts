@@ -77,7 +77,59 @@ test(
 );
 
 test(
-    'a nested view transaction throws',
+    'a nested view transaction joins the open tx',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.postSchemaCreation();
+        await db.transaction(
+            ['members', 'states'],
+            async (view) => {
+                await view.transaction(
+                    ['members'],
+                    async (inner) => {
+                        await inner.members.put('m1', {
+                            type: 'human',
+                        });
+                    },
+                );
+                await view.states.put('s1', aState);
+            },
+        );
+        const member = await db.members.getById('m1');
+        const state = await db.states.getById('s1');
+        assert.equal(member.id, 'm1');
+        assert.equal(state.id, 's1');
+    },
+);
+
+test(
+    'a nested write rolls back with the outer tx',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await db.postSchemaCreation();
+        await assert.rejects(
+            () => db.transaction(
+                ['members', 'states'],
+                async (view) => {
+                    await view.transaction(
+                        ['members'],
+                        async (inner) => {
+                            await inner.members.put('m1', {
+                                type: 'human',
+                            });
+                        },
+                    );
+                    throw new Error('boom');
+                },
+            ),
+            /boom/,
+        );
+        assert.deepEqual(await db.members.getAll(), []);
+    },
+);
+
+test(
+    'a nested out-of-scope table throws a clear error',
     async () => {
         const db = new MemoryDbAdapter();
         await db.postSchemaCreation();
@@ -86,12 +138,12 @@ test(
                 ['members'],
                 async (view) => {
                     await view.transaction(
-                        ['members'],
+                        ['states'],
                         async () => undefined,
                     );
                 },
             ),
-            /[Nn]ested transaction/,
+            /states/,
         );
     },
 );

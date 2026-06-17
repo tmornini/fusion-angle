@@ -81,29 +81,28 @@ export async function validateRecordTransition(
         attributes.map(a => [a.id, a]),
     );
 
-    const [
-        transitions, allFieldValues,
-    ] = await Promise.all([
-        getWorkOrderTransitionEvents(
+    const transitions =
+        await getWorkOrderTransitionEvents(
             ctx, workOrderId,
-        ),
-        ctx.GET<StateFieldValueEntity[]>(
-            'state-field-values',
-        ),
-    ]);
-    const eventIds = new Set(
-        transitions.map(t => t.id),
+        );
+    // The field values are nested under their parent state event,
+    // so fetch each transition event's values directly — no whole-
+    // table scan + client-side event filter. Each read is server-
+    // filtered to its event by the state_event_id FK.
+    const perEvent = await Promise.all(
+        transitions.map(t => ctx.GET<StateFieldValueEntity[]>(
+            'states/' + t.id + '/field-values',
+        )),
     );
     const storedValueByAttr = new Map<
         RecordAttributeId, string
     >();
-    for (const fv of allFieldValues) {
-        if (!eventIds.has(fv.state_event_id)) {
-            continue;
+    for (const fvs of perEvent) {
+        for (const fv of fvs) {
+            storedValueByAttr.set(
+                fv.attribute_id, fv.value,
+            );
         }
-        storedValueByAttr.set(
-            fv.field_id, fv.value,
-        );
     }
 
     const out: ConstraintViolation[] = [];

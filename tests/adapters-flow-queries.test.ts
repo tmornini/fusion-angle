@@ -366,6 +366,11 @@ test(
     async () => {
         const { db } = await setupMemDb();
         const c1 = createRequestContext(db, await devToken());
+        // The nested per-project reassembly enumerates the org's
+        // projects, so the parent rows must exist for their flow
+        // joins to surface.
+        await putProject(db, 'p1', 'Project p1');
+        await putProject(db, 'p2', 'Project p2');
         await createBaseFlow(c1, 'flow-1', 'p1');
         await createBaseFlow(c1, 'flow-2', 'p2');
         const rows: ProjectFlowEntity[] =

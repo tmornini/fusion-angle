@@ -38,14 +38,9 @@ import {
     getIdentityDefaultOrg,
 } from './identity-default-org.ts';
 import {
-    ACTIVE_ORG_KEY,
     resolveActiveOrg,
     postOrgSessionExchange,
 } from './org-session.ts';
-import {
-    getPreference,
-    putPreference,
-} from './preferences.ts';
 
 // Rows whose `field` equals `value` — the single-field
 // equality filter the adapters repeat. Type-safe: `field`
@@ -57,39 +52,6 @@ export function filterByField<T, K extends keyof T>(
     value: T[K],
 ): T[] {
     return rows.filter(row => row[field] === value);
-}
-
-// A unit of write work executed by ctx.commit().
-// `put` upserts a row by full state; `delete` removes
-// a row by its resource path. The whole batch posts as
-// ONE request and commits in one transaction — it
-// applies entirely or not at all. On failure, commit()
-// throws CommitError wrapping the cause; real rollback
-// leaves nothing partially applied.
-export type WriteOp =
-    | {
-        method: 'put';
-        resource: string;
-        body: Record<string, unknown>;
-    }
-    | {
-        method: 'delete';
-        resource: string;
-    };
-
-export interface Transaction {
-    readonly ops: readonly WriteOp[];
-}
-
-export class CommitError extends Error {
-    readonly cause: Error;
-    constructor(cause: Error) {
-        super(
-            'commit failed: ' + cause.message,
-        );
-        this.name = 'CommitError';
-        this.cause = cause;
-    }
 }
 
 export interface RequestContext {
@@ -105,7 +67,6 @@ export interface RequestContext {
         resource: string,
         body: Record<string, unknown>,
     ): Promise<T>;
-    commit(tx: Transaction): Promise<void>;
 }
 
 // The recovery-free context: each verb runs directly on its
@@ -139,7 +100,8 @@ function makeRequestContext(
         make: (tok: string) => Promise<T>,
     ): Promise<T> {
         return recover
-            ? withAuthRecovery(adapter, make)
+            ? withAuthRecovery(
+                adapter, token, identity.organization, make)
             : make(token);
     }
 
@@ -161,19 +123,6 @@ function makeRequestContext(
             body: Record<string, unknown>,
         ) => run<T>(
             tok => httpPost<T>(adapter, resource, body, tok)),
-        commit: async (
-            tx: Transaction,
-        ): Promise<void> => {
-            try {
-                await ctx.POST('commit', {
-                    ops: tx.ops,
-                });
-            } catch (e) {
-                // Atomic batch: a failure applied nothing,
-                // so `applied` is always empty.
-                throw new CommitError(e as Error);
-            }
-        },
     };
     return ctx;
 }
@@ -195,8 +144,9 @@ let recoveryInFlight: Promise<string | null> | null = null;
 
 function sharedRecovery(
     adapter: ClientFacadeAdapter,
+    requestOrg: Id | undefined,
 ): Promise<string | null> {
-    recoveryInFlight ??= recoverSession(adapter)
+    recoveryInFlight ??= recoverSession(adapter, requestOrg)
         .finally(() => {
             recoveryInFlight = null;
         });
@@ -204,22 +154,27 @@ function sharedRecovery(
 }
 
 // Wrap one verb call with single-shot 401 recovery. The first
-// attempt runs on the live session token. A non-401 fault
+// attempt runs on the request's own vessel token — never the
+// live module global, so identity and wire credential cannot
+// diverge mid-request (one vessel truth). A non-401 fault
 // surfaces untouched. A 401 drives one refresh + re-scope; the
 // call is retried exactly once against the recovered token. A
 // second 401 (or no refreshable credential) clears the session
 // and bounces to login — there is no third attempt.
 async function withAuthRecovery<T>(
     adapter: ClientFacadeAdapter,
+    token: string,
+    requestOrg: Id | undefined,
     make: (tok: string) => Promise<T>,
 ): Promise<T> {
     try {
-        return await make(getSessionToken());
+        return await make(token);
     } catch (err) {
         if (!(err instanceof UnauthorizedError)) {
             throw err;
         }
-        const recovered = await sharedRecovery(adapter);
+        const recovered =
+            await sharedRecovery(adapter, requestOrg);
         if (recovered === null) {
             throw err;   // unrefreshable — already redirected
         }
@@ -242,6 +197,7 @@ async function withAuthRecovery<T>(
 // refresh round-trip.
 async function recoverSession(
     adapter: ClientFacadeAdapter,
+    requestOrg: Id | undefined,
 ): Promise<string | null> {
     let creds: SessionCredentials | null;
     try {
@@ -262,7 +218,8 @@ async function recoverSession(
     // scrub + bounce — never destroying a live session over a
     // recoverable unscoped read.
     if (decision.kind === 'install') {
-        return installAndScope(adapter, decision.accessToken);
+        return installAndScope(
+            adapter, decision.accessToken, requestOrg);
     }
     if (decision.kind !== 'refresh') {
         deleteSessionCredentials();
@@ -275,7 +232,8 @@ async function recoverSession(
         return null;
     }
     putSessionCredentials(refreshed);
-    return installAndScope(adapter, refreshed.accessToken);
+    return installAndScope(
+        adapter, refreshed.accessToken, requestOrg);
 }
 
 // Install a flat token as the session and re-scope it to the active
@@ -290,10 +248,12 @@ async function recoverSession(
 async function installAndScope(
     adapter: ClientFacadeAdapter,
     flatToken: string,
+    requestOrg: Id | undefined,
 ): Promise<string | null> {
     putSessionToken(flatToken);
     try {
-        await rescopeToActiveOrg(adapter, flatToken);
+        await rescopeToActiveOrg(
+            adapter, flatToken, requestOrg);
     } catch (err) {
         if (err instanceof UnauthorizedError) {
             deleteSessionCredentials();
@@ -326,12 +286,19 @@ async function refreshCredentials(
 }
 
 // Re-scope the freshly refreshed (org-agnostic) token to the
-// active org, exactly as boot does — resolving the target from
-// the REACHABLE set first, so the exchange never targets a
-// non-member org (H13). Mirrors scopeBootToActiveOrg.
+// request's own org, resolving the target from the REACHABLE
+// set first so the exchange never targets a non-member org
+// (H13). Unlike boot, recovery neither reads nor writes the
+// cross-tab ACTIVE_ORG_KEY preference: the target is the
+// vessel's verified org claim, so a recovering request stays in
+// the org it was operating in — and a background recovery never
+// clobbers the org another tab is viewing (F-109). A flat vessel
+// (no claim) falls back to the identity default, then the first
+// reachable.
 async function rescopeToActiveOrg(
     adapter: ClientFacadeAdapter,
     flatToken: string,
+    requestOrg: Id | undefined,
 ): Promise<void> {
     const ctx = createRequestContext(adapter, flatToken);
     const reachable =
@@ -341,12 +308,11 @@ async function rescopeToActiveOrg(
     }
     const active = resolveActiveOrg(
         reachable,
-        getPreference(ACTIVE_ORG_KEY),
+        requestOrg ?? null,
         await getIdentityDefaultOrg(ctx),
     );
     putSessionToken(
         await postOrgSessionExchange(ctx, flatToken, active));
-    putPreference(ACTIVE_ORG_KEY, active);
 }
 
 // The active org the session is scoped to. Post-boot the

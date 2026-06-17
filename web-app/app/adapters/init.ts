@@ -39,9 +39,9 @@ export async function initAdapter(
     await adapter.initialize();
     // The composition root probes the datastore directly —
     // the same infrastructure tier as initialize() above.
-    // The HTTP snapshot plane is bearer-closed once a schema
-    // exists, and exporting the whole database to compare it
-    // against null was never the question being asked.
+    // Exporting the whole database through the snapshot plane
+    // just to compare it against null was never the question
+    // being asked.
     return adapter.hasSchema();
 }
 

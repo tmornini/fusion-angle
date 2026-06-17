@@ -81,8 +81,10 @@ test(
 
 test('featuredHumanMembers keeps only members with a dept',
 () => {
-    const mk = (dept: boolean) =>
-        ({ hasDepartment: () => dept }) as
+    const mk = (present: boolean) =>
+        ({ department: () => present
+            ? { present: true, label: 'Eng' }
+            : { present: false } }) as
             unknown as HumanMember;
     const result = featuredHumanMembers([
         mk(true), mk(false), mk(true),
@@ -92,7 +94,8 @@ test('featuredHumanMembers keeps only members with a dept',
 
 test('featuredHumanMembers caps the list at six', () => {
     const mk = () =>
-        ({ hasDepartment: () => true }) as
+        ({ department: () =>
+            ({ present: true, label: 'Eng' }) }) as
             unknown as HumanMember;
     const ten = Array.from({ length: 10 }, mk);
     assert.equal(featuredHumanMembers(ten).length, 6);

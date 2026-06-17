@@ -513,7 +513,7 @@ Org-owned (org-fenced): NOT-NULL `organization_id`.
 
 ### record_attributes
 
-One row per attribute of a Record. The `field_id` column
+One row per attribute of a Record. The `attribute_id` column
 on `state_field_values` references this `id` once the flow
 the work order belongs to is bound to the parent Record.
 Org-owned (org-fenced): NOT-NULL `organization_id`.
@@ -840,9 +840,9 @@ their own table, not as columns on the event row.
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY |
 | state_event_id | TEXT | References states |
-| field_id | TEXT | References record_attributes |
+| attribute_id | TEXT | References record_attributes |
 | value | TEXT | Value as a string |
 
-The `field_id` column references `record_attributes.id`;
-the column name predates the Records iteration and will
-be renamed when a second non-Record consumer arrives.
+The `attribute_id` column references `record_attributes.id`,
+not a table named `attributes`; the schema-SVG generator
+carries an explicit FK-target override for it.

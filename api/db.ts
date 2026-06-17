@@ -391,7 +391,8 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     // Run `fn` inside one transaction. The view it receives
     // exposes the same stores bound to the open tx, so every
     // op joins it — GET-modify-PUT and multi-PUT commit
-    // atomically. A nested view.transaction throws.
+    // atomically. A nested view.transaction re-enters this
+    // same tx; its tables must be a subset of the outer set.
     transaction<R>(
         tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
@@ -477,13 +478,21 @@ export const TABLE_INDEXES:
     identity_tokens: ['jti', 'chain_id'],
     authorization_codes: ['code'],
     ideas: ['organization_id'],
+    idea_submissions: ['idea_id'],
     projects: ['organization_id'],
+    project_flows: ['project_id'],
+    project_objective_baseline_scores: ['project_id'],
+    project_objective_actual_scores: ['project_id'],
     flows: ['organization_id'],
+    flow_versions: ['flow_id'],
+    flow_work_orders: ['flow_id'],
+    flow_records: ['flow_id'],
     work_orders: ['organization_id'],
-    state_field_values: ['field_id'],
+    state_field_values: ['attribute_id', 'state_event_id'],
     records: ['organization_id'],
     record_attributes: ['organization_id'],
     objectives: ['organization_id'],
+    objective_revisions: ['objective_id'],
     memberships: ['organization_id', 'identity_id'],
     states: ['entity_id'],
 };

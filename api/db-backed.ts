@@ -238,9 +238,9 @@ export class BackedDbAdapter
             },
         );
         // Imported data IS a schema: stamp the marker after
-        // the commit so hasSchema() answers true and the
-        // anonymous bootstrap plane closes behind a restore
-        // onto a fresh origin. A failed import never stamps.
+        // the commit so hasSchema() answers true after a
+        // restore onto a fresh origin. A failed import never
+        // stamps.
         await this.#backend.postSchemaCreation();
     }
 
@@ -250,16 +250,23 @@ export class BackedDbAdapter
     ): Promise<R> {
         return this.#backend.transaction(
             tables, 'readwrite',
-            (tx) => fn(this.#viewForTx(tx)),
+            (tx) => fn(this.#viewForTx(tx, tables)),
         );
     }
 
     // An adapter whose 32 stores are bound to the open tx
     // (ambientRunner joins it), so every op runs in one
     // transaction. Lifecycle methods delegate to the parent;
-    // a nested transaction throws.
-    #viewForTx(tx: Tx): GuardedDbAdapter {
-        return {
+    // a nested transaction RE-ENTERS this same tx — it runs
+    // `fn` against this view after asserting the nested tables
+    // are a subset of the outer declared set, so a composing
+    // POST opens one tx and calls the same single-noun store
+    // ops the per-noun routes use, all committing together.
+    #viewForTx(
+        tx: Tx,
+        declaredTables: readonly string[],
+    ): GuardedDbAdapter {
+        const view: GuardedDbAdapter = {
             ...this.#buildStores(ambientRunner(tx)),
             initialize: () => this.initialize(),
             deleteSchema: () => this.deleteSchema(),
@@ -270,12 +277,33 @@ export class BackedDbAdapter
             getSnapshot: () => this.getSnapshot(),
             putSnapshot: (json) =>
                 this.putSnapshot(json),
-            transaction: () => {
-                throw new Error(
-                    'Nested transaction is not supported.',
-                );
+            transaction: (tables, fn) => {
+                this.#assertSubset(tables, declaredTables);
+                return fn(view);
             },
         };
+        return view;
+    }
+
+    // The nested-tx guard. IndexedDB locks object stores at
+    // tx-open, so a nested op touching a table the outer did
+    // not declare fails there; the simulated tiers would let
+    // it slip (they buffer any table lazily). This asserts
+    // the subset on every tier — a clear error naming the
+    // table, raised before any row op.
+    #assertSubset(
+        nestedTables: readonly string[],
+        declaredTables: readonly string[],
+    ): void {
+        for (const table of nestedTables) {
+            if (!declaredTables.includes(table)) {
+                throw new Error(
+                    `Nested transaction table '${table}'`
+                    + ' is not in the outer declared set'
+                    + ` [${declaredTables.join(', ')}].`,
+                );
+            }
+        }
     }
 
     // The 32-store wiring lives here once. The constructor

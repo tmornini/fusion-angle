@@ -387,7 +387,7 @@
     <text class="type" x="2366" y="79">id</text>
     <text class="fk" x="2178" y="97">state_event_id</text>
     <text class="type" x="2366" y="97">id</text>
-    <text class="fk" x="2178" y="115">field_id</text>
+    <text class="fk" x="2178" y="115">attribute_id</text>
     <text class="type" x="2366" y="115">id</text>
     <text class="col" x="2178" y="133">value</text>
     <text class="type" x="2366" y="133">text</text>

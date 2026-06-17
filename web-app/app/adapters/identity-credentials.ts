@@ -11,7 +11,6 @@ import {
 import {
     latestByKey,
 } from '../../../api/ledger-reduction.ts';
-import { filterByField } from './shared.ts';
 import type { RequestContext } from './shared.ts';
 
 // Surface the credential-kind union so the identity detail
@@ -26,13 +25,16 @@ async function appendCredentialEvent(
     secret: string,
 ): Promise<void> {
     const id = generateCryptoSafeBase62();
-    await ctx.PUT(`identity-credentials/${id}`, {
-        identity_id: identityId,
-        kind,
-        status,
-        secret,
-        at: nowUtc(),
-    });
+    await ctx.PUT(
+        `identities/${identityId}/credentials/${id}`,
+        {
+            identity_id: identityId,
+            kind,
+            status,
+            secret,
+            at: nowUtc(),
+        },
+    );
 }
 
 export async function
@@ -59,12 +61,12 @@ export async function getIdentityCredentialState(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<IdentityCredentialState> {
-    const all = await ctx.GET<
+    // The server filters the nested collection to the parent
+    // identity by its identity_id FK, so no client filter is
+    // needed.
+    const forIdentity = await ctx.GET<
         IdentityCredentialEntity[]
-    >('identity-credentials');
-    const forIdentity = filterByField(
-        all, 'identity_id', identityId,
-    );
+    >('identities/' + identityId + '/credentials');
     // Latest by `at`, not array order — a snapshot reimport
     // or concurrent write can reorder rows. latestByKey's
     // default >= tiebreak is the secure direction.

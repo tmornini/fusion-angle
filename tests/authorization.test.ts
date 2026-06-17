@@ -2,7 +2,34 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     currentRolesForInOrg, isPermitted,
+    matchesOnSegmentBoundary,
 } from '../api/authorization.ts';
+
+test('a :id segment in a prefix matches any path segment',
+() => {
+    assert.equal(
+        matchesOnSegmentBoundary(
+            '/flows/f1/versions/v1', '/flows/:id/versions',
+        ), true);
+});
+
+test('a nested prefix does not match a shallower path', () => {
+    assert.equal(
+        matchesOnSegmentBoundary(
+            '/flows/f1', '/flows/:id/versions',
+        ), false);
+});
+
+test('a prefix matches only on a segment boundary', () => {
+    assert.equal(
+        matchesOnSegmentBoundary('/memberships', '/members'),
+        false);
+    assert.equal(
+        matchesOnSegmentBoundary('/members/m1', '/members'),
+        true);
+    assert.equal(
+        matchesOnSegmentBoundary('/anything', '/'), true);
+});
 
 const grant = (
     id: string, identity: string, role: string,
@@ -100,8 +127,6 @@ test('member tier: content surfaces are permitted', () => {
         isPermitted('GET', '/ideas', ['member']), true);
     assert.equal(
         isPermitted('PUT', '/ideas/i1', ['member']), true);
-    assert.equal(
-        isPermitted('POST', '/commit', ['member']), true);
     assert.equal(
         isPermitted(
             'POST', '/work-orders/w1/claim', ['member']),

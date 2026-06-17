@@ -49,11 +49,13 @@ async () => {
 test('a member is denied the admin surfaces', async () => {
     const db = await memberDb();
     const token = await devToken(MEMBER);
-    // snapshots/* stay bearer-exempt until the F-006 fix
-    // narrows the bootstrap plane, so they are not probed
-    // here even though the policy already denies them.
+    // snapshots/* are intentionally auth-free — a dev-tier
+    // surface removed at the Postgres server tier — so they
+    // are not probed here even though the policy table would
+    // deny them.
     for (const [method, path] of [
         ['GET', '/memberships'],
+        ['PUT', '/memberships/evil'],
         ['GET', '/identities'],
         ['GET', '/identity-pii'],
         ['PUT', '/organizations/1'],
@@ -73,48 +75,4 @@ test('a member is denied the admin surfaces', async () => {
             at: '2026-06-10T00:00:00.000000Z',
         }));
     assert.equal(grant.status, 403);
-});
-
-test('a member commit batch carries content ops',
-async () => {
-    const db = await memberDb();
-    const token = await devToken(MEMBER);
-    const res = await handleRequest(db, req(
-        'POST', '/commit', token, {
-            ops: [{
-                method: 'put',
-                resource: 'ideas/i2',
-                body: { id: 'i2', ...ideaBody('1', 'ok') },
-            }],
-        }));
-    assert.equal(res.status, 204);
-    const ideas = await db.ideas.getAll();
-    assert.equal(ideas.length, 1);
-});
-
-test('a member cannot smuggle an admin op through commit',
-async () => {
-    const db = await memberDb();
-    const token = await devToken(MEMBER);
-    const res = await handleRequest(db, req(
-        'POST', '/commit', token, {
-            ops: [{
-                method: 'put',
-                resource: 'memberships/evil',
-                body: {
-                    organization_id: '1',
-                    identity_id: 'intruder',
-                    at: '2026-06-10T00:00:00.000000Z',
-                },
-            }],
-        }));
-    assert.equal(res.status, 403);
-    const body = await res.json() as { error: string };
-    assert.match(
-        body.error,
-        /commit op PUT \/memberships\/evil/);
-    const rows = await db.memberships.getAll();
-    assert.equal(
-        rows.length, 1,
-        'the smuggled membership must not land');
 });

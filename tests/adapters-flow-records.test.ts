@@ -45,6 +45,9 @@ async function seedWorkOrder(
     flowId: string,
     position: number,
 ): Promise<void> {
+    // The flow↔work-order join now nests under its parent flow,
+    // so the parent flow must exist to be enumerated.
+    await seedFlow(db, flowId, flowId);
     const flowGraph = jsonObjectField({
         name: 'Flow',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
@@ -268,7 +271,7 @@ test(
             record_id: 'rec-1',
             at: AT,
         });
-        await deleteFlowRecord(ctx, 'fr-1');
+        await deleteFlowRecord(ctx, 'flow-1', 'fr-1');
         assert.equal(
             await getRecordForFlow(ctx, 'flow-1'),
             null,

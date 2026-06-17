@@ -3,6 +3,7 @@ import type {
     EntityStore,
 } from './db.ts';
 import type {
+    Id,
     AIMemberEntity,
     FlowEntity,
     FlowVersionEntity,
@@ -26,9 +27,7 @@ import type {
     RoleGrantEntity,
     MembershipEntity,
     IdentityTokenEntity,
-    ClientEntity,
     IdentityProviderEntity,
-    AuthorizationCodeEntity,
     StateFieldValueEntity,
     WorkOrderEntity,
     MemberEntity,
@@ -38,8 +37,23 @@ import {
     generateCryptoSafeBase62,
 } from './crypto-safe-base62.ts';
 import {
-    validateRecordMultiPutBody,
-    validateStateEntity,
+    validateAIMemberCreateBody,
+    validateAIMemberEditBody,
+    validateHumanMemberCreateBody,
+    validateHumanMemberEditBody,
+    validateFlowCreateBody,
+    validateFlowVersionPublishBody,
+    validateFlowSaveBody,
+    validateFlowUndoBody,
+    validateFlowRedoBody,
+    validateIdeaCreateBody,
+    validateIdeaConversionBody,
+    validateIdentityCreateBody,
+    validateObjectiveCreateBody,
+    validateRecordWriteBody,
+    validateStateBody,
+    validateWorkOrderCreateBody,
+    validateWorkOrderTransitionBody,
     validateWorkOrderFlowGraphJson,
 } from './validators.ts';
 import {
@@ -51,6 +65,7 @@ import {
     collectAttributeReferrers,
     hasReferrers,
     describeReferrers,
+    deleteRecordAttributeSafe,
 } from './record-attribute-refs.ts';
 import {
     postToken,
@@ -64,26 +79,35 @@ import {
     HTTP_CONFLICT,
 } from './http-errors.ts';
 
+// Every handler receives the verified caller's id (actor) as
+// its final argument — the one place authorship is sourced.
+// The gate resolves it from the token; handlers that author
+// state events or identify the caller stamp it, and the rest
+// (the makeIdRoute closures) simply ignore the extra arg.
 type GetHandler = (
     adapter: DbAdapter,
     params: string[],
+    actor: Id,
 ) => Promise<unknown>;
 
 type PutHandler = (
     adapter: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
+    actor: Id,
 ) => Promise<unknown>;
 
 type DeleteHandler = (
     adapter: DbAdapter,
     params: string[],
+    actor: Id,
 ) => Promise<void>;
 
 type PostHandler = (
     adapter: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
+    actor: Id,
 ) => Promise<unknown>;
 
 export interface Route {
@@ -193,11 +217,12 @@ function makeIdRoute<T extends { id: string }>(
     return route(`${config.noun}/:id`, handlers);
 }
 
-async function applyRecordMultiPut(
+async function applyRecordWrite(
     db: DbAdapter,
     payload: Record<string, unknown>,
+    actor: Id,
 ): Promise<void> {
-    const body = validateRecordMultiPutBody(payload);
+    const body = validateRecordWriteBody(payload);
     const entries = body.attributes.map(attr => {
         const { id, ...fields } = attr;
         return { id, fields };
@@ -208,26 +233,26 @@ async function applyRecordMultiPut(
             : [];
     // The record, its initial state event, and its
     // attributes commit as one transaction — a mid-write
-    // failure (e.g. a missing current member) rolls the
-    // whole thing back rather than orphaning the record.
-    // Removed attributes are RESTRICTED inside the same tx:
-    // a referenced attribute 409s and the whole batch rolls
-    // back (api/record-attribute-refs.ts).
+    // failure rolls the whole thing back rather than
+    // orphaning the record. The initial state event is
+    // authored by the verified caller (actor), never a
+    // client-supplied member. Removed attributes are
+    // RESTRICTED inside the same tx: a referenced attribute
+    // 409s and the whole batch rolls back
+    // (api/record-attribute-refs.ts).
     await db.transaction(
         [...new Set([
             'records', 'record_attributes', 'states',
-            'members', ...ATTRIBUTE_RESTRICT_TABLES,
+            ...ATTRIBUTE_RESTRICT_TABLES,
         ])],
         async (view) => {
             await view.records.put(body.id, body.record);
             if (body.kind === 'create') {
-                const member =
-                    await view.members.getById('current');
                 await view.states.postEvent(
                     body.initialStateEventId,
                     body.id,
                     body.initialState,
-                    member.id,
+                    actor,
                 );
             }
             if (removedIds.length > 0) {
@@ -280,22 +305,211 @@ export const routes: Route[] = [
     }),
     route('ai-members', {
         get: (db) => db.aiMembers.getAll(),
+        // AI-member creation: the parent member row, the
+        // ai_members detail row, and the initial state event
+        // commit as ONE transaction — a mid-write failure rolls
+        // the whole thing back rather than orphaning a half-built
+        // member. Each facet store re-validates its own body as
+        // the composing puts land. The parent member type is a
+        // server-supplied fact the handler pins; members and
+        // ai_members are GLOBAL passthrough stores, so the facet
+        // puts go straight to their stores. The initial event is
+        // authored by the verified caller (actor), never the
+        // body. Admin-only — POST /ai-members has no member-tier
+        // entry, so it falls to the root admin tier in
+        // ROUTE_POLICY.
+        post: (db, _p, body, actor) => {
+            const b = validateAIMemberCreateBody(body);
+            return db.transaction(
+                ['members', 'ai_members', 'states'],
+                async (view) => {
+                    await view.members.put(
+                        b.id, { type: 'ai' },
+                    );
+                    await view.aiMembers.put(
+                        b.id,
+                        b.detail as unknown as
+                            Omit<AIMemberEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.initialStateEventId,
+                        b.id,
+                        b.initialState,
+                        actor,
+                    );
+                },
+            );
+        },
     }),
-    makeIdRoute<AIMemberEntity>({
-        noun: 'ai-members',
-        store: db => db.aiMembers,
-        verbs: ['get', 'put'],
+    route('ai-members/:id', {
+        get: (db, p) => db.aiMembers.getById(param(p, 0)),
+        put: (db, p, body) =>
+            db.aiMembers.put(
+                param(p, 0),
+                withoutId(body) as unknown as
+                    Omit<AIMemberEntity, 'id'>,
+            ),
+        // AI-member edit: the parent member row and the
+        // ai_members detail row re-put as ONE transaction — NO
+        // state event (an edit does not move the member's
+        // lifecycle), so the handler needs no actor. The facet
+        // stores re-validate their own bodies. Admin-only,
+        // exactly as create — no member-tier POST entry exists.
+        post: (db, p, body) => {
+            const id = param(p, 0);
+            const b = validateAIMemberEditBody(body);
+            return db.transaction(
+                ['members', 'ai_members'],
+                async (view) => {
+                    await view.members.put(
+                        id, { type: 'ai' },
+                    );
+                    await view.aiMembers.put(
+                        id,
+                        b.detail as unknown as
+                            Omit<AIMemberEntity, 'id'>,
+                    );
+                },
+            );
+        },
     }),
     route('human-members', {
         get: (db) => db.humanMembers.getAll(),
+        // Human-member creation: the parent member row, the
+        // identity, the PII row, the detail row, and the initial
+        // state event commit as ONE transaction — a mid-write
+        // failure rolls the whole thing back rather than
+        // orphaning a half-built member. Each facet store
+        // re-validates its own body as the composing puts land.
+        // The parent member type and the identity kind are
+        // server-supplied facts the handler pins; PII/identity
+        // are GLOBAL passthrough stores, identity_pii is parent-
+        // scoped, so the facet puts go straight to their stores.
+        // The initial event is authored by the verified caller
+        // (actor), never the body. Admin-only — POST /human-
+        // members has no member-tier entry, so it falls to the
+        // root admin tier in ROUTE_POLICY.
+        post: (db, _p, body, actor) => {
+            const b = validateHumanMemberCreateBody(body);
+            return db.transaction(
+                [
+                    'members', 'identities', 'identity_pii',
+                    'human_members', 'states',
+                ],
+                async (view) => {
+                    await view.members.put(
+                        b.id, { type: 'human' },
+                    );
+                    await view.identities.put(
+                        b.id, { kind: 'person' },
+                    );
+                    await view.identityPii.put(
+                        b.id,
+                        b.pii as unknown as
+                            Omit<IdentityPiiEntity, 'id'>,
+                    );
+                    await view.humanMembers.put(
+                        b.id,
+                        b.detail as unknown as
+                            Omit<HumanMemberEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.initialStateEventId,
+                        b.id,
+                        b.initialState,
+                        actor,
+                    );
+                },
+            );
+        },
     }),
-    makeIdRoute<HumanMemberEntity>({
-        noun: 'human-members',
-        store: db => db.humanMembers,
-        verbs: ['get', 'put'],
+    route('human-members/:id', {
+        get: (db, p) => db.humanMembers.getById(param(p, 0)),
+        // Human-member edit: the four member facets re-put as ONE
+        // transaction — NO state event (an edit does not move the
+        // member's lifecycle), so the handler needs no actor. The
+        // facet stores re-validate their own bodies. Admin-only,
+        // exactly as create — no member-tier POST entry exists.
+        post: (db, p, body) => {
+            const id = param(p, 0);
+            const b = validateHumanMemberEditBody(body);
+            return db.transaction(
+                [
+                    'members', 'identities', 'identity_pii',
+                    'human_members',
+                ],
+                async (view) => {
+                    await view.members.put(
+                        id, { type: 'human' },
+                    );
+                    await view.identities.put(
+                        id, { kind: 'person' },
+                    );
+                    await view.identityPii.put(
+                        id,
+                        b.pii as unknown as
+                            Omit<IdentityPiiEntity, 'id'>,
+                    );
+                    await view.humanMembers.put(
+                        id,
+                        b.detail as unknown as
+                            Omit<HumanMemberEntity, 'id'>,
+                    );
+                },
+            );
+        },
     }),
     route('identities', {
         get: (db) => db.identities.getAll(),
+        // Identity creation: the identity row and EITHER its PII
+        // row (person) OR its client_secret credential row
+        // (service) commit as ONE transaction — a mid-write
+        // failure rolls the whole thing back rather than orphaning
+        // a kindless identity. The identity kind is the server-
+        // supplied fact the handler pins; identities/identity_pii/
+        // identity_credentials are GLOBAL/parent-scoped stores (no
+        // org stamp), so the facet puts go straight to their
+        // stores, each re-validating its own body as the composing
+        // put lands. The credential's secret is hashed client-side
+        // — the route touches no crypto. NO state event (an
+        // identity carries no lifecycle event at creation), so the
+        // handler needs no actor. The tx table set branches per
+        // mode so each names exactly the tables it writes. Admin-
+        // only — POST /identities has no member-tier entry, so it
+        // falls to the root admin tier in ROUTE_POLICY.
+        post: (db, _p, body) => {
+            const b = validateIdentityCreateBody(body);
+            const tables = b.kind === 'person'
+                ? ['identities', 'identity_pii']
+                : ['identities', 'identity_credentials'];
+            return db.transaction(
+                tables,
+                async (view) => {
+                    await view.identities.put(
+                        b.id, { kind: b.kind },
+                    );
+                    if (b.kind === 'person') {
+                        await view.identityPii.put(
+                            b.id,
+                            b.pii as unknown as
+                                Omit<IdentityPiiEntity, 'id'>,
+                        );
+                    } else {
+                        const { id: credId, ...fields } =
+                            b.credential as {
+                                id: string;
+                            } & Record<string, unknown>;
+                        await view.identityCredentials.put(
+                            credId,
+                            fields as unknown as
+                                Omit<
+                                    IdentityCredentialEntity, 'id'
+                                >,
+                        );
+                    }
+                },
+            );
+        },
     }),
     makeIdRoute<IdentityEntity>({
         noun: 'identities',
@@ -318,20 +532,35 @@ export const routes: Route[] = [
     route('identity-pii', {
         get: (db) => db.identityPii.getAll(),
     }),
-    route('identity-credentials', {
-        get: async (db) =>
-            (await db.identityCredentials.getAll())
-                .map(withoutSecret),
+    // Credentials nest under their parent identity: the identity
+    // id is param 0, so the SERVER filters the collection to that
+    // identity by its identity_id FK (the org fence still rides
+    // the facade re-entry — viaMembership derives visibility from
+    // the co-membership ledger). Both the collection and the leaf
+    // GET project the opaque `secret` out (withoutSecret) so the
+    // hash never crosses the boundary. The leaf id is param 1; GET
+    // and PUT are exposed exactly as the flat makeIdRoute carried
+    // them. ADMIN-ONLY: /identities is not member-tier, so these
+    // fall to the root admin entries — NO MEMBER_VERBS entry.
+    route('identities/:id/credentials', {
+        get: async (db, p) =>
+            (await db.identityCredentials.getAllWhere(
+                'identity_id', param(p, 0),
+            )).map(withoutSecret),
     }),
-    makeIdRoute<IdentityCredentialEntity>({
-        noun: 'identity-credentials',
-        store: db => db.identityCredentials,
-        verbs: ['get', 'put'],
-        getTransform: withoutSecret,
-    }),
-    route('identity-token-revocations', {
-        get: (db) =>
-            db.identityTokenRevocations.getAll(),
+    route('identities/:id/credentials/:cid', {
+        get: async (db, p) =>
+            withoutSecret(
+                await db.identityCredentials.getById(
+                    param(p, 1),
+                ),
+            ),
+        put: (db, p, body) =>
+            db.identityCredentials.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<IdentityCredentialEntity, 'id'>,
+            ),
     }),
     makeIdRoute<IdentityTokenRevocationEntity>({
         noun: 'identity-token-revocations',
@@ -386,28 +615,12 @@ export const routes: Route[] = [
             await revokeTokenChain(db, param(p, 0));
         },
     }),
-    route('clients', {
-        get: (db) => db.clients.getAll(),
-    }),
-    makeIdRoute<ClientEntity>({
-        noun: 'clients',
-        store: db => db.clients,
-        verbs: ['get', 'put', 'delete'],
-    }),
     route('identity-providers', {
         get: (db) => db.identityProviders.getAll(),
     }),
     makeIdRoute<IdentityProviderEntity>({
         noun: 'identity-providers',
         store: db => db.identityProviders,
-        verbs: ['get', 'put'],
-    }),
-    route('authorization-codes', {
-        get: (db) => db.authorizationCodes.getAll(),
-    }),
-    makeIdRoute<AuthorizationCodeEntity>({
-        noun: 'authorization-codes',
-        store: db => db.authorizationCodes,
         verbs: ['get', 'put'],
     }),
     route('authentication/token', {
@@ -434,45 +647,383 @@ export const routes: Route[] = [
     }),
     route('ideas', {
         get: (db) => db.ideas.getAll(),
+        // Idea creation: the idea row and its initial state
+        // event commit as ONE transaction — a mid-write failure
+        // rolls the whole thing back rather than orphaning the
+        // row. The org-scoped store stamps organization_id from
+        // the verified token before validating the idea, so the
+        // body OMITS it. The initial event is authored by the
+        // verified caller (actor), never the body.
+        post: (db, _p, body, actor) => {
+            const b = validateIdeaCreateBody(body);
+            return db.transaction(
+                ['ideas', 'states'],
+                async (view) => {
+                    await view.ideas.put(
+                        b.id,
+                        b.idea as unknown as
+                            Omit<IdeaEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.initialStateEventId,
+                        b.id,
+                        b.initialState,
+                        actor,
+                    );
+                },
+            );
+        },
+    }),
+    // Convert an idea to a project (promotion): the LONE
+    // cross-aggregate write. A new projects row, the promoted
+    // ideas row, TWO state events (the idea's 'promoted' and the
+    // new project's initial), and N project_objective_baseline_
+    // scores rows commit as ONE transaction — a mid-write failure
+    // rolls the whole thing back rather than landing a project
+    // without its baselines (or an idea promoted without its
+    // project). The idea is the route param. The org-scoped
+    // projects store stamps organization_id from the verified
+    // token and re-validates through validateProjectEntity, so
+    // the project body OMITS it; the ideas store re-validates the
+    // promoted idea, and the baseline store each row, as the
+    // composing puts land. Both events are authored by the
+    // verified caller (actor), never the body. Composed IN THE
+    // SAME ORDER the old commit batch used (project, idea, idea
+    // event, project event, baselines). Member-tier POST —
+    // isPermitted matches /ideas on the segment prefix, so
+    // /ideas/:id/conversion is member-permitted.
+    route('ideas/:id/conversion', {
+        post: (db, p, body, actor) => {
+            const ideaId = param(p, 0);
+            const b = validateIdeaConversionBody(body);
+            return db.transaction(
+                [
+                    'projects', 'ideas', 'states',
+                    'project_objective_baseline_scores',
+                ],
+                async (view) => {
+                    await view.projects.put(
+                        b.projectId,
+                        b.project as unknown as
+                            Omit<ProjectEntity, 'id'>,
+                    );
+                    await view.ideas.put(
+                        ideaId,
+                        b.idea as unknown as
+                            Omit<IdeaEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.ideaStateEventId,
+                        ideaId,
+                        b.ideaState,
+                        actor,
+                    );
+                    await view.states.postEvent(
+                        b.projectStateEventId,
+                        b.projectId,
+                        b.projectState,
+                        actor,
+                    );
+                    for (const baseline of b.baselines) {
+                        await view.projectObjectiveBaselineScores
+                            .put(
+                                baseline.id,
+                                baseline.fields as unknown as
+                                    Omit<
+                                        ProjectObjectiveBaselineScore,
+                                        'id'
+                                    >,
+                            );
+                    }
+                },
+            );
+        },
     }),
     route('projects', {
         get: (db) => db.projects.getAll(),
     }),
-    route('idea-submissions', {
-        get: (db) =>
-            db.ideaSubmissions.getAll(),
+    // Idea submissions nest under their parent idea: the idea id
+    // is param 0, so the SERVER filters the collection to that
+    // idea (the org fence still rides the facade re-entry). The
+    // leaf id is param 1; only PUT is exposed, exactly as the flat
+    // makeIdRoute carried it.
+    route('ideas/:id/submissions', {
+        get: (db, p) =>
+            db.ideaSubmissions.getAllWhere('idea_id', param(p, 0)),
+    }),
+    route('ideas/:id/submissions/:sid', {
+        put: (db, p, body) =>
+            db.ideaSubmissions.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<IdeaSubmissionEntity, 'id'>,
+            ),
     }),
     route('flows', {
         get: (db) =>
             db.flows.getAll(),
+        // Flow creation: the flows row, its project_flows join
+        // row, and the initial 'active' state event commit as ONE
+        // transaction — a mid-write failure rolls the whole thing
+        // back rather than orphaning a half-built flow. The
+        // org-scoped flows store stamps organization_id from the
+        // verified token and re-validates through validateFlowEntity,
+        // so the flow body OMITS it; the join row is re-validated by
+        // the project_flows store. The initial event is authored by
+        // the verified caller (actor), never the body. Member-tier
+        // POST — /flows carries POST in MEMBER_VERBS.
+        post: (db, _p, body, actor) => {
+            const b = validateFlowCreateBody(body);
+            return db.transaction(
+                ['flows', 'project_flows', 'states'],
+                async (view) => {
+                    await view.flows.put(
+                        b.id,
+                        b.flow as unknown as
+                            Omit<FlowEntity, 'id'>,
+                    );
+                    await view.projectFlows.put(
+                        b.projectFlowId,
+                        b.projectFlow as unknown as
+                            Omit<ProjectFlowEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.initialStateEventId,
+                        b.id,
+                        b.initialState,
+                        actor,
+                    );
+                },
+            );
+        },
     }),
     makeIdRoute<FlowEntity>({
         noun: 'flows',
         store: db => db.flows,
         verbs: ['get', 'put'],
     }),
-    route('flow-versions', {
-        get: (db) =>
-            db.flowVersions.getAll(),
+    // Save a flow: an OPTIONAL version snapshot (the new
+    // flow_versions row PUT plus the named over-cap trim
+    // DELETEs), THEN the flow row PUT, THEN the 'updated' state
+    // event — all as ONE transaction. A mid-write failure rolls
+    // the whole thing back rather than landing the version with
+    // the flow half-written (or vice versa). Covers both the
+    // plain save (version null — no flow_versions touch) and the
+    // versioned save. The org-scoped flows store stamps
+    // organization_id from the verified token and re-validates
+    // through validateFlowEntity, so the flow body OMITS it;
+    // flow_versions is parent-scoped and re-validates the
+    // snapshot through validateFlowVersionEntity. The event is
+    // authored by the verified caller (actor), never the body.
+    // Member-tier POST — isPermitted matches /flows on the
+    // segment prefix, so /flows/:id/save is member-permitted.
+    route('flows/:id/save', {
+        post: (db, p, body, actor) => {
+            const id = param(p, 0);
+            const b = validateFlowSaveBody(body);
+            return db.transaction(
+                ['flows', 'flow_versions', 'states'],
+                async (view) => {
+                    if (b.version !== null) {
+                        await view.flowVersions.put(
+                            b.version.id,
+                            b.version.version as unknown as
+                                Omit<FlowVersionEntity, 'id'>,
+                        );
+                        for (const t of b.version.trimIds) {
+                            await view.flowVersions.delete(t);
+                        }
+                    }
+                    await view.flows.put(
+                        id,
+                        b.flow as unknown as
+                            Omit<FlowEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.eventId, id, 'updated', actor,
+                    );
+                },
+            );
+        },
     }),
-    makeIdRoute<FlowVersionEntity>({
-        noun: 'flow-versions',
-        store: db => db.flowVersions,
-        verbs: ['get', 'put', 'delete'],
+    // Undo a flow edit: the flow row PUT, the 'updated' state
+    // event, and the DELETE of the consumed version — all as ONE
+    // transaction. The flow can never land reverted while the
+    // version row survives unconsumed. The org-scoped flows store
+    // stamps organization_id and re-validates the flow body (so
+    // it OMITS it); the event is authored by the verified caller
+    // (actor). Member-tier POST via the /flows segment prefix.
+    route('flows/:id/undo', {
+        post: (db, p, body, actor) => {
+            const id = param(p, 0);
+            const b = validateFlowUndoBody(body);
+            return db.transaction(
+                ['flows', 'flow_versions', 'states'],
+                async (view) => {
+                    await view.flows.put(
+                        id,
+                        b.flow as unknown as
+                            Omit<FlowEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.eventId, id, 'updated', actor,
+                    );
+                    await view.flowVersions.delete(
+                        b.consumedVersionId,
+                    );
+                },
+            );
+        },
     }),
-    route('project-flows', {
-        get: (db) =>
-            db.projectFlows
-                .getAll(),
+    // Redo a flow edit: a REQUIRED version snapshot (the new
+    // flow_versions row PUT plus the named over-cap trim
+    // DELETEs), THEN the flow row PUT, THEN the 'updated' state
+    // event — all as ONE transaction. The current state can
+    // never land archived as a version while the redo graph is
+    // lost. The org-scoped flows store stamps organization_id and
+    // re-validates the flow body (so it OMITS it); flow_versions
+    // re-validates the snapshot; the event is authored by the
+    // verified caller (actor). Member-tier POST via the /flows
+    // segment prefix.
+    route('flows/:id/redo', {
+        post: (db, p, body, actor) => {
+            const id = param(p, 0);
+            const b = validateFlowRedoBody(body);
+            return db.transaction(
+                ['flows', 'flow_versions', 'states'],
+                async (view) => {
+                    await view.flowVersions.put(
+                        b.version.id,
+                        b.version.version as unknown as
+                            Omit<FlowVersionEntity, 'id'>,
+                    );
+                    for (const t of b.version.trimIds) {
+                        await view.flowVersions.delete(t);
+                    }
+                    await view.flows.put(
+                        id,
+                        b.flow as unknown as
+                            Omit<FlowEntity, 'id'>,
+                    );
+                    await view.states.postEvent(
+                        b.eventId, id, 'updated', actor,
+                    );
+                },
+            );
+        },
     }),
-    makeIdRoute<ProjectFlowEntity>({
-        noun: 'project-flows',
-        store: db => db.projectFlows,
-        verbs: ['put', 'delete'],
+    // Flow versions nest under their parent flow: the flow id is
+    // param 0, so the SERVER filters the collection to that flow
+    // (the org fence still rides the facade re-entry). The leaf
+    // id is param 1.
+    route('flows/:id/versions', {
+        get: (db, p) =>
+            db.flowVersions.getAllWhere('flow_id', param(p, 0)),
+        // Publish a flow version: the new snapshot row is put and
+        // the named over-cap versions are deleted as ONE
+        // transaction — a mid-write failure rolls the whole thing
+        // back rather than landing the snapshot with the trim
+        // half-applied (or vice versa). The web-app computes WHICH
+        // versions to trim (its own cap-retention derivation), so
+        // the route writes the put + the named deletes exactly.
+        // flow_versions is parent-scoped — its org derives from the
+        // flow at read time and writes delegate — and re-validates
+        // the snapshot through validateFlowVersionEntity as the put
+        // lands. NO state event is written, so the handler needs no
+        // actor. The body already carries flow_id; the flow id is
+        // param 0. Member-tier POST — /flows/:id/versions carries
+        // POST in MEMBER_VERBS.
+        post: (db, _p, body) => {
+            const b = validateFlowVersionPublishBody(body);
+            return db.transaction(
+                ['flow_versions'],
+                async (view) => {
+                    await view.flowVersions.put(
+                        b.id,
+                        b.version as unknown as
+                            Omit<FlowVersionEntity, 'id'>,
+                    );
+                    for (const t of b.trimIds) {
+                        await view.flowVersions.delete(t);
+                    }
+                },
+            );
+        },
+    }),
+    route('flows/:id/versions/:vid', {
+        get: (db, p) => db.flowVersions.getById(param(p, 1)),
+        put: (db, p, body) =>
+            db.flowVersions.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<FlowVersionEntity, 'id'>,
+            ),
+        delete: (db, p) => db.flowVersions.delete(param(p, 1)),
+    }),
+    // Project↔flow joins nest under their parent project: the
+    // project id is param 0, so the SERVER filters the collection
+    // to that project (the org fence still rides the facade
+    // re-entry). The leaf id is param 1; PUT and DELETE are
+    // exposed exactly as the flat makeIdRoute carried them.
+    route('projects/:id/flows', {
+        get: (db, p) =>
+            db.projectFlows.getAllWhere(
+                'project_id', param(p, 0),
+            ),
+    }),
+    route('projects/:id/flows/:pfid', {
+        put: (db, p, body) =>
+            db.projectFlows.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<ProjectFlowEntity, 'id'>,
+            ),
+        delete: (db, p) => db.projectFlows.delete(param(p, 1)),
     }),
     route('work-orders', {
         get: (db) =>
             db.workOrders.getAll(),
+        // Work-order creation: the work_orders row, its
+        // flow_work_orders join row, and THREE initial state
+        // events (the start transition, the post-start
+        // transition, and the creation-time 'claimed') commit as
+        // ONE transaction — a mid-write failure rolls the whole
+        // thing back rather than orphaning a half-built work
+        // order. The org-scoped work_orders store stamps
+        // organization_id from the verified token and re-validates
+        // through validateWorkOrderEntity, so the work-order body
+        // OMITS it; the join row derives org from its flow and is
+        // re-validated by the flow_work_orders store. The three
+        // events are applied IN ORDER and authored by the verified
+        // caller (actor), never the body. Member-tier POST —
+        // /work-orders carries POST in MEMBER_VERBS (the claim
+        // sub-route is also a member POST).
+        post: (db, _p, body, actor) => {
+            const b = validateWorkOrderCreateBody(body);
+            return db.transaction(
+                ['work_orders', 'flow_work_orders', 'states'],
+                async (view) => {
+                    await view.workOrders.put(
+                        b.id,
+                        b.workOrder as unknown as
+                            Omit<WorkOrderEntity, 'id'>,
+                    );
+                    await view.flowWorkOrders.put(
+                        b.flowWorkOrderId,
+                        b.flowWorkOrder as unknown as
+                            Omit<FlowWorkOrderEntity, 'id'>,
+                    );
+                    for (let i = 0; i < 3; i++) {
+                        await view.states.postEvent(
+                            b.stateEventIds[i]!,
+                            b.id,
+                            b.states[i]!,
+                            actor,
+                        );
+                    }
+                },
+            );
+        },
     }),
     makeIdRoute<WorkOrderEntity>({
         noun: 'work-orders',
@@ -489,9 +1040,9 @@ export const routes: Route[] = [
     // (naming the prior claimant) and the new 'claimed'
     // land atomically.
     route('work-orders/:id/claim', {
-        post: (db, p) =>
+        post: (db, p, _body, actor) =>
             db.transaction(
-                ['work_orders', 'states', 'members'],
+                ['work_orders', 'states'],
                 async (view) => {
                     const workOrderId = param(p, 0);
                     const wo = await view.workOrders
@@ -501,8 +1052,6 @@ export const routes: Route[] = [
                             wo.flow_graph,
                             'work_orders.flow_graph',
                         );
-                    const member = await view.members
-                        .getById('current');
                     const events = await view.states
                         .getAllFor(workOrderId);
                     const prior = latestClaimEvent(
@@ -514,9 +1063,7 @@ export const routes: Route[] = [
                             prior, graph.lockTimeout,
                         );
                     if (priorLive) {
-                        if (
-                            prior.member_id === member.id
-                        ) {
+                        if (prior.member_id === actor) {
                             return;
                         }
                         throw new ApiError(
@@ -540,32 +1087,102 @@ export const routes: Route[] = [
                         generateCryptoSafeBase62(),
                         workOrderId,
                         'claimed',
-                        member.id,
+                        actor,
                     );
                 },
             ),
     }),
-    route('flow-work-orders', {
-        get: (db) =>
-            db.flowWorkOrders.getAll(),
+    // Transition a work order along an edge. The web-app
+    // computes WHAT to write — the target node, the field-value
+    // rows, and whether a live claim must be implicitly released
+    // — exactly as POST /work-orders keeps its graph derivation
+    // client-side. This route writes them ATOMICALLY: the
+    // transition state event (entity_id = the work order, state =
+    // the target node), then each state_field_values row (the
+    // field inputs, re-validated by the store as they land), then
+    // the OPTIONAL 'claim_released' event. A mid-write failure
+    // rolls the whole thing back. Authorship of the transition
+    // event AND the release event is stamped from the verified
+    // caller (actor) — the same author the old commit batch
+    // produced, where both events flowed through PUT /states/:id.
+    // Member-tier POST — /work-orders carries POST in
+    // MEMBER_VERBS, and isPermitted matches on the segment
+    // prefix, so the sub-route is member-permitted like /claim.
+    route('work-orders/:id/transition', {
+        post: (db, p, body, actor) => {
+            const workOrderId = param(p, 0);
+            const b = validateWorkOrderTransitionBody(body);
+            return db.transaction(
+                ['states', 'state_field_values'],
+                async (view) => {
+                    await view.states.postEvent(
+                        b.transitionEventId,
+                        workOrderId,
+                        b.targetState,
+                        actor,
+                    );
+                    for (const row of b.fieldValues) {
+                        await view.stateFieldValues.put(
+                            row.id,
+                            row.fields as unknown as
+                                Omit<StateFieldValueEntity, 'id'>,
+                        );
+                    }
+                    if (b.release !== null) {
+                        await view.states.postEvent(
+                            b.release.id,
+                            workOrderId,
+                            b.release.state,
+                            actor,
+                        );
+                    }
+                },
+            );
+        },
     }),
-    makeIdRoute<FlowWorkOrderEntity>({
-        noun: 'flow-work-orders',
-        store: db => db.flowWorkOrders,
-        verbs: ['put'],
+    // Flow work-order joins nest under their parent flow: the
+    // flow id is param 0, so the SERVER filters the collection to
+    // that flow. The leaf id is param 1; only PUT is exposed (the
+    // flat route never carried GET/DELETE on the leaf).
+    route('flows/:id/work-orders', {
+        get: (db, p) =>
+            db.flowWorkOrders.getAllWhere('flow_id', param(p, 0)),
     }),
-    route('state-field-values', {
-        get: (db) =>
-            db.stateFieldValues
-                .getAll(),
+    route('flows/:id/work-orders/:woid', {
+        put: (db, p, body) =>
+            db.flowWorkOrders.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<FlowWorkOrderEntity, 'id'>,
+            ),
     }),
-    makeIdRoute<StateFieldValueEntity>({
-        noun: 'state-field-values',
-        store: db => db.stateFieldValues,
-        verbs: ['put', 'delete'],
+    // Field values nest under their parent STATE EVENT: the
+    // state event id is param 0, so the SERVER filters the
+    // collection to that event by its state_event_id FK (the org
+    // fence still rides the facade re-entry — the multi-hop
+    // resolver derives the owning org from the event's entity).
+    // The leaf id is param 1; PUT and DELETE are exposed exactly
+    // as the flat makeIdRoute carried them.
+    route('states/:id/field-values', {
+        get: (db, p) =>
+            db.stateFieldValues.getAllWhere(
+                'state_event_id', param(p, 0),
+            ),
+    }),
+    route('states/:id/field-values/:fvid', {
+        put: (db, p, body) =>
+            db.stateFieldValues.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<StateFieldValueEntity, 'id'>,
+            ),
+        delete: (db, p) =>
+            db.stateFieldValues.delete(param(p, 1)),
     }),
     route('records', {
         get: (db) => db.records.getAll(),
+        post: (db, _p, body, actor) =>
+            applyRecordWrite(db, body, actor),
     }),
     makeIdRoute<RecordEntity>({
         noun: 'records',
@@ -599,37 +1216,27 @@ export const routes: Route[] = [
                     'record_attributes',
                     ...ATTRIBUTE_RESTRICT_TABLES,
                 ])],
-                async (view) => {
-                    const referrers =
-                        await collectAttributeReferrers(
-                            view, [id],
-                        );
-                    const refs = referrers.get(id)!;
-                    if (hasReferrers(refs)) {
-                        throw new ApiError(
-                            describeReferrers(id, refs),
-                            HTTP_CONFLICT,
-                        );
-                    }
-                    await view.recordAttributes
-                        .delete(id);
-                },
+                (view) =>
+                    deleteRecordAttributeSafe(view, id),
             );
         },
     }),
-    route('flow-records', {
-        get: (db) =>
-            db.flowRecords.getAll(),
+    // Flow↔record bindings nest under their parent flow: the flow
+    // id is param 0, so the SERVER filters the collection to that
+    // flow. The leaf id is param 1.
+    route('flows/:id/records', {
+        get: (db, p) =>
+            db.flowRecords.getAllWhere('flow_id', param(p, 0)),
     }),
-    makeIdRoute<FlowRecordEntity>({
-        noun: 'flow-records',
-        store: db => db.flowRecords,
-        verbs: ['get', 'put', 'delete'],
-    }),
-    route('records-multi-put', {
-        post: async (db, _p, body) => {
-            await applyRecordMultiPut(db, body);
-        },
+    route('flows/:id/records/:frid', {
+        get: (db, p) => db.flowRecords.getById(param(p, 1)),
+        put: (db, p, body) =>
+            db.flowRecords.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<FlowRecordEntity, 'id'>,
+            ),
+        delete: (db, p) => db.flowRecords.delete(param(p, 1)),
     }),
 
     route('organizations', {
@@ -649,8 +1256,8 @@ export const routes: Route[] = [
         verbs: ['get', 'put', 'delete'],
     }),
     route('current-member', {
-        get: (db) =>
-            db.members.getById('current'),
+        get: (db, _p, actor) =>
+            db.members.getById(actor),
     }),
 
     makeIdRoute<MemberEntity>({
@@ -668,45 +1275,95 @@ export const routes: Route[] = [
         store: db => db.projects,
         verbs: ['get', 'put'],
     }),
-    makeIdRoute<IdeaSubmissionEntity>({
-        noun: 'idea-submissions',
-        store: db => db.ideaSubmissions,
-        verbs: ['put'],
-    }),
     route('objectives', {
         get: (db) => db.objectives.getAll(),
+        // Objective creation: the objective row and its FIRST
+        // revision commit as ONE transaction — a mid-write
+        // failure rolls the whole thing back rather than
+        // orphaning a definitionless objective. The org-scoped
+        // store stamps organization_id from the verified token
+        // before validating the objective, so the body OMITS
+        // it. No state event is written (a fresh objective reads
+        // as active until a later archival event), so the
+        // handler needs no actor.
+        post: (db, _p, body) => {
+            const b = validateObjectiveCreateBody(body);
+            return db.transaction(
+                ['objectives', 'objective_revisions'],
+                async (view) => {
+                    await view.objectives.put(
+                        b.id,
+                        b.objective as unknown as
+                            Omit<Objective, 'id'>,
+                    );
+                    await view.objectiveRevisions.put(
+                        b.revisionId,
+                        b.revision as unknown as
+                            Omit<ObjectiveRevisionEntity, 'id'>,
+                    );
+                },
+            );
+        },
     }),
     makeIdRoute<Objective>({
         noun: 'objectives',
         store: db => db.objectives,
         verbs: ['get', 'put'],
     }),
-    route('objective-revisions', {
-        get: (db) =>
-            db.objectiveRevisions.getAll(),
+    // Objective revisions nest under their parent objective: the
+    // objective id is param 0, so the SERVER filters the
+    // collection to that objective (the org fence still rides the
+    // facade re-entry). The leaf id is param 1; only PUT is
+    // exposed, exactly as the flat makeIdRoute carried it.
+    route('objectives/:id/revisions', {
+        get: (db, p) =>
+            db.objectiveRevisions.getAllWhere(
+                'objective_id', param(p, 0),
+            ),
     }),
-    makeIdRoute<ObjectiveRevisionEntity>({
-        noun: 'objective-revisions',
-        store: db => db.objectiveRevisions,
-        verbs: ['put'],
+    route('objectives/:id/revisions/:rid', {
+        put: (db, p, body) =>
+            db.objectiveRevisions.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<ObjectiveRevisionEntity, 'id'>,
+            ),
     }),
-    route('project-objective-baseline-scores', {
-        get: (db) =>
-            db.projectObjectiveBaselineScores.getAll(),
+    // Objective baseline scores nest under their parent project:
+    // the project id is param 0, so the SERVER filters the
+    // collection to that project (the org fence still rides the
+    // facade re-entry). The leaf id is param 1; only PUT is
+    // exposed, exactly as the flat makeIdRoute carried it.
+    route('projects/:id/objective-baseline-scores', {
+        get: (db, p) =>
+            db.projectObjectiveBaselineScores.getAllWhere(
+                'project_id', param(p, 0),
+            ),
     }),
-    makeIdRoute<ProjectObjectiveBaselineScore>({
-        noun: 'project-objective-baseline-scores',
-        store: db => db.projectObjectiveBaselineScores,
-        verbs: ['put'],
+    route('projects/:id/objective-baseline-scores/:sid', {
+        put: (db, p, body) =>
+            db.projectObjectiveBaselineScores.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<ProjectObjectiveBaselineScore, 'id'>,
+            ),
     }),
-    route('project-objective-actual-scores', {
-        get: (db) =>
-            db.projectObjectiveActualScores.getAll(),
+    // Objective actual scores nest under their parent project,
+    // identically: project id is param 0 (server filter), leaf id
+    // is param 1, PUT only.
+    route('projects/:id/objective-actual-scores', {
+        get: (db, p) =>
+            db.projectObjectiveActualScores.getAllWhere(
+                'project_id', param(p, 0),
+            ),
     }),
-    makeIdRoute<ProjectObjectiveActualScore>({
-        noun: 'project-objective-actual-scores',
-        store: db => db.projectObjectiveActualScores,
-        verbs: ['put'],
+    route('projects/:id/objective-actual-scores/:sid', {
+        put: (db, p, body) =>
+            db.projectObjectiveActualScores.put(
+                param(p, 1),
+                withoutId(body) as unknown as
+                    Omit<ProjectObjectiveActualScore, 'id'>,
+            ),
     }),
     route('states', {
         get: (db) => db.states.getAll(),
@@ -714,12 +1371,18 @@ export const routes: Route[] = [
     route('states/:id', {
         get: (db, p) =>
             db.states.getById(param(p, 0)),
-        put: (db, p, body) =>
+        // The author is the verified caller (actor), stamped
+        // over any client-supplied member_id — the ledger
+        // records who acted, not who the body claims.
+        put: (db, p, body, actor) =>
             db.states.put(
                 param(p, 0),
-                validateStateEntity(
-                    withoutId(body),
-                ),
+                {
+                    ...validateStateBody(
+                        withoutId(body),
+                    ),
+                    member_id: actor,
+                },
             ),
     }),
     route('entity-states/:id', {

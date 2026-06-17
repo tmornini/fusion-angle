@@ -23,7 +23,7 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import type {
-    RequestContext, WriteOp,
+    RequestContext,
 } from './shared.ts';
 import { filterByField } from './shared.ts';
 import {
@@ -31,8 +31,8 @@ import {
     formatFlowProblem,
 } from './flow-publish.ts';
 import {
-    buildStateEventOp,
-} from './state-events.ts';
+    generateCryptoSafeBase62,
+} from '../../../api/crypto-safe-base62.ts';
 import { sha256Bytes } from './digest.ts';
 import {
     nextPosition,
@@ -151,46 +151,36 @@ export async function postWorkOrderCreation(
 
     const flowGraphField =
         storedWorkOrderFlowGraphField(flowGraph);
-    await ctx.commit({
-        ops: [
-            {
-                method: 'put',
-                resource:
-                    `work-orders/`
-                    + `${input.workOrderId}`,
-                body: {
-                    display_id: displayId,
-                    flow_graph: flowGraphField,
-                    position,
-                },
-            },
-            {
-                method: 'put',
-                resource:
-                    `flow-work-orders/`
-                    + `${input.flowLinkId}`,
-                body: {
-                    flow_id: input.flowId,
-                    work_order_id:
-                        input.workOrderId,
-                    at: now,
-                },
-            },
-            await buildStateEventOp(
-                ctx,
-                input.workOrderId,
-                startNode.id,
-            ),
-            await buildStateEventOp(
-                ctx,
-                input.workOrderId,
-                postStartNodeId,
-            ),
-            await buildStateEventOp(
-                ctx,
-                input.workOrderId,
-                'claimed',
-            ),
+    // The work-order row, its flow-link join row, and the three
+    // initial state events (start, post-start, claimed) write as
+    // ONE named operation. The work-order body OMITS
+    // organization_id — the org fence stamps it from the verified
+    // token; the join row derives org from its flow. The three
+    // event ids are minted client-side so a retry hits the same
+    // rows; their authorship is stamped server-side from the
+    // token, never the body.
+    await ctx.POST('work-orders', {
+        id: input.workOrderId,
+        workOrder: {
+            display_id: displayId,
+            flow_graph: flowGraphField,
+            position,
+        },
+        flowWorkOrderId: input.flowLinkId,
+        flowWorkOrder: {
+            flow_id: input.flowId,
+            work_order_id: input.workOrderId,
+            at: now,
+        },
+        stateEventIds: [
+            generateCryptoSafeBase62(),
+            generateCryptoSafeBase62(),
+            generateCryptoSafeBase62(),
+        ],
+        states: [
+            startNode.id,
+            postStartNodeId,
+            'claimed',
         ],
     });
 
@@ -244,39 +234,36 @@ export async function postWorkOrderTransition(
         );
     }
 
-    const transitionOp = await buildStateEventOp(
-        ctx, workOrderId, edge.toNodeId,
-    );
-    const transitionEventId =
-        transitionOp.resource.split('/')[1]!;
+    // Mint the transition event id client-side so a retry
+    // hits the same row; the field-value rows reference it.
+    const transitionEventId = generateCryptoSafeBase62();
 
-    const fieldValueOps: WriteOp[] = [];
-    for (
-        const [attributeId, value]
-            of Object.entries(values)
-    ) {
-        const id = fieldValueIds[attributeId];
-        if (id === undefined) {
-            throw new Error(
-                'Missing fieldValueId for'
-                + ' attribute ' + attributeId,
-            );
-        }
-        fieldValueOps.push({
-            method: 'put',
-            resource:
-                `state-field-values/${id}`,
-            body: {
-                state_event_id: transitionEventId,
-                field_id: attributeId,
-                value,
-            },
-        });
-    }
+    const fieldValues = Object.entries(values).map(
+        ([attributeId, value]) => {
+            const id = fieldValueIds[attributeId];
+            if (id === undefined) {
+                throw new Error(
+                    'Missing fieldValueId for'
+                    + ' attribute ' + attributeId,
+                );
+            }
+            return {
+                id,
+                fields: {
+                    state_event_id: transitionEventId,
+                    attribute_id: attributeId,
+                    value,
+                },
+            };
+        },
+    );
 
     // If a live claim exists for the work order, the
-    // transition implicitly releases it — record a
-    // 'claim_released' event in the same batch.
+    // transition implicitly releases it — carry a
+    // 'claim_released' event the named POST writes atomically
+    // alongside the transition. The release event is authored
+    // server-side by the verified caller (actor), exactly as
+    // the old commit batch authored it through PUT /states/:id.
     const states = await ctx.GET<StateEntity[]>(
         'states',
     );
@@ -288,23 +275,22 @@ export async function postWorkOrderTransition(
         && !isClaimEventExpired(
             latestClaim, fg.lockTimeout,
         );
-    const claimReleasedEvent: WriteOp[] = hasLiveClaim
-        ? [
-            await buildStateEventOp(
-                ctx,
-                workOrderId,
-                'claim_released',
-            ),
-        ]
-        : [];
+    const release = hasLiveClaim
+        ? {
+            id: generateCryptoSafeBase62(),
+            state: 'claim_released',
+        }
+        : null;
 
-    await ctx.commit({
-        ops: [
-            transitionOp,
-            ...fieldValueOps,
-            ...claimReleasedEvent,
-        ],
-    });
+    await ctx.POST(
+        `work-orders/${workOrderId}/transition`,
+        {
+            transitionEventId,
+            targetState: edge.toNodeId,
+            fieldValues,
+            release,
+        },
+    );
 
     workOrderChanges.notify();
 }

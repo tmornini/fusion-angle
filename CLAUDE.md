@@ -102,7 +102,11 @@ is HTTP-only.
   a Bearer gate in `handleRequest` enforces them, backed by
   token-lifecycle + revocation ledgers and PBKDF2 password
   hashing. The HMAC key is client-shipped, so isolation is
-  demo-grade until the server tier.
+  demo-grade until the server tier. The snapshot plane
+  (`BOOTSTRAP_ROUTES`) is intentionally auth-free dev-tier —
+  removed or re-gated when the Postgres server tier lands; see
+  [ARCHITECTURE.md](ARCHITECTURE.md) § Server-tier deploy
+  blockers.
 - **Tenancy.** Every authenticated request runs org-scoped:
   `handleRequest` wraps the adapter in `orgScopedAdapter`
   bound to the org from the VERIFIED token claim (never the
@@ -404,10 +408,9 @@ apply to it (RED is the audit's first finding).
   commits early. So every `transaction(…)` body awaits ONLY
   row ops — validators, crypto, and compression run OUTSIDE
   the tx. Sync compute between row ops is fine.
-- **`state_field_values.field_id` references
-  `record_attributes.id`.** the column name predates Records
-  and stays until a second non-Record consumer arrives. The
-  semantic note lives in [SCHEMA.md](SCHEMA.md) §
+- **`state_field_values.attribute_id` references
+  `record_attributes.id`** (not a table named `attributes`).
+  The semantic note lives in [SCHEMA.md](SCHEMA.md) §
   state_field_values.
 
 ## Commits
@@ -434,10 +437,23 @@ small focused commits don't already provide.
 
 Subagents inherit no scripture and read no CLAUDE.md by
 default. Every subagent prompt MUST begin with the literal
-phrase `Go to Church!` — this invokes the `church-of-code`
-skill in the subagent's session, loading the full scripture
-before the work begins. A subagent unproselytized is a
-heathen given a hammer.
+phrase `Go to Medium Church!` — this invokes the
+`church-of-code` skill in the subagent's session and directs
+it to read the Medium scroll
+(`CHURCH-OF-CODE-medium-context.md`), not the Full one. The
+Medium scroll keeps every doctrine and trims only
+elaboration; at fan-out the token economy compounds. A
+subagent unproselytized is a heathen given a hammer.
+
+**The scroll policy is codebase-wide.** The master session
+reads the Full scroll (`Go to Church!`); every dispatched
+subagent reads the Medium scroll (`Go to Medium Church!`).
+This governs all work in this repo — the master conducts and
+keeps the complete voice, the subagents fan out and pay the
+Medium price. Even the doctrine audit ([AUDIT.md](AUDIT.md))
+follows this: its orchestrator conducts as master and goes
+Full, while its hunters and refuters fan out as subagents and
+go Medium.
 
 The scripture is universal; the codebase is local. After
 the proselytization, the dispatching agent MUST also push

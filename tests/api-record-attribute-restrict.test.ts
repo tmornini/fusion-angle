@@ -12,7 +12,7 @@ import { seedCurrentMember } from './member-fixtures.ts';
 
 // Destroying a record attribute is RESTRICT, not cascade:
 // while a state_field_values row names it or a flow /
-// work-order graph binds it, DELETE (and a multi-put
+// work-order graph binds it, DELETE (and a record-write
 // removal) is a 409 naming the referrers, and the whole
 // batch rolls back — cascading would orphan immutable
 // event payloads.
@@ -72,7 +72,7 @@ test(
             member_id: 'current', at: AT,
         });
         await db.stateFieldValues.put('sfv1', {
-            state_event_id: 'ev1', field_id: 'attr1',
+            state_event_id: 'ev1', attribute_id: 'attr1',
             value: 'High',
         });
         await assert.rejects(
@@ -149,7 +149,7 @@ test(
 
 test(
     'a referenced removal rolls back the whole'
-    + ' multi-put batch',
+    + ' record-write batch',
     async () => {
         const db = await seededDb();
         await db.states.put('ev1', {
@@ -157,11 +157,11 @@ test(
             member_id: 'current', at: AT,
         });
         await db.stateFieldValues.put('sfv1', {
-            state_event_id: 'ev1', field_id: 'attr1',
+            state_event_id: 'ev1', attribute_id: 'attr1',
             value: 'High',
         });
         await assert.rejects(
-            () => POST(db, 'records-multi-put', {
+            () => POST(db, 'records', {
                 kind: 'edit',
                 id: 'r1',
                 record: {

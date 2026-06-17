@@ -202,7 +202,7 @@ test(
                         v.state_event_id,
                     ),
                 )
-                .map(v => v.field_id),
+                .map(v => v.attribute_id),
         );
 
         // At least one target node must reference a

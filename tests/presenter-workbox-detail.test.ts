@@ -605,7 +605,7 @@ test(
             Id, StateFieldValue[]
         >([
             ['t-2', [{
-                fieldId: 'a-amt',
+                attributeId: 'a-amt',
                 value: '1200',
             }]],
         ]);

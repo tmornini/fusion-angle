@@ -13,7 +13,7 @@ import {
     validateStoredGraphJson,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
-import { filterByField } from './shared.ts';
+import { getProjectEntities } from './projects.ts';
 import { withRenderableLayout } from '../flow-graph-layout.ts';
 
 export type {
@@ -54,12 +54,31 @@ export interface FlowListItem {
     edgeCount: number;
 }
 
+// The flow joins for ONE project — the server filters the nested
+// collection to the parent project, so no client filter is
+// needed.
+async function getProjectFlowsForProject(
+    ctx: RequestContext,
+    projectId: string,
+): Promise<ProjectFlowEntity[]> {
+    return ctx.GET<ProjectFlowEntity[]>(
+        'projects/' + projectId + '/flows',
+    );
+}
+
+// The project↔flow joins across EVERY project the caller's org
+// can see — reassembled from the nested per-project collections,
+// since a flow can be joined by projects the caller never named.
+// The projects list is org-scoped; each project's joins are
+// fetched in parallel and concatenated.
 export async function getProjectFlowEntities(
     ctx: RequestContext,
 ): Promise<ProjectFlowEntity[]> {
-    return ctx.GET<ProjectFlowEntity[]>(
-        'project-flows',
+    const projects = await getProjectEntities(ctx);
+    const perProject = await Promise.all(
+        projects.map(p => getProjectFlowsForProject(ctx, p.id)),
     );
+    return perProject.flat();
 }
 
 export interface FlowWithProjectName {
@@ -121,16 +140,12 @@ export async function getFlowsByProject(
 ): Promise<FlowListItem[]> {
     const [projectFlows, flows] =
         await Promise.all([
-            ctx.GET<ProjectFlowEntity[]>(
-                'project-flows',
-            ),
+            getProjectFlowsForProject(ctx, projectId),
             ctx.GET<FlowEntity[]>('flows'),
         ]);
 
     const flowIds = new Set(
-        filterByField(
-            projectFlows, 'project_id', projectId,
-        ).map(pw => pw.flow_id),
+        projectFlows.map(pw => pw.flow_id),
     );
 
     const flowMap = new Map(

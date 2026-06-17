@@ -14,10 +14,9 @@ import {
 } from '../../api/types.ts';
 import {
     postFlowVersion,
-    postFlowVersionOps,
     putFlow,
-    putFlowOps,
-    deleteFlowVersionOp,
+    buildFlowBody,
+    buildFlowVersionSnapshot,
     notifyFlowChange,
     getFlowGraph,
     getFlowVersions,
@@ -693,23 +692,24 @@ export async function performUndo(
             createdAt: nowUtc(),
         },
     );
-    // Restore + consume as ONE atomic batch: the
-    // flow can never land reverted while the
-    // version row survives unconsumed.
-    const ops = [
-        ...await putFlowOps(ctx, snap.flowId, {
-            name: version.name,
-            isLocked: version.isLocked,
-            isAutoLayout: version.isAutoLayout,
-            isAutoFit: version.isAutoFit,
-            lockTimeout: version.lockTimeout,
-            nodes: version.nodes,
-            edges: version.edges,
-        }),
-        deleteFlowVersionOp(version.id),
-    ];
+    // Restore + consume as ONE atomic transaction
+    // through the named POST /flows/:id/undo: the
+    // flow can never land reverted while the version
+    // row survives unconsumed.
     try {
-        await ctx.commit({ ops });
+        await ctx.POST(`flows/${snap.flowId}/undo`, {
+            flow: buildFlowBody({
+                name: version.name,
+                isLocked: version.isLocked,
+                isAutoLayout: version.isAutoLayout,
+                isAutoFit: version.isAutoFit,
+                lockTimeout: version.lockTimeout,
+                nodes: version.nodes,
+                edges: version.edges,
+            }),
+            eventId: generateCryptoSafeBase62(),
+            consumedVersionId: version.id,
+        });
     } catch (err) {
         log.error(
             'performUndo failed',
@@ -751,27 +751,30 @@ export async function performRedo(
         };
     }
     const v = popped.version;
-    // Snapshot + re-apply as ONE atomic batch:
-    // the current state can never land archived
-    // as a version while the redo graph is lost.
-    const ops = [
-        ...await postFlowVersionOps(
-            ctx,
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        ),
-        ...await putFlowOps(ctx, snap.flowId, {
-            name: v.name,
-            isLocked: v.isLocked,
-            isAutoLayout: v.isAutoLayout,
-            isAutoFit: v.isAutoFit,
-            lockTimeout: v.lockTimeout,
-            nodes: v.nodes,
-            edges: v.edges,
-        }),
-    ];
+    // Snapshot + re-apply as ONE atomic transaction
+    // through the named POST /flows/:id/redo: the
+    // current state can never land archived as a
+    // version while the redo graph is lost. The
+    // snapshot read runs OUTSIDE the transaction.
+    const version = await buildFlowVersionSnapshot(
+        ctx,
+        generateCryptoSafeBase62(),
+        snap.flowId,
+    );
     try {
-        await ctx.commit({ ops });
+        await ctx.POST(`flows/${snap.flowId}/redo`, {
+            version,
+            flow: buildFlowBody({
+                name: v.name,
+                isLocked: v.isLocked,
+                isAutoLayout: v.isAutoLayout,
+                isAutoFit: v.isAutoFit,
+                lockTimeout: v.lockTimeout,
+                nodes: v.nodes,
+                edges: v.edges,
+            }),
+            eventId: generateCryptoSafeBase62(),
+        });
     } catch (err) {
         log.error(
             'performRedo failed',

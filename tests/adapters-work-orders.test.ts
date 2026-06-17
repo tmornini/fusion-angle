@@ -608,8 +608,8 @@ import {
 '../web-app/app/adapters/work-orders-queries.ts';
 
 test(
-    'getFlowWorkOrderEntities returns seeded '
-    + 'flow-work-order rows',
+    'getFlowWorkOrderEntities returns the seeded '
+    + 'flow-work-order rows for the asked flow only',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -632,19 +632,16 @@ test(
             },
         );
         const ctx = createRequestContext(db, await devToken());
-        const rows =
-            await getFlowWorkOrderEntities(ctx);
-        assert.equal(rows.length, 2);
-        assert.ok(
-            rows.some(
-                r => r.work_order_id === 'wo1',
-            ),
-        );
-        assert.ok(
-            rows.some(
-                r => r.work_order_id === 'wo2',
-            ),
-        );
+        // The server now filters the nested collection to its
+        // parent flow — each flow surfaces only its own join.
+        const flow1 =
+            await getFlowWorkOrderEntities(ctx, 'flow1');
+        assert.equal(flow1.length, 1);
+        assert.equal(flow1[0]!.work_order_id, 'wo1');
+        const flow2 =
+            await getFlowWorkOrderEntities(ctx, 'flow2');
+        assert.equal(flow2.length, 1);
+        assert.equal(flow2[0]!.work_order_id, 'wo2');
     },
 );
 

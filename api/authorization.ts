@@ -78,17 +78,29 @@ export interface PolicyEntry {
     readonly roles: readonly string[];
 }
 
-function matchesOnSegmentBoundary(
+export function matchesOnSegmentBoundary(
     pathname: string,
     prefix: string,
 ): boolean {
     if (prefix === '/') return true;
-    return pathname === prefix
-        || pathname.startsWith(prefix + '/');
+    const pathSegs = pathname.split('/').filter(Boolean);
+    const prefixSegs = prefix.split('/').filter(Boolean);
+    // A prefix matches when the pathname is at least as deep
+    // and every prefix segment matches the pathname's segment
+    // at that position — a `:`-prefixed prefix segment is the
+    // route's variable id and matches any one segment. So
+    // '/members' never half-matches '/memberships', and
+    // '/flows/:id/versions' matches '/flows/f1/versions/v1'
+    // but not the shallower '/flows/f1'.
+    if (pathSegs.length < prefixSegs.length) return false;
+    return prefixSegs.every(
+        (seg, i) =>
+            seg.startsWith(':') || seg === pathSegs[i],
+    );
 }
 
 // The verbs the `member` role may use, per content prefix.
-// Admin surfaces — identities, credentials, clients,
+// Admin surfaces — identities, credentials,
 // providers, role-grants, memberships, organization and
 // member WRITES, snapshots — are absent: deny-by-default
 // keeps them at the root admin entries. members/ai-members/
@@ -99,26 +111,24 @@ function matchesOnSegmentBoundary(
 const MEMBER_VERBS: Readonly<
     Record<string, readonly string[]>
 > = {
-    '/ideas': ['GET', 'PUT'],
-    '/idea-submissions': ['GET', 'PUT'],
+    '/ideas': ['GET', 'PUT', 'POST'],
+    '/ideas/:id/submissions': ['GET', 'PUT'],
     '/projects': ['GET', 'PUT'],
-    '/project-flows': ['GET', 'PUT', 'DELETE'],
-    '/project-objective-baseline-scores': ['GET', 'PUT'],
-    '/project-objective-actual-scores': ['GET', 'PUT'],
-    '/objectives': ['GET', 'PUT'],
-    '/objective-revisions': ['GET', 'PUT'],
-    '/flows': ['GET', 'PUT'],
-    '/flow-versions': ['GET', 'PUT', 'DELETE'],
-    '/flow-work-orders': ['GET', 'PUT'],
-    '/flow-records': ['GET', 'PUT', 'DELETE'],
-    '/records': ['GET', 'PUT', 'DELETE'],
+    '/projects/:id/flows': ['GET', 'PUT', 'DELETE'],
+    '/projects/:id/objective-baseline-scores': ['GET', 'PUT'],
+    '/projects/:id/objective-actual-scores': ['GET', 'PUT'],
+    '/objectives': ['GET', 'PUT', 'POST'],
+    '/objectives/:id/revisions': ['GET', 'PUT'],
+    '/flows': ['GET', 'PUT', 'POST'],
+    '/flows/:id/versions': ['GET', 'PUT', 'POST', 'DELETE'],
+    '/flows/:id/work-orders': ['GET', 'PUT'],
+    '/flows/:id/records': ['GET', 'PUT', 'DELETE'],
+    '/records': ['GET', 'PUT', 'DELETE', 'POST'],
     '/record-attributes': ['GET', 'PUT', 'DELETE'],
-    '/records-multi-put': ['POST'],
-    '/state-field-values': ['GET', 'PUT', 'DELETE'],
+    '/states/:id/field-values': ['GET', 'PUT', 'DELETE'],
     '/work-orders': ['GET', 'PUT', 'POST'],
     '/states': ['GET', 'PUT'],
     '/entity-states': ['GET'],
-    '/commit': ['POST'],
     '/members': ['GET'],
     '/ai-members': ['GET'],
     '/human-members': ['GET'],

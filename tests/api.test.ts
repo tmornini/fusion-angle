@@ -74,7 +74,6 @@ test(
         const event = {
             entity_id: 'e1',
             state: 'active',
-            member_id: 'w1',
             at: '2026-01-01T00:00:00.000000Z',
         };
         await PUT(db, 'states/s1', event, DEV_TOKEN);
@@ -154,7 +153,7 @@ test(
     async () => {
         const db = await freshDb();
         await assert.rejects(
-            () => POST(db, 'ideas', {}, DEV_TOKEN),
+            () => POST(db, 'projects', {}, DEV_TOKEN),
             /not allowed/i,
         );
     },

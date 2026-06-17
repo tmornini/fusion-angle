@@ -864,7 +864,7 @@ async function openHistoryModal(
     );
     const revsByObj =
         await getObjectiveRevisionsByObjective(
-            ctx,
+            ctx, Array.from(baselineObjIds),
         );
     const revisions = Array.from(
         baselineObjIds,

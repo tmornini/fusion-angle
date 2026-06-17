@@ -1,5 +1,5 @@
 // Root-page redirect script. Reads the boot-declared
-// schema-presence marker and routes to either the landing
+// schema-presence marker and routes to either the login
 // page (data present) or the snapshots page (no data —
 // first run or post-wipe). Runs synchronously so the user
 // never sees the blank root document. Extracted from the
@@ -17,6 +17,6 @@ import {
 
 (function redirectRoot(): void {
     putLocation(getSchemaPresent()
-        ? 'landing/index.html'
+        ? 'auth/index.html'
         : 'snapshots/index.html');
 })();

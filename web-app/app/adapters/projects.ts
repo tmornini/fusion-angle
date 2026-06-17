@@ -13,7 +13,7 @@ import {
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
-    buildStateEventOp,
+    postStateEvent,
     getProjectState,
     getProjectStates,
 } from './state-events.ts';
@@ -307,12 +307,6 @@ export async function postProjectStateChange(
     id: string,
     state: ProjectState,
 ): Promise<void> {
-    await ctx.commit({
-        ops: [
-            await buildStateEventOp(
-                ctx, id, state,
-            ),
-        ],
-    });
+    await postStateEvent(ctx, id, state);
     projectChanges.notify();
 }

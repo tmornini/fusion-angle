@@ -40,9 +40,21 @@ import {
     getSessionCredentials,
     putSessionCredentials,
 } from '../web-app/app/adapters/session-credentials.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
-import { devToken, expiredToken } from './token-fixtures.ts';
-import { ANONYMOUS_ID } from '../api/access-token.ts';
+import {
+    ideaBody, orgRow, seedAdminSchema,
+} from './test-fixtures.ts';
+import {
+    devToken, expiredToken, orgToken,
+} from './token-fixtures.ts';
+import {
+    ANONYMOUS_ID,
+    mintAccessToken,
+    TOKEN_AUDIENCE,
+    principalFromToken,
+} from '../api/access-token.ts';
+import {
+    ACTIVE_ORG_KEY,
+} from '../web-app/app/adapters/org-session.ts';
 import {
     getSessionToken,
 } from '../web-app/app/adapters/init.ts';
@@ -75,6 +87,35 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
             }),
         }));
     return res.json();
+}
+
+// Authorize `current` as admin of `org` and stamp the
+// membership the gate fences on — the per-org grant the
+// facade reads (mirrors api-org-isolation's twoOrgs).
+async function seedOrgAdmin(
+    db: MemoryDbAdapter, org: string,
+): Promise<void> {
+    await db.roleGrants.put('role-current-' + org, {
+        organization_id: org, identity_id: 'current',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system',
+        at: '2020-01-01T00:00:00.000000Z',
+    });
+    await db.memberships.put('m-current-' + org, {
+        organization_id: org, identity_id: 'current',
+        at: '2026-06-04T00:00:00.000000Z',
+    });
+}
+
+// A dead access token already scoped to `org` — the vessel an
+// org-bound request carries when its session expires mid-flight.
+async function expiredOrgToken(org: string): Promise<string> {
+    return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
+        sub: 'current', roles: [], name: 'Demo', org,
+        iat: 1_600_000_000, ttlSeconds: 1,
+        jti: 'exp-org-' + org,
+    });
 }
 
 test('a recover context silently refreshes a dead access token',
@@ -172,4 +213,78 @@ async () => {
     // ...and the tab was redirected to the login page
     assert.match(
         window.location.href, /auth.*return=dashboard/);
+});
+
+test('a recovering context reads through the vessel token,'
++ ' not a concurrently-moved global', async () => {
+    localStorage.clear();
+    const db = await freshDb();
+    await seedOrgAdmin(db, 'A');
+    await seedOrgAdmin(db, 'B');
+    await db.ideas.put('a1', ideaBody('A', 'mine'));
+    await db.ideas.put('b1', ideaBody('B', 'theirs'));
+    const aToken = await orgToken('current', 'A');
+    const ctx = createRecoveringRequestContext(db, aToken);
+    // another tab moves the shared session holder to org B
+    putSessionToken(await orgToken('current', 'B'));
+    const rows = await ctx.GET<{ id: string }[]>('ideas');
+    // the read ran in the vessel's org A, not the global's B
+    assert.deepEqual(rows.map(r => r.id), ['a1']);
+});
+
+test('recovery re-scopes to the vessel org claim, not the'
++ ' cross-tab preference', async () => {
+    localStorage.clear();
+    const db = await freshDb();
+    await seedOrgAdmin(db, 'A');
+    await seedOrgAdmin(db, 'B');
+    // the enumerate joins org rows to memberships, so both
+    // orgs must exist as rows to land in the reachable set
+    await db.organizations.put('A', orgRow('Acme'));
+    await db.organizations.put('B', orgRow('Beta'));
+    const pair = await issuePair(db);
+    // the dying request was scoped to org A: its access token
+    // has expired but the refresh is still live
+    const deadA = await expiredOrgToken('A');
+    putSessionCredentials({
+        accessToken: deadA, refreshToken: pair.refresh_token,
+    });
+    putSessionToken(deadA);
+    // another tab last selected org B (the cross-tab preference)
+    localStorage.setItem(ACTIVE_ORG_KEY, 'B');
+    const ctx = createRecoveringRequestContext(db, deadA);
+    // the 401 drives refresh + re-scope; recovery must honor the
+    // vessel's own org A, never the preference another tab wrote
+    await ctx.GET('ideas');
+    const scoped =
+        principalFromToken(getSessionToken()).organization;
+    // one vessel truth: the recovered session matches the
+    // identity the request carried, and that is org A
+    assert.equal(scoped, ctx.identity.organization);
+    assert.equal(scoped, 'A');
+});
+
+test('recovery leaves the cross-tab active-org preference'
++ ' untouched', async () => {
+    localStorage.clear();
+    const db = await freshDb();
+    await seedOrgAdmin(db, 'A');
+    await seedOrgAdmin(db, 'B');
+    await db.organizations.put('A', orgRow('Acme'));
+    await db.organizations.put('B', orgRow('Beta'));
+    const pair = await issuePair(db);
+    const deadA = await expiredOrgToken('A');
+    putSessionCredentials({
+        accessToken: deadA, refreshToken: pair.refresh_token,
+    });
+    putSessionToken(deadA);
+    // the foreground tab is viewing org B
+    localStorage.setItem(ACTIVE_ORG_KEY, 'B');
+    const ctx = createRecoveringRequestContext(db, deadA);
+    await ctx.GET('ideas');
+    // the background recovery scopes ITS session to vessel org A...
+    assert.equal(
+        principalFromToken(getSessionToken()).organization, 'A');
+    // ...but never clobbers the foreground tab's chosen org
+    assert.equal(localStorage.getItem(ACTIVE_ORG_KEY), 'B');
 });
