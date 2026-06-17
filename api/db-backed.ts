@@ -30,6 +30,10 @@ import type {
     ProjectEntity,
     FlowEntity,
     FlowVersionEntity,
+    FlowNodeEntity,
+    FlowEdgeEntity,
+    FlowNodeMemberEntity,
+    FlowNodeAttributeEntity,
     OrganizationEntity,
     MembershipEntity,
     InvitationEntity,
@@ -74,6 +78,10 @@ import {
     validateProjectEntity,
     validateFlowEntity,
     validateFlowVersionEntity,
+    validateFlowNodeEntity,
+    validateFlowEdgeEntity,
+    validateFlowNodeMemberEntity,
+    validateFlowNodeAttributeEntity,
     validateProjectFlowEntity,
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
@@ -90,7 +98,7 @@ import {
     validateInvitationEntity,
 } from './validators.ts';
 
-// One adapter over any StorageBackend. The 32-store wiring,
+// One adapter over any StorageBackend. The 36-store wiring,
 // the transaction view, and the tx-based snapshot ops live
 // here once (Commandment IX — the third backend, IndexedDB,
 // triggers the abstraction). The per-tier variation rides in
@@ -132,6 +140,12 @@ export class BackedDbAdapter
     readonly flows!: GuardedEntityStore<FlowEntity>;
     readonly flowVersions!:
         GuardedEntityStore<FlowVersionEntity>;
+    readonly flowNodes!: GuardedEntityStore<FlowNodeEntity>;
+    readonly flowEdges!: GuardedEntityStore<FlowEdgeEntity>;
+    readonly flowNodeMembers!:
+        GuardedEntityStore<FlowNodeMemberEntity>;
+    readonly flowNodeAttributes!:
+        GuardedEntityStore<FlowNodeAttributeEntity>;
     readonly projectFlows!:
         GuardedEntityStore<ProjectFlowEntity>;
     readonly workOrders!: GuardedEntityStore<WorkOrderEntity>;
@@ -254,7 +268,7 @@ export class BackedDbAdapter
         );
     }
 
-    // An adapter whose 32 stores are bound to the open tx
+    // An adapter whose 36 stores are bound to the open tx
     // (ambientRunner joins it), so every op runs in one
     // transaction. Lifecycle methods delegate to the parent;
     // a nested transaction RE-ENTERS this same tx — it runs
@@ -306,7 +320,7 @@ export class BackedDbAdapter
         }
     }
 
-    // The 32-store wiring lives here once. The constructor
+    // The 36-store wiring lives here once. The constructor
     // binds it to the backend; the transaction view rebinds
     // the same wiring to an open tx via ambientRunner.
     #buildStores(run: TxRunner): GuardedDbStores {
@@ -393,6 +407,22 @@ export class BackedDbAdapter
             flowVersions: new HistoryEntityStore(
                 'flow_versions', run,
                 validateFlowVersionEntity,
+            ),
+            flowNodes: new EntityStore(
+                'flow_nodes', run, stateStore,
+                validateFlowNodeEntity,
+            ),
+            flowEdges: new EntityStore(
+                'flow_edges', run, stateStore,
+                validateFlowEdgeEntity,
+            ),
+            flowNodeMembers: new HistoryEntityStore(
+                'flow_node_members', run,
+                validateFlowNodeMemberEntity,
+            ),
+            flowNodeAttributes: new HistoryEntityStore(
+                'flow_node_attributes', run,
+                validateFlowNodeAttributeEntity,
             ),
             projectFlows: new EntityStore(
                 'project_flows', run, stateStore,

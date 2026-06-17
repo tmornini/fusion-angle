@@ -1,8 +1,17 @@
-import type { FlowEntity } from '../types.ts';
+import type {
+    FlowEntity,
+    FlowNodeEntity,
+    FlowEdgeEntity,
+    FlowNodeMemberEntity,
+    FlowNodeAttributeEntity,
+} from '../types.ts';
 import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../types.ts';
+import {
+    validateStoredGraphJson,
+} from '../validators.ts';
 import {
     l2cFlowId,
     buildLeadToCloseNodes,
@@ -1014,4 +1023,82 @@ export function buildFlows():
             }),
         },
     ];
+}
+
+// The four relation row-sets a flow's graph blob decomposes
+// into — the dormant normalized half of the dual-seed
+// (F-131 step 2). Derived FROM the blob through
+// validateStoredGraphJson so the relations cannot diverge from
+// it; reassembleStoredGraph is the inverse at the read seam.
+export interface FlowGraphRelations {
+    nodes: FlowNodeEntity[];
+    edges: FlowEdgeEntity[];
+    members: FlowNodeMemberEntity[];
+    attributes: FlowNodeAttributeEntity[];
+}
+
+// Decompose each seeded flow's graph blob into its relations.
+// Node/edge ids ARE the canvas ids (the real FK targets); each
+// ledger row takes a deterministic seed id and the shared
+// moment of union `at`. Members and attributes seed as 'added'
+// — the dual-seed records unions, never dissolutions.
+export function buildFlowGraphRelations(
+    flows: readonly Pick<FlowEntity, 'id' | 'graph'>[],
+    at: string,
+): FlowGraphRelations {
+    const nodes: FlowNodeEntity[] = [];
+    const edges: FlowEdgeEntity[] = [];
+    const members: FlowNodeMemberEntity[] = [];
+    const attributes: FlowNodeAttributeEntity[] = [];
+    for (const flow of flows) {
+        const graph = validateStoredGraphJson(
+            flow.graph, 'seed flow ' + flow.id + ' graph',
+        );
+        for (const node of graph.nodes) {
+            nodes.push({
+                id: node.id,
+                flow_id: flow.id,
+                name: node.name,
+                position_x: node.positionX,
+                position_y: node.positionY,
+                is_create: node.isCreate,
+                is_archive: node.isArchive,
+                task_instructions: node.taskInstructions,
+                at,
+            });
+            for (const memberId of node.memberIds) {
+                members.push({
+                    id: 'seed-fnm-' + node.id
+                        + '-' + memberId,
+                    flow_node_id: node.id,
+                    member_id: memberId,
+                    action: 'added',
+                    at,
+                });
+            }
+            for (const attribute of node.attributes) {
+                attributes.push({
+                    id: 'seed-fna-' + node.id
+                        + '-' + attribute.attributeId,
+                    flow_node_id: node.id,
+                    attribute_id: attribute.attributeId,
+                    mode: attribute.mode,
+                    is_required: attribute.isRequired,
+                    action: 'added',
+                    at,
+                });
+            }
+        }
+        for (const edge of graph.edges) {
+            edges.push({
+                id: edge.id,
+                flow_id: flow.id,
+                name: edge.name,
+                from_node_id: edge.fromNodeId,
+                to_node_id: edge.toNodeId,
+                at,
+            });
+        }
+    }
+    return { nodes, edges, members, attributes };
 }

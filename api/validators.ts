@@ -28,6 +28,10 @@ import type {
     ProjectEntity,
     FlowEntity,
     FlowVersionEntity,
+    FlowNodeEntity,
+    FlowEdgeEntity,
+    FlowNodeMemberEntity,
+    FlowNodeAttributeEntity,
     WorkOrderEntity,
     FlowWorkOrderEntity,
     StateFieldValueEntity,
@@ -1214,6 +1218,127 @@ export function validateFlowVersionEntity(
         graph,
         at: validateTimestampField(
             body, 'at', 'FlowVersionEntity',
+        ),
+    };
+}
+
+const FLOW_NODE_BODY_KEYS: readonly string[] = [
+    'flow_id', 'name', 'position_x', 'position_y',
+    'is_create', 'is_archive', 'task_instructions', 'at',
+];
+
+export function validateFlowNodeEntity(
+    body: Record<string, unknown>,
+): Omit<FlowNodeEntity, 'id'> {
+    assertOnlyKeys(
+        body, FLOW_NODE_BODY_KEYS, 'FlowNodeEntity',
+    );
+    return {
+        flow_id: pickString(body, 'flow_id'),
+        name: pickString(body, 'name'),
+        position_x: pickNumber(body, 'position_x'),
+        position_y: pickNumber(body, 'position_y'),
+        is_create: pickBoolean(body, 'is_create'),
+        is_archive: pickBoolean(body, 'is_archive'),
+        task_instructions: pickString(
+            body, 'task_instructions',
+        ),
+        at: validateTimestampField(
+            body, 'at', 'FlowNodeEntity',
+        ),
+    };
+}
+
+const FLOW_EDGE_BODY_KEYS: readonly string[] = [
+    'flow_id', 'name', 'from_node_id', 'to_node_id', 'at',
+];
+
+// from_node_id / to_node_id are canvas node ids that flow into
+// DOM/SVG markup at render, so the gate pins them to the graph
+// id alphabet — the same stored-XSS fence asGraphEdge applied
+// when the edge lived inside the graph blob.
+export function validateFlowEdgeEntity(
+    body: Record<string, unknown>,
+): Omit<FlowEdgeEntity, 'id'> {
+    assertOnlyKeys(
+        body, FLOW_EDGE_BODY_KEYS, 'FlowEdgeEntity',
+    );
+    return {
+        flow_id: pickString(body, 'flow_id'),
+        name: pickString(body, 'name'),
+        from_node_id: asGraphId(
+            body['from_node_id'],
+            'FlowEdgeEntity.from_node_id',
+        ),
+        to_node_id: asGraphId(
+            body['to_node_id'],
+            'FlowEdgeEntity.to_node_id',
+        ),
+        at: validateTimestampField(
+            body, 'at', 'FlowEdgeEntity',
+        ),
+    };
+}
+
+const FLOW_NODE_MEMBER_BODY_KEYS: readonly string[] = [
+    'flow_node_id', 'member_id', 'action', 'at',
+];
+
+export function validateFlowNodeMemberEntity(
+    body: Record<string, unknown>,
+): Omit<FlowNodeMemberEntity, 'id'> {
+    assertOnlyKeys(
+        body, FLOW_NODE_MEMBER_BODY_KEYS,
+        'FlowNodeMemberEntity',
+    );
+    const action = validateEnumField(
+        body, 'action', ['added', 'removed'],
+        'relation action', 'FlowNodeMemberEntity',
+    );
+    return {
+        flow_node_id: asGraphId(
+            body['flow_node_id'],
+            'FlowNodeMemberEntity.flow_node_id',
+        ),
+        member_id: pickString(body, 'member_id'),
+        action,
+        at: validateTimestampField(
+            body, 'at', 'FlowNodeMemberEntity',
+        ),
+    };
+}
+
+const FLOW_NODE_ATTRIBUTE_BODY_KEYS: readonly string[] = [
+    'flow_node_id', 'attribute_id', 'mode',
+    'is_required', 'action', 'at',
+];
+
+export function validateFlowNodeAttributeEntity(
+    body: Record<string, unknown>,
+): Omit<FlowNodeAttributeEntity, 'id'> {
+    assertOnlyKeys(
+        body, FLOW_NODE_ATTRIBUTE_BODY_KEYS,
+        'FlowNodeAttributeEntity',
+    );
+    const mode = validateEnumField(
+        body, 'mode', ['editable', 'readonly'],
+        'attribute mode', 'FlowNodeAttributeEntity',
+    );
+    const action = validateEnumField(
+        body, 'action', ['added', 'removed'],
+        'relation action', 'FlowNodeAttributeEntity',
+    );
+    return {
+        flow_node_id: asGraphId(
+            body['flow_node_id'],
+            'FlowNodeAttributeEntity.flow_node_id',
+        ),
+        attribute_id: pickString(body, 'attribute_id'),
+        mode,
+        is_required: pickBoolean(body, 'is_required'),
+        action,
+        at: validateTimestampField(
+            body, 'at', 'FlowNodeAttributeEntity',
         ),
     };
 }

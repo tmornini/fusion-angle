@@ -18,6 +18,10 @@ import {
     validateProjectEntity,
     validateFlowEntity,
     validateFlowVersionEntity,
+    validateFlowNodeEntity,
+    validateFlowEdgeEntity,
+    validateFlowNodeMemberEntity,
+    validateFlowNodeAttributeEntity,
     validateProjectFlowEntity,
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
@@ -101,6 +105,18 @@ function validateSnapshotRow(
                 break;
             case 'flow_versions':
                 validateFlowVersionEntity(body);
+                break;
+            case 'flow_nodes':
+                validateFlowNodeEntity(body);
+                break;
+            case 'flow_edges':
+                validateFlowEdgeEntity(body);
+                break;
+            case 'flow_node_members':
+                validateFlowNodeMemberEntity(body);
+                break;
+            case 'flow_node_attributes':
+                validateFlowNodeAttributeEntity(body);
                 break;
             case 'project_flows':
                 validateProjectFlowEntity(body);

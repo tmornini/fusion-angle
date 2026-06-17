@@ -1030,6 +1030,76 @@ export interface FlowVersionEntity {
     at: string;
 }
 
+export type FlowNodeId = Id;
+export type FlowEdgeId = Id;
+
+// A flow-graph node as its own relation — the node is an
+// entity, not an array element welded into the flow's graph
+// blob (Commandment IX). The id IS the canvas node id: the
+// real FK target for flow_edges and the node-relationship
+// ledgers. EntityStore — an edit is a PUT by stable id, a
+// removal a 'deleted' states-log event, never a splice. `at`
+// is the client-minted moment of the last write.
+export interface FlowNodeEntity {
+    id: FlowNodeId;
+    flow_id: Id;
+    name: string;
+    position_x: number;
+    position_y: number;
+    is_create: boolean;
+    is_archive: boolean;
+    task_instructions: string;
+    at: string;
+}
+
+// A named transition between two nodes, its own relation. The
+// id IS the canvas edge id; from_node_id / to_node_id are real
+// FKs to flow_nodes. EntityStore, same removal idiom as nodes.
+export interface FlowEdgeEntity {
+    id: FlowEdgeId;
+    flow_id: Id;
+    name: string;
+    from_node_id: FlowNodeId;
+    to_node_id: FlowNodeId;
+    at: string;
+}
+
+// The relationship-ledger action vocabulary shared by both
+// node-relationship ledgers: a union is 'added', its
+// dissolution a NEW 'removed' row — never a splice. Current
+// state derives via latestByKey keeping the latest 'added'; a
+// same-`at` tie fails closed ('removed' outranks 'added',
+// mirroring role_grants' revoke-beats-grant).
+export type FlowNodeRelationAction = 'added' | 'removed';
+
+// node↔member as its own relation with a moment of union — a
+// pure join (Codd) plus `at`. HistoryEntityStore (append-only
+// ledger); removal is a new 'removed' row. The members a node
+// currently holds derive from this ledger, never a stored set.
+export interface FlowNodeMemberEntity {
+    id: Id;
+    flow_node_id: FlowNodeId;
+    member_id: MemberId;
+    action: FlowNodeRelationAction;
+    at: string;
+}
+
+// node↔attribute as its own relation: a relationship-entity
+// (it carries payload — mode and is_required — beyond the
+// joined identities). HistoryEntityStore; a mode/required
+// change is a NEW 'added' row, never an UPDATE, so latest-wins
+// reads the current payload. Storage spells attribute_id; the
+// read seam maps it to the domain NodeAttribute.
+export interface FlowNodeAttributeEntity {
+    id: Id;
+    flow_node_id: FlowNodeId;
+    attribute_id: RecordAttributeId;
+    mode: 'editable' | 'readonly';
+    is_required: boolean;
+    action: FlowNodeRelationAction;
+    at: string;
+}
+
 export interface WorkOrderFlowGraph {
     name: string;
     lockTimeout: number;

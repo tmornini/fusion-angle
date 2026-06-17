@@ -17,6 +17,10 @@ import type {
     ProjectEntity,
     FlowEntity,
     FlowVersionEntity,
+    FlowNodeEntity,
+    FlowEdgeEntity,
+    FlowNodeMemberEntity,
+    FlowNodeAttributeEntity,
     OrganizationEntity,
     MembershipEntity,
     InvitationEntity,
@@ -284,7 +288,7 @@ export const backendRunner = (
 export const ambientRunner = (tx: Tx): TxRunner =>
     (_tables, _mode, fn) => fn(tx);
 
-// The 32 stores an adapter exposes, factored out of
+// The 36 stores an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
 // place (`#buildStores`) and a transaction can rebuild it
 // bound to an open tx (A9).
@@ -323,6 +327,14 @@ export interface DbStores {
         EntityStore<FlowEntity>;
     flowVersions:
         EntityStore<FlowVersionEntity>;
+    flowNodes:
+        EntityStore<FlowNodeEntity>;
+    flowEdges:
+        EntityStore<FlowEdgeEntity>;
+    flowNodeMembers:
+        EntityStore<FlowNodeMemberEntity>;
+    flowNodeAttributes:
+        EntityStore<FlowNodeAttributeEntity>;
     projectFlows:
         EntityStore<
             ProjectFlowEntity
@@ -441,6 +453,10 @@ export const TABLE_NAMES = [
     'projects',
     'flows',
     'flow_versions',
+    'flow_nodes',
+    'flow_edges',
+    'flow_node_members',
+    'flow_node_attributes',
     'project_flows',
     'work_orders',
     'flow_work_orders',
@@ -485,6 +501,10 @@ export const TABLE_INDEXES:
     project_objective_actual_scores: ['project_id'],
     flows: ['organization_id'],
     flow_versions: ['flow_id'],
+    flow_nodes: ['flow_id'],
+    flow_edges: ['flow_id'],
+    flow_node_members: ['flow_node_id', 'member_id'],
+    flow_node_attributes: ['flow_node_id', 'attribute_id'],
     flow_work_orders: ['flow_id'],
     flow_records: ['flow_id'],
     work_orders: ['organization_id'],

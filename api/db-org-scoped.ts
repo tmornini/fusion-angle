@@ -7,6 +7,10 @@ import type {
 import type {
     Id,
     FlowVersionEntity,
+    FlowNodeEntity,
+    FlowEdgeEntity,
+    FlowNodeMemberEntity,
+    FlowNodeAttributeEntity,
     ProjectFlowEntity,
     FlowWorkOrderEntity,
     FlowRecordEntity,
@@ -107,6 +111,29 @@ export function orgScopedAdapter(
         },
     );
 
+    // A flow-graph ledger row owns no org of its own, and its
+    // node parent owns none either (flow_nodes is itself fenced
+    // via its flow). So resolve TWO hops: ledger → flow_nodes →
+    // flows.organization_id. An absent node (or flow) is a
+    // visible orphan, like every other parent-derived leaf.
+    const flowOrgOfNode = viaParent(
+        base.flows, (n: FlowNodeEntity) => n.flow_id);
+    const viaFlowNode = <T>(
+        flowNodeIdOf: (row: T) => Id,
+    ): OwningOrgResolver<T> =>
+        async (row) => {
+            try {
+                const node = await base.flowNodes.getById(
+                    flowNodeIdOf(row));
+                return flowOrgOfNode(node);
+            } catch (e) {
+                if (e instanceof EntityNotFoundError) {
+                    return null;
+                }
+                throw e;
+            }
+        };
+
     return {
         initialize: () => base.initialize(),
         deleteSchema: () => base.deleteSchema(),
@@ -177,6 +204,29 @@ export function orgScopedAdapter(
             viaParent(
                 base.flows,
                 (r: FlowVersionEntity) => r.flow_id),
+        ),
+        flowNodes: parentScope(
+            base.flowNodes, 'flow_nodes',
+            viaParent(
+                base.flows,
+                (r: FlowNodeEntity) => r.flow_id),
+        ),
+        flowEdges: parentScope(
+            base.flowEdges, 'flow_edges',
+            viaParent(
+                base.flows,
+                (r: FlowEdgeEntity) => r.flow_id),
+        ),
+        flowNodeMembers: parentScope(
+            base.flowNodeMembers, 'flow_node_members',
+            viaFlowNode(
+                (r: FlowNodeMemberEntity) => r.flow_node_id),
+        ),
+        flowNodeAttributes: parentScope(
+            base.flowNodeAttributes, 'flow_node_attributes',
+            viaFlowNode(
+                (r: FlowNodeAttributeEntity) =>
+                    r.flow_node_id),
         ),
         projectFlows: parentScope(
             base.projectFlows, 'project_flows',

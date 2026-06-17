@@ -45,7 +45,10 @@ import {
     buildIdeas,
     buildIdeaSubmissions,
 } from './mock-data/ideas.ts';
-import { buildFlows } from './mock-data/flows.ts';
+import {
+    buildFlows,
+    buildFlowGraphRelations,
+} from './mock-data/flows.ts';
 import {
     l2cProjectId,
     buildProjects,
@@ -347,6 +350,13 @@ async function postMockDataLoadIn(
     const leadToCloseEdges = buildLeadToCloseEdges();
 
     const mockFlows = buildFlows();
+
+    // The dormant normalized half of the flow graph (F-131
+    // step 2): the same blobs decomposed into relation rows,
+    // seeded ALONGSIDE flows.graph. Nothing reads them yet.
+    const flowRelations = buildFlowGraphRelations(
+        mockFlows, MOCK_SEED_TIMESTAMP,
+    );
 
     // Records: app-global data shapes that flows
     // bind to. Customer Profile carries the
@@ -3137,6 +3147,15 @@ async function postMockDataLoadIn(
             member_id: SYSTEM_MEMBER_ID,
             at: MOCK_SEED_TIMESTAMP,
         }),
+        ...flowRelations.nodes.map(node =>
+            adapter.flowNodes.put(node.id, node)),
+        ...flowRelations.edges.map(edge =>
+            adapter.flowEdges.put(edge.id, edge)),
+        ...flowRelations.members.map(member =>
+            adapter.flowNodeMembers.put(member.id, member)),
+        ...flowRelations.attributes.map(attribute =>
+            adapter.flowNodeAttributes.put(
+                attribute.id, attribute)),
     ]);
 
     const ideaSubmissions = buildIdeaSubmissions();
