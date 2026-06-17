@@ -2,6 +2,7 @@ import type {
     DbAdapter,
     EntityStore,
 } from './db.ts';
+import { LedgerImmutabilityError } from './db.ts';
 import type {
     Id,
     AIMemberEntity,
@@ -43,7 +44,7 @@ import {
     validateHumanMemberEditBody,
     validateFlowCreateBody,
     validateFlowVersionPublishBody,
-    validateFlowSaveBody,
+    validateFlowPutBody,
     validateFlowUndoBody,
     validateFlowRedoBody,
     validateIdeaCreateBody,
@@ -797,40 +798,38 @@ export const routes: Route[] = [
             );
         },
     }),
-    makeIdRoute<FlowEntity>({
-        noun: 'flows',
-        store: db => db.flows,
-        verbs: ['get', 'put'],
-    }),
-    // Save a flow: an OPTIONAL version snapshot (the new
+    // Write a flow: an OPTIONAL version snapshot (the new
     // flow_versions row PUT plus the named over-cap trim
     // DELETEs), THEN the flow row PUT, THEN the 'updated' state
     // event — all as ONE transaction. A mid-write failure rolls
-    // the whole thing back rather than landing the version with
-    // the flow half-written (or vice versa). Covers both the
-    // plain save (version null — no flow_versions touch) and the
-    // versioned save. The org-scoped flows store stamps
-    // organization_id from the verified token and re-validates
-    // through validateFlowEntity, so the flow body OMITS it;
-    // flow_versions is parent-scoped and re-validates the
-    // snapshot through validateFlowVersionEntity. The event is
-    // authored by the verified caller (actor), never the body.
-    // Member-tier POST — isPermitted matches /flows on the
-    // segment prefix, so /flows/:id/save is member-permitted.
-    route('flows/:id/save', {
-        post: (db, p, body, actor) => {
+    // the whole thing back. Covers both the plain write (none —
+    // no flow_versions touch) and the versioned write. The
+    // org-scoped flows store stamps organization_id from the
+    // verified token and re-validates through validateFlowEntity,
+    // so the flow body OMITS it; flow_versions is parent-scoped
+    // and re-validates the snapshot through
+    // validateFlowVersionEntity. The event is authored by the
+    // verified caller (actor), never the body. The eventId is
+    // client-minted: a LedgerImmutabilityError from postEvent
+    // means the event already landed (prior retry), so the PUT
+    // is treated as idempotently successful.
+    // Member-tier PUT — MEMBER_VERBS['/flows'] includes 'PUT'.
+    route('flows/:id', {
+        get: (db, p) => db.flows.getById(param(p, 0)),
+        put: (db, p, body, actor) => {
             const id = param(p, 0);
-            const b = validateFlowSaveBody(body);
+            const b = validateFlowPutBody(body);
             return db.transaction(
                 ['flows', 'flow_versions', 'states'],
                 async (view) => {
-                    if (b.version !== null) {
+                    if (b.history.kind === 'snapshot') {
+                        const snap = b.history.version;
                         await view.flowVersions.put(
-                            b.version.id,
-                            b.version.version as unknown as
+                            snap.id,
+                            snap.version as unknown as
                                 Omit<FlowVersionEntity, 'id'>,
                         );
-                        for (const t of b.version.trimIds) {
+                        for (const t of snap.trimIds) {
                             await view.flowVersions.delete(t);
                         }
                     }
@@ -839,9 +838,16 @@ export const routes: Route[] = [
                         b.flow as unknown as
                             Omit<FlowEntity, 'id'>,
                     );
-                    await view.states.postEvent(
-                        b.eventId, id, 'updated', actor,
-                    );
+                    try {
+                        await view.states.postEvent(
+                            b.eventId, id, 'updated', actor,
+                        );
+                    } catch (e) {
+                        if (
+                            !(e instanceof
+                                LedgerImmutabilityError)
+                        ) throw e;
+                    }
                 },
             );
         },

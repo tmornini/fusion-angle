@@ -2398,6 +2398,75 @@ function validateFlowVersionSnapshot(
     return { id, version, trimIds };
 }
 
+export type FlowWriteHistory =
+    | { readonly kind: 'none' }
+    | {
+        readonly kind: 'snapshot';
+        readonly version: FlowVersionSnapshot;
+    };
+
+export interface FlowPutBody {
+    readonly flow: Record<string, unknown>;
+    readonly eventId: string;
+    readonly history: FlowWriteHistory;
+}
+
+const FLOW_PUT_KEYS: readonly string[] = [
+    'flow', 'eventId', 'history',
+];
+
+function validateFlowWriteHistory(
+    value: unknown,
+    label: string,
+): FlowWriteHistory {
+    const obj = asObject(value, label);
+    const kind = asString(obj['kind'], label + '.kind');
+    if (kind === 'none') {
+        assertOnlyKeys(obj, ['kind'], label);
+        return { kind: 'none' };
+    }
+    if (kind === 'snapshot') {
+        assertOnlyKeys(obj, ['kind', 'version'], label);
+        return {
+            kind: 'snapshot',
+            version: validateFlowVersionSnapshot(
+                obj['version'], label + '.version',
+            ),
+        };
+    }
+    throw new ValidationError(
+        "expected history.kind 'none' or 'snapshot' for "
+        + label + '.kind, got ' + kind,
+    );
+}
+
+// The HTTP-body gate for PUT /flows/:id: the flow row, the
+// 'updated' state event, and an OPTIONAL version snapshot
+// (put + trims) — written atomically. The history side-effect
+// is a shape-literal union, never a nullable field, so the
+// neither/both illegal states are unrepresentable. The flow
+// fields are NOT fully validated here — the org-scoped flows
+// store stamps organization_id from the verified token and
+// re-validates through validateFlowEntity, so the body OMITS
+// it. The state is fixed to 'updated' server-side and authored
+// by the verified caller (actor), never the body.
+export function validateFlowPutBody(
+    body: Record<string, unknown>,
+): FlowPutBody {
+    assertOnlyKeys(body, FLOW_PUT_KEYS, 'FlowPutBody');
+    const flow = asObject(body['flow'], 'FlowPutBody.flow');
+    const eventId = pickString(body, 'eventId');
+    if (eventId === '') {
+        throw new ValidationError(
+            'FlowPutBody.eventId must be non-empty',
+        );
+    }
+    const history = validateFlowWriteHistory(
+        body['history'], 'FlowPutBody.history',
+    );
+    return { flow, eventId, history };
+}
+
 export interface FlowSaveBody {
     readonly version: FlowVersionSnapshot | null;
     readonly flow: Record<string, unknown>;

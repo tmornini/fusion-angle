@@ -219,25 +219,25 @@ export class FlowDesignerPresenter {
         );
     }
 
-    // The OPTIONAL version snapshot and the flow write
-    // land as ONE atomic transaction through the named
-    // POST /flows/:id/save — a fault applies neither.
     async #persistFlow(
         ctx: RequestContext,
         versioned: boolean,
         snap: FlowSnapshot,
     ): Promise<void> {
-        const version = versioned
-            ? await buildFlowVersionSnapshot(
-                ctx,
-                generateCryptoSafeBase62(),
-                snap.flowId,
-            )
-            : null;
-        await ctx.POST(`flows/${snap.flowId}/save`, {
-            version,
+        const history = versioned
+            ? {
+                kind: 'snapshot' as const,
+                version: await buildFlowVersionSnapshot(
+                    ctx,
+                    generateCryptoSafeBase62(),
+                    snap.flowId,
+                ),
+            }
+            : { kind: 'none' as const };
+        await ctx.PUT(`flows/${snap.flowId}`, {
             flow: buildFlowBody(this.#buildSaveShape(snap)),
             eventId: generateCryptoSafeBase62(),
+            history,
         });
         notifyFlowChange();
     }

@@ -15,6 +15,7 @@ import {
     validateProjectFlowEntity,
     validateRecordAttributeEntity,
     asStoredGraph,
+    validateFlowPutBody,
 } from '../api/validators.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
@@ -1050,4 +1051,74 @@ test(
             + '"pattern":"^[^@]+@[^@]+\\\\.[^@]+$"}]',
     });
     assert.equal(result.name, 'Priority');
+});
+
+// --- FlowPutBody ---
+
+const validVersionSnapshot = {
+    id: 'ver-1',
+    version: {
+        flow_id: 'flow-1',
+        name: 'snapshot',
+        is_locked: false,
+        is_auto_layout: false,
+        is_auto_fit: false,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        graph: JSON.stringify({ nodes: [], edges: [] }),
+        at: '2026-01-01T00:00:00.000Z',
+    },
+    trimIds: [],
+};
+
+test('validateFlowPutBody accepts a plain (none) write', () => {
+    const result = validateFlowPutBody({
+        flow: { name: 'F' },
+        eventId: 'ev1',
+        history: { kind: 'none' },
+    });
+    assert.equal(result.history.kind, 'none');
+    assert.equal(result.eventId, 'ev1');
+});
+
+test('validateFlowPutBody accepts a snapshot write', () => {
+    const result = validateFlowPutBody({
+        flow: { name: 'F' },
+        eventId: 'ev1',
+        history: {
+            kind: 'snapshot',
+            version: validVersionSnapshot,
+        },
+    });
+    assert.equal(result.history.kind, 'snapshot');
+    if (result.history.kind === 'snapshot') {
+        assert.equal(result.history.version.id, 'ver-1');
+    }
+});
+
+test('validateFlowPutBody rejects the legacy version key', () => {
+    assert.throws(
+        () => validateFlowPutBody({
+            flow: {}, eventId: 'ev1', version: null,
+        }),
+        /FlowPutBody/,
+    );
+});
+
+test('validateFlowPutBody rejects an unknown history kind', () => {
+    assert.throws(
+        () => validateFlowPutBody({
+            flow: {}, eventId: 'ev1',
+            history: { kind: 'consume', versionId: 'v1' },
+        }),
+        /history\.kind/,
+    );
+});
+
+test('validateFlowPutBody rejects an empty eventId', () => {
+    assert.throws(
+        () => validateFlowPutBody({
+            flow: {}, eventId: '', history: { kind: 'none' },
+        }),
+        /eventId/,
+    );
 });

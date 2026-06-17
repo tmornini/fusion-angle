@@ -11,6 +11,7 @@ import { devToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
+    buildFlowBody,
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import type {
@@ -286,5 +287,83 @@ test(
                 n => n.id === 'a-added',
             ),
         );
+    },
+);
+
+test(
+    'PUT flows/:id with a snapshot writes version + flow + event',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'flow-1');
+        await ctx.PUT('flows/flow-1', {
+            flow: buildFlowBody({
+                name: 'Snapped',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [],
+                edges: [],
+            }),
+            eventId: 'put-ev-1',
+            history: {
+                kind: 'snapshot',
+                version: {
+                    id: 'ver-1',
+                    version: {
+                        flow_id: 'flow-1',
+                        name: 'snap',
+                        is_locked: false,
+                        is_auto_layout: false,
+                        is_auto_fit: false,
+                        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                        graph: JSON.stringify({
+                            nodes: [], edges: [],
+                        }),
+                        at: '2026-01-01T00:00:00.000000Z',
+                    },
+                    trimIds: [],
+                },
+            },
+        });
+        const versions = await ctx.GET<unknown[]>(
+            'flows/flow-1/versions',
+        );
+        assert.equal(versions.length, 1);
+        const flow = await ctx.GET<FlowEntity>('flows/flow-1');
+        assert.equal(flow.name, 'Snapped');
+        const events = await ctx.GET<StateEntity[]>(
+            'entity-states/flow-1/history',
+        );
+        assert.deepEqual(
+            events.map(e => e.state), ['active', 'updated'],
+        );
+    },
+);
+
+test(
+    'PUT flows/:id replays idempotently (one updated event)',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'flow-1');
+        const body = {
+            flow: buildFlowBody({
+                name: 'Replayed',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [],
+                edges: [],
+            }),
+            eventId: 'fixed-ev',
+            history: { kind: 'none' },
+        };
+        await ctx.PUT('flows/flow-1', body);
+        await ctx.PUT('flows/flow-1', body);
+        const events = await ctx.GET<StateEntity[]>(
+            'entity-states/flow-1/history',
+        );
+        assert.equal(events.length, 2);
     },
 );

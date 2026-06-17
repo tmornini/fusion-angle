@@ -118,19 +118,19 @@ export function buildFlowBody(
 }
 
 // Save a flow with NO version snapshot: the flow row PUT plus
-// its 'updated' state event, written atomically through the
-// named POST /flows/:id/save operation (the put + the event in
-// one re-entrant transaction). The author is stamped server-
-// side from the token; the client mints the event id.
+// its 'updated' state event, written atomically through
+// PUT /flows/:id (the put + the event in one re-entrant
+// transaction). The author is stamped server-side from the
+// token; the client mints the event id.
 export async function putFlow(
     ctx: RequestContext,
     id: string,
     save: FlowSaveShape,
 ): Promise<void> {
-    await ctx.POST(`flows/${id}/save`, {
-        version: null,
+    await ctx.PUT(`flows/${id}`, {
         flow: buildFlowBody(save),
         eventId: generateCryptoSafeBase62(),
+        history: { kind: 'none' },
     });
     flowChanges.notify();
 }
