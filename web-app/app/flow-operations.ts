@@ -708,6 +708,7 @@ export async function performUndo(
                 edges: version.edges,
             }),
             eventId: generateCryptoSafeBase62(),
+            at: nowUtc(),
             consumedVersionId: version.id,
         });
     } catch (err) {
@@ -774,6 +775,7 @@ export async function performRedo(
                 edges: v.edges,
             }),
             eventId: generateCryptoSafeBase62(),
+            at: nowUtc(),
         });
     } catch (err) {
         log.error(

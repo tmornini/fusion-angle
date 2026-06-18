@@ -39,6 +39,10 @@ test(
             idea: ideaFields('Fresh Idea'),
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            // Far-future timestamp forces a distinct, verifiable
+            // at value so the test can confirm the caller's time
+            // was threaded to the event — not a server nowUtc().
+            initialStateAt: '2099-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const idea = await GET<{
             id: string;
@@ -51,10 +55,15 @@ test(
         const current = await GET<{
             state: string;
             member_id: string;
+            at: string;
         }>(db, 'entity-states/idea-1', DEV_TOKEN);
         assert.equal(current.state, 'active');
         // Authorship is the verified caller, never the body.
         assert.equal(current.member_id, 'current');
+        // The event carries the caller-supplied at, not server time.
+        assert.equal(
+            current.at, '2099-01-01T00:00:00.000000Z',
+        );
     },
 );
 
@@ -79,6 +88,7 @@ test(
                 idea: ideaFields('Doomed'),
                 initialState: 'active',
                 initialStateEventId: 'ev-x',
+                initialStateAt: '2099-01-02T00:00:00.000000Z',
             }, DEV_TOKEN),
         );
         await assert.rejects(

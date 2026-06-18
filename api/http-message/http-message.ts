@@ -10,6 +10,7 @@ import {
     putStatus,
     putTarget,
 } from './modify.ts';
+import { Body } from './body.ts';
 import {
     BodyRegistry,
     defaultBodyRegistry,
@@ -57,7 +58,9 @@ export class HttpMessage {
         json: string,
         bodyRegistry: BodyRegistry = defaultBodyRegistry(),
     ): HttpMessage {
-        return new HttpMessage(parseJson(json), bodyRegistry);
+        return new HttpMessage(
+            parseJson(json, bodyRegistry), bodyRegistry,
+        );
     }
 
     toWire(): string {
@@ -69,13 +72,19 @@ export class HttpMessage {
 
     toJson(): string {
         if (this.#json === undefined) {
-            this.#json = serializeJson(this.#model);
+            this.#json = serializeJson(
+                this.#model, this.#bodyRegistry,
+            );
         }
         return this.#json;
     }
 
     query(dottedKey: string): FieldValue {
         return queryModel(this.#model, this.#bodyRegistry, dottedKey);
+    }
+
+    body(): Body {
+        return Body.fromModel(this.#model, this.#bodyRegistry);
     }
 
     // Modification returns a NEW message; this one is unchanged.

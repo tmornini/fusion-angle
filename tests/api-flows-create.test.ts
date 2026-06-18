@@ -74,6 +74,7 @@ function createBody() {
         },
         initialState: 'active',
         initialStateEventId: 'ev-1',
+        initialStateAt: '2025-01-01T00:00:00.000000Z',
     };
 }
 
@@ -137,5 +138,29 @@ test(
         // create's own event never landed.
         const flowEvents = await db.states.getAllFor('flow-1');
         assert.equal(flowEvents.length, 0);
+    },
+);
+
+test(
+    'POST flows stamps the initial event with the'
+    + ' caller-supplied initialStateAt',
+    async () => {
+        // Use a far-future timestamp so this event sorts last
+        // in any ascending-at history, making the assertion
+        // index-independent if prior tests grow the fixture.
+        const AT = '2099-06-17T12:00:00.000000Z';
+        const db = await freshDb();
+        await POST(db, 'flows', {
+            ...createBody(),
+            initialStateAt: AT,
+        }, DEV_TOKEN);
+
+        const events = await GET<StateEntity[]>(
+            db,
+            'entity-states/flow-1/history',
+            DEV_TOKEN,
+        );
+        assert.equal(events.length, 1);
+        assert.equal(events[0]!.at, AT);
     },
 );

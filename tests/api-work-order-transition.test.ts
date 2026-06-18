@@ -42,7 +42,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 function eventsFor(
     db: MemoryDbAdapter,
-): Promise<{ state: string; member_id: string }[]> {
+): Promise<{ state: string; member_id: string; at: string }[]> {
     return db.states.getAllFor('wo1');
 }
 
@@ -57,6 +57,7 @@ test(
                 targetState: 'n-next',
                 fieldValues: [],
                 release: null,
+                transitionAt: nowUtc(),
             },
             DEV_TOKEN,
         );
@@ -98,6 +99,7 @@ test(
                     },
                 ],
                 release: null,
+                transitionAt: nowUtc(),
             },
             DEV_TOKEN,
         );
@@ -124,6 +126,10 @@ test(
             member_id: 'current',
             at: nowUtc(),
         });
+        // Mint transitionAt before release.at so the
+        // at-ordered log matches route post order.
+        const transitionAt = nowUtc();
+        const releaseAt = nowUtc();
         await POST(
             db, 'work-orders/wo1/transition', {
                 transitionEventId: 'te1',
@@ -132,7 +138,9 @@ test(
                 release: {
                     id: 'rel-1',
                     state: 'claim_released',
+                    at: releaseAt,
                 },
+                transitionAt,
             },
             DEV_TOKEN,
         );
@@ -157,6 +165,7 @@ test(
                 targetState: 'n-next',
                 fieldValues: [],
                 release: null,
+                transitionAt: nowUtc(),
             },
             DEV_TOKEN,
         );
@@ -201,6 +210,7 @@ test(
                         },
                     ],
                     release: null,
+                    transitionAt: nowUtc(),
                 },
                 DEV_TOKEN,
             ),
@@ -235,5 +245,66 @@ test(
         );
         const events = await eventsFor(db);
         assert.equal(events.length, 0);
+    },
+);
+
+test(
+    'transitionAt is recorded as the transition event at',
+    async () => {
+        const db = await seededDb();
+        // Far-future value to distinguish caller-minted
+        // from a server-generated nowUtc().
+        const callerAt = '2099-01-01T00:00:00.000000Z';
+        await POST(
+            db, 'work-orders/wo1/transition', {
+                transitionEventId: 'te1',
+                targetState: 'n-next',
+                fieldValues: [],
+                release: null,
+                transitionAt: callerAt,
+            },
+            DEV_TOKEN,
+        );
+        const events = await eventsFor(db);
+        assert.equal(events.length, 1);
+        assert.equal(events[0]!.state, 'n-next');
+        assert.equal(events[0]!.at, callerAt);
+    },
+);
+
+test(
+    'release.at is recorded as the release event at',
+    async () => {
+        const db = await seededDb();
+        await db.states.put('cl-1', {
+            entity_id: 'wo1',
+            state: 'claimed',
+            member_id: 'current',
+            at: nowUtc(),
+        });
+        // Far-future values to distinguish caller-minted
+        // from a server-generated nowUtc().
+        const transitionAt = '2099-01-01T00:00:00.000000Z';
+        const releaseAt = '2099-01-01T00:00:01.000000Z';
+        await POST(
+            db, 'work-orders/wo1/transition', {
+                transitionEventId: 'te1',
+                targetState: 'n-next',
+                fieldValues: [],
+                release: {
+                    id: 'rel-1',
+                    state: 'claim_released',
+                    at: releaseAt,
+                },
+                transitionAt,
+            },
+            DEV_TOKEN,
+        );
+        const events = await eventsFor(db);
+        // events: claimed, n-next, claim_released
+        assert.equal(events[1]!.state, 'n-next');
+        assert.equal(events[1]!.at, transitionAt);
+        assert.equal(events[2]!.state, 'claim_released');
+        assert.equal(events[2]!.at, releaseAt);
     },
 );

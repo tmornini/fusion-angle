@@ -566,6 +566,7 @@ export async function postFlowFromBackup(
         },
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: nowUtc(),
     });
 
     notifyFlowChange();
@@ -864,6 +865,7 @@ export async function postFlowFromMermaid(
         },
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: nowUtc(),
     });
 
     notifyFlowChange();
@@ -1200,6 +1202,7 @@ export async function postFlowFromZip(
         },
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: nowUtc(),
     });
 
     notifyFlowChange();

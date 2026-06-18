@@ -4,7 +4,7 @@ import type {
     AIMemberEntity,
     MemberState,
 } from '../../../api/types.ts';
-import { AIMember } from '../../../api/types.ts';
+import { AIMember, nowUtc } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     generateCryptoSafeBase62,
@@ -151,6 +151,7 @@ export async function postAIMemberCreation(
             Record<string, unknown>,
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: nowUtc(),
     });
     aiMemberChanges.notify();
 }

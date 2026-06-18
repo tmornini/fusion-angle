@@ -1,3 +1,4 @@
+import { isRawJson } from './json-numbers.ts';
 import type { FieldLine } from './types.ts';
 
 // ASCII byte-ascending comparison. NOT localeCompare, whose
@@ -28,6 +29,7 @@ export function sortFields(
 // order, so canonical JSON must re-key first. Arrays keep their
 // order (it is significant); primitives pass through.
 export function sortJsonKeys(value: unknown): unknown {
+    if (isRawJson(value)) return value;
     if (Array.isArray(value)) {
         return value.map(sortJsonKeys);
     }

@@ -1,3 +1,5 @@
+import { HttpMessageError } from './types.ts';
+
 // An immutable octet sequence — the body payload and any
 // byte-valued field carry one. btoa/atob speak Latin-1 binary
 // strings (one char per byte), so the codec maps each byte to
@@ -27,7 +29,12 @@ export class Octets {
     }
 
     static fromBase64(b64: string): Octets {
-        const binary = atob(b64);
+        let binary: string;
+        try {
+            binary = atob(b64);
+        } catch {
+            throw new HttpMessageError('invalid base64');
+        }
         const bytes = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
             bytes[i] = binary.charCodeAt(i);

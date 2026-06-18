@@ -92,6 +92,15 @@ function createBody() {
         },
         stateEventIds: ['ev-1', 'ev-2', 'ev-3'],
         states: ['n-start', 'n-middle', 'claimed'],
+        stateEventAts: [
+            // Three distinct increasing values — distinct because
+            // latest-wins on entity state must be deterministic;
+            // far-future to prove the caller's at is threaded, not
+            // server-stamped.
+            '2099-01-01T00:00:00.000000Z',
+            '2099-01-01T00:00:00.000001Z',
+            '2099-01-01T00:00:00.000002Z',
+        ],
     };
 }
 
@@ -132,6 +141,35 @@ test(
         for (const ev of events as StateEntity[]) {
             assert.equal(ev.member_id, 'current');
         }
+    },
+);
+
+test(
+    'POST work-orders threads the caller stateEventAts onto'
+    + ' each state event',
+    async () => {
+        const db = await freshDb();
+        await POST(db, 'work-orders', createBody(), DEV_TOKEN);
+
+        const events = await db.states.getAllFor('wo-1');
+        assert.equal(events.length, 3);
+        const byId = new Map(
+            (events as StateEntity[]).map(e => [e.id, e]),
+        );
+        // Each event must carry the exact caller-supplied at,
+        // not a server-stamped value.
+        assert.equal(
+            byId.get('ev-1')!.at,
+            '2099-01-01T00:00:00.000000Z',
+        );
+        assert.equal(
+            byId.get('ev-2')!.at,
+            '2099-01-01T00:00:00.000001Z',
+        );
+        assert.equal(
+            byId.get('ev-3')!.at,
+            '2099-01-01T00:00:00.000002Z',
+        );
     },
 );
 

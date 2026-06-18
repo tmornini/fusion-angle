@@ -222,6 +222,7 @@ export async function postIdeaCreation(
         idea: entity,
         initialState,
         initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: nowUtc(),
     });
     ideaChanges.notify();
 }
@@ -300,7 +301,11 @@ export async function postIdeaConversion(
         baselines.map(b => b.objectiveId),
     );
     type AnyBody = Record<string, unknown>;
-    const at = nowUtc();
+    // Mint idea at FIRST so it is strictly less than project at
+    // (nowUtc is monotonic — the second call is always greater).
+    // The ledger's latest-wins total order requires distinct values.
+    const ideaStateAt = nowUtc();
+    const projectStateAt = nowUtc();
     const member = await getCurrentHumanMember(ctx);
     await ctx.POST(`ideas/${ideaId}/conversion`, {
         projectId,
@@ -308,8 +313,10 @@ export async function postIdeaConversion(
         idea: promotedIdea as unknown as AnyBody,
         ideaStateEventId: generateCryptoSafeBase62(),
         ideaState: 'promoted',
+        ideaStateAt,
         projectStateEventId: generateCryptoSafeBase62(),
         projectState,
+        projectStateAt,
         baselines: baselines.map(b => ({
             id: generateCryptoSafeBase62(),
             fields: {
@@ -317,7 +324,7 @@ export async function postIdeaConversion(
                 objective_id: b.objectiveId,
                 score: b.score,
                 member_id: member.id,
-                at,
+                at: ideaStateAt,
             },
         })),
     });

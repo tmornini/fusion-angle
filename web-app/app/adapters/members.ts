@@ -6,7 +6,7 @@ import type {
     MemberPii,
     MemberState,
 } from '../../../api/types.ts';
-import { HumanMember } from '../../../api/types.ts';
+import { HumanMember, nowUtc } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import { getMemberPii } from './identities.ts';
 import {
@@ -236,6 +236,7 @@ export async function postHumanMemberCreation(
             Record<string, unknown>,
         initialState,
         initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: nowUtc(),
     });
     humanMemberChanges.notify();
 }

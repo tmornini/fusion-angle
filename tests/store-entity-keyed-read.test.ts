@@ -39,7 +39,10 @@ test(
         await store.put('a', { org: 'o1' });
         await store.put('b', { org: 'o2' });
         await store.put('c', { org: 'o1' });
-        await states.postEvent('s1', 'c', 'deleted', 'm1');
+        await states.postEvent(
+            's1', 'c', 'deleted', 'm1',
+            '2026-01-01T00:00:00.000000Z',
+        );
         const slice = await store.getAllWhere('org', 'o1');
         const all = await store.getAll();
         assert.deepEqual(

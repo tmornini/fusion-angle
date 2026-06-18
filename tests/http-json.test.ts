@@ -63,7 +63,7 @@ test('JSON header preserves same-name field order', () => {
     ]);
 });
 
-test('JSON body is the base64 of the octets', () => {
+test('a body without a content-type is base64', () => {
     const json = HttpMessage.fromWire(
         'POST / HTTP/1.1\r\ncontent-length: 5\r\n\r\nhello',
     ).toJson();

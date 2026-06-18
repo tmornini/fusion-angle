@@ -177,6 +177,10 @@ export async function postWorkOrderCreation(
             generateCryptoSafeBase62(),
             generateCryptoSafeBase62(),
         ],
+        // Three separate nowUtc() calls — strictly monotonic,
+        // so [0] < [1] < [2] is guaranteed; latest-wins on
+        // entity state is therefore deterministic.
+        stateEventAts: [nowUtc(), nowUtc(), nowUtc()],
         states: [
             startNode.id,
             postStartNodeId,
@@ -275,10 +279,16 @@ export async function postWorkOrderTransition(
         && !isClaimEventExpired(
             latestClaim, fg.lockTimeout,
         );
+    // Mint transitionAt first: the route emits the
+    // transition event before the release event, so
+    // transitionAt < release.at must hold in the
+    // at-ordered ledger (latest at = current state).
+    const transitionAt = nowUtc();
     const release = hasLiveClaim
         ? {
             id: generateCryptoSafeBase62(),
             state: 'claim_released',
+            at: nowUtc(),
         }
         : null;
 
@@ -289,6 +299,7 @@ export async function postWorkOrderTransition(
             targetState: edge.toNodeId,
             fieldValues,
             release,
+            transitionAt,
         },
     );
 
@@ -316,12 +327,22 @@ export async function putWorkOrder(
 // so two tabs racing the same claim cannot both
 // succeed — the duplicate-claim TOCTOU is closed at
 // the route, not papered over by a disabled button.
+// The caller mints all four values: expireAt is
+// minted BEFORE claimAt so it orders earlier in the
+// event log (nowUtc is strictly monotonic).
 export async function postWorkOrderClaim(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
+    const expireAt = nowUtc();
+    const claimAt = nowUtc();
     await ctx.POST(
-        `work-orders/${workOrderId}/claim`, {},
+        `work-orders/${workOrderId}/claim`, {
+            claimEventId: generateCryptoSafeBase62(),
+            claimAt,
+            expireEventId: generateCryptoSafeBase62(),
+            expireAt,
+        },
     );
     workOrderChanges.notify();
 }

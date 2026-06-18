@@ -787,3 +787,68 @@ async () => {
     assert.equal(events.length, 1);
     assert.equal(events[0]!.state, 'claim_released');
 });
+
+// Regression: transitionAt must be minted before release.at
+// so the at-ordered ledger puts claim_released last (latest
+// event wins for current-state derivation).
+test(
+    'postWorkOrderTransition mints transitionAt before '
+    + 'release.at — latest by at is claim_released',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await db.flows.put(
+            'f1',
+            buildFlow(buildLinearGraph()),
+        );
+        const woId =
+            await createWorkOrder(ctx, 'f1');
+        await pause(2);
+
+        // Verify a live claim exists before transition.
+        const beforeClaim =
+            await getWorkOrderActiveClaim(
+                ctx, woId, DEFAULT_LOCK_TIMEOUT,
+            );
+        assert.ok(
+            beforeClaim !== null,
+            'expected a live claim before transition',
+        );
+
+        await postWorkOrderTransition(ctx, {
+            workOrderId: woId,
+            edgeId: 'e2',
+            values: {},
+            fieldValueIds: {},
+        });
+
+        const allEvents =
+            await db.states.getAllFor(woId);
+        const transitionEvt = allEvents.find(
+            (e: StateEntity) =>
+                e.state === 'n-finish',
+        );
+        const releaseEvt = allEvents.find(
+            (e: StateEntity) =>
+                e.state === 'claim_released',
+        );
+        assert.ok(
+            transitionEvt !== undefined,
+            'expected a transition (n-finish) event',
+        );
+        assert.ok(
+            releaseEvt !== undefined,
+            'expected a claim_released event',
+        );
+        // The route emits transition first, then
+        // release — so transitionAt < release.at must
+        // hold in the at-ordered ledger, making
+        // claim_released the latest (winning) event.
+        assert.ok(
+            transitionEvt.at < releaseEvt.at,
+            'transitionAt must be strictly less than'
+            + ' release.at; got transition='
+            + transitionEvt.at
+            + ' release=' + releaseEvt.at,
+        );
+    },
+);

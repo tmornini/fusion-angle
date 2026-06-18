@@ -186,6 +186,7 @@ export interface StateStore {
         entityId: Id,
         state: string,
         memberId: Id,
+        at: string,
     ): Promise<void>;
     getCurrentFor(
         entityId: Id,

@@ -306,6 +306,7 @@ test(
                 edges: [],
             }),
             eventId: 'put-ev-1',
+            at: '2099-01-01T00:00:00.000000Z',
             history: {
                 kind: 'snapshot',
                 version: {
@@ -342,7 +343,7 @@ test(
 );
 
 test(
-    'PUT flows/:id replays idempotently (one updated event)',
+    'PUT flows/:id replays identically as one updated event',
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
@@ -357,6 +358,7 @@ test(
                 edges: [],
             }),
             eventId: 'fixed-ev',
+            at: '2026-01-01T00:00:00.000000Z',
             history: { kind: 'none' },
         };
         await ctx.PUT('flows/flow-1', body);
@@ -365,5 +367,113 @@ test(
             'entity-states/flow-1/history',
         );
         assert.equal(events.length, 2);
+    },
+);
+
+test(
+    'POST flows/:id/undo posts the updated event'
+    + ' at the caller time',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'flow-1');
+        // Seed a version row to consume
+        await ctx.PUT('flows/flow-1', {
+            flow: buildFlowBody({
+                name: 'v1',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [],
+                edges: [],
+            }),
+            eventId: 'seed-ev',
+            at: '2026-01-01T00:00:00.000000Z',
+            history: {
+                kind: 'snapshot',
+                version: {
+                    id: 'ver-1',
+                    version: {
+                        flow_id: 'flow-1',
+                        name: 'v1',
+                        is_locked: false,
+                        is_auto_layout: false,
+                        is_auto_fit: false,
+                        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                        graph: JSON.stringify({
+                            nodes: [], edges: [],
+                        }),
+                        at: '2026-01-01T00:00:00.000000Z',
+                    },
+                    trimIds: [],
+                },
+            },
+        });
+        await ctx.POST('flows/flow-1/undo', {
+            flow: buildFlowBody({
+                name: 'undone',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [],
+                edges: [],
+            }),
+            eventId: 'undo-ev',
+            at: '2099-01-02T00:00:00.000000Z',
+            consumedVersionId: 'ver-1',
+        });
+        const events = await ctx.GET<StateEntity[]>(
+            'entity-states/flow-1/history',
+        );
+        assert.equal(
+            events.at(-1)!.at,
+            '2099-01-02T00:00:00.000000Z',
+        );
+    },
+);
+
+test(
+    'POST flows/:id/redo posts the updated event'
+    + ' at the caller time',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'flow-1');
+        await ctx.POST('flows/flow-1/redo', {
+            version: {
+                id: 'ver-redo',
+                version: {
+                    flow_id: 'flow-1',
+                    name: 'redo-snap',
+                    is_locked: false,
+                    is_auto_layout: false,
+                    is_auto_fit: false,
+                    lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                    graph: JSON.stringify({
+                        nodes: [], edges: [],
+                    }),
+                    at: '2026-01-01T00:00:00.000000Z',
+                },
+                trimIds: [],
+            },
+            flow: buildFlowBody({
+                name: 'redone',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [],
+                edges: [],
+            }),
+            eventId: 'redo-ev',
+            at: '2099-01-03T00:00:00.000000Z',
+        });
+        const events = await ctx.GET<StateEntity[]>(
+            'entity-states/flow-1/history',
+        );
+        assert.equal(
+            events.at(-1)!.at,
+            '2099-01-03T00:00:00.000000Z',
+        );
     },
 );

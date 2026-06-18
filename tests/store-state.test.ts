@@ -110,14 +110,14 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await db.postSchemaCreation();
-        await db.states.postEvent('s1', 'e1', 'a', 'w1');
-        // RFC-3339 timestamps from Date.now() share
-        // millisecond resolution; pause to guarantee
-        // ordering on fast machines.
-        await new Promise(resolve =>
-            setTimeout(resolve, 2),
+        await db.states.postEvent(
+            's1', 'e1', 'a', 'w1',
+            '2026-01-01T00:00:00.000000Z',
         );
-        await db.states.postEvent('s2', 'e1', 'b', 'w1');
+        await db.states.postEvent(
+            's2', 'e1', 'b', 'w1',
+            '2026-01-01T00:00:01.000000Z',
+        );
         const first = await db.states.getById('s1');
         const second = await db.states.getById('s2');
         assert.ok(second.at > first.at);
@@ -225,6 +225,35 @@ test(
 );
 
 test(
+    'allFor breaks at-ties by id, agreeing with currentFor',
+    async () => {
+        // Same at, inserted out of id order. The (at, id) total
+        // order sorts ties by id ascending and agrees with
+        // getCurrentFor: the last event IS the current one,
+        // independent of insertion order. Caller-minted at can
+        // tie; the old monotonic server stamp never did.
+        const db = new MemoryDbAdapter();
+        await db.postSchemaCreation();
+        const at = '2026-01-01T00:00:00.000000Z';
+        for (const id of ['sc', 'sb', 'sa']) {
+            await db.states.put(id, {
+                entity_id: 'e1',
+                state: id,
+                member_id: 'w1',
+                at,
+            });
+        }
+        const events = await db.states.getAllFor('e1');
+        assert.deepEqual(
+            events.map(e => e.id),
+            ['sa', 'sb', 'sc'],
+        );
+        const current = await db.states.getCurrentFor('e1');
+        assert.equal(events.at(-1)!.id, current!.id);
+    },
+);
+
+test(
     'allFor returns empty array for unknown entity_id',
     async () => {
         const db = new MemoryDbAdapter();
@@ -240,3 +269,33 @@ test(
         assert.deepEqual(events, []);
     },
 );
+
+const AT1 = '2026-01-01T00:00:00.000000Z';
+const AT2 = '2026-01-01T00:00:00.000001Z';
+
+test('postEvent stamps the caller-supplied at', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await db.states.postEvent('s1', 'e1', 'active', 'w1', AT1);
+    const row = await db.states.getById('s1');
+    assert.equal(row.at, AT1);
+});
+
+test('postEvent replays identically as a no-op', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await db.states.postEvent('s1', 'e1', 'active', 'w1', AT1);
+    await db.states.postEvent('s1', 'e1', 'active', 'w1', AT1);
+    const all = await db.states.getAllFor('e1');
+    assert.equal(all.length, 1);
+});
+
+test('postEvent rejects a conflicting at on one id', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await db.states.postEvent('s1', 'e1', 'active', 'w1', AT1);
+    await assert.rejects(
+        () => db.states.postEvent('s1', 'e1', 'active', 'w1', AT2),
+        (e) => e instanceof LedgerImmutabilityError,
+    );
+});

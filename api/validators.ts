@@ -1875,6 +1875,7 @@ export interface RecordWriteCreateBody {
     readonly attributes: readonly RecordAttributeEntity[];
     readonly initialState: RecordState;
     readonly initialStateEventId: string;
+    readonly initialStateAt: string;
 }
 
 export interface RecordWriteEditBody {
@@ -1893,7 +1894,7 @@ const RECORD_WRITE_CREATE_KEYS:
     readonly string[] = [
     'kind', 'id', 'record',
     'attributes', 'initialState',
-    'initialStateEventId',
+    'initialStateEventId', 'initialStateAt',
 ];
 
 const RECORD_WRITE_EDIT_KEYS:
@@ -1958,10 +1959,15 @@ export function validateRecordWriteBody(
         const initialStateEventId = pickString(
             body, 'initialStateEventId',
         );
+        const initialStateAt = validateTimestampField(
+            body, 'initialStateAt',
+            'RecordWriteCreateBody',
+        );
         return {
             kind: 'create',
             id, record, attributes,
             initialState, initialStateEventId,
+            initialStateAt,
         };
     }
     if (kind === 'edit') {
@@ -2017,10 +2023,12 @@ export interface IdeaCreateBody {
     readonly idea: Record<string, unknown>;
     readonly initialState: IdeaState;
     readonly initialStateEventId: string;
+    readonly initialStateAt: string;
 }
 
 const IDEA_CREATE_KEYS: readonly string[] = [
-    'id', 'idea', 'initialState', 'initialStateEventId',
+    'id', 'idea', 'initialState',
+    'initialStateEventId', 'initialStateAt',
 ];
 
 // The HTTP-body gate for POST /ideas: the idea row plus its
@@ -2059,7 +2067,13 @@ export function validateIdeaCreateBody(
             + ' must be non-empty',
         );
     }
-    return { id, idea, initialState, initialStateEventId };
+    const initialStateAt = validateTimestampField(
+        body, 'initialStateAt', 'IdeaCreateBody.initialStateAt',
+    );
+    return {
+        id, idea, initialState,
+        initialStateEventId, initialStateAt,
+    };
 }
 
 export interface IdeaConversionBaseline {
@@ -2073,15 +2087,18 @@ export interface IdeaConversionBody {
     readonly idea: Record<string, unknown>;
     readonly ideaStateEventId: string;
     readonly ideaState: string;
+    readonly ideaStateAt: string;
     readonly projectStateEventId: string;
     readonly projectState: string;
+    readonly projectStateAt: string;
     readonly baselines: readonly IdeaConversionBaseline[];
 }
 
 const IDEA_CONVERSION_KEYS: readonly string[] = [
     'projectId', 'project', 'idea',
-    'ideaStateEventId', 'ideaState',
-    'projectStateEventId', 'projectState', 'baselines',
+    'ideaStateEventId', 'ideaState', 'ideaStateAt',
+    'projectStateEventId', 'projectState', 'projectStateAt',
+    'baselines',
 ];
 
 const IDEA_CONVERSION_BASELINE_KEYS: readonly string[] = [
@@ -2151,6 +2168,14 @@ export function validateIdeaConversionBody(
             'IdeaConversionBody.projectState must be non-empty',
         );
     }
+    const ideaStateAt = validateTimestampField(
+        body, 'ideaStateAt',
+        'IdeaConversionBody.ideaStateAt',
+    );
+    const projectStateAt = validateTimestampField(
+        body, 'projectStateAt',
+        'IdeaConversionBody.projectStateAt',
+    );
     const baselines = asArray(
         body['baselines'], 'IdeaConversionBody.baselines',
     ).map((v, i) => {
@@ -2175,8 +2200,9 @@ export function validateIdeaConversionBody(
     });
     return {
         projectId, project, idea,
-        ideaStateEventId, ideaState,
-        projectStateEventId, projectState, baselines,
+        ideaStateEventId, ideaState, ideaStateAt,
+        projectStateEventId, projectState, projectStateAt,
+        baselines,
     };
 }
 
@@ -2236,11 +2262,13 @@ export interface FlowCreateBody {
     readonly projectFlow: Record<string, unknown>;
     readonly initialState: string;
     readonly initialStateEventId: string;
+    readonly initialStateAt: string;
 }
 
 const FLOW_CREATE_KEYS: readonly string[] = [
     'id', 'flow', 'projectFlowId', 'projectFlow',
     'initialState', 'initialStateEventId',
+    'initialStateAt',
 ];
 
 // The HTTP-body gate for POST /flows: the flow row, its
@@ -2294,9 +2322,13 @@ export function validateFlowCreateBody(
             + ' must be non-empty',
         );
     }
+    const initialStateAt = validateTimestampField(
+        body, 'initialStateAt', 'FlowCreateBody',
+    );
     return {
         id, flow, projectFlowId, projectFlow,
         initialState, initialStateEventId,
+        initialStateAt,
     };
 }
 
@@ -2408,11 +2440,12 @@ export type FlowWriteHistory =
 export interface FlowPutBody {
     readonly flow: Record<string, unknown>;
     readonly eventId: string;
+    readonly at: string;
     readonly history: FlowWriteHistory;
 }
 
 const FLOW_PUT_KEYS: readonly string[] = [
-    'flow', 'eventId', 'history',
+    'flow', 'eventId', 'at', 'history',
 ];
 
 function validateFlowWriteHistory(
@@ -2461,10 +2494,13 @@ export function validateFlowPutBody(
             'FlowPutBody.eventId must be non-empty',
         );
     }
+    const at = validateTimestampField(
+        body, 'at', 'FlowPutBody',
+    );
     const history = validateFlowWriteHistory(
         body['history'], 'FlowPutBody.history',
     );
-    return { flow, eventId, history };
+    return { flow, eventId, at, history };
 }
 
 export interface FlowSaveBody {
@@ -2513,10 +2549,11 @@ export interface FlowUndoBody {
     readonly flow: Record<string, unknown>;
     readonly eventId: string;
     readonly consumedVersionId: string;
+    readonly at: string;
 }
 
 const FLOW_UNDO_KEYS: readonly string[] = [
-    'flow', 'eventId', 'consumedVersionId',
+    'flow', 'eventId', 'consumedVersionId', 'at',
 ];
 
 // The HTTP-body gate for POST /flows/:id/undo: the flow row, the
@@ -2546,17 +2583,21 @@ export function validateFlowUndoBody(
             'FlowUndoBody.consumedVersionId must be non-empty',
         );
     }
-    return { flow, eventId, consumedVersionId };
+    const at = validateTimestampField(
+        body, 'at', 'FlowUndoBody',
+    );
+    return { flow, eventId, consumedVersionId, at };
 }
 
 export interface FlowRedoBody {
     readonly version: FlowVersionSnapshot;
     readonly flow: Record<string, unknown>;
     readonly eventId: string;
+    readonly at: string;
 }
 
 const FLOW_REDO_KEYS: readonly string[] = [
-    'version', 'flow', 'eventId',
+    'version', 'flow', 'eventId', 'at',
 ];
 
 // The HTTP-body gate for POST /flows/:id/redo: a REQUIRED
@@ -2583,7 +2624,10 @@ export function validateFlowRedoBody(
             'FlowRedoBody.eventId must be non-empty',
         );
     }
-    return { version, flow, eventId };
+    const at = validateTimestampField(
+        body, 'at', 'FlowRedoBody',
+    );
+    return { version, flow, eventId, at };
 }
 
 export interface HumanMemberCreateBody {
@@ -2592,11 +2636,13 @@ export interface HumanMemberCreateBody {
     readonly detail: Record<string, unknown>;
     readonly initialState: MemberState;
     readonly initialStateEventId: string;
+    readonly initialStateAt: string;
 }
 
 const HUMAN_MEMBER_CREATE_KEYS: readonly string[] = [
     'id', 'pii', 'detail',
     'initialState', 'initialStateEventId',
+    'initialStateAt',
 ];
 
 // The HTTP-body gate for POST /human-members: the four member
@@ -2642,7 +2688,13 @@ export function validateHumanMemberCreateBody(
             + ' must be non-empty',
         );
     }
-    return { id, pii, detail, initialState, initialStateEventId };
+    const initialStateAt = validateTimestampField(
+        body, 'initialStateAt', 'HumanMemberCreateBody',
+    );
+    return {
+        id, pii, detail, initialState,
+        initialStateEventId, initialStateAt,
+    };
 }
 
 // Identity creation, discriminated by kind. A person carries
@@ -2733,12 +2785,13 @@ export interface WorkOrderCreateBody {
     readonly flowWorkOrderId: string;
     readonly flowWorkOrder: Record<string, unknown>;
     readonly stateEventIds: readonly string[];
+    readonly stateEventAts: readonly string[];
     readonly states: readonly string[];
 }
 
 const WORK_ORDER_CREATE_KEYS: readonly string[] = [
     'id', 'workOrder', 'flowWorkOrderId', 'flowWorkOrder',
-    'stateEventIds', 'states',
+    'stateEventIds', 'stateEventAts', 'states',
 ];
 
 // The HTTP-body gate for POST /work-orders: the work_orders
@@ -2795,6 +2848,16 @@ export function validateWorkOrderCreateBody(
         }
         return eventId;
     });
+    const stateEventAts = asArray(
+        body['stateEventAts'],
+        'WorkOrderCreateBody.stateEventAts',
+    ).map((v, i) => {
+        const label =
+            'WorkOrderCreateBody.stateEventAts[' + i + ']';
+        return validateTimestampField(
+            { at: v }, 'at', label,
+        );
+    });
     const states = asArray(
         body['states'], 'WorkOrderCreateBody.states',
     ).map((v, i) => {
@@ -2811,18 +2874,21 @@ export function validateWorkOrderCreateBody(
     });
     if (
         stateEventIds.length !== 3
+        || stateEventAts.length !== 3
         || states.length !== 3
     ) {
         throw new ValidationError(
             'WorkOrderCreateBody expects exactly three'
-            + ' state events (stateEventIds + states),'
-            + ' got ' + stateEventIds.length + ' ids and '
+            + ' state events'
+            + ' (stateEventIds + stateEventAts + states),'
+            + ' got ' + stateEventIds.length + ' ids, '
+            + stateEventAts.length + ' ats, and '
             + states.length + ' states',
         );
     }
     return {
         id, workOrder, flowWorkOrderId, flowWorkOrder,
-        stateEventIds, states,
+        stateEventIds, stateEventAts, states,
     };
 }
 
@@ -2834,6 +2900,7 @@ export interface WorkOrderTransitionFieldValue {
 export interface WorkOrderTransitionRelease {
     readonly id: string;
     readonly state: string;
+    readonly at: string;
 }
 
 export interface WorkOrderTransitionBody {
@@ -2841,14 +2908,16 @@ export interface WorkOrderTransitionBody {
     readonly targetState: string;
     readonly fieldValues: readonly WorkOrderTransitionFieldValue[];
     readonly release: WorkOrderTransitionRelease | null;
+    readonly transitionAt: string;
 }
 
 const WORK_ORDER_TRANSITION_KEYS: readonly string[] = [
-    'transitionEventId', 'targetState', 'fieldValues', 'release',
+    'transitionEventId', 'targetState',
+    'fieldValues', 'release', 'transitionAt',
 ];
 
 const TRANSITION_RELEASE_KEYS: readonly string[] = [
-    'id', 'state',
+    'id', 'state', 'at',
 ];
 
 const TRANSITION_FIELD_VALUE_KEYS: readonly string[] = [
@@ -2934,10 +3003,18 @@ export function validateWorkOrderTransitionBody(
                 label + '.state must be non-empty',
             );
         }
-        release = { id, state };
+        const at = validateTimestampField(
+            obj, 'at', label,
+        );
+        release = { id, state, at };
     }
+    const transitionAt = validateTimestampField(
+        body, 'transitionAt',
+        'WorkOrderTransitionBody',
+    );
     return {
-        transitionEventId, targetState, fieldValues, release,
+        transitionEventId, targetState,
+        fieldValues, release, transitionAt,
     };
 }
 
@@ -2946,11 +3023,13 @@ export interface AIMemberCreateBody {
     readonly detail: Record<string, unknown>;
     readonly initialState: MemberState;
     readonly initialStateEventId: string;
+    readonly initialStateAt: string;
 }
 
 const AI_MEMBER_CREATE_KEYS: readonly string[] = [
     'id', 'detail',
     'initialState', 'initialStateEventId',
+    'initialStateAt',
 ];
 
 // The HTTP-body gate for POST /ai-members: the parent member
@@ -2991,7 +3070,55 @@ export function validateAIMemberCreateBody(
             + ' must be non-empty',
         );
     }
-    return { id, detail, initialState, initialStateEventId };
+    const initialStateAt = validateTimestampField(
+        body, 'initialStateAt', 'AIMemberCreateBody',
+    );
+    return {
+        id, detail, initialState,
+        initialStateEventId, initialStateAt,
+    };
+}
+
+const WORK_ORDER_CLAIM_KEYS: readonly string[] = [
+    'claimEventId', 'claimAt',
+    'expireEventId', 'expireAt',
+];
+
+export interface WorkOrderClaimBody {
+    readonly claimEventId: string;
+    readonly claimAt: string;
+    readonly expireEventId: string;
+    readonly expireAt: string;
+}
+
+// Gate for POST /work-orders/:id/claim. The caller mints
+// both event ids and timestamps; the route reads them via
+// this validator and never calls generateCryptoSafeBase62
+// for the claim events. Authorship is server-derived
+// (actor for 'claimed', prior.member_id for
+// 'claim_expired') — never supplied by the caller.
+export function validateWorkOrderClaimBody(
+    body: Record<string, unknown>,
+): WorkOrderClaimBody {
+    assertOnlyKeys(
+        body, WORK_ORDER_CLAIM_KEYS, 'WorkOrderClaimBody',
+    );
+    const claimEventId = pickString(body, 'claimEventId');
+    const expireEventId = pickString(
+        body, 'expireEventId',
+    );
+    if (claimEventId === '' || expireEventId === '') {
+        throw new ValidationError(
+            'WorkOrderClaimBody ids must be non-empty',
+        );
+    }
+    const claimAt = validateTimestampField(
+        body, 'claimAt', 'WorkOrderClaimBody',
+    );
+    const expireAt = validateTimestampField(
+        body, 'expireAt', 'WorkOrderClaimBody',
+    );
+    return { claimEventId, claimAt, expireEventId, expireAt };
 }
 
 export interface AIMemberEditBody {

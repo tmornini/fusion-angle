@@ -85,6 +85,7 @@ export async function seedHumanMember(
     });
     await db.states.postEvent(
         `st-${id}`, id, state, 'system',
+        '2026-01-01T00:00:00.000000Z',
     );
     // A member belongs to an org via the ledger — the member
     // list derives from it, so a seeded member needs one.
@@ -105,6 +106,7 @@ export async function seedAIMember(
     await db.aiMembers.put(id, { name, ...aiDetail() });
     await db.states.postEvent(
         `st-${id}`, id, state, 'system',
+        '2026-01-01T00:00:00.000000Z',
     );
     await db.memberships.put(`mb-${id}`, {
         organization_id: '1',

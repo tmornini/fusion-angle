@@ -56,6 +56,8 @@ test(
             ],
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            initialStateAt:
+                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const record = await GET<{
             id: string;
@@ -92,6 +94,8 @@ test(
             attributes: [],
             initialState: 'active',
             initialStateEventId: 'ev-2',
+            initialStateAt:
+                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const record = await GET<{ name: string }>(
             db, 'records/rec-2', DEV_TOKEN,
@@ -128,6 +132,8 @@ test(
             attributes: [],
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            initialStateAt:
+                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await POST(db, 'records', {
             kind: 'edit',
@@ -190,6 +196,8 @@ test(
             ],
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            initialStateAt:
+                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await POST(db, 'records', {
             kind: 'edit',
@@ -256,6 +264,8 @@ test(
             ],
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            initialStateAt:
+                '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await POST(db, 'records', {
             kind: 'edit',
@@ -327,6 +337,8 @@ test(
                 ],
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
+                initialStateAt:
+                    '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
             /must be non-empty/,
         );
@@ -367,6 +379,8 @@ test(
                 ],
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
+                initialStateAt:
+                    '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
             /record_id must match top-level id/,
         );
@@ -413,6 +427,8 @@ test(
                 attributes: [],
                 initialState: 'pending',
                 initialStateEventId: 'ev-1',
+                initialStateAt:
+                    '2025-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
             /expected RecordState/,
         );
@@ -437,6 +453,8 @@ test(
                 attributes: [],
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
+                initialStateAt:
+                    '2025-01-01T00:00:00.000000Z',
                 extra: 'forbidden',
             }, DEV_TOKEN),
             /unexpected key/,
@@ -462,6 +480,46 @@ test(
                 attributes: [],
             }, DEV_TOKEN),
             /missing required key/,
+        );
+    },
+);
+
+test(
+    'POST records create threads caller'
+    + ' initialStateAt to the initial state event',
+    async () => {
+        const db = await freshDb();
+        await seedCurrentMember(db);
+        await POST(db, 'records', {
+            kind: 'create',
+            id: 'rec-at',
+            record: {
+                organization_id: '1',
+                name: 'Timed Record',
+                description: '',
+                position: 1,
+            },
+            attributes: [],
+            initialState: 'active',
+            initialStateEventId: 'ev-at',
+            // Far-future timestamp forces a distinct, verifiable
+            // at value so the test can confirm the caller's time
+            // was threaded to the event — not a server nowUtc().
+            initialStateAt:
+                '2099-07-01T00:00:00.000000Z',
+        }, DEV_TOKEN);
+        const current = await GET<{
+            state: string;
+            member_id: string;
+            at: string;
+        }>(db, 'entity-states/rec-at', DEV_TOKEN);
+        assert.equal(current.state, 'active');
+        // Authorship is the verified caller, never the body.
+        assert.equal(current.member_id, 'current');
+        // The event carries the caller-supplied at, not server time.
+        assert.equal(
+            current.at,
+            '2099-07-01T00:00:00.000000Z',
         );
     },
 );
@@ -493,6 +551,8 @@ test(
                 attributes: [],
                 initialState: 'active',
                 initialStateEventId: 'ev-x',
+                initialStateAt:
+                    '2099-07-01T00:00:00.000000Z',
             }, DEV_TOKEN),
         );
         await assert.rejects(

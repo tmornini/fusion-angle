@@ -77,6 +77,7 @@ test('postProjectApproval moves state to approved',
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.postEvent(
             'st-init', 'p1', 'under_review', 'current',
+            '2026-01-01T00:00:00.000000Z',
         );
         await db.objectives.put('o1', {
             organization_id: '1', position: 0,
@@ -118,6 +119,7 @@ test('postProjectArchival moves state to archived',
         await db.projects.put('p1', SAMPLE_PROJECT_BODY);
         await db.states.postEvent(
             'st-init', 'p1', 'approved', 'current',
+            '2026-01-01T00:00:00.000000Z',
         );
         await db.objectives.put('o1', {
             organization_id: '1', position: 0,

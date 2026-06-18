@@ -9,6 +9,7 @@ import {
     buildFlowBody,
     buildFlowVersionSnapshot,
     notifyFlowChange,
+    nowUtc,
     HumanMember,
     AIMember,
 } from '../adapters/index.ts';
@@ -237,6 +238,7 @@ export class FlowDesignerPresenter {
         await ctx.PUT(`flows/${snap.flowId}`, {
             flow: buildFlowBody(this.#buildSaveShape(snap)),
             eventId: generateCryptoSafeBase62(),
+            at: nowUtc(),
             history,
         });
         notifyFlowChange();

@@ -2,7 +2,6 @@ import type {
     DbAdapter,
     EntityStore,
 } from './db.ts';
-import { LedgerImmutabilityError } from './db.ts';
 import type {
     Id,
     AIMemberEntity,
@@ -35,9 +34,6 @@ import type {
     OrganizationEntity,
 } from './types.ts';
 import {
-    generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
-import {
     validateAIMemberCreateBody,
     validateAIMemberEditBody,
     validateHumanMemberCreateBody,
@@ -53,6 +49,7 @@ import {
     validateObjectiveCreateBody,
     validateRecordWriteBody,
     validateStateBody,
+    validateWorkOrderClaimBody,
     validateWorkOrderCreateBody,
     validateWorkOrderTransitionBody,
     validateWorkOrderFlowGraphJson,
@@ -254,6 +251,7 @@ async function applyRecordWrite(
                     body.id,
                     body.initialState,
                     actor,
+                    body.initialStateAt,
                 );
             }
             if (removedIds.length > 0) {
@@ -337,6 +335,7 @@ export const routes: Route[] = [
                         b.id,
                         b.initialState,
                         actor,
+                        b.initialStateAt,
                     );
                 },
             );
@@ -419,6 +418,7 @@ export const routes: Route[] = [
                         b.id,
                         b.initialState,
                         actor,
+                        b.initialStateAt,
                     );
                 },
             );
@@ -670,6 +670,7 @@ export const routes: Route[] = [
                         b.id,
                         b.initialState,
                         actor,
+                        b.initialStateAt,
                     );
                 },
             );
@@ -718,12 +719,14 @@ export const routes: Route[] = [
                         ideaId,
                         b.ideaState,
                         actor,
+                        b.ideaStateAt,
                     );
                     await view.states.postEvent(
                         b.projectStateEventId,
                         b.projectId,
                         b.projectState,
                         actor,
+                        b.projectStateAt,
                     );
                     for (const baseline of b.baselines) {
                         await view.projectObjectiveBaselineScores
@@ -793,6 +796,7 @@ export const routes: Route[] = [
                         b.id,
                         b.initialState,
                         actor,
+                        b.initialStateAt,
                     );
                 },
             );
@@ -809,10 +813,9 @@ export const routes: Route[] = [
     // so the flow body OMITS it; flow_versions is parent-scoped
     // and re-validates the snapshot through
     // validateFlowVersionEntity. The event is authored by the
-    // verified caller (actor), never the body. The eventId is
-    // client-minted: a LedgerImmutabilityError from postEvent
-    // means the event already landed (prior retry), so the PUT
-    // is treated as idempotently successful.
+    // verified caller (actor), never the body. The eventId and
+    // at are client-minted: a byte-identical replay lands as a
+    // ledger no-op via postEvent.
     // Member-tier PUT — MEMBER_VERBS['/flows'] includes 'PUT'.
     route('flows/:id', {
         get: (db, p) => db.flows.getById(param(p, 0)),
@@ -838,16 +841,10 @@ export const routes: Route[] = [
                         b.flow as unknown as
                             Omit<FlowEntity, 'id'>,
                     );
-                    try {
-                        await view.states.postEvent(
-                            b.eventId, id, 'updated', actor,
-                        );
-                    } catch (e) {
-                        if (
-                            !(e instanceof
-                                LedgerImmutabilityError)
-                        ) throw e;
-                    }
+                    await view.states.postEvent(
+                        b.eventId, id, 'updated', actor,
+                        b.at,
+                    );
                 },
             );
         },
@@ -873,6 +870,7 @@ export const routes: Route[] = [
                     );
                     await view.states.postEvent(
                         b.eventId, id, 'updated', actor,
+                        b.at,
                     );
                     await view.flowVersions.delete(
                         b.consumedVersionId,
@@ -913,6 +911,7 @@ export const routes: Route[] = [
                     );
                     await view.states.postEvent(
                         b.eventId, id, 'updated', actor,
+                        b.at,
                     );
                 },
             );
@@ -1025,6 +1024,7 @@ export const routes: Route[] = [
                             b.id,
                             b.states[i]!,
                             actor,
+                            b.stateEventAts[i]!,
                         );
                     }
                 },
@@ -1046,10 +1046,12 @@ export const routes: Route[] = [
     // (naming the prior claimant) and the new 'claimed'
     // land atomically.
     route('work-orders/:id/claim', {
-        post: (db, p, _body, actor) =>
+        post: (db, p, body, actor) =>
             db.transaction(
                 ['work_orders', 'states'],
                 async (view) => {
+                    const b =
+                        validateWorkOrderClaimBody(body);
                     const workOrderId = param(p, 0);
                     const wo = await view.workOrders
                         .getById(workOrderId);
@@ -1083,17 +1085,14 @@ export const routes: Route[] = [
                         && prior.state === 'claimed'
                     ) {
                         await view.states.postEvent(
-                            generateCryptoSafeBase62(),
-                            workOrderId,
+                            b.expireEventId, workOrderId,
                             'claim_expired',
-                            prior.member_id,
+                            prior.member_id, b.expireAt,
                         );
                     }
                     await view.states.postEvent(
-                        generateCryptoSafeBase62(),
-                        workOrderId,
-                        'claimed',
-                        actor,
+                        b.claimEventId, workOrderId,
+                        'claimed', actor, b.claimAt,
                     );
                 },
             ),
@@ -1126,6 +1125,7 @@ export const routes: Route[] = [
                         workOrderId,
                         b.targetState,
                         actor,
+                        b.transitionAt,
                     );
                     for (const row of b.fieldValues) {
                         await view.stateFieldValues.put(
@@ -1140,6 +1140,7 @@ export const routes: Route[] = [
                             workOrderId,
                             b.release.state,
                             actor,
+                            b.release.at,
                         );
                     }
                 },

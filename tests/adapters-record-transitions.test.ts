@@ -36,6 +36,7 @@ async function seedSystemMember(
     await db.states.postEvent(
         'st-system', SYSTEM_MEMBER_ID, 'active',
         'system',
+        '2026-01-01T00:00:00.000000Z',
     );
 }
 

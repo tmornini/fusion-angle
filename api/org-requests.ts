@@ -1,7 +1,3 @@
-import { nowUtc } from './types.ts';
-import {
-    generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
 import {
     currentDefaultOrgFor,
 } from './authorization.ts';
@@ -20,6 +16,9 @@ import {
     parseObjectBody,
     callerOrgIds,
 } from './request-auth.ts';
+import {
+    validateTimestampField,
+} from './validators.ts';
 import {
     type IncomingContext,
     type AuthenticatedContext,
@@ -93,6 +92,30 @@ export async function identityDefaultOrgRequest(
                 { status: HTTP_BAD_REQUEST },
             );
         }
+        const eventId = body.eventId;
+        if (typeof eventId !== 'string') {
+            return Response.json(
+                { error: 'eventId is required' },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
+        if (eventId === '') {
+            return Response.json(
+                { error: 'eventId must be non-empty' },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
+        let at: string;
+        try {
+            at = validateTimestampField(body, 'at',
+                'identity_default_organizations');
+        } catch {
+            return Response.json(
+                { error: 'at is required and must be'
+                    + ' a valid RFC-3339 timestamp' },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
         const memberOrgs =
             await subjectOrgs(ctx.base, identityId);
         if (!memberOrgs.includes(org)) {
@@ -110,10 +133,10 @@ export async function identityDefaultOrgRequest(
             return new Response(null, { status: 204 });
         }
         await ctx.base.identityDefaultOrganizations.put(
-            generateCryptoSafeBase62(), {
+            eventId, {
                 identity_id: identityId,
                 organization_id: org,
-                at: nowUtc(),
+                at,
             });
         return new Response(null, { status: 204 });
     }

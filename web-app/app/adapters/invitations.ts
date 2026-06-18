@@ -1,4 +1,10 @@
 import type { Id, InvitationState } from '../../../api/types.ts';
+import {
+    nowUtc,
+} from '../../../api/types.ts';
+import {
+    generateCryptoSafeBase62,
+} from '../../../api/crypto-safe-base62.ts';
 import type { RequestContext } from './shared.ts';
 import { RequestError } from '../../../api/api.ts';
 import {
@@ -122,8 +128,13 @@ export async function postInvitationGrant(
     ctx: RequestContext,
     email: string,
 ): Promise<InvitationGrantOutcome> {
+    const invitationId = generateCryptoSafeBase62();
+    const grantEventId = generateCryptoSafeBase62();
+    const grantAt = nowUtc();
     try {
-        await ctx.POST('invitations', { email });
+        await ctx.POST('invitations', {
+            email, invitationId, grantEventId, grantAt,
+        });
     } catch (err) {
         if (err instanceof RequestError && err.status === 404) {
             return 'no-identity';
@@ -143,7 +154,12 @@ export async function postInvitationAcceptance(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    await ctx.POST('invitations/' + id + '/acceptance', {});
+    const membershipId = generateCryptoSafeBase62();
+    const acceptEventId = generateCryptoSafeBase62();
+    const acceptAt = nowUtc();
+    await ctx.POST('invitations/' + id + '/acceptance', {
+        membershipId, acceptEventId, acceptAt,
+    });
     invitationChanges.notify();
 }
 
@@ -151,7 +167,11 @@ export async function postInvitationDecline(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    await ctx.POST('invitations/' + id + '/decline', {});
+    const declineEventId = generateCryptoSafeBase62();
+    const declineAt = nowUtc();
+    await ctx.POST('invitations/' + id + '/decline', {
+        declineEventId, declineAt,
+    });
     invitationChanges.notify();
 }
 
@@ -161,6 +181,10 @@ export async function postInvitationRevocation(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    await ctx.POST('invitations/' + id + '/revocation', {});
+    const revokeEventId = generateCryptoSafeBase62();
+    const revokeAt = nowUtc();
+    await ctx.POST('invitations/' + id + '/revocation', {
+        revokeEventId, revokeAt,
+    });
     invitationChanges.notify();
 }

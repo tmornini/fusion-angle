@@ -362,6 +362,8 @@ test(
             ],
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            initialStateAt:
+                '2025-01-01T00:00:00.000000Z',
         });
         assert.equal(out.kind, 'create');
         assert.equal(out.id, 'rec-1');
@@ -371,6 +373,10 @@ test(
             );
             assert.equal(
                 out.initialStateEventId, 'ev-1',
+            );
+            assert.equal(
+                out.initialStateAt,
+                '2025-01-01T00:00:00.000000Z',
             );
         }
     },
@@ -408,6 +414,8 @@ test(
                 ],
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
+                initialStateAt:
+                    '2025-01-01T00:00:00.000000Z',
             }),
             /record_id must match top-level id/,
         );
@@ -430,6 +438,8 @@ test(
                 attributes: [],
                 initialState: 'in-progress',
                 initialStateEventId: 'ev-1',
+                initialStateAt:
+                    '2025-01-01T00:00:00.000000Z',
             }),
             /expected RecordState/,
         );

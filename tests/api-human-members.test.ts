@@ -68,6 +68,9 @@ test(
             detail: detail(),
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            // Far-future sentinel proves the caller's at is
+            // threaded, not server-stamped.
+            initialStateAt: '2099-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const member = await GET<{ type: string }>(
             db, 'members/w1', DEV_TOKEN);
@@ -85,10 +88,15 @@ test(
         const current = await GET<{
             state: string;
             member_id: string;
+            at: string;
         }>(db, 'entity-states/w1', DEV_TOKEN);
         assert.equal(current.state, 'active');
         // Authorship is the verified caller, never the body.
         assert.equal(current.member_id, 'current');
+        // The caller's at is threaded verbatim.
+        assert.equal(
+            current.at, '2099-01-01T00:00:00.000000Z',
+        );
     },
 );
 
@@ -114,6 +122,7 @@ test(
                 detail: detail(),
                 initialState: 'active',
                 initialStateEventId: 'ev-x',
+                initialStateAt: '2099-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
         );
         // Not one facet survived the aborted transaction.
@@ -137,6 +146,7 @@ test(
             detail: detail(),
             initialState: 'active',
             initialStateEventId: 'ev-1',
+            initialStateAt: '2099-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         await POST(db, 'human-members/w1', {
             pii: pii('Renamed'),
@@ -166,6 +176,7 @@ test(
                 detail: detail(),
                 initialState: 'active',
                 initialStateEventId: 'ev-1',
+                initialStateAt: '2099-01-01T00:00:00.000000Z',
             }));
         assert.equal(create.status, 204);
         const edit = await handleRequest(adminDb, req(
@@ -186,6 +197,7 @@ test(
                 detail: detail(),
                 initialState: 'active',
                 initialStateEventId: 'ev-2',
+                initialStateAt: '2099-01-01T00:00:00.000000Z',
             }));
         assert.equal(deniedCreate.status, 403);
         const deniedEdit = await handleRequest(

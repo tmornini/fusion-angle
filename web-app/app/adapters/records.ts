@@ -25,6 +25,9 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
+    nowUtc,
+} from '../../../api/types.ts';
+import {
     generateCryptoSafeBase62,
 } from '../../../api/crypto-safe-base62.ts';
 import { getFlowEntities } from './flows.ts';
@@ -240,6 +243,7 @@ export async function postRecordChange(
             attributes,
             initialState: change.initialState,
             initialStateEventId,
+            initialStateAt: nowUtc(),
         });
     } else {
         await ctx.POST('records', {

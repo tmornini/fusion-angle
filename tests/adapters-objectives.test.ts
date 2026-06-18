@@ -162,6 +162,7 @@ test('getArchivedObjectiveIds returns a Set', async () => {
     await db.objectives.put('o1', objective(0));
     await db.states.postEvent(
         'e1', 'o1', 'archived', 'system',
+        '2026-01-01T00:00:00.000000Z',
     );
     const ctx = ctxFor(db);
     const ids = await getArchivedObjectiveIds(ctx);

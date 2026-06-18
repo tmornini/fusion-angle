@@ -78,6 +78,7 @@ export async function postFlowCreation(
         },
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: nowUtc(),
     });
 
     flowChanges.notify();
@@ -130,6 +131,7 @@ export async function putFlow(
     await ctx.PUT(`flows/${id}`, {
         flow: buildFlowBody(save),
         eventId: generateCryptoSafeBase62(),
+        at: nowUtc(),
         history: { kind: 'none' },
     });
     flowChanges.notify();

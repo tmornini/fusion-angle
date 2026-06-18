@@ -3,14 +3,11 @@ import {
     EntityNotFoundError,
 } from './db.ts';
 import {
-    nowUtc,
     assertInvitationState,
+    ValidationError,
     type Id,
     type InvitationState,
 } from './types.ts';
-import {
-    generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
 import {
     currentRolesForInOrg,
 } from './authorization.ts';
@@ -32,6 +29,10 @@ import {
     type IncomingContext,
     type AuthenticatedContext,
 } from './request-context.ts';
+import {
+    pickString,
+    validateTimestampField,
+} from './validators.ts';
 
 // The active org of the caller: the verified token claim, else
 // the identity's resolved default. Null when the identity can
@@ -108,13 +109,13 @@ export async function invitationsRequest(
         const id = segments[1]!;
         const op = segments[2]!;
         if (op === 'acceptance') {
-            return acceptInvitation(authed, id);
+            return acceptInvitation(authed, id, request);
         }
         if (op === 'decline') {
-            return declineInvitation(authed, id);
+            return declineInvitation(authed, id, request);
         }
         if (op === 'revocation') {
-            return revokeInvitation(authed, id);
+            return revokeInvitation(authed, id, request);
         }
     }
     return errorJson(
@@ -261,6 +262,33 @@ async function grantInvitation(
         return errorJson(
             'an "email" is required', HTTP_BAD_REQUEST);
     }
+    let invitationId: string;
+    let grantEventId: string;
+    let grantAt: string;
+    try {
+        invitationId = pickString(body, 'invitationId');
+        grantEventId = pickString(body, 'grantEventId');
+        grantAt = validateTimestampField(
+            body, 'grantAt', 'grant',
+        );
+    } catch (e) {
+        if (e instanceof ValidationError) {
+            return errorJson(e.message, HTTP_BAD_REQUEST);
+        }
+        throw e;
+    }
+    if (invitationId === '') {
+        return errorJson(
+            'invitationId must be non-empty',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    if (grantEventId === '') {
+        return errorJson(
+            'grantEventId must be non-empty',
+            HTTP_BAD_REQUEST,
+        );
+    }
     // DEMO-TIER POSTURE: a missing email 404s and an already-member
     // 409s, so an org admin can tell whether an email maps to an
     // existing identity (even one in another org). This is a conscious
@@ -275,9 +303,6 @@ async function grantInvitation(
             'no identity with that email', HTTP_NOT_FOUND);
     }
     const identityId = match.id;
-    const id = generateCryptoSafeBase62();
-    const eventId = generateCryptoSafeBase62();
-    const at = nowUtc();
     // The member/pending checks and the write run in ONE transaction so
     // two concurrent grants cannot both pass the check and each append a
     // pending invitation (Commandment VII). The tx RETURNS its outcome
@@ -297,13 +322,14 @@ async function grantInvitation(
                     id: existing.id, at: existing.at,
                 };
             }
-            await view.invitations.put(id, {
+            await view.invitations.put(invitationId, {
                 organization_id: org,
                 identity_id: identityId,
-                at,
+                at: grantAt,
             });
             await view.states.postEvent(
-                eventId, id, 'pending', ctx.principal.id);
+                grantEventId, invitationId,
+                'pending', ctx.principal.id, grantAt);
             return { kind: 'created' };
         },
     );
@@ -320,8 +346,9 @@ async function grantInvitation(
         });
     }
     return Response.json({
-        id, organization_id: org, identity_id: identityId,
-        at, state: 'pending',
+        id: invitationId, organization_id: org,
+        identity_id: identityId,
+        at: grantAt, state: 'pending',
     });
 }
 
@@ -364,6 +391,7 @@ async function pendingInvitationFor(
 async function acceptInvitation(
     ctx: AuthenticatedContext,
     id: Id,
+    request: Request,
 ): Promise<Response> {
     const inv = await loadInvitation(ctx.base, id);
     if (inv === null) {
@@ -375,9 +403,38 @@ async function acceptInvitation(
             'forbidden: only the invitee may accept',
             HTTP_FORBIDDEN);
     }
-    const membershipId = generateCryptoSafeBase62();
-    const eventId = generateCryptoSafeBase62();
-    const at = nowUtc();
+    const parse = await parseObjectBody(request);
+    if (!parse.ok) {
+        return errorJson('Invalid JSON body', HTTP_BAD_REQUEST);
+    }
+    const body = parse.body;
+    let membershipId: string;
+    let eventId: string;
+    let at: string;
+    try {
+        membershipId = pickString(body, 'membershipId');
+        eventId = pickString(body, 'acceptEventId');
+        at = validateTimestampField(
+            body, 'acceptAt', 'accept',
+        );
+    } catch (e) {
+        if (e instanceof ValidationError) {
+            return errorJson(e.message, HTTP_BAD_REQUEST);
+        }
+        throw e;
+    }
+    if (membershipId === '') {
+        return errorJson(
+            'membershipId must be non-empty',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    if (eventId === '') {
+        return errorJson(
+            'acceptEventId must be non-empty',
+            HTTP_BAD_REQUEST,
+        );
+    }
     // The pending check rides INSIDE the write transaction so a
     // concurrent revoke/decline cannot slip between the check and the
     // membership write — a revoke must actually stop access (Commandment
@@ -402,7 +459,7 @@ async function acceptInvitation(
                 });
             }
             await view.states.postEvent(
-                eventId, id, 'accepted', ctx.principal.id);
+                eventId, id, 'accepted', ctx.principal.id, at);
         },
     );
     if (conflict) {
@@ -417,6 +474,7 @@ async function acceptInvitation(
 async function declineInvitation(
     ctx: AuthenticatedContext,
     id: Id,
+    request: Request,
 ): Promise<Response> {
     const inv = await loadInvitation(ctx.base, id);
     if (inv === null) {
@@ -428,14 +486,37 @@ async function declineInvitation(
             'forbidden: only the invitee may decline',
             HTTP_FORBIDDEN);
     }
-    const eventId = generateCryptoSafeBase62();
+    const parse = await parseObjectBody(request);
+    if (!parse.ok) {
+        return errorJson('Invalid JSON body', HTTP_BAD_REQUEST);
+    }
+    const body = parse.body;
+    let eventId: string;
+    let at: string;
+    try {
+        eventId = pickString(body, 'declineEventId');
+        at = validateTimestampField(
+            body, 'declineAt', 'decline',
+        );
+    } catch (e) {
+        if (e instanceof ValidationError) {
+            return errorJson(e.message, HTTP_BAD_REQUEST);
+        }
+        throw e;
+    }
+    if (eventId === '') {
+        return errorJson(
+            'declineEventId must be non-empty',
+            HTTP_BAD_REQUEST,
+        );
+    }
     let conflict = false;
     await ctx.base.transaction(['states'], async (view) => {
         const state = await currentInvitationState(view, id);
         if (state === 'declined') return;   // idempotent no-op
         if (state !== 'pending') { conflict = true; return; }
         await view.states.postEvent(
-            eventId, id, 'declined', ctx.principal.id);
+            eventId, id, 'declined', ctx.principal.id, at);
     });
     if (conflict) {
         return errorJson(
@@ -451,6 +532,7 @@ async function declineInvitation(
 async function revokeInvitation(
     ctx: AuthenticatedContext,
     id: Id,
+    request: Request,
 ): Promise<Response> {
     const inv = await loadInvitation(ctx.base, id);
     if (inv === null) {
@@ -463,14 +545,37 @@ async function revokeInvitation(
             'forbidden: revoking an invitation requires an'
             + ' admin role', HTTP_FORBIDDEN);
     }
-    const eventId = generateCryptoSafeBase62();
+    const parse = await parseObjectBody(request);
+    if (!parse.ok) {
+        return errorJson('Invalid JSON body', HTTP_BAD_REQUEST);
+    }
+    const body = parse.body;
+    let eventId: string;
+    let at: string;
+    try {
+        eventId = pickString(body, 'revokeEventId');
+        at = validateTimestampField(
+            body, 'revokeAt', 'revoke',
+        );
+    } catch (e) {
+        if (e instanceof ValidationError) {
+            return errorJson(e.message, HTTP_BAD_REQUEST);
+        }
+        throw e;
+    }
+    if (eventId === '') {
+        return errorJson(
+            'revokeEventId must be non-empty',
+            HTTP_BAD_REQUEST,
+        );
+    }
     let conflict = false;
     await ctx.base.transaction(['states'], async (view) => {
         const state = await currentInvitationState(view, id);
         if (state === 'revoked') return;   // idempotent no-op
         if (state !== 'pending') { conflict = true; return; }
         await view.states.postEvent(
-            eventId, id, 'revoked', ctx.principal.id);
+            eventId, id, 'revoked', ctx.principal.id, at);
     });
     if (conflict) {
         return errorJson(

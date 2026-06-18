@@ -287,9 +287,10 @@ export class ParentScopedStateStore implements StateStore {
         entityId: Id,
         state: string,
         memberId: Id,
+        at: string,
     ): Promise<void> {
         return this.#inner.postEvent(
-            id, entityId, state, memberId,
+            id, entityId, state, memberId, at,
         );
     }
 

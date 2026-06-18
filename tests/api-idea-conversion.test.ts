@@ -69,6 +69,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     });
     await db.states.postEvent(
         'st-idea-1', 'idea-1', 'approved', 'system',
+        '2026-01-01T00:00:00.000000Z',
     );
     // The objectives the baselines reference.
     await db.objectives.put('obj-1', {
@@ -86,6 +87,8 @@ test(
     + ' operation',
     async () => {
         const db = await seededDb();
+        // Two distinct timestamps — idea strictly before project —
+        // to verify each at routes to its own event and not the other.
         await POST(db, 'ideas/idea-1/conversion', {
             projectId: 'p1',
             project: projectFields('Promoted Project'),
@@ -94,6 +97,10 @@ test(
             ideaState: 'promoted',
             projectStateEventId: 'ev-project-init',
             projectState: 'submitted',
+            // Distinct values confirm ideaStateAt→idea event and
+            // projectStateAt→project event without crossing.
+            ideaStateAt: '2099-06-01T00:00:00.000000Z',
+            projectStateAt: '2099-06-01T00:00:01.000000Z',
             baselines: [
                 {
                     id: 'bl-1',
@@ -118,9 +125,14 @@ test(
         const ideaCurrent = await GET<{
             state: string;
             member_id: string;
+            at: string;
         }>(db, 'entity-states/idea-1', DEV_TOKEN);
         assert.equal(ideaCurrent.state, 'promoted');
         assert.equal(ideaCurrent.member_id, 'current');
+        // The idea event carries the caller-supplied ideaStateAt.
+        assert.equal(
+            ideaCurrent.at, '2099-06-01T00:00:00.000000Z',
+        );
 
         // The new project entered at its initial state, also
         // authored by the actor.
@@ -128,6 +140,11 @@ test(
         assert.equal(projectEvents.length, 1);
         assert.equal(projectEvents[0]!.state, 'submitted');
         assert.equal(projectEvents[0]!.member_id, 'current');
+        // The project event carries the caller-supplied projectStateAt.
+        assert.equal(
+            projectEvents[0]!.at,
+            '2099-06-01T00:00:01.000000Z',
+        );
 
         const mine = await GET<
             ProjectObjectiveBaselineScore[]
@@ -170,6 +187,8 @@ test(
                 ideaState: 'promoted',
                 projectStateEventId: 'ev-project-init',
                 projectState: 'submitted',
+                ideaStateAt: '2099-06-02T00:00:00.000000Z',
+                projectStateAt: '2099-06-02T00:00:01.000000Z',
                 baselines: [
                     {
                         id: 'bl-1',

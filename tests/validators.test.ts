@@ -1070,20 +1070,25 @@ const validVersionSnapshot = {
     trimIds: [],
 };
 
+const VALID_AT = '2026-01-01T00:00:00.000000Z';
+
 test('validateFlowPutBody accepts a plain (none) write', () => {
     const result = validateFlowPutBody({
         flow: { name: 'F' },
         eventId: 'ev1',
+        at: VALID_AT,
         history: { kind: 'none' },
     });
     assert.equal(result.history.kind, 'none');
     assert.equal(result.eventId, 'ev1');
+    assert.equal(result.at, VALID_AT);
 });
 
 test('validateFlowPutBody accepts a snapshot write', () => {
     const result = validateFlowPutBody({
         flow: { name: 'F' },
         eventId: 'ev1',
+        at: VALID_AT,
         history: {
             kind: 'snapshot',
             version: validVersionSnapshot,
@@ -1108,6 +1113,7 @@ test('validateFlowPutBody rejects an unknown history kind', () => {
     assert.throws(
         () => validateFlowPutBody({
             flow: {}, eventId: 'ev1',
+            at: VALID_AT,
             history: { kind: 'consume', versionId: 'v1' },
         }),
         /history\.kind/,
@@ -1117,8 +1123,18 @@ test('validateFlowPutBody rejects an unknown history kind', () => {
 test('validateFlowPutBody rejects an empty eventId', () => {
     assert.throws(
         () => validateFlowPutBody({
-            flow: {}, eventId: '', history: { kind: 'none' },
+            flow: {}, eventId: '', at: VALID_AT,
+            history: { kind: 'none' },
         }),
         /eventId/,
+    );
+});
+
+test('validateFlowPutBody rejects a missing at', () => {
+    assert.throws(
+        () => validateFlowPutBody({
+            flow: {}, eventId: 'ev1', history: { kind: 'none' },
+        }),
+        /at/,
     );
 });
