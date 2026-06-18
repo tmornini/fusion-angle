@@ -1,17 +1,27 @@
 import { HttpMessageError } from './types.ts';
+import { Octets } from './octets.ts';
 
-// RFC 8941 Structured Field Values — the general grammar for
-// Item / List / Dictionary plus parameters. One parser drives
-// every registered field; it knows nothing about WHICH field is
-// which (that is the registry's job). Inner lists and byte
-// sequences are deferred until a caller needs them.
+// RFC 9651 Structured Field Values (obsoletes RFC 8941) — the
+// general grammar for Item / List / Dictionary plus parameters,
+// including inner lists, byte sequences, Dates, and Display
+// Strings. One parser drives every registered field; it knows
+// nothing about WHICH field is which (that is the registry's
+// job).
 
-export type BareValue = number | string | boolean;
+export type BareValue =
+    number | string | boolean | Octets | Date;
 
 export interface SfItem {
-    readonly value: BareValue;
+    readonly value: BareValue | SfInnerList;
     readonly params: ReadonlyMap<string, BareValue>;
 }
+
+export interface SfInnerList {
+    readonly items: readonly SfItem[];
+    readonly params: ReadonlyMap<string, BareValue>;
+}
+
+const NO_PARAMS: ReadonlyMap<string, BareValue> = new Map();
 
 export type SfList = readonly SfItem[];
 export type SfDictionary = ReadonlyMap<string, SfItem>;
@@ -71,8 +81,7 @@ export function parseList(text: string): SfList {
     cursor.skipOws();
     if (cursor.atEnd()) return members;
     for (;;) {
-        rejectInnerList(cursor);
-        members.push(readItem(cursor));
+        members.push(readMember(cursor));
         cursor.skipOws();
         if (cursor.atEnd()) break;
         cursor.expect(',');
@@ -91,14 +100,14 @@ export function parseDictionary(text: string): SfDictionary {
     if (cursor.atEnd()) return dict;
     for (;;) {
         const key = readKey(cursor);
-        let value: BareValue = true;
+        let member: SfItem;
         if (cursor.peek() === '=') {
             cursor.next();
-            rejectInnerList(cursor);
-            value = readBareItem(cursor);
+            member = readMember(cursor);
+        } else {
+            member = { value: true, params: readParameters(cursor) };
         }
-        const params = readParameters(cursor);
-        dict.set(key, { value, params });
+        dict.set(key, member);
         cursor.skipOws();
         if (cursor.atEnd()) break;
         cursor.expect(',');
@@ -116,6 +125,37 @@ function readItem(cursor: Cursor): SfItem {
     return { value, params };
 }
 
+function readInnerList(cursor: Cursor): SfInnerList {
+    cursor.expect('(');
+    const items: SfItem[] = [];
+    for (;;) {
+        cursor.skipOws();
+        if (cursor.peek() === ')') {
+            cursor.next();
+            break;
+        }
+        items.push(readItem(cursor));
+        const next = cursor.peek();
+        if (next !== ' ' && next !== '\t' && next !== ')') {
+            throw new HttpMessageError(
+                'expected SP or ) in inner list',
+            );
+        }
+    }
+    const params = readParameters(cursor);
+    return { items, params };
+}
+
+function readMember(cursor: Cursor): SfItem {
+    if (cursor.peek() === '(') {
+        return {
+            value: readInnerList(cursor),
+            params: NO_PARAMS,
+        };
+    }
+    return readItem(cursor);
+}
+
 function readBareItem(cursor: Cursor): BareValue {
     const ch = cursor.peek();
     if (ch === undefined) {
@@ -124,6 +164,9 @@ function readBareItem(cursor: Cursor): BareValue {
     if (ch === '-' || isDigit(ch)) return readNumber(cursor);
     if (ch === '"') return readString(cursor);
     if (ch === '?') return readBoolean(cursor);
+    if (ch === ':') return readByteSequence(cursor);
+    if (ch === '@') return readDate(cursor);
+    if (ch === '%') return readDisplayString(cursor);
     if (ch === '*' || isAlpha(ch)) return readToken(cursor);
     throw new HttpMessageError('unexpected bare item: ' + ch);
 }
@@ -172,6 +215,60 @@ function readBoolean(cursor: Cursor): boolean {
     throw new HttpMessageError('invalid boolean: ?' + ch);
 }
 
+function readByteSequence(cursor: Cursor): Octets {
+    cursor.expect(':');
+    let b64 = '';
+    while (cursor.peek() !== ':') {
+        b64 += cursor.next();
+    }
+    cursor.next();
+    return Octets.fromBase64(b64);
+}
+
+function readDate(cursor: Cursor): Date {
+    cursor.expect('@');
+    let text = '';
+    if (cursor.peek() === '-') text += cursor.next();
+    if (!isDigit(cursor.peek())) {
+        throw new HttpMessageError('expected a date integer');
+    }
+    while (isDigit(cursor.peek())) text += cursor.next();
+    if (text.replace('-', '').length > 15) {
+        throw new HttpMessageError('sf-date exceeds 15 digits');
+    }
+    return new Date(Number(text) * 1000);
+}
+
+function readDisplayString(cursor: Cursor): string {
+    cursor.expect('%');
+    cursor.expect('"');
+    const bytes: number[] = [];
+    for (;;) {
+        const ch = cursor.next();
+        if (ch === '"') {
+            return new TextDecoder().decode(
+                Uint8Array.from(bytes),
+            );
+        }
+        if (ch === '%') {
+            const hi = cursor.next();
+            const lo = cursor.next();
+            if (!isLowerHex(hi) || !isLowerHex(lo)) {
+                throw new HttpMessageError(
+                    'invalid display-string escape',
+                );
+            }
+            bytes.push(Number.parseInt(hi + lo, 16));
+        } else {
+            bytes.push(ch.charCodeAt(0));
+        }
+    }
+}
+
+function isLowerHex(ch: string): boolean {
+    return isDigit(ch) || (ch >= 'a' && ch <= 'f');
+}
+
 function readToken(cursor: Cursor): string {
     let text = cursor.next();
     while (isTokenChar(cursor.peek())) text += cursor.next();
@@ -204,12 +301,6 @@ function readKey(cursor: Cursor): string {
     let text = cursor.next();
     while (isKeyChar(cursor.peek())) text += cursor.next();
     return text;
-}
-
-function rejectInnerList(cursor: Cursor): void {
-    if (cursor.peek() === '(') {
-        throw new HttpMessageError('inner lists are not supported');
-    }
 }
 
 const TOKEN_CHARS = "!#$%&'*+-.^_`|~:/";

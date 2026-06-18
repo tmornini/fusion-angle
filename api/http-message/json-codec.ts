@@ -83,7 +83,10 @@ function jsonCodecFor(
         (field) => field.name === 'content-type',
     );
     if (type === undefined) return undefined;
-    return registry.codecFor(type.value);
+    const codec = registry.codecFor(type.value);
+    return codec !== undefined && codec.kind === 'json'
+        ? codec
+        : undefined;
 }
 
 function parseJsonText(json: string): unknown {

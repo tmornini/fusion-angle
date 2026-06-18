@@ -1,4 +1,4 @@
-// RFC 8941 is not self-describing: a parser must be told whether
+// RFC 9651 is not self-describing: a parser must be told whether
 // a field is an Item, a List, or a Dictionary. This allowlist
 // supplies that type for the well-known fields; every other
 // field is 'raw' and is never structurally parsed (mis-parsing

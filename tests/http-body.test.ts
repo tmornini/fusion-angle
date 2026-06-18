@@ -2,6 +2,12 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { HttpMessage } from '../api/http-message/http-message.ts';
 import { HttpMessageError } from '../api/http-message/types.ts';
+import {
+    BodyRegistry,
+    formBodyCodec,
+    textBodyCodec,
+} from '../api/http-message/media-registry.ts';
+import { Octets } from '../api/http-message/octets.ts';
 
 const jsonResponse = HttpMessage.fromWire(
     'HTTP/1.1 200 OK\r\n' +
@@ -34,7 +40,7 @@ test('a missing body member is absent', () => {
 test('a body query is absent without a codec', () => {
     const text = HttpMessage.fromWire(
         'HTTP/1.1 200 OK\r\n' +
-        'content-type: text/plain\r\n' +
+        'content-type: application/xml\r\n' +
         '\r\n' +
         'hello',
     );
@@ -68,7 +74,7 @@ test('withBody throws for an unregistered media type', () => {
     assert.throws(
         () => HttpMessage
             .fromWire('POST / HTTP/1.1\r\n\r\n')
-            .withBody('text/plain', 'hi'),
+            .withBody('application/xml', 'hi'),
         HttpMessageError,
     );
 });
@@ -81,4 +87,80 @@ test('a malformed JSON body is absent on query', () => {
         'not json',
     );
     assert.equal(message.query('body.x').exists(), false);
+});
+
+const thingCodec = {
+    kind: 'other' as const,
+    handles: (t: string) => t === 'application/x-thing',
+    decode: (b: Octets): unknown => b.toLatin1(),
+    encode: (v: unknown): Octets =>
+        Octets.fromLatin1(String(v)),
+};
+
+test('a non-JSON codec body is not inlined as JSON', () => {
+    const registry = new BodyRegistry([thingCodec]);
+    const message = HttpMessage.fromWire(
+        'HTTP/1.1 200 OK\r\n' +
+        'content-type: application/x-thing\r\n\r\n{"a":1}',
+        registry,
+    );
+    const body = JSON.parse(message.toJson()).body;
+    assert.equal(typeof body, 'string');
+});
+
+test('form codec decodes urlencoded to an object', () => {
+    assert.deepEqual(
+        formBodyCodec.decode(Octets.fromLatin1('a=1&b=two')),
+        { a: '1', b: 'two' },
+    );
+});
+
+test('form codec keeps the last value on duplicate keys', () => {
+    assert.deepEqual(
+        formBodyCodec.decode(Octets.fromLatin1('a=1&a=2')),
+        { a: '2' },
+    );
+});
+
+test('form codec encodes an object to urlencoded', () => {
+    const octets = formBodyCodec.encode({ a: '1', b: 'two' });
+    assert.equal(octets.toLatin1(), 'a=1&b=two');
+});
+
+test('form codec rejects a non-string field', () => {
+    assert.throws(
+        () => formBodyCodec.encode({ a: 1 }),
+        HttpMessageError,
+    );
+});
+
+test('text codec round-trips UTF-8', () => {
+    const octets = textBodyCodec.encode('café');
+    assert.equal(textBodyCodec.decode(octets), 'café');
+});
+
+test('withBody round-trips a text/plain body', () => {
+    const message = HttpMessage
+        .fromWire('POST /x HTTP/1.1\r\n\r\n')
+        .withBody('text/plain', 'hello');
+    assert.equal(message.body().decoded().toText(), 'hello');
+});
+
+test('withBody round-trips a form body by field', () => {
+    const message = HttpMessage
+        .fromWire('POST /x HTTP/1.1\r\n\r\n')
+        .withBody(
+            'application/x-www-form-urlencoded',
+            { a: '1', b: 'two' },
+        );
+    assert.equal(message.query('body.a').toText(), '1');
+    assert.equal(message.query('body.b').toText(), 'two');
+});
+
+test('a text/plain body is base64 in the JSON form', () => {
+    const message = HttpMessage
+        .fromWire('POST /x HTTP/1.1\r\n\r\n')
+        .withBody('text/plain', 'hi');
+    const body = JSON.parse(message.toJson()).body;
+    assert.equal(typeof body, 'string');
 });

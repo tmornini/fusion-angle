@@ -1,5 +1,6 @@
 import { parseHttpDate } from './http-date.ts';
 import { HttpMessageError } from './types.ts';
+import { Octets } from './octets.ts';
 
 // The leaf produced by every query. It carries a TYPED value so
 // conversions are honest contracts: toNumber on a boolean
@@ -8,7 +9,7 @@ import { HttpMessageError } from './types.ts';
 // — Design by Contract). Traversal of structured fields and
 // bodies happens in the dotted key, not here, so this surface
 // stays a small set of leaf conversions.
-type Leaf = string | number | boolean;
+type Leaf = string | number | boolean | Octets | Date;
 
 export class FieldValue {
     readonly #value: Leaf | undefined;
@@ -30,11 +31,29 @@ export class FieldValue {
     }
 
     toText(): string {
-        return String(this.#require());
+        const value = this.#require();
+        if (value instanceof Octets || value instanceof Date) {
+            throw new HttpMessageError(
+                'value is not text',
+            );
+        }
+        return String(value);
     }
 
     toString(): string {
         return this.toText();
+    }
+
+    toBytes(): Uint8Array {
+        const value = this.#require();
+        if (value instanceof Octets) return value.asBytes();
+        throw new HttpMessageError('value is not bytes');
+    }
+
+    toBase64(): string {
+        const value = this.#require();
+        if (value instanceof Octets) return value.toBase64();
+        throw new HttpMessageError('value is not bytes');
     }
 
     toNumber(): number {
@@ -59,9 +78,8 @@ export class FieldValue {
 
     toDate(): Date {
         const value = this.#require();
-        if (typeof value === 'string') {
-            return parseHttpDate(value);
-        }
+        if (value instanceof Date) return value;
+        if (typeof value === 'string') return parseHttpDate(value);
         throw new HttpMessageError(
             'value is not a date: ' + String(value),
         );

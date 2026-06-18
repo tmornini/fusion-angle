@@ -6,6 +6,7 @@ import {
     type MessageModel,
 } from './types.ts';
 import type { BodyRegistry } from './media-registry.ts';
+import type { ContentCodingRegistry } from './content-coding.ts';
 
 const CONTENT_TYPE = 'content-type';
 const CONTENT_ENCODING = 'content-encoding';
@@ -21,22 +22,28 @@ export class Body {
     readonly #octets: Octets | undefined;
     readonly #fields: readonly FieldLine[];
     readonly #registry: BodyRegistry;
+    readonly #codingRegistry: ContentCodingRegistry;
 
     private constructor(
         octets: Octets | undefined,
         fields: readonly FieldLine[],
         registry: BodyRegistry,
+        codingRegistry: ContentCodingRegistry,
     ) {
         this.#octets = octets;
         this.#fields = fields;
         this.#registry = registry;
+        this.#codingRegistry = codingRegistry;
     }
 
     static fromModel(
         model: MessageModel,
         registry: BodyRegistry,
+        codingRegistry: ContentCodingRegistry,
     ): Body {
-        return new Body(model.body, model.fields, registry);
+        return new Body(
+            model.body, model.fields, registry, codingRegistry,
+        );
     }
 
     exists(): boolean {
@@ -62,6 +69,7 @@ export class Body {
             Octets.fromBase64(this.toText()),
             this.#fields,
             this.#registry,
+            this.#codingRegistry,
         );
     }
 
@@ -84,9 +92,12 @@ export class Body {
     // Encoding — so a still-encoded (gzip, …) body fails loudly
     // rather than feeding compressed octets to the codec.
     decoded(): Decoded {
-        const source = this.contentDecoded();
-        const octets = source.#require();
-        const type = source.#fields.find(
+        return this.contentDecoded().#decodeByType();
+    }
+
+    #decodeByType(): Decoded {
+        const octets = this.#require();
+        const type = this.#fields.find(
             (field) => field.name === CONTENT_TYPE,
         );
         if (type === undefined) {
@@ -94,13 +105,48 @@ export class Body {
                 'body has no content-type to decode',
             );
         }
-        const codec = source.#registry.codecFor(type.value);
+        const codec = this.#registry.codecFor(type.value);
         if (codec === undefined) {
             throw new HttpMessageError(
                 'no body codec for ' + type.value,
             );
         }
         return Decoded.of(codec.decode(octets));
+    }
+
+    // Async sibling of contentDecoded: strip gzip/deflate via the
+    // coding registry, returning a Body with the content-encoding
+    // field removed (it is identity-coded now). An unknown coding
+    // throws — the seam refuses to pass still-encoded octets on,
+    // exactly as the sync path does.
+    async contentDecodedAsync(): Promise<Body> {
+        this.#require();
+        const codings = this.#contentEncodings();
+        if (codings.every((coding) => coding === IDENTITY)) {
+            return this;
+        }
+        let octets = this.#require();
+        for (const coding of [...codings].reverse()) {
+            if (coding === IDENTITY) continue;
+            const codec = this.#codingRegistry.codecFor(coding);
+            if (codec === undefined) {
+                throw new HttpMessageError(
+                    'unsupported content-encoding: ' + coding,
+                );
+            }
+            octets = await codec.decode(octets);
+        }
+        const fields = this.#fields.filter(
+            (line) => line.name !== CONTENT_ENCODING,
+        );
+        return new Body(
+            octets, fields, this.#registry, this.#codingRegistry,
+        );
+    }
+
+    async decodedAsync(): Promise<Decoded> {
+        const source = await this.contentDecodedAsync();
+        return source.#decodeByType();
     }
 
     toNumber(): number {

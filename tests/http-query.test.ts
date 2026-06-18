@@ -245,3 +245,29 @@ test('a list with a trailing comma falls back to raw', () => {
         'gzip,',
     );
 });
+
+test('indexes into an inner-list member', () => {
+    const message = HttpMessage.fromWire(
+        'HTTP/1.1 200 OK\r\n' +
+        'accept-encoding: (gzip deflate), br\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.accept-encoding.0.1').toText(),
+        'deflate',
+    );
+    assert.equal(
+        message.query('header.accept-encoding.1').toText(),
+        'br',
+    );
+});
+
+test('an inner-list member has no scalar leaf', () => {
+    const message = HttpMessage.fromWire(
+        'HTTP/1.1 200 OK\r\n' +
+        'accept-encoding: (gzip deflate), br\r\n\r\n',
+    );
+    assert.equal(
+        message.query('header.accept-encoding.0').exists(),
+        false,
+    );
+});

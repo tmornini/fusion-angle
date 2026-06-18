@@ -81,8 +81,12 @@ test('conversions on an absent body throw', () => {
 });
 
 test('decoded() throws when no codec handles the type', () => {
+    const noCodec = HttpMessage.fromWire(
+        'HTTP/1.1 200 OK\r\n' +
+        'content-type: application/xml\r\n\r\nhello',
+    );
     assert.throws(
-        () => textBody.body().decoded(),
+        () => noCodec.body().decoded(),
         HttpMessageError,
     );
 });

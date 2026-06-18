@@ -7,6 +7,8 @@ import {
     parseDictionary,
     parseItem,
     parseList,
+    type BareValue,
+    type SfInnerList,
     type SfItem,
 } from './structured-fields.ts';
 import type {
@@ -172,7 +174,7 @@ function navigateItem(
     } catch {
         return FieldValue.present(text);
     }
-    if (rest.length === 0) return FieldValue.present(item.value);
+    if (rest.length === 0) return leaf(item.value);
     return parameter(item, rest);
 }
 
@@ -197,7 +199,10 @@ function navigateList(
         return FieldValue.absent();
     }
     const member = members[index]!;
-    if (rest.length === 1) return FieldValue.present(member.value);
+    if (rest.length === 1) return leaf(member.value);
+    if (isInnerList(member.value)) {
+        return navigateInnerList(member.value, rest.slice(1));
+    }
     return parameter(member, rest.slice(1));
 }
 
@@ -214,8 +219,40 @@ function navigateDictionary(
     if (rest.length === 0) return FieldValue.present(text);
     const member = dict.get(rest[0]!);
     if (member === undefined) return FieldValue.absent();
-    if (rest.length === 1) return FieldValue.present(member.value);
+    if (rest.length === 1) return leaf(member.value);
     return parameter(member, rest.slice(1));
+}
+
+function isInnerList(
+    value: BareValue | SfInnerList,
+): value is SfInnerList {
+    return typeof value === 'object'
+        && value !== null
+        && 'items' in value;
+}
+
+// An inner list has no scalar leaf; a bare value presents.
+function leaf(value: BareValue | SfInnerList): FieldValue {
+    return isInnerList(value)
+        ? FieldValue.absent()
+        : FieldValue.present(value);
+}
+
+function navigateInnerList(
+    inner: SfInnerList,
+    rest: readonly string[],
+): FieldValue {
+    const index = Number(rest[0]);
+    if (
+        !Number.isInteger(index)
+        || index < 0
+        || index >= inner.items.length
+    ) {
+        return FieldValue.absent();
+    }
+    const item = inner.items[index]!;
+    if (rest.length === 1) return leaf(item.value);
+    return parameter(item, rest.slice(1));
 }
 
 // After a value is selected, a single remaining segment names a

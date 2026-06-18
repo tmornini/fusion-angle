@@ -15,6 +15,10 @@ import {
     BodyRegistry,
     defaultBodyRegistry,
 } from './media-registry.ts';
+import {
+    ContentCodingRegistry,
+    defaultContentCodingRegistry,
+} from './content-coding.ts';
 import { HttpMessageError } from './types.ts';
 import type { FieldValue } from './field-value.ts';
 import type { MessageModel } from './types.ts';
@@ -29,37 +33,52 @@ import type { MessageModel } from './types.ts';
 export class HttpMessage {
     readonly #model: MessageModel;
     readonly #bodyRegistry: BodyRegistry;
+    readonly #codingRegistry: ContentCodingRegistry;
     #wire: string | undefined;
     #json: string | undefined;
 
     private constructor(
         model: MessageModel,
         bodyRegistry: BodyRegistry,
+        codingRegistry: ContentCodingRegistry,
     ) {
         this.#model = model;
         this.#bodyRegistry = bodyRegistry;
+        this.#codingRegistry = codingRegistry;
     }
 
     static fromModel(
         model: MessageModel,
         bodyRegistry: BodyRegistry = defaultBodyRegistry(),
+        codingRegistry: ContentCodingRegistry =
+            defaultContentCodingRegistry(),
     ): HttpMessage {
-        return new HttpMessage(model, bodyRegistry);
+        return new HttpMessage(
+            model, bodyRegistry, codingRegistry,
+        );
     }
 
     static fromWire(
         wire: string,
         bodyRegistry: BodyRegistry = defaultBodyRegistry(),
+        codingRegistry: ContentCodingRegistry =
+            defaultContentCodingRegistry(),
     ): HttpMessage {
-        return new HttpMessage(parseWire(wire), bodyRegistry);
+        return new HttpMessage(
+            parseWire(wire), bodyRegistry, codingRegistry,
+        );
     }
 
     static fromJson(
         json: string,
         bodyRegistry: BodyRegistry = defaultBodyRegistry(),
+        codingRegistry: ContentCodingRegistry =
+            defaultContentCodingRegistry(),
     ): HttpMessage {
         return new HttpMessage(
-            parseJson(json, bodyRegistry), bodyRegistry,
+            parseJson(json, bodyRegistry),
+            bodyRegistry,
+            codingRegistry,
         );
     }
 
@@ -84,7 +103,9 @@ export class HttpMessage {
     }
 
     body(): Body {
-        return Body.fromModel(this.#model, this.#bodyRegistry);
+        return Body.fromModel(
+            this.#model, this.#bodyRegistry, this.#codingRegistry,
+        );
     }
 
     // Modification returns a NEW message; this one is unchanged.
@@ -132,6 +153,8 @@ export class HttpMessage {
     }
 
     #derive(model: MessageModel): HttpMessage {
-        return new HttpMessage(model, this.#bodyRegistry);
+        return new HttpMessage(
+            model, this.#bodyRegistry, this.#codingRegistry,
+        );
     }
 }
