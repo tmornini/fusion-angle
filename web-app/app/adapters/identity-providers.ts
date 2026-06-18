@@ -9,7 +9,7 @@ import {
 } from './shared.ts';
 import {
     latestByKey,
-} from '../../../api/ledger-reduction.ts';
+} from '../../../shared/ledger-reduction.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';

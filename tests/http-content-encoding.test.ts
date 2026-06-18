@@ -1,20 +1,20 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { Octets } from '../api/http-message/octets.ts';
+import { Octets } from '../shared/http-message/octets.ts';
 import {
     ContentCodingRegistry,
     defaultContentCodingRegistry,
     gzipContentCodec,
     deflateContentCodec,
     type ContentCodec,
-} from '../api/http-message/content-coding.ts';
-import { Body } from '../api/http-message/body.ts';
+} from '../shared/http-message/content-coding.ts';
+import { Body } from '../shared/http-message/body.ts';
 import {
     defaultBodyRegistry,
-} from '../api/http-message/media-registry.ts';
+} from '../shared/http-message/media-registry.ts';
 import {
     HttpMessageError,
-} from '../api/http-message/types.ts';
+} from '../shared/http-message/types.ts';
 
 async function deflate(
     coding: 'gzip' | 'deflate', text: string,

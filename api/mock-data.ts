@@ -20,8 +20,8 @@ import {
 } from './types.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
-import { hashPassword } from './password-hash.ts';
+} from '../shared/crypto-safe-base62.ts';
+import { hashPassword } from '../shared/password-hash.ts';
 import {
     daysFromNow,
     isoFromMs,

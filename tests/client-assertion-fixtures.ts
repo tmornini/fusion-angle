@@ -1,7 +1,7 @@
 import {
     base64UrlEncode,
     bytesToBase64Url,
-} from '../api/base64url.ts';
+} from '../shared/base64url.ts';
 
 // Mint a fresh key pair and sign private_key_jwt assertions
 // with it. Keys are generated IN-TEST — no fixture key

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     latestByKey,
     findFirstByKey,
-} from '../api/ledger-reduction.ts';
+} from '../shared/ledger-reduction.ts';
 
 const row = (key: string, at: string, id: string) => ({
     key, at, id,

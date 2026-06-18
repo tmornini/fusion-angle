@@ -11,7 +11,7 @@ import { seedCurrentMember } from './member-fixtures.ts';
 import { nowUtc } from '../api/types.ts';
 import {
     generateCryptoSafeBase62,
-} from '../api/crypto-safe-base62.ts';
+} from '../shared/crypto-safe-base62.ts';
 
 // POST work-orders/:id/claim decides and appends in ONE
 // transaction: a live foreign claim is a 409, a live own

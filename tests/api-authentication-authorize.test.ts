@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
-import { hashPassword } from '../api/password-hash.ts';
+import { hashPassword } from '../shared/password-hash.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';

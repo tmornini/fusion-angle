@@ -26,7 +26,7 @@ import {
 } from './project-scoring.ts';
 import {
     generateCryptoSafeBase62,
-} from '../../../api/crypto-safe-base62.ts';
+} from '../../../shared/crypto-safe-base62.ts';
 import {
     postStateEvent,
     getIdeaState,

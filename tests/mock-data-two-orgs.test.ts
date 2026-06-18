@@ -5,7 +5,7 @@ import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     currentRolesForInOrg,
 } from '../api/authorization.ts';
-import { verifyPassword } from '../api/password-hash.ts';
+import { verifyPassword } from '../shared/password-hash.ts';
 
 const ORG_ONE = '1';
 const ORG_TWO = '2';

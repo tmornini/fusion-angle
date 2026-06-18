@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { HttpMessage } from '../api/http-message/http-message.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
 
 const request = HttpMessage.fromWire(
     'GET /search?q=1 HTTP/1.1\r\n' +

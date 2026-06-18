@@ -6,7 +6,7 @@ import {
     postMockDataLoad,
     type SeededCredentials,
 } from '../api/mock-data.ts';
-import { verifyPassword } from '../api/password-hash.ts';
+import { verifyPassword } from '../shared/password-hash.ts';
 
 function currentReveal(creds: SeededCredentials) {
     return creds.identities.find(

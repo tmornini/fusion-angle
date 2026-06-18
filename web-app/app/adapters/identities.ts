@@ -8,7 +8,7 @@ import {
     type IdentityPiiEntity,
     type MemberPii,
 } from '../../../api/types.ts';
-import { hashPassword } from '../../../api/password-hash.ts';
+import { hashPassword } from '../../../shared/password-hash.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,

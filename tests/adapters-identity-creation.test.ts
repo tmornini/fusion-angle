@@ -6,7 +6,7 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { verifyPassword } from '../api/password-hash.ts';
+import { verifyPassword } from '../shared/password-hash.ts';
 import {
     postIdentityCreation,
 } from '../web-app/app/adapters/identities.ts';

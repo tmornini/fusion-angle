@@ -9,7 +9,7 @@ import {
     isRowShaped,
 } from './storage-serialize.ts';
 import { bufferTx } from './backend-buffer-tx.ts';
-import { extractErrorMessage } from './error-helpers.ts';
+import { extractErrorMessage } from '../shared/error-helpers.ts';
 import { createSerializer } from './store-serializer.ts';
 
 const KEY_PREFIX = 'fusion-ai:';

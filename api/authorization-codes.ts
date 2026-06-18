@@ -3,7 +3,7 @@ import type {
     AuthorizationCodeStatus,
     AuthorizationCodeEntity,
 } from './types.ts';
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 
 export interface CodeState {
     readonly status: AuthorizationCodeStatus;

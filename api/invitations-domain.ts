@@ -11,7 +11,7 @@ import {
 import {
     currentRolesForInOrg,
 } from './authorization.ts';
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 import { identityDefaultOrg } from './authentication.ts';
 import {
     errorJson,

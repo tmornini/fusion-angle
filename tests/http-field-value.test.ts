@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { FieldValue } from '../api/http-message/field-value.ts';
-import { HttpMessageError } from '../api/http-message/types.ts';
-import { HttpMessage } from '../api/http-message/http-message.ts';
+import { FieldValue } from '../shared/http-message/field-value.ts';
+import { HttpMessageError } from '../shared/http-message/types.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
 
 test('exists is false for an absent value', () => {
     assert.equal(FieldValue.absent().exists(), false);

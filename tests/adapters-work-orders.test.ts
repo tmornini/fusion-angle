@@ -17,7 +17,7 @@ import {
 import {
     generateCryptoSafeBase62,
 } from
-'../api/crypto-safe-base62.ts';
+'../shared/crypto-safe-base62.ts';
 import {
     getWorkOrderActiveClaim,
     getActiveClaimsByWorkOrder,

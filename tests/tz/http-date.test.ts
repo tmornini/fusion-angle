@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { FieldValue } from '../../api/http-message/field-value.ts';
-import { parseHttpDate } from '../../api/http-message/http-date.ts';
-import { HttpMessageError } from '../../api/http-message/types.ts';
+import { FieldValue } from '../../shared/http-message/field-value.ts';
+import { parseHttpDate } from '../../shared/http-message/http-date.ts';
+import { HttpMessageError } from '../../shared/http-message/types.ts';
 
 // Runs under TZ=Pacific/Honolulu. An HTTP-date carries an
 // explicit GMT zone, so toDate must resolve to the same absolute

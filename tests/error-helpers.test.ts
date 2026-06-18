@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     extractErrorMessage as apiExtract,
-} from '../api/error-helpers.ts';
+} from '../shared/error-helpers.ts';
 import {
     extractErrorMessage as webExtract,
 } from '../web-app/app/error-helpers.ts';

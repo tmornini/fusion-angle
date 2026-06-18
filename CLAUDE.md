@@ -231,12 +231,19 @@ lg 1024px, xl 1280px.
 
 ## Project Structure
 
-`api/` — REST routing, DB adapter interface, mock data,
+`api/` — the server REST/DB-schema handlers (currently
+in-browser): REST routing, DB adapter interface, mock data,
 validators, plus the auth/authz/tenancy spine:
 `authentication.ts` (OAuth grants), `access-token.ts` (JWT
 mint/verify), `authorization.ts` (per-org roles),
 `db-org-scoped.ts` / `store-org-scoped.ts` (the org fence),
 and the identity/organizations/memberships stores.
+`shared/` — code that crosses the client/server chasm, imported
+by both `api/` and `web-app/`: the HTTP wire schema
+(`http-message/`, with its own `types.ts`) plus pure cross-chasm
+utilities (`base64url.ts`, `crypto-safe-base62.ts`,
+`password-hash.ts`, `ledger-reduction.ts`, `error-helpers.ts`).
+The dependency is one-way: `shared/` NEVER imports `api/`.
 `web-app/app/` — all source (TypeScript + CSS), with
 subdirectories `adapters/` (data-access + platform shims, both
 kinds share the folder), `presenters/` (presenter classes

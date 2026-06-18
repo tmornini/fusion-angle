@@ -4,7 +4,7 @@ import {
     type Id,
     type StateEntity,
 } from './types.ts';
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // The closed claim vocabulary. Three strings: a claim
 // either exists ('claimed'), is voluntarily relinquished

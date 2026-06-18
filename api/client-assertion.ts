@@ -11,7 +11,7 @@
 import {
     base64UrlDecode,
     base64UrlToBytes,
-} from './base64url.ts';
+} from '../shared/base64url.ts';
 import type { ClientEntity } from './types.ts';
 
 export type ClientAssertionResult =

@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { HttpMessage } from '../api/http-message/http-message.ts';
-import { HttpMessageError } from '../api/http-message/types.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
+import { HttpMessageError } from '../shared/http-message/types.ts';
 import {
     BodyRegistry,
     formBodyCodec,
     textBodyCodec,
-} from '../api/http-message/media-registry.ts';
-import { Octets } from '../api/http-message/octets.ts';
+} from '../shared/http-message/media-registry.ts';
+import { Octets } from '../shared/http-message/octets.ts';
 
 const jsonResponse = HttpMessage.fromWire(
     'HTTP/1.1 200 OK\r\n' +

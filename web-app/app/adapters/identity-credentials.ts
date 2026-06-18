@@ -1,6 +1,6 @@
 import {
     generateCryptoSafeBase62,
-} from '../../../api/crypto-safe-base62.ts';
+} from '../../../shared/crypto-safe-base62.ts';
 import {
     nowUtc,
     type Id,
@@ -10,7 +10,7 @@ import {
 } from '../../../api/types.ts';
 import {
     latestByKey,
-} from '../../../api/ledger-reduction.ts';
+} from '../../../shared/ledger-reduction.ts';
 import type { RequestContext } from './shared.ts';
 
 // Surface the credential-kind union so the identity detail

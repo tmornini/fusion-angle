@@ -4,7 +4,7 @@ import type {
     RoleGrantEntity,
     IdentityDefaultOrganizationEntity,
 } from './types.ts';
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // On an equal-`at` tie the FAIL-CLOSED action wins regardless
 // of row order — a revoke beats a co-timestamped grant on

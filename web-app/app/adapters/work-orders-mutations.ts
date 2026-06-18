@@ -32,7 +32,7 @@ import {
 } from './flow-publish.ts';
 import {
     generateCryptoSafeBase62,
-} from '../../../api/crypto-safe-base62.ts';
+} from '../../../shared/crypto-safe-base62.ts';
 import { sha256Bytes } from './digest.ts';
 import {
     nextPosition,

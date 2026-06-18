@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { HttpMessage } from '../api/http-message/http-message.ts';
-import { HttpMessageError } from '../api/http-message/types.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
+import { HttpMessageError } from '../shared/http-message/types.ts';
 
 test('wire and JSON forms round-trip to the same wire', () => {
     const wire =

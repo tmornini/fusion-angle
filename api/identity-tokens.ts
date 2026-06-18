@@ -6,7 +6,7 @@ import type {
 import {
     latestByKey,
     findFirstByKey,
-} from './ledger-reduction.ts';
+} from '../shared/ledger-reduction.ts';
 
 // Pure reductions over the append-only identity_tokens ledger.
 // The store is a dumb log; current validity is derived here.

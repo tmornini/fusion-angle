@@ -5,7 +5,7 @@ import {
     base64UrlDecode,
     bytesToBase64Url,
     base64UrlToBytes,
-} from '../api/base64url.ts';
+} from '../shared/base64url.ts';
 
 test('round-trips UTF-8 JSON', () => {
     const json = JSON.stringify({ name: 'Tóny ✦', n: 1 });

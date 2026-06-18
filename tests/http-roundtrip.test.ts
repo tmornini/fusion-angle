@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { HttpMessage } from '../api/http-message/http-message.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
 
 test('round-trips a canonical header-only request', () => {
     const wire =

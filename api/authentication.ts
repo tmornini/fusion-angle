@@ -11,7 +11,7 @@ import {
 } from './access-token.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../shared/crypto-safe-base62.ts';
 import {
     nowUtc,
     nowEpochSeconds,
@@ -32,14 +32,14 @@ import {
 import {
     hashPassword,
     verifyPassword,
-} from './password-hash.ts';
+} from '../shared/password-hash.ts';
 import {
     currentDefaultOrgFor,
 } from './authorization.ts';
 import {
     latestByKey,
     findFirstByKey,
-} from './ledger-reduction.ts';
+} from '../shared/ledger-reduction.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an

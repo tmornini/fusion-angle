@@ -19,6 +19,6 @@
         "exactOptionalPropertyTypes": true,
         "lib": ["ES2024", "DOM", "DOM.Iterable"]
     },
-    "include": ["./**/*.ts", "../**/*.ts", "../../api/**/*.ts"],
+    "include": ["./**/*.ts", "../**/*.ts", "../../api/**/*.ts", "../../shared/**/*.ts"],
     "exclude": ["./compose.ts", "./generate-schema-svg.ts"]
 }

@@ -3,9 +3,9 @@ import {
     base64UrlDecode,
     bytesToBase64Url,
     base64UrlToBytes,
-} from './base64url.ts';
+} from '../shared/base64url.ts';
 import type { Id } from './types.ts';
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // The resolved principal — the verified subject of a request.
 // Distinct from the storage `Identity` ({id,kind}): this is

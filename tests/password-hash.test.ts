@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     hashPassword,
     verifyPassword,
-} from '../api/password-hash.ts';
+} from '../shared/password-hash.ts';
 
 test('hash then verify round-trips', async () => {
     const phc = await hashPassword('correct horse battery');

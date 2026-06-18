@@ -1,4 +1,4 @@
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 import type {
     FlowNodeId,
     FlowNodeEntity,

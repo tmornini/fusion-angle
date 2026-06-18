@@ -3,7 +3,7 @@ import type { Id } from './types.ts';
 import type { Principal } from './access-token.ts';
 import {
     generateCryptoSafeBase62,
-} from './crypto-safe-base62.ts';
+} from '../shared/crypto-safe-base62.ts';
 
 // The server half of the request vessel (Office of the
 // Context): one context enters at the gate and rides the

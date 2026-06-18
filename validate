@@ -10,7 +10,7 @@ AWK_LINT='length > 78 {
 }'
 
 LONG_LINES=$( {
-    find api web-app tests -type f \
+    find api web-app tests shared -type f \
         \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
         ! -path 'web-app/app/compose.ts' \
         -exec awk "$AWK_LINT" {} +

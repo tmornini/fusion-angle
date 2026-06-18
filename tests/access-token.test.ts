@@ -10,7 +10,7 @@ import {
     latestRevocationAt,
     revokedThroughSeconds,
 } from '../api/access-token.ts';
-import { base64UrlEncode } from '../api/base64url.ts';
+import { base64UrlEncode } from '../shared/base64url.ts';
 
 async function token(over: Partial<{
     sub: string; iat: number; ttlSeconds: number;

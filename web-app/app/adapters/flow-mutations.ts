@@ -31,7 +31,7 @@ import {
 } from './flow-defaults.ts';
 import {
     generateCryptoSafeBase62,
-} from '../../../api/crypto-safe-base62.ts';
+} from '../../../shared/crypto-safe-base62.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';

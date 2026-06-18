@@ -493,7 +493,7 @@ run before A1's build. The single canonical invocation is
 
 - [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
 - [ ] **AT2** Run `./test` (delegates to `TZ=UTC node --test --strip-types tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts` for the timezone suite). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0` for both suites.
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, the root `.md` files, and the build scripts, then the `generate-schema-svg --check` SCHEMA.svg-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script.
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files, and the build scripts, then the `generate-schema-svg --check` SCHEMA.svg-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script.
 
 ---
 

@@ -10,7 +10,7 @@ import {
     type Id,
     type StateEntity,
 } from './types.ts';
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // The states table is the append-only event log of every
 // state change in the system. One row, one fact. `record`

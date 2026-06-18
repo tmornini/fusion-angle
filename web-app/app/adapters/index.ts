@@ -46,7 +46,7 @@ export * from './record-attributes.ts';
 export * from './flow-records.ts';
 export * from './record-transitions.ts';
 export * from './flow-defaults.ts';
-export * from '../../../api/crypto-safe-base62.ts';
+export * from '../../../shared/crypto-safe-base62.ts';
 export * from './clipboard.ts';
 export * from './viewport.ts';
 export * from './location.ts';

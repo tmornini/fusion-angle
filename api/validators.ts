@@ -61,7 +61,7 @@ import {
 import {
     isProviderModelId,
 } from './provider-models.ts';
-import { extractErrorMessage } from './error-helpers.ts';
+import { extractErrorMessage } from '../shared/error-helpers.ts';
 import { ValidationError } from './types.ts';
 
 export function parseOrThrow(

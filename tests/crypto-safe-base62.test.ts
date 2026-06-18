@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     generateCryptoSafeBase62,
-} from '../api/crypto-safe-base62.ts';
+} from '../shared/crypto-safe-base62.ts';
 
 const ALPHABET =
     '0123456789abcdefghijklmnopqrstuvwxyz'

@@ -7,7 +7,7 @@ import {
     ApiError,
     HTTP_CONFLICT,
 } from './http-errors.ts';
-import { latestByKey } from './ledger-reduction.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     relationFailClosed,
 } from './flow-graph-relations.ts';

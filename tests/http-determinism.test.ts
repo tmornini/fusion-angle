@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { HttpMessage } from '../api/http-message/http-message.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
 import type {
     FieldLine,
     MessageModel,
-} from '../api/http-message/types.ts';
+} from '../shared/http-message/types.ts';
 
 function requestModel(fields: FieldLine[]): MessageModel {
     return {

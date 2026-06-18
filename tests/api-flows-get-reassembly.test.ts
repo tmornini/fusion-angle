@@ -46,7 +46,7 @@ import {
 } from './test-fixtures.ts';
 import {
     generateCryptoSafeBase62,
-} from '../api/crypto-safe-base62.ts';
+} from '../shared/crypto-safe-base62.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;

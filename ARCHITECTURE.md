@@ -366,6 +366,15 @@ re-verified by the automated suite:
 
 ## API Layer (`/api`)
 
+`api/` is the server tier — the REST/DB-schema request
+handlers, currently running in-browser. Code that crosses the
+client/server chasm lives one level out in `shared/` (a sibling
+of `api/` and `web-app/`): the HTTP wire schema (`http-message/`,
+its own `types.ts`) plus pure cross-chasm utilities
+(`base64url.ts`, `crypto-safe-base62.ts`, `password-hash.ts`,
+`ledger-reduction.ts`, `error-helpers.ts`). Both `api/` and
+`web-app/` import `shared/`; `shared/` NEVER imports `api/`.
+
 `api/types.ts` (row types + shared aliases — `MemberId`,
 `MemberEntity` parent + `Member` union (`HumanMember` /
 `AIMember` / `SystemMember`),

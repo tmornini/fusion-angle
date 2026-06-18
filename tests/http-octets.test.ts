@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { Octets } from '../api/http-message/octets.ts';
+import { Octets } from '../shared/http-message/octets.ts';
 
 test('Octets round-trips bytes through base64', () => {
     const bytes = new Uint8Array([0, 1, 2, 255, 254, 128, 65]);
