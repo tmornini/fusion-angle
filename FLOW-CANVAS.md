@@ -90,6 +90,23 @@ carries a Record-binding `<select>` driven by
 `getRecordForFlow` / `postFlowRecordBinding` /
 `deleteFlowRecordForFlow`.
 
+The canvas is UNCHANGED by the flow-graph relation
+normalization: it operates on the domain `GraphNode` /
+`GraphEdge` (`memberIds`, `attributes`) exactly as before. The
+divorce is at the route — the live graph now lives in four
+relations (`flow_nodes`, `flow_edges`, `flow_node_members`,
+`flow_node_attributes`); the route (`GET flows/:id` /
+`GET flows`) reassembles the `StoredGraph` from those
+relations and returns `FlowWithGraph`; `getFlowGraph` reads
+through `ctx.GET` and parses the returned graph into the
+domain `FlowGraph`. `flow-mutations.ts` builds a
+client-minted save delta (node/edge upserts, `'deleted'`
+removals, member/attribute ledger events) the route writes in
+one transaction. Persistent undo/redo feeds a frozen version's
+decoded graph back as the working copy; reviving a previously
+removed node/edge id posts a `'restored'` event so the
+tombstoned id reappears.
+
 Hazards are two-tier and shared across the designer +
 stats canvases via the pure predicate
 `shouldShowMemberHazard(node, allEdges)` in

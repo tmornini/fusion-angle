@@ -4,12 +4,14 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from
     '../api/mock-data.ts';
 import {
-    asStoredGraph,
     parseOrThrow,
 } from '../api/validators.ts';
 import {
     validateWorkOrderFlowGraphJson,
 } from '../api/validators.ts';
+import {
+    reassembleStoredGraph,
+} from '../api/flow-graph-relations.ts';
 
 async function seeded(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
@@ -232,20 +234,29 @@ test(
 );
 
 test(
-    'every seeded flow.graph parses as a valid'
-    + ' StoredGraph (post-Records shape, no'
+    'every seeded flow graph reassembles to the'
+    + ' post-Records shape (attributes[], no'
     + ' fields[])',
     async () => {
         const db = await seeded();
         const flows = await db.flows.getAll();
+        const allNodes = await db.flowNodes.getAll();
+        const allEdges = await db.flowEdges.getAll();
+        const allMembers =
+            await db.flowNodeMembers.getAll();
+        const allAttrs =
+            await db.flowNodeAttributes.getAll();
         for (const flow of flows) {
-            const parsed = parseOrThrow(
-                flow.graph, 'flow.graph',
+            // The graph is no stored blob — reassemble it
+            // from the relation tables, the read source of
+            // record.
+            const graph = reassembleStoredGraph(
+                allNodes.filter(n => n.flow_id === flow.id),
+                allEdges.filter(e => e.flow_id === flow.id),
+                allMembers,
+                allAttrs,
             );
-            const stored = asStoredGraph(
-                parsed, 'flow.graph',
-            );
-            for (const node of stored.nodes) {
+            for (const node of graph.nodes) {
                 assert.ok(
                     Array.isArray(node.attributes),
                     'node ' + node.id

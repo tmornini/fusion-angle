@@ -13,7 +13,6 @@ import {
     type ProjectEntity,
     type ProjectState,
     type FlowEntity,
-    type JsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 
@@ -80,9 +79,6 @@ async function seedProject(
     );
 }
 
-const EMPTY_GRAPH =
-    '{"nodes":[],"edges":[]}' as JsonObjectField;
-
 function buildFlow(
     id: string,
 ): Omit<FlowEntity, 'id'> {
@@ -93,7 +89,6 @@ function buildFlow(
         is_auto_layout: true,
         is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: EMPTY_GRAPH,
     };
 }
 

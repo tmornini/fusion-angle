@@ -16,6 +16,7 @@ import { ANONYMOUS_ID } from './access-token.ts';
 import {
     ownerOrgOfEntity,
     orgOwnedProbes,
+    graphEntityProbe,
 } from './store-parent-scoped.ts';
 import {
     exchangeBearerForOrg,
@@ -244,10 +245,14 @@ export async function handleRequest(
                     === 'entity-states/:id/history')) {
             // The owner resolves through the memberships
             // identity_id index, never a whole-ledger scan.
+            // The graphProbe closes the flow_nodes / flow_edges
+            // two-hop for node/edge deletion events.
+            // rawReadRow bypasses EntityStore's deleted filter.
             const owner = await ownerOrgOfEntity(
                 orgOwnedProbes(adapter),
                 adapter.memberships, fenced.organization,
                 param(params, 0),
+                graphEntityProbe(adapter, adapter.flows),
             );
             if (owner !== null
                 && owner !== fenced.organization) {

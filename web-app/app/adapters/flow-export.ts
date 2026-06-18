@@ -11,7 +11,7 @@ import {
     getProjectStates,
 } from './state-events.ts';
 import type {
-    FlowEntity,
+    FlowWithGraph,
     ProjectEntity,
     GraphNode,
     GraphEdge,
@@ -22,6 +22,7 @@ import {
 } from '../../../api/crypto-safe-base62.ts';
 import {
     notifyFlowChange,
+    buildSaveEvents,
 } from './flow-mutations.ts';
 import {
     validateStoredGraphJson,
@@ -238,12 +239,12 @@ async function getFlowBackupData(
     ctx: RequestContext,
     flowId: string,
 ): Promise<{
-    flow: FlowEntity;
+    flow: FlowWithGraph;
     projectId: string | undefined;
 }> {
     const [flow, projectFlows] =
         await Promise.all([
-            ctx.GET<FlowEntity>(
+            ctx.GET<FlowWithGraph>(
                 'flows/' + flowId,
             ),
             getProjectFlowEntities(ctx),
@@ -258,7 +259,7 @@ async function getFlowBackupData(
 }
 
 function buildBackupJson(
-    flow: FlowEntity,
+    flow: FlowWithGraph,
     projectId: string | undefined,
 ): string {
     const graph = validateStoredGraphJson(
@@ -458,7 +459,7 @@ export async function computeFlowBackupResolution(
 ): Promise<ImportResolution> {
     const [flows, projects, projectStates] =
         await Promise.all([
-            ctx.GET<FlowEntity[]>('flows'),
+            ctx.GET<FlowWithGraph[]>('flows'),
             ctx.GET<ProjectEntity[]>(
                 'projects',
             ),
@@ -517,7 +518,7 @@ export async function postFlowFromBackup(
             isCreate: n.isCreate,
             isArchive: n.isArchive,
             memberIds: n.memberIds,
-            attributes: [],
+            attributes: n.attributes,
             taskInstructions: n.taskInstructions,
         });
     }
@@ -545,6 +546,17 @@ export async function postFlowFromBackup(
             };
         });
 
+    // The graph lands in the relation tables via the delta —
+    // the flow row carries no blob. The baseline is empty (a
+    // fresh flow), so the delta is pure upserts for every
+    // imported node/edge.
+    const graphDelta = buildSaveEvents(
+        { nodes: [], edges: [] },
+        { nodes, edges },
+        flowId,
+        generateCryptoSafeBase62,
+        now,
+    );
     const linkId = generateCryptoSafeBase62();
     await ctx.POST('flows', {
         id: flowId,
@@ -554,9 +566,6 @@ export async function postFlowFromBackup(
             is_auto_layout: backup.flow.isAutoLayout,
             is_auto_fit: backup.flow.isAutoFit,
             lock_timeout: backup.flow.lockTimeout,
-            graph: storedGraphField({
-                nodes, edges,
-            }),
         },
         projectFlowId: linkId,
         projectFlow: {
@@ -567,6 +576,7 @@ export async function postFlowFromBackup(
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
         initialStateAt: nowUtc(),
+        graphDelta,
     });
 
     notifyFlowChange();

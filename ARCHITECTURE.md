@@ -46,6 +46,46 @@ and auto-fit reconciliation, the two-tier hazard predicate,
 and the read-only stats variant — lives in
 [FLOW-CANVAS.md](FLOW-CANVAS.md).
 
+### Flow-graph storage seam
+
+The live flow graph is normalized out of the retired
+`flows.graph` JSON blob into four relations: `flow_nodes` +
+`flow_edges` (`EntityStore`; removal = a `'deleted'` states-log
+event, undo/redo revival = a `'restored'` event that supersedes
+the `'deleted'` under the `(at, id)` total order) and
+`flow_node_members` + `flow_node_attributes`
+(`HistoryEntityStore` append-only ledgers; removal = a new
+`'removed'` row; current state via `latestByKey` keeping the
+latest `'added'`, same-`at` ties failing closed). The frozen
+plane keeps its inlined blob (`flow_versions.graph`,
+`work_orders.flow_graph`) — a frozen value is not a live
+relationship.
+
+The **route is the single divorce point**. `GET flows/:id` AND
+`GET flows` (list) reassemble the graph from relations and
+return `FlowWithGraph` (`= FlowEntity & { graph }` — the read
+DTO; the stored row carries only scalars). Freeze, work-order
+creation, stats, the member-hazard reader, and export all
+derive from relations for free because they read through
+`ctx.GET`; the client `getFlowGraph` adapter is unchanged. The
+WRITE seam carries a client-minted `FlowGraphDelta` (node/edge
+upserts by stable id, node/edge `'deleted'` events,
+member/attribute `'added'`/`'removed'` ledger events) written
+in one tx over the flow tables (Atomicity); ids and `at` are
+client-minted (Idempotency), the author server-derived from
+the verified token. Undo/redo bodies carry the `graphDelta`
+PLUS a sibling `revivals: GraphRevival[]` array; the route
+posts each revival as a `'restored'` event (local-revival
+design: revivals are undo/redo-specific, not part of the
+shared delta).
+
+A node/edge `'deleted'` / `'restored'` states event's
+`entity_id` resolves to its flow's org via a node/edge → flow →
+`organization_id` two-hop in `ownerOrgOfEntity` (a
+tombstone-blind `rawReadRow`), fencing it cross-tenant. The org
+fence parent-scopes `flow_nodes` / `flow_edges` through their
+flow, and the two ledgers via `flow_node` → `flow` (two hops).
+
 ## Records
 
 A Record is a named data shape: name + description +

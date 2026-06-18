@@ -62,7 +62,6 @@ async function seedFlow(
         is_auto_layout: false,
         is_auto_fit: false,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: flowGraph(),
     });
 }
 

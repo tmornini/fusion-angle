@@ -1,5 +1,5 @@
 import type {
-    FlowEntity,
+    FlowWithGraph,
     WorkOrderEntity,
     WorkOrderFlowGraph,
     StoredGraph,
@@ -89,7 +89,7 @@ export async function postWorkOrderCreation(
     ctx: RequestContext,
     input: WorkOrderCreationInput,
 ): Promise<void> {
-    const flow = await ctx.GET<FlowEntity>(
+    const flow = await ctx.GET<FlowWithGraph>(
         `flows/${input.flowId}`,
     );
     const readiness = validateFlowForCreation(flow);

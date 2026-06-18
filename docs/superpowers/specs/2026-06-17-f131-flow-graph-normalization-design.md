@@ -288,3 +288,43 @@ session arc cannot lose them:
   client-shipped). True moment-of-union for legacy data (none
   recorded). No decompose-on-import. No canvas rewrite. Execute the
   request, not the request plus improvements.
+
+## Status: complete (steps 3–6)
+
+Steps 1–2 (additive dormant relations + dual-seed) landed earlier
+(cf214b32→3443166f). Steps 3–6 — the seam cutover, blob retirement,
+docs — landed via subagent-driven development under
+`docs/superpowers/plans/2026-06-17-f131-flow-graph-normalization-cutover.md`
+(commits 797418d1→ this close-out, on master). The live flow graph is
+fully normalized into `flow_nodes` / `flow_edges` / `flow_node_members`
+/ `flow_node_attributes`; the live `flows.graph` blob is retired
+(`FlowEntity` drops it; the GET routes reassemble into a `FlowWithGraph`
+read DTO; freeze + work-order + stats + hazard + export auto-derive).
+The frozen plane (`flow_versions.graph`, `work_orders.flow_graph`)
+keeps its inlined snapshot. Each commit passed `./validate`; the
+central cutover (steps-3 commits) passed a clean broad review.
+
+Carry-forward resolution:
+1. States-log tenancy fence — closed as the FIRST commit (a node/edge
+   `'deleted'`/`'restored'` event resolves to its flow's org via a
+   tombstone-blind two-hop in `ownerOrgOfEntity`).
+2. Reader-less indexes — `flow_node_attributes.attribute_id` kept (the
+   record-attribute referrer scan reads it); `flow_node_members
+   .member_id` dropped (no keyed reader).
+3. Render safety — confirmed: stored `member_id` / `attribute_id` stay
+   `pickString` and reach member/attribute SELECTOR UIs, not a
+   markup-id sink; the three node-id refs (`from_node_id` /
+   `to_node_id` / `flow_node_id`) stay `asGraphId`-pinned.
+
+Discovered + resolved during execution: the spec's "undo … no special
+machinery" was incomplete — reviving a deleted node/edge on undo/redo
+needs a `'restored'` states event to supersede the `'deleted'`
+tombstone (the latest `(at, id)` event wins); implemented as a sibling
+`revivals` array on the undo/redo body (not inside the shared
+`FlowGraphDelta`).
+
+Approved follow-up (NOT in this arc): flow creation `POST /flows` is an
+Idempotency-VII sin (INSERT); the client already mints the id, so a
+later spec corrects it to a direct `PUT /flows/:id` (create-or-update)
+and REMOVES the POST route — mirroring the shipped SAVE verb
+correction.

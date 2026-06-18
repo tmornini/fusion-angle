@@ -29,12 +29,6 @@ async function seedFlow(
         is_auto_layout: true,
         is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: jsonObjectField({
-            name,
-            lockTimeout: DEFAULT_LOCK_TIMEOUT,
-            nodes: [],
-            edges: [],
-        }),
     });
 }
 

@@ -18,6 +18,7 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     postFlowCreation,
+    putFlow,
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import {
@@ -241,6 +242,27 @@ async function flowVersionCount(
     const rows = await createRequestContext(db, DEV_TOKEN)
         .GET<unknown[]>('flows/' + FLOW_ID + '/versions');
     return rows.length;
+}
+
+// Save a graph through the real route (putFlow) so the four
+// relation tables hold exactly this state — the read source
+// GET /flows/:id reassembles from. Undo/redo diff their
+// in-memory snap against a version; that diff only applies
+// correctly when the relations already carry the snap's graph.
+async function seedCurrentGraph(
+    ctx: RequestContext,
+    nodes: GraphNode[],
+    edges: GraphEdge[] = [],
+): Promise<void> {
+    await putFlow(ctx, FLOW_ID, {
+        name: 'Test Flow',
+        isLocked: false,
+        isAutoLayout: true,
+        isAutoFit: true,
+        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+        nodes,
+        edges,
+    });
 }
 
 async function silenceConsoleError<T>(
@@ -1198,12 +1220,18 @@ test(
             }),
             at: '2026-01-01T00:00:00.000000Z',
         });
-        // Current state has a third node.
-        const snap = snapFrom(buildGraph([
+        // Current state has a third node. Seed the relations
+        // with that same graph so GET /flows/:id (the read
+        // source) reflects what the snap claims is current —
+        // the undo diff (current → version) then applies
+        // against real rows, not an empty graph.
+        const currentNodes = [
             buildNode('a'),
             buildNode('b'),
             buildNode('c'),
-        ]));
+        ];
+        await seedCurrentGraph(ctx, currentNodes);
+        const snap = snapFrom(buildGraph(currentNodes));
         const op = await performUndo(
             createRequestContext(db, DEV_TOKEN), snap,
             buildFlowHistorySnapshot(true),
@@ -1275,10 +1303,13 @@ test(
     + ' snapshots the current state, and marks'
     + ' undo available',
     async () => {
-        const { db } = await setupFlow();
-        const snap = snapFrom(buildGraph([
-            buildNode('a'),
-        ]));
+        const { db, ctx } = await setupFlow();
+        // Seed the relations with the current single-node graph
+        // so GET /flows/:id reflects the snap; redo diffs this
+        // current graph against the popped (a,b) version.
+        const currentNodes = [buildNode('a')];
+        await seedCurrentGraph(ctx, currentNodes);
+        const snap = snapFrom(buildGraph(currentNodes));
         const history = appendToRedoStack(
             buildFlowHistorySnapshot(false),
             buildFlowVersion({

@@ -59,9 +59,10 @@ function buildEdge(
     };
 }
 
+// The flow row stores only scalar fields — the graph lives in
+// the relation tables (seeded separately via seedFlowRelations).
 function buildFlow(
     name: string,
-    graph: StoredGraph,
 ): Omit<FlowEntity, 'id'> {
     return {
         organization_id: '1',
@@ -70,12 +71,64 @@ function buildFlow(
         is_auto_layout: true,
         is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: jsonObjectField(
-            graph as unknown as Record<
-                string, unknown
-            >,
-        ),
     };
+}
+
+// Seed the four relation tables to match a StoredGraph —
+// GET /flows/:id reassembles the read graph from these rows,
+// so the stored blob is never the read source. Direct puts
+// with no 'deleted' state event leave every node/edge live.
+async function seedFlowRelations(
+    db: MemoryDbAdapter,
+    flowId: string,
+    graph: StoredGraph,
+): Promise<void> {
+    const at = '2026-01-01T00:00:00.000000Z';
+    for (const n of graph.nodes) {
+        await db.flowNodes.put(n.id, {
+            flow_id: flowId,
+            name: n.name,
+            position_x: n.positionX,
+            position_y: n.positionY,
+            is_create: n.isCreate,
+            is_archive: n.isArchive,
+            task_instructions: n.taskInstructions,
+            at,
+        });
+        for (const mid of n.memberIds) {
+            await db.flowNodeMembers.put(
+                `${n.id}-${mid}`,
+                {
+                    flow_node_id: n.id,
+                    member_id: mid,
+                    action: 'added',
+                    at,
+                },
+            );
+        }
+        for (const a of n.attributes) {
+            await db.flowNodeAttributes.put(
+                `${n.id}-${a.attributeId}`,
+                {
+                    flow_node_id: n.id,
+                    attribute_id: a.attributeId,
+                    mode: a.mode,
+                    is_required: a.isRequired,
+                    action: 'added',
+                    at,
+                },
+            );
+        }
+    }
+    for (const e of graph.edges) {
+        await db.flowEdges.put(e.id, {
+            flow_id: flowId,
+            name: e.name,
+            from_node_id: e.fromNodeId,
+            to_node_id: e.toNodeId,
+            at,
+        });
+    }
 }
 
 // Timestamps relative to now so the 90-day window
@@ -115,11 +168,15 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
 
-        // Flow f1 with an Onboarding graph
+        // Flow f1 with an Onboarding graph — seed both the
+        // blob (for shape) and the relations (the read source
+        // GET /flows/:id reassembles from).
+        const f1Graph = buildTestGraph();
         await db.flows.put(
             'f1',
-            buildFlow('Onboarding', buildTestGraph()),
+            buildFlow('Onboarding'),
         );
+        await seedFlowRelations(db, 'f1', f1Graph);
 
         // Minimal VALID work-order graphs — the gate
         // demands shape, but getFlowStats reads from
@@ -229,11 +286,14 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         // buildFlow is is_auto_layout; buildTestGraph
-        // seeds c→a→z all at (0,0).
+        // seeds c→a→z all at (0,0). Seed the relations too —
+        // GET /flows/:id reassembles the read graph from them.
+        const autoGraph = buildTestGraph();
         await db.flows.put(
             'f1',
-            buildFlow('AutoLayout', buildTestGraph()),
+            buildFlow('AutoLayout'),
         );
+        await seedFlowRelations(db, 'f1', autoGraph);
         await db.workOrders.put('wo1', {
             organization_id: '1',
             display_id: 'WO-1',

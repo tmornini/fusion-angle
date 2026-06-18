@@ -23,7 +23,7 @@ const RELATION_ACTION_RANK:
     added: 0,
 };
 
-function relationFailClosed<
+export function relationFailClosed<
     T extends {
         action: FlowNodeRelationAction;
         at: string;

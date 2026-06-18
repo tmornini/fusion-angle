@@ -15,7 +15,7 @@ import {
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import type {
-    FlowEntity,
+    FlowWithGraph,
     GraphNode,
     GraphEdge,
     StateEntity,
@@ -41,6 +41,17 @@ async function setupMemDb(): Promise<{
     const ctx = createRequestContext(db, await devToken());
     return { db, ctx };
 }
+
+// The four-relation delta a no-graph-change PUT carries: the
+// direct ctx.PUT tests below craft the wire body by hand, so
+// they supply the empty delta that putFlow would have diffed.
+const EMPTY_GRAPH_DELTA = {
+    nodes: [],
+    edges: [],
+    deletions: [],
+    memberEvents: [],
+    attributeEvents: [],
+};
 
 function buildNode(
     id: string,
@@ -90,7 +101,7 @@ test(
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
-        const flow = await ctx.GET<FlowEntity>(
+        const flow = await ctx.GET<FlowWithGraph>(
             'flows/flow-1',
         );
         assert.equal(flow.id, 'flow-1');
@@ -183,7 +194,7 @@ test(
             nodes: [start, middle, complete],
             edges: [edge],
         });
-        const flow = await ctx.GET<FlowEntity>(
+        const flow = await ctx.GET<FlowWithGraph>(
             'flows/flow-1',
         );
         assert.equal(flow.name, 'Renamed');
@@ -228,7 +239,7 @@ test(
             nodes: [a],
             edges: [],
         });
-        const flow = await ctx.GET<FlowEntity>(
+        const flow = await ctx.GET<FlowWithGraph>(
             'flows/flow-1',
         );
         const graph =
@@ -270,7 +281,7 @@ test(
             nodes: callerBNodes,
             edges: [],
         });
-        const flow = await ctx.GET<FlowEntity>(
+        const flow = await ctx.GET<FlowWithGraph>(
             'flows/flow-1',
         );
         assert.equal(flow.name, 'caller-B');
@@ -326,12 +337,13 @@ test(
                     trimIds: [],
                 },
             },
+            graphDelta: EMPTY_GRAPH_DELTA,
         });
         const versions = await ctx.GET<unknown[]>(
             'flows/flow-1/versions',
         );
         assert.equal(versions.length, 1);
-        const flow = await ctx.GET<FlowEntity>('flows/flow-1');
+        const flow = await ctx.GET<FlowWithGraph>('flows/flow-1');
         assert.equal(flow.name, 'Snapped');
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/flow-1/history',
@@ -360,6 +372,7 @@ test(
             eventId: 'fixed-ev',
             at: '2026-01-01T00:00:00.000000Z',
             history: { kind: 'none' },
+            graphDelta: EMPTY_GRAPH_DELTA,
         };
         await ctx.PUT('flows/flow-1', body);
         await ctx.PUT('flows/flow-1', body);
@@ -408,6 +421,7 @@ test(
                     trimIds: [],
                 },
             },
+            graphDelta: EMPTY_GRAPH_DELTA,
         });
         await ctx.POST('flows/flow-1/undo', {
             flow: buildFlowBody({
@@ -422,6 +436,8 @@ test(
             eventId: 'undo-ev',
             at: '2099-01-02T00:00:00.000000Z',
             consumedVersionId: 'ver-1',
+            graphDelta: EMPTY_GRAPH_DELTA,
+            revivals: [],
         });
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/flow-1/history',
@@ -467,6 +483,8 @@ test(
             }),
             eventId: 'redo-ev',
             at: '2099-01-03T00:00:00.000000Z',
+            graphDelta: EMPTY_GRAPH_DELTA,
+            revivals: [],
         });
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/flow-1/history',

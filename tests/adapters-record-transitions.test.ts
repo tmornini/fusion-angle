@@ -15,7 +15,6 @@ import {
 import {
     storedWorkOrderFlowGraphField,
     jsonArrayField,
-    jsonObjectField,
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
     type GraphNode,
@@ -132,7 +131,6 @@ async function seedFlowLink(
         is_auto_layout: false,
         is_auto_fit: false,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: jsonObjectField({ nodes: [], edges: [] }),
     });
     await db.flowWorkOrders.put(
         'fwo-' + workOrderId, {

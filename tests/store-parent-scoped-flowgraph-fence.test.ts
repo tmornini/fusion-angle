@@ -1,0 +1,214 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { handleRequest } from '../api/api.ts';
+import { orgToken } from './token-fixtures.ts';
+import { orgRow } from './test-fixtures.ts';
+
+// Flow-graph entity deletion events must be fenced by the
+// flow's owning org. A 'deleted' states event whose entity_id
+// is a flow_nodes or flow_edges id must NOT be visible through
+// another tenant's /states or entity-states/:id reads.
+//
+// Before the two-hop probe in ownerOrgOfEntity, these ids
+// matched NO org-owned probe and fell through to the membership
+// ledger (also no match) → null → orphan → VISIBLE to every
+// tenant (the leak). This test suite pins that the fence is
+// closed.
+
+const BASE = 'http://localhost';
+const AT = '2026-01-01T00:00:00.000000Z';
+
+function req(
+    method: string,
+    path: string,
+    token: string,
+): Request {
+    return new Request(`${BASE}${path}`, {
+        method,
+        headers: {
+            Authorization: 'Bearer ' + token,
+        },
+    });
+}
+
+// Two orgs: A (admin = current) and B. A flow + node + edge
+// seeded in org A. Deletion events posted for the node and
+// edge (the 'deleted' state). `current` is admin+member of A;
+// no membership in B.
+async function seed(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await db.organizations.put('A', orgRow('Acme'));
+    await db.organizations.put('B', orgRow('Beta'));
+    await db.roleGrants.put('rg-current-a', {
+        organization_id: 'A', identity_id: 'current',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system', at: AT,
+    });
+    await db.memberships.put('m-current-a', {
+        organization_id: 'A', identity_id: 'current',
+        at: AT,
+    });
+    await db.flows.put('flow-a', {
+        organization_id: 'A', name: 'Flow A',
+        is_locked: false, is_auto_layout: false,
+        is_auto_fit: false, lock_timeout: 0,
+    });
+    await db.flowNodes.put('node-a', {
+        flow_id: 'flow-a', name: 'Node A',
+        position_x: 0, position_y: 0,
+        is_create: false, is_archive: false,
+        task_instructions: '', at: AT,
+    });
+    await db.flowEdges.put('edge-a', {
+        flow_id: 'flow-a', name: 'Edge A',
+        from_node_id: 'node-a', to_node_id: 'node-a',
+        at: AT,
+    });
+    // Post 'deleted' state events with the node/edge ids as
+    // entity_id — these are the events that must be fenced.
+    await db.states.put('se-node-del', {
+        entity_id: 'node-a', state: 'deleted',
+        member_id: 'current', at: AT,
+    });
+    await db.states.put('se-edge-del', {
+        entity_id: 'edge-a', state: 'deleted',
+        member_id: 'current', at: AT,
+    });
+    return db;
+}
+
+// GET /organizations/{org}/states through the named facade.
+async function getStates(
+    db: MemoryDbAdapter, org: string,
+): Promise<{ id: string }[]> {
+    const token = await orgToken('current', org);
+    const res = await handleRequest(
+        db, req('GET', '/organizations/' + org + '/states', token),
+    );
+    assert.equal(res.status, 200);
+    return res.json() as Promise<{ id: string }[]>;
+}
+
+// GET /organizations/{org}/entity-states/{entityId} status.
+async function entityStatesStatus(
+    db: MemoryDbAdapter, org: string, entityId: string,
+): Promise<number> {
+    const token = await orgToken('current', org);
+    const res = await handleRequest(db, req(
+        'GET',
+        '/organizations/' + org
+            + '/entity-states/' + entityId,
+        token,
+    ));
+    return res.status;
+}
+
+// ---- Node deletion event fence ----
+
+test('node deletion event is visible through org A', async () => {
+    const db = await seed();
+    const rows = await getStates(db, 'A');
+    const ids = rows.map(r => r.id);
+    assert.ok(ids.includes('se-node-del'),
+        'org A must see its own node deletion event');
+});
+
+test('node deletion event is hidden from org B', async () => {
+    const db = await seed();
+    // Prove the row EXISTS in raw storage — exclusion is
+    // the fence, not an absent row.
+    assert.equal(
+        (await db.states.getById('se-node-del')).id,
+        'se-node-del',
+    );
+    // Grant current admin access to B so the facade opens.
+    await db.roleGrants.put('rg-current-b', {
+        organization_id: 'B', identity_id: 'current',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system', at: AT,
+    });
+    await db.memberships.put('m-current-b', {
+        organization_id: 'B', identity_id: 'current',
+        at: AT,
+    });
+    const rows = await getStates(db, 'B');
+    const ids = rows.map(r => r.id);
+    assert.ok(!ids.includes('se-node-del'),
+        'org B must NOT see the node deletion event');
+});
+
+// ---- Edge deletion event fence ----
+
+test('edge deletion event is visible through org A', async () => {
+    const db = await seed();
+    const rows = await getStates(db, 'A');
+    const ids = rows.map(r => r.id);
+    assert.ok(ids.includes('se-edge-del'),
+        'org A must see its own edge deletion event');
+});
+
+test('edge deletion event is hidden from org B', async () => {
+    const db = await seed();
+    assert.equal(
+        (await db.states.getById('se-edge-del')).id,
+        'se-edge-del',
+    );
+    await db.roleGrants.put('rg-current-b', {
+        organization_id: 'B', identity_id: 'current',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system', at: AT,
+    });
+    await db.memberships.put('m-current-b', {
+        organization_id: 'B', identity_id: 'current',
+        at: AT,
+    });
+    const rows = await getStates(db, 'B');
+    const ids = rows.map(r => r.id);
+    assert.ok(!ids.includes('se-edge-del'),
+        'org B must NOT see the edge deletion event');
+});
+
+// ---- entity-states guard ----
+
+test('entity-states for a node id is 200 in org A', async () => {
+    const db = await seed();
+    const status = await entityStatesStatus(
+        db, 'A', 'node-a');
+    assert.equal(status, 200);
+});
+
+test('entity-states for a node id is 404 in org B', async () => {
+    const db = await seed();
+    await db.roleGrants.put('rg-current-b', {
+        organization_id: 'B', identity_id: 'current',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system', at: AT,
+    });
+    await db.memberships.put('m-current-b', {
+        organization_id: 'B', identity_id: 'current',
+        at: AT,
+    });
+    const status = await entityStatesStatus(
+        db, 'B', 'node-a');
+    assert.equal(status, 404);
+});
+
+// ---- Orphan path: entity_id matches nothing → null → visible
+// This preserves the existing orphan rule — do NOT break it.
+// An event whose entity matches no org-owned store, no
+// flow_node, no flow_edge, and no membership is visible.
+
+test('orphan deletion event remains visible to all orgs',
+async () => {
+    const db = await seed();
+    await db.states.put('se-ghost', {
+        entity_id: 'ghost', state: 'deleted',
+        member_id: 'system', at: AT,
+    });
+    const rows = await getStates(db, 'A');
+    const ids = rows.map(r => r.id);
+    assert.ok(ids.includes('se-ghost'),
+        'orphan event must stay visible (null owner rule)');
+});

@@ -9,13 +9,14 @@ import {
 import { validateStoredGraphJson } from '../api/validators.ts';
 import type { StoredGraph } from '../api/types.ts';
 
-// The dual-seed covenant (F-131 step 2): every seeded flow's
-// graph blob decomposes into flow_nodes / flow_edges /
-// flow_node_members / flow_node_attributes rows that, run back
-// through reassembleStoredGraph, reproduce the blob exactly.
-// Relations are SETS, so the comparison is order-normalized —
-// the covenant is which node carries which members/attributes,
-// not array order.
+// The decompose covenant: every seeded flow's AUTHORED
+// build-time graph literal (buildFlows' FlowSeed.graph — the
+// stored flows.graph blob is retired) decomposes into flow_nodes
+// / flow_edges / flow_node_members / flow_node_attributes rows
+// that, run back through reassembleStoredGraph, reproduce the
+// authored graph exactly. Relations are SETS, so the comparison
+// is order-normalized — the covenant is which node carries which
+// members/attributes, not array order.
 function normalizeGraph(graph: StoredGraph): StoredGraph {
     return {
         nodes: [...graph.nodes]
@@ -35,8 +36,9 @@ function normalizeGraph(graph: StoredGraph): StoredGraph {
     };
 }
 
-test('dual-seed decomposes each flow graph into '
-    + 'relations that reassemble to the blob', async () => {
+test('seed decomposes each flow graph into '
+    + 'relations that reassemble to the authored graph',
+async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
@@ -64,7 +66,7 @@ test('dual-seed decomposes each flow graph into '
             normalizeGraph(reassembled),
             normalizeGraph(expected),
             'flow ' + flow.id + ' relations must '
-                + 'reassemble to its graph blob',
+                + 'reassemble to its authored graph',
         );
     }
 });

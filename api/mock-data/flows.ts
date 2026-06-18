@@ -1,5 +1,5 @@
 import type {
-    FlowEntity,
+    FlowWithGraph,
     FlowNodeEntity,
     FlowEdgeEntity,
     FlowNodeMemberEntity,
@@ -18,12 +18,19 @@ import {
     buildLeadToCloseEdges,
 } from './lead-to-close-flow.ts';
 
+// A build-time flow seed: the storage row's scalar fields PLUS
+// the AUTHORED graph literal. `graph` is NOT a stored column
+// (flows.graph is retired) — it is the seed input from which the
+// relation rows are derived (buildFlowGraphRelations) and the
+// work-order snapshots are taken. The composition root stores
+// only the scalar fields and discards the literal.
+export type FlowSeed = Omit<FlowWithGraph, 'organization_id'>;
+
 // The five seeded flows and their inline graph definitions.
 // The Lead-to-Close graph reuses the extracted lead-to-close
 // node and edge builders. Fixed data; the composition root
 // assigns organization_id at write time.
-export function buildFlows():
-    Omit<FlowEntity, 'organization_id'>[] {
+export function buildFlows(): FlowSeed[] {
     const leadToCloseNodes = buildLeadToCloseNodes();
     const leadToCloseEdges = buildLeadToCloseEdges();
     return [
@@ -1025,11 +1032,10 @@ export function buildFlows():
     ];
 }
 
-// The four relation row-sets a flow's graph blob decomposes
-// into — the dormant normalized half of the dual-seed
-// (F-131 step 2). Derived FROM the blob through
-// validateStoredGraphJson so the relations cannot diverge from
-// it; reassembleStoredGraph is the inverse at the read seam.
+// The four relation row-sets a flow's authored graph literal
+// decomposes into — the normalized graph truth (F-131). Derived
+// FROM the build-time literal through validateStoredGraphJson;
+// reassembleStoredGraph is the inverse at the read seam.
 export interface FlowGraphRelations {
     nodes: FlowNodeEntity[];
     edges: FlowEdgeEntity[];
@@ -1043,7 +1049,7 @@ export interface FlowGraphRelations {
 // moment of union `at`. Members and attributes seed as 'added'
 // — the dual-seed records unions, never dissolutions.
 export function buildFlowGraphRelations(
-    flows: readonly Pick<FlowEntity, 'id' | 'graph'>[],
+    flows: readonly Pick<FlowSeed, 'id' | 'graph'>[],
     at: string,
 ): FlowGraphRelations {
     const nodes: FlowNodeEntity[] = [];

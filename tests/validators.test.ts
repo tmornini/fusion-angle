@@ -346,6 +346,12 @@ test(
 
 // --- FlowEntity ---
 
+// The graph is NOT a flow column — flows.graph is retired. The
+// stored flow row carries only its scalar fields; the graph
+// lives in the four relation tables and the relation validators
+// (validateFlowEdgeEntity et al.) own the node-id alphabet
+// fence. So validateFlowEntity neither requires nor accepts a
+// graph key.
 const validFlow = {
     organization_id: '1',
     name: 'Flow A',
@@ -353,7 +359,6 @@ const validFlow = {
     is_auto_layout: true,
     is_auto_fit: true,
     lock_timeout: DEFAULT_LOCK_TIMEOUT,
-    graph: '{"nodes":[],"edges":[]}',
 };
 
 test('validateFlowEntity accepts valid payload', () => {
@@ -399,57 +404,6 @@ test(
     );
 });
 
-test(
-    'validateFlowEntity rejects a shapeless graph',
-    () => {
-    assert.throws(
-        () => validateFlowEntity({
-            ...validFlow,
-            graph: '{}',
-        }),
-        /expected array for FlowEntity.graph.nodes/,
-    );
-});
-
-function graphNode(id: string): Record<string, unknown> {
-    return {
-        id, name: 'n', positionX: 0, positionY: 0,
-        isCreate: false, isArchive: false,
-        memberIds: [], attributes: [],
-        taskInstructions: '',
-    };
-}
-
-test(
-    'validateFlowEntity rejects a node id outside the'
-    + ' id alphabet',
-    () => {
-    // markup-significant characters in a node id are the
-    // stored-XSS vector — the gate kills them at entry
-    assert.throws(
-        () => validateFlowEntity({
-            ...validFlow,
-            graph: JSON.stringify({
-                nodes: [graphNode('"><img src=x>')],
-                edges: [],
-            }),
-        }),
-        /must contain only \[A-Za-z0-9_-\]/,
-    );
-});
-
-test(
-    'validateFlowEntity accepts base62 node ids',
-    () => {
-    const result = validateFlowEntity({
-        ...validFlow,
-        graph: JSON.stringify({
-            nodes: [graphNode('n1')],
-            edges: [],
-        }),
-    });
-    assert.ok(result.graph.includes('n1'));
-});
 
 // --- FlowVersionEntity ---
 
@@ -1072,12 +1026,21 @@ const validVersionSnapshot = {
 
 const VALID_AT = '2026-01-01T00:00:00.000000Z';
 
+const EMPTY_GRAPH_DELTA = {
+    nodes: [],
+    edges: [],
+    deletions: [],
+    memberEvents: [],
+    attributeEvents: [],
+};
+
 test('validateFlowPutBody accepts a plain (none) write', () => {
     const result = validateFlowPutBody({
         flow: { name: 'F' },
         eventId: 'ev1',
         at: VALID_AT,
         history: { kind: 'none' },
+        graphDelta: EMPTY_GRAPH_DELTA,
     });
     assert.equal(result.history.kind, 'none');
     assert.equal(result.eventId, 'ev1');
@@ -1093,6 +1056,7 @@ test('validateFlowPutBody accepts a snapshot write', () => {
             kind: 'snapshot',
             version: validVersionSnapshot,
         },
+        graphDelta: EMPTY_GRAPH_DELTA,
     });
     assert.equal(result.history.kind, 'snapshot');
     if (result.history.kind === 'snapshot') {
@@ -1115,6 +1079,7 @@ test('validateFlowPutBody rejects an unknown history kind', () => {
             flow: {}, eventId: 'ev1',
             at: VALID_AT,
             history: { kind: 'consume', versionId: 'v1' },
+            graphDelta: EMPTY_GRAPH_DELTA,
         }),
         /history\.kind/,
     );
@@ -1125,6 +1090,7 @@ test('validateFlowPutBody rejects an empty eventId', () => {
         () => validateFlowPutBody({
             flow: {}, eventId: '', at: VALID_AT,
             history: { kind: 'none' },
+            graphDelta: EMPTY_GRAPH_DELTA,
         }),
         /eventId/,
     );

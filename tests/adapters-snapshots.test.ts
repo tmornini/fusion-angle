@@ -330,6 +330,24 @@ test(
 );
 
 test(
+    'putSnapshot rejects retired flows.graph',
+    async () => {
+        const { ctx } = await setup();
+        const json = JSON.stringify({
+            flows: [{
+                id: 'f1',
+                name: 'F',
+                graph: '{"nodes":[],"edges":[]}',
+            }],
+        });
+        await assert.rejects(
+            () => putSnapshot(ctx, json),
+            /flows\.graph/,
+        );
+    },
+);
+
+test(
     'putSnapshot accepts current-shape snapshot',
     async () => {
         const { db, ctx } = await setup();

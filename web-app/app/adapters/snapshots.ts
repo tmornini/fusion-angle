@@ -42,7 +42,7 @@ export const RETIRED_KEYS_PER_TABLE:
     identity_tokens: ['parent_jti'],
     members: ['first_name', 'last_name'],
     ai_members: ['created_at', 'auth_token', 'provider'],
-    flows: ['created_at', 'updated_at'],
+    flows: ['created_at', 'updated_at', 'graph'],
     work_orders: ['created_at'],
     flow_versions: ['created_at'],
     flow_work_orders: ['created_at'],

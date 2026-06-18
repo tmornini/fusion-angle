@@ -268,6 +268,18 @@ export class BackedDbAdapter
         );
     }
 
+    // Raw single-row read bypassing the EntityStore deleted
+    // filter — see GuardedDbAdapter.rawReadRow.
+    rawReadRow<T extends { id: string }>(
+        table: string,
+        id: string,
+    ): Promise<T | null> {
+        return this.#backend.transaction(
+            [table], 'readonly',
+            tx => tx.get<T>(table, id),
+        );
+    }
+
     // An adapter whose 36 stores are bound to the open tx
     // (ambientRunner joins it), so every op runs in one
     // transaction. Lifecycle methods delegate to the parent;
@@ -295,6 +307,10 @@ export class BackedDbAdapter
                 this.#assertSubset(tables, declaredTables);
                 return fn(view);
             },
+            rawReadRow: <T extends { id: string }>(
+                table: string,
+                id: string,
+            ) => tx.get<T>(table, id),
         };
         return view;
     }

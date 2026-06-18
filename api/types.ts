@@ -1007,6 +1007,11 @@ export const DEFAULT_NODE_MEMBER_IDS:
     readonly MemberId[] = [];
 export const DEFAULT_NODE_TASK_INSTRUCTIONS = '';
 
+// The stored flow row. The graph is NOT a column: it lives in
+// the four relation tables (flow_nodes, flow_edges,
+// flow_node_members, flow_node_attributes) and the GET handlers
+// reassemble it on read. The frozen plane (flow_versions.graph,
+// work_orders.flow_graph) keeps its own blob.
 export interface FlowEntity {
     id: Id;
     organization_id: Id;
@@ -1015,8 +1020,16 @@ export interface FlowEntity {
     is_auto_layout: boolean;
     is_auto_fit: boolean;
     lock_timeout: number;
-    graph: JsonObjectField;
 }
+
+// The GET-response shape for a flow: the stored row PLUS the
+// `graph` field the GET handlers derive by reassembling the
+// four relation tables (single GET /flows/:id and the list GET
+// /flows). The stored row no longer carries the blob; readers
+// that need the graph annotate their GET as FlowWithGraph.
+export type FlowWithGraph = FlowEntity & {
+    graph: JsonObjectField;
+};
 
 export interface FlowVersionEntity {
     id: Id;
@@ -1108,11 +1121,15 @@ export interface WorkOrderFlowGraph {
 }
 
 // The graph storage seam, serialize half — the parse half
-// is asStoredGraph in validators.ts. The stored JSON shape
-// is a pinned contract (SCHEMA.md documents it; old rows
-// and exported backups carry it), so domain graphs cross
-// into rows ONLY through these mappers — a domain-type
-// change cannot silently rewrite storage.
+// is asStoredGraph in validators.ts. The live flows.graph blob
+// is retired; this seam now serves the frozen plane
+// (flow_versions.graph, work_orders.flow_graph) plus the
+// GET-derived read DTO (the graph the GET handlers reassemble
+// from relations and return as FlowWithGraph.graph). The stored
+// JSON shape is a pinned contract (SCHEMA.md documents it; old
+// rows and exported backups carry it), so domain graphs cross
+// into rows ONLY through these mappers — a domain-type change
+// cannot silently rewrite storage.
 function storedNodeAttribute(
     ref: NodeAttribute,
 ): Record<string, unknown> {

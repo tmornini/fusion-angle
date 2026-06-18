@@ -18,12 +18,16 @@ import {
 import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
+    nowUtc,
 } from '../api/types.ts';
+import {
+    buildFlowGraphRelations,
+} from '../api/mock-data/flows.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import type {
-    FlowEntity,
+    FlowWithGraph,
     GraphEdge,
     GraphNode,
     StoredGraph,
@@ -58,11 +62,14 @@ function buildEdge(
     };
 }
 
+// Carries the authored graph literal alongside the stored
+// scalar fields. `graph` is NOT a stored column — it is the
+// relation-seed input; the flow row stores only the scalars.
 function buildFlowEntity(
     id: string,
     graph: StoredGraph,
-    overrides: Partial<FlowEntity> = {},
-): FlowEntity {
+    overrides: Partial<FlowWithGraph> = {},
+): FlowWithGraph {
     return {
         id,
         organization_id: '1',
@@ -80,18 +87,51 @@ function buildFlowEntity(
     };
 }
 
-function readyGraph(): StoredGraph {
+// Seed a flow the way the write path does: the flow row (scalar
+// fields only — no graph blob) PLUS the four relation rows its
+// graph decomposes into. The LIST GET reassembles the graph
+// from those relations (the read source of record), so a
+// relation-less seed would read as an empty graph.
+async function seedFlowWithRelations(
+    db: MemoryDbAdapter,
+    flow: FlowWithGraph,
+): Promise<void> {
+    const { id, graph: _graph, ...body } = flow;
+    await db.flows.put(id, body);
+    const at = nowUtc();
+    const rel = buildFlowGraphRelations(
+        [{ id, graph: flow.graph }], at,
+    );
+    for (const node of rel.nodes) {
+        await db.flowNodes.put(node.id, node);
+    }
+    for (const edge of rel.edges) {
+        await db.flowEdges.put(edge.id, edge);
+    }
+    for (const member of rel.members) {
+        await db.flowNodeMembers.put(member.id, member);
+    }
+    for (const attr of rel.attributes) {
+        await db.flowNodeAttributes.put(attr.id, attr);
+    }
+}
+
+// Node/edge ids are globally-unique canvas ids (the flow_nodes
+// keyPath), so seeding two flows demands distinct ids — the
+// optional prefix namespaces them per flow.
+function readyGraph(prefix = ''): StoredGraph {
+    const n = (id: string) => prefix + id;
     return {
         nodes: [
-            buildNode('start', { isCreate: true }),
-            buildNode('mid', {
+            buildNode(n('start'), { isCreate: true }),
+            buildNode(n('mid'), {
                 memberIds: ['hw_1'],
             }),
-            buildNode('done', { isArchive: true }),
+            buildNode(n('done'), { isArchive: true }),
         ],
         edges: [
-            buildEdge('e1', 'start', 'mid'),
-            buildEdge('e2', 'mid', 'done'),
+            buildEdge(n('e1'), n('start'), n('mid')),
+            buildEdge(n('e2'), n('mid'), n('done')),
         ],
     };
 }
@@ -213,28 +253,28 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        const goodGraph = readyGraph();
+        const goodGraph = readyGraph('good-');
         const badGraph: StoredGraph = {
             nodes: [
-                buildNode('start', {
+                buildNode('bad-start', {
                     isCreate: true,
                 }),
-                buildNode('mid'),
-                buildNode('done', {
+                buildNode('bad-mid'),
+                buildNode('bad-done', {
                     isArchive: true,
                 }),
             ],
             edges: [
-                buildEdge('e1', 'start', 'mid'),
-                buildEdge('e2', 'mid', 'done'),
+                buildEdge('bad-e1', 'bad-start', 'bad-mid'),
+                buildEdge('bad-e2', 'bad-mid', 'bad-done'),
             ],
         };
-        const { id: _g, ...goodBody } =
-            buildFlowEntity('good', goodGraph);
-        const { id: _b, ...badBody } =
-            buildFlowEntity('bad', badGraph);
-        await db.flows.put('good', goodBody);
-        await db.flows.put('bad', badBody);
+        await seedFlowWithRelations(
+            db, buildFlowEntity('good', goodGraph),
+        );
+        await seedFlowWithRelations(
+            db, buildFlowEntity('bad', badGraph),
+        );
         const ctx = createRequestContext(db, await devToken());
         const result = await getFlowsForCreation(
             ctx,
@@ -257,20 +297,18 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        const { id: _g, ...lockedReadyBody } =
+        await seedFlowWithRelations(
+            db,
             buildFlowEntity(
-                'locked-ready', readyGraph(),
+                'locked-ready', readyGraph('locked-'),
                 { is_locked: true },
-            );
-        const { id: _g2, ...openReadyBody } =
-            buildFlowEntity(
-                'open-ready', readyGraph(),
-            );
-        await db.flows.put(
-            'locked-ready', lockedReadyBody,
+            ),
         );
-        await db.flows.put(
-            'open-ready', openReadyBody,
+        await seedFlowWithRelations(
+            db,
+            buildFlowEntity(
+                'open-ready', readyGraph('open-'),
+            ),
         );
         const ctx = createRequestContext(db, await devToken());
         const result = await getFlowsForCreation(

@@ -1,5 +1,5 @@
 import type {
-    FlowEntity,
+    FlowWithGraph,
     Id,
 } from '../../../api/types.ts';
 import {
@@ -17,7 +17,7 @@ export type FlowProblem =
 export type FlowReadiness = ValidationResult<FlowProblem>;
 
 export function validateFlowForCreation(
-    flow: FlowEntity,
+    flow: FlowWithGraph,
 ): FlowReadiness {
     const graph = validateStoredGraphJson(
         flow.graph, 'flow.graph',
@@ -80,7 +80,7 @@ export interface FlowsForCreation {
 export async function getFlowsForCreation(
     ctx: RequestContext,
 ): Promise<FlowsForCreation> {
-    const flows = await ctx.GET<FlowEntity[]>(
+    const flows = await ctx.GET<FlowWithGraph[]>(
         'flows',
     );
     const ready: FlowPickerEntry[] = [];

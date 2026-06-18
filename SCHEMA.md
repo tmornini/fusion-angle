@@ -437,7 +437,16 @@ on write and filtered on read by the gate.
 | is_auto_layout | BOOLEAN | Default false |
 | is_auto_fit | BOOLEAN | Default false |
 | lock_timeout | INTEGER | Seconds (default 28800 = 8h) |
-| graph | TEXT | JSON document (see below) |
+
+`flows` carries only scalars: the live graph is no longer a
+`graph` column. It is normalized into the four relations
+below (`flow_nodes`, `flow_edges`, `flow_node_members`,
+`flow_node_attributes`); the `GET flows/:id` and `GET flows`
+(list) handlers reassemble the graph from those relations on
+read and return it as the derived `FlowWithGraph.graph` field.
+The frozen plane keeps an inlined blob (`flow_versions.graph`,
+`work_orders.flow_graph`) — a frozen value is not a live
+relationship.
 
 Lifecycle state lives in `states` (alphabet
 `FLOW_STATES`): `active`, `archived`, `deleted`,
@@ -448,50 +457,102 @@ head and tail of the entity's event sequence —
 the retired `created_at` / `updated_at` columns
 are now derived from the log.
 
-The `graph` column stores the entire flow definition as a
-JSON document:
+### flow_nodes
 
-```json
-{
-  "nodes": [{
-    "id": "...",
-    "name": "...",
-    "positionX": 0,
-    "positionY": 0,
-    "isCreate": false,
-    "isArchive": false,
-    "memberIds": ["..."],
-    "attributes": [{
-      "attribute_id": "...",
-      "mode": "editable",
-      "isRequired": true
-    }],
-    "taskInstructions": "..."
-  }],
-  "edges": [{
-    "id": "...",
-    "name": "...",
-    "fromNodeId": "...",
-    "toNodeId": "..."
-  }]
-}
-```
+A flow-graph node as its own relation — the node is an
+entity, not an array element welded into a graph blob. The
+`id` IS the canvas node id: the real FK target for `flow_edges`
+and both node-relationship ledgers. `EntityStore` (live,
+mutable): an edit is a PUT-overwrite by stable id; removal is
+a `'deleted'` states-log event, never a hard splice. Undo/redo
+revives a tombstoned id with a `'restored'` states-log event
+(see the State Event Log). Org-fenced via its parent flow.
 
-`isCreate` / `isArchive` are graph topology markers, not
-state values: they identify the special start/end nodes of
-the flow. A work order's *state* at a node is recorded as
-that node's id (a base62 token) in the `states` log.
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY (= canvas node id) |
+| flow_id | TEXT | FK → flows |
+| name | TEXT | empty string allowed |
+| position_x | REAL | |
+| position_y | REAL | |
+| is_create | BOOLEAN | start-node topology marker |
+| is_archive | BOOLEAN | end-node topology marker |
+| task_instructions | TEXT | empty string allowed |
+| at | TEXT | RFC-3339 Zulu — moment of the last write |
 
-`memberIds` is the set of MemberId values that may operate
-on the node — zero or more, drawn from the human and AI
-members (a unified MemberId space rooted in the `members`
+Index `['flow_id']`. `is_create` / `is_archive` are graph
+topology markers, not state values: they identify the special
+start/end nodes. A work order's *state* at a node is recorded
+as that node's id (a base62 token) in the `states` log.
+
+### flow_edges
+
+A named transition between two nodes, its own relation. The
+`id` IS the canvas edge id; `from_node_id` / `to_node_id` are
+real FKs to `flow_nodes`. `EntityStore`, same removal idiom as
+nodes (`'deleted'` event; `'restored'` on undo/redo revival).
+Org-fenced via its parent flow.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY (= canvas edge id) |
+| flow_id | TEXT | FK → flows |
+| name | TEXT | empty string allowed |
+| from_node_id | TEXT | FK → flow_nodes |
+| to_node_id | TEXT | FK → flow_nodes |
+| at | TEXT | RFC-3339 Zulu — moment of the last write |
+
+Index `['flow_id']`.
+
+### flow_node_members
+
+node↔member as its own relation with a moment of union — a
+pure join (Codd) plus `at`. `HistoryEntityStore` (append-only
+ledger): a union is an `'added'` row, its dissolution a NEW
+`'removed'` row — never a splice. The members a node currently
+holds derive via `latestByKey` (keyed by `member_id`) keeping
+the latest `'added'`; a same-`at` tie fails closed (`'removed'`
+outranks `'added'`). `member_id` is a MemberId drawn from the
+human and AI members (a unified space rooted in the `members`
 parent table; see `adapters/members-union.ts`).
 
-`attributes` is the per-node attribute reference list. Each
-entry points at a `record_attributes.id`; absence from the
-list means hidden. `mode` is `'editable'` or `'readonly'`.
-Bind the flow to a Record via `flow_records` to populate the
-attribute pool.
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY (one row per event) |
+| flow_node_id | TEXT | FK → flow_nodes |
+| member_id | TEXT | FK → members |
+| action | TEXT | `'added'` or `'removed'` |
+| at | TEXT | RFC-3339 Zulu — moment of union |
+
+Index `['flow_node_id']` (the `member_id` reverse index was
+dropped — no keyed reader). Org-fenced two hops:
+`flow_node` → `flow`.
+
+### flow_node_attributes
+
+node↔attribute as its own relation: a relationship-entity (it
+carries payload — `mode` and `is_required` — beyond the joined
+identities). `HistoryEntityStore`; a mode/required change is a
+NEW `'added'` row, never an UPDATE, so latest-wins reads the
+current payload. The attributes a node currently references
+derive via `latestByKey` (keyed by `attribute_id`) keeping the
+latest `'added'`; same-`at` ties fail closed as above. Absence
+from the derived set means hidden. Bind the flow to a Record
+via `flow_records` to populate the attribute pool.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY (one row per event) |
+| flow_node_id | TEXT | FK → flow_nodes |
+| attribute_id | TEXT | FK → record_attributes |
+| mode | TEXT | `'editable'` or `'readonly'` |
+| is_required | BOOLEAN | |
+| action | TEXT | `'added'` or `'removed'` |
+| at | TEXT | RFC-3339 Zulu — moment of union |
+
+Index `['flow_node_id', 'attribute_id']` (the `attribute_id`
+index also serves the record-attribute referrer scan).
+Org-fenced two hops: `flow_node` → `flow`.
 
 ## Records
 
@@ -567,11 +628,14 @@ on write and filtered on read by the gate.
 | position | REAL | Display order, ascending |
 
 The `flow_graph` column stores a snapshot of the flow
-definition at work order creation time. Same structure as
-`flows.graph` plus flow-level metadata (`name`,
-`lockTimeout`). The flow identity lives only in the
-`flow_work_orders` join row; legacy snapshots may still
-carry a `flowId` key, which the validator ignores.
+definition at work order creation time. The live `flows.graph`
+blob is retired; this frozen blob is the graph reassembled
+from the four relations AT FREEZE, then inlined immutably (plus
+flow-level metadata `name`, `lockTimeout`). The serialized node
+/ edge shape is identical to `flow_versions.graph`. The flow
+identity lives only in the `flow_work_orders` join row; legacy
+snapshots may still carry a `flowId` key, which the validator
+ignores.
 
 Transitions and claims are NOT separate tables — both
 families of events live in the unified `states` log
@@ -725,8 +789,43 @@ persistent undo on the flows/detail page.
 | is_auto_layout | BOOLEAN | Snapshot of flows.is_auto_layout |
 | is_auto_fit | BOOLEAN | Snapshot of flows.is_auto_fit |
 | lock_timeout | INTEGER | Snapshot of flows.lock_timeout |
-| graph | TEXT | Snapshot of flows.graph (JSON) |
+| graph | TEXT | Frozen graph reassembled at capture (JSON) |
 | at | TEXT | RFC-3339 Zulu — capture time |
+
+The frozen `graph` is the live flow graph reassembled from the
+four relations at capture time and serialized through the
+storage seam (`storedGraphField`). The shape is a pinned
+contract — the same JSON `work_orders.flow_graph` inlines, and
+the form exported backups carry:
+
+```json
+{
+  "nodes": [{
+    "id": "...",
+    "name": "...",
+    "positionX": 0,
+    "positionY": 0,
+    "isCreate": false,
+    "isArchive": false,
+    "memberIds": ["..."],
+    "attributes": [{
+      "attribute_id": "...",
+      "mode": "editable",
+      "isRequired": true
+    }],
+    "taskInstructions": "..."
+  }],
+  "edges": [{
+    "id": "...",
+    "name": "...",
+    "fromNodeId": "...",
+    "toNodeId": "..."
+  }]
+}
+```
+
+`work_orders.flow_graph` wraps this same node/edge shape with
+flow-level metadata (`name`, `lockTimeout`).
 
 ### objectives
 
@@ -822,6 +921,13 @@ State alphabets by entity kind:
   graph node id, a base62 token) plus the closed claim
   alphabet (`'claimed'`, `'claim_released'`,
   `'claim_expired'`)
+- **flow nodes / flow edges** — the `EntityStore` removal
+  lifecycle (these are the only two stores whose deletion is a
+  states-log event, not a hard splice): `'deleted'` removes a
+  node/edge; `'restored'` revives a tombstoned id on undo/redo,
+  superseding the prior `'deleted'` under the `(at, id)` total
+  order. A fresh node/edge is born live and event-free; the log
+  records only its removal and any revival
 
 `buildStateEventOp(ctx, entityId, state)` in
 `adapters/state-events.ts` is the canonical helper for

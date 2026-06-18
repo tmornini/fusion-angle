@@ -16,7 +16,6 @@ import {
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
     validateStateEntity,
-    validateStoredGraphJson,
 } from '../api/validators.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra
@@ -155,16 +154,14 @@ test('mock-data organization row passes the validator', async () => {
     );
 });
 
-// validateFlowEntity only checks that flow.graph is a
-// JsonObjectField (an opaque branded string). The strict
-// per-node / per-edge shape lives behind asStoredGraph;
-// without this test, a seed that omits e.g. node.description
-// would pass entity-row validation and surface as a runtime
-// validator throw on the first read path. Pin the deep
-// content here.
+// The live flows.graph blob is retired: the stored flow row
+// carries no graph column — the graph lives in the four
+// relation tables and is reassembled on read. Pin that the
+// seed stores no blob. The deep per-node/per-edge shape is
+// pinned by the dual-seed covenant (mock-data-flow-relations).
 
 test(
-    'mock-data flow.graph JSON validates via asStoredGraph',
+    'mock-data stored flow rows carry no graph blob',
     async () => {
         const db = await seededDb();
         const flows = await db.flows.getAll();
@@ -173,13 +170,10 @@ test(
             'precondition: flows seeded',
         );
         for (const flow of flows) {
-            assert.doesNotThrow(
-                () => validateStoredGraphJson(
-                    flow.graph,
-                    'flows[' + flow.id + '].graph',
-                ),
+            assert.ok(
+                !('graph' in flow),
                 'flow ' + flow.id
-                    + ' should parse via asStoredGraph',
+                    + ' must store no graph blob',
             );
         }
     },

@@ -124,7 +124,12 @@ is HTTP-only.
   via `currentRolesForInOrg`. See [SCHEMA.md](SCHEMA.md) /
   [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over IndexedDB. Adapters
-  in `web-app/app/adapters/` shape rows for pages.
+  in `web-app/app/adapters/` shape rows for pages. The live
+  flow graph is normalized into four relations (`flow_nodes`,
+  `flow_edges`, `flow_node_members`, `flow_node_attributes`)
+  and reassembled at the GET route into `FlowWithGraph`;
+  `flows.graph` is retired live but kept frozen
+  (`flow_versions.graph`, `work_orders.flow_graph`).
 - **Presentation.** Presenters in `web-app/app/presenters/` emit
   `SafeHtml`.
 - **Database.** IndexedDB (`api/backend-indexeddb.ts`): one

@@ -1,12 +1,16 @@
 import type { DbAdapter } from './db.ts';
+import { EntityNotFoundError } from './db.ts';
 import {
-    validateStoredGraphJson,
     validateWorkOrderFlowGraphJson,
 } from './validators.ts';
 import {
     ApiError,
     HTTP_CONFLICT,
 } from './http-errors.ts';
+import { latestByKey } from './ledger-reduction.ts';
+import {
+    relationFailClosed,
+} from './flow-graph-relations.ts';
 
 // Destroying a record attribute must not orphan its
 // covenants: state_field_values rows name the attribute in
@@ -28,13 +32,17 @@ export interface AttributeReferrers {
 // Every table the referrer scan touches. The fenced
 // state_field_values read resolves each MATCHED row's owning
 // org through its parent state event and the org-owned probe
-// ring, so an in-tx caller must declare the whole ring —
-// IndexedDB throws on any store a transaction did not name.
+// ring; the flow-node-attribute scan reads
+// flow_node_attributes + flow_nodes (+ states, already in
+// the ring, for the tombstone check). An in-tx caller must
+// declare the whole ring — IndexedDB throws on any store a
+// transaction did not name.
 export const ATTRIBUTE_RESTRICT_TABLES:
     readonly string[] = [
     'state_field_values', 'flows', 'work_orders',
     'states', 'ideas', 'projects', 'records',
     'objectives', 'invitations', 'memberships',
+    'flow_node_attributes', 'flow_nodes',
 ];
 
 interface BoundGraph {
@@ -56,21 +64,18 @@ function graphBindsAttribute(
     );
 }
 
-// Referrers for each of `attributeIds`, reading the flow and
-// work-order graphs ONCE for the whole batch. `view` is the
-// org-fenced transaction view: graphs come from the caller's
-// org slice; the field-value count fences per matched row.
+// Referrers for each of `attributeIds`. `view` is the
+// org-fenced transaction view. Live-flow referrers derive
+// from the flow_node_attributes relation (latest action per
+// flow_node_id — a 'removed' row means no current binding).
+// Frozen work-order referrers still parse the
+// work_orders.flow_graph blob (the frozen plane keeps its
+// inlined graph). Field-value referrers are a keyed read on
+// state_field_values.
 export async function collectAttributeReferrers(
     view: DbAdapter,
     attributeIds: readonly string[],
 ): Promise<Map<string, AttributeReferrers>> {
-    const flows = await view.flows.getAll();
-    const flowGraphs = flows.map(flow => ({
-        id: flow.id,
-        graph: validateStoredGraphJson(
-            flow.graph, 'flows.graph',
-        ),
-    }));
     const workOrders = await view.workOrders.getAll();
     const workOrderGraphs = workOrders.map(wo => ({
         id: wo.id,
@@ -82,13 +87,36 @@ export async function collectAttributeReferrers(
     for (const attributeId of attributeIds) {
         const values = await view.stateFieldValues
             .getAllWhere('attribute_id', attributeId);
+        const attrRows =
+            await view.flowNodeAttributes
+                .getAllWhere('attribute_id', attributeId);
+        // Latest action per flow_node_id — same tie-break
+        // as currentNodeAttributes: equal-`at` 'removed'
+        // outranks 'added' (fail-closed).
+        const latestPerNode = latestByKey(
+            attrRows,
+            r => r.flow_node_id,
+            relationFailClosed,
+        );
+        const flowIds = new Set<string>();
+        for (const [flowNodeId, last] of latestPerNode) {
+            if (last.action !== 'added') continue;
+            try {
+                const node =
+                    await view.flowNodes.getById(
+                        flowNodeId,
+                    );
+                flowIds.add(node.flow_id);
+            } catch (e) {
+                if (e instanceof EntityNotFoundError) {
+                    continue; // deleted node — not current
+                }
+                throw e;
+            }
+        }
         referrers.set(attributeId, {
             valueCount: values.length,
-            flowIds: flowGraphs
-                .filter(f => graphBindsAttribute(
-                    f.graph, attributeId,
-                ))
-                .map(f => f.id),
+            flowIds: [...flowIds],
             workOrderIds: workOrderGraphs
                 .filter(wo => graphBindsAttribute(
                     wo.graph, attributeId,

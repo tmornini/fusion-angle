@@ -199,19 +199,80 @@ export function orgOwnedProbes(
     ];
 }
 
+// The raw-read adapter the graph-entity probe needs. Both
+// call sites (db-org-scoped, api.ts) pass the UNFENCED base
+// adapter so a foreign parent reports its real org and the
+// leaf is correctly hidden.
+// rawReadRow bypasses EntityStore's deleted filter — essential
+// because 'deleted' states events have entity_id = node/edge
+// id, and EntityStore.getById hides those rows. The ownership
+// probe must resolve the flow_id even for deleted entities.
+interface RawReader {
+    rawReadRow<T extends { id: string }>(
+        table: string,
+        id: string,
+    ): Promise<T | null>;
+}
+
+// Build the graph-entity probe shared by both ownerOrgOfEntity
+// call sites (db-org-scoped.ts and api.ts). Tries flow_nodes
+// first (raw — bypasses deleted filter), then flow_edges (raw);
+// on a hit resolves the flow's org via the UNFENCED flows store.
+// An absent node AND absent edge return null (visible orphan,
+// like every other parent-derived miss). Each read is in its
+// OWN try — one call per try, per the no-greedy-catch covenant.
+// Re-throws any non-EntityNotFoundError so unexpected storage
+// failures surface instead of silently resolving to null.
+export function graphEntityProbe(
+    base: RawReader,
+    flows: OrgOwnedProbe,
+): (entityId: Id) => Promise<Id | null> {
+    return async (entityId) => {
+        let flowId: Id | null = null;
+        // Try flow_nodes first — raw bypasses deleted filter.
+        const nodeRow = await base.rawReadRow<{
+            id: string; flow_id: Id;
+        }>('flow_nodes', entityId);
+        if (nodeRow !== null) {
+            flowId = nodeRow.flow_id;
+        }
+        // Try flow_edges if not a node.
+        if (flowId === null) {
+            const edgeRow = await base.rawReadRow<{
+                id: string; flow_id: Id;
+            }>('flow_edges', entityId);
+            if (edgeRow !== null) {
+                flowId = edgeRow.flow_id;
+            }
+        }
+        if (flowId === null) return null;
+        // Resolve the flow's org. An absent flow is an orphan.
+        try {
+            const flow = await flows.getById(flowId);
+            return flow.organization_id;
+        } catch (e) {
+            if (e instanceof EntityNotFoundError) return null;
+            throw e;
+        }
+    };
+}
+
 // Resolve the org that owns the entity behind a
 // `states.entity_id`. The log is unified across kinds, so the
 // id is probed against each org-owned store (UNFENCED, so a
-// foreign entity reports its real org). A member-lifecycle
-// event names an ORG-LESS member; it resolves via the
-// membership ledger like viaMembership. An id matching nothing
-// is an orphan (null). Used by the `states` and
-// `state_field_values` read fences.
+// foreign entity reports its real org). An optional
+// graphProbe is applied AFTER the orgOwnedStores loop and
+// BEFORE the membership ledger; it closes the flow_nodes /
+// flow_edges two-hop. A member-lifecycle event names an
+// ORG-LESS member; it resolves via the membership ledger like
+// viaMembership. An id matching nothing is an orphan (null).
+// Used by the `states` and `state_field_values` read fences.
 export async function ownerOrgOfEntity(
     orgOwnedStores: readonly OrgOwnedProbe[],
     memberships: MembershipReader,
     boundOrg: Id,
     entityId: Id,
+    graphProbe?: (entityId: Id) => Promise<Id | null>,
 ): Promise<Id | null> {
     for (const store of orgOwnedStores) {
         try {
@@ -220,6 +281,10 @@ export async function ownerOrgOfEntity(
         } catch (e) {
             if (!(e instanceof EntityNotFoundError)) throw e;
         }
+    }
+    if (graphProbe !== undefined) {
+        const graphOrg = await graphProbe(entityId);
+        if (graphOrg !== null) return graphOrg;
     }
     const mine = await memberships.getAllWhere(
         'identity_id', entityId);

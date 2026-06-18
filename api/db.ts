@@ -434,6 +434,15 @@ export interface GuardedDbAdapter
         tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
+    // Raw single-row read bypassing the EntityStore deleted
+    // filter. Used ONLY by the ownership probe for deleted
+    // graph entities (flow_nodes / flow_edges) — EntityStore's
+    // isDeleted check hides deleted rows, but the ownership
+    // resolver must find the flow_id even after deletion.
+    rawReadRow<T extends { id: string }>(
+        table: string,
+        id: string,
+    ): Promise<T | null>;
 }
 
 export const TABLE_NAMES = [
@@ -504,7 +513,7 @@ export const TABLE_INDEXES:
     flow_versions: ['flow_id'],
     flow_nodes: ['flow_id'],
     flow_edges: ['flow_id'],
-    flow_node_members: ['flow_node_id', 'member_id'],
+    flow_node_members: ['flow_node_id'],
     flow_node_attributes: ['flow_node_id', 'attribute_id'],
     flow_work_orders: ['flow_id'],
     flow_records: ['flow_id'],

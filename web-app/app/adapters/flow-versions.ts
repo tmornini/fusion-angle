@@ -1,5 +1,5 @@
 import type {
-    FlowEntity,
+    FlowWithGraph,
     FlowVersionEntity,
     GraphNode,
     GraphEdge,
@@ -87,7 +87,7 @@ async function computeFlowVersionPublish(
     flowId: string,
 ): Promise<FlowVersionPublish> {
     const [flow, mine] = await Promise.all([
-        ctx.GET<FlowEntity>('flows/' + flowId),
+        ctx.GET<FlowWithGraph>('flows/' + flowId),
         ctx.GET<FlowVersionEntity[]>(
             'flows/' + flowId + '/versions',
         ),

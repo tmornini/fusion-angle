@@ -33,6 +33,7 @@ import {
     viaMembership,
     ownerOrgOfEntity,
     orgOwnedProbes,
+    graphEntityProbe,
     type OwningOrgResolver,
 } from './store-parent-scoped.ts';
 
@@ -83,17 +84,23 @@ export function orgScopedAdapter(
     // A state event's entity_id is any org-owned entity, or an
     // org-less member visible only to a co-member of this org —
     // resolved through the UNFENCED stores so a foreign owner
-    // reports its real org and is hidden.
+    // reports its real org and is hidden. The graphProbe closes
+    // the flow_nodes / flow_edges two-hop for deletion events.
+    // rawReadRow bypasses EntityStore's deleted filter so the
+    // probe works even after the node/edge is soft-deleted.
     const orgOwned = orgOwnedProbes(base);
+    const graphProbe = graphEntityProbe(base, base.flows);
     const states = new ParentScopedStateStore(
         base.states, org, 'states',
         (row) => ownerOrgOfEntity(
-            orgOwned, memberships, org, row.entity_id,
+            orgOwned, memberships, org,
+            row.entity_id, graphProbe,
         ),
     );
 
     // state_field_values pin to a parent state event — they are
-    // owned by whatever owns that event (multi-hop).
+    // owned by whatever owns that event (multi-hop). The same
+    // graphProbe resolves flow-graph deletion events here too.
     const stateFieldValues = parentScope(
         base.stateFieldValues, 'state_field_values',
         async (row: StateFieldValueEntity) => {
@@ -106,7 +113,8 @@ export function orgScopedAdapter(
                 throw e;
             }
             return ownerOrgOfEntity(
-                orgOwned, memberships, org, ev.entity_id,
+                orgOwned, memberships, org,
+                ev.entity_id, graphProbe,
             );
         },
     );

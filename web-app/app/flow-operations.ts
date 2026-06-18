@@ -16,6 +16,7 @@ import {
     postFlowVersion,
     putFlow,
     buildFlowBody,
+    buildSaveEvents,
     buildFlowVersionSnapshot,
     notifyFlowChange,
     getFlowGraph,
@@ -23,6 +24,9 @@ import {
     generateCryptoSafeBase62,
     nowUtc,
 } from './adapters/index.ts';
+import type {
+    GraphRevival,
+} from '../../api/validators.ts';
 import type {
     FlowSaveShape,
 } from './adapters/flow-mutations.ts';
@@ -628,6 +632,43 @@ export interface HistoryOpOk {
     readonly newHistory: FlowHistorySnapshot;
 }
 
+// Compute the revival set for an undo/redo: every node/edge id
+// present in the TARGET graph but absent from the CURRENT graph
+// is a tombstoned id the target re-introduces. In undo/redo,
+// such an id is always previously-deleted, so revive it
+// unconditionally — a 'restored' event on an already-live
+// entity is harmless. `at` is the one moment of the op.
+function buildRevivals(
+    current: { nodes: GraphNode[]; edges: GraphEdge[] },
+    target: { nodes: GraphNode[]; edges: GraphEdge[] },
+    at: string,
+): GraphRevival[] {
+    const currentIds = new Set<string>([
+        ...current.nodes.map(n => n.id),
+        ...current.edges.map(e => e.id),
+    ]);
+    const revivals: GraphRevival[] = [];
+    for (const node of target.nodes) {
+        if (!currentIds.has(node.id)) {
+            revivals.push({
+                eventId: generateCryptoSafeBase62(),
+                entityId: node.id,
+                at,
+            });
+        }
+    }
+    for (const edge of target.edges) {
+        if (!currentIds.has(edge.id)) {
+            revivals.push({
+                eventId: generateCryptoSafeBase62(),
+                entityId: edge.id,
+                at,
+            });
+        }
+    }
+    return revivals;
+}
+
 function applyServerGraph(
     snap: FlowSnapshot,
     graph: {
@@ -677,6 +718,7 @@ export async function performUndo(
             ),
         };
     }
+    const now = nowUtc();
     const stagedHistory = appendToRedoStack(
         history,
         {
@@ -689,8 +731,25 @@ export async function performUndo(
             lockTimeout: snap.lockTimeout,
             nodes: snap.nodes,
             edges: snap.edges,
-            createdAt: nowUtc(),
+            createdAt: now,
         },
+    );
+    // The delta diffs the CURRENT graph (snap — the
+    // authoritative state at undo time) against the
+    // TARGET (the version being reverted to). The
+    // revivals re-introduce ids the target carries that
+    // the current graph dropped (their tombstones).
+    const graphDelta = buildSaveEvents(
+        { nodes: snap.nodes, edges: snap.edges },
+        { nodes: version.nodes, edges: version.edges },
+        snap.flowId,
+        generateCryptoSafeBase62,
+        now,
+    );
+    const revivals = buildRevivals(
+        { nodes: snap.nodes, edges: snap.edges },
+        { nodes: version.nodes, edges: version.edges },
+        now,
     );
     // Restore + consume as ONE atomic transaction
     // through the named POST /flows/:id/undo: the
@@ -708,8 +767,10 @@ export async function performUndo(
                 edges: version.edges,
             }),
             eventId: generateCryptoSafeBase62(),
-            at: nowUtc(),
+            at: now,
             consumedVersionId: version.id,
+            graphDelta,
+            revivals,
         });
     } catch (err) {
         log.error(
@@ -752,6 +813,7 @@ export async function performRedo(
         };
     }
     const v = popped.version;
+    const now = nowUtc();
     // Snapshot + re-apply as ONE atomic transaction
     // through the named POST /flows/:id/redo: the
     // current state can never land archived as a
@@ -761,6 +823,22 @@ export async function performRedo(
         ctx,
         generateCryptoSafeBase62(),
         snap.flowId,
+    );
+    // The delta diffs the CURRENT graph (snap) against the
+    // TARGET (the popped redo version). The revivals
+    // re-introduce ids the redo target carries that the
+    // current graph dropped (their tombstones).
+    const graphDelta = buildSaveEvents(
+        { nodes: snap.nodes, edges: snap.edges },
+        { nodes: v.nodes, edges: v.edges },
+        snap.flowId,
+        generateCryptoSafeBase62,
+        now,
+    );
+    const revivals = buildRevivals(
+        { nodes: snap.nodes, edges: snap.edges },
+        { nodes: v.nodes, edges: v.edges },
+        now,
     );
     try {
         await ctx.POST(`flows/${snap.flowId}/redo`, {
@@ -775,7 +853,9 @@ export async function performRedo(
                 edges: v.edges,
             }),
             eventId: generateCryptoSafeBase62(),
-            at: nowUtc(),
+            at: now,
+            graphDelta,
+            revivals,
         });
     } catch (err) {
         log.error(

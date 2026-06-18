@@ -1,5 +1,5 @@
 import type {
-    FlowEntity,
+    FlowWithGraph,
     ProjectEntity,
     ProjectFlowEntity,
     GraphNode,
@@ -93,7 +93,7 @@ getFlowsWithProjectNames(
     const [
         flows, projectFlows, allProjects,
     ] = await Promise.all([
-        ctx.GET<FlowEntity[]>('flows'),
+        ctx.GET<FlowWithGraph[]>('flows'),
         getProjectFlowEntities(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
     ]);
@@ -141,7 +141,7 @@ export async function getFlowsByProject(
     const [projectFlows, flows] =
         await Promise.all([
             getProjectFlowsForProject(ctx, projectId),
-            ctx.GET<FlowEntity[]>('flows'),
+            ctx.GET<FlowWithGraph[]>('flows'),
         ]);
 
     const flowIds = new Set(
@@ -172,7 +172,7 @@ export async function getFlowGraph(
     flowId: string,
 ): Promise<FlowGraph> {
     const flow =
-        await ctx.GET<FlowEntity>(
+        await ctx.GET<FlowWithGraph>(
             `flows/${flowId}`,
         );
     const g = parseGraph(flow.graph);

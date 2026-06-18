@@ -6,10 +6,9 @@ import { $required } from '../dom.ts';
 import { showToast } from '../toast.ts';
 import {
     sessionContext,
-    buildFlowBody,
+    buildFlowPutBody,
     buildFlowVersionSnapshot,
     notifyFlowChange,
-    nowUtc,
     HumanMember,
     AIMember,
 } from '../adapters/index.ts';
@@ -235,12 +234,15 @@ export class FlowDesignerPresenter {
                 ),
             }
             : { kind: 'none' as const };
-        await ctx.PUT(`flows/${snap.flowId}`, {
-            flow: buildFlowBody(this.#buildSaveShape(snap)),
-            eventId: generateCryptoSafeBase62(),
-            at: nowUtc(),
-            history,
-        });
+        await ctx.PUT(
+            `flows/${snap.flowId}`,
+            await buildFlowPutBody(
+                ctx,
+                snap.flowId,
+                this.#buildSaveShape(snap),
+                history,
+            ),
+        );
         notifyFlowChange();
     }
 

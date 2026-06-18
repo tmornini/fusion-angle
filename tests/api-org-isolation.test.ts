@@ -164,7 +164,6 @@ function flowBody(org: string) {
         organization_id: org, name: 'f', is_locked: false,
         is_auto_layout: false, is_auto_fit: false,
         lock_timeout: 0,
-        graph: jsonObjectField({ nodes: [], edges: [] }),
     };
 }
 

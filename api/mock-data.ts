@@ -352,9 +352,10 @@ async function postMockDataLoadIn(
 
     const mockFlows = buildFlows();
 
-    // The dormant normalized half of the flow graph (F-131
-    // step 2): the same blobs decomposed into relation rows,
-    // seeded ALONGSIDE flows.graph. Nothing reads them yet.
+    // The normalized graph truth (F-131): each flow's authored
+    // graph literal decomposed into relation rows. These ARE the
+    // graph — the GET handlers reassemble it from them; the flow
+    // row stores no blob.
     const flowRelations = buildFlowGraphRelations(
         mockFlows, MOCK_SEED_TIMESTAMP,
     );
@@ -3116,11 +3117,15 @@ async function postMockDataLoadIn(
                 ...project, organization_id: STARK_ORG,
             }),
         ),
-        ...mockFlows.map(flow =>
-            adapter.flows.put(flow.id, {
-                ...flow, organization_id: STARK_ORG,
-            }),
-        ),
+        // Store only the flow's scalar fields — the authored
+        // graph literal is the relation-seed input (below),
+        // never a stored column.
+        ...mockFlows.map(flow => {
+            const { graph: _graph, ...row } = flow;
+            return adapter.flows.put(flow.id, {
+                ...row, organization_id: STARK_ORG,
+            });
+        }),
         // Org '2' owns a small, self-contained slice so each
         // org owns at least one project and flow. The whole
         // work-order graph stays in org '1', so org '2' gets a
@@ -3138,9 +3143,6 @@ async function postMockDataLoadIn(
             is_auto_layout: true,
             is_auto_fit: true,
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: jsonObjectField({
-                nodes: [], edges: [],
-            }),
         }),
         adapter.states.put('seed-state-flow-org2', {
             entity_id: 'seed-flow-org2',

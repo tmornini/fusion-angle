@@ -27,7 +27,6 @@ import type {
     TransitionEvent,
 } from '../web-app/app/adapters/state-events.ts';
 import {
-    jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {
@@ -90,11 +89,6 @@ function buildFlow(
         is_auto_layout: true,
         is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: jsonObjectField(
-            graph as unknown as Record<
-                string, unknown
-            >,
-        ),
     };
 }
 
@@ -119,6 +113,66 @@ function buildLinearGraph(): StoredGraph {
             buildEdge('e2', 'n-middle', 'n-finish'),
         ],
     };
+}
+
+// Seed the flow row AND the four relation tables from a
+// StoredGraph. GET /flows/:id reassembles the read graph from
+// the relations (the read source of record); work-order
+// creation freezes that reassembled graph, so a blob-only put
+// would freeze an empty graph. Direct puts with no 'deleted'
+// state event leave every node/edge live.
+async function seedFlow(
+    db: MemoryDbAdapter,
+    flowId: string,
+    graph: StoredGraph,
+): Promise<void> {
+    await db.flows.put(flowId, buildFlow(graph));
+    const at = '2026-01-01T00:00:00.000000Z';
+    for (const n of graph.nodes) {
+        await db.flowNodes.put(n.id, {
+            flow_id: flowId,
+            name: n.name,
+            position_x: n.positionX,
+            position_y: n.positionY,
+            is_create: n.isCreate,
+            is_archive: n.isArchive,
+            task_instructions: n.taskInstructions,
+            at,
+        });
+        for (const mid of n.memberIds) {
+            await db.flowNodeMembers.put(
+                `${n.id}-${mid}`,
+                {
+                    flow_node_id: n.id,
+                    member_id: mid,
+                    action: 'added',
+                    at,
+                },
+            );
+        }
+        for (const a of n.attributes) {
+            await db.flowNodeAttributes.put(
+                `${n.id}-${a.attributeId}`,
+                {
+                    flow_node_id: n.id,
+                    attribute_id: a.attributeId,
+                    mode: a.mode,
+                    is_required: a.isRequired,
+                    action: 'added',
+                    at,
+                },
+            );
+        }
+    }
+    for (const e of graph.edges) {
+        await db.flowEdges.put(e.id, {
+            flow_id: flowId,
+            name: e.name,
+            from_node_id: e.fromNodeId,
+            to_node_id: e.toNodeId,
+            at,
+        });
+    }
 }
 
 interface WoTables {
@@ -164,9 +218,7 @@ async function setupOneWorkOrder(): Promise<{
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db, await devToken());
-    await db.flows.put(
-        'f1', buildFlow(buildLinearGraph()),
-    );
+    await seedFlow(db, 'f1', buildLinearGraph());
     const woId = generateCryptoSafeBase62();
     await postWorkOrderCreation(ctx, {
         workOrderId: woId,
@@ -317,9 +369,7 @@ test(
             db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db, await devToken());
-        await db.flows.put(
-            'f1', buildFlow(buildLinearGraph()),
-        );
+        await seedFlow(db, 'f1', buildLinearGraph());
         for (let i = 0; i < 3; i++) {
             await postWorkOrderCreation(ctx, {
                 workOrderId:
@@ -383,7 +433,7 @@ test(
             db, 'current', 'Demo Test',
         );
         const ctx = createRequestContext(db, await devToken());
-        await db.flows.put('f1', buildFlow({
+        await seedFlow(db, 'f1', {
             nodes: [
                 buildNode('n-start', 'Start', {
                     isCreate: true,
@@ -407,7 +457,7 @@ test(
                     'e2', 'n-middle', 'n-finish',
                 ),
             ],
-        }));
+        });
         await postWorkOrderCreation(ctx, {
             workOrderId:
                 generateCryptoSafeBase62(),
