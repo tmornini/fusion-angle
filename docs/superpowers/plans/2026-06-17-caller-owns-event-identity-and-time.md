@@ -1276,3 +1276,33 @@ memberId, at)` is used identically in T2–T12; the `at` field
 names match the spec map across validator, route, and client in
 every task; `validateTimestampField(body, field, label)` is the
 single `at` gate everywhere. ✓
+
+---
+
+## Follow-up considerations (out of arc scope)
+
+Surfaced during the manual browser regression — NOT part of the
+caller-owns-event-time arc; recorded here so they are not lost.
+
+### Flow-designer toolbar accessibility — INVESTIGATED, benign
+
+Observed then resolved during the regression. A first
+accessibility-tree read of the designer returned `main` with NO
+interactive descendants, while a direct DOM query found the
+toolbar buttons present with `aria-label`s — which looked like a
+screen-reader reachability gap.
+
+Re-read AFTER the canvas finished mounting: the full toolbar
+surfaces correctly in the accessibility tree — Back, Flow
+statistics, the record combobox, the Locked / Auto Layout / Auto
+Fit controls as `switch` roles, and Undo / Redo / Zoom in/out /
+Copy Mermaid / Export ZIP / Delete as named `button`s. So the
+initial absence was a RENDER-TIMING ARTIFACT (the read ran before
+the async canvas/toolbar mounted), NOT a defect: roles and
+accessible names are present and correct.
+
+No code fix needed. Lower-priority due diligence, if ever wanted:
+a real keyboard-Tab traversal + screen-reader pass over the
+designer, since the Office of the Interface makes screen-reader
+affordance a gate of entry — but the automated affordances
+(roles + labels) are already in place.
