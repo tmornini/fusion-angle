@@ -1,7 +1,7 @@
 import type {
     ProjectEntity,
     Id,
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
@@ -38,7 +38,7 @@ function latestPerObjective(
 }
 
 export function validateProjectForApproval(
-    activeObjectives: Objective[],
+    activeObjectives: ObjectiveEntity[],
     baselineScores: ObjectiveScore[],
 ): ValidationResult<ProjectProblem> {
     const scored = latestPerObjective(baselineScores);

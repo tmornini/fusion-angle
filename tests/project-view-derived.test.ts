@@ -5,7 +5,7 @@ import {
     ProjectView,
 } from '../web-app/app/adapters/projects.ts';
 import type {
-    Objective,
+    ObjectiveEntity,
 } from '../api/types.ts';
 
 function makeProject(): Project {
@@ -22,10 +22,10 @@ function makeProject(): Project {
 const T1 = '2026-05-14T00:00:00.000000Z';
 const T2 = '2026-05-15T00:00:00.000000Z';
 
-const oneObjective: Objective[] = [
+const oneObjective: ObjectiveEntity[] = [
     { id: 'o1', position: 0 },
 ];
-const twoObjectives: Objective[] = [
+const twoObjectives: ObjectiveEntity[] = [
     { id: 'o1', position: 0 },
     { id: 'o2', position: 1 },
 ];

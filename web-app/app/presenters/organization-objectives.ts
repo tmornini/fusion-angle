@@ -1,6 +1,6 @@
 import { html, type SafeHtml } from '../safe-html.ts';
 import type {
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
 import {
@@ -15,14 +15,14 @@ interface Definition {
 }
 
 export class OrganizationObjectivesPresenter {
-    readonly #active: Objective[];
-    readonly #archived: Objective[];
+    readonly #active: ObjectiveEntity[];
+    readonly #archived: ObjectiveEntity[];
     readonly #defs: Map<ObjectiveId, Definition>;
     readonly #archivedAt: Map<ObjectiveId, string>;
 
     constructor(
-        active: Objective[],
-        archived: Objective[],
+        active: ObjectiveEntity[],
+        archived: ObjectiveEntity[],
         defs: Map<ObjectiveId, Definition>,
         archivedAt: Map<ObjectiveId, string>,
     ) {
@@ -100,7 +100,7 @@ export class OrganizationObjectivesPresenter {
     }
 
     #row(
-        o: Objective,
+        o: ObjectiveEntity,
         isArchived: boolean,
     ): SafeHtml {
         const def = this.#defs.get(o.id);

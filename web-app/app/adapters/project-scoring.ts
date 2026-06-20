@@ -1,10 +1,10 @@
 import type {
     Id,
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
     ProjectEntity,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
+    ProjectObjectiveBaselineScoreEntity,
+    ProjectObjectiveActualScoreEntity,
 } from '../../../api/types.ts';
 import {
     nowUtc,
@@ -68,8 +68,8 @@ export interface ObjectiveScore {
 }
 
 function toObjectiveScore(
-    r: ProjectObjectiveBaselineScore
-        | ProjectObjectiveActualScore,
+    r: ProjectObjectiveBaselineScoreEntity
+        | ProjectObjectiveActualScoreEntity,
 ): ObjectiveScore {
     return {
         id: r.id,
@@ -89,7 +89,7 @@ export async function getBaselineScoresForProject(
     projectId: Id,
 ): Promise<ObjectiveScore[]> {
     const rows = await ctx.GET<
-        ProjectObjectiveBaselineScore[]
+        ProjectObjectiveBaselineScoreEntity[]
     >('projects/' + projectId + '/objective-baseline-scores');
     return rows.map(toObjectiveScore);
 }
@@ -100,7 +100,7 @@ export async function getActualScoresForProject(
     projectId: Id,
 ): Promise<ObjectiveScore[]> {
     const rows = await ctx.GET<
-        ProjectObjectiveActualScore[]
+        ProjectObjectiveActualScoreEntity[]
     >('projects/' + projectId + '/objective-actual-scores');
     return rows.map(toObjectiveScore);
 }
@@ -260,7 +260,7 @@ export async function getPortfolioImpactSummary(
 // the same five logical reads, so fetching per-builder
 // repeated every read and its auth/ledger derivation.
 export interface ObjectiveScoringInputs {
-    activeObjectives: Objective[];
+    activeObjectives: ObjectiveEntity[];
     approvedProjectIds: Set<Id>;
     baselineScores: ObjectiveScore[];
     actualScores: ObjectiveScore[];

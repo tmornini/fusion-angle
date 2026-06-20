@@ -32,10 +32,10 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     FlowRecordEntity,
-    Objective,
+    ObjectiveEntity,
     ObjectiveRevisionEntity,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
+    ProjectObjectiveBaselineScoreEntity,
+    ProjectObjectiveActualScoreEntity,
     StateEntity,
 } from './types.ts';
 
@@ -369,16 +369,16 @@ export interface DbStores {
             IdeaSubmissionEntity
         >;
     objectives:
-        EntityStore<Objective>;
+        EntityStore<ObjectiveEntity>;
     objectiveRevisions:
         EntityStore<ObjectiveRevisionEntity>;
     projectObjectiveBaselineScores:
         EntityStore<
-            ProjectObjectiveBaselineScore
+            ProjectObjectiveBaselineScoreEntity
         >;
     projectObjectiveActualScores:
         EntityStore<
-            ProjectObjectiveActualScore
+            ProjectObjectiveActualScoreEntity
         >;
     states: StateStore;
 }

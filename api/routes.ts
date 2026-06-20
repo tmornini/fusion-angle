@@ -22,12 +22,12 @@ import type {
     IdentityTokenRevocationEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
-    Objective,
+    ObjectiveEntity,
     ObjectiveRevisionEntity,
     ProjectEntity,
     ProjectFlowEntity,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
+    ProjectObjectiveBaselineScoreEntity,
+    ProjectObjectiveActualScoreEntity,
     RecordEntity,
     RecordAttributeEntity,
     RoleGrantEntity,
@@ -803,7 +803,7 @@ export const routes: Route[] = [
                                 baseline.id,
                                 baseline.fields as unknown as
                                     Omit<
-                                        ProjectObjectiveBaselineScore,
+                                        ProjectObjectiveBaselineScoreEntity,
                                         'id'
                                     >,
                             );
@@ -1575,7 +1575,7 @@ export const routes: Route[] = [
                     await view.objectives.put(
                         b.id,
                         b.objective as unknown as
-                            Omit<Objective, 'id'>,
+                            Omit<ObjectiveEntity, 'id'>,
                     );
                     await view.objectiveRevisions.put(
                         b.revisionId,
@@ -1586,7 +1586,7 @@ export const routes: Route[] = [
             );
         },
     }),
-    makeIdRoute<Objective>({
+    makeIdRoute<ObjectiveEntity>({
         noun: 'objectives',
         store: db => db.objectives,
         verbs: ['get', 'put'],
@@ -1626,7 +1626,7 @@ export const routes: Route[] = [
             db.projectObjectiveBaselineScores.put(
                 param(p, 1),
                 withoutId(body) as unknown as
-                    Omit<ProjectObjectiveBaselineScore, 'id'>,
+                    Omit<ProjectObjectiveBaselineScoreEntity, 'id'>,
             ),
     }),
     // Objective actual scores nest under their parent project,
@@ -1643,7 +1643,7 @@ export const routes: Route[] = [
             db.projectObjectiveActualScores.put(
                 param(p, 1),
                 withoutId(body) as unknown as
-                    Omit<ProjectObjectiveActualScore, 'id'>,
+                    Omit<ProjectObjectiveActualScoreEntity, 'id'>,
             ),
     }),
     route('states', {

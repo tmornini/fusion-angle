@@ -45,10 +45,10 @@ import type {
     RecordId,
     RecordState,
     FlowRecordEntity,
-    Objective,
+    ObjectiveEntity,
     ObjectiveRevisionEntity,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
+    ProjectObjectiveBaselineScoreEntity,
+    ProjectObjectiveActualScoreEntity,
     StateEntity,
 } from './types.ts';
 import {
@@ -1563,7 +1563,7 @@ const OBJECTIVE_BODY_KEYS: readonly string[] = [
 
 export function validateObjectiveEntity(
     body: Record<string, unknown>,
-): Omit<Objective, 'id'> {
+): Omit<ObjectiveEntity, 'id'> {
     assertOnlyKeys(
         body, OBJECTIVE_BODY_KEYS, 'Objective',
     );
@@ -1618,7 +1618,7 @@ const BASELINE_SCORE_BODY_KEYS:
 
 export function validateBaselineScoreEntity(
     body: Record<string, unknown>,
-): Omit<ProjectObjectiveBaselineScore, 'id'> {
+): Omit<ProjectObjectiveBaselineScoreEntity, 'id'> {
     assertOnlyKeys(
         body,
         BASELINE_SCORE_BODY_KEYS,
@@ -1651,7 +1651,7 @@ const ACTUAL_SCORE_BODY_KEYS:
 
 export function validateActualScoreEntity(
     body: Record<string, unknown>,
-): Omit<ProjectObjectiveActualScore, 'id'> {
+): Omit<ProjectObjectiveActualScoreEntity, 'id'> {
     assertOnlyKeys(
         body,
         ACTUAL_SCORE_BODY_KEYS,

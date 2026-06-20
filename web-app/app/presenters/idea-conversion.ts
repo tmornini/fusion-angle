@@ -17,7 +17,7 @@ import {
 } from '../icons.ts';
 import { type Idea } from '../adapters/index.ts';
 import type {
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
 import {
@@ -93,7 +93,7 @@ export function conversionCompletedCount(
 
 export function conversionIsReady(
     draft: ConversionDraft,
-    activeObjectives: readonly Objective[],
+    activeObjectives: readonly ObjectiveEntity[],
 ): boolean {
     const allFieldsFilled = REQUIRED_FIELDS.every(
         f => draft.fields[f] !== '',
@@ -120,7 +120,7 @@ export class IdeaConversionPresenter {
     readonly #successMetrics: string;
     readonly #draft: ConversionDraft;
     readonly #activeObjectives:
-        readonly Objective[];
+        readonly ObjectiveEntity[];
     readonly #defs: ReadonlyMap<
         ObjectiveId, ObjectiveDefinition
     >;
@@ -128,7 +128,7 @@ export class IdeaConversionPresenter {
     constructor(
         idea: Idea,
         draft: ConversionDraft,
-        activeObjectives: readonly Objective[],
+        activeObjectives: readonly ObjectiveEntity[],
         defs: ReadonlyMap<
             ObjectiveId, ObjectiveDefinition
         >,
@@ -679,7 +679,7 @@ export class IdeaConversionPresenter {
             </div>`;
     }
 
-    #baselineRow(obj: Objective): SafeHtml {
+    #baselineRow(obj: ObjectiveEntity): SafeHtml {
         const def = this.#defs.get(obj.id);
         if (!def) {
             throw new Error(

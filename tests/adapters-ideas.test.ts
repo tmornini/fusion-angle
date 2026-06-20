@@ -20,7 +20,7 @@ import {
 import {
     type IdeaEntity,
     type ProjectEntity,
-    type ProjectObjectiveBaselineScore,
+    type ProjectObjectiveBaselineScoreEntity,
 } from '../api/types.ts';
 import {
     seedHumanMember,
@@ -292,7 +292,7 @@ test(
 
         const mine =
             await ctx.GET<
-                ProjectObjectiveBaselineScore[]
+                ProjectObjectiveBaselineScoreEntity[]
             >(
                 'projects/p1/objective'
                 + '-baseline-scores',

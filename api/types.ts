@@ -925,7 +925,7 @@ export interface IdeaEntity {
 
 export type ObjectiveId = Id;
 
-export interface Objective {
+export interface ObjectiveEntity {
     id: ObjectiveId;
     organization_id: Id;
     position: number;
@@ -940,7 +940,7 @@ export interface ObjectiveRevisionEntity {
     at: string;
 }
 
-export interface ProjectObjectiveBaselineScore {
+export interface ProjectObjectiveBaselineScoreEntity {
     id: Id;
     project_id: Id;
     objective_id: ObjectiveId;
@@ -949,7 +949,7 @@ export interface ProjectObjectiveBaselineScore {
     at: string;
 }
 
-export interface ProjectObjectiveActualScore {
+export interface ProjectObjectiveActualScoreEntity {
     id: Id;
     project_id: Id;
     objective_id: ObjectiveId;

@@ -9,7 +9,7 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    type ProjectObjectiveBaselineScore,
+    type ProjectObjectiveBaselineScoreEntity,
 } from '../api/types.ts';
 
 // POST ideas/:id/conversion is the LONE cross-aggregate write:
@@ -147,7 +147,7 @@ test(
         );
 
         const mine = await GET<
-            ProjectObjectiveBaselineScore[]
+            ProjectObjectiveBaselineScoreEntity[]
         >(
             db,
             'projects/p1/objective-baseline-scores',

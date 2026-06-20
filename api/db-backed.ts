@@ -45,10 +45,10 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     FlowRecordEntity,
-    Objective,
+    ObjectiveEntity,
     ObjectiveRevisionEntity,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
+    ProjectObjectiveBaselineScoreEntity,
+    ProjectObjectiveActualScoreEntity,
 } from './types.ts';
 import type { LatencySimulation } from './latency.ts';
 import { EntityStore } from './store-entity.ts';
@@ -167,13 +167,13 @@ export class BackedDbAdapter
         GuardedEntityStore<InvitationEntity>;
     readonly ideaSubmissions!:
         GuardedEntityStore<IdeaSubmissionEntity>;
-    readonly objectives!: GuardedEntityStore<Objective>;
+    readonly objectives!: GuardedEntityStore<ObjectiveEntity>;
     readonly objectiveRevisions!:
         GuardedEntityStore<ObjectiveRevisionEntity>;
     readonly projectObjectiveBaselineScores!:
-        GuardedEntityStore<ProjectObjectiveBaselineScore>;
+        GuardedEntityStore<ProjectObjectiveBaselineScoreEntity>;
     readonly projectObjectiveActualScores!:
-        GuardedEntityStore<ProjectObjectiveActualScore>;
+        GuardedEntityStore<ProjectObjectiveActualScoreEntity>;
     readonly states!: IStateStore;
 
     constructor(

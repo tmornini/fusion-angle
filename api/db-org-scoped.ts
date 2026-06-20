@@ -16,8 +16,8 @@ import type {
     FlowRecordEntity,
     IdeaSubmissionEntity,
     ObjectiveRevisionEntity,
-    ProjectObjectiveBaselineScore,
-    ProjectObjectiveActualScore,
+    ProjectObjectiveBaselineScoreEntity,
+    ProjectObjectiveActualScoreEntity,
     StateFieldValueEntity,
     IdentityPiiEntity,
     IdentityCredentialEntity,
@@ -271,7 +271,7 @@ export function orgScopedAdapter(
             'project_objective_baseline_scores',
             viaParent(
                 base.projects,
-                (r: ProjectObjectiveBaselineScore) =>
+                (r: ProjectObjectiveBaselineScoreEntity) =>
                     r.project_id),
         ),
         projectObjectiveActualScores: parentScope(
@@ -279,7 +279,7 @@ export function orgScopedAdapter(
             'project_objective_actual_scores',
             viaParent(
                 base.projects,
-                (r: ProjectObjectiveActualScore) =>
+                (r: ProjectObjectiveActualScoreEntity) =>
                     r.project_id),
         ),
         states,

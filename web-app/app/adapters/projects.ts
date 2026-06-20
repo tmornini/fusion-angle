@@ -1,7 +1,7 @@
 import type {
     ProjectEntity,
     ProjectState,
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
 import {
@@ -98,7 +98,7 @@ export class ProjectView {
 
     constructor(
         project: Project,
-        objectives: readonly Objective[],
+        objectives: readonly ObjectiveEntity[],
         baselineScores: readonly ObjectiveScore[],
         actualScores: readonly ObjectiveScore[],
     ) {

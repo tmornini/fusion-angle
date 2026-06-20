@@ -30,7 +30,7 @@ import {
 } from '../app/adapters/objectives.ts';
 import { MS_PER_DAY } from '../../api/types.ts';
 import type {
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
 } from '../../api/types.ts';
 import {
@@ -96,7 +96,7 @@ export async function init(
         );
         return;
     }
-    let activeObjectives: readonly Objective[];
+    let activeObjectives: readonly ObjectiveEntity[];
     let defs: ReadonlyMap<
         ObjectiveId, ObjectiveDefinition
     >;
@@ -566,7 +566,7 @@ async function performConversion(
     projectId: string,
     draft: ConversionDraft,
     ideaEntity: IdeaEntity,
-    activeObjectives: readonly Objective[],
+    activeObjectives: readonly ObjectiveEntity[],
 ): Promise<void> {
     const fields = draft.fields;
     const projects = await getProjectEntities(ctx);

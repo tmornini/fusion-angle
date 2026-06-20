@@ -25,7 +25,7 @@ const { ProjectDetailPresenter } = await import(
 );
 
 import type {
-    Objective,
+    ObjectiveEntity,
 } from '../api/types.ts';
 
 function makeRecordingContainer(): {
@@ -85,7 +85,7 @@ function makeProject() {
     }, 'approved');
 }
 
-const objectives: Objective[] = [
+const objectives: ObjectiveEntity[] = [
     { id: 'o1', position: 0 },
     { id: 'o2', position: 1 },
 ];

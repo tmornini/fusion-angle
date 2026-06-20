@@ -1,6 +1,6 @@
 import { html, type SafeHtml } from '../safe-html.ts';
 import type {
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
 import { ICON_SIZE, iconTrendingUp } from '../icons.ts';
@@ -42,13 +42,13 @@ function directionForDelta(delta: number): Direction {
 }
 
 export class DashboardObjectiveAggregatesPresenter {
-    readonly #activeObjectives: Objective[];
+    readonly #activeObjectives: ObjectiveEntity[];
     readonly #defs: Map<ObjectiveId, Definition>;
     readonly #aggregates: Aggregate[];
     readonly #trendlines: Map<ObjectiveId, TrendPoint[]>;
 
     constructor(
-        activeObjectives: Objective[],
+        activeObjectives: ObjectiveEntity[],
         defs: Map<ObjectiveId, Definition>,
         aggregates: Aggregate[],
         trendlines: Map<ObjectiveId, TrendPoint[]>,
@@ -90,7 +90,7 @@ export class DashboardObjectiveAggregatesPresenter {
     }
 
     #row(
-        o: Objective,
+        o: ObjectiveEntity,
         agg: Aggregate | undefined,
     ): SafeHtml {
         const def = this.#defs.get(o.id);

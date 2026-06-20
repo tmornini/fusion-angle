@@ -1,6 +1,6 @@
 import { html, type SafeHtml } from '../safe-html.ts';
 import type {
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
     ProjectState,
 } from '../../../api/types.ts';
@@ -47,14 +47,14 @@ function actualVisible(state: ProjectState): boolean {
 }
 
 export class ProjectObjectivesPresenter {
-    readonly #activeObjectives: Objective[];
+    readonly #activeObjectives: ObjectiveEntity[];
     readonly #defs: Map<ObjectiveId, Definition>;
     readonly #latestBaselines: ObjectiveScore[];
     readonly #latestActuals: ObjectiveScore[];
     readonly #state: ProjectState;
 
     constructor(
-        activeObjectives: Objective[],
+        activeObjectives: ObjectiveEntity[],
         defs: Map<ObjectiveId, Definition>,
         latestBaselines: ObjectiveScore[],
         latestActuals: ObjectiveScore[],
@@ -124,7 +124,7 @@ export class ProjectObjectivesPresenter {
     }
 
     #row(
-        obj: Objective,
+        obj: ObjectiveEntity,
         baseline: ObjectiveScore | undefined,
         actual: ObjectiveScore | undefined,
         showActual: boolean,

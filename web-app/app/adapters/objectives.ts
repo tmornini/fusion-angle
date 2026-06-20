@@ -1,6 +1,6 @@
 import type {
     Id,
-    Objective,
+    ObjectiveEntity,
     ObjectiveId,
     ObjectiveRevisionEntity,
     ObjectiveState,
@@ -45,8 +45,8 @@ export function notifyObjectiveChange(): void {
 
 export async function getObjectives(
     ctx: RequestContext,
-): Promise<Objective[]> {
-    return ctx.GET<Objective[]>('objectives');
+): Promise<ObjectiveEntity[]> {
+    return ctx.GET<ObjectiveEntity[]>('objectives');
 }
 
 export async function getArchivedObjectiveIds(
@@ -199,7 +199,7 @@ export async function getCurrentObjectiveDefinitions(
 
 export async function getActiveObjectives(
     ctx: RequestContext,
-): Promise<Objective[]> {
+): Promise<ObjectiveEntity[]> {
     const [all, archived] = await Promise.all([
         getObjectives(ctx),
         getArchivedObjectiveIds(ctx),
