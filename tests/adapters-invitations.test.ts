@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { BackedDbAdapter } from '../api/db-backed.ts';
+import { MemoryStorageBackend } from '../api/backend-memory.ts';
 import type { DbAdapter } from '../api/db.ts';
+import type { NotificationEvent } from '../api/notifications.ts';
 import {
     validateInvitationEntity,
 } from '../api/validators.ts';
@@ -24,8 +27,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // Two orgs (Stark '1', Wayne '2'). Tony ('current') is admin
 // and member of both. Sarah is a Stark-only member. Dave is an
 // identity with no membership anywhere (a fresh invitee).
-async function seed(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+async function seedRows(db: DbAdapter): Promise<void> {
     await db.postSchemaCreation();
     await db.organizations.put('1', organizationRow('Stark'));
     await db.organizations.put('2', organizationRow('Wayne'));
@@ -46,11 +48,32 @@ async function seed(): Promise<MemoryDbAdapter> {
         organization_id: '1', identity_id: 'sarah', at: AT,
     });
     await seedPerson(db, 'dave', 'Dave', 'dave@x.com');
+}
+
+async function seed(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await seedRows(db);
+    return db;
+}
+
+// The same world, over a BackedDbAdapter constructed directly
+// so the notify hook (its 4th ctor arg) can be a counting spy —
+// MemoryDbAdapter's preset always wires a no-op there.
+async function seedWithNotify(
+    notify: (event: NotificationEvent) => void,
+): Promise<BackedDbAdapter> {
+    const db = new BackedDbAdapter(
+        new MemoryStorageBackend(),
+        async () => {},
+        async () => {},
+        notify,
+    );
+    await seedRows(db);
     return db;
 }
 
 async function seedPerson(
-    db: MemoryDbAdapter,
+    db: DbAdapter,
     id: string,
     name: string,
     email: string,
@@ -413,4 +436,56 @@ test('revoke: event author is server-derived', async () => {
     assert.ok(ev?.at !== '');
     // Author is server-derived (the admin's identity id).
     assert.equal(ev?.member_id, 'current');
+});
+
+// A notify fires only after a write commits — an idempotent
+// no-op writes nothing, so it must ring nothing.
+
+test('a repeated grant (existing pending) posts no notification',
+async () => {
+    const posted: NotificationEvent[] = [];
+    const db = await seedWithNotify(e => posted.push(e));
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    assert.equal(posted.length, 1);
+    await postInvitationGrant(tony, 'sarah@x.com');
+    assert.equal(posted.length, 1);
+});
+
+test('a repeated accept posts no notification', async () => {
+    const posted: NotificationEvent[] = [];
+    const db = await seedWithNotify(e => posted.push(e));
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    const inv = (await db.invitations.getAll())[0]!;
+    const sarah = await ctxOn(db, 'sarah', '1');
+    await postInvitationAcceptance(sarah, inv.id);
+    assert.equal(posted.length, 2);   // grant, accept
+    await postInvitationAcceptance(sarah, inv.id);
+    assert.equal(posted.length, 2);
+});
+
+test('a repeated decline posts no notification', async () => {
+    const posted: NotificationEvent[] = [];
+    const db = await seedWithNotify(e => posted.push(e));
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'dave@x.com');
+    const inv = (await db.invitations.getAll())[0]!;
+    const dave = await ctxOn(db, 'dave', '1');
+    await postInvitationDecline(dave, inv.id);
+    assert.equal(posted.length, 2);   // grant, decline
+    await postInvitationDecline(dave, inv.id);
+    assert.equal(posted.length, 2);
+});
+
+test('a repeated revoke posts no notification', async () => {
+    const posted: NotificationEvent[] = [];
+    const db = await seedWithNotify(e => posted.push(e));
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    const inv = (await db.invitations.getAll())[0]!;
+    await postInvitationRevocation(tony, inv.id);
+    assert.equal(posted.length, 2);   // grant, revoke
+    await postInvitationRevocation(tony, inv.id);
+    assert.equal(posted.length, 2);
 });

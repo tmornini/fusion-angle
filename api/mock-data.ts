@@ -1,5 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import { TABLE_NAMES } from './db.ts';
+import { postIdeaCreationOp } from './routes.ts';
 import type {
     ProjectFlowEntity,
     WorkOrderEntity,
@@ -318,12 +319,111 @@ async function postMockDataLoadIn(
 
     const ideas = buildIdeas();
 
+    // Each seeded idea's sole state event doubles as its
+    // creation event — driven through postIdeaCreationOp
+    // below so the seed writes exactly as POST /ideas does.
+    // Driving the op below the org fence, the unscoped store
+    // stamps nothing, so organization_id rides in the idea
+    // sub-body instead of the (route-only) omission.
+    const ideaStateEvents: StateEntity[] = [
+        {
+            id: 'qJoFXyzUUaq0vEpHL5e34l',
+            entity_id: 'eT5xdKjzLDmuRn3r7XMX4R',
+            state: 'in_review',
+            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            at: daysFromNow(-75, 9, 30),
+        },
+        {
+            id: 'tIcL6f8KJoyG2YN9NofOMo',
+            entity_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
+            state: 'approved',
+            member_id: 'bLP3X1hb1mSz8gY9neogU3',
+            at: daysFromNow(-70, 9, 0),
+        },
+        {
+            id: 'mGfBLqA7lScpEKxc5w0Yt2',
+            entity_id: 'wuCMQqo4IkEksx7MYmu8g2',
+            state: 'active',
+            member_id: '53J8h9dr76XFqCjYcNVwIR',
+            at: daysFromNow(-65, 9, 0),
+        },
+        {
+            id: 'BvBRvDQ8b5l5Tg7iZSGyHF',
+            entity_id: 'ojOEXtdzdtTZtpM81TxVca',
+            state: 'in_review',
+            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            at: daysFromNow(-55, 9, 0),
+        },
+        {
+            id: 'BMS9TmTKR0DZ41vTUSpvxX',
+            entity_id: 'T2vAafLDcshDONlYxpzPLc',
+            state: 'active',
+            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            at: daysFromNow(-50, 9, 0),
+        },
+        {
+            id: 'XX2EXrIUcQVTnzGo0YO2Iw',
+            entity_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
+            state: 'sent_back',
+            member_id: 'zyTbfbjcGEfbpCsNTP0XjX',
+            at: daysFromNow(-45, 9, 0),
+        },
+        {
+            id: 'fxlbcnsAmCWp4j8B2NkDKM',
+            entity_id: 'MCxK0hzT9CPjJx1ZV5unfr',
+            state: 'in_review',
+            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
+            at: daysFromNow(-75, 10, 0),
+        },
+        {
+            id: 'JjkkkkrZw4FvOWBpJYE2J7',
+            entity_id: 'SUb4gKXsZ1OsEauzqszg0t',
+            state: 'in_review',
+            member_id: 'WxQn4LVWb76YkmqK5B0EPp',
+            at: daysFromNow(-35, 9, 0),
+        },
+        {
+            id: '4nzdNB97hgD1GZ7CjA2EwS',
+            entity_id: 'gxa84W9KvEgD0wT1F4TOM9',
+            state: 'in_review',
+            member_id: '53J8h9dr76XFqCjYcNVwIR',
+            at: daysFromNow(-30, 9, 0),
+        },
+        {
+            id: 'wmCY9xZdrk0XlydyABZqXY',
+            entity_id: '1Z68gROMrlTAfPEGiyJJAY',
+            state: 'in_review',
+            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
+            at: daysFromNow(-25, 9, 0),
+        },
+        {
+            id: 'OWGsZqEi1bnWUetzS2sURr',
+            entity_id: 'Q2On2xwMpFdzOklBQJXrni',
+            state: 'in_review',
+            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
+            at: daysFromNow(-20, 9, 0),
+        },
+    ];
+
+    const ideaStateEventById = new Map(
+        ideaStateEvents.map(e => [e.entity_id, e]),
+    );
+
     await Promise.all([
-        ...ideas.map((idea, i) =>
-            adapter.ideas.put(idea.id, {
-                ...idea, organization_id: assignOrganization(i),
-            }),
-        ),
+        ...ideas.map((idea, i) => {
+            const { id, ...ideaFields } = idea;
+            const event = ideaStateEventById.get(id)!;
+            return postIdeaCreationOp(adapter, {
+                id,
+                idea: {
+                    ...ideaFields,
+                    organization_id: assignOrganization(i),
+                },
+                initialState: event.state,
+                initialStateEventId: event.id,
+                initialStateAt: event.at,
+            }, event.member_id);
+        }),
         adapter.organizations.put(STARK_ORGANIZATION, {
             name: 'Stark Industries',
             domain: 'acmecorp.com',
@@ -3163,86 +3263,6 @@ async function postMockDataLoadIn(
 
     const ideaSubmissions = buildIdeaSubmissions();
 
-    const ideaStateEvents: StateEntity[] = [
-        {
-            id: 'qJoFXyzUUaq0vEpHL5e34l',
-            entity_id: 'eT5xdKjzLDmuRn3r7XMX4R',
-            state: 'in_review',
-            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
-            at: daysFromNow(-75, 9, 30),
-        },
-        {
-            id: 'tIcL6f8KJoyG2YN9NofOMo',
-            entity_id: 'cbTuSs0Ex84PeFGSvoAEFZ',
-            state: 'approved',
-            member_id: 'bLP3X1hb1mSz8gY9neogU3',
-            at: daysFromNow(-70, 9, 0),
-        },
-        {
-            id: 'mGfBLqA7lScpEKxc5w0Yt2',
-            entity_id: 'wuCMQqo4IkEksx7MYmu8g2',
-            state: 'active',
-            member_id: '53J8h9dr76XFqCjYcNVwIR',
-            at: daysFromNow(-65, 9, 0),
-        },
-        {
-            id: 'BvBRvDQ8b5l5Tg7iZSGyHF',
-            entity_id: 'ojOEXtdzdtTZtpM81TxVca',
-            state: 'in_review',
-            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
-            at: daysFromNow(-55, 9, 0),
-        },
-        {
-            id: 'BMS9TmTKR0DZ41vTUSpvxX',
-            entity_id: 'T2vAafLDcshDONlYxpzPLc',
-            state: 'active',
-            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
-            at: daysFromNow(-50, 9, 0),
-        },
-        {
-            id: 'XX2EXrIUcQVTnzGo0YO2Iw',
-            entity_id: 'HRYrImq1rBJ5ZRe1T9TAVk',
-            state: 'sent_back',
-            member_id: 'zyTbfbjcGEfbpCsNTP0XjX',
-            at: daysFromNow(-45, 9, 0),
-        },
-        {
-            id: 'fxlbcnsAmCWp4j8B2NkDKM',
-            entity_id: 'MCxK0hzT9CPjJx1ZV5unfr',
-            state: 'in_review',
-            member_id: 'LhfaUUf4IumVsCSGB4xjdK',
-            at: daysFromNow(-75, 10, 0),
-        },
-        {
-            id: 'JjkkkkrZw4FvOWBpJYE2J7',
-            entity_id: 'SUb4gKXsZ1OsEauzqszg0t',
-            state: 'in_review',
-            member_id: 'WxQn4LVWb76YkmqK5B0EPp',
-            at: daysFromNow(-35, 9, 0),
-        },
-        {
-            id: '4nzdNB97hgD1GZ7CjA2EwS',
-            entity_id: 'gxa84W9KvEgD0wT1F4TOM9',
-            state: 'in_review',
-            member_id: '53J8h9dr76XFqCjYcNVwIR',
-            at: daysFromNow(-30, 9, 0),
-        },
-        {
-            id: 'wmCY9xZdrk0XlydyABZqXY',
-            entity_id: '1Z68gROMrlTAfPEGiyJJAY',
-            state: 'in_review',
-            member_id: 'jBoWiyWxj7pp4sG3JgX5l2',
-            at: daysFromNow(-25, 9, 0),
-        },
-        {
-            id: 'OWGsZqEi1bnWUetzS2sURr',
-            entity_id: 'Q2On2xwMpFdzOklBQJXrni',
-            state: 'in_review',
-            member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
-            at: daysFromNow(-20, 9, 0),
-        },
-    ];
-
     const projectStateEvents: StateEntity[] = [
         {
             // 'submitted' so the scoring loop skips this org-'2'
@@ -3450,14 +3470,6 @@ async function postMockDataLoadIn(
             ),
         ),
         ...mockStateEvents.map(r =>
-            adapter.states.put(r.id, {
-                entity_id: r.entity_id,
-                state: r.state,
-                member_id: r.member_id,
-                at: r.at,
-            }),
-        ),
-        ...ideaStateEvents.map(r =>
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,

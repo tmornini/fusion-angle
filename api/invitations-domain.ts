@@ -338,15 +338,19 @@ async function grantInvitation(
             'that identity is already a member of this'
             + ' organization', HTTP_CONFLICT);
     }
-    // The invitee's bell is body/row-derived, not
-    // path-derived — the named M3 case the generic
-    // route-pattern post hook cannot reach, since this
-    // domain runs off the dispatch switch entirely.
-    ctx.base.postNotification({
-        kind: 'scoped',
-        organizationIds: [organization],
-        identityIds: [identityId],
-    });
+    if (result.kind === 'created') {
+        // The invitee's bell is body/row-derived, not
+        // path-derived — the named M3 case the generic
+        // route-pattern post hook cannot reach, since this
+        // domain runs off the dispatch switch entirely. An
+        // 'existing' outcome wrote nothing (idempotent
+        // no-op), so it posts nothing.
+        ctx.base.postNotification({
+            kind: 'scoped',
+            organizationIds: [organization],
+            identityIds: [identityId],
+        });
+    }
     if (result.kind === 'existing') {
         return Response.json({
             id: result.id, organization_id: organization,
@@ -449,11 +453,15 @@ async function acceptInvitation(
     // membership write — a revoke must actually stop access (Commandment
     // X / II). Mirrors grantAuthorizationCode's in-tx state gate.
     let conflict = false;
+    let noOp = false;
     await ctx.base.transaction(
         ['memberships', 'states'],
         async (view) => {
             const state = await currentInvitationState(view, id);
-            if (state === 'accepted') return;   // idempotent no-op
+            if (state === 'accepted') {
+                noOp = true;   // idempotent no-op
+                return;
+            }
             if (state !== 'pending') { conflict = true; return; }
             const already = (await view.memberships.getAll())
                 .some(m =>
@@ -475,11 +483,13 @@ async function acceptInvitation(
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
     }
-    ctx.base.postNotification({
-        kind: 'scoped',
-        organizationIds: [inv.organization_id],
-        identityIds: [inv.identity_id],
-    });
+    if (!noOp) {
+        ctx.base.postNotification({
+            kind: 'scoped',
+            organizationIds: [inv.organization_id],
+            identityIds: [inv.identity_id],
+        });
+    }
     return new Response(null, { status: 204 });
 }
 
@@ -525,9 +535,13 @@ async function declineInvitation(
         );
     }
     let conflict = false;
+    let noOp = false;
     await ctx.base.transaction(['states'], async (view) => {
         const state = await currentInvitationState(view, id);
-        if (state === 'declined') return;   // idempotent no-op
+        if (state === 'declined') {
+            noOp = true;   // idempotent no-op
+            return;
+        }
         if (state !== 'pending') { conflict = true; return; }
         await view.states.postEvent(
             eventId, id, 'declined', ctx.principal.id, at);
@@ -536,11 +550,13 @@ async function declineInvitation(
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
     }
-    ctx.base.postNotification({
-        kind: 'scoped',
-        organizationIds: [inv.organization_id],
-        identityIds: [inv.identity_id],
-    });
+    if (!noOp) {
+        ctx.base.postNotification({
+            kind: 'scoped',
+            organizationIds: [inv.organization_id],
+            identityIds: [inv.identity_id],
+        });
+    }
     return new Response(null, { status: 204 });
 }
 
@@ -589,9 +605,13 @@ async function revokeInvitation(
         );
     }
     let conflict = false;
+    let noOp = false;
     await ctx.base.transaction(['states'], async (view) => {
         const state = await currentInvitationState(view, id);
-        if (state === 'revoked') return;   // idempotent no-op
+        if (state === 'revoked') {
+            noOp = true;   // idempotent no-op
+            return;
+        }
         if (state !== 'pending') { conflict = true; return; }
         await view.states.postEvent(
             eventId, id, 'revoked', ctx.principal.id, at);
@@ -600,11 +620,13 @@ async function revokeInvitation(
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
     }
-    ctx.base.postNotification({
-        kind: 'scoped',
-        organizationIds: [inv.organization_id],
-        identityIds: [inv.identity_id],
-    });
+    if (!noOp) {
+        ctx.base.postNotification({
+            kind: 'scoped',
+            organizationIds: [inv.organization_id],
+            identityIds: [inv.identity_id],
+        });
+    }
     return new Response(null, { status: 204 });
 }
 

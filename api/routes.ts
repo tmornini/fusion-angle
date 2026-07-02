@@ -349,6 +349,36 @@ async function writeFlowGraphDelta(
     }
 }
 
+// Idea creation: the idea row and its initial state event
+// commit as ONE transaction — a mid-write failure rolls the
+// whole thing back rather than orphaning the row. Exported so
+// the seed can drive idea creation through the same gate the
+// route uses (Decision 6's below-facade carve-out) — this is
+// also Phase 1's dual-write insertion seam.
+export async function postIdeaCreationOp(
+    db: DbAdapter,
+    body: Record<string, unknown>,
+    actor: Id,
+): Promise<void> {
+    const b = validateIdeaCreateBody(body);
+    return db.transaction(
+        ['ideas', 'states'],
+        async (view) => {
+            await view.ideas.put(
+                b.id,
+                b.idea as unknown as Omit<IdeaEntity, 'id'>,
+            );
+            await view.states.postEvent(
+                b.initialStateEventId,
+                b.id,
+                b.initialState,
+                actor,
+                b.initialStateAt,
+            );
+        },
+    );
+}
+
 export const routes: Route[] = [
     route('members', {
         // Members are derived from the membership ledger off
@@ -717,33 +747,13 @@ export const routes: Route[] = [
     }),
     route('ideas', {
         get: (db) => db.ideas.getAll(),
-        // Idea creation: the idea row and its initial state
-        // event commit as ONE transaction — a mid-write failure
-        // rolls the whole thing back rather than orphaning the
-        // row. The org-scoped store stamps organization_id from
-        // the verified token before validating the idea, so the
+        // The org-scoped store stamps organization_id from the
+        // verified token before validating the idea, so the
         // body OMITS it. The initial event is authored by the
-        // verified caller (actor), never the body.
-        post: (db, _p, body, actor) => {
-            const b = validateIdeaCreateBody(body);
-            return db.transaction(
-                ['ideas', 'states'],
-                async (view) => {
-                    await view.ideas.put(
-                        b.id,
-                        b.idea as unknown as
-                            Omit<IdeaEntity, 'id'>,
-                    );
-                    await view.states.postEvent(
-                        b.initialStateEventId,
-                        b.id,
-                        b.initialState,
-                        actor,
-                        b.initialStateAt,
-                    );
-                },
-            );
-        },
+        // verified caller (actor), never the body. See
+        // postIdeaCreationOp for the transaction shape.
+        post: (db, _p, body, actor) =>
+            postIdeaCreationOp(db, body, actor),
     }),
     // Convert an idea to a project (promotion): the LONE
     // cross-aggregate write. A new projects row, the promoted
