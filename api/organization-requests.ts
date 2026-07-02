@@ -140,6 +140,16 @@ export async function identityDefaultOrganizationRequest(
                 organization_id: organization,
                 at,
             });
+        // This side channel returns from handleRequest BEFORE
+        // the dispatch switch, so the generic gate-side post
+        // hook (api.ts's postWriteNotification) never fires
+        // for it — post its own scoped event so cross-tab
+        // refresh of the identity-tokens page is preserved.
+        ctx.base.postNotification({
+            kind: 'scoped',
+            organizationIds: [],
+            identityIds: [identityId],
+        });
         return new Response(null, { status: 204 });
     }
     return Response.json(

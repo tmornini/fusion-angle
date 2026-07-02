@@ -53,6 +53,10 @@ import type {
     ResponseEntity,
 } from './types.ts';
 import type { LatencySimulation } from './latency.ts';
+import type {
+    NotificationEvent,
+    NotificationPost,
+} from './notifications.ts';
 import { EntityStore } from './store-entity.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
@@ -116,6 +120,7 @@ export class BackedDbAdapter
     readonly #backend: StorageBackend;
     readonly #latency: () => Promise<void>;
     readonly #open: () => Promise<void>;
+    readonly #notify: NotificationPost;
 
     readonly members!: GuardedEntityStore<MemberEntity>;
     readonly humanMembers!:
@@ -186,10 +191,12 @@ export class BackedDbAdapter
         backend: StorageBackend,
         latency: () => Promise<void>,
         open: () => Promise<void>,
+        notify: NotificationPost,
     ) {
         this.#backend = backend;
         this.#latency = latency;
         this.#open = open;
+        this.#notify = notify;
         Object.assign(
             this,
             this.#buildStores(backendRunner(backend)),
@@ -202,6 +209,10 @@ export class BackedDbAdapter
 
     simulateLatency(): Promise<void> {
         return this.#latency();
+    }
+
+    postNotification(event: NotificationEvent): void {
+        this.#notify(event);
     }
 
     hasSchema(): Promise<boolean> {
@@ -309,6 +320,8 @@ export class BackedDbAdapter
             getSnapshot: () => this.getSnapshot(),
             putSnapshot: (json) =>
                 this.putSnapshot(json),
+            postNotification: (e) =>
+                this.postNotification(e),
             transaction: (tables, fn) => {
                 this.#assertSubset(tables, declaredTables);
                 return fn(view);

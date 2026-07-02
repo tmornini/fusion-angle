@@ -40,13 +40,7 @@ import type {
 } from './shared.ts';
 
 const flowChanges =
-    createSubscriptionChannel(
-        [
-            'flows',
-            'flow_versions',
-            'project_flows',
-        ],
-    );
+    createSubscriptionChannel();
 
 export function subscribeFlowChanges(
     fn: () => void,

@@ -29,9 +29,7 @@ import type {
 } from './project-scoring.ts';
 
 const projectChanges =
-    createSubscriptionChannel(
-        ['projects', 'states'],
-    );
+    createSubscriptionChannel();
 
 export function subscribeProjectChanges(
     fn: () => void,

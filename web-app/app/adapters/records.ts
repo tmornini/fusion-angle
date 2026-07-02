@@ -67,9 +67,7 @@ export interface RecordWithCounts {
     readonly boundFlowCount: number;
 }
 
-const recordChanges = createSubscriptionChannel(
-    ['records', 'record_attributes', 'states'],
-);
+const recordChanges = createSubscriptionChannel();
 
 export function subscribeRecordChanges(
     fn: () => void,

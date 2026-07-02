@@ -152,6 +152,7 @@ export function organizationScopedAdapter(
         getSnapshot: () => base.getSnapshot(),
         putSnapshot: (json) =>
             base.putSnapshot(json),
+        postNotification: (e) => base.postNotification(e),
         // Re-scope the open view to `org` so the fence rides
         // INSIDE the tx: a guard's read and its inner write now
         // run in one transaction, closing the TOCTOU for free.

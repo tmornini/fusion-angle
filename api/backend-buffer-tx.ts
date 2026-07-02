@@ -1,7 +1,12 @@
 import {
     serializeRecord,
 } from './storage-serialize.ts';
-import type { Tx, TxMode } from './db.ts';
+import {
+    UniqueConstraintError,
+    uniqueColumns,
+    type Tx,
+    type TxMode,
+} from './db.ts';
 
 // Builds a row-granular Tx handle over a pre-loaded buffer
 // of the touched tables. The buffer IS the unit of
@@ -76,6 +81,29 @@ export function bufferTx(
         ): Promise<void> {
             assertWritable();
             const rows = scoped(table);
+            // Scan BEFORE serializeRecord/splice: absence
+            // is unindexed, so a row lacking the column
+            // never collides (genesis rows coexist).
+            for (const column of uniqueColumns(table)) {
+                const value = (
+                    row as Record<string, unknown>
+                )[column];
+                if (value === undefined) continue;
+                const collision = rows.find(
+                    (existing) =>
+                        existing.id !== row.id
+                        && (
+                            existing as Record<
+                                string, unknown
+                            >
+                        )[column] === value,
+                );
+                if (collision !== undefined) {
+                    throw new UniqueConstraintError(
+                        table, column,
+                    );
+                }
+            }
             const written = {
                 ...serializeRecord(
                     row as Record<string, unknown>,

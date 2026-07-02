@@ -1,21 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    subscribeSchemaChanges,
-} from '../web-app/app/adapters/schema.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-
-test(
-    'subscribeSchemaChanges returns'
-    + ' an unsubscribe function',
-    () => {
-        const unsub = subscribeSchemaChanges(
-            () => {},
-        );
-        assert.equal(typeof unsub, 'function');
-        unsub();
-    },
-);
 
 // Integration: initCommandPalette() performs no
 // data reads at init — the index builds lazily on

@@ -2,7 +2,7 @@ import {
     indexedDbAdapter,
 } from '../../../api/db-indexeddb.ts';
 import {
-    postTablesChanged,
+    postNotificationEvent,
 } from './broadcast-channel.ts';
 import type {
     ClientFacadeAdapter,
@@ -23,12 +23,13 @@ import {
 let adapter: ClientFacadeAdapter | undefined;
 
 // The persistence tier: a real IndexedDB transaction per op,
-// O(1) appends, and cross-tab refresh via the posted table
-// names. The connection opens in initialize(). Production
-// boot passes this; boot-path tests substitute an in-memory
-// tier — IndexedDB has no Node stub, and we add no fake.
+// O(1) appends, and cross-tab refresh via the posted
+// notification events. The connection opens in initialize().
+// Production boot passes this; boot-path tests substitute an
+// in-memory tier — IndexedDB has no Node stub, and we add no
+// fake.
 export function defaultAdapter(): ClientFacadeAdapter {
-    return indexedDbAdapter(postTablesChanged);
+    return indexedDbAdapter(postNotificationEvent);
 }
 
 export async function initAdapter(
@@ -92,6 +93,16 @@ export async function postSessionSeed(): Promise<void> {
             ANONYMOUS_ID, 'Anonymous',
         );
     }
+}
+
+// True once postSessionSeed() (or putSessionToken()) has set a
+// holder. Non-throwing — the one caller allowed to run before
+// boot completes (a cross-tab subscriber woken by another tab's
+// write while THIS tab is still initializing) checks this
+// before any principalFromToken(getSessionToken()) read, since
+// every predicate below throws on an unseeded holder.
+export function sessionTokenIsSeeded(): boolean {
+    return sessionToken !== undefined;
 }
 
 // Returns the already-minted per-tab token. postSessionSeed

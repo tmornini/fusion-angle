@@ -6,13 +6,20 @@ import {
     EntityNotFoundError,
     LedgerImmutabilityError,
     MissingTableError,
+    UniqueConstraintError,
 } from './db.ts';
 import type { LatencySimulation } from './latency.ts';
 import {
     ValidationError,
 } from './types.ts';
 import type { Id } from './types.ts';
-import { ANONYMOUS_ID } from './access-token.ts';
+import {
+    ANONYMOUS_ID,
+    decodeAccessToken,
+} from './access-token.ts';
+import {
+    identityTargetsFor,
+} from './notifications.ts';
 import {
     ownerOrganizationOfEntity,
     organizationOwnedProbes,
@@ -31,6 +38,7 @@ import {
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
     HTTP_CONFLICT,
+    HTTP_PRECONDITION_FAILED,
 } from './http-errors.ts';
 import {
     AUTHENTICATION_ROUTES,
@@ -119,6 +127,35 @@ async function facadeRequest(
     return handleRequest(ctx.base, flatRequest);
 }
 
+// The gate-side Decision 5 post: fired once per successful
+// write, AFTER the route handler's promise resolves (so on
+// IndexedDB the commit has already reached `oncomplete`).
+// BOOTSTRAP_ROUTES (the snapshot plane) replace the whole
+// store, so they post a full-refresh event rather than a
+// scoped one; every other write posts the fenced organization
+// plus whatever identity targets the route/body name.
+function postWriteNotification(
+    adapter: GuardedDbAdapter,
+    routePattern: string,
+    params: readonly string[],
+    body: Record<string, unknown> | undefined,
+    organization: Id | undefined,
+): void {
+    if (BOOTSTRAP_ROUTES.has(routePattern)) {
+        adapter.postNotification({ kind: 'full' });
+        return;
+    }
+    adapter.postNotification({
+        kind: 'scoped',
+        organizationIds:
+            organization === undefined
+                ? [] : [organization],
+        identityIds: identityTargetsFor(
+            routePattern, params, body,
+        ),
+    });
+}
+
 export async function handleRequest(
     adapter: GuardedDbAdapter,
     request: Request,
@@ -188,6 +225,10 @@ export async function handleRequest(
     // carries the anonymous id — its handlers never author a
     // member-state event.
     let actor: Id = ANONYMOUS_ID;
+    // The fenced organization, for the post-write notification
+    // target — undefined for a bearer-exempt route (no fence
+    // ran) or the global identity/auth spine.
+    let organization: Id | undefined;
     // BOOTSTRAP_ROUTES: the accepted dev-tier auth-free
     // snapshot plane (removed at the Postgres server tier) —
     // see api/request-auth.ts.
@@ -264,6 +305,7 @@ export async function handleRequest(
         }
         effective = fenced.scoped;
         actor = fenced.principal.id;
+        organization = fenced.organization;
     }
 
     // Parse the request body when the method
@@ -329,6 +371,10 @@ export async function handleRequest(
                         body!,
                         actor,
                     );
+                postWriteNotification(
+                    adapter, routePattern, params,
+                    body, organization,
+                );
                 if (result === undefined) {
                     return new Response(null, {
                         status: 204,
@@ -354,6 +400,10 @@ export async function handleRequest(
                     params,
                     actor,
                 );
+                postWriteNotification(
+                    adapter, routePattern, params,
+                    body, organization,
+                );
                 return new Response(null, {
                     status: 204,
                 });
@@ -378,6 +428,34 @@ export async function handleRequest(
                         body!,
                         actor,
                     );
+                // authentication/authorize mints an
+                // authorization code, not a session — no UI
+                // subscribes to it, so it posts nothing.
+                // authentication/token mints the session
+                // itself: decode the freshly minted access
+                // token so the identity-tokens page refreshes
+                // cross-tab, the same case every other write
+                // reaches via the fenced organization.
+                if (routePattern === 'authentication/token') {
+                    const claims = decodeAccessToken(
+                        (result as { access_token: string })
+                            .access_token,
+                    );
+                    adapter.postNotification({
+                        kind: 'scoped',
+                        identityIds: [claims.sub],
+                        organizationIds: [
+                            ...(claims.organizations ?? []),
+                        ],
+                    });
+                } else if (
+                    routePattern !== 'authentication/authorize'
+                ) {
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization,
+                    );
+                }
                 if (result === undefined) {
                     return new Response(null, {
                         status: 204,
@@ -422,6 +500,14 @@ export async function handleRequest(
             return Response.json(
                 { error: error.message },
                 { status: HTTP_CONFLICT },
+            );
+        }
+        if (
+            error instanceof UniqueConstraintError
+        ) {
+            return Response.json(
+                { error: error.message },
+                { status: HTTP_PRECONDITION_FAILED },
             );
         }
         if (

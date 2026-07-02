@@ -18,9 +18,7 @@ export type { InvitationState } from '../../../api/types.ts';
 // The invitations surface refreshes whenever an invitation, its
 // lifecycle event, or a membership (written on accept) changes —
 // so a grant in one tab and an accept in another both settle.
-const invitationChanges = createSubscriptionChannel(
-    ['invitations', 'states', 'memberships'],
-);
+const invitationChanges = createSubscriptionChannel();
 
 export function subscribeInvitationChanges(
     fn: () => void,

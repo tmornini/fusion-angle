@@ -338,6 +338,15 @@ async function grantInvitation(
             'that identity is already a member of this'
             + ' organization', HTTP_CONFLICT);
     }
+    // The invitee's bell is body/row-derived, not
+    // path-derived — the named M3 case the generic
+    // route-pattern post hook cannot reach, since this
+    // domain runs off the dispatch switch entirely.
+    ctx.base.postNotification({
+        kind: 'scoped',
+        organizationIds: [organization],
+        identityIds: [identityId],
+    });
     if (result.kind === 'existing') {
         return Response.json({
             id: result.id, organization_id: organization,
@@ -466,6 +475,11 @@ async function acceptInvitation(
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
     }
+    ctx.base.postNotification({
+        kind: 'scoped',
+        organizationIds: [inv.organization_id],
+        identityIds: [inv.identity_id],
+    });
     return new Response(null, { status: 204 });
 }
 
@@ -522,6 +536,11 @@ async function declineInvitation(
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
     }
+    ctx.base.postNotification({
+        kind: 'scoped',
+        organizationIds: [inv.organization_id],
+        identityIds: [inv.identity_id],
+    });
     return new Response(null, { status: 204 });
 }
 
@@ -581,6 +600,11 @@ async function revokeInvitation(
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
     }
+    ctx.base.postNotification({
+        kind: 'scoped',
+        organizationIds: [inv.organization_id],
+        identityIds: [inv.identity_id],
+    });
     return new Response(null, { status: 204 });
 }
 

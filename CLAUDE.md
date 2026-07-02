@@ -409,11 +409,14 @@ apply to it (RED is the audit's first finding).
   database, and an append is an O(1) `objectStore.put`, not a
   whole-table rewrite — so two tabs appending to `states`
   concurrently both survive (verified in-browser). A
-  successful readwrite commit posts the touched table names
-  over a `BroadcastChannel` (`adapters/broadcast-channel.ts`)
-  so other tabs refresh; the poster is never echoed, so it
-  does not double-refresh. Theme/sidebar still sync over
-  `StorageEvent` (they stay in localStorage).
+  successful write posts a scoped `NotificationEvent`
+  (organization/identity ids, or a full-refresh event) over a
+  `BroadcastChannel` (`adapters/broadcast-channel.ts`); a
+  subscriber refreshes when the event names its active
+  organization or its own identity, or is a full event. The
+  poster is never echoed, so it does not double-refresh.
+  Theme/sidebar still sync over `StorageEvent` (they stay in
+  localStorage).
 - **IndexedDB auto-commit constraint.** An `IDBTransaction`
   lives only while it has pending requests; awaiting any
   NON-IDB promise inside a `transaction(…)` body (a timer,

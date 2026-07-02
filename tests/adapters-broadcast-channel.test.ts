@@ -1,50 +1,72 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    tablesFromMessage,
-} from '../web-app/app/adapters/broadcast-channel.ts';
+    notificationEventFromWire,
+} from '../api/notifications.ts';
 
 // The cross-tab wire shape is validated at the adapter —
 // a malformed message throws instead of handing subscribers
-// a corrupt table list.
+// a corrupt notification event.
 
-test('a well-formed message yields its tables', () => {
+test('a well-formed full event round-trips', () => {
     assert.deepEqual(
-        tablesFromMessage({ tables: ['states', 'ideas'] }),
-        ['states', 'ideas'],
+        notificationEventFromWire({ kind: 'full' }),
+        { kind: 'full' },
     );
 });
 
-test('an empty tables list is valid', () => {
+test('a well-formed scoped event round-trips', () => {
+    const event = {
+        kind: 'scoped',
+        organizationIds: ['1'],
+        identityIds: ['ada'],
+    };
     assert.deepEqual(
-        tablesFromMessage({ tables: [] }), [],
+        notificationEventFromWire(event), event,
     );
 });
 
-test('a missing tables key throws', () => {
-    assert.throws(
-        () => tablesFromMessage({}),
-        /malformed cross-tab tables message/,
+test('an empty scoped event round-trips', () => {
+    const event = {
+        kind: 'scoped',
+        organizationIds: [],
+        identityIds: [],
+    };
+    assert.deepEqual(
+        notificationEventFromWire(event), event,
     );
 });
 
-test('a non-array tables value throws', () => {
+test('an unknown kind throws', () => {
     assert.throws(
-        () => tablesFromMessage({ tables: 'states' }),
-        /malformed cross-tab tables message/,
+        () => notificationEventFromWire({ kind: 'other' }),
+        /malformed notification event/,
+    );
+});
+
+test('a scoped event missing organizationIds throws', () => {
+    assert.throws(
+        () => notificationEventFromWire({
+            kind: 'scoped', identityIds: [],
+        }),
+        /malformed notification event/,
     );
 });
 
 test('non-string array elements throw', () => {
     assert.throws(
-        () => tablesFromMessage({ tables: ['states', 7] }),
-        /malformed cross-tab tables message/,
+        () => notificationEventFromWire({
+            kind: 'scoped',
+            organizationIds: ['1', 7],
+            identityIds: [],
+        }),
+        /malformed notification event/,
     );
 });
 
 test('a null message throws', () => {
     assert.throws(
-        () => tablesFromMessage(null),
-        /malformed cross-tab tables message/,
+        () => notificationEventFromWire(null),
+        /malformed notification event/,
     );
 });

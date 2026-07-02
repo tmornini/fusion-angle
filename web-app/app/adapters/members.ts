@@ -33,9 +33,7 @@ export type {
 } from '../../../api/types.ts';
 
 const humanMemberChanges =
-    createSubscriptionChannel(
-        ['members', 'states', 'identity_pii'],
-    );
+    createSubscriptionChannel();
 
 export function subscribeHumanMemberChanges(
     fn: () => void,

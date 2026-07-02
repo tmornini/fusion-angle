@@ -167,12 +167,13 @@ freezes `flow_graph` at creation time. If Agent-F edits the
 shared flow concurrently, the captured snapshot reflects
 mid-edit state, not a clean baseline.
 
-Because a sibling tab's commit broadcasts its touched tables
-(BroadcastChannel) and triggers a refresh, cross-boundary
-assertions use `≥ N` or "displayed-count matches the current
-database at read time" framing rather than frozen expected
-values. Agent-CH's dashboard count checks are non-zero +
-consistency, not numeric equality.
+Because a sibling tab's commit posts a scoped notification
+event (BroadcastChannel) naming the organization/identity it
+touched — or a full-refresh event — and triggers a refresh,
+cross-boundary assertions use `≥ N` or "displayed-count
+matches the current database at read time" framing rather
+than frozen expected values. Agent-CH's dashboard count
+checks are non-zero + consistency, not numeric equality.
 
 **Shared states-log writes are now safe.** The mutation domains
 above partition the *entity* tables, and the append-only
@@ -2600,15 +2601,15 @@ Backend: `api/backend-indexeddb.ts`. No Node test (no fake-IDB, zero devDeps) �
 
 Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fusion-ai` database, so they need exclusive DB access alongside G30–G35 — never concurrently with the seven Phase 2 agents.
 
-- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 34 object stores (33 tables + `__schema__`).
+- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 40 object stores (39 tables + `__schema__`).
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
 - [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and table rows persist; the dashboard renders the seeded org.
 - [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
 - [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct `states` rows concurrently. PASS: both rows survive (count grows by 2) — the old localStorage clobber is gone.
-- [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message with the touched tables reaches the other tab; the poster is not echoed (no self-refresh).
+- [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).
 - [ ] **L7** Atomic import. The clear+put import runs in one `IDBTransaction`. PASS: a rejected import leaves prior data intact (no corruption).
 - [ ] **L8** Quota pre-flight. PASS: an oversize snapshot rejects with `SnapshotTooLargeError` before any write (also `tests/snapshot-quota.test.ts`).
-- [ ] **L9** Bare-DB self-heal. On a 404 path (no app connection), run `indexedDB.deleteDatabase('fusion-ai')` then `indexedDB.open('fusion-ai', 1)` with NO `onupgradeneeded` handler — forging a v1 DB with 0 object stores and no `__schema__` — then load a real page. PASS: `open()` (`api/backend-indexeddb.ts`) sees the missing `__schema__` store, deletes and reopens so the upgrade rebuilds all 34 stores, and the app boots to the graceful empty-state (Snapshots route + working "Wipe and Load Mock Data"), NOT a "Failed to initialize database" dead-end.
+- [ ] **L9** Bare-DB self-heal. On a 404 path (no app connection), run `indexedDB.deleteDatabase('fusion-ai')` then `indexedDB.open('fusion-ai', 1)` with NO `onupgradeneeded` handler — forging a v1 DB with 0 object stores and no `__schema__` — then load a real page. PASS: `open()` (`api/backend-indexeddb.ts`) sees the missing `__schema__` store, deletes and reopens so the upgrade rebuilds all 40 stores, and the app boots to the graceful empty-state (Snapshots route + working "Wipe and Load Mock Data"), NOT a "Failed to initialize database" dead-end.
 
 ## J. Teardown
 

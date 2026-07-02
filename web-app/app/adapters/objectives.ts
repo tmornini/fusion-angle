@@ -27,11 +27,7 @@ import {
 } from './members.ts';
 
 const objectiveChanges =
-    createSubscriptionChannel([
-        'objectives',
-        'objective_revisions',
-        'states',
-    ]);
+    createSubscriptionChannel();
 
 export function subscribeObjectiveChanges(
     fn: () => void,

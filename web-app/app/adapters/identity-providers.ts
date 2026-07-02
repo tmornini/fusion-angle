@@ -15,9 +15,7 @@ import {
 } from '../channels.ts';
 
 const providerChanges =
-    createSubscriptionChannel(
-        ['identity_providers'],
-    );
+    createSubscriptionChannel();
 
 export function subscribeIdentityProviderChanges(
     fn: () => void,

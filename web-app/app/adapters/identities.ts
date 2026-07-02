@@ -29,14 +29,7 @@ export type {
 // and detail read identities + PII + the AI facet; the
 // detail's credential state reads identity_credentials.
 const identityChanges =
-    createSubscriptionChannel(
-        [
-            'identities',
-            'identity_pii',
-            'ai_members',
-            'identity_credentials',
-        ],
-    );
+    createSubscriptionChannel();
 
 export function subscribeIdentityChanges(
     fn: () => void,

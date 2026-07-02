@@ -47,6 +47,7 @@ export const HTTP_INTERNAL_ERROR = 500;
 export const HTTP_UNAUTHORIZED = 401;
 export const HTTP_FORBIDDEN = 403;
 export const HTTP_CONFLICT = 409;
+export const HTTP_PRECONDITION_FAILED = 412;
 
 // A JSON error response at one status — the shape every
 // invitation guard returns on rejection.

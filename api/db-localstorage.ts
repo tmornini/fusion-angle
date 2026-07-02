@@ -18,6 +18,7 @@ export class LocalStorageDbAdapter extends BackedDbAdapter {
                 DEFAULT_LATENCY_CONFIG,
             ),
             async () => {},
+            () => {},
         );
     }
 }

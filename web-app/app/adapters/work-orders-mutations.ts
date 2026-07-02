@@ -44,14 +44,7 @@ import {
 } from './record-transitions.ts';
 
 const workOrderChanges =
-    createSubscriptionChannel(
-        [
-            'work_orders',
-            'states',
-            'state_field_values',
-            'flow_work_orders',
-        ],
-    );
+    createSubscriptionChannel();
 
 export function subscribeWorkOrderChanges(
     fn: () => void,

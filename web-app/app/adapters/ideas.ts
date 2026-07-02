@@ -37,9 +37,7 @@ import {
 } from '../channels.ts';
 
 const ideaChanges =
-    createSubscriptionChannel(
-        ['ideas', 'idea_submissions', 'states'],
-    );
+    createSubscriptionChannel();
 
 export function subscribeIdeaChanges(
     fn: () => void,

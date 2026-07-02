@@ -26,7 +26,7 @@ export type {
 } from '../../../api/types.ts';
 
 const aiMemberChanges =
-    createSubscriptionChannel(['ai_members', 'states']);
+    createSubscriptionChannel();
 
 export function subscribeAIMemberChanges(
     fn: () => void,

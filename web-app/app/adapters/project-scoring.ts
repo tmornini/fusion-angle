@@ -39,10 +39,7 @@ import {
 } from '../../../shared/crypto-safe-base62.ts';
 
 const projectScoreChanges =
-    createSubscriptionChannel([
-        'project_objective_baseline_scores',
-        'project_objective_actual_scores',
-    ]);
+    createSubscriptionChannel();
 
 export function subscribeProjectScoreChanges(
     fn: () => void,

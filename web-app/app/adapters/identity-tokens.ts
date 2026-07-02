@@ -11,9 +11,7 @@ import {
 } from '../channels.ts';
 
 const tokenChanges =
-    createSubscriptionChannel(
-        ['identity_tokens'],
-    );
+    createSubscriptionChannel();
 
 export function subscribeIdentityTokenChanges(
     fn: () => void,

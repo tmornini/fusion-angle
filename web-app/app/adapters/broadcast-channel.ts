@@ -8,12 +8,14 @@
 import {
     subscribeEventListener,
 } from './event-listener.ts';
+import type {
+    NotificationEvent,
+} from '../../../api/notifications.ts';
+import {
+    notificationEventFromWire,
+} from '../../../api/notifications.ts';
 
 const CHANNEL_NAME = 'fusion-ai:data';
-
-interface TablesMessage {
-    readonly tables: readonly string[];
-}
 
 let channel: BroadcastChannel | undefined;
 
@@ -33,47 +35,24 @@ function getChannel(): BroadcastChannel | undefined {
     return channel;
 }
 
-// Announce that `tables` changed in this tab. Other tabs'
+// Announce a scoped (or full) notification event. Other tabs'
 // subscribers fire; BroadcastChannel does not echo to the
 // poster, so the originating tab never double-refreshes.
-export function postTablesChanged(
-    tables: readonly string[],
+export function postNotificationEvent(
+    event: NotificationEvent,
 ): void {
-    const message: TablesMessage = { tables };
-    getChannel()?.postMessage(message);
+    getChannel()?.postMessage(event);
 }
 
-// The wire shape is another tab's dharma — validate it at
-// this adapter before any subscriber trusts it. A malformed
-// message is a bug in the poster; crash loudly rather than
-// hand subscribers a corrupt table list.
-export function tablesFromMessage(
-    data: unknown,
-): readonly string[] {
-    if (typeof data === 'object' && data !== null) {
-        const { tables } = data as { tables?: unknown };
-        if (
-            Array.isArray(tables)
-            && tables.every(t => typeof t === 'string')
-        ) {
-            return tables;
-        }
-    }
-    throw new Error(
-        'malformed cross-tab tables message: '
-        + JSON.stringify(data),
-    );
-}
-
-// Subscribe to cross-tab table-change announcements; returns
-// an unsubscribe function.
-export function subscribeTablesChanged(
-    handler: (tables: readonly string[]) => void,
+// Subscribe to cross-tab notification events; returns an
+// unsubscribe function.
+export function subscribeNotificationEvents(
+    handler: (event: NotificationEvent) => void,
 ): () => void {
     const ch = getChannel();
     if (ch === undefined) return () => {};
     const listener = (event: MessageEvent): void => {
-        handler(tablesFromMessage(event.data));
+        handler(notificationEventFromWire(event.data));
     };
     return subscribeEventListener(ch, 'message', listener);
 }

@@ -13,7 +13,6 @@ export {
     UnauthorizedError,
 } from '../../../api/api.ts';
 export * from './shared.ts';
-export * from './schema.ts';
 export * from './dashboard.ts';
 export * from './ideas.ts';
 export * from './projects.ts';

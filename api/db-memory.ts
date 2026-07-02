@@ -11,6 +11,7 @@ export class MemoryDbAdapter extends BackedDbAdapter {
             new MemoryStorageBackend(),
             async () => {},
             async () => {},
+            () => {},
         );
     }
 }
