@@ -33,6 +33,19 @@ import {
     pickString,
     validateTimestampField,
 } from './validators.ts';
+import { messageAddress } from './message-address.ts';
+import {
+    formWritePair,
+    headPairIdAt,
+    storedResponseFor,
+    appendMessagePair,
+    createdEntityUriId,
+    canonicalUriPrefix,
+    responseFromStored,
+    hoistedHeaderFields,
+    storedPairResponse,
+} from './message-pair.ts';
+import type { MessagePair } from './message-pair.ts';
 
 // The active org of the caller: the verified token claim, else
 // the identity's resolved default. Null when the identity can
@@ -236,6 +249,24 @@ async function sentInvitations(
 // org is the admin's verified active org. Idempotent on an
 // outstanding pending invite for the (org, identity) pair.
 // New-identity creation and email delivery are deferred.
+//
+// Shadow-ledger shape: create-shaped, document-class, addressed
+// at the REQUEST body's client-minted `invitationId` (mirrors
+// the CREATE_BODY_ID_FIELDS override the generic gate uses for
+// 'ideas'/'records'/etc — see message-pair.ts). Both the
+// fresh-grant and duplicate-echo branches answer 200, so both
+// append their pair. Crypto (pair formation) must run PRE-tx
+// (the IndexedDB auto-commit constraint bars awaiting anything
+// but row ops inside a transaction body), yet the response body
+// depends on which branch the domain write takes — so the
+// member/pending checks run TWICE: once pre-tx (to decide the
+// response and form the pair), once again inside the write
+// transaction (the domain gate stays primary, exactly as
+// before). A disagreement between the two reads means a
+// concurrent grant raced this one between the peek and the
+// transaction — an exceedingly rare interleaving this throws
+// on rather than silently trusting the stale pre-tx read; the
+// caller's retry re-enters and forms a fresh, correct pair.
 async function grantInvitation(
     ctx: AuthenticatedContext,
     request: Request,
@@ -303,42 +334,84 @@ async function grantInvitation(
             'no identity with that email', HTTP_NOT_FOUND);
     }
     const identityId = match.id;
-    // The member/pending checks and the write run in ONE transaction so
-    // two concurrent grants cannot both pass the check and each append a
-    // pending invitation (Commandment VII). The tx RETURNS its outcome
-    // (a closure-mutated outer var would not narrow), mapped below.
-    const result = await ctx.base.transaction(
-        ['invitations', 'states', 'memberships'],
-        async (view): Promise<GrantOutcome> => {
-            const member = (await view.memberships.getAll())
-                .some(m => m.identity_id === identityId
-                    && m.organization_id === organization);
-            if (member) return { kind: 'member' };
-            const existing = await pendingInvitationFor(
-                view, organization, identityId);
-            if (existing !== null) {
-                return {
-                    kind: 'existing',
-                    id: existing.id, at: existing.at,
-                };
-            }
-            await view.invitations.put(invitationId, {
-                organization_id: organization,
-                identity_id: identityId,
-                at: grantAt,
-            });
-            await view.states.postEvent(
-                grantEventId, invitationId,
-                'pending', ctx.principal.id, grantAt);
-            return { kind: 'created' };
-        },
-    );
-    if (result.kind === 'member') {
+    const preOutcome = await grantOutcomeFor(
+        ctx.base, organization, identityId);
+    if (preOutcome.kind === 'member') {
         return errorJson(
             'that identity is already a member of this'
             + ' organization', HTTP_CONFLICT);
     }
-    if (result.kind === 'created') {
+    const responseBody = preOutcome.kind === 'existing'
+        ? {
+            id: preOutcome.id, organization_id: organization,
+            identity_id: identityId, at: preOutcome.at,
+            state: 'pending',
+        }
+        : {
+            id: invitationId, organization_id: organization,
+            identity_id: identityId,
+            at: grantAt, state: 'pending',
+        };
+    const routeSegments = ['invitations'];
+    const pathSegments = ['invitations'];
+    const address = messageAddress(routeSegments, pathSegments);
+    const canonicalPrefix =
+        canonicalUriPrefix(undefined, address.uriPrefix);
+    const uriId =
+        createdEntityUriId('invitations', body) ?? address.uriId;
+    const pair = await formWritePair({
+        method: 'POST', pathname: '/invitations',
+        routePattern: 'invitations',
+        routeSegments, pathSegments,
+        headerFields: hoistedHeaderFields(request),
+        body, requesterIdentityId: ctx.principal.id,
+        requestAt: ctx.requestAt, organization: undefined,
+        responseStatus: 200, responseBody,
+        headPairId: await headPairIdAt(
+            ctx.base, canonicalPrefix, uriId),
+    });
+    const replay = await storedResponseFor(
+        ctx.base, pair.requestHash);
+    if (replay !== undefined) {
+        return responseFromStored(replay);
+    }
+    // The member/pending checks and the write run in ONE transaction so
+    // two concurrent grants cannot both pass the check and each append a
+    // pending invitation (Commandment VII).
+    await ctx.base.transaction(
+        [
+            'invitations', 'states', 'memberships',
+            'requests', 'responses',
+        ],
+        async (view) => {
+            const outcome = await grantOutcomeFor(
+                view, organization, identityId);
+            const agrees = outcome.kind === preOutcome.kind
+                && (outcome.kind !== 'existing'
+                    || (preOutcome.kind === 'existing'
+                        && outcome.id === preOutcome.id));
+            if (!agrees) {
+                throw new Error(
+                    'grantInvitation: the duplicate-grant'
+                    + ' check raced between its pre-tx read'
+                    + ' and its transaction — retry the'
+                    + ' request',
+                );
+            }
+            if (outcome.kind === 'fresh') {
+                await view.invitations.put(invitationId, {
+                    organization_id: organization,
+                    identity_id: identityId,
+                    at: grantAt,
+                });
+                await view.states.postEvent(
+                    grantEventId, invitationId,
+                    'pending', ctx.principal.id, grantAt);
+            }
+            await appendMessagePair(view, pair);
+        },
+    );
+    if (preOutcome.kind === 'fresh') {
         // The invitee's bell is body/row-derived, not
         // path-derived — the named M3 case the generic
         // route-pattern post hook cannot reach, since this
@@ -351,24 +424,36 @@ async function grantInvitation(
             identityIds: [identityId],
         });
     }
-    if (result.kind === 'existing') {
-        return Response.json({
-            id: result.id, organization_id: organization,
-            identity_id: identityId, at: result.at,
-            state: 'pending',
-        });
-    }
-    return Response.json({
-        id: invitationId, organization_id: organization,
-        identity_id: identityId,
-        at: grantAt, state: 'pending',
-    });
+    return storedPairResponse(
+        ctx.base, pair.requestHash, 'grantInvitation');
 }
 
 type GrantOutcome =
     | { kind: 'member' }
     | { kind: 'existing'; id: Id; at: string }
-    | { kind: 'created' };
+    | { kind: 'fresh' };
+
+// The duplicate-grant decision, read-only: whether the (org,
+// identity) pair is already a membership, already has a pending
+// invite, or is clear to grant afresh. Called BOTH pre-tx (to
+// decide the response and form the pair) and again inside the
+// write transaction (the domain gate stays primary) — see
+// grantInvitation.
+async function grantOutcomeFor(
+    adapter: DbAdapter,
+    organization: Id,
+    identityId: Id,
+): Promise<GrantOutcome> {
+    const member = (await adapter.memberships.getAll())
+        .some(m => m.identity_id === identityId
+            && m.organization_id === organization);
+    if (member) return { kind: 'member' };
+    const existing = await pendingInvitationFor(
+        adapter, organization, identityId);
+    return existing === null
+        ? { kind: 'fresh' }
+        : { kind: 'existing', id: existing.id, at: existing.at };
+}
 
 // The org's outstanding pending invitation for an identity, or
 // null. The grant idempotency check.
@@ -395,6 +480,34 @@ async function pendingInvitationFor(
         }
     }
     return null;
+}
+
+// Form an operation-addressed pair for an invitation sub-route
+// (acceptance/decline/revocation): uriPrefix
+// '/invitations/<id>/<op>/', uriId '' — no head-read, so it
+// never chains. A repeat op (a no-op re-accept/re-decline/
+// re-revoke) still gets its OWN genesis pair at that same
+// address, exactly as postWorkOrderClaimOp's repeat-claim does
+// — never a Supersedes chain.
+async function formInvitationOpPair(
+    ctx: AuthenticatedContext,
+    request: Request,
+    body: Record<string, unknown>,
+    invitationId: Id,
+    op: string,
+): Promise<MessagePair> {
+    return formWritePair({
+        method: 'POST',
+        pathname: '/invitations/' + invitationId + '/' + op,
+        routePattern: 'invitations/:id/' + op,
+        routeSegments: ['invitations', ':id', op],
+        pathSegments: ['invitations', invitationId, op],
+        headerFields: hoistedHeaderFields(request),
+        body, requesterIdentityId: ctx.principal.id,
+        requestAt: ctx.requestAt, organization: undefined,
+        responseStatus: 204, responseBody: undefined,
+        headPairId: undefined,
+    });
 }
 
 // Accept: the invitee turns a pending invitation into a real
@@ -448,6 +561,13 @@ async function acceptInvitation(
             HTTP_BAD_REQUEST,
         );
     }
+    const pair = await formInvitationOpPair(
+        ctx, request, body, id, 'acceptance');
+    const replay = await storedResponseFor(
+        ctx.base, pair.requestHash);
+    if (replay !== undefined) {
+        return responseFromStored(replay);
+    }
     // The pending check rides INSIDE the write transaction so a
     // concurrent revoke/decline cannot slip between the check and the
     // membership write — a revoke must actually stop access (Commandment
@@ -455,11 +575,15 @@ async function acceptInvitation(
     let conflict = false;
     let noOp = false;
     await ctx.base.transaction(
-        ['memberships', 'states'],
+        [
+            'memberships', 'states',
+            'requests', 'responses',
+        ],
         async (view) => {
             const state = await currentInvitationState(view, id);
             if (state === 'accepted') {
                 noOp = true;   // idempotent no-op
+                await appendMessagePair(view, pair);
                 return;
             }
             if (state !== 'pending') { conflict = true; return; }
@@ -477,6 +601,7 @@ async function acceptInvitation(
             }
             await view.states.postEvent(
                 eventId, id, 'accepted', ctx.principal.id, at);
+            await appendMessagePair(view, pair);
         },
     );
     if (conflict) {
@@ -490,7 +615,8 @@ async function acceptInvitation(
             identityIds: [inv.identity_id],
         });
     }
-    return new Response(null, { status: 204 });
+    return storedPairResponse(
+        ctx.base, pair.requestHash, 'acceptInvitation');
 }
 
 // Decline: the invitee appends 'declined'. No membership is
@@ -534,18 +660,30 @@ async function declineInvitation(
             HTTP_BAD_REQUEST,
         );
     }
+    const pair = await formInvitationOpPair(
+        ctx, request, body, id, 'decline');
+    const replay = await storedResponseFor(
+        ctx.base, pair.requestHash);
+    if (replay !== undefined) {
+        return responseFromStored(replay);
+    }
     let conflict = false;
     let noOp = false;
-    await ctx.base.transaction(['states'], async (view) => {
-        const state = await currentInvitationState(view, id);
-        if (state === 'declined') {
-            noOp = true;   // idempotent no-op
-            return;
-        }
-        if (state !== 'pending') { conflict = true; return; }
-        await view.states.postEvent(
-            eventId, id, 'declined', ctx.principal.id, at);
-    });
+    await ctx.base.transaction(
+        ['states', 'requests', 'responses'],
+        async (view) => {
+            const state = await currentInvitationState(view, id);
+            if (state === 'declined') {
+                noOp = true;   // idempotent no-op
+                await appendMessagePair(view, pair);
+                return;
+            }
+            if (state !== 'pending') { conflict = true; return; }
+            await view.states.postEvent(
+                eventId, id, 'declined', ctx.principal.id, at);
+            await appendMessagePair(view, pair);
+        },
+    );
     if (conflict) {
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
@@ -557,7 +695,8 @@ async function declineInvitation(
             identityIds: [inv.identity_id],
         });
     }
-    return new Response(null, { status: 204 });
+    return storedPairResponse(
+        ctx.base, pair.requestHash, 'declineInvitation');
 }
 
 // Revoke: an admin of the invitation's org cancels a pending
@@ -604,18 +743,30 @@ async function revokeInvitation(
             HTTP_BAD_REQUEST,
         );
     }
+    const pair = await formInvitationOpPair(
+        ctx, request, body, id, 'revocation');
+    const replay = await storedResponseFor(
+        ctx.base, pair.requestHash);
+    if (replay !== undefined) {
+        return responseFromStored(replay);
+    }
     let conflict = false;
     let noOp = false;
-    await ctx.base.transaction(['states'], async (view) => {
-        const state = await currentInvitationState(view, id);
-        if (state === 'revoked') {
-            noOp = true;   // idempotent no-op
-            return;
-        }
-        if (state !== 'pending') { conflict = true; return; }
-        await view.states.postEvent(
-            eventId, id, 'revoked', ctx.principal.id, at);
-    });
+    await ctx.base.transaction(
+        ['states', 'requests', 'responses'],
+        async (view) => {
+            const state = await currentInvitationState(view, id);
+            if (state === 'revoked') {
+                noOp = true;   // idempotent no-op
+                await appendMessagePair(view, pair);
+                return;
+            }
+            if (state !== 'pending') { conflict = true; return; }
+            await view.states.postEvent(
+                eventId, id, 'revoked', ctx.principal.id, at);
+            await appendMessagePair(view, pair);
+        },
+    );
     if (conflict) {
         return errorJson(
             'invitation is not pending', HTTP_CONFLICT);
@@ -627,7 +778,8 @@ async function revokeInvitation(
             identityIds: [inv.identity_id],
         });
     }
-    return new Response(null, { status: 204 });
+    return storedPairResponse(
+        ctx.base, pair.requestHash, 'revokeInvitation');
 }
 
 // Read one invitation by id from the base store, or null when

@@ -1,5 +1,5 @@
 import type { DbAdapter, GuardedDbAdapter } from './db.ts';
-import type { Id } from './types.ts';
+import { nowUtc, type Id } from './types.ts';
 import type { Principal } from './access-token.ts';
 import {
     generateCryptoSafeBase62,
@@ -31,6 +31,11 @@ export interface IncomingContext {
     // the fence step can consume the guarded write capability
     // without re-acquiring it by assertion.
     readonly base: GuardedDbAdapter;
+    // The ARRIVAL stamp: minted here, gate entry, as early as
+    // the request is observable — the message plane's requests
+    // row keeps it verbatim (api/message-pair.ts). nowUtc() is
+    // synchronous, so minting it here costs nothing async.
+    readonly requestAt: string;
 }
 
 // Enriched by the authentication step (request-auth.ts) —
@@ -63,5 +68,6 @@ export function incomingContext(
         method: request.method,
         pathname: new URL(request.url).pathname,
         base,
+        requestAt: nowUtc(),
     };
 }

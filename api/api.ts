@@ -13,6 +13,21 @@ import {
     ValidationError,
 } from './types.ts';
 import type { Id } from './types.ts';
+import { messageAddress } from './message-address.ts';
+import {
+    formWritePair,
+    headPairIdAt,
+    storedResponseFor,
+    createdEntityUriId,
+    canonicalUriPrefix,
+    hoistedHeaderFields,
+    responseFromStored,
+    wireHeadersFor,
+    PAIR_WIRED_ROUTE_PATTERNS,
+    DOCUMENT_CLASS_ROUTE_PATTERNS,
+    REPLAY_EXEMPT_ROUTE_PATTERNS,
+} from './message-pair.ts';
+import type { MessagePair, AuthPairSeed } from './message-pair.ts';
 import {
     ANONYMOUS_ID,
     decodeAccessToken,
@@ -27,6 +42,8 @@ import {
 } from './store-parent-scoped.ts';
 import {
     exchangeBearerForOrganization,
+    postToken,
+    postAuthorize,
 } from './authentication.ts';
 import {
     ApiError,
@@ -53,7 +70,9 @@ import {
     routes,
     matchRoute,
     param,
+    WRITE_RESPONSE_SPECS,
     type Route,
+    type WriteResponseSpec,
 } from './routes.ts';
 import {
     invitationsRequest,
@@ -154,6 +173,25 @@ function postWriteNotification(
             routePattern, params, body,
         ),
     });
+}
+
+// Resolve a route pattern's WRITE_RESPONSE_SPECS entry for the
+// verb actually in flight. Every entry but one is a plain
+// WriteResponseSpec, applying regardless of which non-DELETE
+// verb hit it (no prior pattern wired both a PUT and a POST at
+// once). A PerVerbWriteResponseSpec — recognized by the absence
+// of `status` at its top level — supplies one spec per verb
+// instead; today only 'ai-members/:id' needs this (see
+// routes.ts).
+function writeResponseSpecFor(
+    routePattern: string,
+    method: string,
+): WriteResponseSpec | undefined {
+    const entry = WRITE_RESPONSE_SPECS[routePattern];
+    if (entry === undefined || 'status' in entry) {
+        return entry;
+    }
+    return method === 'PUT' ? entry.put : entry.post;
 }
 
 export async function handleRequest(
@@ -330,7 +368,108 @@ export async function handleRequest(
         body = parse.body;
     }
 
+    const isWrite = method === 'PUT' || method === 'POST'
+        || method === 'DELETE';
+    // A route pattern can be pair-wired for one verb (PUT,
+    // say) while exposing no handler for another (DELETE) —
+    // ideas/:id is exactly this today. Requiring the matched
+    // verb's handler to exist keeps that combination 405ing
+    // exactly as it did before pairs existed, rather than
+    // running the pair machinery (and its successBody
+    // validation) against a request no handler will ever see.
+    const hasWriteHandler =
+        (method === 'PUT' && matched.put !== undefined)
+        || (method === 'POST' && matched.post !== undefined)
+        || (method === 'DELETE'
+            && matched.delete !== undefined);
+
     try {
+        // The shadow-ledger pair: formed pre-tx (all crypto and
+        // address resolution happen before a transaction opens
+        // — see api/message-pair.ts), gated to routes wired in
+        // PAIR_WIRED_ROUTE_PATTERNS so no unwired route ever
+        // advertises a Response-ID it did not store. Runs
+        // INSIDE the try so a validation error raised while
+        // precomputing the success body (below) is caught and
+        // mapped to its usual HTTP status, exactly as if the
+        // handler itself had raised it.
+        let pair: MessagePair | undefined;
+        if (isWrite && hasWriteHandler && !bearerExempt
+            && PAIR_WIRED_ROUTE_PATTERNS.has(routePattern)) {
+            const address = messageAddress(
+                matched.segments, pathSegments,
+            );
+            const canonicalPrefix = canonicalUriPrefix(
+                organization, address.uriPrefix,
+            );
+            const uriId = createdEntityUriId(
+                routePattern, body,
+            ) ?? address.uriId;
+            // The head-read class is encoded PER ROUTE PATTERN,
+            // never inferred from uriId — an event-append
+            // address (states/:id) has a non-empty uriId yet
+            // must never chain (message-pair.ts).
+            const headPairId =
+                DOCUMENT_CLASS_ROUTE_PATTERNS.has(routePattern)
+                    ? await headPairIdAt(
+                        effective, canonicalPrefix, uriId,
+                    )
+                    : undefined;
+            // DELETE responses are UNIVERSALLY 204 with no
+            // body — every wired DELETE handler returns void
+            // (message-pair.ts resolution: DELETEs join their
+            // family's document class but never carry a
+            // response body). The gate short-circuits the spec
+            // lookup for DELETE rather than asking
+            // WRITE_RESPONSE_SPECS to key by (pattern, verb):
+            // a route pattern can carry BOTH a PUT (200, its
+            // written row) and a DELETE (204) — the map's one
+            // entry per pattern serves the PUT/POST verb only.
+            // The rare pattern that wires BOTH a PUT and a POST
+            // with genuinely different shapes (ai-members/:id)
+            // supplies a PerVerbWriteResponseSpec instead — see
+            // writeResponseSpecFor.
+            const spec = method === 'DELETE'
+                ? { status: 204 }
+                : writeResponseSpecFor(routePattern, method);
+            if (spec === undefined) {
+                throw new Error(
+                    'no write response spec for wired route: '
+                    + routePattern,
+                );
+            }
+            pair = await formWritePair({
+                method, pathname, routePattern,
+                routeSegments: matched.segments,
+                pathSegments,
+                headerFields: hoistedHeaderFields(request),
+                body,
+                requesterIdentityId: actor,
+                requestAt: ctx.requestAt,
+                organization,
+                responseStatus: spec.status,
+                responseBody: spec.successBody?.(
+                    params, body, actor, organization,
+                ),
+                headPairId,
+            });
+            // The pre-tx idempotency fast-path: a byte-
+            // identical resend never reaches the handler and
+            // posts no notification — nothing was written.
+            // Skipped for REPLAY_EXEMPT_ROUTE_PATTERNS: those
+            // routes' own domain guard (or, from Task 3, their
+            // redacted stored body) makes serving the cached
+            // response wrong rather than merely redundant — see
+            // message-pair.ts.
+            if (!REPLAY_EXEMPT_ROUTE_PATTERNS.has(routePattern)) {
+                const replay = await storedResponseFor(
+                    effective, pair.requestHash,
+                );
+                if (replay !== undefined) {
+                    return responseFromStored(replay);
+                }
+            }
+        }
         switch (method) {
             case 'GET': {
                 if (!matched.get) {
@@ -370,7 +509,24 @@ export async function handleRequest(
                         params,
                         body!,
                         actor,
+                        pair,
                     );
+                if (pair !== undefined) {
+                    const stored = await storedResponseFor(
+                        effective, pair.requestHash,
+                    );
+                    if (stored === undefined) {
+                        throw new Error(
+                            'wired write stored no pair: '
+                            + routePattern,
+                        );
+                    }
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization,
+                    );
+                    return responseFromStored(stored);
+                }
                 postWriteNotification(
                     adapter, routePattern, params,
                     body, organization,
@@ -399,7 +555,24 @@ export async function handleRequest(
                     effective,
                     params,
                     actor,
+                    pair,
                 );
+                if (pair !== undefined) {
+                    const stored = await storedResponseFor(
+                        effective, pair.requestHash,
+                    );
+                    if (stored === undefined) {
+                        throw new Error(
+                            'wired write stored no pair: '
+                            + routePattern,
+                        );
+                    }
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization,
+                    );
+                    return responseFromStored(stored);
+                }
                 postWriteNotification(
                     adapter, routePattern, params,
                     body, organization,
@@ -409,25 +582,114 @@ export async function handleRequest(
                 });
             }
             case 'POST': {
-                if (!matched.post) {
-                    return Response.json(
-                        {
-                            error:
-                                'Method POST'
-                                + ' not allowed'
-                                + ' on '
-                                + pathname,
-                        },
-                        { status: 405 },
+                // The dedicated authentication arm (Task 3, C1
+                // discharge): both grant routes are bearerExempt,
+                // so the generic pair block above never fires
+                // for them, and neither carries a `post` closure
+                // in routes.ts any more (retired into this arm —
+                // matchRoute still matches both patterns, so an
+                // unknown path still 404s and a non-POST verb
+                // still 405s via the ordinary matched.get/put/
+                // delete checks). The seed carries everything
+                // WritePairInput needs except the requester
+                // identity and the response — only the grant
+                // itself, deep inside postToken/postAuthorize,
+                // can resolve those (a code's issuer, a verified
+                // token's subject) — so the grant forms its OWN
+                // pair, pre-tx, and appends it as the last act of
+                // its own domain transaction (authentication.ts).
+                let authWireHeaders: HeadersInit | undefined;
+                let result: unknown;
+                if (
+                    routePattern === 'authentication/token'
+                    || routePattern === 'authentication/authorize'
+                ) {
+                    const seed: AuthPairSeed = {
+                        requestAt: ctx.requestAt,
+                        headerFields: hoistedHeaderFields(request),
+                        method, pathname, routePattern,
+                        routeSegments: matched.segments,
+                        pathSegments,
+                    };
+                    const dispatched =
+                        routePattern === 'authentication/token'
+                            ? await postToken(
+                                effective, body!, seed)
+                            : await postAuthorize(
+                                effective, body!, seed);
+                    if (!dispatched.ok) {
+                        return Response.json(
+                            { error: dispatched.error },
+                            { status: dispatched.status },
+                        );
+                    }
+                    // Non-2xx stores no pair (the branch above
+                    // already returned); a 2xx here always
+                    // carries one, since the dedicated arm is
+                    // the ONLY caller that seeds postToken/
+                    // postAuthorize (exchangeBearerForOrganization,
+                    // the other grantTokenExchange caller, never
+                    // reaches here — it is an internal facade
+                    // hop, not a route dispatch).
+                    if (dispatched.requestHash === undefined) {
+                        throw new Error(
+                            'authentication grant stored no'
+                            + ' pair: ' + routePattern,
+                        );
+                    }
+                    const stored = await storedResponseFor(
+                        effective, dispatched.requestHash,
                     );
-                }
-                const result =
-                    await matched.post(
+                    if (stored === undefined) {
+                        throw new Error(
+                            'wired write stored no pair: '
+                            + routePattern,
+                        );
+                    }
+                    // The ONE named exception where the wire
+                    // body (live tokens) differs from the stored
+                    // (redacted) body — the headers still derive
+                    // from the SAME stored row every other wired
+                    // write reads.
+                    result = dispatched.response;
+                    authWireHeaders = wireHeadersFor(stored);
+                } else {
+                    if (!matched.post) {
+                        return Response.json(
+                            {
+                                error:
+                                    'Method POST'
+                                    + ' not allowed'
+                                    + ' on '
+                                    + pathname,
+                            },
+                            { status: 405 },
+                        );
+                    }
+                    result = await matched.post(
                         effective,
                         params,
                         body!,
                         actor,
+                        pair,
                     );
+                }
+                if (pair !== undefined) {
+                    const stored = await storedResponseFor(
+                        effective, pair.requestHash,
+                    );
+                    if (stored === undefined) {
+                        throw new Error(
+                            'wired write stored no pair: '
+                            + routePattern,
+                        );
+                    }
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization,
+                    );
+                    return responseFromStored(stored);
+                }
                 // authentication/authorize mints an
                 // authorization code, not a session — no UI
                 // subscribes to it, so it posts nothing.
@@ -461,7 +723,11 @@ export async function handleRequest(
                         status: 204,
                     });
                 }
-                return Response.json(result);
+                return authWireHeaders === undefined
+                    ? Response.json(result)
+                    : Response.json(
+                        result, { headers: authWireHeaders },
+                    );
             }
             default:
                 return Response.json(

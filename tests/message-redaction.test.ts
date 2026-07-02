@@ -15,6 +15,16 @@ import {
     HttpMessageError,
     type MessageModel,
 } from '../shared/http-message/types.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
+import { sha256Hex } from '../shared/digest.ts';
+
+// The redacted body, decoded — for tests asserting an EXACT
+// fingerprint value rather than merely a pattern's presence.
+function bodyOf(model: MessageModel): Record<string, unknown> {
+    return JSON.parse(
+        HttpMessage.fromModel(model).body().toText(),
+    ) as Record<string, unknown>;
+}
 
 test('authorization header value is fingerprinted',
 async () => {
@@ -124,6 +134,102 @@ async () => {
             'authentication/token', model,
         ),
         HttpMessageError,
+    );
+});
+
+// A stray, GRANT-IRRELEVANT non-string field (e.g. a
+// refresh-grant field on an authorization_code exchange) must
+// redact cleanly, never throw — the redactor applies ONE static
+// field list per ROUTE, not per grant_type, so a field a given
+// grant never reads still passes through this module. The
+// fingerprint is over the value's canonical JSON text (the
+// ES2025 raw-JSON holder for a bare top-level number stringifies
+// to its exact source text), so it is independently
+// recomputable and must match exactly — a mere "is redacted"
+// check would miss a determinism regression.
+test('a present non-string high-entropy field is redacted over'
++ ' its canonical JSON text, never thrown', async () => {
+    const model = buildRequestModel({
+        method: 'POST',
+        target: '/authentication/token',
+        fields: [],
+        body: {
+            grant_type: 'authorization_code',
+            code: 'the-code',
+            refresh_token: 12345,
+        },
+    });
+    const redacted = await redactAuthenticationRequest(
+        'authentication/token', model,
+    );
+    const body = bodyOf(redacted);
+    assert.equal(
+        body.refresh_token,
+        'sha256:' + await sha256Hex('12345'),
+    );
+    assert.ok(
+        !canonicalJson(redacted).includes(':12345'),
+        'the live integer must not survive verbatim',
+    );
+});
+
+test('a present non-string password is PBKDF2-hashed over its'
++ ' canonical JSON text, never thrown', async () => {
+    const model = buildRequestModel({
+        method: 'POST',
+        target: '/authentication/authorize',
+        fields: [],
+        body: {
+            method: 'password',
+            username: 'ada',
+            password: 12345,
+        },
+    });
+    const redacted = await redactAuthenticationRequest(
+        'authentication/authorize', model,
+    );
+    const body = bodyOf(redacted);
+    assert.match(body.password as string, /\$pbkdf2-sha256\$/);
+    assert.ok(!canonicalJson(redacted).includes(':12345'));
+});
+
+test('redacting the same non-string stray field twice yields'
++ ' the identical fingerprint (determinism pin)', async () => {
+    const body = {
+        grant_type: 'authorization_code',
+        code: 'the-code',
+        refresh_token: 12345,
+    };
+    const first = bodyOf(await redactAuthenticationRequest(
+        'authentication/token',
+        buildRequestModel({
+            method: 'POST', target: '/authentication/token',
+            fields: [], body,
+        }),
+    ));
+    const second = bodyOf(await redactAuthenticationRequest(
+        'authentication/token',
+        buildRequestModel({
+            method: 'POST', target: '/authentication/token',
+            fields: [], body,
+        }),
+    ));
+    assert.equal(first.refresh_token, second.refresh_token);
+});
+
+test('an absent high-entropy field stays absent, no throw',
+async () => {
+    const model = buildRequestModel({
+        method: 'POST',
+        target: '/authentication/token',
+        fields: [],
+        body: { grant_type: 'client_credentials' },
+    });
+    const redacted = await redactAuthenticationRequest(
+        'authentication/token', model,
+    );
+    assert.equal(
+        canonicalJson(redacted), canonicalJson(model),
     );
 });
 

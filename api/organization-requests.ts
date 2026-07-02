@@ -23,6 +23,14 @@ import {
     type IncomingContext,
     type AuthenticatedContext,
 } from './request-context.ts';
+import {
+    formWritePair,
+    storedResponseFor,
+    appendMessagePair,
+    responseFromStored,
+    hoistedHeaderFields,
+    storedPairResponse,
+} from './message-pair.ts';
 
 // GET /organizations — the caller's reachable orgs, derived
 // fresh from the membership ledger (never the token claim, so
@@ -127,30 +135,88 @@ export async function identityDefaultOrganizationRequest(
                 { status: HTTP_FORBIDDEN },
             );
         }
+        // Event-append class: uriId is the body's OWN eventId
+        // (fresh per write, never the identity from the URL) —
+        // achieved by treating the eventId as a trailing :param
+        // segment (messageAddress derives uriId from a route
+        // whose LAST segment is a :param). No head-read, no
+        // Supersedes, global plane (organization: undefined) —
+        // this ledger is latest-wins by (at, id), not a document
+        // chain. Formed pre-tx (crypto stays outside the
+        // transaction body — the IndexedDB auto-commit
+        // constraint). The response is ALWAYS 204/no-body, so
+        // the pair's shape is identical whether or not the org
+        // actually changes.
+        const pair = await formWritePair({
+            method: 'PUT',
+            pathname: ctx.pathname,
+            routePattern: 'identities/:id/default-org',
+            routeSegments: [
+                'identities', ':id', 'default-org', ':eventId',
+            ],
+            pathSegments: [
+                'identities', identityId, 'default-org', eventId,
+            ],
+            headerFields: hoistedHeaderFields(request),
+            body, requesterIdentityId: authed.principal.id,
+            requestAt: ctx.requestAt, organization: undefined,
+            responseStatus: 204, responseBody: undefined,
+            headPairId: undefined,
+        });
+        const replay = await storedResponseFor(
+            ctx.base, pair.requestHash);
+        if (replay !== undefined) {
+            return responseFromStored(replay);
+        }
         const rows =
             await ctx.base.identityDefaultOrganizations.getAll();
-        if (
-            currentDefaultOrganizationFor(rows, identityId) === organization
-        ) {
-            return new Response(null, { status: 204 });
-        }
-        await ctx.base.identityDefaultOrganizations.put(
-            eventId, {
-                identity_id: identityId,
-                organization_id: organization,
-                at,
+        const changes = currentDefaultOrganizationFor(
+            rows, identityId) !== organization;
+        if (changes) {
+            await ctx.base.transaction(
+                [
+                    'identity_default_organizations',
+                    'requests', 'responses',
+                ],
+                async (view) => {
+                    await view.identityDefaultOrganizations.put(
+                        eventId, {
+                            identity_id: identityId,
+                            organization_id: organization,
+                            at,
+                        });
+                    await appendMessagePair(view, pair);
+                },
+            );
+            // This side channel returns from handleRequest
+            // BEFORE the dispatch switch, so the generic
+            // gate-side post hook (api.ts's postWriteNotification)
+            // never fires for it — post its own scoped event so
+            // cross-tab refresh of the identity-tokens page is
+            // preserved. The idempotent no-change branch below
+            // writes no ledger row, so it posts nothing — the
+            // established "skip notification on no-op writes"
+            // precedent (see git history).
+            ctx.base.postNotification({
+                kind: 'scoped',
+                organizationIds: [],
+                identityIds: [identityId],
             });
-        // This side channel returns from handleRequest BEFORE
-        // the dispatch switch, so the generic gate-side post
-        // hook (api.ts's postWriteNotification) never fires
-        // for it — post its own scoped event so cross-tab
-        // refresh of the identity-tokens page is preserved.
-        ctx.base.postNotification({
-            kind: 'scoped',
-            organizationIds: [],
-            identityIds: [identityId],
-        });
-        return new Response(null, { status: 204 });
+        } else {
+            // The no-change branch still returns 2xx, so the
+            // pair IS this request's only write — a minimal tx
+            // over just the message-plane tables.
+            await ctx.base.transaction(
+                ['requests', 'responses'],
+                async (view) => {
+                    await appendMessagePair(view, pair);
+                },
+            );
+        }
+        return storedPairResponse(
+            ctx.base, pair.requestHash,
+            'identityDefaultOrganizationRequest',
+        );
     }
     return Response.json(
         {

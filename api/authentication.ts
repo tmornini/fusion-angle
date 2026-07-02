@@ -40,6 +40,11 @@ import {
     latestByKey,
     findFirstByKey,
 } from '../shared/ledger-reduction.ts';
+import {
+    appendMessagePair,
+    formAuthPair,
+} from './message-pair.ts';
+import type { MessagePair, AuthPairSeed } from './message-pair.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an
@@ -57,7 +62,18 @@ export interface TokenResponse {
 }
 
 export type TokenResult =
-    | { readonly ok: true; readonly response: TokenResponse }
+    | {
+        readonly ok: true;
+        readonly response: TokenResponse;
+        // The just-appended pair's request hash — undefined
+        // only for exchangeBearerForOrganization's internal,
+        // seedless hop (never a real /authentication/token
+        // request, so it forms no pair). The dedicated gate
+        // arm (api.ts) always supplies a seed, so a result it
+        // sees always carries one — see storedPairResponse's
+        // sibling crash-loud idiom.
+        readonly requestHash: string | undefined;
+    }
     | {
         readonly ok: false;
         readonly status: number;
@@ -180,14 +196,17 @@ async function mintPair(
     };
 }
 
-// Record a fresh chain root (the refresh jti) and return it. A
-// pure DB write — safe to run inside a caller's transaction, so
-// the issue can be atomic with whatever the grant consumes.
+// Record a fresh chain root for a CALLER-SUPPLIED refresh jti —
+// a pure DB write, safe to run inside a caller's transaction so
+// the issue can be atomic with whatever the grant consumes. The
+// jti itself is generated OUTSIDE, pre-tx (Task 3: every grant's
+// TokenResponse — and the mintPair HMAC signing behind it — must
+// be fully known before a transaction opens).
 async function recordIssuedRoot(
     view: DbAdapter,
     identityId: Id,
-): Promise<string> {
-    const refreshJti = generateCryptoSafeBase62();
+    refreshJti: string,
+): Promise<void> {
     await view.identityTokens.put(
         generateCryptoSafeBase62(), {
             jti: refreshJti,
@@ -196,27 +215,53 @@ async function recordIssuedRoot(
             chain_id: generateCryptoSafeBase62(),
             at: nowUtc(),
         });
-    return refreshJti;
 }
 
-// Issue a pair on a NEW chain — the refresh jti is recorded as a
+// Issue a pair on a NEW chain: the refresh jti is recorded as a
 // fresh chain root. Used by grants that start a session without
-// consuming a single-use resource (so the single write needs no
-// surrounding transaction).
+// consuming a single-use resource. All crypto (jti generation,
+// mintPair's HMAC signing, formAuthPair's fingerprinting) runs
+// PRE-tx; the chain-root write and the pair append are this
+// grant's only row writes, so they ride ONE minimal transaction
+// (the default-organization no-change precedent) — a mid-write
+// fault can never leave an issued chain root with no matching
+// ledger pair. `seed` is undefined for
+// exchangeBearerForOrganization's internal, non-route hop (the
+// org-switch facade never was an /authentication/token request),
+// so that caller mints its chain root with no pair at all —
+// exactly as before Task 3.
 async function issueTokenPair(
     adapter: DbAdapter,
     identityId: Id,
     name: string,
+    body: Record<string, unknown>,
+    seed: AuthPairSeed | undefined,
     act?: { sub: Id },
     organization?: Id,
-): Promise<TokenResponse> {
-    const refreshJti =
-        await recordIssuedRoot(adapter, identityId);
-    const organizations = await subjectOrganizations(adapter, identityId);
-    return mintPair(identityId, name, refreshJti, act, {
+): Promise<{
+    readonly response: TokenResponse;
+    readonly requestHash: string | undefined;
+}> {
+    const refreshJti = generateCryptoSafeBase62();
+    const organizations =
+        await subjectOrganizations(adapter, identityId);
+    const response = await mintPair(identityId, name, refreshJti, act, {
         ...(organization ? { organization } : {}),
         organizations,
     });
+    const pair = seed === undefined
+        ? undefined
+        : await formAuthPair(seed, body, identityId, 200, response);
+    await adapter.transaction(
+        ['identity_tokens', 'requests', 'responses'],
+        async (view) => {
+            await recordIssuedRoot(view, identityId, refreshJti);
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+        },
+    );
+    return { response, requestHash: pair?.requestHash };
 }
 
 async function appendEvents(
@@ -272,13 +317,27 @@ export type RotationOutcome =
 // events in ONE transaction — a concurrent reuse of the same
 // jti can not double-rotate. Shared by the refresh grant and
 // the POST identity-tokens/:jti/rotation route: one truth for
-// the atomic rotate.
+// the atomic rotate. `newJti` is caller-supplied (synchronous
+// generateCryptoSafeBase62() is safe on either side of the
+// tx boundary) rather than minted internally, so the route can
+// pre-mint it at the gate and thread the SAME value through;
+// `pair` is optional and appends as the LAST act, ONLY on the
+// 'rotate' branch — a 409 (reuse or unknown) stores no pair
+// even though the reuse branch still revokes the chain for
+// real. The route is REPLAY_EXEMPT_ROUTE_PATTERNS-wired
+// (message-pair.ts / api.ts): the gate never serves a stored
+// response for a byte-identical resend of this route, so a
+// resent reuse attempt genuinely re-enters this function and
+// re-fails 409 — this function's own re-check IS the guard the
+// exemption relies on; it must stay live on every call.
 export function rotateRefreshJti(
     adapter: DbAdapter,
     presentedJti: string,
+    newJti: string,
+    pair?: MessagePair,
 ): Promise<RotationOutcome> {
     return adapter.transaction(
-        ['identity_tokens'],
+        ['identity_tokens', 'requests', 'responses'],
         async (view) => {
             // Two-step narrow: find the presented jti's chain,
             // then read the WHOLE chain — planRotation's replay
@@ -295,11 +354,13 @@ export function rotateRefreshJti(
                 : await tokens.getAllWhere(
                     'chain_id', chainId);
             const plan = planRotation(
-                rows, presentedJti,
-                generateCryptoSafeBase62(), nowUtc(),
+                rows, presentedJti, newJti, nowUtc(),
             );
             if (plan.kind === 'rotate') {
                 await appendEvents(view, plan.appends);
+                if (pair !== undefined) {
+                    await appendMessagePair(view, pair);
+                }
                 return {
                     kind: 'rotate' as const,
                     newJti: plan.newJti,
@@ -316,19 +377,25 @@ export function rotateRefreshJti(
 // Revoke every jti in the chain `jti` belongs to (logging out
 // one session). Read and appends ride the same transaction, so
 // a concurrent rotation cannot slip a fresh successor past the
-// revoke. A no-op for an unknown jti.
+// revoke. A no-op for an unknown jti — `pair` still appends on
+// BOTH exit paths (the claim-op precedent: a 2xx no-op is not
+// a failure).
 export function revokeTokenChain(
     adapter: DbAdapter,
     jti: string,
+    pair?: MessagePair,
 ): Promise<void> {
     return adapter.transaction(
-        ['identity_tokens'],
+        ['identity_tokens', 'requests', 'responses'],
         async (view) => {
             const tokens = view.identityTokens;
             const byJti = await tokens.getAllWhere('jti', jti);
             const chainId = chainIdForJti(byJti, jti);
             const identityId = identityForJti(byJti, jti);
             if (chainId === null || identityId === null) {
+                if (pair !== undefined) {
+                    await appendMessagePair(view, pair);
+                }
                 return;
             }
             const rows = await tokens.getAllWhere(
@@ -336,6 +403,9 @@ export function revokeTokenChain(
             await appendEvents(view, revocationAppends(
                 rows, chainId, identityId, nowUtc(),
             ));
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
         },
     );
 }
@@ -343,10 +413,18 @@ export function revokeTokenChain(
 // refresh grant: rotate a live refresh jti (retire it, issue a
 // successor in the same chain) and mint a new pair. A non-live
 // jti is reuse — the whole chain is revoked, then 401. An
-// invalid/unknown token mints nothing and appends nothing.
+// invalid/unknown token mints nothing and appends nothing. The
+// successor jti, the TokenResponse (mintPair's HMAC signing),
+// and the pair are all resolved PRE-tx — rotateRefreshJti
+// already accepts a caller-supplied jti and an optional
+// pre-formed pair, appending the pair itself ONLY on the
+// 'rotate' branch of its own transaction, so a reuse re-check
+// that loses the race discards the pre-minted pair (wasted
+// crypto, never observed) rather than ever storing it.
 async function grantRefresh(
     adapter: DbAdapter,
     body: Record<string, unknown>,
+    seed: AuthPairSeed,
 ): Promise<TokenResult> {
     const token = typeof body.refresh_token === 'string'
         ? body.refresh_token
@@ -365,21 +443,22 @@ async function grantRefresh(
     if (refreshRev !== null) {
         return failure(401, refreshRev);
     }
+    const newJti = generateCryptoSafeBase62();
+    const name = await nameFor(adapter, verified.claims.sub);
+    const organizations = await subjectOrganizations(
+        adapter, verified.claims.sub);
+    const response = await mintPair(
+        verified.claims.sub, name, newJti,
+        undefined, { organizations },
+    );
+    const pair = await formAuthPair(
+        seed, body, verified.claims.sub, 200, response,
+    );
     const outcome = await rotateRefreshJti(
-        adapter, verified.claims.jti,
+        adapter, verified.claims.jti, newJti, pair,
     );
     if (outcome.kind === 'rotate') {
-        const name =
-            await nameFor(adapter, verified.claims.sub);
-        const organizations = await subjectOrganizations(
-            adapter, verified.claims.sub);
-        return {
-            ok: true,
-            response: await mintPair(
-                verified.claims.sub, name, outcome.newJti,
-                undefined, { organizations },
-            ),
-        };
+        return { ok: true, response, requestHash: pair.requestHash };
     }
     return failure(401, 'refresh token reuse or unknown');
 }
@@ -397,6 +476,7 @@ async function grantRefresh(
 async function grantTokenExchange(
     adapter: DbAdapter,
     body: Record<string, unknown>,
+    seed?: AuthPairSeed,
 ): Promise<TokenResult> {
     const subjectToken =
         typeof body.subject_token === 'string'
@@ -454,19 +534,25 @@ async function grantTokenExchange(
         }
     }
     const name = await nameFor(adapter, subject);
+    const issued = await issueTokenPair(
+        adapter, subject, name, body, seed,
+        { sub: actor },
+        organization === '' ? undefined : organization,
+    );
     return {
         ok: true,
-        response: await issueTokenPair(
-            adapter, subject, name, { sub: actor },
-            organization === '' ? undefined : organization,
-        ),
+        response: issued.response,
+        requestHash: issued.requestHash,
     };
 }
 
 // The facade's self-delegation: a caller exchanges its own
 // bearer for a token scoped to `org` (subject == actor == the
 // caller). Returns 403, minting nothing, when the caller is
-// not a member — the gate's tenant fence.
+// not a member — the gate's tenant fence. This is an INTERNAL
+// hop (api.ts's facadeRequest), never a real
+// /authentication/token request, so it supplies no seed —
+// issueTokenPair forms no pair for it, exactly as before Task 3.
 export async function exchangeBearerForOrganization(
     adapter: DbAdapter,
     bearer: string,
@@ -489,6 +575,7 @@ export async function exchangeBearerForOrganization(
 async function grantClientCredentials(
     adapter: DbAdapter,
     body: Record<string, unknown>,
+    seed: AuthPairSeed,
 ): Promise<TokenResult> {
     const clientId = typeof body.client_id === 'string'
         ? body.client_id
@@ -526,91 +613,112 @@ async function grantClientCredentials(
         );
     }
     const name = await nameFor(adapter, clientId);
+    const issued = await issueTokenPair(
+        adapter, clientId, name, body, seed,
+    );
     return {
         ok: true,
-        response: await issueTokenPair(adapter, clientId, name),
+        response: issued.response,
+        requestHash: issued.requestHash,
     };
 }
 
 // authorization_code grant: consume an ISSUED code, then issue a
 // token pair. A consumed (replay) or unknown code is a clean 401
-// that mints nothing and appends nothing (grant-first).
+// that mints nothing and appends nothing (grant-first). PRE-tx:
+// read the code state (mintPair's inputs beyond the jti come
+// from the identity this read alone discovers), mint the
+// refresh jti and the full TokenResponse, and form the pair —
+// all before any transaction opens. Then ONE tx RE-READS the
+// code and RE-RUNS codeState: a concurrent consumer may have
+// won the race between the pre-tx read and here, in which case
+// this call aborts (401, mints nothing further, appends
+// nothing — the pre-minted response and pair above are simply
+// discarded, wasted crypto on the losing side of the race)
+// exactly as the pre-restructure single-tx version did.
 async function grantAuthorizationCode(
     adapter: DbAdapter,
     body: Record<string, unknown>,
+    seed: AuthPairSeed,
 ): Promise<TokenResult> {
     const code = typeof body.code === 'string'
         ? body.code
         : '';
-    // Read the code state, consume it, and record the issued
-    // chain root in ONE transaction — a concurrent replay can
-    // not slip between the check and the consume (double-spend).
-    const issued = await adapter.transaction(
-        ['authorization_codes', 'identity_tokens'],
-        async (view) => {
-            const rows = await view.authorizationCodes
-                .getAllWhere('code', code);
-            const state = codeState(rows, code);
-            if (
-                state === null
-                || state.status !== 'issued'
-            ) {
-                return null;
-            }
-            await view.authorizationCodes.put(
-                generateCryptoSafeBase62(), {
-                    code,
-                    identity_id: state.identityId,
-                    client_id: state.clientId,
-                    status: 'consumed',
-                    at: nowUtc(),
-                });
-            const refreshJti = await recordIssuedRoot(
-                view, state.identityId,
-            );
-            return {
-                identityId: state.identityId,
-                refreshJti,
-            };
-        },
-    );
-    if (issued === null) {
+    const rows = await adapter.authorizationCodes
+        .getAllWhere('code', code);
+    const state = codeState(rows, code);
+    if (state === null || state.status !== 'issued') {
         return failure(
             401, 'invalid or used authorization code',
         );
     }
-    const name =
-        await nameFor(adapter, issued.identityId);
+    const refreshJti = generateCryptoSafeBase62();
+    const name = await nameFor(adapter, state.identityId);
     const organizations =
-        await subjectOrganizations(adapter, issued.identityId);
-    return {
-        ok: true,
-        response: await mintPair(
-            issued.identityId, name, issued.refreshJti,
-            undefined, { organizations },
-        ),
-    };
+        await subjectOrganizations(adapter, state.identityId);
+    const response = await mintPair(
+        state.identityId, name, refreshJti,
+        undefined, { organizations },
+    );
+    const pair = await formAuthPair(
+        seed, body, state.identityId, 200, response,
+    );
+    const consumed = await adapter.transaction(
+        [
+            'authorization_codes', 'identity_tokens',
+            'requests', 'responses',
+        ],
+        async (view) => {
+            const freshRows = await view.authorizationCodes
+                .getAllWhere('code', code);
+            const fresh = codeState(freshRows, code);
+            if (fresh === null || fresh.status !== 'issued') {
+                return false;
+            }
+            await view.authorizationCodes.put(
+                generateCryptoSafeBase62(), {
+                    code,
+                    identity_id: fresh.identityId,
+                    client_id: fresh.clientId,
+                    status: 'consumed',
+                    at: nowUtc(),
+                });
+            await recordIssuedRoot(
+                view, fresh.identityId, refreshJti,
+            );
+            await appendMessagePair(view, pair);
+            return true;
+        },
+    );
+    if (!consumed) {
+        return failure(
+            401, 'invalid or used authorization code',
+        );
+    }
+    return { ok: true, response, requestHash: pair.requestHash };
 }
 
 // Dispatch on grant_type. Single-grant primitives are added one
 // per commit; an unsupported grant is a clean 400 with no side
-// effects.
+// effects. `seed` seeds every grant's own pair — see
+// AuthPairSeed and api.ts's dedicated authentication arm.
 export async function postToken(
     adapter: DbAdapter,
     body: Record<string, unknown>,
+    seed: AuthPairSeed,
 ): Promise<TokenResult> {
     const grantType = typeof body.grant_type === 'string'
         ? body.grant_type
         : '';
     switch (grantType) {
         case 'authorization_code':
-            return grantAuthorizationCode(adapter, body);
+            return grantAuthorizationCode(adapter, body, seed);
         case 'refresh':
-            return grantRefresh(adapter, body);
+            return grantRefresh(adapter, body, seed);
         case 'token-exchange':
-            return grantTokenExchange(adapter, body);
+            return grantTokenExchange(adapter, body, seed);
         case 'client_credentials':
-            return grantClientCredentials(adapter, body);
+            return grantClientCredentials(adapter, body, seed);
         default:
             return failure(
                 400, 'unsupported grant_type: ' + grantType,
@@ -626,6 +734,7 @@ export type AuthorizeResult =
     | {
         readonly ok: true;
         readonly response: AuthorizeResponse;
+        readonly requestHash: string;
     }
     | {
         readonly ok: false;
@@ -683,10 +792,18 @@ async function equalizeFailureTiming(
 // The password loop: verify username + password, and on success
 // issue an authorization code bound to (identity, client). Every
 // failure returns the SAME 401 (no user enumeration) and appends
-// nothing — grant-first, no-op on failure.
+// nothing — grant-first, no-op on failure. On success there is
+// no prior state to race (a fresh code always issues cleanly),
+// so — unlike grantAuthorizationCode's consume path — the store
+// put and the pair append simply ride ONE transaction, no in-tx
+// re-check needed. The stored request carries the PBKDF2-
+// fingerprinted password and the stored response the sha256-
+// fingerprinted code (redactAuthenticationRequest/Response,
+// applied inside formAuthPair) — never the live values.
 async function authorizePassword(
     adapter: DbAdapter,
     body: Record<string, unknown>,
+    seed: AuthPairSeed,
 ): Promise<AuthorizeResult> {
     const username = typeof body.username === 'string'
         ? body.username
@@ -719,15 +836,25 @@ async function authorizePassword(
         return denied;
     }
     const code = generateCryptoSafeBase62();
-    await adapter.authorizationCodes.put(
-        generateCryptoSafeBase62(), {
-            code,
-            identity_id: identityId,
-            client_id: clientId,
-            status: 'issued',
-            at: nowUtc(),
-        });
-    return { ok: true, response: { code } };
+    const response: AuthorizeResponse = { code };
+    const pair = await formAuthPair(
+        seed, body, identityId, 200, response,
+    );
+    await adapter.transaction(
+        ['authorization_codes', 'requests', 'responses'],
+        async (view) => {
+            await view.authorizationCodes.put(
+                generateCryptoSafeBase62(), {
+                    code,
+                    identity_id: identityId,
+                    client_id: clientId,
+                    status: 'issued',
+                    at: nowUtc(),
+                });
+            await appendMessagePair(view, pair);
+        },
+    );
+    return { ok: true, response, requestHash: pair.requestHash };
 }
 
 // Interactive front door. The password loop is real; passkey,
@@ -736,13 +863,14 @@ async function authorizePassword(
 export async function postAuthorize(
     adapter: DbAdapter,
     body: Record<string, unknown>,
+    seed: AuthPairSeed,
 ): Promise<AuthorizeResult> {
     const method = typeof body.method === 'string'
         ? body.method
         : '';
     switch (method) {
         case 'password':
-            return authorizePassword(adapter, body);
+            return authorizePassword(adapter, body, seed);
         case 'passkey':
         case 'provider':
         case 'oidc':

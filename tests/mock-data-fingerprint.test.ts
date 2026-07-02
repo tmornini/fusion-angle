@@ -68,10 +68,21 @@ const EXPECTED: Record<string, TableFingerprint> = {
         { count: 49, hash: '01d7b8b0' },
     'project_objective_actual_scores':
         { count: 92, hash: 'f7c18b25' },
-    'requests': { count: 0, hash: '811c9dc5' },
-    'responses': { count: 0, hash: '811c9dc5' },
     'states': { count: 911, hash: '679a7541' },
 };
+
+// requests/responses are EXCLUDED from this fingerprint (Task
+// 4): every pair-wired seed op now forms its own message pair
+// (api/mock-data/seed-message-pairs.ts), whose id
+// (generateCryptoSafeBase62) and envelope `at` (the seed's own
+// arrival moment / nowUtc()) are mint-fresh on every run BY
+// DESIGN — the two message tables can never be pinned by a row-
+// id hash the way the rest of the seed can. Determinism of the
+// OLD plane (every table above) is what invisibility pins; the
+// two message tables' DETERMINISTIC coverage (pair count,
+// balance, per-family address, hash-verify) moved to
+// tests/mock-data-pairs.test.ts.
+const EXCLUDED_TABLES = new Set(['requests', 'responses']);
 
 async function seededFingerprint(): Promise<
     Record<string, TableFingerprint>
@@ -84,6 +95,7 @@ async function seededFingerprint(): Promise<
     >;
     const fp: Record<string, TableFingerprint> = {};
     for (const [table, rows] of Object.entries(snap)) {
+        if (EXCLUDED_TABLES.has(table)) continue;
         const ids = rows.map(r => r.id).sort();
         fp[table] = { count: ids.length, hash: hashIds(ids) };
     }
