@@ -27,7 +27,7 @@ import {
 import { navigateTo } from './navigation.ts';
 import { sessionContext } from './adapters/shared.ts';
 import {
-    sessionIsOrgScoped,
+    sessionIsOrganizationScoped,
     sessionIsAuthenticated,
 } from './adapters/init.ts';
 import {
@@ -114,7 +114,7 @@ async function initSidebarLayout(
             mutateSidebarMember(),
             mutateInvitationsBell(),
         ];
-        if (sessionIsOrgScoped()) {
+        if (sessionIsOrganizationScoped()) {
             widgets.push(mutateHeaderInfo());
         }
         const results = await Promise.allSettled(widgets);

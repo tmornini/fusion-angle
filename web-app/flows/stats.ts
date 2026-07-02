@@ -107,7 +107,7 @@ export async function init(
         container: host,
         skeleton: buildSkeleton('detail', 1),
         fetch: () => getFlowStats(
-            sessionContext(), flowId,
+            sessionContext(), flowId, Date.now(),
         ),
         onData: ({ model, graph }) => {
             const viewBox = boundingViewBox(

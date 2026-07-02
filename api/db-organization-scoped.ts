@@ -23,18 +23,18 @@ import type {
     IdentityCredentialEntity,
 } from './types.ts';
 import {
-    OrgScopedEntityStore,
-    type OrgScoped,
-} from './store-org-scoped.ts';
+    OrganizationScopedEntityStore,
+    type OrganizationScoped,
+} from './store-organization-scoped.ts';
 import {
     ParentScopedEntityStore,
     ParentScopedStateStore,
     viaParent,
     viaMembership,
-    ownerOrgOfEntity,
-    orgOwnedProbes,
+    ownerOrganizationOfEntity,
+    organizationOwnedProbes,
     graphEntityProbe,
-    type OwningOrgResolver,
+    type OwningOrganizationResolver,
 } from './store-parent-scoped.ts';
 
 // Wrap `base` in an org-scoped view. The org-owned entity
@@ -58,22 +58,22 @@ import {
 // feeds the guard, and that HMAC key is still client-shipped.
 // Do not rely on tenant isolation in a networked / multi-user
 // context until the signing key lives server-side.
-export function orgScopedAdapter(
+export function organizationScopedAdapter(
     base: GuardedDbAdapter,
-    org: Id,
+    organization: Id,
 ): DbAdapter {
-    const scope = <T extends OrgScoped>(
+    const scope = <T extends OrganizationScoped>(
         inner: GuardedEntityStore<T>,
         table: string,
-    ): OrgScopedEntityStore<T> =>
-        new OrgScopedEntityStore(inner, org, table);
+    ): OrganizationScopedEntityStore<T> =>
+        new OrganizationScopedEntityStore(inner, organization, table);
 
     const parentScope = <T extends { id: string }>(
         inner: GuardedEntityStore<T>,
         table: string,
-        resolver: OwningOrgResolver<T>,
+        resolver: OwningOrganizationResolver<T>,
     ): ParentScopedEntityStore<T> =>
-        new ParentScopedEntityStore(inner, org, table, resolver);
+        new ParentScopedEntityStore(inner, organization, table, resolver);
 
     // The membership ledger is read for parent-derived
     // ownership (PII, credentials, state events): an identity's
@@ -88,12 +88,12 @@ export function orgScopedAdapter(
     // the flow_nodes / flow_edges two-hop for deletion events.
     // rawReadRow bypasses EntityStore's deleted filter so the
     // probe works even after the node/edge is soft-deleted.
-    const orgOwned = orgOwnedProbes(base);
+    const organizationOwned = organizationOwnedProbes(base);
     const graphProbe = graphEntityProbe(base, base.flows);
     const states = new ParentScopedStateStore(
-        base.states, org, 'states',
-        (row) => ownerOrgOfEntity(
-            orgOwned, memberships, org,
+        base.states, organization, 'states',
+        (row) => ownerOrganizationOfEntity(
+            organizationOwned, memberships, organization,
             row.entity_id, graphProbe,
         ),
     );
@@ -112,8 +112,8 @@ export function orgScopedAdapter(
                 if (e instanceof EntityNotFoundError) return null;
                 throw e;
             }
-            return ownerOrgOfEntity(
-                orgOwned, memberships, org,
+            return ownerOrganizationOfEntity(
+                organizationOwned, memberships, organization,
                 ev.entity_id, graphProbe,
             );
         },
@@ -124,16 +124,16 @@ export function orgScopedAdapter(
     // via its flow). So resolve TWO hops: ledger → flow_nodes →
     // flows.organization_id. An absent node (or flow) is a
     // visible orphan, like every other parent-derived leaf.
-    const flowOrgOfNode = viaParent(
+    const flowOrganizationOfNode = viaParent(
         base.flows, (n: FlowNodeEntity) => n.flow_id);
     const viaFlowNode = <T>(
         flowNodeIdOf: (row: T) => Id,
-    ): OwningOrgResolver<T> =>
+    ): OwningOrganizationResolver<T> =>
         async (row) => {
             try {
                 const node = await base.flowNodes.getById(
                     flowNodeIdOf(row));
-                return flowOrgOfNode(node);
+                return flowOrganizationOfNode(node);
             } catch (e) {
                 if (e instanceof EntityNotFoundError) {
                     return null;
@@ -158,7 +158,7 @@ export function orgScopedAdapter(
         transaction: (tables, fn) =>
             base.transaction(
                 tables,
-                (view) => fn(orgScopedAdapter(view, org)),
+                (view) => fn(organizationScopedAdapter(view, organization)),
             ),
 
         // Global identity/auth spine — untouched.
@@ -186,6 +186,14 @@ export function orgScopedAdapter(
         // (inviter) instead.
         invitations: base.invitations,
 
+        // The message plane (requests/responses) is the global
+        // substrate the migration rides on: tenancy lives IN
+        // `uri_prefix`, enforced at the route gate, not by an
+        // organization_id column — so both pass through unwrapped,
+        // like the identity/auth spine above.
+        requests: base.requests,
+        responses: base.responses,
+
         // Identity PII / credential facets — visible to the
         // caller's org only for co-members (need-to-know),
         // derived from the membership ledger. Credentials also
@@ -194,14 +202,14 @@ export function orgScopedAdapter(
             base.identityPii, 'identity_pii',
             viaMembership(
                 memberships,
-                (r: IdentityPiiEntity) => r.id, org),
+                (r: IdentityPiiEntity) => r.id, organization),
         ),
         identityCredentials: parentScope(
             base.identityCredentials, 'identity_credentials',
             viaMembership(
                 memberships,
                 (r: IdentityCredentialEntity) =>
-                    r.identity_id, org),
+                    r.identity_id, organization),
         ),
 
         // Parent-derived leaves — owning org resolved from the
@@ -285,7 +293,7 @@ export function orgScopedAdapter(
         states,
         stateFieldValues,
 
-        // Org-owned entities — fenced to `org`.
+        // Organization-owned entities — fenced to `org`.
         roleGrants: scope(base.roleGrants, 'role_grants'),
         ideas: scope(base.ideas, 'ideas'),
         projects: scope(base.projects, 'projects'),

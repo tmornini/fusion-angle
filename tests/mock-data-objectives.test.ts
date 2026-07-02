@@ -95,7 +95,7 @@ test('approved projects have full baseline coverage',
         // is scored against the objectives in ITS org, not the
         // global set.
         const objectives = await db.objectives.getAll();
-        const orgByProject = new Map(
+        const organizationByProject = new Map(
             (await db.projects.getAll())
                 .map(p => [p.id, p.organization_id]));
         const allBaselines = await
@@ -106,12 +106,12 @@ test('approved projects have full baseline coverage',
                     .filter(b => b.project_id === pid)
                     .map(b => b.objective_id),
             );
-            const orgObjCount = objectives.filter(
+            const organizationObjCount = objectives.filter(
                 o => o.organization_id
-                    === orgByProject.get(pid)).length;
+                    === organizationByProject.get(pid)).length;
             assert.equal(
                 pairs.size,
-                orgObjCount,
+                organizationObjCount,
                 `project ${pid} missing coverage`,
             );
         }

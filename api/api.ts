@@ -14,12 +14,12 @@ import {
 import type { Id } from './types.ts';
 import { ANONYMOUS_ID } from './access-token.ts';
 import {
-    ownerOrgOfEntity,
-    orgOwnedProbes,
+    ownerOrganizationOfEntity,
+    organizationOwnedProbes,
     graphEntityProbe,
 } from './store-parent-scoped.ts';
 import {
-    exchangeBearerForOrg,
+    exchangeBearerForOrganization,
 } from './authentication.ts';
 import {
     ApiError,
@@ -51,9 +51,9 @@ import {
     invitationsRequest,
 } from './invitations-domain.ts';
 import {
-    identityDefaultOrgRequest,
+    identityDefaultOrganizationRequest,
     organizationsEnumerationRequest,
-} from './org-requests.ts';
+} from './organization-requests.ts';
 import {
     incomingContext,
     REQUEST_ID_HEADER,
@@ -89,7 +89,7 @@ async function facadeRequest(
         );
     }
     const bearer = header.slice('Bearer '.length);
-    const exchanged = await exchangeBearerForOrg(
+    const exchanged = await exchangeBearerForOrganization(
         ctx.base, bearer, segments[1]!,
     );
     if (!exchanged.ok) {
@@ -131,7 +131,7 @@ export async function handleRequest(
     // Facade: /organizations/:org/:entity[/:id] — exchange the
     // caller's bearer for an org-scoped token and re-enter the
     // gate against the flat resource path, so the existing
-    // handler is fenced automatically. Org rides the one
+    // handler is fenced automatically. Organization rides the one
     // verified token, never the path.
     if (pathSegments[0] === 'organizations'
         && pathSegments.length >= 3) {
@@ -140,7 +140,7 @@ export async function handleRequest(
     if (pathSegments[0] === 'identities'
         && pathSegments.length === 3
         && pathSegments[2] === 'default-org') {
-        return identityDefaultOrgRequest(
+        return identityDefaultOrganizationRequest(
             ctx, request, pathSegments,
         );
     }
@@ -179,7 +179,7 @@ export async function handleRequest(
     // Every authenticated request runs org-scoped — see
     // fenceRequest, which completes the vessel: the org, the
     // live memberships, the roles, and the scoped adapter.
-    // Org-owned stores fence to the org; the global
+    // Organization-owned stores fence to the org; the global
     // identity/auth spine passes through.
     let effective: DbAdapter = adapter;
     // The acting member, sourced from the verified token and
@@ -228,7 +228,7 @@ export async function handleRequest(
         // org is created before its first membership exists.
         if (method === 'GET'
             && routePattern === 'organizations/:id'
-            && !fenced.memberOrgs.has(param(params, 0))) {
+            && !fenced.memberOrganizations.has(param(params, 0))) {
             return Response.json(
                 { error: 'Not found: ' + pathname },
                 { status: HTTP_NOT_FOUND },
@@ -248,8 +248,8 @@ export async function handleRequest(
             // The graphProbe closes the flow_nodes / flow_edges
             // two-hop for node/edge deletion events.
             // rawReadRow bypasses EntityStore's deleted filter.
-            const owner = await ownerOrgOfEntity(
-                orgOwnedProbes(adapter),
+            const owner = await ownerOrganizationOfEntity(
+                organizationOwnedProbes(adapter),
                 adapter.memberships, fenced.organization,
                 param(params, 0),
                 graphEntityProbe(adapter, adapter.flows),

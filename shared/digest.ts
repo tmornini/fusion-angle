@@ -11,3 +11,14 @@ export async function sha256Bytes(
         .digest('SHA-256', data);
     return new Uint8Array(hash);
 }
+
+export async function sha256Hex(
+    text: string,
+): Promise<string> {
+    const bytes = await sha256Bytes(text);
+    let hex = '';
+    for (const byte of bytes) {
+        hex += byte.toString(16).padStart(2, '0');
+    }
+    return hex;
+}

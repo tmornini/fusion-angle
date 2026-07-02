@@ -6,18 +6,18 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
-    putIdentityDefaultOrg,
-    getIdentityDefaultOrg,
-} from '../web-app/app/adapters/identity-default-org.ts';
+    putIdentityDefaultOrganization,
+    getIdentityDefaultOrganization,
+} from '../web-app/app/adapters/identity-default-organization.ts';
 
 const AT = '2026-06-04T00:00:00.000000Z';
 
-async function memberOf(orgs: string[]) {
+async function memberOf(organizations: string[]) {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    for (const [i, org] of orgs.entries()) {
+    for (const [i, organization] of organizations.entries()) {
         await db.memberships.put('m-' + i, {
-            organization_id: org,
+            organization_id: organization,
             identity_id: 'current',
             at: AT,
         });
@@ -25,25 +25,25 @@ async function memberOf(orgs: string[]) {
     return db;
 }
 
-test('putIdentityDefaultOrg sets the caller default org',
+test('putIdentityDefaultOrganization sets the caller default org',
 async () => {
     const db = await memberOf(['1']);
     const ctx = createRequestContext(db, await devToken());
-    await putIdentityDefaultOrg(ctx, '1');
-    assert.equal(await getIdentityDefaultOrg(ctx), '1');
+    await putIdentityDefaultOrganization(ctx, '1');
+    assert.equal(await getIdentityDefaultOrganization(ctx), '1');
 });
 
-test('getIdentityDefaultOrg resolves the primary membership',
+test('getIdentityDefaultOrganization resolves the primary membership',
 async () => {
     const db = await memberOf(['1']);
     const ctx = createRequestContext(db, await devToken());
-    assert.equal(await getIdentityDefaultOrg(ctx), '1');
+    assert.equal(await getIdentityDefaultOrganization(ctx), '1');
 });
 
-test('putIdentityDefaultOrg rejects a non-member org',
+test('putIdentityDefaultOrganization rejects a non-member org',
 async () => {
     const db = await memberOf(['1']);
     const ctx = createRequestContext(db, await devToken());
     await assert.rejects(
-        () => putIdentityDefaultOrg(ctx, '2'));
+        () => putIdentityDefaultOrganization(ctx, '2'));
 });

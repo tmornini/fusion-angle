@@ -14,15 +14,15 @@ import type {
     AuthenticatedContext,
     RequestContext,
 } from './request-context.ts';
-import { orgScopedAdapter } from './db-org-scoped.ts';
+import { organizationScopedAdapter } from './db-organization-scoped.ts';
 import { HTTP_FORBIDDEN } from './http-errors.ts';
 import {
-    currentRolesForInOrg,
+    currentRolesForInOrganization,
     isPermitted,
 } from './authorization.ts';
 import {
     tokenRevocationReason,
-    identityDefaultOrg,
+    identityDefaultOrganization,
 } from './authentication.ts';
 
 // Authenticate in-tree requests at the one chokepoint. The
@@ -93,17 +93,17 @@ export async function authenticateRequest(
 
 // Roles are per-org, but a grant is keyed by identity: read
 // this principal's grants through the identity_id index, then
-// currentRolesForInOrg filters to the org — identity is
+// currentRolesForInOrganization filters to the org — identity is
 // global, roles are per-org. Derived ONCE per request at the
 // gate; every authorizer consumes the same derivation.
-async function callerRolesInOrg(
+async function callerRolesInOrganization(
     adapter: DbAdapter,
     principal: Principal,
-    org: Id,
+    organization: Id,
 ): Promise<string[]> {
     const rows = await adapter.roleGrants
         .getAllWhere('identity_id', principal.id);
-    return currentRolesForInOrg(rows, principal.id, org);
+    return currentRolesForInOrganization(rows, principal.id, organization);
 }
 
 type FenceResult =
@@ -125,7 +125,7 @@ export async function fenceRequest(
     ctx: AuthenticatedContext,
 ): Promise<FenceResult> {
     const organization = ctx.principal.organization
-        ?? await identityDefaultOrg(
+        ?? await identityDefaultOrganization(
             ctx.base, ctx.principal.id,
         );
     if (organization === null) {
@@ -136,9 +136,9 @@ export async function fenceRequest(
             status: HTTP_FORBIDDEN,
         };
     }
-    const memberOrgs =
-        await callerOrgIds(ctx.base, ctx.principal);
-    if (!memberOrgs.has(organization)) {
+    const memberOrganizations =
+        await callerOrganizationIds(ctx.base, ctx.principal);
+    if (!memberOrganizations.has(organization)) {
         return {
             ok: false,
             error: 'forbidden: no longer a member'
@@ -146,7 +146,7 @@ export async function fenceRequest(
             status: HTTP_FORBIDDEN,
         };
     }
-    const roles = await callerRolesInOrg(
+    const roles = await callerRolesInOrganization(
         ctx.base, ctx.principal, organization,
     );
     return {
@@ -154,9 +154,9 @@ export async function fenceRequest(
         ctx: {
             ...ctx,
             organization,
-            memberOrgs,
+            memberOrganizations,
             roles,
-            scoped: orgScopedAdapter(ctx.base, organization),
+            scoped: organizationScopedAdapter(ctx.base, organization),
         },
     };
 }
@@ -197,7 +197,7 @@ export function authorizeIdentityPii(
 // membership ledger (never the token claim, so it cannot be
 // stale). Shared by GET /organizations and the
 // organizations/:id read fence in handleRequest.
-export async function callerOrgIds(
+export async function callerOrganizationIds(
     adapter: DbAdapter,
     principal: Principal,
 ): Promise<Set<Id>> {

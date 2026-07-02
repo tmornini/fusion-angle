@@ -16,13 +16,13 @@ async function getHeaderData(
         getDashboardStats,
     } = await import('./adapters');
     const ctx = sessionContext();
-    const [org, stats] =
+    const [organization, stats] =
         await Promise.all([
             getOrganization(ctx),
             getDashboardStats(ctx),
         ]);
     return {
-        organization: org.nameText(),
+        organization: organization.nameText(),
         stats,
     };
 }

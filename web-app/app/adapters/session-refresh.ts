@@ -13,7 +13,7 @@ interface TokenGrantResponse {
 // the anonymous boot bearer reaches it. A terminal 401 (reuse,
 // unknown, or expired refresh) surfaces as UnauthorizedError —
 // one typed error everywhere; non-401 faults propagate as-is.
-// Free of global side effects (mirrors postOrgSessionExchange):
+// Free of global side effects (mirrors postOrganizationSessionExchange):
 // the caller persists and installs the result.
 export async function postSessionRefresh(
     ctx: RequestContext,

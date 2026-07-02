@@ -958,6 +958,37 @@ export interface ProjectObjectiveActualScoreEntity {
     at: string;
 }
 
+// One row per stored HTTP request message. The canonical
+// message IS the row; the columns beside it are addressing
+// and index machinery, never a second truth.
+export interface RequestEntity {
+    id: Id;
+    uri_prefix: string;
+    uri_id: string;
+    at: string;
+    requester_identity_id: Id;
+    message_hash: string;
+    message: string;
+}
+
+// The paired response. id equals the request's id. follows /
+// supersedes are absent when the write had no predecessor —
+// key absence, not null (the IndexedDB unique index skips
+// absent keys, which is the partial-index semantics the
+// two-PUT-classes design requires).
+export interface ResponseEntity {
+    id: Id;
+    uri_prefix: string;
+    uri_id: string;
+    at: string;
+    status: number;
+    etag: string;
+    message_hash: string;
+    message: string;
+    follows?: string;
+    supersedes?: string;
+}
+
 export interface ProjectEntity {
     id: Id;
     organization_id: Id;

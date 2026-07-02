@@ -34,13 +34,13 @@ import {
     getOrganizations,
 } from './adapters/organizations.ts';
 import {
-    resolveActiveOrg,
-    postOrgSessionExchange,
-    ACTIVE_ORG_KEY,
-} from './adapters/org-session.ts';
+    resolveActiveOrganization,
+    postOrganizationSessionExchange,
+    ACTIVE_ORGANIZATION_KEY,
+} from './adapters/organization-session.ts';
 import {
-    getIdentityDefaultOrg,
-} from './adapters/identity-default-org.ts';
+    getIdentityDefaultOrganization,
+} from './adapters/identity-default-organization.ts';
 import {
     nowEpochSeconds,
 } from '../../api/types.ts';
@@ -145,20 +145,20 @@ function redirectIfMissingTable(
 // Returns false when the identity reaches no org — the caller
 // decides what that means (bounce when auth-gated, degrade to
 // anonymous when the page is auth-exempt).
-async function scopeBootToActiveOrg(): Promise<boolean> {
+async function scopeBootToActiveOrganization(): Promise<boolean> {
     const ctx = sessionContext();
     const reachable =
         (await getOrganizations(ctx)).map(o => o.id);
     if (reachable.length === 0) return false;
-    const active = resolveActiveOrg(
+    const active = resolveActiveOrganization(
         reachable,
-        getPreference(ACTIVE_ORG_KEY),
-        await getIdentityDefaultOrg(ctx),
+        getPreference(ACTIVE_ORGANIZATION_KEY),
+        await getIdentityDefaultOrganization(ctx),
     );
     putSessionToken(
-        await postOrgSessionExchange(
+        await postOrganizationSessionExchange(
             ctx, getSessionToken(), active));
-    putPreference(ACTIVE_ORG_KEY, active);
+    putPreference(ACTIVE_ORGANIZATION_KEY, active);
     return true;
 }
 
@@ -169,7 +169,7 @@ async function scopeBootToActiveOrg(): Promise<boolean> {
 // dead one, exactly as the auth gate does, so an expired access token
 // no longer renders these pages anonymously. Everyone else keeps the
 // anonymous seed and the sidebar renders without a member chip — the
-// org-bound reads gate on sessionIsOrgScoped(). Never bounces and
+// org-bound reads gate on sessionIsOrganizationScoped(). Never bounces and
 // never scrubs (the page is reachable without auth); a dead or failed
 // refresh degrades to the unscoped state rather than aborting boot.
 async function scopeBootIfCredentialed(): Promise<void> {
@@ -192,7 +192,7 @@ async function scopeBootIfCredentialed(): Promise<void> {
         ) {
             return;   // dead refresh — stay anonymous, no scrub
         }
-        await scopeBootToActiveOrg();
+        await scopeBootToActiveOrganization();
     } catch (err) {
         log.warn('opportunistic org scope failed', 'core', err);
     }
@@ -230,8 +230,8 @@ async function bootAuthGate(): Promise<boolean> {
 // Sibling to bootAuthGate: returns false once it has redirected,
 // so the caller stops booting. Accepting an invitation grants the
 // first membership and unblocks every org-scoped route.
-async function bootOrgGate(): Promise<boolean> {
-    if (await scopeBootToActiveOrg()) return true;
+async function bootOrganizationGate(): Promise<boolean> {
+    if (await scopeBootToActiveOrganization()) return true;
     return !bounceTo('invitations');
 }
 
@@ -262,7 +262,7 @@ async function refreshAndInstall(
 
 // The auth gate's refresh: install the new session, or — on a dead
 // refresh (recovery-FREE context, a 401 is terminal) — scrub and
-// bounce to login. scopeBootToActiveOrg then re-scopes the org.
+// bounce to login. scopeBootToActiveOrganization then re-scopes the org.
 async function installRefreshedSession(
     refreshToken: string,
 ): Promise<boolean> {
@@ -321,7 +321,7 @@ document.addEventListener(
                 if (!(await bootAuthGate())) {
                     return;   // bounced to login
                 }
-                if (!(await bootOrgGate())) {
+                if (!(await bootOrganizationGate())) {
                     return;   // bounced to invitations
                 }
             } else {

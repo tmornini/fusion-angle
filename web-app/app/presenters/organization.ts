@@ -86,19 +86,19 @@ function buildEditField(
 }
 
 function buildReadIdentity(
-    org: Organization,
+    organization: Organization,
 ): SafeHtml {
     return html`
         <h2 class="${
             'text-xl font-display'
             + ' font-semibold'
-        }">${org.nameText()}
+        }">${organization.nameText()}
             <span class="${
                 'text-muted font-normal'
             }">·</span>
             <span class="${
                 'text-muted font-normal'
-            }">${org.domainText()}</span>
+            }">${organization.domainText()}</span>
         </h2>`;
 }
 
@@ -124,7 +124,7 @@ function buildEditIdentity(
 }
 
 function buildOverviewCard(
-    org: Organization,
+    organization: Organization,
     stats: OrganizationStats,
     identity: SafeHtml,
 ): SafeHtml {
@@ -168,7 +168,7 @@ function buildOverviewCard(
                 ${buildStatCell(
                     iconCalendar(ICON_SIZE.base, ''),
                     'Next Billing',
-                    html`${org
+                    html`${organization
                         .nextBillingDate()}`,
                     STAT_VALUE_LG,
                 )}
@@ -231,7 +231,7 @@ function buildUsageBar(
 }
 
 function buildUsageCard(
-    org: Organization,
+    organization: Organization,
     stats: OrganizationStats,
 ): SafeHtml {
     return html`
@@ -247,25 +247,25 @@ function buildUsageCard(
             <div class="flex flex-col gap-4">
                 ${buildUsageBar(
                     'Seats',
-                    org.usedSeats(),
-                    org.totalSeats(),
+                    organization.usedSeats(),
+                    organization.totalSeats(),
                 )}
                 ${buildUsageBar(
                     'Projects',
                     stats.projectsCurrent,
-                    org.projectsLimit(),
+                    organization.projectsLimit(),
                 )}
                 ${buildUsageBar(
                     'Ideas',
                     stats.ideasCurrent,
-                    org.ideasLimit(),
+                    organization.ideasLimit(),
                 )}
             </div>
         </div>`;
 }
 
 function buildPage(
-    org: Organization,
+    organization: Organization,
     stats: OrganizationStats,
     headerActions: SafeHtml,
     identity: SafeHtml,
@@ -273,9 +273,9 @@ function buildPage(
     return html`
     <div class="overview">
         ${buildPageHeader(headerActions)}
-        ${buildOverviewCard(org, stats, identity)}
+        ${buildOverviewCard(organization, stats, identity)}
         <div id="objectives-box"></div>
-        ${buildUsageCard(org, stats)}
+        ${buildUsageCard(organization, stats)}
     </div>`;
 }
 
@@ -284,15 +284,15 @@ export class OrganizationPresenter {
     readonly #stats: OrganizationStats;
 
     constructor(
-        org: Organization,
+        organization: Organization,
         stats: OrganizationStats,
     ) {
-        this.#org = org;
+        this.#org = organization;
         this.#stats = stats;
     }
 
     buildPage(): SafeHtml {
-        const org = this.#org;
+        const organization = this.#org;
         const actions = html`
             <button class="${
                 'btn btn-outline gap-2'
@@ -301,8 +301,8 @@ export class OrganizationPresenter {
                 ${iconEdit(ICON_SIZE.base, '')} Edit
             </button>`;
         return buildPage(
-            org, this.#stats, actions,
-            buildReadIdentity(org),
+            organization, this.#stats, actions,
+            buildReadIdentity(organization),
         );
     }
 }
@@ -313,11 +313,11 @@ export class OrganizationEditPresenter {
     readonly #draft: GeneralInfoDraft;
 
     constructor(
-        org: Organization,
+        organization: Organization,
         stats: OrganizationStats,
         draft: GeneralInfoDraft,
     ) {
-        this.#org = org;
+        this.#org = organization;
         this.#stats = stats;
         this.#draft = draft;
     }

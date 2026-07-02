@@ -5,8 +5,8 @@ import {
     putSessionToken,
     deleteSessionToken,
     postSessionSeed,
-    sessionIsOrgScoped,
-    sessionHasReachableOrg,
+    sessionIsOrganizationScoped,
+    sessionHasReachableOrganization,
 } from '../web-app/app/adapters/init.ts';
 import {
     principalFromToken,
@@ -14,7 +14,7 @@ import {
 } from '../api/access-token.ts';
 import {
     devToken,
-    orgToken,
+    organizationToken,
     reachableToken,
 } from './token-fixtures.ts';
 
@@ -34,36 +34,36 @@ test('returns the established token once set', () => {
 test('the anonymous seed is not org-scoped', async () => {
     deleteSessionToken();
     await postSessionSeed();
-    assert.equal(sessionIsOrgScoped(), false);
+    assert.equal(sessionIsOrganizationScoped(), false);
     deleteSessionToken();
 });
 
 test('a flat token (no org claim) is not org-scoped', async () => {
     putSessionToken(await devToken());
-    assert.equal(sessionIsOrgScoped(), false);
+    assert.equal(sessionIsOrganizationScoped(), false);
     deleteSessionToken();
 });
 
 test('an org-exchanged token is org-scoped', async () => {
-    putSessionToken(await orgToken());
-    assert.equal(sessionIsOrgScoped(), true);
+    putSessionToken(await organizationToken());
+    assert.equal(sessionIsOrganizationScoped(), true);
     deleteSessionToken();
 });
 
 test('a token with reachable orgs has one', async () => {
     putSessionToken(await reachableToken());
-    assert.equal(sessionHasReachableOrg(), true);
+    assert.equal(sessionHasReachableOrganization(), true);
     deleteSessionToken();
 });
 
 test('a flat token (no orgs claim) has none', async () => {
     putSessionToken(await devToken());
-    assert.equal(sessionHasReachableOrg(), false);
+    assert.equal(sessionHasReachableOrganization(), false);
     deleteSessionToken();
 });
 
 test('an empty reachable set has none', async () => {
     putSessionToken(await reachableToken('current', []));
-    assert.equal(sessionHasReachableOrg(), false);
+    assert.equal(sessionHasReachableOrganization(), false);
     deleteSessionToken();
 });

@@ -70,9 +70,9 @@ test('a subject reaches its orgs via memberships', async () => {
         at: '2026-06-04T00:00:00.000000Z',
     });
     const all = await db.memberships.getAll();
-    const aliceOrgs = all
+    const aliceOrganizations = all
         .filter(m => m.identity_id === 'alice')
         .map(m => m.organization_id)
         .sort();
-    assert.deepEqual(aliceOrgs, ['1', '7']);
+    assert.deepEqual(aliceOrganizations, ['1', '7']);
 });

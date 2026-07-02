@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { orgToken } from './token-fixtures.ts';
-import { orgRow } from './test-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
+import { organizationRow } from './test-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -31,16 +31,16 @@ function req(
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('1', orgRow('Stark'));
-    await db.organizations.put('2', orgRow('Wayne'));
-    for (const org of ['1', '2']) {
-        await db.roleGrants.put('rg-current-' + org, {
-            organization_id: org, identity_id: 'current',
+    await db.organizations.put('1', organizationRow('Stark'));
+    await db.organizations.put('2', organizationRow('Wayne'));
+    for (const organization of ['1', '2']) {
+        await db.roleGrants.put('rg-current-' + organization, {
+            organization_id: organization, identity_id: 'current',
             role: 'admin', action: 'granted',
             by_member_id: 'system', at: AT,
         });
-        await db.memberships.put('m-current-' + org, {
-            organization_id: org, identity_id: 'current',
+        await db.memberships.put('m-current-' + organization, {
+            organization_id: organization, identity_id: 'current',
             at: AT,
         });
     }
@@ -72,7 +72,7 @@ async function grantSarahToWayne(
 ): Promise<string> {
     const res = await handleRequest(db, req(
         'POST', '/invitations',
-        await orgToken('current', '2'),
+        await organizationToken('current', '2'),
         {
             email: 'sarah@x.com',
             invitationId: 'inv-sarah',
@@ -90,7 +90,7 @@ async () => {
     const db = await seed();
     await grantSarahToWayne(db);
     const res = await handleRequest(db, req(
-        'GET', '/invitations', await orgToken('sarah', '1')));
+        'GET', '/invitations', await organizationToken('sarah', '1')));
     assert.equal(res.status, 200);
     const rows = await res.json() as { state: string }[];
     assert.equal(rows.length, 1);
@@ -100,7 +100,7 @@ async () => {
 test('a non-admin is forbidden from granting', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
-        'POST', '/invitations', await orgToken('sarah', '1'),
+        'POST', '/invitations', await organizationToken('sarah', '1'),
         {
             email: 'demo@example.com',
             invitationId: 'inv-x', grantEventId: 'ev-x',
@@ -114,10 +114,10 @@ test('a pending invite writes no membership', async () => {
     // invite must not add one, so the org stays unreachable.
     const db = await seed();
     await grantSarahToWayne(db);
-    const sarahOrgs = (await db.memberships.getAll())
+    const sarahOrganizations = (await db.memberships.getAll())
         .filter(m => m.identity_id === 'sarah')
         .map(m => m.organization_id).sort();
-    assert.deepEqual(sarahOrgs, ['1']);
+    assert.deepEqual(sarahOrganizations, ['1']);
 });
 
 test('a pending invitee is absent from the roster', async () => {
@@ -129,7 +129,7 @@ test('a pending invitee is absent from the roster', async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const acc = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
-        await orgToken('sarah', '1'),
+        await organizationToken('sarah', '1'),
         {
             membershipId: 'ms-sarah', acceptEventId: 'ev-acc',
             acceptAt: AT,
@@ -143,7 +143,7 @@ async function rosterIds(
     db: MemoryDbAdapter,
 ): Promise<Set<string>> {
     const res = await handleRequest(db, req(
-        'GET', '/members', await orgToken('current', '2')));
+        'GET', '/members', await organizationToken('current', '2')));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
     return new Set(rows.map(r => r.id));
@@ -154,16 +154,16 @@ test('accept makes the invitation org reachable', async () => {
     const id = await grantSarahToWayne(db);
     await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
-        await orgToken('sarah', '1'),
+        await organizationToken('sarah', '1'),
         {
             membershipId: 'ms-sarah-2',
             acceptEventId: 'ev-acc-2',
             acceptAt: AT,
         }));
-    const sarahOrgs = (await db.memberships.getAll())
+    const sarahOrganizations = (await db.memberships.getAll())
         .filter(m => m.identity_id === 'sarah')
         .map(m => m.organization_id).sort();
-    assert.deepEqual(sarahOrgs, ['1', '2']);
+    assert.deepEqual(sarahOrganizations, ['1', '2']);
 });
 
 test('an invitation event stays out of other orgs /states',
@@ -178,10 +178,10 @@ async () => {
 
 async function statesEntityIds(
     db: MemoryDbAdapter,
-    org: string,
+    organization: string,
 ): Promise<Set<string>> {
     const res = await handleRequest(db, req(
-        'GET', '/states', await orgToken('current', org)));
+        'GET', '/states', await organizationToken('current', organization)));
     assert.equal(res.status, 200);
     const rows = await res.json() as { entity_id: string }[];
     return new Set(rows.map(r => r.entity_id));
@@ -208,7 +208,7 @@ async () => {
         grantEventId: 'ev-g-idem',
         grantAt: GRANT_AT,
     };
-    const tok = await orgToken('current', '2');
+    const tok = await organizationToken('current', '2');
     const r1 = await handleRequest(
         db, req('POST', '/invitations', tok, body));
     assert.equal(r1.status, 200);
@@ -230,7 +230,7 @@ async () => {
     // grant emits 1 event, accept emits 1 more; a second accept
     // of the same body must not emit a third.
     const db = await seed();
-    const tok = await orgToken('current', '2');
+    const tok = await organizationToken('current', '2');
     await handleRequest(db, req('POST', '/invitations', tok, {
         email: 'sarah@x.com',
         invitationId: 'inv-ai',
@@ -242,7 +242,7 @@ async () => {
         acceptEventId: 'ev-a-idem',
         acceptAt: ACCEPT_AT,
     };
-    const sTok = await orgToken('sarah', '1');
+    const sTok = await organizationToken('sarah', '1');
     const a1 = await handleRequest(db, req(
         'POST', '/invitations/inv-ai/acceptance',
         sTok, accBody));
@@ -267,7 +267,7 @@ async () => {
     // grant emits 1 event, decline emits 1 more; a second
     // decline of the same body must not emit a third.
     const db = await seed();
-    const tok = await orgToken('current', '2');
+    const tok = await organizationToken('current', '2');
     await handleRequest(db, req('POST', '/invitations', tok, {
         email: 'sarah@x.com',
         invitationId: 'inv-di',
@@ -278,7 +278,7 @@ async () => {
         declineEventId: 'ev-d-idem',
         declineAt: DECLINE_AT,
     };
-    const sTok = await orgToken('sarah', '1');
+    const sTok = await organizationToken('sarah', '1');
     const d1 = await handleRequest(db, req(
         'POST', '/invitations/inv-di/decline',
         sTok, decBody));
@@ -301,7 +301,7 @@ async () => {
     // grant emits 1 event, revoke emits 1 more; a second revoke
     // of the same body must not emit a third.
     const db = await seed();
-    const tok = await orgToken('current', '2');
+    const tok = await organizationToken('current', '2');
     await handleRequest(db, req('POST', '/invitations', tok, {
         email: 'sarah@x.com',
         invitationId: 'inv-ri',
@@ -337,7 +337,7 @@ test('grant: empty invitationId is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/invitations',
-        await orgToken('current', '2'),
+        await organizationToken('current', '2'),
         {
             email: 'sarah@x.com',
             invitationId: '',
@@ -351,7 +351,7 @@ test('grant: empty grantEventId is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/invitations',
-        await orgToken('current', '2'),
+        await organizationToken('current', '2'),
         {
             email: 'sarah@x.com',
             invitationId: 'inv-x',
@@ -367,7 +367,7 @@ test('accept: empty membershipId is rejected (400)', async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
-        await orgToken('sarah', '1'),
+        await organizationToken('sarah', '1'),
         {
             membershipId: '',
             acceptEventId: 'ev-x',
@@ -383,7 +383,7 @@ async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/decline',
-        await orgToken('sarah', '1'),
+        await organizationToken('sarah', '1'),
         {
             declineEventId: '',
             declineAt: AT,
@@ -397,7 +397,7 @@ test('revoke: empty revokeEventId is rejected (400)', async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/revocation',
-        await orgToken('current', '2'),
+        await organizationToken('current', '2'),
         {
             revokeEventId: '',
             revokeAt: AT,
@@ -414,7 +414,7 @@ test('grant: missing invitationId is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/invitations',
-        await orgToken('current', '2'),
+        await organizationToken('current', '2'),
         {
             email: 'sarah@x.com',
             // invitationId intentionally absent
@@ -428,7 +428,7 @@ test('grant: non-string grantAt is rejected (400)', async () => {
     const db = await seed();
     const res = await handleRequest(db, req(
         'POST', '/invitations',
-        await orgToken('current', '2'),
+        await organizationToken('current', '2'),
         {
             email: 'sarah@x.com',
             invitationId: 'inv-x',
@@ -445,7 +445,7 @@ async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
-        await orgToken('sarah', '1'),
+        await organizationToken('sarah', '1'),
         {
             membershipId: 'ms-x',
             // acceptEventId intentionally absent
@@ -461,7 +461,7 @@ async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
-        await orgToken('sarah', '1'),
+        await organizationToken('sarah', '1'),
         {
             membershipId: 'ms-x',
             acceptEventId: 'ev-x',
@@ -476,7 +476,7 @@ test('decline: missing declineAt is rejected (400)', async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/decline',
-        await orgToken('sarah', '1'),
+        await organizationToken('sarah', '1'),
         {
             declineEventId: 'ev-x',
             // declineAt intentionally absent
@@ -490,7 +490,7 @@ test('revoke: missing revokeAt is rejected (400)', async () => {
     const id = (await db.invitations.getAll())[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/revocation',
-        await orgToken('current', '2'),
+        await organizationToken('current', '2'),
         {
             revokeEventId: 'ev-x',
             // revokeAt intentionally absent

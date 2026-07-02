@@ -27,7 +27,7 @@ import {
     deleteSessionCredentials,
     SessionCredentialsCorruptError,
 } from '../web-app/app/adapters/session-credentials.ts';
-import { devToken, orgToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 
 const KEY = 'fusion.session-credentials';
 
@@ -41,7 +41,7 @@ test('a stored credential round-trips by value', async () => {
     localStorage.clear();
     const creds = {
         accessToken: await devToken(),
-        refreshToken: await orgToken(),
+        refreshToken: await organizationToken(),
     };
     putSessionCredentials(creds);
     assert.deepEqual(getSessionCredentials(), creds);
@@ -92,7 +92,7 @@ test('a deleted credential reads as null again', async () => {
     localStorage.clear();
     putSessionCredentials({
         accessToken: await devToken(),
-        refreshToken: await orgToken(),
+        refreshToken: await organizationToken(),
     });
     deleteSessionCredentials();
     assert.equal(getSessionCredentials(), null);

@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { devToken, orgToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     ideaBody,
-    orgRow,
+    organizationRow,
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { jsonObjectField } from '../api/types.ts';
@@ -34,7 +34,7 @@ function req(
 // the org-A grant authorizes the facade tests; seedRootAdmin's
 // org '1' grant + membership keep the flat-token enumerate
 // test authorized.
-async function twoOrgs(): Promise<MemoryDbAdapter> {
+async function twoOrganizations(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     await db.roleGrants.put('role-current-admin-a', {
@@ -54,7 +54,7 @@ async function twoOrgs(): Promise<MemoryDbAdapter> {
 
 test('a facade GET returns only the bound org rows',
 async () => {
-    const db = await twoOrgs();
+    const db = await twoOrganizations();
     const res = await handleRequest(db, req(
         'GET', '/organizations/A/ideas',
         await devToken('current')));
@@ -64,7 +64,7 @@ async () => {
 });
 
 test('a facade into a non-member org is 403', async () => {
-    const db = await twoOrgs();
+    const db = await twoOrganizations();
     const res = await handleRequest(db, req(
         'GET', '/organizations/B/ideas',
         await devToken('current')));
@@ -73,7 +73,7 @@ test('a facade into a non-member org is 403', async () => {
 
 test('a facade PUT stamps the bound org over a forged body',
 async () => {
-    const db = await twoOrgs();
+    const db = await twoOrganizations();
     const res = await handleRequest(db, req(
         'PUT', '/organizations/A/ideas/a2',
         await devToken('current'),
@@ -85,9 +85,9 @@ async () => {
 
 test('enumerate returns only the caller member orgs',
 async () => {
-    const db = await twoOrgs();
-    await db.organizations.put('A', orgRow('Acme'));
-    await db.organizations.put('B', orgRow('Beta'));
+    const db = await twoOrganizations();
+    await db.organizations.put('A', organizationRow('Acme'));
+    await db.organizations.put('B', organizationRow('Beta'));
     const res = await handleRequest(db, req(
         'GET', '/organizations', await devToken('current')));
     assert.equal(res.status, 200);
@@ -96,7 +96,7 @@ async () => {
 });
 
 test('the facade requires a bearer token', async () => {
-    const db = await twoOrgs();
+    const db = await twoOrganizations();
     const res = await handleRequest(db, new Request(
         `${BASE}/organizations/A/ideas`));
     assert.equal(res.status, 401);
@@ -110,8 +110,8 @@ test('the facade requires a bearer token', async () => {
 async function rolelessMemberDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('A', orgRow('Acme'));
-    await db.organizations.put('B', orgRow('Beta'));
+    await db.organizations.put('A', organizationRow('Acme'));
+    await db.organizations.put('B', organizationRow('Beta'));
     await db.memberships.put('m-sarah-a', {
         organization_id: 'A', identity_id: 'sarah',
         at: '2026-06-04T00:00:00.000000Z',
@@ -150,26 +150,26 @@ async () => {
 
 const T8_AT = '2026-06-04T00:00:00.000000Z';
 
-function projectBody(org: string) {
+function projectBody(organization: string) {
     return {
-        organization_id: org, title: 't', description: 'd',
+        organization_id: organization, title: 't', description: 'd',
         progress: 0, start_date: '2026-06-04',
         target_end_date: '2026-06-04', estimated_cost: 0,
         actual_cost: 0, position: 0,
     };
 }
 
-function flowBody(org: string) {
+function flowBody(organization: string) {
     return {
-        organization_id: org, name: 'f', is_locked: false,
+        organization_id: organization, name: 'f', is_locked: false,
         is_auto_layout: false, is_auto_fit: false,
         lock_timeout: 0,
     };
 }
 
-function workOrderBody(org: string) {
+function workOrderBody(organization: string) {
     return {
-        organization_id: org, display_id: 'WO',
+        organization_id: organization, display_id: 'WO',
         flow_graph: jsonObjectField({
             flowId: 'f', name: 'f', lockTimeout: 0,
             nodes: [], edges: [],
@@ -180,18 +180,18 @@ function workOrderBody(org: string) {
 
 // Seed a full parent→leaf chain in `org`, ids suffixed `s`.
 async function seedChain(
-    db: MemoryDbAdapter, org: string, s: string,
+    db: MemoryDbAdapter, organization: string, s: string,
 ): Promise<void> {
-    await db.ideas.put('i' + s, ideaBody(org, 'idea'));
-    await db.projects.put('p' + s, projectBody(org));
-    await db.flows.put('f' + s, flowBody(org));
+    await db.ideas.put('i' + s, ideaBody(organization, 'idea'));
+    await db.projects.put('p' + s, projectBody(organization));
+    await db.flows.put('f' + s, flowBody(organization));
     await db.objectives.put(
-        'o' + s, { organization_id: org, position: 0 });
+        'o' + s, { organization_id: organization, position: 0 });
     await db.records.put('r' + s, {
-        organization_id: org, name: 'r',
+        organization_id: organization, name: 'r',
         description: 'd', position: 0,
     });
-    await db.workOrders.put('wo' + s, workOrderBody(org));
+    await db.workOrders.put('wo' + s, workOrderBody(organization));
     await db.flowVersions.put('fv' + s, {
         flow_id: 'f' + s, name: 'v', is_locked: false,
         is_auto_layout: false, is_auto_fit: false,
@@ -240,8 +240,8 @@ async function seedChain(
 async function deepDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('A', orgRow('Acme'));
-    await db.organizations.put('B', orgRow('Beta'));
+    await db.organizations.put('A', organizationRow('Acme'));
+    await db.organizations.put('B', organizationRow('Beta'));
     await db.roleGrants.put('rg-current-a', {
         organization_id: 'A', identity_id: 'current',
         role: 'admin', action: 'granted',
@@ -251,7 +251,7 @@ async function deepDb(): Promise<MemoryDbAdapter> {
         organization_id: 'A', identity_id: 'current',
         at: T8_AT,
     });
-    for (const [id, org] of [
+    for (const [id, organization] of [
         ['pa', 'A'], ['pb', 'B'],
     ] as const) {
         await db.members.put(id, { type: 'human' });
@@ -265,7 +265,7 @@ async function deepDb(): Promise<MemoryDbAdapter> {
             status: 'set', secret: 'HASH-' + id, at: T8_AT,
         });
         await db.memberships.put('mem-' + id, {
-            organization_id: org, identity_id: id, at: T8_AT,
+            organization_id: organization, identity_id: id, at: T8_AT,
         });
         await db.states.put('seMem-' + id, {
             entity_id: id, state: 'active',
@@ -573,11 +573,11 @@ async () => {
     });
     const asAdmin = await handleRequest(db, req(
         'GET', '/organizations/A/identities/pa/credentials',
-        await orgToken('current', 'A')));
+        await organizationToken('current', 'A')));
     assert.equal(asAdmin.status, 200);
     const asMember = await handleRequest(db, req(
         'GET', '/organizations/A/identities/pa/credentials',
-        await orgToken('pa', 'A')));
+        await organizationToken('pa', 'A')));
     assert.equal(asMember.status, 403);
 });
 
@@ -585,13 +585,13 @@ test('organizations/:id 404s a non-member org', async () => {
     const db = await deepDb();
     const mine = await handleRequest(db, req(
         'GET', '/organizations/A',
-        await orgToken('current', 'A')));
+        await organizationToken('current', 'A')));
     assert.equal(mine.status, 200);
     assert.equal(
         (await db.organizations.getById('B')).id, 'B');
     const foreign = await handleRequest(db, req(
         'GET', '/organizations/B',
-        await orgToken('current', 'A')));
+        await organizationToken('current', 'A')));
     assert.equal(foreign.status, 404);
 });
 

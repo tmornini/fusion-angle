@@ -115,7 +115,7 @@ export function getSessionToken(): string {
 // (the sidebar member chip, the command palette index) can gate
 // their reads on a real scoped session instead of firing them on
 // a seed and surfacing a 'no active org' / anonymous-principal 401.
-export function sessionIsOrgScoped(): boolean {
+export function sessionIsOrganizationScoped(): boolean {
     return principalFromToken(getSessionToken()).organization
         !== undefined;
 }
@@ -125,17 +125,17 @@ export function sessionIsOrgScoped(): boolean {
 // before org-scoping; an identity with zero memberships reads
 // false, so login and boot can land it on invitations instead of
 // an org-scoped dead end.
-export function sessionHasReachableOrg(): boolean {
-    const orgs =
+export function sessionHasReachableOrganization(): boolean {
+    const organizations =
         principalFromToken(getSessionToken()).organizations;
-    return orgs !== undefined && orgs.length > 0;
+    return organizations !== undefined && organizations.length > 0;
 }
 
 // True when the held token belongs to a logged-in identity rather
 // than the anonymous seed. Identity-scoped sidebar widgets (the
 // member chip name, the invitations bell) render for any logged-in
 // visitor — including a zero-membership identity on its invitations
-// page — while org-bound widgets still gate on sessionIsOrgScoped.
+// page — while org-bound widgets still gate on sessionIsOrganizationScoped.
 export function sessionIsAuthenticated(): boolean {
     return principalFromToken(getSessionToken()).id
         !== ANONYMOUS_ID;

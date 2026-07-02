@@ -31,7 +31,7 @@ import {
     getSessionCredentials,
     putSessionCredentials,
 } from '../web-app/app/adapters/session-credentials.ts';
-import { devToken, orgToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 
 test('logout revokes this identity and clears credentials',
@@ -40,7 +40,7 @@ async () => {
     const { db, ctx } = await adminContext();
     putSessionCredentials({
         accessToken: await devToken(),
-        refreshToken: await orgToken(),
+        refreshToken: await organizationToken(),
     });
     await postSessionLogout(ctx);
     const rows = await db.identityTokenRevocations.getAll();
@@ -54,7 +54,7 @@ async () => {
     localStorage.clear();
     putSessionCredentials({
         accessToken: await devToken(),
-        refreshToken: await orgToken(),
+        refreshToken: await organizationToken(),
     });
     // identity is read from the vessel; the server PUT throws.
     const ctx = {

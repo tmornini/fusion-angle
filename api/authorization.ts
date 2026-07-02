@@ -36,17 +36,17 @@ function failClosed(
 // `role_grants.organization_id` the gate had been writing but
 // never reading. A same-`at` tie falls to the fail-closed rank
 // above.
-export function currentRolesForInOrg(
+export function currentRolesForInOrganization(
     rows: readonly RoleGrantEntity[],
     identityId: Id,
-    org: Id,
+    organization: Id,
 ): string[] {
-    const inOrg = rows.filter(
+    const inOrganization = rows.filter(
         row => row.identity_id === identityId
-            && row.organization_id === org,
+            && row.organization_id === organization,
     );
     const latest = latestByKey(
-        inOrg, row => row.role, failClosed,
+        inOrganization, row => row.role, failClosed,
     );
     const held: string[] = [];
     for (const [role, last] of latest) {
@@ -59,7 +59,7 @@ export function currentRolesForInOrg(
 // latest event in its append-only default-org ledger, null when
 // it has none. The default (at, id) total order decides a
 // same-`at` tie deterministically on every backend.
-export function currentDefaultOrgFor(
+export function currentDefaultOrganizationFor(
     rows: readonly IdentityDefaultOrganizationEntity[],
     identityId: Id,
 ): Id | null {

@@ -14,7 +14,7 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { seedOrgMember } from './root-admin-fixture.ts';
+import { seedOrganizationMember } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 
@@ -196,7 +196,7 @@ async () => {
 test('a non-admin member reaches the snapshot plane',
 async () => {
     const db = await freshDb();
-    await seedOrgMember(db, 'walt');
+    await seedOrganizationMember(db, 'walt');
     const res = await handleRequest(db, new Request(
         `${BASE}/snapshots/schema`, {
             headers: {

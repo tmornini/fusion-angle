@@ -17,16 +17,16 @@ export async function devToken(sub = 'current'): Promise<string> {
 }
 
 // An org-scoped dev token: the org-exchanged session a web-app
-// adapter sees post-boot, carrying the `org` claim activeOrg
+// adapter sees post-boot, carrying the `org` claim activeOrganization
 // reads. Defaults to `current` in org '1'.
-export async function orgToken(
-    sub = 'current', org = '1',
+export async function organizationToken(
+    sub = 'current', organization = '1',
 ): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub, roles: [], name: 'Demo', org,
+        sub, roles: [], name: 'Demo', organization,
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
-        jti: 'org-' + sub + '-' + org,
+        jti: 'org-' + sub + '-' + organization,
     });
 }
 
@@ -36,11 +36,11 @@ export async function orgToken(
 // an org-scoped session. Defaults to one reachable org; pass []
 // for the zero-membership identity.
 export async function reachableToken(
-    sub = 'current', orgs: readonly string[] = ['1'],
+    sub = 'current', organizations: readonly string[] = ['1'],
 ): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub, roles: [], name: 'Demo', orgs,
+        sub, roles: [], name: 'Demo', organizations,
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'reach-' + sub,
     });

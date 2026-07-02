@@ -3,7 +3,7 @@ import type { RequestContext } from './shared.ts';
 // The persisted active-org key — the CLIENT-side org vessel.
 // We persist the org id, NEVER the token (a 15-min TTL would
 // rot it); boot re-exchanges a fresh scoped token from this id.
-export const ACTIVE_ORG_KEY = 'fusion.active-org';
+export const ACTIVE_ORGANIZATION_KEY = 'fusion.active-org';
 
 // Exchange the held bearer for a token scoped to `org` via the
 // real OAuth token-exchange (RFC 8693 self-delegation: subject
@@ -13,27 +13,27 @@ export const ACTIVE_ORG_KEY = 'fusion.active-org';
 // the caller installs it as the per-tab session, kept free of
 // that global side effect so it stays testable (mirrors
 // postPasswordLogin).
-export async function postOrgSessionExchange(
+export async function postOrganizationSessionExchange(
     ctx: RequestContext,
     subjectToken: string,
-    org: string,
+    organization: string,
 ): Promise<string> {
     const res = await ctx.POST<{ access_token: string }>(
         'authentication/token', {
             grant_type: 'token-exchange',
             subject_token: subjectToken,
             actor_token: subjectToken,
-            organization: org,
+            organization: organization,
         });
     return res.access_token;
 }
 
 // The switcher is an honest affordance only when there is a
 // real choice — two or more reachable orgs.
-export function shouldShowOrgSwitcher(
-    orgs: readonly { id: string }[],
+export function shouldShowOrganizationSwitcher(
+    organizations: readonly { id: string }[],
 ): boolean {
-    return orgs.length >= 2;
+    return organizations.length >= 2;
 }
 
 // Boot ALWAYS resolves an active org from the reachable set:
@@ -41,7 +41,7 @@ export function shouldShowOrgSwitcher(
 // identity's default (its set choice, else primary membership —
 // resolved server-side), else the first reachable. A single-org
 // member always lands in their org.
-export function resolveActiveOrg(
+export function resolveActiveOrganization(
     reachable: readonly string[],
     persisted: string | null,
     identityDefault: string | null,

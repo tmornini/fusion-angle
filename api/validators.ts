@@ -49,6 +49,8 @@ import type {
     ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
+    RequestEntity,
+    ResponseEntity,
     StateEntity,
 } from './types.ts';
 import {
@@ -575,6 +577,37 @@ export function pickJsonObjectField(
     return asJsonObjectField(body[key], key);
 }
 
+// A string field that may be ABSENT from the body — never
+// null. Presence is checked before type: a missing key
+// yields undefined, so the caller omits the property from
+// the validated result (key absence models "none"); a
+// PRESENT `null` is the Sin of Null and is rejected outright.
+// An empty string is likewise rejected — non-empty per the
+// follows/supersedes spec these fields serve.
+export function pickOptionalString(
+    body: Record<string, unknown>,
+    key: string,
+    entityLabel: string,
+): string | undefined {
+    if (!(key in body)) return undefined;
+    const value = body[key];
+    if (value === null) {
+        throw new ValidationError(
+            'null is not valid for optional field "'
+            + key + '" on ' + entityLabel
+            + ' — omit the key to signal absence',
+        );
+    }
+    const str = asString(value, key);
+    if (str === '') {
+        throw new ValidationError(
+            entityLabel + '.' + key + ' must be'
+            + ' non-empty when present',
+        );
+    }
+    return str;
+}
+
 // RFC-3339 zulu at EXACTLY six fraction digits — the one
 // width the mints emit (nowUtc/dt/isoFromMs) and the ledgers
 // sort. The Office of Time's enemy is AMBIGUITY (a date-only
@@ -681,14 +714,20 @@ export function validateEnumField<E extends string>(
 // columns under key-count discipline is
 // the next iteration.
 
+// `optional` names keys that MAY appear but need not — the
+// follows/supersedes shape (absent is the only valid "none",
+// so they are never in `expected`). Every existing caller
+// omits the 4th argument, so the accepted set collapses to
+// `expected` and behavior is unchanged for them.
 export function assertOnlyKeys(
     body: Record<string, unknown>,
     expected: readonly string[],
     label: string,
+    optional: readonly string[] = [],
 ): void {
-    const expectedSet = new Set(expected);
+    const allowedSet = new Set([...expected, ...optional]);
     for (const key of Object.keys(body)) {
-        if (!expectedSet.has(key)) {
+        if (!allowedSet.has(key)) {
             throw new ValidationError(
                 'unexpected key "'
                     + key + '"'
@@ -817,7 +856,7 @@ validateIdentityTokenRevocationEntity(
     };
 }
 
-const IDENTITY_DEFAULT_ORG_BODY_KEYS:
+const IDENTITY_DEFAULT_ORGANIZATION_BODY_KEYS:
     readonly string[] = [
     'identity_id', 'organization_id', 'at',
 ];
@@ -827,7 +866,7 @@ export function validateIdentityDefaultOrganizationEntity(
 ): Omit<IdentityDefaultOrganizationEntity, 'id'> {
     assertOnlyKeys(
         body,
-        IDENTITY_DEFAULT_ORG_BODY_KEYS,
+        IDENTITY_DEFAULT_ORGANIZATION_BODY_KEYS,
         'IdentityDefaultOrganizationEntity',
     );
     const at = validateTimestampField(
@@ -1673,6 +1712,118 @@ export function validateActualScoreEntity(
         at: validateTimestampField(
             body, 'at', 'ActualScore',
         ),
+    };
+}
+
+// The two message-plane ledgers (Phase 0 of the
+// message-as-state migration): one row per stored HTTP
+// request/response. `message_hash` is the sha256 digest
+// (`shared/digest.ts` sha256Hex) of `message`, hex-encoded
+// lowercase.
+const MESSAGE_HASH = /^[0-9a-f]{64}$/;
+
+const REQUEST_BODY_KEYS: readonly string[] = [
+    'uri_prefix', 'uri_id', 'at', 'requester_identity_id',
+    'message_hash', 'message',
+];
+
+export function validateRequestEntity(
+    body: Record<string, unknown>,
+): Omit<RequestEntity, 'id'> {
+    assertOnlyKeys(
+        body, REQUEST_BODY_KEYS, 'RequestEntity',
+    );
+    const uriPrefix = pickString(body, 'uri_prefix');
+    if (!uriPrefix.endsWith('/')) {
+        throw new ValidationError(
+            'RequestEntity.uri_prefix must end with "/"',
+        );
+    }
+    const messageHash = pickString(body, 'message_hash');
+    if (!MESSAGE_HASH.test(messageHash)) {
+        throw new ValidationError(
+            'RequestEntity.message_hash must be a 64-'
+            + 'character lowercase hex sha256 digest',
+        );
+    }
+    const at = validateTimestampField(
+        body, 'at', 'RequestEntity',
+    );
+    return {
+        uri_prefix: uriPrefix,
+        uri_id: pickString(body, 'uri_id'),
+        at,
+        requester_identity_id: pickString(
+            body, 'requester_identity_id',
+        ),
+        message_hash: messageHash,
+        message: pickString(body, 'message'),
+    };
+}
+
+const RESPONSE_BODY_KEYS: readonly string[] = [
+    'uri_prefix', 'uri_id', 'at', 'status', 'etag',
+    'message_hash', 'message',
+];
+
+// follows/supersedes are the only optional keys in the
+// codebase: present only when the write had a predecessor.
+// assertOnlyKeys's 4th argument admits them without requiring
+// them — absence is the sole valid "none" (Sin of Null).
+const RESPONSE_OPTIONAL_BODY_KEYS: readonly string[] = [
+    'follows', 'supersedes',
+];
+
+export function validateResponseEntity(
+    body: Record<string, unknown>,
+): Omit<ResponseEntity, 'id'> {
+    assertOnlyKeys(
+        body, RESPONSE_BODY_KEYS, 'ResponseEntity',
+        RESPONSE_OPTIONAL_BODY_KEYS,
+    );
+    const uriPrefix = pickString(body, 'uri_prefix');
+    if (!uriPrefix.endsWith('/')) {
+        throw new ValidationError(
+            'ResponseEntity.uri_prefix must end with "/"',
+        );
+    }
+    const status = pickNumber(body, 'status');
+    if (
+        !Number.isInteger(status)
+        || status < 100 || status > 599
+    ) {
+        throw new ValidationError(
+            'ResponseEntity.status must be an integer in'
+            + ' 100..599',
+        );
+    }
+    const messageHash = pickString(body, 'message_hash');
+    if (!MESSAGE_HASH.test(messageHash)) {
+        throw new ValidationError(
+            'ResponseEntity.message_hash must be a 64-'
+            + 'character lowercase hex sha256 digest',
+        );
+    }
+    const at = validateTimestampField(
+        body, 'at', 'ResponseEntity',
+    );
+    const follows = pickOptionalString(
+        body, 'follows', 'ResponseEntity',
+    );
+    const supersedes = pickOptionalString(
+        body, 'supersedes', 'ResponseEntity',
+    );
+    return {
+        uri_prefix: uriPrefix,
+        uri_id: pickString(body, 'uri_id'),
+        at,
+        status,
+        etag: pickString(body, 'etag'),
+        message_hash: messageHash,
+        message: pickString(body, 'message'),
+        ...(follows !== undefined ? { follows } : {}),
+        ...(supersedes !== undefined
+            ? { supersedes } : {}),
     };
 }
 

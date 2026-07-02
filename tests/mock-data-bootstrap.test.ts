@@ -41,11 +41,11 @@ test(
             ids.includes('current'),
             'current user seeded',
         );
-        const org = await db.organizations.getById(
+        const organization = await db.organizations.getById(
             '1',
         );
         assert.ok(
-            org.id.length > 0,
+            organization.id.length > 0,
             'organization seeded',
         );
     },

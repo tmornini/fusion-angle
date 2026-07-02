@@ -10,18 +10,18 @@ import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 
 // A real signed token for `current` (admin, via seedRootAdmin)
 // carrying an active `org` — what the facade exchange mints.
-async function orgToken(org: string): Promise<string> {
+async function organizationToken(organization: string): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
         sub: 'current', roles: [], name: 'Demo',
         iat: 1_700_000_000,
         ttlSeconds: 10_000_000_000,
         jti: 'org-scoped-test',
-        ...(org ? { org } : {}),
+        ...(organization ? { organization } : {}),
     });
 }
 
-async function twoOrgIdeas(): Promise<MemoryDbAdapter> {
+async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);   // current = admin (global)
     await db.ideas.put('a1', ideaBody('1', 'mine'));
@@ -31,17 +31,17 @@ async function twoOrgIdeas(): Promise<MemoryDbAdapter> {
 
 test('an org-scoped token fences GET to its tenant',
 async () => {
-    const db = await twoOrgIdeas();
+    const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
-        db, 'ideas', await orgToken('1'));
+        db, 'ideas', await organizationToken('1'));
     assert.deepEqual(rows.map(r => r.id), ['a1']);
 });
 
 test('a flat token bridges to the default org',
 async () => {
-    const db = await twoOrgIdeas();
+    const db = await twoOrganizationIdeas();
     const rows = await GET<{ id: string }[]>(
-        db, 'ideas', await orgToken(''));
+        db, 'ideas', await organizationToken(''));
     // No honest unscoped default since SP-6: the token
     // resolves to org '1', so the org '7' idea stays hidden.
     assert.deepEqual(rows.map(r => r.id), ['a1']);

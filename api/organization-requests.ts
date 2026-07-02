@@ -1,9 +1,9 @@
 import {
-    currentDefaultOrgFor,
+    currentDefaultOrganizationFor,
 } from './authorization.ts';
 import {
-    subjectOrgs,
-    identityDefaultOrg,
+    subjectOrganizations,
+    identityDefaultOrganization,
 } from './authentication.ts';
 import {
     errorJson,
@@ -14,7 +14,7 @@ import {
 import {
     authenticateRequest,
     parseObjectBody,
-    callerOrgIds,
+    callerOrganizationIds,
 } from './request-auth.ts';
 import {
     validateTimestampField,
@@ -28,14 +28,14 @@ import {
 // fresh from the membership ledger (never the token claim, so
 // it cannot be stale). The authoritative source the embedded
 // `orgs` claim is a snapshot of.
-async function enumerateMyOrgs(
+async function enumerateMyOrganizations(
     ctx: AuthenticatedContext,
 ): Promise<Response> {
     const mine =
-        await callerOrgIds(ctx.base, ctx.principal);
-    const orgs = await ctx.base.organizations.getAll();
+        await callerOrganizationIds(ctx.base, ctx.principal);
+    const organizations = await ctx.base.organizations.getAll();
     return Response.json(
-        orgs.filter(o => mine.has(o.id)),
+        organizations.filter(o => mine.has(o.id)),
     );
 }
 
@@ -45,7 +45,7 @@ async function enumerateMyOrgs(
 // its own subtree. PUT appends a NEW event only when the org
 // changes (an idempotent repeat writes nothing), and only if the
 // org is one of the identity's memberships (no dangling default).
-export async function identityDefaultOrgRequest(
+export async function identityDefaultOrganizationRequest(
     ctx: IncomingContext,
     request: Request,
     segments: readonly string[],
@@ -71,7 +71,7 @@ export async function identityDefaultOrgRequest(
     if (ctx.method === 'GET') {
         return Response.json({
             organization_id:
-                await identityDefaultOrg(
+                await identityDefaultOrganization(
                     ctx.base, identityId,
                 ),
         });
@@ -85,8 +85,8 @@ export async function identityDefaultOrgRequest(
             );
         }
         const body = parse.body;
-        const org = body.organization_id;
-        if (typeof org !== 'string') {
+        const organization = body.organization_id;
+        if (typeof organization !== 'string') {
             return Response.json(
                 { error: 'organization_id is required' },
                 { status: HTTP_BAD_REQUEST },
@@ -116,9 +116,9 @@ export async function identityDefaultOrgRequest(
                 { status: HTTP_BAD_REQUEST },
             );
         }
-        const memberOrgs =
-            await subjectOrgs(ctx.base, identityId);
-        if (!memberOrgs.includes(org)) {
+        const memberOrganizations =
+            await subjectOrganizations(ctx.base, identityId);
+        if (!memberOrganizations.includes(organization)) {
             return Response.json(
                 {
                     error: 'forbidden: org is not one of the'
@@ -129,13 +129,15 @@ export async function identityDefaultOrgRequest(
         }
         const rows =
             await ctx.base.identityDefaultOrganizations.getAll();
-        if (currentDefaultOrgFor(rows, identityId) === org) {
+        if (
+            currentDefaultOrganizationFor(rows, identityId) === organization
+        ) {
             return new Response(null, { status: 204 });
         }
         await ctx.base.identityDefaultOrganizations.put(
             eventId, {
                 identity_id: identityId,
-                organization_id: org,
+                organization_id: organization,
                 at,
             });
         return new Response(null, { status: 204 });
@@ -151,7 +153,7 @@ export async function identityDefaultOrgRequest(
 
 // GET /organizations enumerates the caller's OWN membership
 // orgs — identity-scoped like /invitations, so it gates on
-// authentication, not a role. enumerateMyOrgs self-fences to
+// authentication, not a role. enumerateMyOrganizations self-fences to
 // the caller's memberships, so a roleless member sees only
 // their own orgs and can boot the shell.
 export async function organizationsEnumerationRequest(
@@ -163,5 +165,5 @@ export async function organizationsEnumerationRequest(
     if (typeof authed === 'string') {
         return errorJson(authed, HTTP_UNAUTHORIZED);
     }
-    return enumerateMyOrgs(authed);
+    return enumerateMyOrganizations(authed);
 }

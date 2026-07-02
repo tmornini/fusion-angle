@@ -34,7 +34,7 @@ import {
 // init.ts is the composition root —
 // intentionally outside the adapter barrel.
 import {
-    sessionIsOrgScoped,
+    sessionIsOrganizationScoped,
 } from './adapters/init.ts';
 import {
     PAGE_REGISTRY,
@@ -306,7 +306,7 @@ export function initCommandPalette(
         // On an unscoped session (the anonymous seed on an auth-exempt
         // sidebar page) skip the build rather than 401; a later scoped
         // load reseeds it.
-        if (!sessionIsOrgScoped()) return;
+        if (!sessionIsOrganizationScoped()) return;
 
         const ctx = sessionContext();
         const [ideas, projects, humans] =

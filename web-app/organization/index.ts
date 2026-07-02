@@ -63,12 +63,12 @@ const { signal } = createPageAbort();
 type PageState =
     | {
         kind: 'reading';
-        org: Organization;
+        organization: Organization;
         stats: OrganizationStats;
     }
     | {
         kind: 'editing';
-        org: Organization;
+        organization: Organization;
         stats: OrganizationStats;
         draft: GeneralInfoDraft;
     };
@@ -92,10 +92,10 @@ function buildPresenter():
     }
     return state.kind === 'reading'
         ? new OrganizationPresenter(
-            state.org, state.stats,
+            state.organization, state.stats,
         )
         : new OrganizationEditPresenter(
-            state.org, state.stats, state.draft,
+            state.organization, state.stats, state.draft,
         );
 }
 
@@ -221,11 +221,11 @@ export async function init(): Promise<void> {
         buildSkeleton('detail', 4),
     );
 
-    let org: Organization;
+    let organization: Organization;
     let stats: OrganizationStats;
     try {
         const ctx = sessionContext();
-        [org, stats] = await Promise.all([
+        [organization, stats] = await Promise.all([
             getOrganization(ctx),
             getOrganizationStats(ctx),
         ]);
@@ -267,7 +267,7 @@ export async function init(): Promise<void> {
         return;
     }
 
-    state = { kind: 'reading', org, stats };
+    state = { kind: 'reading', organization, stats };
     subscribeObjectiveChanges(renderObjectives);
     subscribeInvitationChanges(
         () => void renderSentInvitations());
@@ -414,36 +414,36 @@ function bindStableListeners(
 function onClick(e: MouseEvent): void {
     const target = e.target as Element | null;
     if (!target) return;
-    const orgAction = target
+    const organizationAction = target
         .closest('[data-org-action]')
         ?.getAttribute('data-org-action');
-    if (orgAction === 'edit') {
+    if (organizationAction === 'edit') {
         if (!state || state.kind !== 'reading') {
             return;
         }
         state = {
             kind: 'editing',
-            org: state.org,
+            organization: state.organization,
             stats: state.stats,
-            draft: state.org
+            draft: state.organization
                 .toGeneralInfoDraft(),
         };
         void rerender();
         return;
     }
-    if (orgAction === 'cancel') {
+    if (organizationAction === 'cancel') {
         if (!state || state.kind !== 'editing') {
             return;
         }
         state = {
             kind: 'reading',
-            org: state.org,
+            organization: state.organization,
             stats: state.stats,
         };
         void rerender();
         return;
     }
-    if (orgAction === 'save') {
+    if (organizationAction === 'save') {
         void handleSave();
         return;
     }
@@ -491,7 +491,7 @@ function onDocumentKeydown(
     e.preventDefault();
     state = {
         kind: 'reading',
-        org: state.org,
+        organization: state.organization,
         stats: state.stats,
     };
     void rerender();
@@ -520,14 +520,14 @@ async function handleSave(): Promise<void> {
         return;
     }
     showToast('Organization saved', 'success');
-    const [freshOrg, freshStats] =
+    const [freshOrganization, freshStats] =
         await Promise.all([
             getOrganization(ctx),
             getOrganizationStats(ctx),
         ]);
     state = {
         kind: 'reading',
-        org: freshOrg,
+        organization: freshOrganization,
         stats: freshStats,
     };
     await rerender();

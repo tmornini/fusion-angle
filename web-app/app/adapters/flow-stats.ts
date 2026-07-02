@@ -24,6 +24,7 @@ import {
 export async function getFlowStats(
     ctx: RequestContext,
     flowId: string,
+    nowMs: number,
 ): Promise<{
     model: FlowStatsModel;
     graph: FlowGraph;
@@ -62,7 +63,7 @@ export async function getFlowStats(
         nodes: graph.nodes,
         edges: graph.edges,
         transitions,
-        nowMs: Date.now(),
+        nowMs,
         windowDays: 90,
         memberNameById,
     };

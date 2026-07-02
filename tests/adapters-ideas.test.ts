@@ -6,7 +6,7 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { orgToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
@@ -388,14 +388,14 @@ test('getIdeas resolves every seeded submitter in'
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
-    for (const org of ['1', '2']) {
+    for (const organization of ['1', '2']) {
         const ctx = createRequestContext(
-            db, await orgToken('current', org));
+            db, await organizationToken('current', organization));
         const ideas = await getIdeas(ctx);
         for (const i of ideas) {
             assert.ok(
                 i.submitterName.length > 0,
-                'empty submitter in org ' + org);
+                'empty submitter in org ' + organization);
         }
     }
 });

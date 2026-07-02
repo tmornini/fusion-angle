@@ -6,7 +6,7 @@ import type { MemberEntity } from '../api/types.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
-import { seedOrgMember } from './root-admin-fixture.ts';
+import { seedOrganizationMember } from './root-admin-fixture.ts';
 
 // The author of a state event is the verified token: a body
 // that names a member_id is malformed and rejected.
@@ -52,7 +52,7 @@ test(
         const db = new MemoryDbAdapter();
         await db.postSchemaCreation();
         await seedHumanMember(db, 'alice', 'Alice');
-        await seedOrgMember(db, 'alice');
+        await seedOrganizationMember(db, 'alice');
         const member = await GET<MemberEntity>(
             db, 'current-member', await devToken('alice'),
         );

@@ -66,3 +66,24 @@ test('MemoryDbAdapter exposes objective stores',
             db.projectObjectiveActualScores.getAll();
         assert.equal(ac.length, 1);
     });
+
+test('TABLE_NAMES includes the message tables', () => {
+    assert.ok(TABLE_NAMES.includes('requests'));
+    assert.ok(TABLE_NAMES.includes('responses'));
+});
+
+test('MemoryDbAdapter exposes message stores', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await db.requests.put('pair-1', {
+        uri_prefix: '/organizations/1/ideas/',
+        uri_id: '42',
+        at: '2026-01-01T00:00:00.000000Z',
+        requester_identity_id: 'current',
+        message_hash: 'a'.repeat(64),
+        message: '{"kind":"request"}',
+    });
+    const rows = await db.requests.getAll();
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.id, 'pair-1');
+});

@@ -28,9 +28,9 @@ import {
 } from './mock-data/seed-kit.ts';
 import {
     MOCK_SEED_TIMESTAMP,
-    STARK_ORG,
-    ORG_TWO,
-    assignOrg,
+    STARK_ORGANIZATION,
+    ORGANIZATION_TWO,
+    assignOrganization,
 } from './mock-data/seed-constants.ts';
 import {
     generateFlowWorkload,
@@ -208,26 +208,26 @@ async function postMockDataLoadIn(
                 ...detail
             } = member;
             // 'current' (the admin) joins BOTH orgs; every
-            // other human is single-org via assignOrg.
-            const orgs = member.id === 'current'
-                ? [STARK_ORG, ORG_TWO]
-                : [assignOrg(index)];
+            // other human is single-org via assignOrganization.
+            const organizations = member.id === 'current'
+                ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
+                : [assignOrganization(index)];
             return [
                 adapter.members.put(member.id, {
                     type: 'human',
                 }),
-                ...orgs.map((org, n) =>
+                ...organizations.map((organization, n) =>
                     adapter.memberships.put(
                         'seed-membership-'
                         + member.id + '-' + n, {
-                            organization_id: org,
+                            organization_id: organization,
                             identity_id: member.id,
                             at: MOCK_SEED_TIMESTAMP,
                         })),
                 adapter.identityDefaultOrganizations.put(
                     'seed-default-org-' + member.id, {
                         identity_id: member.id,
-                        organization_id: orgs[0]!,
+                        organization_id: organizations[0]!,
                         at: MOCK_SEED_TIMESTAMP,
                     }),
                 adapter.humanMembers.put(member.id, {
@@ -258,7 +258,7 @@ async function postMockDataLoadIn(
         }),
         adapter.roleGrants.put(
             'seed-role-current-admin', {
-                organization_id: STARK_ORG,
+                organization_id: STARK_ORGANIZATION,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',
@@ -268,7 +268,7 @@ async function postMockDataLoadIn(
         ),
         adapter.roleGrants.put(
             'seed-role-current-admin-org2', {
-                organization_id: ORG_TWO,
+                organization_id: ORGANIZATION_TWO,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',
@@ -277,7 +277,7 @@ async function postMockDataLoadIn(
             },
         ),
         // Every non-admin human gets the member role in its
-        // membership org (same assignOrg(index) partition as
+        // membership org (same assignOrganization(index) partition as
         // the membership seed above), so each seeded sign-in
         // lands on a working content tier — not a 403 wall.
         ...members.flatMap((member, index) =>
@@ -285,7 +285,7 @@ async function postMockDataLoadIn(
                 ? []
                 : [adapter.roleGrants.put(
                     'seed-role-' + member.id + '-member', {
-                        organization_id: assignOrg(index),
+                        organization_id: assignOrganization(index),
                         identity_id: member.id,
                         role: 'member',
                         action: 'granted',
@@ -321,10 +321,10 @@ async function postMockDataLoadIn(
     await Promise.all([
         ...ideas.map((idea, i) =>
             adapter.ideas.put(idea.id, {
-                ...idea, organization_id: assignOrg(i),
+                ...idea, organization_id: assignOrganization(i),
             }),
         ),
-        adapter.organizations.put(STARK_ORG, {
+        adapter.organizations.put(STARK_ORGANIZATION, {
             name: 'Stark Industries',
             domain: 'acmecorp.com',
             next_billing: daysFromNow(300, 0, 0),
@@ -332,7 +332,7 @@ async function postMockDataLoadIn(
             projects_limit: TIER_PROJECTS_LIMIT,
             ideas_limit: TIER_IDEAS_LIMIT,
         }),
-        adapter.organizations.put(ORG_TWO, {
+        adapter.organizations.put(ORGANIZATION_TWO, {
             name: 'Wayne Enterprises',
             domain: 'wayne.example.com',
             next_billing: daysFromNow(200, 0, 0),
@@ -394,8 +394,8 @@ async function postMockDataLoadIn(
         },
         {
             // Project Brief lives in org '2'
-            // (assignOrg(index 1)), so it binds to the
-            // org-'2' flow — flowOrg === recordOrg keeps
+            // (assignOrganization(index 1)), so it binds to the
+            // org-'2' flow — flowOrganization === recordOrganization keeps
             // the binding visible behind the org fence.
             id: 'frb03Fus10nPr0jBri3f03',
             flow_id: 'seed-flow-org2',
@@ -3114,7 +3114,7 @@ async function postMockDataLoadIn(
     await Promise.all([
         ...projects.map(project =>
             adapter.projects.put(project.id, {
-                ...project, organization_id: STARK_ORG,
+                ...project, organization_id: STARK_ORGANIZATION,
             }),
         ),
         // Store only the flow's scalar fields — the authored
@@ -3123,21 +3123,21 @@ async function postMockDataLoadIn(
         ...mockFlows.map(flow => {
             const { graph: _graph, ...row } = flow;
             return adapter.flows.put(flow.id, {
-                ...row, organization_id: STARK_ORG,
+                ...row, organization_id: STARK_ORGANIZATION,
             });
         }),
-        // Org '2' owns a small, self-contained slice so each
+        // Organization '2' owns a small, self-contained slice so each
         // org owns at least one project and flow. The whole
         // work-order graph stays in org '1', so org '2' gets a
         // work-order-free flow and a flow-free project — no
         // cross-org coupling.
         adapter.projects.put('seed-project-org2', {
             ...projects[0]!,
-            organization_id: ORG_TWO,
+            organization_id: ORGANIZATION_TWO,
             title: 'Wayne R&D Portfolio',
         }),
         adapter.flows.put('seed-flow-org2', {
-            organization_id: ORG_TWO,
+            organization_id: ORGANIZATION_TWO,
             name: 'Wayne Onboarding',
             is_locked: false,
             is_auto_layout: true,
@@ -3425,8 +3425,8 @@ async function postMockDataLoadIn(
     // Each record attribute is stamped with ITS parent
     // record's org, so the recordAttributes-match-parent
     // invariant holds however records are partitioned.
-    const recordOrgById = new Map(
-        mockRecords.map((r, i) => [r.id, assignOrg(i)]));
+    const recordOrganizationById = new Map(
+        mockRecords.map((r, i) => [r.id, assignOrganization(i)]));
 
     await Promise.all([
         ...ideaSubmissions.map(r =>
@@ -3441,7 +3441,7 @@ async function postMockDataLoadIn(
         ),
         ...mockWorkOrders.map(r =>
             adapter.workOrders.put(r.id, {
-                ...r, organization_id: STARK_ORG,
+                ...r, organization_id: STARK_ORGANIZATION,
             }),
         ),
         ...mockFlowWorkOrders.map(r =>
@@ -3501,7 +3501,7 @@ async function postMockDataLoadIn(
                 }),
                 adapter.memberships.put(
                     'seed-membership-' + m.id, {
-                        organization_id: STARK_ORG,
+                        organization_id: STARK_ORGANIZATION,
                         identity_id: m.id,
                         at: MOCK_SEED_TIMESTAMP,
                     }),
@@ -3530,7 +3530,7 @@ async function postMockDataLoadIn(
         ),
         ...mockRecords.map((r, i) =>
             adapter.records.put(r.id, {
-                organization_id: assignOrg(i),
+                organization_id: assignOrganization(i),
                 name: r.name,
                 description: r.description,
                 position: r.position,
@@ -3539,7 +3539,7 @@ async function postMockDataLoadIn(
         ...mockRecordAttributes.map(r =>
             adapter.recordAttributes.put(r.id, {
                 organization_id:
-                    recordOrgById.get(r.record_id)!,
+                    recordOrganizationById.get(r.record_id)!,
                 record_id: r.record_id,
                 name: r.name,
                 attribute_type:
@@ -3576,18 +3576,18 @@ async function postMockDataLoadIn(
     // picking across orgs produced authors outside the
     // org-scoped roster, and memberName (strict by design)
     // then threw when the project-history modal resolved them.
-    const humansByOrg = new Map<string, string[]>();
+    const humansByOrganization = new Map<string, string[]>();
     for (const m of await adapter.memberships.getAll()) {
         if (!humanIds.has(m.identity_id)) continue;
         const pool =
-            humansByOrg.get(m.organization_id) ?? [];
+            humansByOrganization.get(m.organization_id) ?? [];
         pool.push(m.identity_id);
-        humansByOrg.set(m.organization_id, pool);
+        humansByOrganization.set(m.organization_id, pool);
     }
     const memberFor = (
-        org: string, seed: string,
+        organization: string, seed: string,
     ): string => {
-        const pool = humansByOrg.get(org) ?? [];
+        const pool = humansByOrganization.get(organization) ?? [];
         return pool[
             deterministicScore(seed, 0, pool.length - 1)
         ] ?? SYSTEM_MEMBER_ID;
@@ -3595,7 +3595,7 @@ async function postMockDataLoadIn(
 
     for (const seed of OBJECTIVE_SEEDS) {
         await adapter.objectives.put(seed.id, {
-            organization_id: STARK_ORG,
+            organization_id: STARK_ORGANIZATION,
             position: seed.position,
         });
         await adapter.objectiveRevisions.put(
@@ -3605,7 +3605,7 @@ async function postMockDataLoadIn(
                 name: seed.name,
                 description: seed.description,
                 member_id: memberFor(
-                    STARK_ORG,
+                    STARK_ORGANIZATION,
                     `${seed.id}:revision`,
                 ),
                 at: MOCK_SEED_TIMESTAMP,
@@ -3613,9 +3613,9 @@ async function postMockDataLoadIn(
         );
     }
 
-    // Org '2' owns one objective so each org owns at least one.
+    // Organization '2' owns one objective so each org owns at least one.
     await adapter.objectives.put('seed-objective-org2', {
-        organization_id: ORG_TWO,
+        organization_id: ORGANIZATION_TWO,
         position: 0,
     });
     await adapter.objectiveRevisions.put(
@@ -3802,14 +3802,14 @@ async function postBootstrapIn(
         }),
         adapter.memberships.put(
             'bootstrap-membership-current', {
-                organization_id: STARK_ORG,
+                organization_id: STARK_ORGANIZATION,
                 identity_id: 'current',
                 at: MOCK_SEED_TIMESTAMP,
             }),
         adapter.identityDefaultOrganizations.put(
             'bootstrap-default-org-current', {
                 identity_id: 'current',
-                organization_id: STARK_ORG,
+                organization_id: STARK_ORGANIZATION,
                 at: MOCK_SEED_TIMESTAMP,
             }),
         adapter.identities.put('current', {
@@ -3852,7 +3852,7 @@ async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             nowUtc(),
         ),
-        adapter.organizations.put(STARK_ORG, {
+        adapter.organizations.put(STARK_ORGANIZATION, {
             name: 'Stark Industries',
             domain: 'acmecorp.com',
             next_billing: daysFromNow(300, 0, 0),
@@ -3862,7 +3862,7 @@ async function postBootstrapIn(
         }),
         adapter.roleGrants.put(
             'bootstrap-role-current-admin', {
-                organization_id: STARK_ORG,
+                organization_id: STARK_ORGANIZATION,
                 identity_id: 'current',
                 role: 'admin',
                 action: 'granted',

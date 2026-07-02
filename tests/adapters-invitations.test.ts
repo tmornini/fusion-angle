@@ -8,8 +8,8 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { orgToken } from './token-fixtures.ts';
-import { orgRow } from './test-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
+import { organizationRow } from './test-fixtures.ts';
 import {
     postInvitationGrant,
     postInvitationAcceptance,
@@ -27,16 +27,16 @@ const AT = '2026-01-01T00:00:00.000000Z';
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('1', orgRow('Stark'));
-    await db.organizations.put('2', orgRow('Wayne'));
-    for (const org of ['1', '2']) {
-        await db.roleGrants.put('rg-current-' + org, {
-            organization_id: org, identity_id: 'current',
+    await db.organizations.put('1', organizationRow('Stark'));
+    await db.organizations.put('2', organizationRow('Wayne'));
+    for (const organization of ['1', '2']) {
+        await db.roleGrants.put('rg-current-' + organization, {
+            organization_id: organization, identity_id: 'current',
             role: 'admin', action: 'granted',
             by_member_id: 'system', at: AT,
         });
-        await db.memberships.put('m-current-' + org, {
-            organization_id: org, identity_id: 'current',
+        await db.memberships.put('m-current-' + organization, {
+            organization_id: organization, identity_id: 'current',
             at: AT,
         });
     }
@@ -62,15 +62,19 @@ async function seedPerson(
     });
 }
 
-async function ctxFor(sub: string, org: string) {
+async function ctxFor(sub: string, organization: string) {
     const db = await seed();
-    const ctx = createRequestContext(db, await orgToken(sub, org));
+    const ctx = createRequestContext(
+        db, await organizationToken(sub, organization),
+    );
     return { db, ctx };
 }
 
 // A context bound to an existing db (for two actors in one test).
-async function ctxOn(db: DbAdapter, sub: string, org: string) {
-    return createRequestContext(db, await orgToken(sub, org));
+async function ctxOn(db: DbAdapter, sub: string, organization: string) {
+    return createRequestContext(
+        db, await organizationToken(sub, organization),
+    );
 }
 
 test('validateInvitationEntity accepts a full body', () => {
@@ -210,8 +214,8 @@ async () => {
     await postInvitationAcceptance(sarah, inv.id);
     const memberships = (await db.memberships.getAll())
         .filter(m => m.identity_id === 'sarah');
-    const orgs = memberships.map(m => m.organization_id).sort();
-    assert.deepEqual(orgs, ['1', '2']);
+    const organizations = memberships.map(m => m.organization_id).sort();
+    assert.deepEqual(organizations, ['1', '2']);
     const views = await getInvitations(sarah);
     assert.equal(
         views.find(v => v.id === inv.id)?.state, 'accepted');

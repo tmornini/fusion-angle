@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
-import { seedOrgMember } from './root-admin-fixture.ts';
+import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { ideaBody } from './test-fixtures.ts';
 
 const BASE = 'http://localhost';
@@ -27,7 +27,7 @@ function req(
 async function memberDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await seedOrgMember(db, MEMBER);
+    await seedOrganizationMember(db, MEMBER);
     return db;
 }
 

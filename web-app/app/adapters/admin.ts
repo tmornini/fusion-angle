@@ -13,7 +13,7 @@ import {
     DISPLAY_ABSENT,
 } from '../format.ts';
 import {
-    activeOrg,
+    activeOrganization,
     type RequestContext,
 } from './shared.ts';
 import { getProjects } from './projects.ts';
@@ -29,8 +29,8 @@ async function getOrganizationEntity(
 ): Promise<OrganizationEntity> {
     // The active org — the tenant the session is scoped to —
     // so the org page reflects an org switch. The session token
-    // always carries it post-boot (activeOrg crashes otherwise).
-    return fetchOrganization(ctx, activeOrg(ctx));
+    // always carries it post-boot (activeOrganization crashes otherwise).
+    return fetchOrganization(ctx, activeOrganization(ctx));
 }
 
 // Ledger-derived facts about the org, computed at read time:
@@ -201,7 +201,7 @@ putOrganizationGeneralInfo(
     const current = await getOrganizationEntity(ctx);
     const { id: _id, ...rest } = current;
     await putOrganization(
-        ctx, activeOrg(ctx), {
+        ctx, activeOrganization(ctx), {
             ...rest,
             name: draft.name,
             domain: draft.domain,

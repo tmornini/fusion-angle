@@ -5,7 +5,7 @@ import {
     postMockDataLoad,
     postBootstrap,
 } from '../api/mock-data.ts';
-import { identityDefaultOrg } from '../api/authentication.ts';
+import { identityDefaultOrganization } from '../api/authentication.ts';
 
 async function mockSeeded() {
     const db = new MemoryDbAdapter();
@@ -38,7 +38,7 @@ test("the seeded 'current' default resolves to org 1",
 async () => {
     const db = await mockSeeded();
     assert.equal(
-        await identityDefaultOrg(db, 'current'), '1');
+        await identityDefaultOrganization(db, 'current'), '1');
 });
 
 test("bootstrap seeds 'current' a default-org event for org 1",

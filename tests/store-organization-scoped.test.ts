@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { OrgScopedEntityStore }
-    from '../api/store-org-scoped.ts';
+import { OrganizationScopedEntityStore }
+    from '../api/store-organization-scoped.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import type {
     EntityStore,
@@ -131,8 +131,8 @@ function seeded(): FakeStore {
     ]);
 }
 
-function scopedToA(inner: FakeStore): OrgScopedEntityStore<Row> {
-    return new OrgScopedEntityStore<Row>(inner, 'A', 'rows');
+function scopedToA(inner: FakeStore): OrganizationScopedEntityStore<Row> {
+    return new OrganizationScopedEntityStore<Row>(inner, 'A', 'rows');
 }
 
 test('getAll returns only the bound org rows', async () => {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { orgScopedAdapter } from '../api/db-org-scoped.ts';
+import { organizationScopedAdapter } from '../api/db-organization-scoped.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 
 // The org guard must fence WRITES the same way it fences reads:
@@ -9,9 +9,9 @@ import { EntityNotFoundError } from '../api/db.ts';
 // 404 (no clobber, no re-stamp), while a brand-new id still
 // creates and an owned id still updates.
 
-function ideaBody(org: string) {
+function ideaBody(organization: string) {
     return {
-        organization_id: org, title: 't', position: 0,
+        organization_id: organization, title: 't', position: 0,
         problem_statement: '', target_users: '',
         proposed_solution: '', expected_outcome: '',
         success_metrics: '',
@@ -23,7 +23,7 @@ async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await db.ideas.put('b1', ideaBody('B'));
-    const scopedA = orgScopedAdapter(db, 'A');
+    const scopedA = organizationScopedAdapter(db, 'A');
     await assert.rejects(
         () => scopedA.ideas.put('b1', ideaBody('A')),
         EntityNotFoundError);
@@ -39,7 +39,7 @@ async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await db.ideas.put('b1', ideaBody('B'));
-    const scopedA = orgScopedAdapter(db, 'A');
+    const scopedA = organizationScopedAdapter(db, 'A');
     await assert.rejects(
         () => scopedA.ideas.putMany(
             [{ id: 'b1', fields: ideaBody('A') }], []),
@@ -52,7 +52,7 @@ test('an org-scoped put still creates a brand-new row',
 async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    const scopedA = orgScopedAdapter(db, 'A');
+    const scopedA = organizationScopedAdapter(db, 'A');
     await scopedA.ideas.put('a1', ideaBody('ignored'));
     const stored = await db.ideas.getById('a1');
     assert.equal(stored.organization_id, 'A');
@@ -63,7 +63,7 @@ async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await db.ideas.put('a1', ideaBody('A'));
-    const scopedA = orgScopedAdapter(db, 'A');
+    const scopedA = organizationScopedAdapter(db, 'A');
     await scopedA.ideas.put(
         'a1', { ...ideaBody('A'), title: 'updated' });
     const stored = await db.ideas.getById('a1');
@@ -83,7 +83,7 @@ async () => {
         'ev1', 'b1', 'deleted', 'w1',
         '2026-01-01T00:00:00.000000Z',
     );
-    const scopedA = orgScopedAdapter(db, 'A');
+    const scopedA = organizationScopedAdapter(db, 'A');
     await assert.rejects(
         () => scopedA.ideas.put('b1', ideaBody('A')),
         EntityNotFoundError);
@@ -102,7 +102,7 @@ async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await db.ideas.put('a1', ideaBody('A'));
-    const scopedA = orgScopedAdapter(db, 'A');
+    const scopedA = organizationScopedAdapter(db, 'A');
     await scopedA.ideas.delete('a1');
     await scopedA.ideas.delete('a1');
     await assert.rejects(
@@ -115,7 +115,7 @@ async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await db.ideas.put('b1', ideaBody('B'));
-    const scopedA = orgScopedAdapter(db, 'A');
+    const scopedA = organizationScopedAdapter(db, 'A');
     await scopedA.ideas.delete('b1');
     const after = await db.ideas.getById('b1');
     assert.equal(after.organization_id, 'B');

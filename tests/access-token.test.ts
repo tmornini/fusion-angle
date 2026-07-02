@@ -14,7 +14,7 @@ import { base64UrlEncode } from '../shared/base64url.ts';
 
 async function token(over: Partial<{
     sub: string; iat: number; ttlSeconds: number;
-    org: string; orgs: readonly string[];
+    organization: string; organizations: readonly string[];
 }> = {}): Promise<string> {
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
@@ -24,8 +24,8 @@ async function token(over: Partial<{
         iat: over.iat ?? 1_700_000_000,
         ttlSeconds: over.ttlSeconds ?? 10_000_000_000,
         jti: 'jti-test',
-        ...(over.org ? { org: over.org } : {}),
-        ...(over.orgs ? { orgs: over.orgs } : {}),
+        ...(over.organization ? { organization: over.organization } : {}),
+        ...(over.organizations ? { organizations: over.organizations } : {}),
     });
 }
 
@@ -117,19 +117,19 @@ test('principalFromToken reads sub/roles/name', async () => {
 
 test('mints and verifies an org-scoped token', async () => {
     const r = await verifyAccessToken(
-        await token({ org: '7' }), 1_700_000_100);
+        await token({ organization: '7' }), 1_700_000_100);
     assert.equal(r.valid, true);
-    assert.equal(r.valid && r.claims.org, '7');
+    assert.equal(r.valid && r.claims.organization, '7');
 });
 
 test('a flat token carries no org claim', async () => {
     const r = await verifyAccessToken(
         await token(), 1_700_000_100);
-    assert.equal(r.valid && r.claims.org, undefined);
+    assert.equal(r.valid && r.claims.organization, undefined);
 });
 
 test('principalFromToken reads the org claim', async () => {
-    const p = principalFromToken(await token({ org: '7' }));
+    const p = principalFromToken(await token({ organization: '7' }));
     assert.equal(p.organization, '7');
 });
 
@@ -142,7 +142,7 @@ async () => {
 test('decodeAccessToken rejects a non-string org claim', () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'current', roles: [], name: 'Demo',
-        aud: 'fusion-ai-web', org: 7, iat: 1_700_000_000,
+        aud: 'fusion-ai-web', organization: 7, iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));
     assert.throws(
@@ -153,14 +153,14 @@ test('decodeAccessToken rejects a non-string org claim', () => {
 
 test('mints and verifies an orgs-list token', async () => {
     const r = await verifyAccessToken(
-        await token({ orgs: ['1', '7'] }), 1_700_000_100);
+        await token({ organizations: ['1', '7'] }), 1_700_000_100);
     assert.equal(r.valid, true);
-    assert.deepEqual(r.valid && r.claims.orgs, ['1', '7']);
+    assert.deepEqual(r.valid && r.claims.organizations, ['1', '7']);
 });
 
 test('principalFromToken reads the orgs list', async () => {
     const p = principalFromToken(
-        await token({ orgs: ['1', '7'] }));
+        await token({ organizations: ['1', '7'] }));
     assert.deepEqual(p.organizations, ['1', '7']);
 });
 
@@ -173,9 +173,9 @@ test('principalFromClaims matches principalFromToken on the'
     + ' same token', async () => {
     const variants = [
         await token(),
-        await token({ org: '7' }),
-        await token({ orgs: ['1', '7'] }),
-        await token({ org: '7', orgs: ['1', '7'] }),
+        await token({ organization: '7' }),
+        await token({ organizations: ['1', '7'] }),
+        await token({ organization: '7', organizations: ['1', '7'] }),
     ];
     for (const t of variants) {
         const r = await verifyAccessToken(t, 1_700_000_100);
@@ -191,7 +191,7 @@ test('decodeAccessToken rejects a non-array orgs claim',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'current', roles: [], name: 'Demo',
-        aud: 'fusion-ai-web', orgs: 'nope',
+        aud: 'fusion-ai-web', organizations: 'nope',
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
     }));
@@ -205,7 +205,7 @@ test('decodeAccessToken rejects non-string orgs elements',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'current', roles: [], name: 'Demo',
-        aud: 'fusion-ai-web', orgs: ['1', 7],
+        aud: 'fusion-ai-web', organizations: ['1', 7],
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
     }));

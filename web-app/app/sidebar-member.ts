@@ -2,11 +2,11 @@ import { $, $$ } from './dom.ts';
 import { setHtml } from './safe-html.ts';
 import { navigateTo } from './navigation.ts';
 import {
-    orgSwitcherHtml, wireOrgSwitcher,
-} from './org-switcher.ts';
+    organizationSwitcherHtml, wireOrganizationSwitcher,
+} from './organization-switcher.ts';
 import {
-    shouldShowOrgSwitcher,
-} from './adapters/org-session.ts';
+    shouldShowOrganizationSwitcher,
+} from './adapters/organization-session.ts';
 import {
     RequestError, HTTP_FORBIDDEN,
 } from '../../api/api.ts';
@@ -19,12 +19,12 @@ const SIDEBAR_MEMBER_NAME_IDS = [
     'mobile-sidebar-member-name',
 ] as const;
 
-const SIDEBAR_MEMBER_ORG_IDS = [
+const SIDEBAR_MEMBER_ORGANIZATION_IDS = [
     'sidebar-member-org',
     'mobile-sidebar-member-org',
 ] as const;
 
-const SIDEBAR_ORG_SWITCHER_IDS = [
+const SIDEBAR_ORGANIZATION_SWITCHER_IDS = [
     'sidebar-org-switcher',
     'mobile-sidebar-org-switcher',
 ] as const;
@@ -33,8 +33,8 @@ interface SidebarMember {
     id: string;
     name: string;
     organization: string;
-    orgs: ReadonlyArray<{ id: string; name: string }>;
-    activeOrgId: string;
+    organizations: ReadonlyArray<{ id: string; name: string }>;
+    activeOrganizationId: string;
 }
 
 async function getSidebarMember(
@@ -42,7 +42,7 @@ async function getSidebarMember(
     const { sessionContext } = await import('./adapters');
     const { getOrganizations } =
         await import('./adapters/organizations.ts');
-    const { activeOrg } =
+    const { activeOrganization } =
         await import('./adapters/shared.ts');
     const ctx = sessionContext();
     // The chip is the caller's own row, drawn from role-independent
@@ -52,30 +52,32 @@ async function getSidebarMember(
     // zero-membership identity resolves no org context (a 403), so
     // the chip still renders its name while the org line and
     // switcher stay empty.
-    let orgs: OrganizationEntity[] = [];
+    let organizations: OrganizationEntity[] = [];
     try {
-        orgs = await getOrganizations(ctx);
+        organizations = await getOrganizations(ctx);
     } catch (err) {
         if (!(err instanceof RequestError
             && err.status === HTTP_FORBIDDEN)) {
             throw err;
         }
     }
-    const activeOrgId = activeOrg(ctx);
-    const active = orgs.find(o => o.id === activeOrgId);
+    const activeOrganizationId = activeOrganization(ctx);
+    const active = organizations.find(o => o.id === activeOrganizationId);
     return {
         id: ctx.identity.id,
         name: ctx.identity.name,
         organization: active ? active.name : '',
-        orgs: orgs.map(o => ({ id: o.id, name: o.name })),
-        activeOrgId,
+        organizations: organizations.map(o => ({ id: o.id, name: o.name })),
+        activeOrganizationId,
     };
 }
 
 export async function mutateSidebarMember(
 ): Promise<void> {
     const sidebarMember = await getSidebarMember();
-    const multiOrg = shouldShowOrgSwitcher(sidebarMember.orgs);
+    const multiOrganization = shouldShowOrganizationSwitcher(
+        sidebarMember.organizations,
+    );
     for (const id of SIDEBAR_MEMBER_NAME_IDS) {
         const el = $(`#${id}`, document);
         if (el) el.textContent = sidebarMember.name;
@@ -83,20 +85,20 @@ export async function mutateSidebarMember(
     // Single-org members read the org as plain text; multi-org
     // members get the switcher below, so the line is cleared to
     // avoid naming the org twice.
-    for (const id of SIDEBAR_MEMBER_ORG_IDS) {
+    for (const id of SIDEBAR_MEMBER_ORGANIZATION_IDS) {
         const el = $(`#${id}`, document);
         if (el) {
-            el.textContent = multiOrg
+            el.textContent = multiOrganization
                 ? ''
                 : sidebarMember.organization;
         }
     }
-    const switcher = orgSwitcherHtml(sidebarMember.orgs);
-    for (const id of SIDEBAR_ORG_SWITCHER_IDS) {
+    const switcher = organizationSwitcherHtml(sidebarMember.organizations);
+    for (const id of SIDEBAR_ORGANIZATION_SWITCHER_IDS) {
         const el = $(`#${id}`, document);
         if (el) setHtml(el, switcher);
     }
-    wireOrgSwitcher(sidebarMember.activeOrgId);
+    wireOrganizationSwitcher(sidebarMember.activeOrganizationId);
     const chips = $$('.sidebar-member', document);
     for (const chip of chips) {
         chip.addEventListener(

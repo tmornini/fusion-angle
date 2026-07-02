@@ -118,7 +118,7 @@ function parseFields(
     for (const raw of body.split('\n')) {
         const line = raw.trim();
         if (line === '' || line.startsWith('//')) continue;
-        const m = line.match(/^(\w+)\s*:\s*([^;]+);/);
+        const m = line.match(/^(\w+)\??\s*:\s*([^;]+);/);
         if (m) fields.push({ name: m[1]!, type: m[2]!.trim() });
     }
     return fields;

@@ -6,7 +6,7 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { orgToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getOrganization,
@@ -19,7 +19,7 @@ import {
 import { seedHumanMember } from './member-fixtures.ts';
 import {
     seedAdminSchema,
-    orgRow,
+    organizationRow,
 } from './test-fixtures.ts';
 
 function buildProject(
@@ -192,7 +192,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.organizations.put('1', orgRow('Acme'));
+        await db.organizations.put('1', organizationRow('Acme'));
         // two rows for one identity + one other:
         // DISTINCT identities = 2, not 3
         await db.memberships.put('m1', {
@@ -211,10 +211,10 @@ test(
             at: '2026-03-01T00:00:00.000000Z',
         });
         const ctx = createRequestContext(
-            db, await orgToken(),
+            db, await organizationToken(),
         );
-        const org = await getOrganization(ctx);
-        assert.equal(org.usedSeats(), 2);
+        const organization = await getOrganization(ctx);
+        assert.equal(organization.usedSeats(), 2);
     },
 );
 
@@ -224,14 +224,14 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.organizations.put('1', orgRow('Acme'));
+        await db.organizations.put('1', organizationRow('Acme'));
         await db.memberships.put('m1', {
             organization_id: '1',
             identity_id: 'current',
             at: '2026-01-01T00:00:00.000000Z',
         });
         const ctx = createRequestContext(
-            db, await orgToken(),
+            db, await organizationToken(),
         );
         const before = await getOrganization(ctx);
         assert.equal(before.lastActivityText(), '—');

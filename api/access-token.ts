@@ -43,8 +43,8 @@ export interface AccessTokenClaims {
     readonly aud: string;
     readonly cnf?: { readonly jkt: string };
     readonly act?: { readonly sub: Id };
-    readonly org?: Id;
-    readonly orgs?: readonly Id[];
+    readonly organization?: Id;
+    readonly organizations?: readonly Id[];
     readonly iat: number;
     readonly nbf: number;
     readonly exp: number;
@@ -151,8 +151,8 @@ export interface MintInput {
     // mint a real-signed wrong-aud token pass another.
     readonly aud: string;
     readonly act?: { readonly sub: Id };
-    readonly org?: Id;
-    readonly orgs?: readonly Id[];
+    readonly organization?: Id;
+    readonly organizations?: readonly Id[];
 }
 
 export async function mintAccessToken(
@@ -168,8 +168,10 @@ export async function mintAccessToken(
         exp: input.iat + input.ttlSeconds,
         jti: input.jti,
         ...(input.act ? { act: input.act } : {}),
-        ...(input.org ? { org: input.org } : {}),
-        ...(input.orgs ? { orgs: input.orgs } : {}),
+        ...(input.organization ? { organization: input.organization } : {}),
+        ...(input.organizations
+            ? { organizations: input.organizations }
+            : {}),
     };
     const head =
         base64UrlEncode(JSON.stringify(HEADER));
@@ -196,12 +198,12 @@ function hasClaimShape(
             return false;
         }
     }
-    if (c.org !== undefined && typeof c.org !== 'string') {
+    if (c.organization !== undefined && typeof c.organization !== 'string') {
         return false;
     }
-    if (c.orgs !== undefined) {
-        if (!Array.isArray(c.orgs)
-            || c.orgs.some(o => typeof o !== 'string')) {
+    if (c.organizations !== undefined) {
+        if (!Array.isArray(c.organizations)
+            || c.organizations.some(o => typeof o !== 'string')) {
             return false;
         }
     }
@@ -246,9 +248,9 @@ export function principalFromClaims(
         id: claims.sub,
         roles: claims.roles,
         name: claims.name,
-        ...(claims.org ? { organization: claims.org } : {}),
-        ...(claims.orgs
-            ? { organizations: claims.orgs } : {}),
+        ...(claims.organization ? { organization: claims.organization } : {}),
+        ...(claims.organizations
+            ? { organizations: claims.organizations } : {}),
     };
 }
 

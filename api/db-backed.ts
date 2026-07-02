@@ -49,6 +49,8 @@ import type {
     ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
+    RequestEntity,
+    ResponseEntity,
 } from './types.ts';
 import type { LatencySimulation } from './latency.ts';
 import { EntityStore } from './store-entity.ts';
@@ -96,6 +98,8 @@ import {
     validateOrganizationEntity,
     validateMembershipEntity,
     validateInvitationEntity,
+    validateRequestEntity,
+    validateResponseEntity,
 } from './validators.ts';
 
 // One adapter over any StorageBackend. The 36-store wiring,
@@ -174,6 +178,8 @@ export class BackedDbAdapter
         GuardedEntityStore<ProjectObjectiveBaselineScoreEntity>;
     readonly projectObjectiveActualScores!:
         GuardedEntityStore<ProjectObjectiveActualScoreEntity>;
+    readonly requests!: GuardedEntityStore<RequestEntity>;
+    readonly responses!: GuardedEntityStore<ResponseEntity>;
     readonly states!: IStateStore;
 
     constructor(
@@ -492,6 +498,12 @@ export class BackedDbAdapter
                     run,
                     validateActualScoreEntity,
                 ),
+            requests: new HistoryEntityStore(
+                'requests', run, validateRequestEntity,
+            ),
+            responses: new HistoryEntityStore(
+                'responses', run, validateResponseEntity,
+            ),
         };
     }
 }

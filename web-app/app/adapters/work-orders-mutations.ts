@@ -33,7 +33,7 @@ import {
 import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
-import { sha256Bytes } from './digest.ts';
+import { sha256Bytes } from '../../../shared/digest.ts';
 import {
     nextPosition,
 } from '../drag-reorder-positions.ts';

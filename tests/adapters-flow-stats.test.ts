@@ -246,7 +246,7 @@ test(
 
         const ctx = createRequestContext(db, await devToken());
         const { model, graph } =
-            await getFlowStats(ctx, 'f1');
+            await getFlowStats(ctx, 'f1', Date.now());
 
         assert.equal(graph.name, 'Onboarding');
         assert.equal(
@@ -274,7 +274,7 @@ test(
     async () => {
         const { ctx } = await adminContext();
         await assert.rejects(
-            () => getFlowStats(ctx, 'nope'),
+            () => getFlowStats(ctx, 'nope', Date.now()),
         );
     },
 );
@@ -316,7 +316,7 @@ test(
         });
         const ctx = createRequestContext(db, await devToken());
         const { model, graph } =
-            await getFlowStats(ctx, 'f1');
+            await getFlowStats(ctx, 'f1', Date.now());
         const graphPos = new Set(
             graph.nodes.map(
                 n => `${n.positionX},${n.positionY}`,

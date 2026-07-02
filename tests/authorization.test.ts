@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    currentRolesForInOrg, isPermitted,
+    currentRolesForInOrganization, isPermitted,
     matchesOnSegmentBoundary,
 } from '../api/authorization.ts';
 
@@ -34,9 +34,9 @@ test('a prefix matches only on a segment boundary', () => {
 const grant = (
     id: string, identity: string, role: string,
     action: 'granted' | 'revoked', at: string,
-    org: string,
+    organization: string,
 ) => ({
-    id, organization_id: org, identity_id: identity,
+    id, organization_id: organization, identity_id: identity,
     role, action, by_member_id: 'system', at,
 });
 
@@ -46,7 +46,7 @@ test('a granted role with no later revoke is held', () => {
             '2026-01-01T00:00:00.000000Z', 'A'),
     ];
     assert.deepEqual(
-        currentRolesForInOrg(rows, 'current', 'A'),
+        currentRolesForInOrganization(rows, 'current', 'A'),
         ['admin']);
 });
 
@@ -58,7 +58,7 @@ test('latest action per (identity, role) wins', () => {
             '2026-02-01T00:00:00.000000Z', 'A'),
     ];
     assert.deepEqual(
-        currentRolesForInOrg(rows, 'current', 'A'), []);
+        currentRolesForInOrganization(rows, 'current', 'A'), []);
 });
 
 test('roles are isolated per identity', () => {
@@ -67,7 +67,7 @@ test('roles are isolated per identity', () => {
             '2026-01-01T00:00:00.000000Z', 'A'),
     ];
     assert.deepEqual(
-        currentRolesForInOrg(rows, 'other', 'A'), []);
+        currentRolesForInOrganization(rows, 'other', 'A'), []);
 });
 
 test('roles are isolated per org', () => {
@@ -76,10 +76,10 @@ test('roles are isolated per org', () => {
             '2026-01-01T00:00:00.000000Z', 'A'),
     ];
     assert.deepEqual(
-        currentRolesForInOrg(rows, 'current', 'A'),
+        currentRolesForInOrganization(rows, 'current', 'A'),
         ['admin']);
     assert.deepEqual(
-        currentRolesForInOrg(rows, 'current', 'B'), []);
+        currentRolesForInOrganization(rows, 'current', 'B'), []);
 });
 
 test('a same-instant revoke beats the grant, either order',
@@ -89,7 +89,7 @@ test('a same-instant revoke beats the grant, either order',
     // realms (two tabs), where append order proves nothing.
     const at = '2026-03-01T00:00:00.000000Z';
     assert.deepEqual(
-        currentRolesForInOrg([
+        currentRolesForInOrganization([
             grant('1', 'current', 'admin', 'granted',
                 at, 'A'),
             grant('2', 'current', 'admin', 'revoked',
@@ -97,7 +97,7 @@ test('a same-instant revoke beats the grant, either order',
         ], 'current', 'A'),
         []);
     assert.deepEqual(
-        currentRolesForInOrg([
+        currentRolesForInOrganization([
             grant('1', 'current', 'admin', 'revoked',
                 at, 'A'),
             grant('2', 'current', 'admin', 'granted',

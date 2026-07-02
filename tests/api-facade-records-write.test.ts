@@ -30,12 +30,12 @@ function req(
 // An edit record write puts only the record row — the path
 // that isolates the org stamp from the create-path member
 // and initial-state writes.
-function editBody(org: string) {
+function editBody(organization: string) {
     return {
         kind: 'edit',
         id: 'rec-1',
         record: {
-            organization_id: org,
+            organization_id: organization,
             name: 'rec', description: 'd', position: 0,
         },
         attributes: [],
@@ -46,7 +46,7 @@ function editBody(org: string) {
 // `current` holds admin in org A (the administered org) and
 // is a member of org A only. Roles are per-org since Phase 3,
 // so the org-A grant authorizes the facade write.
-async function oneOrg(): Promise<MemoryDbAdapter> {
+async function oneOrganization(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     await db.roleGrants.put('role-current-admin-a', {
@@ -64,7 +64,7 @@ async function oneOrg(): Promise<MemoryDbAdapter> {
 
 test('a facade records write stamps the bound org'
     + ' over a forged record', async () => {
-    const db = await oneOrg();
+    const db = await oneOrganization();
     const res = await handleRequest(db, req(
         'POST', '/organizations/A/records',
         await devToken('current'),
@@ -76,7 +76,7 @@ test('a facade records write stamps the bound org'
 
 test('a facade records write into a non-member org'
     + ' is 403', async () => {
-    const db = await oneOrg();
+    const db = await oneOrganization();
     const res = await handleRequest(db, req(
         'POST', '/organizations/B/records',
         await devToken('current'),

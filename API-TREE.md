@@ -6,15 +6,15 @@ Know that every entity will be kept in a backend structured in this way: ~/.clau
 
 That mechanism will replace the existing ledger's and common states system by moving said state into each message stored message.
 
-└─|─ /invitations/
+└─|─ /invitations/ • derived view over org-nested canonical storage
   |  └── :id
-└─|─ /memberships/
+└─|─ /memberships/ • derived view over org-nested canonical storage
   |  └── :id
-└─|─ /records/
+└─|─ /records/ • derived view over org-nested canonical storage
   |  └── :id
   |      └── /attribute-definitions.          • all of them, single document
   |      └── /attribute-values                • all of them, single document
-└─|─ work-orders/
+└─|─ work-orders/ • derived view over org-nested canonical storage
   |  └── :id/
   |      └── claim
   |      └── transition
@@ -27,7 +27,7 @@ That mechanism will replace the existing ledger's and common states system by mo
   |      └─|─ /third-party-identity-providers  • all of them, single document
   |      └─|─ /token-revocations               • if the answer to the question directly above is "PUT/GET"
   |      └─|─ /memberships/                    • /memberships/ with forced and/or filtered identity
-  |      └─|─ /organizations/                  • /memberships/ with forced and/or filtered identity
+  |      └─|─ /organizations/                  • /organizations/ with forced and/or filtered identity
   |      └─|─ /work-orders/                    • /work-orders/ with forced and/or filtered identity
   |      └─|─ /tokens/
   |        |  └── :id
@@ -42,16 +42,15 @@ That mechanism will replace the existing ledger's and common states system by mo
   |    |  └── /objectives                     • all objectives in a single document
   |    |  └── /flows/
   |    |      └── :id
-  |    |          ├── /undo
-  |    |          └── /redo
+  |    |          └── /undo
   |    |  └── /ideas/
   |    |      └── :id
-  |    |  └── /memberships/                   • /memberships/ with forced and/or filtered organization
+  |    |  └── /memberships/                   • canonical storage (tenancy covenant)
   |    |  └── /projects/
   |    |      └── :id
   |    |          └── /scores                 • all objectives scores in a single document
-  |    |  └── /records/                       • /records/ with forced and/or filtered organization
-  |    |  └── /work-orders/                   • /work-orders/ with forced and/or filtered organization
+  |    |  └── /records/                       • canonical storage
+  |    |  └── /work-orders/                   • canonical storage
   \    \
    \    \- organization membership authz realm
     \- administration authz realm

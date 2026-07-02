@@ -8,7 +8,7 @@ import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { seedOrgMember } from './root-admin-fixture.ts';
+import { seedOrganizationMember } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const MEMBER = 'walt';
@@ -176,7 +176,7 @@ test(
 
         const memberDb = new MemoryDbAdapter();
         await memberDb.postSchemaCreation();
-        await seedOrgMember(memberDb, MEMBER);
+        await seedOrganizationMember(memberDb, MEMBER);
         const token = await devToken(MEMBER);
         const denied = await handleRequest(
             memberDb, req('POST', '/identities', token, {

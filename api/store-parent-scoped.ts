@@ -6,7 +6,7 @@ import type {
     StateStore,
     Tx,
 } from './db.ts';
-import type { OrgScoped } from './store-org-scoped.ts';
+import type { OrganizationScoped } from './store-organization-scoped.ts';
 import type { Id, StateEntity } from './types.ts';
 
 // Resolve the org that OWNS a leaf row, by following its parent
@@ -15,11 +15,11 @@ import type { Id, StateEntity } from './types.ts';
 // absent / it has no membership). The fence rule below treats
 // null as visible, so an incomplete-but-harmless row is not
 // mistaken for another tenant's data.
-export type OwningOrgResolver<T> = (row: T) => Promise<Id | null>;
+export type OwningOrganizationResolver<T> = (row: T) => Promise<Id | null>;
 
 // The READ fence for rows that carry NO organization_id of
 // their own (junctions, ledgers, the states log, the identity
-// PII/credential facets). Where OrgScopedEntityStore filters by
+// PII/credential facets). Where OrganizationScopedEntityStore filters by
 // a stamped column, this DERIVES containment from the parent at
 // read time. A row is visible iff its owner is the bound org or
 // null (orphan); a row owned by a DIFFERENT, existing org is
@@ -28,41 +28,41 @@ export type OwningOrgResolver<T> = (row: T) => Promise<Id | null>;
 //
 // DEPLOYMENT CONSTRAINT (inherited from access-token.ts): this
 // is only as strong as the token whose verified `org` claim
-// feeds #org, and that HMAC key is still client-shipped.
+// feeds #organization, and that HMAC key is still client-shipped.
 export class ParentScopedEntityStore<T extends { id: string }>
     implements EntityStore<T>
 {
     readonly #inner: EntityStore<T>;
-    readonly #org: Id;
+    readonly #organization: Id;
     readonly #table: string;
-    readonly #resolveOwningOrg: OwningOrgResolver<T>;
+    readonly #resolveOwningOrganization: OwningOrganizationResolver<T>;
 
     constructor(
         inner: EntityStore<T>,
-        org: Id,
+        organization: Id,
         table: string,
-        resolveOwningOrg: OwningOrgResolver<T>,
+        resolveOwningOrganization: OwningOrganizationResolver<T>,
     ) {
         this.#inner = inner;
-        this.#org = org;
+        this.#organization = organization;
         this.#table = table;
-        this.#resolveOwningOrg = resolveOwningOrg;
+        this.#resolveOwningOrganization = resolveOwningOrganization;
     }
 
     async getAll(): Promise<T[]> {
         const rows = await this.#inner.getAll();
         const owner = await Promise.all(
-            rows.map(row => this.#resolveOwningOrg(row)),
+            rows.map(row => this.#resolveOwningOrganization(row)),
         );
         return rows.filter(
-            (_, i) => isVisible(owner[i]!, this.#org),
+            (_, i) => isVisible(owner[i]!, this.#organization),
         );
     }
 
     async getById(id: string): Promise<T> {
         const row = await this.#inner.getById(id);
-        const owner = await this.#resolveOwningOrg(row);
-        if (!isVisible(owner, this.#org)) {
+        const owner = await this.#resolveOwningOrganization(row);
+        if (!isVisible(owner, this.#organization)) {
             throw new EntityNotFoundError(this.#table, id);
         }
         return row;
@@ -80,10 +80,10 @@ export class ParentScopedEntityStore<T extends { id: string }>
         const rows = await this.#inner
             .getAllWhere(column, key);
         const owner = await Promise.all(
-            rows.map(row => this.#resolveOwningOrg(row)),
+            rows.map(row => this.#resolveOwningOrganization(row)),
         );
         return rows.filter(
-            (_, i) => isVisible(owner[i]!, this.#org),
+            (_, i) => isVisible(owner[i]!, this.#organization),
         );
     }
 
@@ -93,7 +93,7 @@ export class ParentScopedEntityStore<T extends { id: string }>
     // which is outside that tx scope, so a write-side parent
     // check would break legitimate batches (e.g. creating a work
     // order reads `flows`). Cross-tenant write integrity rides
-    // the parent's own OrgScoped fence — a foreign parent can be
+    // the parent's own OrganizationScoped fence — a foreign parent can be
     // neither created nor owned — and lands fully at the server
     // tier (FK + WHERE organization_id). READS are the fence.
     put(
@@ -118,18 +118,18 @@ export class ParentScopedEntityStore<T extends { id: string }>
 // A row is visible to `org` when it owns the row or the row is
 // an orphan (null owner). Only a DIFFERENT, existing owner
 // hides it.
-function isVisible(owner: Id | null, org: Id): boolean {
-    return owner === null || owner === org;
+function isVisible(owner: Id | null, organization: Id): boolean {
+    return owner === null || owner === organization;
 }
 
 // Build a resolver that derives org from a single parent store
 // (the common case). The parent store is the UNFENCED one, so a
 // foreign parent reports its real org and the row is hidden; an
 // absent parent reports null and the row is a visible orphan.
-export function viaParent<T, P extends OrgScoped>(
+export function viaParent<T, P extends OrganizationScoped>(
     parent: EntityStore<P>,
     parentIdOf: (row: T) => Id,
-): OwningOrgResolver<T> {
+): OwningOrganizationResolver<T> {
     return async (row) => {
         try {
             const found = await parent.getById(parentIdOf(row));
@@ -142,7 +142,7 @@ export function viaParent<T, P extends OrgScoped>(
 }
 
 // The minimal store/ledger shapes the org-ownership checks need.
-interface OrgOwnedProbe {
+interface OrganizationOwnedProbe {
     getById(id: string): Promise<{ organization_id: Id }>;
 }
 // The keyed membership read the ownership checks need: an
@@ -167,8 +167,8 @@ interface MembershipReader {
 export function viaMembership<T>(
     memberships: MembershipReader,
     identityIdOf: (row: T) => Id,
-    boundOrg: Id,
-): OwningOrgResolver<T> {
+    boundOrganization: Id,
+): OwningOrganizationResolver<T> {
     return async (row) => {
         const id = identityIdOf(row);
         // The identity_id index IS the lookup — the rows it
@@ -176,22 +176,22 @@ export function viaMembership<T>(
         const mine = await memberships.getAllWhere(
             'identity_id', id);
         if (mine.length === 0) return null;
-        return mine.some(m => m.organization_id === boundOrg)
-            ? boundOrg
+        return mine.some(m => m.organization_id === boundOrganization)
+            ? boundOrganization
             : mine[0]!.organization_id;
     };
 }
 
 // The org-owned stores the ownership probe walks — ONE list,
-// shared by the states read fence (db-org-scoped) and the
+// shared by the states read fence (db-organization-scoped) and the
 // entity-states route guard (api.ts), so a new org-owned
 // entity extends the system in exactly one place.
 // `invitations` is included (though global-spine) so an
 // invitation's lifecycle events resolve to the invitation's
 // org and stay out of every other tenant's /states read.
-export function orgOwnedProbes(
+export function organizationOwnedProbes(
     db: DbAdapter,
-): readonly OrgOwnedProbe[] {
+): readonly OrganizationOwnedProbe[] {
     return [
         db.ideas, db.projects, db.flows,
         db.records, db.objectives, db.workOrders,
@@ -200,7 +200,7 @@ export function orgOwnedProbes(
 }
 
 // The raw-read adapter the graph-entity probe needs. Both
-// call sites (db-org-scoped, api.ts) pass the UNFENCED base
+// call sites (db-organization-scoped, api.ts) pass the UNFENCED base
 // adapter so a foreign parent reports its real org and the
 // leaf is correctly hidden.
 // rawReadRow bypasses EntityStore's deleted filter — essential
@@ -214,8 +214,8 @@ interface RawReader {
     ): Promise<T | null>;
 }
 
-// Build the graph-entity probe shared by both ownerOrgOfEntity
-// call sites (db-org-scoped.ts and api.ts). Tries flow_nodes
+// Build the graph-entity probe shared by both ownerOrganizationOfEntity
+// call sites (db-organization-scoped.ts and api.ts). Tries flow_nodes
 // first (raw — bypasses deleted filter), then flow_edges (raw);
 // on a hit resolves the flow's org via the UNFENCED flows store.
 // An absent node AND absent edge return null (visible orphan,
@@ -225,7 +225,7 @@ interface RawReader {
 // failures surface instead of silently resolving to null.
 export function graphEntityProbe(
     base: RawReader,
-    flows: OrgOwnedProbe,
+    flows: OrganizationOwnedProbe,
 ): (entityId: Id) => Promise<Id | null> {
     return async (entityId) => {
         let flowId: Id | null = null;
@@ -261,20 +261,20 @@ export function graphEntityProbe(
 // `states.entity_id`. The log is unified across kinds, so the
 // id is probed against each org-owned store (UNFENCED, so a
 // foreign entity reports its real org). An optional
-// graphProbe is applied AFTER the orgOwnedStores loop and
+// graphProbe is applied AFTER the organizationOwnedStores loop and
 // BEFORE the membership ledger; it closes the flow_nodes /
 // flow_edges two-hop. A member-lifecycle event names an
 // ORG-LESS member; it resolves via the membership ledger like
 // viaMembership. An id matching nothing is an orphan (null).
 // Used by the `states` and `state_field_values` read fences.
-export async function ownerOrgOfEntity(
-    orgOwnedStores: readonly OrgOwnedProbe[],
+export async function ownerOrganizationOfEntity(
+    organizationOwnedStores: readonly OrganizationOwnedProbe[],
     memberships: MembershipReader,
-    boundOrg: Id,
+    boundOrganization: Id,
     entityId: Id,
     graphProbe?: (entityId: Id) => Promise<Id | null>,
 ): Promise<Id | null> {
-    for (const store of orgOwnedStores) {
+    for (const store of organizationOwnedStores) {
         try {
             return (await store.getById(entityId))
                 .organization_id;
@@ -283,14 +283,14 @@ export async function ownerOrgOfEntity(
         }
     }
     if (graphProbe !== undefined) {
-        const graphOrg = await graphProbe(entityId);
-        if (graphOrg !== null) return graphOrg;
+        const graphOrganization = await graphProbe(entityId);
+        if (graphOrganization !== null) return graphOrganization;
     }
     const mine = await memberships.getAllWhere(
         'identity_id', entityId);
     if (mine.length === 0) return null;
-    return mine.some(m => m.organization_id === boundOrg)
-        ? boundOrg
+    return mine.some(m => m.organization_id === boundOrganization)
+        ? boundOrganization
         : mine[0]!.organization_id;
 }
 
@@ -305,36 +305,37 @@ export async function ownerOrgOfEntity(
 // at the entity layer.
 export class ParentScopedStateStore implements StateStore {
     readonly #inner: StateStore;
-    readonly #org: Id;
+    readonly #organization: Id;
     readonly #table: string;
-    readonly #resolveOwningOrg: OwningOrgResolver<StateEntity>;
+    readonly #resolveOwningOrganization:
+        OwningOrganizationResolver<StateEntity>;
 
     constructor(
         inner: StateStore,
-        org: Id,
+        organization: Id,
         table: string,
-        resolveOwningOrg: OwningOrgResolver<StateEntity>,
+        resolveOwningOrganization: OwningOrganizationResolver<StateEntity>,
     ) {
         this.#inner = inner;
-        this.#org = org;
+        this.#organization = organization;
         this.#table = table;
-        this.#resolveOwningOrg = resolveOwningOrg;
+        this.#resolveOwningOrganization = resolveOwningOrganization;
     }
 
     async getAll(): Promise<StateEntity[]> {
         const rows = await this.#inner.getAll();
         const owner = await Promise.all(
-            rows.map(row => this.#resolveOwningOrg(row)),
+            rows.map(row => this.#resolveOwningOrganization(row)),
         );
         return rows.filter(
-            (_, i) => isVisible(owner[i]!, this.#org),
+            (_, i) => isVisible(owner[i]!, this.#organization),
         );
     }
 
     async getById(id: Id): Promise<StateEntity> {
         const row = await this.#inner.getById(id);
-        const owner = await this.#resolveOwningOrg(row);
-        if (!isVisible(owner, this.#org)) {
+        const owner = await this.#resolveOwningOrganization(row);
+        if (!isVisible(owner, this.#organization)) {
             throw new EntityNotFoundError(this.#table, id);
         }
         return row;

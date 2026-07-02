@@ -20,7 +20,7 @@ import {
     getDbAdapter,
     getSessionToken,
     putSessionToken,
-    sessionHasReachableOrg,
+    sessionHasReachableOrganization,
 } from '../app/adapters/init.ts';
 import {
     createRequestContext,
@@ -633,7 +633,7 @@ export async function init(): Promise<void> {
             // would 403 every org-scoped route; land it on
             // its pending invitations instead of the return
             // target's dead end.
-            if (!sessionHasReachableOrg()) {
+            if (!sessionHasReachableOrganization()) {
                 navigateTo('invitations');
                 return;
             }

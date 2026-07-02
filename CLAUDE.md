@@ -52,9 +52,10 @@ tools can drive the page normally.
 --test --strip-types tests/*.test.ts`), then enforces a
 78-character maximum line length on all `.ts`, `.html`, and
 `.css` files (excluding `compose.ts`) and on every `.md`
-file at the repo root except [TEST-PLAN.md](TEST-PLAN.md) — exempted
-because each test case bullet is meant to scan as one
-self-contained line. Finally it runs the
+file at the repo root except [TEST-PLAN.md](TEST-PLAN.md)
+and [API-TREE.md](API-TREE.md) — both exempted because their
+entries are meant to scan as one self-contained line. Finally
+it runs the
 `generate-schema-svg --check` gate, which fails on
 `SCHEMA.svg` drift from the schema of record (`api/db.ts` +
 `api/types.ts`).

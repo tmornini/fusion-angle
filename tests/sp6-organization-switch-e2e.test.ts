@@ -10,8 +10,8 @@ import {
     getOrganizations,
 } from '../web-app/app/adapters/organizations.ts';
 import {
-    postOrgSessionExchange,
-} from '../web-app/app/adapters/org-session.ts';
+    postOrganizationSessionExchange,
+} from '../web-app/app/adapters/organization-session.ts';
 import { devToken } from './token-fixtures.ts';
 
 // End-to-end of the boot-scope + org-switch flow the browser
@@ -35,9 +35,9 @@ async () => {
     const db = await seeded();
     const ctx = createRequestContext(
         db, await devToken('current'));
-    const orgs = await getOrganizations(ctx);
+    const organizations = await getOrganizations(ctx);
     assert.deepEqual(
-        [...orgs.map(o => o.id)].sort(), ['1', '2']);
+        [...organizations.map(o => o.id)].sort(), ['1', '2']);
 });
 
 test('switching the active org re-scopes members and ideas',
@@ -45,8 +45,8 @@ async () => {
     const db = await seeded();
     const flat = await devToken('current');
     const ctx = createRequestContext(db, flat);
-    const tokA = await postOrgSessionExchange(ctx, flat, '1');
-    const tokB = await postOrgSessionExchange(ctx, flat, '2');
+    const tokA = await postOrganizationSessionExchange(ctx, flat, '1');
+    const tokB = await postOrganizationSessionExchange(ctx, flat, '2');
 
     const membersA = idsOf(
         await GET<{ id: string }[]>(db, 'members', tokA));
@@ -81,9 +81,9 @@ async () => {
     const flatIdeas = idsOf(
         await GET<{ id: string }[]>(db, 'ideas', flat));
     const ctx = createRequestContext(db, flat);
-    const tokA = await postOrgSessionExchange(ctx, flat, '1');
-    const org1Ideas = idsOf(
+    const tokA = await postOrganizationSessionExchange(ctx, flat, '1');
+    const organization1Ideas = idsOf(
         await GET<{ id: string }[]>(db, 'ideas', tokA));
     // a flat token resolves to its primary org '1' (same view)
-    assert.deepEqual(flatIdeas, org1Ideas);
+    assert.deepEqual(flatIdeas, organization1Ideas);
 });

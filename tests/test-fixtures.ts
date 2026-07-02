@@ -17,7 +17,7 @@ export async function seedAdminSchema(
 
 // A complete organization row (minus id) for tests needing a
 // tenant root. `name` varies; the rest are fixed demo values.
-export function orgRow(
+export function organizationRow(
     name: string,
 ): Omit<OrganizationEntity, 'id'> {
     return {
@@ -35,11 +35,11 @@ export function orgRow(
 // gate. The validated-path and id-bearing idea builders differ
 // in their defaults and stay local to their own suites.
 export function ideaBody(
-    org: string,
+    organization: string,
     title: string,
 ): Omit<IdeaEntity, 'id'> {
     return {
-        organization_id: org,
+        organization_id: organization,
         title,
         position: 0,
         problem_statement: '',

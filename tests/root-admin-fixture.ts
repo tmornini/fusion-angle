@@ -29,7 +29,7 @@ export async function seedRootAdmin(
 // the member role grant AND the membership the gate resolves
 // the org and liveness from. The member-tier counterpart of
 // seedRootAdmin above.
-export async function seedOrgMember(
+export async function seedOrganizationMember(
     db: DbAdapter,
     identityId: string,
 ): Promise<void> {

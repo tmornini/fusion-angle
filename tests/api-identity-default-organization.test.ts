@@ -16,10 +16,10 @@ async function freshDb() {
 async function seedMembership(
     db: MemoryDbAdapter,
     identityId: string,
-    org: string,
+    organization: string,
 ) {
-    await db.memberships.put('m-' + identityId + '-' + org, {
-        organization_id: org,
+    await db.memberships.put('m-' + identityId + '-' + organization, {
+        organization_id: organization,
         identity_id: identityId,
         at: AT,
     });
@@ -29,15 +29,15 @@ async function seedMembership(
 // timestamps are deterministic across timezones.
 const EVENT_AT = '2099-01-01T00:00:00.000000Z';
 
-function putDefaultOrg(
+function putDefaultOrganization(
     token: string,
     identityId: string,
-    org: string,
+    organization: string,
     eventId?: string,
     at?: string,
 ) {
     const payload: Record<string, string> =
-        { organization_id: org };
+        { organization_id: organization };
     if (eventId !== undefined) payload['eventId'] = eventId;
     if (at !== undefined) payload['at'] = at;
     return new Request(
@@ -51,7 +51,7 @@ function putDefaultOrg(
         });
 }
 
-function getDefaultOrg(token: string, identityId: string) {
+function getDefaultOrganization(token: string, identityId: string) {
     return new Request(
         `${BASE}/identities/${identityId}/default-org`, {
             headers: { 'Authorization': 'Bearer ' + token },
@@ -63,12 +63,12 @@ test('PUT default-org sets it and GET returns it', async () => {
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const put = await handleRequest(
-        db, putDefaultOrg(
+        db, putDefaultOrganization(
             token, 'current', '1', 'ev-set-1', EVENT_AT,
         ));
     assert.equal(put.status, 204);
     const got = await handleRequest(
-        db, getDefaultOrg(token, 'current'));
+        db, getDefaultOrganization(token, 'current'));
     assert.equal(got.status, 200);
     const body = await got.json() as
         { organization_id: string | null };
@@ -80,7 +80,7 @@ test('PUT a non-member org is forbidden', async () => {
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const res = await handleRequest(
-        db, putDefaultOrg(
+        db, putDefaultOrganization(
             token, 'current', '2', 'ev-forbid-1', EVENT_AT,
         ));
     assert.equal(res.status, 403);
@@ -91,7 +91,7 @@ test('PUT to another identity tree is forbidden', async () => {
     await seedMembership(db, 'other', '1');
     const token = await devToken();   // sub = current
     const res = await handleRequest(
-        db, putDefaultOrg(
+        db, putDefaultOrganization(
             token, 'other', '1', 'ev-tree-1', EVENT_AT,
         ));
     assert.equal(res.status, 403);
@@ -102,11 +102,11 @@ test('PUT the same org twice appends one event', async () => {
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     await handleRequest(
-        db, putDefaultOrg(
+        db, putDefaultOrganization(
             token, 'current', '1', 'ev-dup-1', EVENT_AT,
         ));
     await handleRequest(
-        db, putDefaultOrg(
+        db, putDefaultOrganization(
             token, 'current', '1', 'ev-dup-1', EVENT_AT,
         ));
     const rows = await db.identityDefaultOrganizations.getAll();
@@ -119,7 +119,7 @@ async () => {
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const got = await handleRequest(
-        db, getDefaultOrg(token, 'current'));
+        db, getDefaultOrganization(token, 'current'));
     assert.equal(got.status, 200);
     const body = await got.json() as
         { organization_id: string | null };
@@ -130,7 +130,7 @@ test('GET is null for an org-less identity', async () => {
     const db = await freshDb();
     const token = await devToken();
     const got = await handleRequest(
-        db, getDefaultOrg(token, 'current'));
+        db, getDefaultOrganization(token, 'current'));
     assert.equal(got.status, 200);
     const body = await got.json() as
         { organization_id: string | null };
@@ -143,7 +143,7 @@ async () => {
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const put = await handleRequest(
-        db, putDefaultOrg(
+        db, putDefaultOrganization(
             token, 'current', '1', 'caller-id-1', EVENT_AT,
         ));
     assert.equal(put.status, 204);
@@ -159,10 +159,10 @@ async () => {
     const db = await freshDb();
     await seedMembership(db, 'current', '1');
     const token = await devToken();
-    const req1 = putDefaultOrg(
+    const req1 = putDefaultOrganization(
         token, 'current', '1', 'caller-id-2', EVENT_AT,
     );
-    const req2 = putDefaultOrg(
+    const req2 = putDefaultOrganization(
         token, 'current', '1', 'caller-id-2', EVENT_AT,
     );
     const r1 = await handleRequest(db, req1);
@@ -180,7 +180,7 @@ test('PUT with empty eventId returns 400', async () => {
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const res = await handleRequest(
-        db, putDefaultOrg(
+        db, putDefaultOrganization(
             token, 'current', '1', '', EVENT_AT,
         ));
     assert.equal(res.status, 400);

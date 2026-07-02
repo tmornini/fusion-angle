@@ -9,21 +9,21 @@ import { nowUtc } from '../../../api/types.ts';
 // (append-on-change server-side); a non-member org is refused
 // as a 403, surfaced here as a thrown error. The row id
 // (eventId) and timestamp (at) are caller-minted.
-export async function putIdentityDefaultOrg(
+export async function putIdentityDefaultOrganization(
     ctx: RequestContext,
-    org: string,
+    organization: string,
 ): Promise<void> {
     await ctx.PUT<void>(
         'identities/' + ctx.identity.id + '/default-org',
         {
             eventId: generateCryptoSafeBase62(),
-            organization_id: org,
+            organization_id: organization,
             at: nowUtc(),
         },
     );
 }
 
-export async function getIdentityDefaultOrg(
+export async function getIdentityDefaultOrganization(
     ctx: RequestContext,
 ): Promise<string | null> {
     const res = await ctx.GET<{

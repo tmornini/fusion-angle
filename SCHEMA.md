@@ -952,3 +952,67 @@ their own table, not as columns on the event row.
 The `attribute_id` column references `record_attributes.id`,
 not a table named `attributes`; the schema-SVG generator
 carries an explicit FK-target override for it.
+
+## Messages
+
+Phase 0 of the message-as-state migration: the append-only
+ledgers every stored HTTP request/response will dual-write
+into starting Phase 1. EMPTY at Phase 0 — mock-data seeding
+and the snapshot plane leave both tables untouched, and
+`tests/mock-data-fingerprint.test.ts` pins that. Global-spine
+(pass-through), NOT org-fenced: tenancy lives IN `uri_prefix`,
+enforced at the route gate.
+
+### requests
+
+One row per stored canonical HTTP request message. The
+message text IS the row; `uri_prefix` (retains its trailing
+`/`) and `uri_id` (empty string for a collection request) are
+addressing metadata, and `message_hash` is an index over the
+sha256 digest (`shared/digest.ts` `sha256Hex`) of `message`
+— never a second copy of its truth. `at` is pair ENVELOPE
+metadata only, not a domain timestamp inside the message.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY — shared with the paired response |
+| uri_prefix | TEXT | Collection URI, trailing `/` kept |
+| uri_id | TEXT | Resource id, or `''` for a collection |
+| at | TEXT | RFC-3339 Zulu — envelope metadata |
+| requester_identity_id | TEXT | FK → identities |
+| message_hash | TEXT | sha256 hex digest of `message` |
+| message | TEXT | The canonical stored HTTP message |
+
+Validator: `validateRequestEntity` (`api/validators.ts`).
+Secondary indexes: `uri_prefix`, `uri_id`, `message_hash`
+(`api/db.ts` `TABLE_INDEXES`).
+
+### responses
+
+The paired response: `id` equals the request's `id` (one
+UUID per pair, never a foreign key of its own). `follows` /
+`supersedes` are ABSENT KEYS when the write had no
+predecessor — never `null`, never `''`. Absence-of-key IS
+absence-of-event, and IndexedDB skips absent keys when
+indexing, which is the partial-unique-index semantics the
+two-PUT-classes design (Task 5) requires; a `null` value for
+either is rejected by `validateResponseEntity` as invalid.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | TEXT | PRIMARY KEY — equals the request's id |
+| uri_prefix | TEXT | Collection URI, trailing `/` kept |
+| uri_id | TEXT | Resource id, or `''` for a collection |
+| at | TEXT | RFC-3339 Zulu — envelope metadata |
+| status | INTEGER | HTTP status, 100..599 |
+| etag | TEXT | The response's ETag |
+| message_hash | TEXT | sha256 hex digest of `message` |
+| message | TEXT | The canonical stored HTTP message |
+| follows | TEXT | ABSENT unless this follows a prior pair |
+| supersedes | TEXT | ABSENT unless this supersedes a pair |
+
+Validator: `validateResponseEntity` (`api/validators.ts`).
+Secondary indexes: `uri_prefix`, `uri_id` (`api/db.ts`
+`TABLE_INDEXES`) — the unique `follows` index arrives in
+Task 5 with the machinery that can express a partial unique
+index.

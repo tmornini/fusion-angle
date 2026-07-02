@@ -11,7 +11,7 @@ import {
     assertRecordState,
 } from '../../../api/types.ts';
 import {
-    activeOrg,
+    activeOrganization,
     type RequestContext,
 } from './shared.ts';
 import {
@@ -226,12 +226,12 @@ export async function postRecordChange(
     // The server stamps organization_id from the verified
     // token; this present-and-valid value only satisfies the
     // record-write body validator, which requires the column.
-    const org = activeOrg(ctx);
+    const organization = activeOrganization(ctx);
     const record = {
-        ...change.record, organization_id: org,
+        ...change.record, organization_id: organization,
     };
     const attributes = change.attributes.map(a => ({
-        ...a, organization_id: org,
+        ...a, organization_id: organization,
     }));
     if (change.kind === 'create') {
         const initialStateEventId =

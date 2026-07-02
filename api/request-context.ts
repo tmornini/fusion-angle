@@ -47,7 +47,7 @@ export interface RequestContext extends AuthenticatedContext {
     // The caller's live membership orgs, derived from the
     // ledger at the fence — the one truth the liveness check
     // and the organizations/:id read fence both consume.
-    readonly memberOrgs: ReadonlySet<Id>;
+    readonly memberOrganizations: ReadonlySet<Id>;
     readonly roles: readonly string[];
     readonly scoped: DbAdapter;
 }

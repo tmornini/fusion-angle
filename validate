@@ -16,6 +16,7 @@ LONG_LINES=$( {
         -exec awk "$AWK_LINT" {} +
     find . -maxdepth 1 -type f -name '*.md' \
         ! -name 'TEST-PLAN.md' \
+        ! -name 'API-TREE.md' \
         -exec awk "$AWK_LINT" {} +
     awk "$AWK_LINT" build serve test validate generate-schema-svg
 } )
@@ -23,6 +24,27 @@ LONG_LINES=$( {
 if [ -n "$LONG_LINES" ]; then
     echo "Error: lines exceed 78 characters:" >&2
     echo "$LONG_LINES" >&2
+    exit 1
+fi
+
+# Reject the `org` abbreviation in identifiers; use `organization`.
+# Prose, URLs (w3.org), and CSS class names may keep the short form.
+ORG_ABBREV=$(
+    find api web-app tests shared -type f \
+        \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
+        ! -path 'web-app/app/compose.ts' -print0 \
+    | xargs -0 perl -ne '
+        close ARGV if eof;
+        print "$ARGV:$.: $_"
+            if /org[A-Z]|[a-z]Org([A-Z]|\b)|\bOrg[A-Z]/
+            || /[a-z]Orgs([A-Z]|\b)|\bOrgs[A-Z]/
+            || /_ORG(_|[0-9]|\b)|\bORG(_|[0-9])/;
+    '
+)
+
+if [ -n "$ORG_ABBREV" ]; then
+    echo "Error: 'org' abbreviation in identifiers:" >&2
+    echo "$ORG_ABBREV" >&2
     exit 1
 fi
 

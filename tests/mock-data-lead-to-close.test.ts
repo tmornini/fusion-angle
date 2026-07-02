@@ -14,6 +14,7 @@ import {
     getFlowStats,
 } from '../web-app/app/adapters/flow-stats.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { now } from '../api/mock-data/seed-kit.ts';
 
 const FLOW_NAME = 'Lead-to-Close';
 const EXPECTED_NODE_COUNT = 7;
@@ -37,7 +38,7 @@ async function seededLeadToClose() {
         `flow "${FLOW_NAME}" not seeded`,
     );
     const ctx = createRequestContext(db, await devToken());
-    return await getFlowStats(ctx, flow!.id);
+    return await getFlowStats(ctx, flow!.id, now.getTime());
 }
 
 test(

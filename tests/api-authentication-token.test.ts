@@ -255,8 +255,8 @@ async () => {
     assert.equal(res.status, 200);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.org, '1');
-    assert.deepEqual(claims.orgs, ['1']);
+    assert.equal(claims.organization, '1');
+    assert.deepEqual(claims.organizations, ['1']);
 });
 
 test('token-exchange into a non-member org is 403',
@@ -298,8 +298,8 @@ async () => {
     assert.equal(res.status, 200);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
-    assert.equal(claims.org, undefined);
-    assert.deepEqual(claims.orgs, ['1']);
+    assert.equal(claims.organization, undefined);
+    assert.deepEqual(claims.organizations, ['1']);
 });
 
 const activeClient = {

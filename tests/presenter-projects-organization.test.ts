@@ -125,7 +125,7 @@ function makeProject(overrides: {
     }, overrides.state ?? 'approved');
 }
 
-function makeOrg() {
+function makeOrganization() {
     return new Organization({
         id: 'org-1',
         name: 'Acme Innovations',
@@ -379,7 +379,7 @@ test(
     + ' org name, domain, and an Edit action',
     () => {
         const out = new OrganizationPresenter(
-            makeOrg(), makeStats(),
+            makeOrganization(), makeStats(),
         ).buildPage().toString();
         assert.match(out, /Acme Innovations/);
         assert.match(out, /acme\.example/);
@@ -396,7 +396,7 @@ test(
     + ' current/limit values',
     () => {
         const out = new OrganizationPresenter(
-            makeOrg(), makeStats(),
+            makeOrganization(), makeStats(),
         ).buildPage().toString();
         assert.match(out, /Active People/);
         assert.match(out, /Projects/);
@@ -412,11 +412,11 @@ test(
     + ' editable name/domain inputs and'
     + ' Save/Cancel actions',
     () => {
-        const org = makeOrg();
+        const organization = makeOrganization();
         const out = new OrganizationEditPresenter(
-            org,
+            organization,
             makeStats(),
-            org.toGeneralInfoDraft(),
+            organization.toGeneralInfoDraft(),
         ).buildPage().toString();
         assert.match(out, /data-org-field="name"/);
         assert.match(

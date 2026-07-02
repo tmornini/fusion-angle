@@ -34,7 +34,7 @@ import {
     verifyPassword,
 } from '../shared/password-hash.ts';
 import {
-    currentDefaultOrgFor,
+    currentDefaultOrganizationFor,
 } from './authorization.ts';
 import {
     latestByKey,
@@ -96,7 +96,7 @@ async function nameFor(
 // derived fresh from the membership ledger (never cached). The
 // source of the token's `orgs` claim and the exchange's
 // member-check.
-export async function subjectOrgs(
+export async function subjectOrganizations(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id[]> {
@@ -109,21 +109,21 @@ export async function subjectOrgs(
 // the identity's SET default, else its PRIMARY membership, else
 // null. The gate denies a null — there is no global default left
 // to fall back on.
-export async function identityDefaultOrg(
+export async function identityDefaultOrganization(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
     const events = await adapter.identityDefaultOrganizations
         .getAllWhere('identity_id', identityId);
-    const chosen = currentDefaultOrgFor(events, identityId);
+    const chosen = currentDefaultOrganizationFor(events, identityId);
     if (chosen !== null) return chosen;
-    return await primaryMembershipOrg(adapter, identityId);
+    return await primaryMembershipOrganization(adapter, identityId);
 }
 
 // The earliest org an identity joined. Equal join moments
 // tie-break to the lexically lowest org id, so resolution is
 // deterministic.
-async function primaryMembershipOrg(
+async function primaryMembershipOrganization(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
@@ -131,16 +131,16 @@ async function primaryMembershipOrg(
     // per-row identity guard after (trust the gate).
     const rows = await adapter.memberships
         .getAllWhere('identity_id', identityId);
-    let best: { org: Id; at: string } | null = null;
+    let best: { organization: Id; at: string } | null = null;
     for (const row of rows) {
         if (best === null
             || row.at < best.at
             || (row.at === best.at
-                && row.organization_id < best.org)) {
-            best = { org: row.organization_id, at: row.at };
+                && row.organization_id < best.organization)) {
+            best = { organization: row.organization_id, at: row.at };
         }
     }
-    return best === null ? null : best.org;
+    return best === null ? null : best.organization;
 }
 
 // Mint an access + refresh JWT pair. The access token gets a
@@ -154,7 +154,7 @@ async function mintPair(
     name: string,
     refreshJti: string,
     act?: { sub: Id },
-    scope?: { org?: Id; orgs?: readonly Id[] },
+    scope?: { organization?: Id; organizations?: readonly Id[] },
 ): Promise<TokenResponse> {
     const iat = nowEpochSeconds();
     const accessToken = await mintAccessToken({
@@ -163,9 +163,9 @@ async function mintPair(
         ttlSeconds: ACCESS_TTL_SECONDS,
         jti: generateCryptoSafeBase62(),
         ...(act ? { act } : {}),
-        ...(scope?.org ? { org: scope.org } : {}),
-        ...(scope?.orgs && scope.orgs.length > 0
-            ? { orgs: scope.orgs } : {}),
+        ...(scope?.organization ? { organization: scope.organization } : {}),
+        ...(scope?.organizations && scope.organizations.length > 0
+            ? { organizations: scope.organizations } : {}),
     });
     const refreshToken = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
@@ -208,14 +208,14 @@ async function issueTokenPair(
     identityId: Id,
     name: string,
     act?: { sub: Id },
-    org?: Id,
+    organization?: Id,
 ): Promise<TokenResponse> {
     const refreshJti =
         await recordIssuedRoot(adapter, identityId);
-    const orgs = await subjectOrgs(adapter, identityId);
+    const organizations = await subjectOrganizations(adapter, identityId);
     return mintPair(identityId, name, refreshJti, act, {
-        ...(org ? { org } : {}),
-        orgs,
+        ...(organization ? { organization } : {}),
+        organizations,
     });
 }
 
@@ -371,13 +371,13 @@ async function grantRefresh(
     if (outcome.kind === 'rotate') {
         const name =
             await nameFor(adapter, verified.claims.sub);
-        const orgs = await subjectOrgs(
+        const organizations = await subjectOrganizations(
             adapter, verified.claims.sub);
         return {
             ok: true,
             response: await mintPair(
                 verified.claims.sub, name, outcome.newJti,
-                undefined, { orgs },
+                undefined, { organizations },
             ),
         };
     }
@@ -444,8 +444,8 @@ async function grantTokenExchange(
             ? body.organization
             : '';
     if (organization !== '') {
-        const orgs = await subjectOrgs(adapter, subject);
-        if (!orgs.includes(organization)) {
+        const organizations = await subjectOrganizations(adapter, subject);
+        if (!organizations.includes(organization)) {
             return failure(
                 403,
                 'subject is not a member of'
@@ -467,15 +467,15 @@ async function grantTokenExchange(
 // bearer for a token scoped to `org` (subject == actor == the
 // caller). Returns 403, minting nothing, when the caller is
 // not a member — the gate's tenant fence.
-export async function exchangeBearerForOrg(
+export async function exchangeBearerForOrganization(
     adapter: DbAdapter,
     bearer: string,
-    org: Id,
+    organization: Id,
 ): Promise<TokenResult> {
     return grantTokenExchange(adapter, {
         subject_token: bearer,
         actor_token: bearer,
-        organization: org,
+        organization: organization,
     });
 }
 
@@ -581,13 +581,13 @@ async function grantAuthorizationCode(
     }
     const name =
         await nameFor(adapter, issued.identityId);
-    const orgs =
-        await subjectOrgs(adapter, issued.identityId);
+    const organizations =
+        await subjectOrganizations(adapter, issued.identityId);
     return {
         ok: true,
         response: await mintPair(
             issued.identityId, name, issued.refreshJti,
-            undefined, { orgs },
+            undefined, { organizations },
         ),
     };
 }

@@ -642,6 +642,50 @@
     <text class="type" x="2062" y="297">text</text>
   </g>
   <g class="table">
+    <rect class="box" x="344" y="478" width="208" height="152" rx="6" />
+    <rect class="head" x="344" y="478" width="208" height="26" rx="6" />
+    <text class="thead" x="354" y="496">requests</text>
+    <text class="pk" x="354" y="517">id</text>
+    <text class="type" x="542" y="517">id</text>
+    <text class="col" x="354" y="535">uri_prefix</text>
+    <text class="type" x="542" y="535">text</text>
+    <text class="col" x="354" y="553">uri_id</text>
+    <text class="type" x="542" y="553">text</text>
+    <text class="col" x="354" y="571">at</text>
+    <text class="type" x="542" y="571">text</text>
+    <text class="col" x="354" y="589">requester_identity_id</text>
+    <text class="type" x="542" y="589">id</text>
+    <text class="col" x="354" y="607">message_hash</text>
+    <text class="type" x="542" y="607">text</text>
+    <text class="col" x="354" y="625">message</text>
+    <text class="type" x="542" y="625">text</text>
+  </g>
+  <g class="table">
+    <rect class="box" x="344" y="660" width="208" height="206" rx="6" />
+    <rect class="head" x="344" y="660" width="208" height="26" rx="6" />
+    <text class="thead" x="354" y="678">responses</text>
+    <text class="pk" x="354" y="699">id</text>
+    <text class="type" x="542" y="699">id</text>
+    <text class="col" x="354" y="717">uri_prefix</text>
+    <text class="type" x="542" y="717">text</text>
+    <text class="col" x="354" y="735">uri_id</text>
+    <text class="type" x="542" y="735">text</text>
+    <text class="col" x="354" y="753">at</text>
+    <text class="type" x="542" y="753">text</text>
+    <text class="col" x="354" y="771">status</text>
+    <text class="type" x="542" y="771">num</text>
+    <text class="col" x="354" y="789">etag</text>
+    <text class="type" x="542" y="789">text</text>
+    <text class="col" x="354" y="807">message_hash</text>
+    <text class="type" x="542" y="807">text</text>
+    <text class="col" x="354" y="825">message</text>
+    <text class="type" x="542" y="825">text</text>
+    <text class="col" x="354" y="843">follows</text>
+    <text class="type" x="542" y="843">text</text>
+    <text class="col" x="354" y="861">supersedes</text>
+    <text class="type" x="542" y="861">text</text>
+  </g>
+  <g class="table">
     <rect class="box" x="1256" y="40" width="208" height="116" rx="6" />
     <rect class="head" x="1256" y="40" width="208" height="26" rx="6" />
     <text class="thead" x="1266" y="58">states</text>

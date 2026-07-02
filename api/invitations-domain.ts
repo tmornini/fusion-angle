@@ -9,10 +9,10 @@ import {
     type InvitationState,
 } from './types.ts';
 import {
-    currentRolesForInOrg,
+    currentRolesForInOrganization,
 } from './authorization.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
-import { identityDefaultOrg } from './authentication.ts';
+import { identityDefaultOrganization } from './authentication.ts';
 import {
     errorJson,
     HTTP_BAD_REQUEST,
@@ -37,23 +37,23 @@ import {
 // The active org of the caller: the verified token claim, else
 // the identity's resolved default. Null when the identity can
 // reach no org — the same denial the main gate raises.
-async function callerActiveOrg(
+async function callerActiveOrganization(
     ctx: AuthenticatedContext,
 ): Promise<Id | null> {
     return ctx.principal.organization
-        ?? await identityDefaultOrg(
+        ?? await identityDefaultOrganization(
             ctx.base, ctx.principal.id,
         );
 }
 
-async function callerIsOrgAdmin(
+async function callerIsOrganizationAdmin(
     ctx: AuthenticatedContext,
-    org: Id,
+    organization: Id,
 ): Promise<boolean> {
     const rows = await ctx.base.roleGrants
         .getAllWhere('identity_id', ctx.principal.id);
-    return currentRolesForInOrg(
-        rows, ctx.principal.id, org,
+    return currentRolesForInOrganization(
+        rows, ctx.principal.id, organization,
     ).includes('admin');
 }
 
@@ -77,7 +77,7 @@ async function currentInvitationState(
 // writes the membership in the INVITATION's org — never the
 // caller's active org, which the org-scoped store would stamp.
 // So every op runs on the BASE adapter with an explicit guard,
-// like identityDefaultOrgRequest: grant/revoke/sent require an
+// like identityDefaultOrganizationRequest: grant/revoke/sent require an
 // admin role in the relevant org; accept/decline/read require
 // the caller to BE the invitee. These never touch the
 // admin-only ROUTE_POLICY, so a non-admin invitee can accept.
@@ -135,7 +135,7 @@ async function invitationsForInvitee(
         .filter(inv =>
             inv.identity_id === ctx.principal.id);
     if (mine.length === 0) return Response.json([]);
-    const orgName = new Map(
+    const organizationName = new Map(
         (await ctx.base.organizations.getAll())
             .map(o => [o.id, o.name]));
     const personName = new Map(
@@ -158,7 +158,7 @@ async function invitationsForInvitee(
         // the absent key, never a '' sentinel.
         const grant = eventsFor.get(inv.id)!
             .find(ev => ev.state === 'pending');
-        const name = orgName.get(inv.organization_id);
+        const name = organizationName.get(inv.organization_id);
         const inviter = grant === undefined
             ? undefined
             : personName.get(grant.member_id);
@@ -186,21 +186,21 @@ async function invitationsForInvitee(
 async function sentInvitations(
     ctx: AuthenticatedContext,
 ): Promise<Response> {
-    const org = await callerActiveOrg(ctx);
-    if (org === null) {
+    const organization = await callerActiveOrganization(ctx);
+    if (organization === null) {
         return errorJson(
             'forbidden: identity has no organization',
             HTTP_FORBIDDEN);
     }
-    if (!await callerIsOrgAdmin(ctx, org)) {
+    if (!await callerIsOrganizationAdmin(ctx, organization)) {
         return errorJson(
             'forbidden: listing sent invitations requires'
             + ' an admin role', HTTP_FORBIDDEN);
     }
-    const orgInvites =
+    const organizationInvites =
         (await ctx.base.invitations.getAll())
-            .filter(inv => inv.organization_id === org);
-    if (orgInvites.length === 0) return Response.json([]);
+            .filter(inv => inv.organization_id === organization);
+    if (organizationInvites.length === 0) return Response.json([]);
     const email = new Map(
         (await ctx.base.identityPii.getAll())
             .map(p => [p.id, p.email]));
@@ -209,7 +209,7 @@ async function sentInvitations(
     const latest = latestByKey(
         await ctx.base.states.getAll(), ev => ev.entity_id);
     const out = [];
-    for (const inv of orgInvites) {
+    for (const inv of organizationInvites) {
         const current = latest.get(inv.id);
         if (current === undefined) continue;
         const state = assertInvitationState(
@@ -220,7 +220,7 @@ async function sentInvitations(
         const inviteeEmail = email.get(inv.identity_id);
         out.push({
             id: inv.id,
-            organization_id: org,
+            organization_id: organization,
             identity_id: inv.identity_id,
             ...(inviteeEmail !== undefined
                 ? { invitee_email: inviteeEmail }
@@ -240,13 +240,13 @@ async function grantInvitation(
     ctx: AuthenticatedContext,
     request: Request,
 ): Promise<Response> {
-    const org = await callerActiveOrg(ctx);
-    if (org === null) {
+    const organization = await callerActiveOrganization(ctx);
+    if (organization === null) {
         return errorJson(
             'forbidden: identity has no organization',
             HTTP_FORBIDDEN);
     }
-    if (!await callerIsOrgAdmin(ctx, org)) {
+    if (!await callerIsOrganizationAdmin(ctx, organization)) {
         return errorJson(
             'forbidden: granting an invitation requires an'
             + ' admin role', HTTP_FORBIDDEN);
@@ -312,10 +312,10 @@ async function grantInvitation(
         async (view): Promise<GrantOutcome> => {
             const member = (await view.memberships.getAll())
                 .some(m => m.identity_id === identityId
-                    && m.organization_id === org);
+                    && m.organization_id === organization);
             if (member) return { kind: 'member' };
             const existing = await pendingInvitationFor(
-                view, org, identityId);
+                view, organization, identityId);
             if (existing !== null) {
                 return {
                     kind: 'existing',
@@ -323,7 +323,7 @@ async function grantInvitation(
                 };
             }
             await view.invitations.put(invitationId, {
-                organization_id: org,
+                organization_id: organization,
                 identity_id: identityId,
                 at: grantAt,
             });
@@ -340,13 +340,13 @@ async function grantInvitation(
     }
     if (result.kind === 'existing') {
         return Response.json({
-            id: result.id, organization_id: org,
+            id: result.id, organization_id: organization,
             identity_id: identityId, at: result.at,
             state: 'pending',
         });
     }
     return Response.json({
-        id: invitationId, organization_id: org,
+        id: invitationId, organization_id: organization,
         identity_id: identityId,
         at: grantAt, state: 'pending',
     });
@@ -361,11 +361,11 @@ type GrantOutcome =
 // null. The grant idempotency check.
 async function pendingInvitationFor(
     adapter: DbAdapter,
-    org: Id,
+    organization: Id,
     identityId: Id,
 ): Promise<{ id: Id; at: string } | null> {
     const candidates = (await adapter.invitations.getAll())
-        .filter(inv => inv.organization_id === org
+        .filter(inv => inv.organization_id === organization
             && inv.identity_id === identityId);
     if (candidates.length === 0) return null;
     // One states read answers every candidate; on the grant
@@ -539,7 +539,7 @@ async function revokeInvitation(
         return errorJson('Not found: /invitations/' + id,
             HTTP_NOT_FOUND);
     }
-    if (!await callerIsOrgAdmin(
+    if (!await callerIsOrganizationAdmin(
         ctx, inv.organization_id)) {
         return errorJson(
             'forbidden: revoking an invitation requires an'

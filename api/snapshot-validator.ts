@@ -38,6 +38,8 @@ import {
     validateObjectiveRevisionEntity,
     validateBaselineScoreEntity,
     validateActualScoreEntity,
+    validateRequestEntity,
+    validateResponseEntity,
 } from './validators.ts';
 
 // Map table name → entity validator. Stored rows
@@ -169,6 +171,12 @@ function validateSnapshotRow(
                 break;
             case 'project_objective_actual_scores':
                 validateActualScoreEntity(body);
+                break;
+            case 'requests':
+                validateRequestEntity(body);
+                break;
+            case 'responses':
+                validateResponseEntity(body);
                 break;
         }
     } catch (err) {

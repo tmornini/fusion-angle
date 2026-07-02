@@ -11,7 +11,7 @@ import type { Id } from './types.ts';
 // by. Entity interfaces that gain organization_id (the SP-2
 // rollout) satisfy it; pure join tables never do — they
 // derive org from a parent — so no guard ever wraps them.
-export interface OrgScoped {
+export interface OrganizationScoped {
     id: Id;
     organization_id: Id;
 }
@@ -29,7 +29,7 @@ export interface OrgScoped {
 // claim feeds #org, and that HMAC key is still client-shipped.
 // Tenant isolation MUST NOT be relied on in a networked /
 // multi-user context until the signing key lives server-side.
-export class OrgScopedEntityStore<T extends OrgScoped>
+export class OrganizationScopedEntityStore<T extends OrganizationScoped>
     implements EntityStore<T>
 {
     readonly #inner: GuardedEntityStore<T>;
@@ -38,11 +38,11 @@ export class OrgScopedEntityStore<T extends OrgScoped>
 
     constructor(
         inner: GuardedEntityStore<T>,
-        org: Id,
+        organization: Id,
         table: string,
     ) {
         this.#inner = inner;
-        this.#org = org;
+        this.#org = organization;
         this.#table = table;
     }
 

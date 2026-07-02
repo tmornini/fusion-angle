@@ -7,7 +7,7 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { orgToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     postRoleRevocation,
@@ -86,7 +86,7 @@ test('role_grants store retains appended events', async () => {
 async function adminCtx() {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);   // current may write grants
-    return { db, ctx: createRequestContext(db, await orgToken()) };
+    return { db, ctx: createRequestContext(db, await organizationToken()) };
 }
 
 

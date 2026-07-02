@@ -4,7 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { orgToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     getRecord,
     getRecords,
@@ -31,7 +31,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -59,7 +59,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -94,7 +94,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -123,7 +123,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -177,7 +177,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -216,7 +216,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {
@@ -245,7 +245,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await assert.rejects(
             () => getRecordState(ctx, 'rec-missing'),
             /no state event/,
@@ -260,7 +260,7 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        const ctx = createRequestContext(db, await orgToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await postRecordChange(ctx, 'rec-1', {
             kind: 'create',
             record: {

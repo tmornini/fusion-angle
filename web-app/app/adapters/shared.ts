@@ -35,12 +35,12 @@ import { postSessionRefresh } from './session-refresh.ts';
 import { redirectToLogin } from '../auth-redirect.ts';
 import { getOrganizations } from './organizations.ts';
 import {
-    getIdentityDefaultOrg,
-} from './identity-default-org.ts';
+    getIdentityDefaultOrganization,
+} from './identity-default-organization.ts';
 import {
-    resolveActiveOrg,
-    postOrgSessionExchange,
-} from './org-session.ts';
+    resolveActiveOrganization,
+    postOrganizationSessionExchange,
+} from './organization-session.ts';
 
 // Rows whose `field` equals `value` — the single-field
 // equality filter the adapters repeat. Type-safe: `field`
@@ -144,9 +144,9 @@ let recoveryInFlight: Promise<string | null> | null = null;
 
 function sharedRecovery(
     adapter: ClientFacadeAdapter,
-    requestOrg: Id | undefined,
+    requestOrganization: Id | undefined,
 ): Promise<string | null> {
-    recoveryInFlight ??= recoverSession(adapter, requestOrg)
+    recoveryInFlight ??= recoverSession(adapter, requestOrganization)
         .finally(() => {
             recoveryInFlight = null;
         });
@@ -164,7 +164,7 @@ function sharedRecovery(
 async function withAuthRecovery<T>(
     adapter: ClientFacadeAdapter,
     token: string,
-    requestOrg: Id | undefined,
+    requestOrganization: Id | undefined,
     make: (tok: string) => Promise<T>,
 ): Promise<T> {
     try {
@@ -174,7 +174,7 @@ async function withAuthRecovery<T>(
             throw err;
         }
         const recovered =
-            await sharedRecovery(adapter, requestOrg);
+            await sharedRecovery(adapter, requestOrganization);
         if (recovered === null) {
             throw err;   // unrefreshable — already redirected
         }
@@ -197,7 +197,7 @@ async function withAuthRecovery<T>(
 // refresh round-trip.
 async function recoverSession(
     adapter: ClientFacadeAdapter,
-    requestOrg: Id | undefined,
+    requestOrganization: Id | undefined,
 ): Promise<string | null> {
     let creds: SessionCredentials | null;
     try {
@@ -219,7 +219,7 @@ async function recoverSession(
     // recoverable unscoped read.
     if (decision.kind === 'install') {
         return installAndScope(
-            adapter, decision.accessToken, requestOrg);
+            adapter, decision.accessToken, requestOrganization);
     }
     if (decision.kind !== 'refresh') {
         deleteSessionCredentials();
@@ -233,7 +233,7 @@ async function recoverSession(
     }
     putSessionCredentials(refreshed);
     return installAndScope(
-        adapter, refreshed.accessToken, requestOrg);
+        adapter, refreshed.accessToken, requestOrganization);
 }
 
 // Install a flat token as the session and re-scope it to the active
@@ -248,12 +248,12 @@ async function recoverSession(
 async function installAndScope(
     adapter: ClientFacadeAdapter,
     flatToken: string,
-    requestOrg: Id | undefined,
+    requestOrganization: Id | undefined,
 ): Promise<string | null> {
     putSessionToken(flatToken);
     try {
-        await rescopeToActiveOrg(
-            adapter, flatToken, requestOrg);
+        await rescopeToActiveOrganization(
+            adapter, flatToken, requestOrganization);
     } catch (err) {
         if (err instanceof UnauthorizedError) {
             deleteSessionCredentials();
@@ -289,16 +289,16 @@ async function refreshCredentials(
 // request's own org, resolving the target from the REACHABLE
 // set first so the exchange never targets a non-member org
 // (H13). Unlike boot, recovery neither reads nor writes the
-// cross-tab ACTIVE_ORG_KEY preference: the target is the
+// cross-tab ACTIVE_ORGANIZATION_KEY preference: the target is the
 // vessel's verified org claim, so a recovering request stays in
 // the org it was operating in — and a background recovery never
 // clobbers the org another tab is viewing (F-109). A flat vessel
 // (no claim) falls back to the identity default, then the first
 // reachable.
-async function rescopeToActiveOrg(
+async function rescopeToActiveOrganization(
     adapter: ClientFacadeAdapter,
     flatToken: string,
-    requestOrg: Id | undefined,
+    requestOrganization: Id | undefined,
 ): Promise<void> {
     const ctx = createRequestContext(adapter, flatToken);
     const reachable =
@@ -306,26 +306,26 @@ async function rescopeToActiveOrg(
     if (reachable.length === 0) {
         return;
     }
-    const active = resolveActiveOrg(
+    const active = resolveActiveOrganization(
         reachable,
-        requestOrg ?? null,
-        await getIdentityDefaultOrg(ctx),
+        requestOrganization ?? null,
+        await getIdentityDefaultOrganization(ctx),
     );
     putSessionToken(
-        await postOrgSessionExchange(ctx, flatToken, active));
+        await postOrganizationSessionExchange(ctx, flatToken, active));
 }
 
 // The active org the session is scoped to. Post-boot the
 // session token always carries it; its absence is an impossible
 // state — boot scopes the token before any org-bound request —
 // so we crash rather than invent a default.
-export function activeOrg(ctx: RequestContext): Id {
-    const org = ctx.identity.organization;
-    if (org === undefined) {
+export function activeOrganization(ctx: RequestContext): Id {
+    const organization = ctx.identity.organization;
+    if (organization === undefined) {
         throw new Error(
             'no active org on the session: boot must scope'
             + ' the token before an org-bound request',
         );
     }
-    return org;
+    return organization;
 }

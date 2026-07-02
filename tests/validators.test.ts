@@ -557,7 +557,7 @@ test(
 
 // --- OrganizationEntity ---
 
-const validOrg = {
+const validOrganization = {
     name: 'Acme Corp',
     domain: 'acme.com',
     next_billing: '2025-01-01',
@@ -570,7 +570,7 @@ test(
     'validateOrganizationEntity accepts valid payload',
     () => {
     const result =
-        validateOrganizationEntity(validOrg);
+        validateOrganizationEntity(validOrganization);
     assert.equal(result.name, 'Acme Corp');
     assert.equal(result.seats, 10);
 });
@@ -581,7 +581,7 @@ test(
     () => {
     assert.throws(
         () => validateOrganizationEntity({
-            ...validOrg,
+            ...validOrganization,
             seats: 'ten',
         }),
         /expected finite number for seats/,
@@ -594,7 +594,7 @@ test(
     () => {
     assert.throws(
         () => validateOrganizationEntity({
-            ...validOrg,
+            ...validOrganization,
             admin: true,
         }),
         /unexpected key "admin"/,
@@ -605,7 +605,7 @@ test(
     'validateOrganizationEntity rejects missing'
     + ' required key',
     () => {
-    const body = { ...validOrg };
+    const body = { ...validOrganization };
     delete (
         body as Record<string, unknown>
     )['seats'];
@@ -624,7 +624,7 @@ test(
     // copy is a second truth kept in sync by nothing
     assert.throws(
         () => validateOrganizationEntity({
-            ...validOrg,
+            ...validOrganization,
             used_seats: 5,
         }),
         /unexpected key "used_seats"/,

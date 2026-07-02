@@ -6,7 +6,7 @@ import {
     postMockDataLoad,
 } from '../api/mock-data.ts';
 import {
-    currentRolesForInOrg,
+    currentRolesForInOrganization,
 } from '../api/authorization.ts';
 
 test('bootstrap seeds current as admin', async () => {
@@ -15,7 +15,7 @@ test('bootstrap seeds current as admin', async () => {
     await postBootstrap(db);
     const rows = await db.roleGrants.getAll();
     assert.ok(
-        currentRolesForInOrg(rows, 'current', '1')
+        currentRolesForInOrganization(rows, 'current', '1')
             .includes('admin'));
 });
 
@@ -25,6 +25,6 @@ test('mock data seeds current as admin', async () => {
     await postMockDataLoad(db);
     const rows = await db.roleGrants.getAll();
     assert.ok(
-        currentRolesForInOrg(rows, 'current', '1')
+        currentRolesForInOrganization(rows, 'current', '1')
             .includes('admin'));
 });

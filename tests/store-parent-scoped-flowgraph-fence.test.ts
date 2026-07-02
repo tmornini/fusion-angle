@@ -2,15 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { orgToken } from './token-fixtures.ts';
-import { orgRow } from './test-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
+import { organizationRow } from './test-fixtures.ts';
 
 // Flow-graph entity deletion events must be fenced by the
 // flow's owning org. A 'deleted' states event whose entity_id
 // is a flow_nodes or flow_edges id must NOT be visible through
 // another tenant's /states or entity-states/:id reads.
 //
-// Before the two-hop probe in ownerOrgOfEntity, these ids
+// Before the two-hop probe in ownerOrganizationOfEntity, these ids
 // matched NO org-owned probe and fell through to the membership
 // ledger (also no match) → null → orphan → VISIBLE to every
 // tenant (the leak). This test suite pins that the fence is
@@ -39,8 +39,8 @@ function req(
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('A', orgRow('Acme'));
-    await db.organizations.put('B', orgRow('Beta'));
+    await db.organizations.put('A', organizationRow('Acme'));
+    await db.organizations.put('B', organizationRow('Beta'));
     await db.roleGrants.put('rg-current-a', {
         organization_id: 'A', identity_id: 'current',
         role: 'admin', action: 'granted',
@@ -81,11 +81,11 @@ async function seed(): Promise<MemoryDbAdapter> {
 
 // GET /organizations/{org}/states through the named facade.
 async function getStates(
-    db: MemoryDbAdapter, org: string,
+    db: MemoryDbAdapter, organization: string,
 ): Promise<{ id: string }[]> {
-    const token = await orgToken('current', org);
+    const token = await organizationToken('current', organization);
     const res = await handleRequest(
-        db, req('GET', '/organizations/' + org + '/states', token),
+        db, req('GET', '/organizations/' + organization + '/states', token),
     );
     assert.equal(res.status, 200);
     return res.json() as Promise<{ id: string }[]>;
@@ -93,12 +93,12 @@ async function getStates(
 
 // GET /organizations/{org}/entity-states/{entityId} status.
 async function entityStatesStatus(
-    db: MemoryDbAdapter, org: string, entityId: string,
+    db: MemoryDbAdapter, organization: string, entityId: string,
 ): Promise<number> {
-    const token = await orgToken('current', org);
+    const token = await organizationToken('current', organization);
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/' + org
+        '/organizations/' + organization
             + '/entity-states/' + entityId,
         token,
     ));

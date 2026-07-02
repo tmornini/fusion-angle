@@ -36,6 +36,8 @@ import type {
     ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
+    RequestEntity,
+    ResponseEntity,
     StateEntity,
 } from './types.ts';
 
@@ -380,6 +382,10 @@ export interface DbStores {
         EntityStore<
             ProjectObjectiveActualScoreEntity
         >;
+    requests:
+        EntityStore<RequestEntity>;
+    responses:
+        EntityStore<ResponseEntity>;
     states: StateStore;
 }
 
@@ -482,6 +488,8 @@ export const TABLE_NAMES = [
     'objective_revisions',
     'project_objective_baseline_scores',
     'project_objective_actual_scores',
+    'requests',
+    'responses',
     'states',
 ];
 
@@ -524,5 +532,7 @@ export const TABLE_INDEXES:
     objectives: ['organization_id'],
     objective_revisions: ['objective_id'],
     memberships: ['organization_id', 'identity_id'],
+    requests: ['uri_prefix', 'uri_id', 'message_hash'],
+    responses: ['uri_prefix', 'uri_id'],
     states: ['entity_id'],
 };

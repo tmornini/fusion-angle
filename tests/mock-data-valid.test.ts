@@ -142,15 +142,15 @@ for (const [name, getAll] of AT_LEDGERS) {
 
 test('mock-data seeds the organizations table', async () => {
     const db = await seededDb();
-    const org = await db.organizations.getById('1');
-    assert.ok(org.id.length > 0);
+    const organization = await db.organizations.getById('1');
+    assert.ok(organization.id.length > 0);
 });
 
 test('mock-data organization row passes the validator', async () => {
     const db = await seededDb();
-    const org = await db.organizations.getById('1');
+    const organization = await db.organizations.getById('1');
     assert.doesNotThrow(
-        () => validateOrganizationEntity(withoutId(org)),
+        () => validateOrganizationEntity(withoutId(organization)),
     );
 });
 
@@ -200,15 +200,15 @@ test(
             db.memberships.getAll(),
             db.members.getAll(),
         ]);
-        const orgByWo = new Map(
+        const organizationByWo = new Map(
             workOrders.map(w => [w.id, w.organization_id]),
         );
-        const orgsByMember = new Map<string, Set<string>>();
+        const organizationsByMember = new Map<string, Set<string>>();
         for (const m of memberships) {
-            const set = orgsByMember.get(m.identity_id)
+            const set = organizationsByMember.get(m.identity_id)
                 ?? new Set<string>();
             set.add(m.organization_id);
-            orgsByMember.set(m.identity_id, set);
+            organizationsByMember.set(m.identity_id, set);
         }
         const systemMembers = new Set(
             members
@@ -217,13 +217,16 @@ test(
         );
         const violations = new Set<string>();
         for (const s of states) {
-            const woOrg = orgByWo.get(s.entity_id);
-            if (woOrg === undefined) continue;
+            const woOrganization = organizationByWo.get(s.entity_id);
+            if (woOrganization === undefined) continue;
             if (systemMembers.has(s.member_id)) continue;
-            const orgs = orgsByMember.get(s.member_id);
-            if (orgs === undefined || !orgs.has(woOrg)) {
+            const organizations = organizationsByMember.get(s.member_id);
+            if (
+                organizations === undefined
+                || !organizations.has(woOrganization)
+            ) {
                 violations.add(
-                    s.member_id + ' in org ' + woOrg,
+                    s.member_id + ' in org ' + woOrganization,
                 );
             }
         }

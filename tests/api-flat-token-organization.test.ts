@@ -16,10 +16,10 @@ async function freshDb() {
 async function grantAdmin(
     db: MemoryDbAdapter,
     identityId: string,
-    org: string,
+    organization: string,
 ) {
-    await db.roleGrants.put('g-' + identityId + '-' + org, {
-        organization_id: org,
+    await db.roleGrants.put('g-' + identityId + '-' + organization, {
+        organization_id: organization,
         identity_id: identityId,
         role: 'admin',
         action: 'granted',
@@ -31,10 +31,10 @@ async function grantAdmin(
 async function join(
     db: MemoryDbAdapter,
     identityId: string,
-    org: string,
+    organization: string,
 ) {
-    await db.memberships.put('m-' + identityId + '-' + org, {
-        organization_id: org,
+    await db.memberships.put('m-' + identityId + '-' + organization, {
+        organization_id: organization,
         identity_id: identityId,
         at: AT,
     });

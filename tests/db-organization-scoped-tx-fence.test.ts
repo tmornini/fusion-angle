@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { orgScopedAdapter } from '../api/db-org-scoped.ts';
+import { organizationScopedAdapter } from '../api/db-organization-scoped.ts';
 import { ideaBody } from './test-fixtures.ts';
 
 async function seeded() {
@@ -16,7 +16,7 @@ test(
     'an org-scoped tx commits a write stamped to the org',
     async () => {
         const db = await seeded();
-        const scoped = orgScopedAdapter(db, 'A');
+        const scoped = organizationScopedAdapter(db, 'A');
         await scoped.transaction(
             ['ideas', 'states'],
             (view) => view.ideas.put(
@@ -32,7 +32,7 @@ test(
     'an org-scoped tx rolls back on throw',
     async () => {
         const db = await seeded();
-        const scoped = orgScopedAdapter(db, 'A');
+        const scoped = organizationScopedAdapter(db, 'A');
         await assert.rejects(
             () => scoped.transaction(
                 ['ideas', 'states'],
@@ -54,7 +54,7 @@ test(
     + 'foreign id',
     async () => {
         const db = await seeded();
-        const scoped = orgScopedAdapter(db, 'A');
+        const scoped = organizationScopedAdapter(db, 'A');
         // b1 belongs to org B; the in-tx #assertWritable
         // read must 404 it, aborting the write.
         await assert.rejects(

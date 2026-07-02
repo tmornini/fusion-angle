@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    currentDefaultOrgFor,
+    currentDefaultOrganizationFor,
 } from '../api/authorization.ts';
 import type {
     IdentityDefaultOrganizationEntity,
@@ -25,42 +25,42 @@ function ev(
 }
 
 test(
-    'currentDefaultOrgFor is null with no event for the identity',
+    'currentDefaultOrganizationFor is null with no event for the identity',
     () => {
         const rows = [ev('d1', 'other', '1', AT1)];
-        assert.equal(currentDefaultOrgFor(rows, 'me'), null);
+        assert.equal(currentDefaultOrganizationFor(rows, 'me'), null);
     },
 );
 
 test(
-    'currentDefaultOrgFor returns the latest event org',
+    'currentDefaultOrganizationFor returns the latest event org',
     () => {
         const rows = [
             ev('d1', 'me', '1', AT1),
             ev('d2', 'me', '2', AT2),
         ];
-        assert.equal(currentDefaultOrgFor(rows, 'me'), '2');
+        assert.equal(currentDefaultOrganizationFor(rows, 'me'), '2');
     },
 );
 
 test(
-    'currentDefaultOrgFor breaks an at-tie toward later row',
+    'currentDefaultOrganizationFor breaks an at-tie toward later row',
     () => {
         const rows = [
             ev('d1', 'me', '1', AT1),
             ev('d2', 'me', '3', AT1),
         ];
-        assert.equal(currentDefaultOrgFor(rows, 'me'), '3');
+        assert.equal(currentDefaultOrganizationFor(rows, 'me'), '3');
     },
 );
 
 test(
-    'currentDefaultOrgFor ignores other identities',
+    'currentDefaultOrganizationFor ignores other identities',
     () => {
         const rows = [
             ev('d1', 'me', '1', AT1),
             ev('d2', 'other', '2', AT2),
         ];
-        assert.equal(currentDefaultOrgFor(rows, 'me'), '1');
+        assert.equal(currentDefaultOrganizationFor(rows, 'me'), '1');
     },
 );

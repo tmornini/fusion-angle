@@ -22,7 +22,7 @@ import {
     sampleLogNormal,
     isoFromMs,
 } from './seed-kit.ts';
-import { STARK_ORG } from './seed-constants.ts';
+import { STARK_ORGANIZATION } from './seed-constants.ts';
 
 const MS_PER_HOUR =
     SECONDS_PER_HOUR * MS_PER_SECOND;
@@ -211,7 +211,7 @@ export function generateFlowWorkload(args: {
 
         workOrders.push({
             id: woId,
-            organization_id: STARK_ORG,
+            organization_id: STARK_ORGANIZATION,
             display_id: displayId,
             flow_graph: frozenFlowGraph,
             position: i + 1,

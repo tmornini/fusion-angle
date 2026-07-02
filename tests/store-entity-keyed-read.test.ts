@@ -12,7 +12,7 @@ import { validateStateEntity } from '../api/validators.ts';
 // by the column — same tombstone removal, just a smaller
 // source. These pin that equivalence on the simulated tier.
 
-interface Owned { id: string; org: string }
+interface Owned { id: string; organization: string }
 
 const passOwned = (
     b: Record<string, unknown>,
@@ -36,17 +36,17 @@ test(
     'getAllWhere equals getAll filtered, minus tombstones',
     async () => {
         const { store, states } = await ownedStore();
-        await store.put('a', { org: 'o1' });
-        await store.put('b', { org: 'o2' });
-        await store.put('c', { org: 'o1' });
+        await store.put('a', { organization: 'o1' });
+        await store.put('b', { organization: 'o2' });
+        await store.put('c', { organization: 'o1' });
         await states.postEvent(
             's1', 'c', 'deleted', 'm1',
             '2026-01-01T00:00:00.000000Z',
         );
-        const slice = await store.getAllWhere('org', 'o1');
+        const slice = await store.getAllWhere('organization','o1');
         const all = await store.getAll();
         assert.deepEqual(
-            slice, all.filter(r => r.org === 'o1'),
+            slice, all.filter(r => r.organization === 'o1'),
         );
         assert.deepEqual(slice.map(r => r.id), ['a']);
     },
@@ -56,9 +56,9 @@ test(
     'getAllWhere is empty for an unmatched key',
     async () => {
         const { store } = await ownedStore();
-        await store.put('a', { org: 'o1' });
+        await store.put('a', { organization: 'o1' });
         assert.deepEqual(
-            await store.getAllWhere('org', 'zzz'), [],
+            await store.getAllWhere('organization','zzz'), [],
         );
     },
 );

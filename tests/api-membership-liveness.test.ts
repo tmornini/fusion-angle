@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { devToken, orgToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
@@ -24,14 +24,14 @@ test('a live member passes the membership fence',
 async () => {
     const db = await adminDb();
     const res = await handleRequest(
-        db, req('/members', await orgToken()));
+        db, req('/members', await organizationToken()));
     assert.equal(res.status, 200);
 });
 
 test('a revoked membership stops access mid-token',
 async () => {
     const db = await adminDb();
-    const token = await orgToken();   // org '1' claim
+    const token = await organizationToken();   // org '1' claim
     const before = await handleRequest(
         db, req('/members', token));
     assert.equal(before.status, 200);

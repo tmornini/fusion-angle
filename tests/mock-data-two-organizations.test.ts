@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
-    currentRolesForInOrg,
+    currentRolesForInOrganization,
 } from '../api/authorization.ts';
 import { verifyPassword } from '../shared/password-hash.ts';
 
-const ORG_ONE = '1';
-const ORG_TWO = '2';
+const ORGANIZATION_ONE = '1';
+const ORGANIZATION_TWO = '2';
 
 async function seed() {
     const db = new MemoryDbAdapter();
@@ -20,30 +20,30 @@ async function seed() {
 test('current is a member of exactly orgs 1 and 2',
 async () => {
     const { db } = await seed();
-    const orgs = (await db.memberships.getAll())
+    const organizations = (await db.memberships.getAll())
         .filter(m => m.identity_id === 'current')
         .map(m => m.organization_id)
         .sort();
-    assert.deepEqual(orgs, ['1', '2']);
+    assert.deepEqual(organizations, ['1', '2']);
 });
 
 test('current holds admin in both orgs', async () => {
     const { db } = await seed();
     const grants = await db.roleGrants.getAll();
     assert.ok(
-        currentRolesForInOrg(grants, 'current', ORG_ONE)
+        currentRolesForInOrganization(grants, 'current', ORGANIZATION_ONE)
             .includes('admin'));
     assert.ok(
-        currentRolesForInOrg(grants, 'current', ORG_TWO)
+        currentRolesForInOrganization(grants, 'current', ORGANIZATION_TWO)
             .includes('admin'));
 });
 
 test('both organizations exist with distinct names',
 async () => {
     const { db } = await seed();
-    const orgs = await db.organizations.getAll();
-    const one = orgs.find(o => o.id === ORG_ONE);
-    const two = orgs.find(o => o.id === ORG_TWO);
+    const organizations = await db.organizations.getAll();
+    const one = organizations.find(o => o.id === ORGANIZATION_ONE);
+    const two = organizations.find(o => o.id === ORGANIZATION_TWO);
     assert.ok(one, 'org 1 exists');
     assert.ok(two, 'org 2 exists');
     assert.notEqual(one.name, two.name);
@@ -59,13 +59,13 @@ test('each org owns at least one of every org-scoped'
         records: await db.records.getAll(),
         objectives: await db.objectives.getAll(),
     };
-    for (const org of [ORG_ONE, ORG_TWO]) {
+    for (const organization of [ORGANIZATION_ONE, ORGANIZATION_TWO]) {
         for (const [name, rows] of Object.entries(tables)) {
             const owned = rows.filter(
-                r => r.organization_id === org);
+                r => r.organization_id === organization);
             assert.ok(
                 owned.length >= 1,
-                `org ${org} owns no ${name}`);
+                `org ${organization} owns no ${name}`);
         }
     }
 });
@@ -75,20 +75,20 @@ test('every work order belongs to org 1', async () => {
     const wos = await db.workOrders.getAll();
     assert.ok(wos.length > 0, 'work orders exist');
     for (const wo of wos) {
-        assert.equal(wo.organization_id, ORG_ONE);
+        assert.equal(wo.organization_id, ORGANIZATION_ONE);
     }
 });
 
 test('every record attribute matches its parent record org',
 async () => {
     const { db } = await seed();
-    const recordOrg = new Map(
+    const recordOrganization = new Map(
         (await db.records.getAll())
             .map(r => [r.id, r.organization_id]));
     for (const attr of await db.recordAttributes.getAll()) {
         assert.equal(
             attr.organization_id,
-            recordOrg.get(attr.record_id),
+            recordOrganization.get(attr.record_id),
             `attribute ${attr.id} org mismatch`);
     }
 });
@@ -108,9 +108,9 @@ async () => {
         .map(i => i.id);
     for (const id of persons) {
         if (id === 'current') continue;
-        const orgs = byIdentity.get(id) ?? new Set();
+        const organizations = byIdentity.get(id) ?? new Set();
         assert.ok(
-            orgs.size <= 1,
+            organizations.size <= 1,
             `non-admin ${id} spans multiple orgs`);
     }
 });
@@ -118,18 +118,18 @@ async () => {
 test('every flow_records row joins same-org flow and'
     + ' record', async () => {
     const { db } = await seed();
-    const flowOrg = new Map(
+    const flowOrganization = new Map(
         (await db.flows.getAll())
             .map(f => [f.id, f.organization_id]));
-    const recordOrg = new Map(
+    const recordOrganization = new Map(
         (await db.records.getAll())
             .map(r => [r.id, r.organization_id]));
     const bindings = await db.flowRecords.getAll();
     assert.ok(bindings.length > 0, 'bindings exist');
     for (const b of bindings) {
         assert.equal(
-            flowOrg.get(b.flow_id),
-            recordOrg.get(b.record_id),
+            flowOrganization.get(b.flow_id),
+            recordOrganization.get(b.record_id),
             `binding ${b.id} crosses orgs`);
     }
 });
@@ -137,25 +137,25 @@ test('every flow_records row joins same-org flow and'
 test('every idea submission names a submitter in its'
     + " idea's org", async () => {
     const { db } = await seed();
-    const ideaOrg = new Map(
+    const ideaOrganization = new Map(
         (await db.ideas.getAll())
             .map(i => [i.id, i.organization_id]));
-    const memberOrgs = new Map<string, Set<string>>();
+    const memberOrganizations = new Map<string, Set<string>>();
     for (const m of await db.memberships.getAll()) {
-        const set = memberOrgs.get(m.identity_id)
+        const set = memberOrganizations.get(m.identity_id)
             ?? new Set<string>();
         set.add(m.organization_id);
-        memberOrgs.set(m.identity_id, set);
+        memberOrganizations.set(m.identity_id, set);
     }
     const violations: string[] = [];
     for (const s of await db.ideaSubmissions.getAll()) {
-        const org = ideaOrg.get(s.idea_id);
-        const orgs = memberOrgs.get(s.member_id)
+        const organization = ideaOrganization.get(s.idea_id);
+        const organizations = memberOrganizations.get(s.member_id)
             ?? new Set<string>();
-        if (org === undefined || !orgs.has(org)) {
+        if (organization === undefined || !organizations.has(organization)) {
             violations.push(
                 s.id + ': ' + s.member_id
-                + ' not in idea org ' + org);
+                + ' not in idea org ' + organization);
         }
     }
     assert.deepEqual(
@@ -166,15 +166,15 @@ test('every idea submission names a submitter in its'
 test('every project score names an author in its'
     + " project's org", async () => {
     const { db } = await seed();
-    const projectOrg = new Map(
+    const projectOrganization = new Map(
         (await db.projects.getAll())
             .map(p => [p.id, p.organization_id]));
-    const memberOrgs = new Map<string, Set<string>>();
+    const memberOrganizations = new Map<string, Set<string>>();
     for (const m of await db.memberships.getAll()) {
-        const set = memberOrgs.get(m.identity_id)
+        const set = memberOrganizations.get(m.identity_id)
             ?? new Set<string>();
         set.add(m.organization_id);
-        memberOrgs.set(m.identity_id, set);
+        memberOrganizations.set(m.identity_id, set);
     }
     const scores = [
         ...await db.projectObjectiveBaselineScores.getAll(),
@@ -183,13 +183,13 @@ test('every project score names an author in its'
     assert.ok(scores.length > 0, 'scores exist');
     const violations: string[] = [];
     for (const s of scores) {
-        const org = projectOrg.get(s.project_id);
-        const orgs = memberOrgs.get(s.member_id)
+        const organization = projectOrganization.get(s.project_id);
+        const organizations = memberOrganizations.get(s.member_id)
             ?? new Set<string>();
-        if (org === undefined || !orgs.has(org)) {
+        if (organization === undefined || !organizations.has(organization)) {
             violations.push(
                 s.id + ': ' + s.member_id
-                + ' not in project org ' + org);
+                + ' not in project org ' + organization);
         }
     }
     assert.deepEqual(
