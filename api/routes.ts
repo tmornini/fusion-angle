@@ -2485,7 +2485,13 @@ export const routes: Route[] = [
     // Flow versions nest under their parent flow: the flow id is
     // param 0, so the SERVER filters the collection to that flow
     // (the org fence still rides the facade re-entry). The leaf
-    // id is param 1.
+    // id is param 1. Reads stay TABLE-BACKED BY DESIGN, not
+    // deferral: flow_versions is a mutable working set with
+    // sanctioned physical deletes (version-cap trims store no
+    // tombstone pairs), so the append-only ledger cannot serve
+    // it. It stays until the undo-as-replay election — whose
+    // trigger is the Phase 4 retrospective, an author decision,
+    // never this code's.
     route('flows/:id/versions', {
         get: (db, p) =>
             db.flowVersions.getAllWhere('flow_id', param(p, 0)),
@@ -2676,7 +2682,10 @@ export const routes: Route[] = [
     // Flow work-order joins nest under their parent flow: the
     // flow id is param 0, so the SERVER filters the collection to
     // that flow. The leaf id is param 1; only PUT is exposed (the
-    // flat route never carried GET/DELETE on the leaf).
+    // flat route never carried GET/DELETE on the leaf). Reads
+    // stay old-plane until the WORK-ORDERS phase; their GET
+    // flows/:id dependency already rides the Phase 4 flip
+    // transitively.
     route('flows/:id/work-orders', {
         get: (db, p) =>
             db.flowWorkOrders.getAllWhere('flow_id', param(p, 0)),
@@ -2864,7 +2873,8 @@ export const routes: Route[] = [
     }),
     // Flow↔record bindings nest under their parent flow: the flow
     // id is param 0, so the SERVER filters the collection to that
-    // flow. The leaf id is param 1.
+    // flow. The leaf id is param 1. Reads stay old-plane until the
+    // RECORDS phase.
     route('flows/:id/records', {
         get: (db, p) =>
             db.flowRecords.getAllWhere('flow_id', param(p, 0)),

@@ -8,10 +8,12 @@
 // its OWN entries from those literals, never both at once — a
 // registered family answers ONLY from here.
 //
-// PROVISIONAL until the third family registers: the slot count
-// and names above may still change. Two instances are
-// coincidence; three is pattern — do not add slots, families,
-// or helpers ahead of that third entry.
+// The standing rule: this registry is the single source of
+// family wiring. Slots grow only on per-family evidence — two
+// instances are coincidence, three is pattern — never ahead of
+// it. Aspirational families (policy, transform, ownership,
+// among others) wait for their own demand before a slot, a
+// registration, or a helper is added on their behalf.
 
 export type ConcurrencyClass = 'simple' | 'locked';
 

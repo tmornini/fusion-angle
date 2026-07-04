@@ -7,6 +7,7 @@ import type {
     GraphNode,
     NodeAttribute,
     RecordAttributeId,
+    StoredGraph,
 } from '../../api/types.ts';
 import {
     DEFAULT_NEW_STATE_NAME,
@@ -667,43 +668,50 @@ function applyServerGraph(
 const MAX_UNDO_ATTEMPTS = 3;
 
 // Drive POST /flows/:id/undo with its own jittered 412-absorb
-// (Task 5): the undo op's synthesized document pair takes the
-// LOCKED family's follows slot, so a save racing this undo for
-// the SAME head 412s the whole transaction (the responses.follows
-// unique index — message-pair.ts). Each attempt re-fetches a
-// FRESH getFlowGraph baseline before recomputing graphDelta/
-// revivals — retrying against the ORIGINAL (now-stale) baseline
-// would under-revive any node a concurrent save deleted in
-// between (the same hazard class Task 4 closed for redo's
+// (Task 5, corrected): the undo op's synthesized document pair
+// takes the LOCKED family's follows slot, so a save racing this
+// undo for the SAME head 412s the whole transaction (the
+// responses.follows unique index — message-pair.ts). Attempt 1
+// computes graphDelta/revivals from the CALLER's in-memory
+// liveGraph — the designer's live working snapshot IS the
+// baseline on the happy path, exactly as the pre-Task-5 code
+// did, so the happy path never fetches getFlowGraph at all (it
+// stays at getFlowVersions + POST + a TRAILING getFlowGraph +
+// getFlowVersions — 4 hops, performUndo below). Only a 412 retry
+// (attempt 2+) re-fetches a FRESH getFlowGraph baseline before
+// recomputing — retrying against the ORIGINAL (now-stale)
+// baseline would under-revive any node a concurrent save deleted
+// in between (the same hazard class Task 4 closed for redo's
 // revivals; re-reading getFlowVersions alone would not catch
 // it — the TARGET version stays fixed across attempts, only the
-// CURRENT baseline is re-read). Not exported: performUndo is the
-// only caller.
+// CURRENT baseline is re-read on retry). Not exported: performUndo
+// is the only caller.
 async function postFlowUndo(
     ctx: RequestContext,
     flowId: string,
     version: FlowVersion,
+    liveGraph: StoredGraph,
 ): Promise<void> {
     const target = {
         nodes: version.nodes,
         edges: version.edges,
     };
+    let baseline: StoredGraph = liveGraph;
     for (
         let attempt = 1;
         attempt <= MAX_UNDO_ATTEMPTS;
         attempt++
     ) {
-        const baseline = await getFlowGraph(ctx, flowId);
         const now = nowUtc();
         const graphDelta = buildSaveEvents(
-            { nodes: baseline.nodes, edges: baseline.edges },
+            baseline,
             target,
             flowId,
             generateCryptoSafeBase62,
             now,
         );
         const revivals = buildRevivals(
-            { nodes: baseline.nodes, edges: baseline.edges },
+            baseline,
             target,
             now,
         );
@@ -733,6 +741,7 @@ async function postFlowUndo(
                 && attempt < MAX_UNDO_ATTEMPTS
             ) {
                 await jitteredBackoff(attempt);
+                baseline = await getFlowGraph(ctx, flowId);
                 continue;
             }
             throw err;
@@ -778,9 +787,14 @@ export async function performUndo(
     // Restore + consume as ONE atomic transaction through the
     // named POST /flows/:id/undo — the flow can never land
     // reverted while the version row survives unconsumed. The
-    // 3-attempt jittered 412-absorb lives in postFlowUndo, above.
+    // 3-attempt jittered 412-absorb lives in postFlowUndo, above;
+    // its attempt-1 baseline is THIS snap — the designer's live
+    // working state — never a fetch.
     try {
-        await postFlowUndo(ctx, snap.flowId, version);
+        await postFlowUndo(
+            ctx, snap.flowId, version,
+            { nodes: snap.nodes, edges: snap.edges },
+        );
     } catch (err) {
         log.error(
             'performUndo failed',

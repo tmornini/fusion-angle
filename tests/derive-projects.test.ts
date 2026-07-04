@@ -125,6 +125,31 @@ test(
         const history = await deriveProjectStateHistory(
             db, STARK_ORGANIZATION, 'project-drv-skew',
         );
-        assert.equal(history.length, 2);
+        // Order- AND content-sensitive: (state_at, id)
+        // ascending — the SAME order store-state.ts's
+        // getAllForIn returns. The later-ARRIVED but earlier-
+        // STAMPED 'deleted' event sorts FIRST; genesis SECOND.
+        assert.deepEqual(
+            history.map((entry) => ({
+                id: entry.id,
+                entity_id: entry.entity_id,
+                state: entry.state,
+                at: entry.at,
+            })),
+            [
+                {
+                    id: 'ev-drv-skew-later',
+                    entity_id: 'project-drv-skew',
+                    state: 'deleted',
+                    at: '2020-01-01T00:00:00.000000Z',
+                },
+                {
+                    id: 'ev-drv-skew-genesis',
+                    entity_id: 'project-drv-skew',
+                    state: 'submitted',
+                    at: '2026-06-01T00:00:00.000000Z',
+                },
+            ],
+        );
     },
 );

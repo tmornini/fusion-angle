@@ -567,30 +567,48 @@ a lost save — the structural path's already-shipped behavior.
   converges at the gate's pre-tx fast path: one row, one event,
   one pair) — a same-id, genuinely different-content collision
   still 409s via `LedgerImmutabilityError`, today's covenant.
-- **Response-ID on GET.** `GET /flows/:id` now carries a
+- **Response-ID on GET.** `GET /flows/:id` carries a
   `Response-ID` header — the current head pair id, the exact
   value a save's `If-Response-ID` echoes back — attached
   generically by the gate for any locked-family document GET
-  (never a `flows` literal), still served by the SAME
-  hand-written old-plane reassembly handler.
-- **INTERIM acceptance.** Between this task and a future
-  derivation task, undo leaves the shadow head stale (its pair is
-  operation-addressed, never touching `flows/:id`'s own head —
-  §2.6), so a pre-undo echo is still accepted on the next save —
-  today's lost-update baseline exactly, named here so the window
-  is a decision, not a surprise. Redo (Phase 4 Task 4, R1/E5) no
-  longer shares this gap: its document half rides THIS route, so
-  it moves the head like any other save.
+  (never a `flows` literal), served by the generic
+  `documentGetHandler` (§5.5) like every other document GET.
+- **Undo advances the shadow head.** Undo forms its own
+  document pair (PUT-shaped, at `flows/:id`'s own address) in
+  the SAME transaction as its own operation pair, taking the
+  locked family's FOLLOWS slot against the pre-undo head —
+  never Supersedes, since the op holds no echo of its own.
+  Undo therefore moves `flows/:id`'s own head exactly like any
+  other save. A save racing an undo for the same head loses the
+  `responses.follows` unique index and 412s; the client absorbs
+  it with a jittered retry (`postFlowUndo`, web-app), rebuilt
+  against a fresh baseline — the SAME shape redo (Phase 4 Task
+  4, R1/E5) carries, since its document half rides
+  `PUT /flows/:id` (§3.13) directly.
 
 ### 3.14 `POST /flows/:id/undo` — undo a flow edit
 
-- tx: `[flows, flow_versions, states, requests, responses]`
+- tx: `[flows, flow_versions, states, flow_nodes, flow_edges,
+  flow_node_members, flow_node_attributes, requests,
+  responses]`
 - actual: `flows.put(id, flow)` (reverted graph) →
   `states.postEvent(eventId, id, 'updated', actor)` →
-  `flowVersions.delete(consumedVersionId)` →
-  `appendMessagePair(pair)`.
-- doctrinal: `put_flow` + `post_state_event` + `delete_flow_version`
-  as `post_undo_flow`.
+  `flowVersions.delete(consumedVersionId)` → the graph delta's
+  node/edge upserts, member/attribute events, and deletion
+  events (`writeFlowGraphDelta`, the SAME helper
+  `PUT /flows/:id` and create use) → for each revival:
+  `states.postEvent(eventId, entityId, 'restored', actor, at)`
+  → `appendMessagePair(pair)` → `appendMessagePair(documentPair)`.
+- doctrinal: `put_flow` + `post_state_event` +
+  `delete_flow_version` + graph-relation writes + N
+  `post_restored_event` as `post_undo_flow`.
+- **Two pairs, one tx.** Undo synthesizes a second pair — a
+  PUT-shaped document pair at `flows/:id`'s own address
+  (`put_flow_document`, §3.13), taking the FOLLOWS slot at the
+  pre-undo head — beside its own operation pair; both append in
+  the ONE transaction, so a pair count of two or zero, never
+  one (+2 to the message-pair balance per undo). See §3.13's
+  own note on the follows collision this creates.
 - props: atomic; member-tier; `validateFlowUndoBody`.
 
 ### 3.15 `POST /flows/:id/redo` — retired (Phase 4 Task 4, R1/E5)
@@ -1136,19 +1154,26 @@ synthetic registration in Task 2 (`tests/document-family.
 test.ts`); Task 3 registers `flows`' own `DocumentFamilyWiring`
 row and moves `PUT /flows/:id` onto it (`documentPutHandler`) —
 the first LIVE route riding the arm (§3.13). `flows/:id`'s `GET`
-stays the hand-written old-plane reassembly (only its response
-gains the `Response-ID` header); a future derivation task moves
-it onto the generic `documentGetHandler`.
+rides the SAME generic `documentGetHandler` (§5.5, Task 8) —
+its response additionally carries the `Response-ID` header
+(§3.13).
 
-### 5.5 ideas/projects: generic components, wire-identical
+### 5.5 ideas/projects/flows: generic components
 
-`ideas/:id`, `ideas` (collection), `projects/:id`, and
-`projects` (collection) — plus their `WRITE_RESPONSE_SPECS`
-entries — now dispatch through `api/document-family.ts`'s
-generic `documentEntityRoute`/`documentCollectionRoute`/
-`documentWriteResponseSpec`, driven by a per-family
-`DocumentFamilyWiring` (a validator, a decompose op, and an
-entity mapper) rather than four hand-written route objects. The
-wire is byte-identical to the routes it replaces — the untouched
-existing suite plus `tests/document-family.test.ts`'s successBody
-and dispatch pins are the absorption's proof.
+`ideas/:id`, `ideas` (collection), `projects/:id`, `projects`
+(collection), `flows/:id`, and `flows` (collection) — plus
+their `WRITE_RESPONSE_SPECS` entries — dispatch through
+`api/document-family.ts`'s generic `documentEntityRoute`/
+`documentCollectionRoute`/`documentWriteResponseSpec`, driven
+by a per-family `DocumentFamilyWiring` (a validator, a
+decompose op, and an entity mapper) rather than hand-written
+route objects. For `ideas`/`projects` (`simple` concurrency,
+§5.4) the wire is byte-identical to the routes it replaces.
+`flows` rides the SAME generic dispatch as `locked` concurrency
+(§5.4) — its document PUT alone carries the `If-Response-ID`/
+`Follows` four-outcome machinery the other two families never
+need; `flows` also keeps its own hand-written `POST /flows`
+(create, §3.12) and `POST /flows/:id/undo` (§3.14) outside this
+generic dispatch. The untouched existing suite plus
+`tests/document-family.test.ts`'s successBody and dispatch pins
+are the absorption's proof.
