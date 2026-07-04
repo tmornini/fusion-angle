@@ -29,7 +29,11 @@ function buildIdea(
         proposed_solution: '',
         expected_outcome: '',
         success_metrics: '',
-    }, state);
+    }, {
+        state,
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-' + id,
+    });
 }
 
 function buildProject(
@@ -46,7 +50,11 @@ function buildProject(
         estimated_cost: 0,
         actual_cost: 0,
         position: 1,
-    }, 'approved');
+    }, {
+        state: 'approved',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-' + id,
+    });
 }
 
 function buildHumanMember(

@@ -9,6 +9,7 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -16,13 +17,14 @@ import {
     getFlowsForCreation,
 } from '../web-app/app/adapters/flow-publish.ts';
 import {
+    postFlowCreation,
+    putFlow,
+} from '../web-app/app/adapters/flow-mutations.ts';
+import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
-    nowUtc,
 } from '../api/types.ts';
-import {
-    buildFlowGraphRelations,
-} from '../api/mock-data/flows.ts';
+import { asStoredGraph } from '../api/validators.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -87,33 +89,36 @@ function buildFlowEntity(
     };
 }
 
-// Seed a flow the way the write path does: the flow row (scalar
-// fields only — no graph blob) PLUS the four relation rows its
-// graph decomposes into. The LIST GET reassembles the graph
-// from those relations (the read source of record), so a
-// relation-less seed would read as an empty graph.
+// Seed a flow through the SAME gate-driven create/document-PUT
+// idiom the live route uses (postFlowCreation + putFlow), so a
+// message pair exists at this flow's address — required for the
+// flipped GET flows route (Phase 4 Task 8), which
+// getFlowsForCreation reads, to derive it. postFlowCreation
+// seeds a default start/complete graph; the immediate putFlow
+// overwrites it with the caller's own graph and is_locked flag —
+// the two-step idiom every gate-driven flow fixture uses.
 async function seedFlowWithRelations(
-    db: MemoryDbAdapter,
+    ctx: RequestContext,
     flow: FlowWithGraph,
 ): Promise<void> {
-    const { id, graph: _graph, ...body } = flow;
-    await db.flows.put(id, body);
-    const at = nowUtc();
-    const rel = buildFlowGraphRelations(
-        [{ id, graph: flow.graph }], at,
+    const graph = asStoredGraph(
+        JSON.parse(flow.graph), 'flow.graph',
     );
-    for (const node of rel.nodes) {
-        await db.flowNodes.put(node.id, node);
-    }
-    for (const edge of rel.edges) {
-        await db.flowEdges.put(edge.id, edge);
-    }
-    for (const member of rel.members) {
-        await db.flowNodeMembers.put(member.id, member);
-    }
-    for (const attr of rel.attributes) {
-        await db.flowNodeAttributes.put(attr.id, attr);
-    }
+    await postFlowCreation(ctx, {
+        flowId: flow.id,
+        linkId: flow.id + '-link',
+        projectId: 'p-' + flow.id,
+        name: flow.name,
+    });
+    await putFlow(ctx, flow.id, {
+        name: flow.name,
+        isLocked: flow.is_locked,
+        isAutoLayout: flow.is_auto_layout,
+        isAutoFit: flow.is_auto_fit,
+        lockTimeout: flow.lock_timeout,
+        nodes: graph.nodes,
+        edges: graph.edges,
+    });
 }
 
 // Node/edge ids are globally-unique canvas ids (the flow_nodes
@@ -253,6 +258,7 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
+        const ctx = createRequestContext(db, await devToken());
         const goodGraph = readyGraph('good-');
         const badGraph: StoredGraph = {
             nodes: [
@@ -270,12 +276,11 @@ test(
             ],
         };
         await seedFlowWithRelations(
-            db, buildFlowEntity('good', goodGraph),
+            ctx, buildFlowEntity('good', goodGraph),
         );
         await seedFlowWithRelations(
-            db, buildFlowEntity('bad', badGraph),
+            ctx, buildFlowEntity('bad', badGraph),
         );
-        const ctx = createRequestContext(db, await devToken());
         const result = await getFlowsForCreation(
             ctx,
         );
@@ -297,20 +302,20 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
+        const ctx = createRequestContext(db, await devToken());
         await seedFlowWithRelations(
-            db,
+            ctx,
             buildFlowEntity(
                 'locked-ready', readyGraph('locked-'),
                 { is_locked: true },
             ),
         );
         await seedFlowWithRelations(
-            db,
+            ctx,
             buildFlowEntity(
                 'open-ready', readyGraph('open-'),
             ),
         );
-        const ctx = createRequestContext(db, await devToken());
         const result = await getFlowsForCreation(
             ctx,
         );

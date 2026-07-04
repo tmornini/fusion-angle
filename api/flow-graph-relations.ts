@@ -11,7 +11,14 @@ import type {
     StoredGraph,
     MemberId,
     NodeAttribute,
+    JsonObjectField,
 } from './types.ts';
+import { storedGraphField } from './types.ts';
+import {
+    type FlowGraphDelta,
+    validateStoredGraphJson,
+} from './validators.ts';
+import { byIdAscending } from './derive-documents.ts';
 
 // On an equal-`at` tie a 'removed' outranks an 'added'
 // regardless of row order — the union's dissolution wins on
@@ -118,4 +125,55 @@ export function reassembleStoredGraph(
         toNodeId: edge.to_node_id,
     }));
     return { nodes, edges };
+}
+
+// Reduce a CREATE-shaped FlowGraphDelta into a StoredGraph — the
+// pure counterpart of reassembleStoredGraph for a delta that has
+// never touched storage: a create delta's `deletions` is always
+// empty, so every node/edge row is an upsert and every member/
+// attribute event is current by construction — the SAME row
+// shapes reassembleStoredGraph already reduces (FlowNodeRowBody/
+// FlowEdgeRowBody/FlowNodeMemberRowBody/FlowNodeAttributeRowBody
+// mirror the entity rows field-for-field). Exported so the live
+// POST /flows handler and the seed's pass-1 pair body-builder
+// share ONE reduction for the synthesized document's graph field
+// — never two hand-rolled constructions of the same value.
+export function reduceCreateGraphDelta(
+    delta: FlowGraphDelta,
+): StoredGraph {
+    return reassembleStoredGraph(
+        delta.nodes, delta.edges,
+        delta.memberEvents, delta.attributeEvents,
+    );
+}
+
+// The message-plane flows derivation's ONE flows-novel
+// reduction (Task 7, design decision 1): a document PUT's
+// `graph` field is the client-authored working snapshot,
+// carried verbatim by postFlowDocumentOp — its nodes[]/edges[]
+// arrive in whatever order the client happened to serialize.
+// The OLD plane's own GET reassembles nodes[]/edges[] from
+// flow_nodes/flow_edges via getAllWhere, which returns rows in
+// PRIMARY-KEY (id) order on IndexedDB — so the two orders
+// already coincide there (H7: invisible on IndexedDB) — but in
+// ARRIVAL order on the memory/localStorage tiers, where they
+// can diverge (load-bearing there). Re-sorting nodes[]/edges[]
+// ascending-id here makes the derived side match the OLD
+// plane's IndexedDB behavior byte-exactly regardless of which
+// backend actually ran the comparison. Within-node
+// memberIds[]/attributes[] pass through UNSORTED — a cosmetic
+// order change design decision 1 accepts: currentNodeMemberIds/
+// currentNodeAttributes above already return them in THEIR OWN
+// reduction order (a Map's insertion order), which neither
+// plane could re-derive from the other's array order alone.
+export function normalizedStoredGraphField(
+    graph: JsonObjectField,
+): JsonObjectField {
+    const parsed = validateStoredGraphJson(
+        graph, 'normalizedStoredGraphField.graph',
+    );
+    return storedGraphField({
+        nodes: [...parsed.nodes].sort(byIdAscending),
+        edges: [...parsed.edges].sort(byIdAscending),
+    });
 }

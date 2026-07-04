@@ -28,7 +28,10 @@ import {
     handleDialogClick,
 } from '../app/core.ts';
 import {
+    Project,
     getProject,
+    getProjectEntity,
+    getProjectStateDetail,
     ProjectView,
     putProjectFields,
     postProjectStateChange,
@@ -55,6 +58,8 @@ import {
 } from '../app/adapters/index.ts';
 import type {
     FlowListItem,
+    ProjectEntity,
+    ProjectStateDetail,
 } from '../app/adapters/index.ts';
 import {
     getMemberMap,
@@ -79,11 +84,15 @@ type PageState =
     | {
         kind: 'reading';
         view: ProjectView;
+        entity: ProjectEntity;
+        detail: ProjectStateDetail;
         flows: FlowListItem[];
     }
     | {
         kind: 'editing';
         view: ProjectView;
+        entity: ProjectEntity;
+        detail: ProjectStateDetail;
         flows: FlowListItem[];
         draft: ProjectDraftFields;
     };
@@ -110,28 +119,40 @@ const SUBMIT_ON_ENTER_IDS:
 
 const isFieldKey = makeFieldKeyValidator(FIELDS);
 
+// DATA-CORRUPTION TRAP: ProjectView's own accessors
+// (progressPercent, costActualK) are display-transformed and
+// have no position accessor at all — composing a wire body
+// from the view would corrupt progress/actual_cost and fail
+// to compile on position. So the loader retains the RAW
+// entity + state detail beside the view (the same two GETs
+// getProject fires today — zero added hops), the
+// web-app/ideas/detail.ts state.view.entity precedent.
 async function loadProjectView(
     projectId: string,
     ctx: RequestContext,
 ): Promise<{
     view: ProjectView;
+    entity: ProjectEntity;
+    detail: ProjectStateDetail;
 }> {
     const [
-        project,
+        entity,
+        detail,
         objectives,
         scoring,
     ] = await Promise.all([
-        getProject(ctx, projectId),
+        getProjectEntity(ctx, projectId),
+        getProjectStateDetail(ctx, projectId),
         getObjectives(ctx),
         getProjectScoring(ctx, projectId),
     ]);
     const view = new ProjectView(
-        project,
+        new Project(entity, detail),
         objectives,
         scoring.baseline,
         scoring.actual,
     );
-    return { view };
+    return { view, entity, detail };
 }
 
 function buildPresenter():
@@ -191,6 +212,8 @@ export async function init(
 
     let project: {
         view: ProjectView;
+        entity: ProjectEntity;
+        detail: ProjectStateDetail;
     };
     let flows: FlowListItem[];
     try {
@@ -225,6 +248,8 @@ export async function init(
     state = {
         kind: 'reading',
         view: project.view,
+        entity: project.entity,
+        detail: project.detail,
         flows,
     };
     buildPresenter().renderShell(container);
@@ -242,6 +267,8 @@ export async function init(
         state = {
             kind: 'reading',
             view: upd.view,
+            entity: upd.entity,
+            detail: upd.detail,
             flows: updFlows,
         };
         rerender();
@@ -259,6 +286,8 @@ export async function init(
         state = {
             kind: 'reading',
             view: upd.view,
+            entity: upd.entity,
+            detail: upd.detail,
             flows: updFlows,
         };
         rerender();
@@ -275,6 +304,8 @@ export async function init(
         state = {
             kind: 'reading',
             view: upd.view,
+            entity: upd.entity,
+            detail: upd.detail,
             flows: updFlows,
         };
         rerender();
@@ -527,6 +558,8 @@ function handleProjectActions(
             state = {
                 kind: 'editing',
                 view: state.view,
+                entity: state.entity,
+                detail: state.detail,
                 flows: state.flows,
                 draft: projectDraftFromView(
                     state.view,
@@ -541,6 +574,8 @@ function handleProjectActions(
             state = {
                 kind: 'reading',
                 view: state.view,
+                entity: state.entity,
+                detail: state.detail,
                 flows: state.flows,
             };
             rerender();
@@ -608,6 +643,8 @@ function onDocumentKeydown(
     state = {
         kind: 'reading',
         view: state.view,
+        entity: state.entity,
+        detail: state.detail,
         flows: state.flows,
     };
     rerender();
@@ -618,6 +655,8 @@ async function handleSave(): Promise<void> {
         return;
     }
     const projectId = state.view.idForLink();
+    const entity = state.entity;
+    const detail = state.detail;
     const ctx = sessionContext();
     try {
         // Inside the try: a draft with an empty/invalid
@@ -630,11 +669,33 @@ async function handleSave(): Promise<void> {
         const stateChanged =
             patch.state !== state.view.stateValue();
         await putProjectFields(
-            ctx, projectId, fields,
+            ctx, projectId, fields, detail,
         );
         if (stateChanged) {
+            // DATA-CORRUPTION TRAP: the eight fields come
+            // from the RETAINED RAW entity (progress,
+            // actual_cost, position never touched by this
+            // form) plus the patch's five edited fields —
+            // never from ProjectView's display-transformed
+            // accessors.
+            const {
+                id: _id,
+                organization_id: _org,
+                ...entityFields
+            } = entity;
             await postProjectStateChange(
-                ctx, projectId, patch.state,
+                ctx, projectId,
+                {
+                    ...entityFields,
+                    title: fields.title,
+                    description: fields.description,
+                    start_date: fields.startDate,
+                    target_end_date:
+                        fields.targetEndDate,
+                    estimated_cost:
+                        fields.estimatedCost,
+                },
+                patch.state,
             );
         }
     } catch (err) {

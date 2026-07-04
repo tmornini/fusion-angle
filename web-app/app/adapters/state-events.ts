@@ -1,6 +1,7 @@
 import type {
-    Id, IdeaEntity, IdeaState, ProjectEntity,
-    ProjectState, RecordEntity, RecordState,
+    Id, IdeaEntity, IdeaState, IdeaStateDetail,
+    ProjectEntity, ProjectState, ProjectStateDetail,
+    RecordEntity, RecordState,
     StateEntity, MemberEntity, MemberState,
 } from '../../../api/types.ts';
 import {
@@ -268,31 +269,6 @@ export async function getTransitionEventsByWorkOrder(
     return out;
 }
 
-// Read the current state for one idea from the
-// states log. Returns the validated IdeaState (the
-// composite alphabet). Throws when no event has
-// been recorded — every idea created through the
-// supported paths gets an initial 'active:*' event,
-// so absence is a bug, not a missing default.
-export async function getIdeaState(
-    ctx: RequestContext,
-    ideaId: Id,
-): Promise<IdeaState> {
-    const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${ideaId}/history`,
-    );
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(ideaId);
-    if (latest === undefined) {
-        throw new Error(
-            'no state event for idea ' + ideaId,
-        );
-    }
-    return assertIdeaState(
-        latest.state, 'idea ' + ideaId,
-    );
-}
-
 // Bulk variant for getIdeas, which calls this — so it
 // reads the ideas table directly to avoid recursing.
 export async function getIdeaStates(
@@ -304,6 +280,62 @@ export async function getIdeaStates(
     ]);
     const ids = new Set<Id>(rows.map(r => r.id));
     return latestStatesForIds<IdeaState>(events, ids);
+}
+
+// Single-idea state read, widened to carry the STORED head
+// event's `at`/`id` alongside the state — the trio Decision 7
+// folds into the idea document (state_at, state_event_id).
+// Consumed by getIdea (adapters/ideas.ts) to build the Idea
+// domain object.
+export async function getIdeaStateDetail(
+    ctx: RequestContext,
+    ideaId: Id,
+): Promise<IdeaStateDetail> {
+    const events = await ctx.GET<StateEntity[]>(
+        `entity-states/${ideaId}/history`,
+    );
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(ideaId);
+    if (latest === undefined) {
+        throw new Error(
+            'no state event for idea ' + ideaId,
+        );
+    }
+    return {
+        state: assertIdeaState(
+            latest.state, 'idea ' + ideaId,
+        ),
+        stateAt: latest.at,
+        stateEventId: latest.id,
+    };
+}
+
+// Bulk sibling of getIdeaStates, widened the same way.
+// Consumed by getIdeas (adapters/ideas.ts) so the ideas LIST
+// page can echo each row's trio on a plain field edit
+// (drag-reorder) without minting a fresh event. dashboard.ts
+// keeps reading the bare getIdeaStates above — unwidened, per
+// its own bare-state need and per tests/adapters-state-
+// events.test.ts, which pins getIdeaStates' return shape.
+export async function getIdeaStateDetails(
+    ctx: RequestContext,
+): Promise<Map<Id, IdeaStateDetail>> {
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<IdeaEntity[]>('ideas'),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    const inScope = events.filter(ev => ids.has(ev.entity_id));
+    const latest = latestByKey(inScope, ev => ev.entity_id);
+    const out = new Map<Id, IdeaStateDetail>();
+    for (const [id, ev] of latest) {
+        out.set(id, {
+            state: assertIdeaState(ev.state, 'idea ' + id),
+            stateAt: ev.at,
+            stateEventId: ev.id,
+        });
+    }
+    return out;
 }
 
 // Read the current state for one project from the
@@ -343,6 +375,63 @@ export async function getProjectStates(
     ]);
     const ids = new Set<Id>(rows.map(r => r.id));
     return latestStatesForIds<ProjectState>(events, ids);
+}
+
+// Single-project state read, widened to carry the STORED head
+// event's `at`/`id` alongside the state — the trio Decision 7
+// folds into the project document (state_at, state_event_id).
+// Consumed by getProject (adapters/projects.ts) to build the
+// Project domain object.
+export async function getProjectStateDetail(
+    ctx: RequestContext,
+    projectId: Id,
+): Promise<ProjectStateDetail> {
+    const events = await ctx.GET<StateEntity[]>(
+        `entity-states/${projectId}/history`,
+    );
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(projectId);
+    if (latest === undefined) {
+        throw new Error(
+            'no state event for project ' + projectId,
+        );
+    }
+    return {
+        state: assertProjectState(
+            latest.state, 'project ' + projectId,
+        ),
+        stateAt: latest.at,
+        stateEventId: latest.id,
+    };
+}
+
+// Bulk sibling of getProjectStates, widened the same way.
+// Consumed by getProjects (adapters/projects.ts) so the
+// projects LIST page can echo each row's trio on a plain field
+// edit (drag-reorder) without minting a fresh event.
+// dashboard.ts, flow-export.ts, and project-scoring.ts keep
+// reading the bare getProjectStates above — unwidened, per
+// their own bare-state need and per tests/adapters-state-
+// events.test.ts, which pins getProjectStates' return shape.
+export async function getProjectStateDetails(
+    ctx: RequestContext,
+): Promise<Map<Id, ProjectStateDetail>> {
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<ProjectEntity[]>('projects'),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    const inScope = events.filter(ev => ids.has(ev.entity_id));
+    const latest = latestByKey(inScope, ev => ev.entity_id);
+    const out = new Map<Id, ProjectStateDetail>();
+    for (const [id, ev] of latest) {
+        out.set(id, {
+            state: assertProjectState(ev.state, 'project ' + id),
+            stateAt: ev.at,
+            stateEventId: ev.id,
+        });
+    }
+    return out;
 }
 
 // Bulk variant for getRecords, which calls this — so it

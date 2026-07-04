@@ -31,6 +31,7 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
+    storedGraphField,
 } from '../api/types.ts';
 import {
     reassembleStoredGraph,
@@ -362,6 +363,10 @@ test(
             }),
             eventId: 'undo-ev-1',
             at: now,
+            // Task 5: the post-undo reduced graph — REQUIRED
+            // plumbing, consumed only by the undo route's own
+            // synthesized document pair.
+            graph: storedGraphField(targetGraph),
             consumedVersionId: verId,
             graphDelta: {
                 nodes: targetGraph.nodes.map(n => ({

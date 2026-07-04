@@ -58,6 +58,9 @@ test('PUT then GET round-trips an entity', async () => {
         proposed_solution: 's',
         expected_outcome: 'o',
         success_metrics: 'm',
+        state: 'active',
+        state_at: '2026-01-01T00:00:00.000000Z',
+        state_event_id: 'ev-i1',
     };
     await PUT(db, 'ideas/i1', payload, DEV_TOKEN);
     const fetched =
@@ -251,7 +254,10 @@ test(
     'the 500 fallback body never carries fault detail',
     async () => {
         const db = await freshDb();
-        (db.ideas as unknown as {
+        // GET ideas is flipped (Phase 2 Task 5): it derives from
+        // the message ledger, never db.ideas, so the fault must
+        // be forced from the store the derivation actually reads.
+        (db.requests as unknown as {
             getAllWhere: () => Promise<never>;
         }).getAllWhere = async () => {
             throw new Error('secret fault detail');

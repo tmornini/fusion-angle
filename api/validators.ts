@@ -26,7 +26,9 @@ import type {
     IdeaEntity,
     IdeaState,
     ProjectEntity,
+    ProjectState,
     FlowEntity,
+    FlowState,
     FlowVersionEntity,
     FlowNodeEntity,
     FlowEdgeEntity,
@@ -56,8 +58,10 @@ import type {
 import {
     assertAttributeType,
     assertConstraintAppliesTo,
+    assertFlowState,
     assertIdeaState,
     assertMemberState,
+    assertProjectState,
     assertRecordState,
 } from './types.ts';
 import {
@@ -1131,6 +1135,80 @@ export function validateIdeaEntity(
     };
 }
 
+const IDEA_DOCUMENT_ENTITY_KEYS: readonly string[] = [
+    'title', 'position', 'problem_statement',
+    'target_users', 'proposed_solution',
+    'expected_outcome', 'success_metrics',
+];
+
+const IDEA_DOCUMENT_BODY_KEYS: readonly string[] = [
+    ...IDEA_DOCUMENT_ENTITY_KEYS,
+    'state', 'state_at', 'state_event_id',
+];
+
+export interface IdeaDocumentBody {
+    readonly entity: Omit<IdeaEntity, 'id' | 'organization_id'>;
+    readonly state: IdeaState;
+    readonly state_at: string;
+    readonly state_event_id: string;
+}
+
+// The HTTP-body gate for PUT /ideas/:id (Decision 7): the full
+// wire document — the entity's own fields plus the lifecycle
+// trio folded in. organization_id is deliberately absent from
+// the expected set (like every other org-owned write, the
+// client never supplies it; the org fence stamps it downstream
+// when view.ideas.put re-validates through validateIdeaEntity)
+// yet rides the `optional` allowance rather than `expected` —
+// a caller-forged organization_id is tolerated-but-ignored, not
+// rejected, because the fence's stamp always overrides whatever
+// key it finds (the forged-body isolation test relies on this).
+// The trio holds to the SAME rules the bare states/:id route
+// applies to an event (assertIdeaState, an RFC-3339 `at`, a
+// non-empty event id), so a folded document and a bare event
+// share one shape. Entity fields are picked directly rather
+// than delegated to validateIdeaEntity — that function REQUIRES
+// organization_id, which this body never carries pre-stamp.
+export function validateIdeaDocumentBody(
+    body: Record<string, unknown>,
+): IdeaDocumentBody {
+    assertOnlyKeys(
+        body, IDEA_DOCUMENT_BODY_KEYS, 'IdeaDocumentBody',
+        ['organization_id'],
+    );
+    const state = assertIdeaState(
+        pickString(body, 'state'),
+        'IdeaDocumentBody.state',
+    );
+    const stateEventId = pickString(body, 'state_event_id');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'IdeaDocumentBody.state_event_id must be'
+            + ' non-empty',
+        );
+    }
+    return {
+        entity: {
+            title: pickString(body, 'title'),
+            position: pickNumber(body, 'position'),
+            problem_statement:
+                pickString(body, 'problem_statement'),
+            target_users: pickString(body, 'target_users'),
+            proposed_solution:
+                pickString(body, 'proposed_solution'),
+            expected_outcome:
+                pickString(body, 'expected_outcome'),
+            success_metrics:
+                pickString(body, 'success_metrics'),
+        },
+        state,
+        state_at: validateTimestampField(
+            body, 'state_at', 'IdeaDocumentBody.state_at',
+        ),
+        state_event_id: stateEventId,
+    };
+}
+
 const PROJECT_BODY_KEYS: readonly string[] = [
     'organization_id', 'title', 'description',
     'progress', 'start_date',
@@ -1175,6 +1253,83 @@ export function validateProjectEntity(
     };
 }
 
+const PROJECT_DOCUMENT_ENTITY_KEYS: readonly string[] = [
+    'title', 'description', 'progress', 'start_date',
+    'target_end_date', 'estimated_cost', 'actual_cost',
+    'position',
+];
+
+const PROJECT_DOCUMENT_BODY_KEYS: readonly string[] = [
+    ...PROJECT_DOCUMENT_ENTITY_KEYS,
+    'state', 'state_at', 'state_event_id',
+];
+
+export interface ProjectDocumentBody {
+    readonly entity:
+        Omit<ProjectEntity, 'id' | 'organization_id'>;
+    readonly state: ProjectState;
+    readonly state_at: string;
+    readonly state_event_id: string;
+}
+
+// The HTTP-body gate for PUT /projects/:id (Decision 7): the
+// full wire document — the entity's own fields plus the
+// lifecycle trio folded in. organization_id is deliberately
+// absent from the expected set (like every other org-owned
+// write, the client never supplies it; the org fence stamps it
+// downstream when view.projects.put re-validates through
+// validateProjectEntity) yet rides the `optional` allowance
+// rather than `expected` — a caller-forged organization_id is
+// tolerated-but-ignored, not rejected, because the fence's
+// stamp always overrides whatever key it finds. The trio holds
+// to the SAME rules the bare states/:id route applies to an
+// event (assertProjectState, an RFC-3339 `at`, a non-empty
+// event id), so a folded document and a bare event share one
+// shape. Entity fields are picked directly rather than
+// delegated to validateProjectEntity — that function REQUIRES
+// organization_id, which this body never carries pre-stamp.
+export function validateProjectDocumentBody(
+    body: Record<string, unknown>,
+): ProjectDocumentBody {
+    assertOnlyKeys(
+        body, PROJECT_DOCUMENT_BODY_KEYS,
+        'ProjectDocumentBody', ['organization_id'],
+    );
+    const state = assertProjectState(
+        pickString(body, 'state'),
+        'ProjectDocumentBody.state',
+    );
+    const stateEventId = pickString(body, 'state_event_id');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'ProjectDocumentBody.state_event_id must be'
+            + ' non-empty',
+        );
+    }
+    return {
+        entity: {
+            title: pickString(body, 'title'),
+            description: pickString(body, 'description'),
+            progress: pickNumber(body, 'progress'),
+            start_date: validateCalendarDateField(
+                body, 'start_date', 'ProjectDocumentBody',
+            ),
+            target_end_date: validateCalendarDateField(
+                body, 'target_end_date',
+                'ProjectDocumentBody',
+            ),
+            estimated_cost:
+                pickNumber(body, 'estimated_cost'),
+            actual_cost: pickNumber(body, 'actual_cost'),
+            position: pickNumber(body, 'position'),
+        },
+        state,
+        state_at: validateTimestampField(
+            body, 'state_at', 'ProjectDocumentBody.state_at',
+        ),
+        state_event_id: stateEventId,
+    };
+}
 
 // The graph is NOT a flow column — it lives in the four
 // relation tables. The storage row carries only the flow's own
@@ -1210,6 +1365,106 @@ export function validateFlowEntity(
         lock_timeout: pickNumber(
             body, 'lock_timeout',
         ),
+    };
+}
+
+const FLOW_DOCUMENT_ENTITY_KEYS: readonly string[] = [
+    'name', 'is_locked', 'is_auto_layout',
+    'is_auto_fit', 'lock_timeout',
+];
+
+const FLOW_DOCUMENT_BODY_KEYS: readonly string[] = [
+    ...FLOW_DOCUMENT_ENTITY_KEYS,
+    'state', 'state_at', 'state_event_id',
+    'graph', 'graphDelta', 'revivals',
+];
+
+export interface FlowDocumentBody {
+    readonly entity:
+        Omit<FlowEntity, 'id' | 'organization_id'>;
+    readonly state: FlowState;
+    readonly state_at: string;
+    readonly state_event_id: string;
+    // The FULL reduced graph in EXACTLY the wire form GET
+    // /flows/:id emits today (JsonObjectField is a branded
+    // JSON-ENCODED STRING — the same covenant
+    // flow_versions.graph already carries); validated via
+    // validateStoredGraphJson but stored as the SAME encoded
+    // string — the op never re-serializes it.
+    readonly graph: JsonObjectField;
+    // TRANSITIONAL decomposition sidecars — the ONLY consumer
+    // is the old-plane relation writer (writeFlowGraphDelta);
+    // no derivation reads either one. Retiring at Phase Final,
+    // once the relation tables alone are the graph's source of
+    // truth for every reader, not only the reassembly GET.
+    readonly graphDelta: FlowGraphDelta;
+    readonly revivals: readonly GraphRevival[];
+}
+
+// The HTTP-body gate for PUT /flows/:id (Decision 7, the
+// LOCKED class — Task 3): the full wire document — the
+// entity's own fields, the lifecycle trio, the client-
+// authored post-save graph snapshot, and the two transitional
+// decomposition sidecars. organization_id is deliberately
+// absent from the expected set (like every other org-owned
+// write) yet rides the `optional` allowance rather than
+// `expected` — a caller-forged organization_id is tolerated-
+// but-ignored (the fence's stamp always overrides whatever key
+// it finds), and the below-facade seed path (no scoping
+// wrapper) embeds it in the raw body so this op can read it
+// straight back. The trio holds to the SAME rules the bare
+// states/:id route applies to an event (assertFlowState, an
+// RFC-3339 `at`, a non-empty event id). Entity fields are
+// picked directly rather than delegated to validateFlowEntity
+// — that function REQUIRES organization_id, which this body
+// never carries pre-stamp. `graphDelta`/`revivals` reuse the
+// undo/redo bodies' own validators (validateFlowGraphDelta,
+// validateRevivals below) — same wire shape, same gate.
+export function validateFlowDocumentBody(
+    body: Record<string, unknown>,
+): FlowDocumentBody {
+    assertOnlyKeys(
+        body, FLOW_DOCUMENT_BODY_KEYS, 'FlowDocumentBody',
+        ['organization_id'],
+    );
+    const state = assertFlowState(
+        pickString(body, 'state'),
+        'FlowDocumentBody.state',
+    );
+    const stateEventId = pickString(body, 'state_event_id');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'FlowDocumentBody.state_event_id must be'
+            + ' non-empty',
+        );
+    }
+    const graph = pickJsonObjectField(body, 'graph');
+    validateStoredGraphJson(graph, 'FlowDocumentBody.graph');
+    const graphDelta = validateFlowGraphDelta(
+        asObject(
+            body['graphDelta'], 'FlowDocumentBody.graphDelta',
+        ),
+    );
+    const revivals = validateRevivals(
+        body['revivals'], 'FlowDocumentBody.revivals',
+    );
+    return {
+        entity: {
+            name: pickString(body, 'name'),
+            is_locked: pickBoolean(body, 'is_locked'),
+            is_auto_layout:
+                pickBoolean(body, 'is_auto_layout'),
+            is_auto_fit: pickBoolean(body, 'is_auto_fit'),
+            lock_timeout: pickNumber(body, 'lock_timeout'),
+        },
+        state,
+        state_at: validateTimestampField(
+            body, 'state_at', 'FlowDocumentBody.state_at',
+        ),
+        state_event_id: stateEventId,
+        graph,
+        graphDelta,
+        revivals,
     };
 }
 
@@ -2167,64 +2422,6 @@ export function validateRecordWriteBody(
     );
 }
 
-export interface IdeaCreateBody {
-    readonly id: string;
-    readonly idea: Record<string, unknown>;
-    readonly initialState: IdeaState;
-    readonly initialStateEventId: string;
-    readonly initialStateAt: string;
-}
-
-const IDEA_CREATE_KEYS: readonly string[] = [
-    'id', 'idea', 'initialState',
-    'initialStateEventId', 'initialStateAt',
-];
-
-// The HTTP-body gate for POST /ideas: the idea row plus its
-// initial state event, written atomically. The idea fields are
-// NOT fully validated here — the org-scoped store stamps
-// organization_id from the verified token and re-validates the
-// idea through validateIdeaEntity AFTER the stamp, so the body
-// must OMIT organization_id (the fence supplies it). Authorship
-// of the initial event is stamped from the verified caller in
-// the route, never the body.
-export function validateIdeaCreateBody(
-    body: Record<string, unknown>,
-): IdeaCreateBody {
-    assertOnlyKeys(
-        body, IDEA_CREATE_KEYS, 'IdeaCreateBody',
-    );
-    const id = pickString(body, 'id');
-    if (id === '') {
-        throw new ValidationError(
-            'IdeaCreateBody.id must be non-empty',
-        );
-    }
-    const idea = asObject(
-        body['idea'], 'IdeaCreateBody.idea',
-    );
-    const initialState = assertIdeaState(
-        pickString(body, 'initialState'),
-        'IdeaCreateBody.initialState',
-    );
-    const initialStateEventId = pickString(
-        body, 'initialStateEventId',
-    );
-    if (initialStateEventId === '') {
-        throw new ValidationError(
-            'IdeaCreateBody.initialStateEventId'
-            + ' must be non-empty',
-        );
-    }
-    const initialStateAt = validateTimestampField(
-        body, 'initialStateAt', 'IdeaCreateBody.initialStateAt',
-    );
-    return {
-        id, idea, initialState,
-        initialStateEventId, initialStateAt,
-    };
-}
-
 export interface IdeaConversionBaseline {
     readonly id: string;
     readonly fields: Record<string, unknown>;
@@ -2544,144 +2741,27 @@ export function validateFlowVersionPublishBody(
     return { id, version, trimIds };
 }
 
-// The version-snapshot sub-object shared by POST /flows/:id/save
-// (optional) and POST /flows/:id/redo (required): a new
-// flow_versions snapshot to PUT plus the ids of the over-cap
-// versions to trim. Same shape as FlowVersionPublishBody — the
-// flow_versions store re-validates the snapshot through
-// validateFlowVersionEntity when the composing POST puts it; the
-// web-app owns the cap-retention trim derivation, so trimIds is a
-// list of non-empty version ids. `label` names the offender so
-// the message reads from the enclosing body.
-export interface FlowVersionSnapshot {
-    readonly id: string;
-    readonly version: Record<string, unknown>;
-    readonly trimIds: readonly string[];
-}
-
-const FLOW_VERSION_SNAPSHOT_KEYS: readonly string[] = [
-    'id', 'version', 'trimIds',
-];
-
-function validateFlowVersionSnapshot(
-    value: unknown,
-    label: string,
-): FlowVersionSnapshot {
-    const obj = asObject(value, label);
-    assertOnlyKeys(obj, FLOW_VERSION_SNAPSHOT_KEYS, label);
-    const id = asString(obj['id'], label + '.id');
-    if (id === '') {
-        throw new ValidationError(
-            label + '.id must be non-empty',
-        );
-    }
-    const version = asObject(obj['version'], label + '.version');
-    const trimRaw = asArray(obj['trimIds'], label + '.trimIds');
-    const trimIds = trimRaw.map((t, i) => {
-        const v = asString(t, label + '.trimIds[' + i + ']');
-        if (v === '') {
-            throw new ValidationError(
-                label + '.trimIds[' + i + '] must be non-empty',
-            );
-        }
-        return v;
-    });
-    return { id, version, trimIds };
-}
-
-export type FlowWriteHistory =
-    | { readonly kind: 'none' }
-    | {
-        readonly kind: 'snapshot';
-        readonly version: FlowVersionSnapshot;
-    };
-
-export interface FlowPutBody {
-    readonly flow: Record<string, unknown>;
-    readonly eventId: string;
-    readonly at: string;
-    readonly history: FlowWriteHistory;
-    readonly graphDelta: FlowGraphDelta;
-}
-
-const FLOW_PUT_KEYS: readonly string[] = [
-    'flow', 'eventId', 'at', 'history', 'graphDelta',
-];
-
-function validateFlowWriteHistory(
-    value: unknown,
-    label: string,
-): FlowWriteHistory {
-    const obj = asObject(value, label);
-    const kind = asString(obj['kind'], label + '.kind');
-    if (kind === 'none') {
-        assertOnlyKeys(obj, ['kind'], label);
-        return { kind: 'none' };
-    }
-    if (kind === 'snapshot') {
-        assertOnlyKeys(obj, ['kind', 'version'], label);
-        return {
-            kind: 'snapshot',
-            version: validateFlowVersionSnapshot(
-                obj['version'], label + '.version',
-            ),
-        };
-    }
-    throw new ValidationError(
-        "expected history.kind 'none' or 'snapshot' for "
-        + label + '.kind, got ' + kind,
-    );
-}
-
-// The HTTP-body gate for PUT /flows/:id: the flow row, the
-// 'updated' state event, and an OPTIONAL version snapshot
-// (put + trims) — written atomically. The history side-effect
-// is a shape-literal union, never a nullable field, so the
-// neither/both illegal states are unrepresentable. The flow
-// fields are NOT fully validated here — the org-scoped flows
-// store stamps organization_id from the verified token and
-// re-validates through validateFlowEntity, so the body OMITS
-// it. The state is fixed to 'updated' server-side and authored
-// by the verified caller (actor), never the body. graphDelta is
-// the client-built relation delta (upserts, deletions, and
-// append-only member/attribute events) — validated here at the
-// HTTP gate via validateFlowGraphDelta; the route writes its
-// rows atomically with the flow PUT.
-export function validateFlowPutBody(
-    body: Record<string, unknown>,
-): FlowPutBody {
-    assertOnlyKeys(body, FLOW_PUT_KEYS, 'FlowPutBody');
-    const flow = asObject(body['flow'], 'FlowPutBody.flow');
-    const eventId = pickString(body, 'eventId');
-    if (eventId === '') {
-        throw new ValidationError(
-            'FlowPutBody.eventId must be non-empty',
-        );
-    }
-    const at = validateTimestampField(
-        body, 'at', 'FlowPutBody',
-    );
-    const history = validateFlowWriteHistory(
-        body['history'], 'FlowPutBody.history',
-    );
-    const graphDelta = validateFlowGraphDelta(
-        asObject(body['graphDelta'], 'FlowPutBody.graphDelta'),
-    );
-    return { flow, eventId, at, history, graphDelta };
-}
-
 export interface FlowUndoBody {
     readonly flow: Record<string, unknown>;
     readonly eventId: string;
     readonly consumedVersionId: string;
     readonly at: string;
+    // Task 5: the post-undo reduced graph — performUndo already
+    // computes the target working copy, so the client carries it
+    // verbatim (the SAME wire covenant validateFlowDocumentBody's
+    // `graph` field already holds). REQUIRED — an old-shape undo
+    // body (missing this field) 400s; there is no silent
+    // fallback. The ONLY consumer is the undo route's synthesized
+    // document pair (message-pair.ts); this op's own row writes
+    // never touch it.
+    readonly graph: JsonObjectField;
     readonly graphDelta: FlowGraphDelta;
     readonly revivals: GraphRevival[];
 }
 
 const FLOW_UNDO_KEYS: readonly string[] = [
     'flow', 'eventId', 'consumedVersionId', 'at',
-    'graphDelta', 'revivals',
+    'graph', 'graphDelta', 'revivals',
 ];
 
 // The revivals array gate, shared by the undo and redo
@@ -2732,6 +2812,8 @@ export function validateFlowUndoBody(
     const at = validateTimestampField(
         body, 'at', 'FlowUndoBody',
     );
+    const graph = pickJsonObjectField(body, 'graph');
+    validateStoredGraphJson(graph, 'FlowUndoBody.graph');
     const graphDelta = validateFlowGraphDelta(
         asObject(body['graphDelta'], 'FlowUndoBody.graphDelta'),
     );
@@ -2740,62 +2822,7 @@ export function validateFlowUndoBody(
     );
     return {
         flow, eventId, consumedVersionId, at,
-        graphDelta, revivals,
-    };
-}
-
-export interface FlowRedoBody {
-    readonly version: FlowVersionSnapshot;
-    readonly flow: Record<string, unknown>;
-    readonly eventId: string;
-    readonly at: string;
-    readonly graphDelta: FlowGraphDelta;
-    readonly revivals: GraphRevival[];
-}
-
-const FLOW_REDO_KEYS: readonly string[] = [
-    'version', 'flow', 'eventId', 'at',
-    'graphDelta', 'revivals',
-];
-
-// The HTTP-body gate for POST /flows/:id/redo: a REQUIRED
-// version snapshot (put + trims), the flow row, the 'updated'
-// state event, the graphDelta to the four relation tables, and
-// the revivals — written atomically. The current state can
-// never land archived as a version while the redo graph is
-// lost. The flow fields are re-validated by the org-scoped
-// flows store after the org stamp (body OMITS organization_id);
-// the version snapshot is re-validated by the flow_versions
-// store. The state is fixed to 'updated' server-side and
-// authored by the verified caller (actor), never the body.
-// graphDelta lands the redo target graph in relations;
-// revivals post 'restored' events that supersede the tombstones
-// of the nodes/edges the redo target re-introduces.
-export function validateFlowRedoBody(
-    body: Record<string, unknown>,
-): FlowRedoBody {
-    assertOnlyKeys(body, FLOW_REDO_KEYS, 'FlowRedoBody');
-    const version = validateFlowVersionSnapshot(
-        body['version'], 'FlowRedoBody.version',
-    );
-    const flow = asObject(body['flow'], 'FlowRedoBody.flow');
-    const eventId = pickString(body, 'eventId');
-    if (eventId === '') {
-        throw new ValidationError(
-            'FlowRedoBody.eventId must be non-empty',
-        );
-    }
-    const at = validateTimestampField(
-        body, 'at', 'FlowRedoBody',
-    );
-    const graphDelta = validateFlowGraphDelta(
-        asObject(body['graphDelta'], 'FlowRedoBody.graphDelta'),
-    );
-    const revivals = validateRevivals(
-        body['revivals'], 'FlowRedoBody.revivals',
-    );
-    return {
-        version, flow, eventId, at, graphDelta, revivals,
+        graph, graphDelta, revivals,
     };
 }
 

@@ -43,7 +43,11 @@ function buildView() {
         estimated_cost: 50000,
         actual_cost: 12000,
         position: 1,
-    }, 'approved');
+    }, {
+        state: 'approved',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-p1',
+    });
     return new ProjectView(project, [], [], []);
 }
 

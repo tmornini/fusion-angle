@@ -4,6 +4,7 @@ import {
     Idea,
     type IdeaEntity,
     type IdeaState,
+    type IdeaStateDetail,
 } from '../api/types.ts';
 import {
     DISPLAY_ABSENT,
@@ -132,12 +133,22 @@ function makeIdeaEntity(
     };
 }
 
+function makeStateDetail(
+    state: IdeaState = 'active',
+): IdeaStateDetail {
+    return {
+        state,
+        stateAt: '2026-01-15T09:00:00.000000Z',
+        stateEventId: 'ev-fixture',
+    };
+}
+
 function makeIdea(
     overrides: Partial<IdeaEntity> = {},
     state: IdeaState = 'active',
 ): Idea {
     return new Idea(
-        makeIdeaEntity(overrides), state,
+        makeIdeaEntity(overrides), makeStateDetail(state),
     );
 }
 
@@ -149,7 +160,7 @@ function makeWithSubmitter(
 ): IdeaWithSubmitter {
     const entity = makeIdeaEntity(overrides);
     return {
-        idea: new Idea(entity, state),
+        idea: new Idea(entity, makeStateDetail(state)),
         entity,
         submitterName,
         submittedAt,
@@ -238,7 +249,7 @@ test(
         );
         const roundTripped = new Idea(
             { ...base, ...patch },
-            'active',
+            makeStateDetail(),
         );
         assert.deepEqual(
             ideaDraftFromIdea(roundTripped),

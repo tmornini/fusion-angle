@@ -1,0 +1,244 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { handleRequest } from '../api/api.ts';
+import { postMockDataLoad } from '../api/mock-data.ts';
+import { organizationToken } from './token-fixtures.ts';
+import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import {
+    deriveFlow,
+    deriveFlows,
+    deriveFlowStateHistory,
+} from '../api/derive-flows.ts';
+
+// The flows sibling of tests/derive-ideas.test.ts/derive-
+// projects.test.ts: unit-level lifecycle-reduction guarantees
+// that tests/drift-flows.test.ts (parity-against-old-plane
+// only) does not exercise. MECHANISM: flows are the LOCKED
+// class (Decision 7) — a SECOND PUT to an existing flow is
+// non-genesis and must thread If-Response-ID via a header-
+// capable req helper (echo the first PUT's Response-ID), unlike
+// the bare-req idiom the ideas/projects skew tests use.
+
+const BASE = 'http://localhost';
+const STARK_ORGANIZATION = '1';
+const AT = '2026-01-01T00:00:00.000000Z';
+
+function req(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+    headers?: Record<string, string>,
+): Request {
+    return new Request(`${BASE}${path}`, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            ...(headers ?? {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+}
+
+async function seededDb(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    return db;
+}
+
+function flowFields(name: string) {
+    return {
+        name,
+        is_locked: false,
+        is_auto_layout: false,
+        is_auto_fit: false,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+    };
+}
+
+function emptyDelta() {
+    return {
+        nodes: [], edges: [], deletions: [],
+        memberEvents: [], attributeEvents: [],
+    };
+}
+
+function emptyGraph(): string {
+    return JSON.stringify({ nodes: [], edges: [] });
+}
+
+function graphWithNode(nodeId: string, name: string): string {
+    return JSON.stringify({
+        nodes: [{
+            id: nodeId, name,
+            positionX: 0, positionY: 0,
+            isCreate: false, isArchive: false,
+            memberIds: [], attributes: [],
+            taskInstructions: '',
+        }],
+        edges: [],
+    });
+}
+
+function flowDocument(
+    name: string,
+    state: string,
+    stateAt: string,
+    stateEventId: string,
+    graph: string,
+): Record<string, unknown> {
+    return {
+        ...flowFields(name),
+        state, state_at: stateAt, state_event_id: stateEventId,
+        graph,
+        graphDelta: emptyDelta(),
+        revivals: [],
+    };
+}
+
+function putFlow(
+    db: MemoryDbAdapter,
+    token: string,
+    id: string,
+    name: string,
+    state: string,
+    stateAt: string,
+    stateEventId: string,
+    graph: string,
+    headers?: Record<string, string>,
+): Promise<Response> {
+    return handleRequest(db, req(
+        'PUT', '/flows/' + id, token,
+        flowDocument(name, state, stateAt, stateEventId, graph),
+        headers,
+    ));
+}
+
+async function headResponseId(
+    db: MemoryDbAdapter,
+    token: string,
+    flowId: string,
+): Promise<string> {
+    const got = await handleRequest(db, req(
+        'GET', '/flows/' + flowId, token,
+    ));
+    const id = got.headers.get('Response-ID');
+    assert.ok(id, 'no Response-ID on GET /flows/' + flowId);
+    return id!;
+}
+
+test(
+    'a clock-skewed transition does NOT displace genesis — '
+    + 'the graph still tracks the DOCUMENT head',
+    async () => {
+        const db = await seededDb();
+        const token = await organizationToken();
+        const id = 'flow-drv-skew';
+        const genesisGraph = graphWithNode(
+            'n-genesis', 'Genesis Node',
+        );
+
+        // Genesis claims a LATER state_at than the skewed
+        // transition below — exactly the clock-skew scenario
+        // the (state_at, id) reduction must resist.
+        const genesis = await putFlow(
+            db, token, id, 'Genesis Title', 'active',
+            '2026-06-01T00:00:00.000000Z', 'ev-drv-skew-genesis',
+            genesisGraph,
+        );
+        assert.equal(genesis.status, 200);
+        const headId = await headResponseId(db, token, id);
+
+        // The locked class: this second PUT is non-genesis, so
+        // it must echo the current head's Response-ID rather
+        // than the bare-req idiom the ideas/projects skew tests
+        // use — a save with no echo 412s outright.
+        const skewedGraph = graphWithNode(
+            'n-skewed', 'Skewed Node',
+        );
+        const res = await putFlow(
+            db, token, id, 'Skewed Title', 'deleted',
+            '2020-01-01T00:00:00.000000Z', 'ev-drv-skew-later',
+            skewedGraph, { 'if-response-id': headId },
+        );
+        assert.equal(res.status, 200);
+
+        // Genesis must still win the lifecycle reduction: the
+        // flow stays visible despite the later-arriving
+        // 'deleted' transition, because that transition's OWN
+        // state_at is older than genesis's.
+        const derived = await deriveFlow(
+            db, STARK_ORGANIZATION, id,
+        );
+        // Arrival order still governs the entity's OTHER
+        // fields — the two reductions are independent.
+        assert.equal(derived.name, 'Skewed Title');
+        // Design decision 6's third-head distinction: `graph`
+        // tracks the DOCUMENT head (the second, envelope-later
+        // PUT) — never the lifecycle-current pair (genesis),
+        // even though genesis wins the lifecycle reduction.
+        assert.deepEqual(
+            JSON.parse(derived.graph),
+            JSON.parse(skewedGraph),
+        );
+
+        const flows = await deriveFlows(
+            db, STARK_ORGANIZATION,
+        );
+        assert.equal(
+            flows.some((flow) => flow.id === id), true,
+        );
+
+        const history = await deriveFlowStateHistory(
+            db, STARK_ORGANIZATION, id,
+        );
+        // Order- AND content-sensitive: (state_at, id)
+        // ascending — the SAME order store-state.ts's
+        // getAllForIn returns. The later-ARRIVED but earlier-
+        // STAMPED 'deleted' event sorts FIRST; genesis SECOND.
+        assert.deepEqual(
+            history.map((entry) => ({
+                id: entry.id,
+                entity_id: entry.entity_id,
+                state: entry.state,
+                at: entry.at,
+            })),
+            [
+                {
+                    id: 'ev-drv-skew-later',
+                    entity_id: id,
+                    state: 'deleted',
+                    at: '2020-01-01T00:00:00.000000Z',
+                },
+                {
+                    id: 'ev-drv-skew-genesis',
+                    entity_id: id,
+                    state: 'active',
+                    at: '2026-06-01T00:00:00.000000Z',
+                },
+            ],
+        );
+    },
+);
+
+test('ordering is id-lex', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const ids = [
+        'zz-order-flow', 'aa-order-flow', 'mm-order-flow',
+    ];
+    for (const id of ids) {
+        const res = await putFlow(
+            db, token, id, 'Order ' + id, 'active',
+            AT, 'ev-' + id, emptyGraph(),
+        );
+        assert.equal(res.status, 200);
+    }
+    const derived = await deriveFlows(db, STARK_ORGANIZATION);
+    const observed = derived
+        .map((flow) => flow.id)
+        .filter((id) => ids.includes(id));
+    assert.deepEqual(observed, [...ids].sort());
+});

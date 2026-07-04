@@ -301,6 +301,24 @@ export function assertMemberState(
     return v;
 }
 
+// No isFlowState — nothing narrows a bare string against
+// FLOW_STATES at runtime today (unlike ideas/projects/records,
+// which each drive a page-level string-to-enum guard); the
+// document validator (validateFlowDocumentBody) is the ONE
+// caller, and it always needs the throwing form.
+export function assertFlowState(
+    v: string,
+    label: string,
+): FlowState {
+    if (!includes(FLOW_STATES, v)) {
+        throw new ValidationError(
+            'expected FlowState for '
+                + label + ', got ' + v,
+        );
+    }
+    return v;
+}
+
 export function isRecordState(
     v: string,
 ): v is RecordState {
@@ -1335,11 +1353,25 @@ export interface ProjectFlowEntity {
     at: string;
 }
 
+// The lifecycle trio Decision 7 folds into the idea document:
+// the current state plus its creator-minted `at` and the
+// (transitional — retires with the states log) event id. A
+// bare IdeaState alone no longer carries enough to round-trip
+// a document PUT, so every reader that feeds an Idea gains
+// this shape.
+export interface IdeaStateDetail {
+    readonly state: IdeaState;
+    readonly stateAt: string;
+    readonly stateEventId: string;
+}
+
 export class Idea {
     readonly #id: string;
     readonly #title: string;
     readonly #position: number;
     readonly #state: IdeaState;
+    readonly #stateAt: string;
+    readonly #stateEventId: string;
     readonly #problemStatement: string;
     readonly #targetUsers: string;
     readonly #proposedSolution: string;
@@ -1348,12 +1380,14 @@ export class Idea {
 
     constructor(
         entity: IdeaEntity,
-        state: IdeaState,
+        detail: IdeaStateDetail,
     ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#position = entity.position;
-        this.#state = state;
+        this.#state = detail.state;
+        this.#stateAt = detail.stateAt;
+        this.#stateEventId = detail.stateEventId;
         this.#problemStatement =
             entity.problem_statement;
         this.#targetUsers =
@@ -1417,6 +1451,14 @@ export class Idea {
         return this.#state;
     }
 
+    stateAtValue(): string {
+        return this.#stateAt;
+    }
+
+    stateEventIdValue(): string {
+        return this.#stateEventId;
+    }
+
     problemStatementText(): string {
         return this.#problemStatement;
     }
@@ -1438,11 +1480,25 @@ export class Idea {
     }
 }
 
+// The lifecycle trio Decision 7 folds into the project
+// document: the current state plus its creator-minted `at` and
+// the (transitional — retires with the states log) event id. A
+// bare ProjectState alone no longer carries enough to
+// round-trip a document PUT, so every reader that feeds a
+// Project gains this shape.
+export interface ProjectStateDetail {
+    readonly state: ProjectState;
+    readonly stateAt: string;
+    readonly stateEventId: string;
+}
+
 export class Project {
     readonly #id: string;
     readonly #title: string;
     readonly #description: string;
     readonly #state: ProjectState;
+    readonly #stateAt: string;
+    readonly #stateEventId: string;
     readonly #progress: number;
     readonly #startDate: string;
     readonly #targetEndDate: string;
@@ -1452,13 +1508,15 @@ export class Project {
 
     constructor(
         entity: ProjectEntity,
-        state: ProjectState,
+        detail: ProjectStateDetail,
     ) {
         this.#id = entity.id;
         this.#title = entity.title;
         this.#description =
             entity.description;
-        this.#state = state;
+        this.#state = detail.state;
+        this.#stateAt = detail.stateAt;
+        this.#stateEventId = detail.stateEventId;
         this.#progress = entity.progress;
         this.#startDate =
             entity.start_date;
@@ -1529,6 +1587,14 @@ export class Project {
 
     stateValue(): ProjectState {
         return this.#state;
+    }
+
+    stateAtValue(): string {
+        return this.#stateAt;
+    }
+
+    stateEventIdValue(): string {
+        return this.#stateEventId;
     }
 
     progressPercent(): number {

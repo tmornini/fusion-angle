@@ -1,5 +1,6 @@
 import type {
     FlowEntity,
+    FlowWithGraph,
     GraphNode,
     GraphEdge,
     StoredGraph,
@@ -7,6 +8,7 @@ import type {
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
+    storedGraphField,
 } from '../../../api/types.ts';
 import type {
     FlowGraphDelta,
@@ -15,9 +17,11 @@ import type {
     GraphDeletion,
     FlowNodeMemberRowBody,
     FlowNodeAttributeRowBody,
-    FlowWriteHistory,
+    GraphRevival,
 } from '../../../api/validators.ts';
-import { getFlowGraph } from './flow-queries.ts';
+import {
+    validateStoredGraphJson,
+} from '../../../api/validators.ts';
 export type {
     FlowGraphDelta,
     FlowNodeRowBody,
@@ -25,6 +29,7 @@ export type {
     GraphDeletion,
     FlowNodeMemberRowBody,
     FlowNodeAttributeRowBody,
+    GraphRevival,
 };
 import {
     buildStartAndCompleteNodes,
@@ -35,9 +40,11 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
+import { RequestError } from '../../../api/api.ts';
 import type {
     RequestContext,
 } from './shared.ts';
+import { jitteredBackoff } from './shared.ts';
 
 const flowChanges =
     createSubscriptionChannel();
@@ -309,53 +316,182 @@ export function buildSaveEvents(
     };
 }
 
-// Assemble the PUT /flows/:id body for a save: the flow row
-// (scalar fields only — no graph blob), a fresh 'updated' event
-// id, the caller moment, the version-history side-effect, and
-// the graph delta diffed against the CURRENT stored graph. The
-// baseline is fetched HERE, before the body is built — never
-// empty, so deletions fire only for ids the working copy
-// dropped. Both PUT call sites (putFlow and the designer's
-// persist chain) build their body through this single voice.
-export async function buildFlowPutBody(
+// Compute the revival set for an undo/redo-style op: every
+// node/edge id present in the TARGET graph but absent from the
+// CURRENT graph is a tombstoned id the target re-introduces. In
+// undo/redo, such an id is always previously-deleted, so revive
+// it unconditionally — a 'restored' event on an already-live
+// entity is harmless. `at` is the one moment of the computation.
+// Exported: buildFlowPutBody (below) recomputes this fresh
+// against EACH retry attempt's own baseline — the one caller
+// that needs it inside a retry loop; performUndo
+// (flow-operations.ts) is the other caller, computing its own
+// once, ahead of its single-shot (non-retrying) POST /undo.
+export function buildRevivals(
+    current: StoredGraph,
+    target: StoredGraph,
+    at: string,
+): GraphRevival[] {
+    const currentIds = new Set<string>([
+        ...current.nodes.map(n => n.id),
+        ...current.edges.map(e => e.id),
+    ]);
+    const revivals: GraphRevival[] = [];
+    for (const node of target.nodes) {
+        if (!currentIds.has(node.id)) {
+            revivals.push({
+                eventId: generateCryptoSafeBase62(),
+                entityId: node.id,
+                at,
+            });
+        }
+    }
+    for (const edge of target.edges) {
+        if (!currentIds.has(edge.id)) {
+            revivals.push({
+                eventId: generateCryptoSafeBase62(),
+                entityId: edge.id,
+                at,
+            });
+        }
+    }
+    return revivals;
+}
+
+// Assemble the PUT /flows/:id document body for a save: the
+// flow row's own fields, a fresh 'updated' trio, the client-
+// authored post-save graph snapshot (the exact wire form GET
+// /flows/:id emits — byte-identical types, no transform), the
+// graph delta diffed against the CURRENT stored graph, and the
+// revivals diffed against that SAME fresh baseline (empty for
+// every ordinary edit; performRedo is the one caller that
+// supplies a revivalTarget — see putFlow below). ONE GET
+// (ctx.GETWithResponseId, never getFlowGraph — that helper also
+// applies withRenderableLayout, a presentation concern, and
+// hides the Response-ID header this builder also needs) serves
+// BOTH the baseline diff source AND the echo to carry as
+// If-Response-ID — calling getFlowGraph plus a separate header
+// read would silently add a hop to every save path. Not
+// exported: putFlow (below) is the ONLY caller since the C6
+// retry loop owns rebuilding a fresh body per attempt —
+// including the revivals: everything derived from the mutable
+// baseline (the delta AND the revivals) recomputes per attempt;
+// only the caller's INTENT (revivalTarget, the graph itself)
+// stays stable across retries.
+async function buildFlowPutBody(
     ctx: RequestContext,
     id: string,
     save: FlowSaveShape,
-    history: FlowWriteHistory,
-): Promise<Record<string, unknown>> {
+    revivalTarget: StoredGraph | undefined,
+): Promise<{
+    body: Record<string, unknown>;
+    ifResponseId: string | undefined;
+}> {
     const now = nowUtc();
-    const baseline = await getFlowGraph(ctx, id);
+    const { body: current, responseId } =
+        await ctx.GETWithResponseId<FlowWithGraph>(
+            'flows/' + id,
+        );
+    const baseline = validateStoredGraphJson(
+        current.graph, 'flow.graph',
+    );
     const delta = buildSaveEvents(
-        { nodes: baseline.nodes, edges: baseline.edges },
+        baseline,
         { nodes: save.nodes, edges: save.edges },
         id,
         generateCryptoSafeBase62,
         now,
     );
+    const revivals = revivalTarget
+        ? buildRevivals(baseline, revivalTarget, now)
+        : [];
     return {
-        flow: buildFlowBody(save),
-        eventId: generateCryptoSafeBase62(),
-        at: now,
-        history,
-        graphDelta: delta,
+        body: {
+            ...buildFlowBody(save),
+            state: 'updated',
+            state_at: now,
+            state_event_id: generateCryptoSafeBase62(),
+            graph: storedGraphField({
+                nodes: save.nodes,
+                edges: save.edges,
+            }),
+            graphDelta: delta,
+            revivals,
+        },
+        ifResponseId: responseId,
     };
 }
 
-// Save a flow with NO version snapshot: the flow row PUT, its
-// 'updated' state event, and the graph delta — written
-// atomically through PUT /flows/:id (one re-entrant
-// transaction). The author is stamped server-side from the
-// token; the client mints the event id.
+// The C6 retry loop's attempt cap — three attempts, never
+// infinite (Commandment: retries only where the error is
+// transient, capped).
+const MAX_PUT_ATTEMPTS = 3;
+
+// Save a flow: the flow row PUT, its 'updated' state event, and
+// the graph delta — written atomically through the locked-class
+// PUT /flows/:id. The client echoes the baseline it just read
+// (buildFlowPutBody's ifResponseId) as If-Response-ID; a save
+// racing another writer's save finds the head has moved and
+// 412s. This loop ABSORBS that 412: on attempt < 3 it backs off
+// (jitteredBackoff) and REBUILDS the body — buildFlowPutBody
+// re-fetches the baseline and re-diffs, so the rebuild IS the
+// re-apply — then resubmits with the FRESH echo. E6 split: each
+// 412 attempt is a NEW write (fresh baseline, fresh delta, fresh
+// trio, fresh revivals) — a network-level resend of ONE attempt
+// is still byte-identical and replays via the gate's own fast
+// path. Any other error, or the third 412, propagates — the
+// caller (the designer's #persistFlow, routed through
+// reportFault, or performRedo's own catch) is the only place a
+// save failure surfaces. The flow-change notification fires
+// EXACTLY ONCE, on this loop's OWN success return — never per
+// attempt, never in a finally — so a mid-retry 412 never
+// triggers a wasted cross-tab re-render.
+// `revivalTarget` names the CALLER's intent — the graph a
+// revival-bearing op (redo; undo's own retry, a later task)
+// wants restored — never a precomputed revivals list: a
+// concurrent save landing between attempts can tombstone a node
+// the target carries, so a list captured once would replay
+// STALE revivals against a delta that is, by construction,
+// always rebuilt fresh. buildFlowPutBody derives the actual
+// revivals from `revivalTarget` fresh on EVERY attempt, against
+// that attempt's own baseline — exactly like the delta. Every
+// ordinary edit omits revivalTarget and gets an empty revivals
+// list, unchanged from today.
 export async function putFlow(
     ctx: RequestContext,
     id: string,
     save: FlowSaveShape,
+    revivalTarget?: StoredGraph,
 ): Promise<void> {
-    await ctx.PUT(
-        `flows/${id}`,
-        await buildFlowPutBody(
-            ctx, id, save, { kind: 'none' },
-        ),
-    );
-    flowChanges.notify();
+    for (
+        let attempt = 1;
+        attempt <= MAX_PUT_ATTEMPTS;
+        attempt++
+    ) {
+        const { body, ifResponseId } =
+            await buildFlowPutBody(
+                ctx, id, save, revivalTarget,
+            );
+        try {
+            await ctx.PUT(
+                `flows/${id}`,
+                body,
+                ifResponseId === undefined
+                    ? undefined
+                    : [['if-response-id', ifResponseId]],
+            );
+            flowChanges.notify();
+            return;
+        } catch (err) {
+            if (
+                err instanceof RequestError
+                && err.status === 412
+                && attempt < MAX_PUT_ATTEMPTS
+            ) {
+                await jitteredBackoff(attempt);
+                continue;
+            }
+            throw err;
+        }
+    }
 }

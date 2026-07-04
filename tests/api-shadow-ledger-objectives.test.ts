@@ -110,6 +110,72 @@ test('a failed objective create appends nothing', async () => {
     assert.equal((await db.responses.getAll()).length, 0);
 });
 
+test('a PUT to a fresh objective appends its pair at the'
++ ' entity address, and a second PUT supersedes it',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const first = await handleRequest(db, req(
+        'PUT', '/objectives/obj-8', token, { position: 2 },
+    ));
+    assert.equal(first.status, 200);
+    const firstId = first.headers.get('Response-ID');
+    assert.ok(firstId);
+    assert.equal(first.headers.get('Supersedes'), null);
+    const requests = await db.requests.getAll();
+    const row = requests.find(
+        r => r.uri_prefix === '/organizations/1/objectives/'
+            && r.uri_id === 'obj-8',
+    );
+    assert.ok(row);
+    const domainRow = await db.objectives.getById('obj-8');
+    assert.deepEqual(await first.json(), domainRow);
+    const second = await handleRequest(db, req(
+        'PUT', '/objectives/obj-8', token, { position: 3 },
+    ));
+    assert.equal(second.status, 200);
+    assert.equal(second.headers.get('Supersedes'), firstId);
+});
+
+test('a byte-identical PUT resend to an objective returns'
++ ' the stored response and appends nothing', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const body = { position: 5 };
+    const first = await handleRequest(db, req(
+        'PUT', '/objectives/obj-9', token, body,
+    ));
+    const firstId = first.headers.get('Response-ID');
+    const second = await handleRequest(db, req(
+        'PUT', '/objectives/obj-9', token, body,
+    ));
+    assert.equal(second.headers.get('Response-ID'), firstId);
+    assert.equal((await db.requests.getAll()).length, 1);
+    assert.equal((await db.responses.getAll()).length, 1);
+});
+
+test('a PUT to an objective verifies against its hash and'
++ ' keeps request/response counts balanced', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await handleRequest(db, req(
+        'PUT', '/objectives/obj-10', token, { position: 1 },
+    ));
+    const requests = await db.requests.getAll();
+    const responses = await db.responses.getAll();
+    for (const row of requests) {
+        assert.equal(
+            await sha256Hex(row.message), row.message_hash,
+        );
+    }
+    for (const row of responses) {
+        assert.equal(
+            await sha256Hex(row.message), row.message_hash,
+        );
+    }
+    assert.equal(requests.length, responses.length);
+});
+
 test('a PUT to a fresh objective revision appends its pair,'
 + ' and a second PUT supersedes it', async () => {
     const db = await freshDb();

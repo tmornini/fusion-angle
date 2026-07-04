@@ -25,6 +25,7 @@ import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
 import { REQUEST_ID_HEADER } from './request-context.ts';
+import { familyRegistration } from './family-registry.ts';
 
 // The shadow-ledger message pair: one row in `requests`, one
 // in `responses`, sharing `id`. Formed pre-tx (all crypto and
@@ -53,6 +54,14 @@ export interface MessagePair {
     readonly responseEtag: string;
     readonly responseHash: string;
     readonly supersedes?: string;      // absent == genesis
+    // The locked-class sibling of supersedes (spec §The two
+    // PUT classes): the verified If-Response-ID echo, carried
+    // forward as PROVENANCE rather than displacement — mutually
+    // exclusive with supersedes (a locked non-genesis write sets
+    // follows and never supersedes; a simple write sets
+    // supersedes and never follows). Absent == genesis, exactly
+    // like supersedes.
+    readonly follows?: string;
 }
 
 // The gate's seed for the two /authentication/* grant routes
@@ -94,9 +103,18 @@ export interface WritePairInput {
     readonly responseStatus: number;
     readonly responseBody: unknown | undefined;
     readonly headPairId: string | undefined;
+    // The locked-class counterpart of headPairId: the verified
+    // If-Response-ID echo, set by the caller ONLY when the gate's
+    // four-outcome table (api.ts) resolved the write as a
+    // matching-echo non-genesis locked write — mutually
+    // exclusive with headPairId (a caller passes one or the
+    // other, never both). Optional so every existing simple-
+    // family call site keeps compiling unchanged.
+    readonly follows?: string;
 }
 
 const SUPERSEDES_FIELD = 'supersedes';
+const FOLLOWS_FIELD = 'follows';
 const RESPONSE_ID_FIELD = 'response-id';
 
 // One entry per FIRST PATH SEGMENT — note the multi-word nouns
@@ -105,23 +123,30 @@ const RESPONSE_ID_FIELD = 'response-id';
 // 'records' yet is genuinely organization-owned (organization-
 // scoped store, organization_id index). Audit any new write
 // route's first segment against the org-scoped adapter before
-// trusting this set.
+// trusting this set. A registered family (family-registry.ts)
+// answers ONLY from its registration — its entry here is
+// deleted, never kept as a parallel truth.
 const ORGANIZATION_NESTED_FIRST_SEGMENTS: ReadonlySet<string> =
     new Set([
-        'ideas', 'projects', 'flows', 'work-orders',
+        'work-orders',
         'records', 'record-attributes', 'objectives',
         'memberships', 'states',
     ]);
 
 // The tier rule, exported so gate, seed, and derivations share
-// ONE prefix voice.
+// ONE prefix voice. A registered family's organizationNested
+// slot decides first; the literal set above is the fallback
+// for every not-yet-registered first segment.
 export function canonicalUriPrefix(
     organization: Id | undefined,
     flatPrefix: string,
 ): string {
     const first = flatPrefix.split('/')[1] ?? '';
-    if (organization !== undefined
-        && ORGANIZATION_NESTED_FIRST_SEGMENTS.has(first)) {
+    const registered = familyRegistration(first);
+    const nested = registered !== undefined
+        ? registered.organizationNested
+        : ORGANIZATION_NESTED_FIRST_SEGMENTS.has(first);
+    if (organization !== undefined && nested) {
         return '/organizations/' + organization
             + flatPrefix;
     }
@@ -160,6 +185,10 @@ export async function formWritePair(
             name: SUPERSEDES_FIELD,
             value: input.headPairId,
         }]),
+        ...(input.follows === undefined ? [] : [{
+            name: FOLLOWS_FIELD,
+            value: input.follows,
+        }]),
     ];
     const responseModel =
         await redactAuthenticationResponse(
@@ -186,6 +215,8 @@ export async function formWritePair(
         responseHash: await messageHashOf(responseMessage),
         ...(input.headPairId === undefined
             ? {} : { supersedes: input.headPairId }),
+        ...(input.follows === undefined
+            ? {} : { follows: input.follows }),
     };
 }
 
@@ -253,13 +284,20 @@ export function httpDateOf(at: string): string {
     return new Date(at).toUTCString();
 }
 
+// The locked-class request header: the client's claimed current
+// head, echoed back so a byte-identical resend is a different
+// message from a genuinely stale one (a different echo hashes
+// differently — spec §The two PUT classes). Exported so api.ts
+// reads the SAME header name the hash covers.
+export const IF_RESPONSE_ID_HEADER = 'if-response-id';
+
 // The header fields worth storing in a pair's request message:
 // enumerated explicitly (never hoisted blindly). `authorization`
 // is redacted downstream (message-redaction.ts); the rest are
 // stored verbatim.
 const HOISTED_HEADER_NAMES: readonly string[] = [
     'authorization', 'content-type', 'idempotency-key',
-    REQUEST_ID_HEADER,
+    REQUEST_ID_HEADER, IF_RESPONSE_ID_HEADER,
 ];
 
 export function hoistedHeaderFields(request: Request): FieldLine[] {
@@ -284,6 +322,9 @@ export function wireHeadersFor(stored: ResponseEntity): HeadersInit {
     };
     if (stored.supersedes !== undefined) {
         headers['Supersedes'] = stored.supersedes;
+    }
+    if (stored.follows !== undefined) {
+        headers['Follows'] = stored.follows;
     }
     return headers;
 }
@@ -389,15 +430,17 @@ export async function appendMessagePair(
         message: pair.responseMessage,
         ...(pair.supersedes === undefined
             ? {} : { supersedes: pair.supersedes }),
+        ...(pair.follows === undefined
+            ? {} : { follows: pair.follows }),
     });
 }
 
 // The create-address override table: which body field names
 // the created entity for create-shaped collection POSTs. Grown
-// family by family in Tasks 2-5.
+// family by family in Tasks 2-5. A registered family (family-
+// registry.ts) answers ONLY from its own createBodyIdField —
+// its entry here is deleted, never kept as a parallel truth.
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
-    'ideas': 'id',
-    'flows': 'id',
     'work-orders': 'id',
     'records': 'id',
     'objectives': 'id',
@@ -415,7 +458,28 @@ export function createdEntityUriId(
     routePattern: string,
     body: Record<string, unknown> | undefined,
 ): string | undefined {
-    const field = CREATE_BODY_ID_FIELDS[routePattern];
+    // A registered family's createBodyIdField serves a bare
+    // collection-POST create route whose pattern IS the family
+    // name (e.g. 'records' below, still an unregistered
+    // literal). Ideas registered this slot in Task 1 for its own
+    // POST /ideas, which Phase 2 Task 3 (R1) retired — genesis
+    // folded into the document-class PUT ideas/:id, whose uriId
+    // messageAddress already derives from the path segment, so
+    // this lookup never fires for ideas today. Projects (second
+    // family) registers the same inert slot: it has NO bare
+    // collection POST at all, so the registry consult here never
+    // fires for it either — the route-pattern==family-name
+    // coincidence remains unexercised by both registered
+    // families. Flows (third family, Phase 4 Task 1) is the
+    // first to exercise it: POST flows is a live bare
+    // collection-POST create route whose pattern is literally
+    // 'flows', so the registry consult now FIRES for real — the
+    // coincidence is no longer theoretical. Falls back to the
+    // literal table for every not-yet-registered pattern.
+    const registered = familyRegistration(routePattern);
+    const field = registered !== undefined
+        ? registered.createBodyIdField
+        : CREATE_BODY_ID_FIELDS[routePattern];
     if (field === undefined || body === undefined) {
         return undefined;
     }
@@ -431,7 +495,7 @@ export function createdEntityUriId(
 // write route — so no intermediate commit ever advertises a
 // Response-ID it did not store.
 export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
-    'ideas',
+    'members/:id',
     'ideas/:id',
     'ideas/:id/conversion',
     'ideas/:id/submissions/:sid',
@@ -441,8 +505,8 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'flows',
     'flows/:id',
     'flows/:id/undo',
-    'flows/:id/redo',
     'flows/:id/versions',
+    'flows/:id/versions/:vid',
     'work-orders',
     'work-orders/:id',
     'work-orders/:id/claim',
@@ -453,6 +517,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'record-attributes/:id',
     'flows/:id/records/:frid',
     'objectives',
+    'objectives/:id',
     'objectives/:id/revisions/:rid',
     'projects/:id/objective-baseline-scores/:sid',
     'projects/:id/objective-actual-scores/:sid',
@@ -511,13 +576,14 @@ export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
 // family alongside PAIR_WIRED_ROUTE_PATTERNS.
 export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
     new Set([
-        'ideas',
+        'members/:id',
         'ideas/:id',
         'ideas/:id/submissions/:sid',
         'projects/:id',
         'projects/:id/flows/:pfid',
         'flows',
         'flows/:id',
+        'flows/:id/versions/:vid',
         'work-orders',
         'work-orders/:id',
         'flows/:id/work-orders/:woid',
@@ -526,6 +592,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'record-attributes/:id',
         'flows/:id/records/:frid',
         'objectives',
+        'objectives/:id',
         'objectives/:id/revisions/:rid',
         'projects/:id/objective-baseline-scores/:sid',
         'projects/:id/objective-actual-scores/:sid',

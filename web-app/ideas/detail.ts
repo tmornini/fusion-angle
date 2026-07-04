@@ -34,6 +34,7 @@ import {
     sessionContext,
     type IdeaWithSubmitter,
 } from '../app/adapters/index.ts';
+import type { IdeaEntity } from '../../api/types.ts';
 
 const { signal } = createPageAbort();
 
@@ -99,7 +100,7 @@ const TRANSITION_CONFIG:
 };
 
 async function transitionIdea(
-    ideaId: string,
+    entity: IdeaEntity,
     toState: IdeaTransition,
 ): Promise<void> {
     if (!state) return;
@@ -107,7 +108,7 @@ async function transitionIdea(
     const cfg = TRANSITION_CONFIG[toState]!;
     try {
         await postIdeaStateChange(
-            ctx, ideaId, toState,
+            ctx, entity, toState,
         );
     } catch (err) {
         reportFault(ctx, cfg.failureToast, err);
@@ -269,16 +270,16 @@ function handleIdeaActions(
             return true;
         case 'submit-review':
             void transitionIdea(
-                ideaId, 'in_review',
+                state.view.entity, 'in_review',
             );
             return true;
         case 'approve':
             void transitionIdea(
-                ideaId, 'approved',
+                state.view.entity, 'approved',
             );
             return true;
         case 'send-back-confirm':
-            void handleSendBackConfirm(ideaId);
+            void handleSendBackConfirm(state.view.entity);
             return true;
         default:
             return false;
@@ -286,11 +287,11 @@ function handleIdeaActions(
 }
 
 async function handleSendBackConfirm(
-    ideaId: string,
+    entity: IdeaEntity,
 ): Promise<void> {
     closeDialog('approval-send-back');
     await transitionIdea(
-        ideaId, 'sent_back',
+        entity, 'sent_back',
     );
 }
 
@@ -350,11 +351,15 @@ async function handleSave(): Promise<void> {
     );
     const ideaId = state.view.idea.idForLink();
     const entity = state.view.entity;
+    const idea = state.view.idea;
     const ctx = sessionContext();
     try {
         await putIdea(ctx, ideaId, {
             ...entity,
             ...trimStrings(patch),
+            state: idea.stateValue(),
+            stateAt: idea.stateAtValue(),
+            stateEventId: idea.stateEventIdValue(),
         });
     } catch (err) {
         log.error(

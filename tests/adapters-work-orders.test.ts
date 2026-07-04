@@ -15,6 +15,11 @@ import {
 } from
 '../web-app/app/adapters/work-orders-mutations.ts';
 import {
+    postFlowCreation,
+    putFlow,
+} from
+'../web-app/app/adapters/flow-mutations.ts';
+import {
     generateCryptoSafeBase62,
 } from
 '../shared/crypto-safe-base62.ts';
@@ -34,7 +39,6 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {
-    FlowEntity,
     GraphNode,
     GraphEdge,
     StoredGraph,
@@ -102,20 +106,6 @@ function buildEdge(
     };
 }
 
-function buildFlow(
-    graph: StoredGraph,
-): Omit<FlowEntity, 'id'> {
-    return {
-        organization_id: '1',
-        name: 'Test flow',
-        is_locked: false,
-        is_auto_layout: true,
-        is_auto_fit: true,
-        lock_timeout:
-            DEFAULT_LOCK_TIMEOUT,
-    };
-}
-
 function buildLinearGraph(): StoredGraph {
     return {
         nodes: [
@@ -150,63 +140,45 @@ function buildLinearGraph(): StoredGraph {
     };
 }
 
-// Seed the flow row AND the four relation tables from a
-// StoredGraph. GET /flows/:id reassembles the read graph from
-// the relations (the read source of record), so a blob-only
-// put would reassemble to an empty graph. Direct puts with no
-// 'deleted' state event leave every node/edge live.
+// Seed (or re-save) a flow through the SAME gate-driven create/
+// document-PUT idiom the live route uses (postFlowCreation +
+// putFlow), so a message pair exists at this flow's address —
+// required for the flipped GET flows/:id route (Phase 4 Task
+// 8), which postWorkOrderCreation reads before creating, to
+// derive it. A first call creates (postFlowCreation seeds a
+// default start/complete graph; the immediate putFlow overwrites
+// it with the caller's own graph); a REPEAT call on the same
+// flowId (the "freezes flow_graph against subsequent flow
+// edits" case re-seeds 'f1' to simulate an edit) instead saves
+// straight over the existing flow via putFlow alone — postFlowCreation
+// is genesis-only.
 async function seedFlow(
     db: MemoryDbAdapter,
     flowId: string,
     graph: StoredGraph,
 ): Promise<void> {
-    await db.flows.put(flowId, buildFlow(graph));
-    const at = '2026-01-01T00:00:00.000000Z';
-    for (const n of graph.nodes) {
-        await db.flowNodes.put(n.id, {
-            flow_id: flowId,
-            name: n.name,
-            position_x: n.positionX,
-            position_y: n.positionY,
-            is_create: n.isCreate,
-            is_archive: n.isArchive,
-            task_instructions: n.taskInstructions,
-            at,
-        });
-        for (const mid of n.memberIds) {
-            await db.flowNodeMembers.put(
-                `${n.id}-${mid}`,
-                {
-                    flow_node_id: n.id,
-                    member_id: mid,
-                    action: 'added',
-                    at,
-                },
-            );
-        }
-        for (const a of n.attributes) {
-            await db.flowNodeAttributes.put(
-                `${n.id}-${a.attributeId}`,
-                {
-                    flow_node_id: n.id,
-                    attribute_id: a.attributeId,
-                    mode: a.mode,
-                    is_required: a.isRequired,
-                    action: 'added',
-                    at,
-                },
-            );
-        }
+    const ctx = createRequestContext(db, await devToken());
+    const save = {
+        name: 'Test flow',
+        isLocked: false,
+        isAutoLayout: true,
+        isAutoFit: true,
+        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+        nodes: graph.nodes,
+        edges: graph.edges,
+    };
+    const existing = await db.flows.getAll();
+    if (existing.some(f => f.id === flowId)) {
+        await putFlow(ctx, flowId, save);
+        return;
     }
-    for (const e of graph.edges) {
-        await db.flowEdges.put(e.id, {
-            flow_id: flowId,
-            name: e.name,
-            from_node_id: e.fromNodeId,
-            to_node_id: e.toNodeId,
-            at,
-        });
-    }
+    await postFlowCreation(ctx, {
+        flowId,
+        linkId: flowId + '-link',
+        projectId: 'p-' + flowId,
+        name: save.name,
+    });
+    await putFlow(ctx, flowId, save);
 }
 
 async function setupDb(): Promise<{

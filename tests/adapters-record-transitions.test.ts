@@ -13,6 +13,9 @@ import {
 } from
 '../web-app/app/adapters/record-transitions.ts';
 import {
+    postFlowCreation,
+} from '../web-app/app/adapters/flow-mutations.ts';
+import {
     storedWorkOrderFlowGraphField,
     jsonArrayField,
     SYSTEM_MEMBER_ID,
@@ -116,6 +119,14 @@ async function seedBinding(
     });
 }
 
+// DELTA (Phase 4 Task 8 — the inventory grep, not the brief,
+// found this site): getRecordForWorkOrder walks
+// getAllFlowWorkOrderEntities -> getFlowEntities(ctx), i.e. the
+// flipped GET flows list — a raw db.flows.put leaves no message
+// pair, so the flipped list would never find this flow and the
+// record binding lookup would silently resolve empty. Seeded
+// through the SAME document PUT the live route uses
+// (postFlowCreation) so a pair exists at this flow's address.
 async function seedFlowLink(
     db: MemoryDbAdapter,
     flowId: string,
@@ -124,13 +135,12 @@ async function seedFlowLink(
     // The flow↔work-order join nests under its parent flow now,
     // so the parent flow must exist to be enumerated — the
     // record lookup walks flows → work-orders → records.
-    await db.flows.put(flowId, {
-        organization_id: '1',
+    const ctx = createRequestContext(db, await devToken());
+    await postFlowCreation(ctx, {
+        flowId,
+        linkId: flowId + '-link',
+        projectId: 'p-' + flowId,
         name: flowId,
-        is_locked: false,
-        is_auto_layout: false,
-        is_auto_fit: false,
-        lock_timeout: DEFAULT_LOCK_TIMEOUT,
     });
     await db.flowWorkOrders.put(
         'fwo-' + workOrderId, {

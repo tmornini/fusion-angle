@@ -15,20 +15,25 @@
 // literals that merely happen to agree, so a stored pair can
 // never drift from what was actually written.
 //
-// Only the six seed op-invocations that already accept a `pair?`
-// parameter are covered here (traced against every
+// Only the eight seed op-invocations that already accept a
+// `pair?` parameter are covered here (traced against every
 // postXxxCreationOp / postRecordWriteOp call site in
-// mock-data.ts): human-members, ideas, flows, ai-members,
-// records, objectives. Memberships, project_objective_baseline_
-// scores, and work-order historical traces are direct writes the
-// seed never routes through a pair-capable op — the three named
-// deferrals stay untouched.
+// mock-data.ts): human-members, ideas, idea-submissions,
+// projects, flows, ai-members, records, objectives.
+// Memberships, project_objective_baseline_scores, and
+// work-order historical traces are direct writes the seed
+// never routes through a pair-capable op — the three named
+// deferrals stay untouched. A fourth, previously-unlisted
+// direct write — seed-flow-org2 — is now ALSO covered here,
+// closed through postFlowDocumentOp (Task 6).
 
 import type {
     Id,
     StateEntity,
     AIMemberEntity,
     IdeaEntity,
+    IdeaSubmissionEntity,
+    ProjectEntity,
     RecordEntity,
     RecordAttributeEntity,
     ProjectFlowEntity,
@@ -37,12 +42,18 @@ import {
     jsonArrayField,
     jsonObjectField,
     nowUtc,
+    DEFAULT_LOCK_TIMEOUT,
     SYSTEM_MEMBER_ID,
 } from '../types.ts';
 import {
     formWritePair,
 } from '../message-pair.ts';
 import type { MessagePair } from '../message-pair.ts';
+import {
+    WRITE_RESPONSE_SPECS,
+    flowCreateDocumentBody,
+} from '../routes.ts';
+import { validateFlowCreateBody } from '../validators.ts';
 import {
     MOCK_SEED_TIMESTAMP,
     STARK_ORGANIZATION,
@@ -52,7 +63,7 @@ import {
 import { daysFromNow } from './seed-kit.ts';
 import { buildMembers } from './members.ts';
 import type { SeedHumanMember } from './members.ts';
-import { buildIdeas } from './ideas.ts';
+import { buildIdeas, buildIdeaSubmissions } from './ideas.ts';
 import { buildFlows, buildFlowGraphRelations } from './flows.ts';
 import type { FlowSeed, FlowGraphRelations } from './flows.ts';
 import { buildAiMembers } from './ai-members.ts';
@@ -67,7 +78,7 @@ import {
     l2cFlowId,
     l2cProjectFlowId,
 } from './lead-to-close-flow.ts';
-import { l2cProjectId } from './projects.ts';
+import { l2cProjectId, buildProjects } from './projects.ts';
 
 // ---- hoisted static seed-event data ----
 //
@@ -82,8 +93,8 @@ import { l2cProjectId } from './projects.ts';
 export const wfTimestamp = daysFromNow(-60, 9, 0);
 
 // One state event per seeded idea — the creation moment of
-// each idea on the states log, doubling as postIdeaCreationOp's
-// initial-state input.
+// each idea on the states log, doubling as postIdeaDocumentOp's
+// genesis-state input.
 export const ideaStateEvents: StateEntity[] = [
     {
         id: 'qJoFXyzUUaq0vEpHL5e34l',
@@ -161,6 +172,135 @@ export const ideaStateEvents: StateEntity[] = [
         state: 'in_review',
         member_id: 'Trf1Up2jMsPhEnjbW4Ji1n',
         at: daysFromNow(-20, 9, 0),
+    },
+];
+
+// One state event per seeded project (including the org-2
+// override's own event) — the creation moment of each project
+// on the states log, doubling as postProjectDocumentOp's
+// genesis-state input.
+export const projectStateEvents: StateEntity[] = [
+    {
+        // 'submitted' so the scoring loop skips this org-'2'
+        // project — no cross-org score against org-'1'
+        // objectives.
+        id: 'seed-state-project-org2',
+        entity_id: 'seed-project-org2',
+        state: 'submitted',
+        member_id: SYSTEM_MEMBER_ID,
+        at: MOCK_SEED_TIMESTAMP,
+    },
+    {
+        id: 'pSe01Cu5tSegmAi5pEv01',
+        entity_id: 'u6YkHhlGc91oDMkr3x0isa',
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-60, 9, 0),
+    },
+    {
+        id: 'pSe02Aut0Rep0rtComp02',
+        entity_id: 'jRE2Tj32NHsFGZIeEADp0p',
+        state: 'archived',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-110, 9, 0),
+    },
+    {
+        id: 'pSe03SalesP1p3App03Z',
+        entity_id: l2cProjectId,
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-55, 9, 0),
+    },
+    {
+        id: 'pSe04PredMa1ntRev04AB',
+        entity_id: 'P04PredMa1ntzyXY010203',
+        state: 'under_review',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-18, 9, 0),
+    },
+    {
+        id: 'pSe05RtAna1ytComp05CD',
+        entity_id: 'P05RtAna1ytcsXY010203Z',
+        state: 'archived',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-95, 9, 0),
+    },
+    {
+        id: 'pSe06SmInvOptSnt06EF',
+        entity_id: 'P06SmInvOptZyXY010203A',
+        state: 'sent_back',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-38, 9, 0),
+    },
+    {
+        id: 'pSe07Empl0yTraRev07GH',
+        entity_id: 'P07Empl0yTrainZyXY00B0',
+        state: 'under_review',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-12, 9, 0),
+    },
+    {
+        id: 'pSe08CustSuppApp08IJ',
+        entity_id: 'P08CustSuppKn0wXY01C0D',
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-48, 9, 0),
+    },
+    {
+        id: 'pSe09C0mp1AudApp09KL',
+        entity_id: 'P09C0mp1AudAut0mXY01E0',
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-72, 9, 0),
+    },
+    {
+        id: 'pSe10MlRgD1s4App10MN',
+        entity_id: 'P10MlRgD1s4stRc1XY01FG',
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-82, 9, 0),
+    },
+    {
+        id: 'pSe11V0iceField11OPQ',
+        entity_id: 'P11V0iceField0psXY01HJ',
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-40, 9, 0),
+    },
+    {
+        id: 'pSe12CarbF00tCmp12RS',
+        entity_id: 'P12CarbF00tprXY01K0L0M',
+        state: 'archived',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-120, 9, 0),
+    },
+    {
+        id: 'pSe13W0rk4rcRev13TU',
+        entity_id: 'P13W0rk4rcF0r3castsXY1',
+        state: 'under_review',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-22, 9, 0),
+    },
+    {
+        id: 'pSe14SmartD0cAp14VWX',
+        entity_id: 'P14SmartD0cumtR0utngX1',
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-65, 9, 0),
+    },
+    {
+        id: 'pSe15Inv3st0rAp15YZA',
+        entity_id: 'P15Inv3st0rRep0rtP1Y00',
+        state: 'approved',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-58, 9, 0),
+    },
+    {
+        id: 'pSe16MktSentSubmt16BC',
+        entity_id: 'P16MktSent1mentXY01020',
+        state: 'submitted',
+        member_id: SYSTEM_MEMBER_ID,
+        at: daysFromNow(-5, 9, 0),
     },
 ];
 
@@ -349,22 +489,99 @@ export function humanMemberSeedBody(
     };
 }
 
+// The genesis case of the document PUT ideas/:id (Decision 7,
+// Phase 2 Task 3): the flat entity fields plus the lifecycle
+// trio, no `id` (a route param, not a body field) and no
+// `idea`/`initialState*` wrapper. organization_id rides along
+// as the validator's tolerated-but-ignored extra — load-bearing
+// here since the seed drives postIdeaDocumentOp below the org
+// fence (no scoping wrapper to stamp it).
 export function ideaSeedBody(
     idea: Omit<IdeaEntity, 'organization_id'>,
     event: StateEntity,
     index: number,
 ): Record<string, unknown> {
-    const { id, ...ideaFields } = idea;
+    const { id: _id, ...ideaFields } = idea;
     return {
-        id,
-        idea: {
-            ...ideaFields,
-            organization_id: assignOrganization(index),
-        },
-        initialState: event.state,
-        initialStateEventId: event.id,
-        initialStateAt: event.at,
+        ...ideaFields,
+        organization_id: assignOrganization(index),
+        state: event.state,
+        state_at: event.at,
+        state_event_id: event.id,
     };
+}
+
+// The genesis case of the document PUT
+// ideas/:id/submissions/:sid (Phase 2 Task 4b): the flat
+// entity fields, no `id` (a route param, not a body field) —
+// the SAME shape putIdeaSubmission's ctx.PUT body carries
+// (web-app/app/adapters/ideas.ts).
+export function ideaSubmissionSeedBody(
+    submission: IdeaSubmissionEntity,
+): Record<string, unknown> {
+    const { id: _id, ...fields } = submission;
+    return { ...fields };
+}
+
+// The genesis case of the document PUT projects/:id (mirrors
+// ideaSeedBody exactly): the flat entity fields plus the
+// lifecycle trio, no `id` (a route param, not a body field).
+// organization_id rides along as the validator's tolerated-but-
+// ignored extra — load-bearing here since the seed drives
+// postProjectDocumentOp below the org fence (no scoping wrapper
+// to stamp it). Unlike ideas, every Stark project shares one
+// org, so `organization` is passed straight through rather than
+// derived from an index.
+export function projectSeedBody(
+    project: Omit<ProjectEntity, 'organization_id'>,
+    event: StateEntity,
+    organization: Id,
+): Record<string, unknown> {
+    const { id: _id, ...projectFields } = project;
+    return {
+        ...projectFields,
+        organization_id: organization,
+        state: event.state,
+        state_at: event.at,
+        state_event_id: event.id,
+    };
+}
+
+// The 17th seeded project: organization '2' owns a small,
+// self-contained slice so each org owns at least one (mirrors
+// ORGANIZATION_TWO_OBJECTIVE). A near-copy of the first Stark
+// project under its own id and title — the ONE shared
+// construction both the invocation loop (this file) and the
+// write (mock-data.ts) use, so pass 1's pair can never drift
+// from what pass 2 actually stores. The literal id (matching
+// the sibling 'seed-flow-org2' / 'seed-state-flow-org2' sentinels
+// above) is exported so both files compare against the SAME
+// string rather than each re-typing it.
+export const secondOrganizationProjectId = 'seed-project-org2';
+
+export function projectOrg2(
+    projects: readonly Omit<ProjectEntity, 'organization_id'>[],
+): Omit<ProjectEntity, 'organization_id'> {
+    return {
+        ...projects[0]!,
+        id: secondOrganizationProjectId,
+        title: 'Wayne R&D Portfolio',
+    };
+}
+
+// Every Stark project lands in STARK_ORGANIZATION; the lone
+// org-2 override (secondOrganizationProjectId) lands in
+// ORGANIZATION_TWO. The ONE construction both pass 1 (this
+// file's buildMockDataInvocations) and pass 2
+// (mock-data.ts's postProjectDocumentOp loop) consume, so
+// neither can drift from the other by hand-editing a second
+// ternary.
+export function projectOrganizationFor(
+    project: Omit<ProjectEntity, 'organization_id'>,
+): Id {
+    return project.id === secondOrganizationProjectId
+        ? ORGANIZATION_TWO
+        : STARK_ORGANIZATION;
 }
 
 export function flowSeedBody(
@@ -409,6 +626,44 @@ export function flowSeedBody(
                     a => nodeIds.has(a.flow_node_id),
                 ),
         },
+    };
+}
+
+// The genesis case of the document PUT flows/:id for
+// organization '2's own flow (Task 6): mirrors ideaSeedBody/
+// projectSeedBody's shape — the flat entity fields plus the
+// lifecycle trio — but for the flows family, which also
+// carries the client-authored graph snapshot and the two
+// transitional decomposition sidecars (validateFlowDocumentBody).
+// This flow has no project_flows join row (org '2' gets a
+// flow-free project and a work-order-free flow — no cross-org
+// coupling), so it drives through postFlowDocumentOp rather
+// than postFlowCreationOp (which requires a join row).
+// organization_id rides along as the validator's tolerated-
+// but-ignored extra — load-bearing here since the seed drives
+// postFlowDocumentOp below the org fence (no scoping wrapper
+// to stamp it). A fresh flow starts with an empty graph and
+// revives nothing.
+export function flowOrg2SeedBody(): Record<string, unknown> {
+    return {
+        organization_id: ORGANIZATION_TWO,
+        name: 'Wayne Onboarding',
+        is_locked: false,
+        is_auto_layout: true,
+        is_auto_fit: true,
+        lock_timeout: DEFAULT_LOCK_TIMEOUT,
+        state: 'active',
+        state_at: MOCK_SEED_TIMESTAMP,
+        state_event_id: 'seed-state-flow-org2',
+        graph: jsonObjectField({ nodes: [], edges: [] }),
+        graphDelta: {
+            nodes: [],
+            edges: [],
+            deletions: [],
+            memberEvents: [],
+            attributeEvents: [],
+        },
+        revivals: [],
     };
 }
 
@@ -544,15 +799,24 @@ export function seedPairKey(
 interface MockDataInvocation {
     readonly key: string;
     readonly routePattern: string;
+    // Present only for a document-class genesis PUT: the path
+    // value for each ':'-prefixed route segment, in pattern
+    // order — one entry for 'ideas/:id' (Phase 2 Task 3), two
+    // for 'ideas/:id/submissions/:sid' (Phase 2 Task 4b: the
+    // idea id, then the submission id). Absent for the five bare
+    // collection-POST creates, which keep forming a POST at the
+    // bare pattern exactly as before.
+    readonly idParams?: readonly Id[];
     readonly organization: Id | undefined;
     readonly requesterIdentityId: Id;
     readonly body: Record<string, unknown>;
 }
 
 // Dependency-ordered (matches postMockDataLoadIn's write order):
-// human-members, ideas, flows, ai-members, records, objectives.
-// A dropped or reordered invocation here is caught by
-// tests/mock-data-pairs.test.ts's pinned invocation count.
+// human-members, ideas, idea-submissions, projects, flows,
+// ai-members, records, objectives. A dropped or reordered
+// invocation here is caught by tests/mock-data-pairs.test.ts's
+// pinned invocation count.
 export function buildMockDataInvocations():
     readonly MockDataInvocation[] {
     const members = buildMembers();
@@ -560,6 +824,10 @@ export function buildMockDataInvocations():
         ideaStateEvents.map(e => [e.entity_id, e]),
     );
     const ideas = buildIdeas();
+    const projects = buildProjects();
+    const projectStateEventById = new Map(
+        projectStateEvents.map(e => [e.entity_id, e]),
+    );
     const mockFlows = buildFlows();
     const flowRelations = buildFlowGraphRelations(
         mockFlows, MOCK_SEED_TIMESTAMP,
@@ -586,31 +854,99 @@ export function buildMockDataInvocations():
             body: humanMemberSeedBody(member),
         });
     }
+    const ideaIndexById = new Map(
+        ideas.map((idea, i) => [idea.id, i]),
+    );
     ideas.forEach((idea, i) => {
         const event = ideaStateEventById.get(idea.id)!;
         invocations.push({
             key: seedPairKey('ideas', idea.id),
-            routePattern: 'ideas',
+            routePattern: 'ideas/:id',
+            idParams: [idea.id],
             organization: assignOrganization(i),
             requesterIdentityId: event.member_id,
             body: ideaSeedBody(idea, event, i),
         });
     });
+    for (const submission of buildIdeaSubmissions()) {
+        const ideaIndex = ideaIndexById.get(submission.idea_id)!;
+        invocations.push({
+            key: seedPairKey('idea-submissions', submission.id),
+            routePattern: 'ideas/:id/submissions/:sid',
+            idParams: [submission.idea_id, submission.id],
+            organization: assignOrganization(ideaIndex),
+            requesterIdentityId: submission.member_id,
+            body: ideaSubmissionSeedBody(submission),
+        });
+    }
+    for (const project of [...projects, projectOrg2(projects)]) {
+        const event = projectStateEventById.get(project.id)!;
+        const organization = projectOrganizationFor(project);
+        invocations.push({
+            key: seedPairKey('projects', project.id),
+            routePattern: 'projects/:id',
+            idParams: [project.id],
+            organization,
+            requesterIdentityId: event.member_id,
+            body: projectSeedBody(project, event, organization),
+        });
+    }
     for (const flow of mockFlows) {
         const event = flowStateEventByFlowId.get(flow.id)!;
         const projectFlow = mockProjectFlows.find(
             pf => pf.flow_id === flow.id,
         )!;
+        const createBody = flowSeedBody(
+            flow, event, projectFlow, flowRelations,
+        );
         invocations.push({
             key: seedPairKey('flows', flow.id),
             routePattern: 'flows',
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
-            body: flowSeedBody(
-                flow, event, projectFlow, flowRelations,
+            body: createBody,
+        });
+        // Task 5: create appends THREE pairs — the operation
+        // pair above, plus a document pair (at the flow's own
+        // address) and a join pair (at the project_flows
+        // address), each keyed by its OWN deterministic
+        // invocation entry, mirroring the idea-submissions
+        // two-idParams precedent. The document body is built
+        // through flowCreateDocumentBody — the SAME construction
+        // api/routes.ts's POST /flows handler uses — never a
+        // second, hand-rolled copy.
+        const b = validateFlowCreateBody(createBody);
+        invocations.push({
+            key: seedPairKey('flows/:id', flow.id),
+            routePattern: 'flows/:id',
+            idParams: [flow.id],
+            organization: STARK_ORGANIZATION,
+            requesterIdentityId: event.member_id,
+            body: flowCreateDocumentBody(b),
+        });
+        invocations.push({
+            key: seedPairKey(
+                'projects/:id/flows/:pfid', projectFlow.id,
             ),
+            routePattern: 'projects/:id/flows/:pfid',
+            idParams: [projectFlow.project_id, projectFlow.id],
+            organization: STARK_ORGANIZATION,
+            requesterIdentityId: event.member_id,
+            body: b.projectFlow,
         });
     }
+    // Task 6: the fifth seeded flow — organization '2's own —
+    // has no project_flows join row, so it drives through
+    // postFlowDocumentOp's genesis document PUT instead of the
+    // four-above's postFlowCreationOp.
+    invocations.push({
+        key: seedPairKey('flows/:id', 'seed-flow-org2'),
+        routePattern: 'flows/:id',
+        idParams: ['seed-flow-org2'],
+        organization: ORGANIZATION_TWO,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        body: flowOrg2SeedBody(),
+    });
     for (const m of aiMembers) {
         invocations.push({
             key: seedPairKey('ai-members', m.id),
@@ -663,20 +999,45 @@ export function buildMockDataInvocations():
     return invocations;
 }
 
-// All six families are global/collection-level POSTs (no `:id`
-// segment), so the route/path segments are always the bare
-// pattern — messageAddress derives the empty uriId and
+// Five of the seven families are global/collection-level POSTs
+// (no `:id` segment), so their route/path segments are always
+// the bare pattern — messageAddress derives the empty uriId and
 // createdEntityUriId (message-pair.ts's CREATE_BODY_ID_FIELDS)
-// overrides it to the created entity's own id.
+// overrides it to the created entity's own id. Ideas (Phase 2
+// Task 3, R1) and idea-submissions (Phase 2 Task 4b) are the
+// exception: each genesis folds into a document-class PUT
+// (ideas/:id, ideas/:id/submissions/:sid), so its invocation
+// carries idParams and the id-tailed address is built directly
+// — messageAddress derives the real uriId from the path
+// segment itself, no createdEntityUriId override needed.
 async function formSeedPair(
     inv: MockDataInvocation, requestAt: string,
 ): Promise<MessagePair> {
+    const idParams = inv.idParams;
+    const routeSegments = inv.routePattern.split('/');
+    let paramIndex = 0;
+    const pathSegments = idParams === undefined
+        ? routeSegments
+        : routeSegments.map((segment) =>
+            segment.startsWith(':')
+                ? idParams[paramIndex++]!
+                : segment);
+    const method = idParams === undefined ? 'POST' : 'PUT';
+    // Every bare collection-POST family here is a create route,
+    // all {status: 204} in WRITE_RESPONSE_SPECS (routes.ts) — no
+    // successBody. A document-class genesis PUT reads its OWN
+    // spec from the same table (documentSeedResponse) so a
+    // seeded pair's stored response can never drift from what
+    // the live gate would have stored for the identical request.
+    const response = idParams === undefined
+        ? { status: 204, body: undefined }
+        : documentSeedResponse(inv, routeSegments, pathSegments);
     return formWritePair({
-        method: 'POST',
-        pathname: '/' + inv.routePattern,
+        method,
+        pathname: '/' + pathSegments.join('/'),
         routePattern: inv.routePattern,
-        routeSegments: [inv.routePattern],
-        pathSegments: [inv.routePattern],
+        routeSegments,
+        pathSegments,
         // The seed carries no real HTTP request — no bearer to
         // redact, no content-type to hoist. Honest about the
         // below-gate carve-out rather than synthesizing a fake
@@ -686,15 +1047,44 @@ async function formSeedPair(
         requesterIdentityId: inv.requesterIdentityId,
         requestAt,
         organization: inv.organization,
-        // Every wired family here is a create route; all six
-        // are {status: 204} in WRITE_RESPONSE_SPECS (routes.ts)
-        // — no successBody.
-        responseStatus: 204,
-        responseBody: undefined,
+        responseStatus: response.status,
+        responseBody: response.body,
         // Fresh database: every seed pair is genesis, so there
         // is nothing to chain off of — no pre-tx head-read.
         headPairId: undefined,
     });
+}
+
+// The response side of a document-class genesis seed write: the
+// SAME per-pattern spec the live gate reads (WRITE_RESPONSE_
+// SPECS, api/routes.ts) — one voice, so a seed pair's stored
+// response can never drift from what the gate would have stored
+// for the identical request. `params` mirrors matchRoute's own
+// extraction (routes.ts): the path segment at each `:`-prefixed
+// route segment, in order.
+function documentSeedResponse(
+    inv: MockDataInvocation,
+    routeSegments: readonly string[],
+    pathSegments: readonly string[],
+): { readonly status: number; readonly body: unknown } {
+    const spec = WRITE_RESPONSE_SPECS[inv.routePattern];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for seeded document'
+            + ' route: ' + inv.routePattern,
+        );
+    }
+    const params = routeSegments
+        .map((segment, i) =>
+            segment.startsWith(':') ? pathSegments[i] : undefined)
+        .filter((value): value is string => value !== undefined);
+    return {
+        status: spec.status,
+        body: spec.successBody?.(
+            params, inv.body, inv.requesterIdentityId,
+            inv.organization,
+        ),
+    };
 }
 
 // Pass 1 for postMockDataLoad: every op-invocation's pair,

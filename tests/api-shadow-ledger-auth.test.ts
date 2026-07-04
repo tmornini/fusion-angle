@@ -13,6 +13,7 @@ import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
 import type { NotificationEvent } from '../api/notifications.ts';
+import { REQUEST_ID_HEADER } from '../api/request-context.ts';
 
 // C1 discharge: the /authentication/{token,authorize} message
 // pairs carry live secrets in BOTH directions (a request's
@@ -25,10 +26,17 @@ import type { NotificationEvent } from '../api/notifications.ts';
 const BASE = 'http://localhost';
 const PASSWORD = 'hunter2-s3cret';
 
-function jsonPost(path: string, body: unknown): Request {
+function jsonPost(
+    path: string,
+    body: unknown,
+    extraHeaders: Record<string, string> = {},
+): Request {
     return new Request(`${BASE}/${path}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            ...extraHeaders,
+        },
         body: JSON.stringify(body),
     });
 }
@@ -194,10 +202,16 @@ async () => {
     await seedRootAdmin(db);
     const { code } = await fullLoginFlow(db);
     const before = (await db.requests.getAll()).length;
+    // A distinguishing header keeps this replay from being
+    // byte-identical to the original exchange — otherwise
+    // appendMessagePair's same-hash dedup (message-pair.ts)
+    // would mask a regression that mistakenly appended a pair
+    // on a failing branch: the row counts below would stay
+    // flat whether or not a stray append fired.
     const replay = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'authorization_code', code,
-        }));
+        }, { [REQUEST_ID_HEADER]: 'replay-attempt' }));
     assert.equal(replay.status, 401);
     assert.equal((await db.requests.getAll()).length, before);
     assert.equal(
@@ -429,11 +443,15 @@ test('a reused (already-rotated-away) refresh token grant is a'
         refresh_token: first.refresh_token,
     }));
     const before = (await db.requests.getAll()).length;
+    // Same reasoning as the double-spent-code test above: a
+    // distinguishing header keeps this reuse attempt from
+    // being byte-identical to the rotation that already
+    // stored a pair with the same body.
     const reused = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'refresh',
             refresh_token: first.refresh_token,
-        }));
+        }, { [REQUEST_ID_HEADER]: 'replay-attempt' }));
     assert.equal(reused.status, 401);
     assert.equal((await db.requests.getAll()).length, before);
     assert.equal(

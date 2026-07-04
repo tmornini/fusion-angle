@@ -59,6 +59,8 @@ const KEYED_READS: ReadonlyArray<{
     },
     { table: 'requests', column: 'message_hash' },
     { table: 'responses', column: 'uri_id' },
+    { table: 'requests', column: 'uri_prefix' },
+    { table: 'responses', column: 'uri_prefix' },
 ];
 
 test('every keyed read has a matching secondary index', () => {

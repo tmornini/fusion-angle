@@ -5,6 +5,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
@@ -12,11 +13,14 @@ import {
     getFlowStats,
 } from '../web-app/app/adapters/flow-stats.ts';
 import {
+    postFlowCreation,
+    putFlow,
+} from '../web-app/app/adapters/flow-mutations.ts';
+import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {
-    FlowEntity,
     GraphNode,
     GraphEdge,
     StoredGraph,
@@ -59,76 +63,34 @@ function buildEdge(
     };
 }
 
-// The flow row stores only scalar fields — the graph lives in
-// the relation tables (seeded separately via seedFlowRelations).
-function buildFlow(
-    name: string,
-): Omit<FlowEntity, 'id'> {
-    return {
-        organization_id: '1',
-        name,
-        is_locked: false,
-        is_auto_layout: true,
-        is_auto_fit: true,
-        lock_timeout: DEFAULT_LOCK_TIMEOUT,
-    };
-}
-
-// Seed the four relation tables to match a StoredGraph —
-// GET /flows/:id reassembles the read graph from these rows,
-// so the stored blob is never the read source. Direct puts
-// with no 'deleted' state event leave every node/edge live.
-async function seedFlowRelations(
-    db: MemoryDbAdapter,
+// Seed a flow through the SAME gate-driven create/document-PUT
+// idiom the live route uses (postFlowCreation + putFlow), so a
+// message pair exists at this flow's address — required for the
+// flipped GET flows/:id route (Phase 4 Task 8), which
+// getFlowStats reads via getFlowGraph, to derive it.
+// postFlowCreation seeds a default start/complete graph; the
+// immediate putFlow overwrites it with the caller's own graph.
+async function seedFlow(
+    ctx: RequestContext,
     flowId: string,
+    name: string,
     graph: StoredGraph,
 ): Promise<void> {
-    const at = '2026-01-01T00:00:00.000000Z';
-    for (const n of graph.nodes) {
-        await db.flowNodes.put(n.id, {
-            flow_id: flowId,
-            name: n.name,
-            position_x: n.positionX,
-            position_y: n.positionY,
-            is_create: n.isCreate,
-            is_archive: n.isArchive,
-            task_instructions: n.taskInstructions,
-            at,
-        });
-        for (const mid of n.memberIds) {
-            await db.flowNodeMembers.put(
-                `${n.id}-${mid}`,
-                {
-                    flow_node_id: n.id,
-                    member_id: mid,
-                    action: 'added',
-                    at,
-                },
-            );
-        }
-        for (const a of n.attributes) {
-            await db.flowNodeAttributes.put(
-                `${n.id}-${a.attributeId}`,
-                {
-                    flow_node_id: n.id,
-                    attribute_id: a.attributeId,
-                    mode: a.mode,
-                    is_required: a.isRequired,
-                    action: 'added',
-                    at,
-                },
-            );
-        }
-    }
-    for (const e of graph.edges) {
-        await db.flowEdges.put(e.id, {
-            flow_id: flowId,
-            name: e.name,
-            from_node_id: e.fromNodeId,
-            to_node_id: e.toNodeId,
-            at,
-        });
-    }
+    await postFlowCreation(ctx, {
+        flowId,
+        linkId: flowId + '-link',
+        projectId: 'p-' + flowId,
+        name,
+    });
+    await putFlow(ctx, flowId, {
+        name,
+        isLocked: false,
+        isAutoLayout: true,
+        isAutoFit: true,
+        lockTimeout: DEFAULT_LOCK_TIMEOUT,
+        nodes: graph.nodes,
+        edges: graph.edges,
+    });
 }
 
 // Timestamps relative to now so the 90-day window
@@ -167,16 +129,12 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
+        const ctx = createRequestContext(db, await devToken());
 
-        // Flow f1 with an Onboarding graph — seed both the
-        // blob (for shape) and the relations (the read source
-        // GET /flows/:id reassembles from).
+        // Flow f1 with an Onboarding graph, seeded through the
+        // gate-driven create/document-PUT idiom.
         const f1Graph = buildTestGraph();
-        await db.flows.put(
-            'f1',
-            buildFlow('Onboarding'),
-        );
-        await seedFlowRelations(db, 'f1', f1Graph);
+        await seedFlow(ctx, 'f1', 'Onboarding', f1Graph);
 
         // Minimal VALID work-order graphs — the gate
         // demands shape, but getFlowStats reads from
@@ -244,7 +202,6 @@ test(
             at: daysAgo(40),
         });
 
-        const ctx = createRequestContext(db, await devToken());
         const { model, graph } =
             await getFlowStats(ctx, 'f1', Date.now());
 
@@ -285,15 +242,11 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        // buildFlow is is_auto_layout; buildTestGraph
-        // seeds c→a→z all at (0,0). Seed the relations too —
-        // GET /flows/:id reassembles the read graph from them.
+        const ctx = createRequestContext(db, await devToken());
+        // seedFlow saves is_auto_layout true; buildTestGraph
+        // seeds c→a→z all at (0,0).
         const autoGraph = buildTestGraph();
-        await db.flows.put(
-            'f1',
-            buildFlow('AutoLayout'),
-        );
-        await seedFlowRelations(db, 'f1', autoGraph);
+        await seedFlow(ctx, 'f1', 'AutoLayout', autoGraph);
         await db.workOrders.put('wo1', {
             organization_id: '1',
             display_id: 'WO-1',
@@ -314,7 +267,6 @@ test(
             member_id: 'p1',
             at: daysAgo(10),
         });
-        const ctx = createRequestContext(db, await devToken());
         const { model, graph } =
             await getFlowStats(ctx, 'f1', Date.now());
         const graphPos = new Set(

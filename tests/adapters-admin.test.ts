@@ -5,6 +5,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
@@ -12,8 +13,12 @@ import {
     getOrganization,
     getOrganizationStats,
 } from '../web-app/app/adapters/admin.ts';
+import { putIdea } from '../web-app/app/adapters/ideas.ts';
+import { putProject } from '../web-app/app/adapters/projects.ts';
 import {
     type ProjectEntity, type IdeaEntity,
+    type IdeaState,
+    type ProjectState,
     type MemberState,
 } from '../api/types.ts';
 import { seedHumanMember } from './member-fixtures.ts';
@@ -53,28 +58,51 @@ function buildIdea(
     };
 }
 
+// Seeds a project through the SAME document PUT the live route
+// uses (putProject), so a message pair exists at this project's
+// address — required for the flipped GET projects route
+// (Phase 3 Task 6), which getProjects (getOrganizationStats'
+// project count) reads, to derive it. A fixed historical
+// stateAt (matching the old seedProject idiom this replaces)
+// mirrors seedIdea below.
 async function seedProject(
-    db: MemoryDbAdapter,
-    id: string, state: string,
+    ctx: RequestContext,
+    id: string, state: ProjectState,
 ): Promise<void> {
-    await db.projects.put(id, buildProject(id));
-    await db.states.postEvent(
-        'sp-' + id, id, state, 'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
+    const { organization_id: _organizationId, ...entity } =
+        buildProject(id);
+    await putProject(ctx, id, {
+        ...entity,
+        state,
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'sp-' + id,
+    });
 }
 
+// Seeds an idea through the SAME document PUT the live route
+// uses (putIdea) and its submission through the live
+// submissions PUT, so both message pairs exist — required for
+// the flipped GET ideas / GET ideas/:id/submissions routes
+// (Phase 2 Task 5), which getIdeas (getOrganizationStats' idea
+// count) reads, to derive them. A fixed historical stateAt
+// (matching the old seedIdeaState idiom this replaces) rather
+// than postIdeaCreation's nowUtc(): the 'reflects latest state
+// event' test posts a LATER raw transition at a fixed 2026-01-02
+// instant, which a real-clock genesis timestamp would outrank.
 async function seedIdea(
-    db: MemoryDbAdapter,
-    id: string, state: string,
+    ctx: RequestContext,
+    id: string, state: IdeaState,
     submitter: string,
 ): Promise<void> {
-    await db.ideas.put(id, buildIdea(id));
-    await db.states.postEvent(
-        'si-' + id, id, state, 'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
-    await db.ideaSubmissions.put('sub-' + id, {
+    const { organization_id: _organizationId, ...entity } =
+        buildIdea(id);
+    await putIdea(ctx, id, {
+        ...entity,
+        state,
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'si-' + id,
+    });
+    await ctx.PUT('ideas/' + id + '/submissions/sub-' + id, {
         idea_id: id,
         member_id: submitter,
         at: '2026-04-01T00:00:00.000000Z',
@@ -94,15 +122,15 @@ test(
     'getOrganizationStats counts projects that'
     + ' are not deleted or declined',
     async () => {
-        const { db, ctx } = await adminContext();
-        await seedProject(db, 'p1', 'submitted');
+        const { ctx } = await adminContext();
+        await seedProject(ctx, 'p1', 'submitted');
         await seedProject(
-            db, 'p2', 'under_review',
+            ctx, 'p2', 'under_review',
         );
-        await seedProject(db, 'p3', 'approved');
-        await seedProject(db, 'p4', 'archived');
-        await seedProject(db, 'p5', 'declined');
-        await seedProject(db, 'p6', 'deleted');
+        await seedProject(ctx, 'p3', 'approved');
+        await seedProject(ctx, 'p4', 'archived');
+        await seedProject(ctx, 'p5', 'declined');
+        await seedProject(ctx, 'p6', 'deleted');
         const stats =
             await getOrganizationStats(ctx);
         assert.equal(stats.projectsCurrent, 4);
@@ -116,15 +144,15 @@ test(
         const { db, ctx } = await adminContext();
         await seedMember(db, 'u1', 'active');
         await seedIdea(
-            db, 'i1', 'active', 'u1',
+            ctx, 'i1', 'active', 'u1',
         );
         await seedIdea(
-            db, 'i2', 'in_review', 'u1',
+            ctx, 'i2', 'in_review', 'u1',
         );
-        await seedIdea(db, 'i3', 'approved', 'u1');
-        await seedIdea(db, 'i4', 'promoted', 'u1');
-        await seedIdea(db, 'i5', 'archived', 'u1');
-        await seedIdea(db, 'i6', 'deleted', 'u1');
+        await seedIdea(ctx, 'i3', 'approved', 'u1');
+        await seedIdea(ctx, 'i4', 'promoted', 'u1');
+        await seedIdea(ctx, 'i5', 'archived', 'u1');
+        await seedIdea(ctx, 'i6', 'deleted', 'u1');
         const stats =
             await getOrganizationStats(ctx);
         assert.equal(stats.ideasCurrent, 4);
@@ -152,9 +180,9 @@ test(
     async () => {
         const { db, ctx } = await adminContext();
         await seedMember(db, 'u1', 'active');
-        await seedProject(db, 'p1', 'approved');
+        await seedProject(ctx, 'p1', 'approved');
         await seedIdea(
-            db, 'i1', 'active', 'u1',
+            ctx, 'i1', 'active', 'u1',
         );
         let stats =
             await getOrganizationStats(ctx);

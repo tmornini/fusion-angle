@@ -82,7 +82,11 @@ function makeProject() {
         estimated_cost: 100000,
         actual_cost: 50000,
         position: 0,
-    }, 'approved');
+    }, {
+        state: 'approved',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-pr-1',
+    });
 }
 
 const objectives: ObjectiveEntity[] = [

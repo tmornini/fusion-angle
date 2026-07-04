@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { GET } from '../api/api.ts';
+import { GET, PUT } from '../api/api.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
@@ -24,7 +24,19 @@ async function organizationToken(organization: string): Promise<string> {
 async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);   // current = admin (global)
-    await db.ideas.put('a1', ideaBody('1', 'mine'));
+    // Seeded through the live document PUT (not a raw
+    // db.ideas.put) so a1's message pair exists — the flipped
+    // GET ideas route (Phase 2 Task 5) derives from the ledger,
+    // not the old ideas table. b1 stays a raw row: neither test
+    // below ever fences into org '7', so it is never derived.
+    const { organization_id: _organizationId, ...a1Fields } =
+        ideaBody('1', 'mine');
+    await PUT(db, 'ideas/a1', {
+        ...a1Fields,
+        state: 'active',
+        state_at: '2020-01-01T00:00:00.000000Z',
+        state_event_id: 'ev-a1',
+    }, await organizationToken('1'));
     await db.ideas.put('b1', ideaBody('7', 'theirs'));
     return db;
 }

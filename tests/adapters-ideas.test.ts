@@ -5,6 +5,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
@@ -19,6 +20,7 @@ import {
 } from '../web-app/app/adapters/ideas.ts';
 import {
     type IdeaEntity,
+    type IdeaState,
     type ProjectEntity,
     type ProjectObjectiveBaselineScoreEntity,
 } from '../api/types.ts';
@@ -55,18 +57,50 @@ async function seedIdeaState(
     );
 }
 
+// Seeds an idea through the SAME document PUT the live route
+// uses (postIdeaCreation), so a message pair exists at this
+// idea's address — required for the flipped GET ideas / GET
+// ideas/:id routes (Phase 2 Task 5) to derive it. The direct
+// db.ideas.put + seedIdeaState idiom above stays for tests that
+// read only the raw stores or drive an op directly.
+async function seedIdea(
+    ctx: RequestContext,
+    id: string,
+    title: string,
+    state: IdeaState,
+): Promise<void> {
+    const { organization_id: _organizationId, ...entity } =
+        buildIdea(id, title);
+    await postIdeaCreation(ctx, id, entity, state);
+}
+
+// Seeds a submission through the live PUT
+// ideas/:id/submissions/:sid route, so its message pair exists
+// for the flipped GET ideas/:id/submissions (Phase 2 Task 5) to
+// derive it. Takes an explicit memberId (unlike the
+// putIdeaSubmission adapter, which always stamps the CURRENT
+// actor) so a submission can be attributed to a co-member.
+async function seedIdeaSubmission(
+    ctx: RequestContext,
+    submissionId: string,
+    ideaId: string,
+    memberId: string,
+    at: string,
+): Promise<void> {
+    await ctx.PUT(
+        'ideas/' + ideaId + '/submissions/' + submissionId,
+        { idea_id: ideaId, member_id: memberId, at },
+    );
+}
+
 test('getIdeas returns ideas with submitter', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
-    await db.ideas.put('i1', buildIdea(
-        'i1', 'First idea',
-    ));
-    await seedIdeaState(db, 'i1', 'active');
-    await db.ideaSubmissions.put('s1', {
-        idea_id: 'i1',
-        member_id: 'u1',
-        at: '2026-04-01T00:00:00.000000Z',
-    });
+    await seedIdea(ctx, 'i1', 'First idea', 'active');
+    await seedIdeaSubmission(
+        ctx, 's1', 'i1', 'u1',
+        '2026-04-01T00:00:00.000000Z',
+    );
     const result = await getIdeas(ctx);
     assert.equal(result.length, 1);
     assert.equal(
@@ -86,10 +120,7 @@ test('getIdeas returns ideas with submitter', async () => {
 test('getIdeas throws when idea has no submission', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
-    await db.ideas.put('i1', buildIdea(
-        'i1', 'Orphan',
-    ));
-    await seedIdeaState(db, 'i1', 'active');
+    await seedIdea(ctx, 'i1', 'Orphan', 'active');
     // No submission for i1
     await assert.rejects(
         () => getIdeas(ctx),
@@ -100,15 +131,11 @@ test('getIdeas throws when idea has no submission', async () => {
 test('getIdea finds submission for one idea', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
-    await db.ideas.put('i1', buildIdea(
-        'i1', 'A',
-    ));
-    await seedIdeaState(db, 'i1', 'active');
-    await db.ideaSubmissions.put('s1', {
-        idea_id: 'i1',
-        member_id: 'u1',
-        at: '2026-04-01T00:00:00.000000Z',
-    });
+    await seedIdea(ctx, 'i1', 'A', 'active');
+    await seedIdeaSubmission(
+        ctx, 's1', 'i1', 'u1',
+        '2026-04-01T00:00:00.000000Z',
+    );
     const result = await getIdea(ctx, 'i1');
     assert.equal(result.idea.titleText(), 'A');
     assert.equal(
@@ -119,10 +146,7 @@ test('getIdea finds submission for one idea', async () => {
 test('getIdea throws on missing submission', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
-    await db.ideas.put(
-        'i1', buildIdea('i1', 'A'),
-    );
-    await seedIdeaState(db, 'i1', 'active');
+    await seedIdea(ctx, 'i1', 'A', 'active');
     await assert.rejects(
         () => getIdea(ctx, 'i1'),
         /submission not found/,
@@ -136,6 +160,9 @@ test('putIdea persists changes', async () => {
     );
     await putIdea(ctx, 'i1', {
         ...buildIdea('i1', 'Updated'),
+        state: 'active',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-i1',
     });
     const stored =
         await db.ideas.getById('i1');
@@ -145,24 +172,16 @@ test('putIdea persists changes', async () => {
 test('archived ideas are filtered from getIdeas', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
-    await db.ideas.put(
-        'i1', buildIdea('i1', 'Keep'),
+    await seedIdea(ctx, 'i1', 'Keep', 'active');
+    await seedIdeaSubmission(
+        ctx, 's1', 'i1', 'u1',
+        '2026-04-01T00:00:00.000000Z',
     );
-    await seedIdeaState(db, 'i1', 'active');
-    await db.ideaSubmissions.put('s1', {
-        idea_id: 'i1',
-        member_id: 'u1',
-        at: '2026-04-01T00:00:00.000000Z',
-    });
-    await db.ideas.put(
-        'i2', buildIdea('i2', 'Hide me'),
+    await seedIdea(ctx, 'i2', 'Hide me', 'archived');
+    await seedIdeaSubmission(
+        ctx, 's2', 'i2', 'u1',
+        '2026-04-01T00:00:00.000000Z',
     );
-    await seedIdeaState(db, 'i2', 'archived');
-    await db.ideaSubmissions.put('s2', {
-        idea_id: 'i2',
-        member_id: 'u1',
-        at: '2026-04-01T00:00:00.000000Z',
-    });
     const result = await getIdeas(ctx);
     assert.equal(result.length, 1);
     assert.equal(
@@ -215,7 +234,7 @@ test(
             await db.ideas.getById('i1');
 
         await postIdeaStateChange(
-            ctx, 'i1', 'approved',
+            ctx, before, 'approved',
         );
 
         const after =
@@ -353,25 +372,24 @@ test(
 test('deleted ideas are filtered from getIdeas', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
-    await db.ideas.put(
-        'i1', buildIdea('i1', 'Keep'),
+    await seedIdea(ctx, 'i1', 'Keep', 'active');
+    await seedIdeaSubmission(
+        ctx, 's1', 'i1', 'u1',
+        '2026-04-01T00:00:00.000000Z',
     );
-    await seedIdeaState(db, 'i1', 'active');
-    await db.ideaSubmissions.put('s1', {
-        idea_id: 'i1',
-        member_id: 'u1',
-        at: '2026-04-01T00:00:00.000000Z',
-    });
-    await db.ideas.put(
-        'i2', buildIdea('i2', 'Delete me'),
+    await seedIdea(ctx, 'i2', 'Delete me', 'active');
+    await seedIdeaSubmission(
+        ctx, 's2', 'i2', 'u1',
+        '2026-04-01T00:00:00.000000Z',
     );
-    await seedIdeaState(db, 'i2', 'active');
-    await db.ideaSubmissions.put('s2', {
-        idea_id: 'i2',
-        member_id: 'u1',
-        at: '2026-04-01T00:00:00.000000Z',
-    });
-    await db.ideas.delete('i2');
+    // A transition to 'deleted' (ideas has no DELETE route) —
+    // the flipped GET ideas derives visibility from the
+    // lifecycle trio, not a raw db.ideas.delete row removal, so
+    // the deletion must land as a document PUT like any other
+    // transition (mirrors drift-ideas.test.ts's lifecycle case).
+    await postIdeaStateChange(
+        ctx, await db.ideas.getById('i2'), 'deleted',
+    );
     const result = await getIdeas(ctx);
     assert.equal(result.length, 1);
     assert.equal(

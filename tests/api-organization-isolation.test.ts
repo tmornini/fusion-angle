@@ -47,7 +47,24 @@ async function twoOrganizations(): Promise<MemoryDbAdapter> {
         organization_id: 'A', identity_id: 'current',
         at: '2026-06-04T00:00:00.000000Z',
     });
-    await db.ideas.put('a1', ideaBody('A', 'mine'));
+    // Seeded through the live document PUT (not a raw
+    // db.ideas.put) so a1's message pair exists — the flipped
+    // GET ideas / GET ideas/:id routes (Phase 2 Task 5) derive
+    // from the ledger, not the old ideas table. b1 stays a raw
+    // row: every case below reads it only through org B, which
+    // `current` never fences into, so it is never derived.
+    const { organization_id: _organizationId, ...a1Fields } =
+        ideaBody('A', 'mine');
+    await handleRequest(db, req(
+        'PUT', '/organizations/A/ideas/a1',
+        await devToken('current'),
+        {
+            ...a1Fields,
+            state: 'active',
+            state_at: '2020-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-a1',
+        },
+    ));
     await db.ideas.put('b1', ideaBody('B', 'theirs'));
     return db;
 }
@@ -77,7 +94,12 @@ async () => {
     const res = await handleRequest(db, req(
         'PUT', '/organizations/A/ideas/a2',
         await devToken('current'),
-        { id: 'a2', ...ideaBody('B', 'forged') }));
+        {
+            id: 'a2', ...ideaBody('B', 'forged'),
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-a2',
+        }));
     assert.equal(res.status, 200);
     const stored = await db.ideas.getById('a2');
     assert.equal(stored.organization_id, 'A');
@@ -179,8 +201,13 @@ function workOrderBody(organization: string) {
 }
 
 // Seed a full parent→leaf chain in `org`, ids suffixed `s`.
+// `identity` authors the ONE seed write that now rides the wire
+// (the project-flow join, below) — it must hold a role in
+// `organization` (deepDb grants 'current' admin in A and 'pb'
+// admin in B, solely for this).
 async function seedChain(
     db: MemoryDbAdapter, organization: string, s: string,
+    identity: string,
 ): Promise<void> {
     await db.ideas.put('i' + s, ideaBody(organization, 'idea'));
     await db.projects.put('p' + s, projectBody(organization));
@@ -199,9 +226,18 @@ async function seedChain(
         graph: jsonObjectField({ nodes: [], edges: [] }),
         at: T8_AT,
     });
-    await db.projectFlows.put('pf' + s, {
-        project_id: 'p' + s, flow_id: 'f' + s, at: T8_AT,
-    });
+    // NAMED re-pin (Phase 4 Task 8): the flipped GET
+    // projects/:id/flows derives from the message ledger, not
+    // the raw project_flows table — a raw db.projectFlows.put
+    // leaves no pair at this address, so the link must land
+    // through the SAME wire-reachable PUT the live route serves.
+    // The three OTHER nested-flow sub-collections (versions/
+    // records/work-orders) genuinely stay old-plane — untouched.
+    await handleRequest(db, req(
+        'PUT', '/projects/p' + s + '/flows/pf' + s,
+        await organizationToken(identity, organization),
+        { project_id: 'p' + s, flow_id: 'f' + s, at: T8_AT },
+    ));
     await db.flowWorkOrders.put('fwo' + s, {
         flow_id: 'f' + s, work_order_id: 'wo' + s, at: T8_AT,
     });
@@ -272,8 +308,31 @@ async function deepDb(): Promise<MemoryDbAdapter> {
             member_id: 'system', at: T8_AT,
         });
     }
-    await seedChain(db, 'A', 'A');
-    await seedChain(db, 'B', 'B');
+    // Grants 'pb' admin in B TOO (on top of its plain
+    // membership above) — solely so seedChain's project-flow
+    // join can land through the wire-reachable :pfid PUT (the
+    // flipped GET projects/:id/flows route reads only the
+    // message ledger). No case in this file exercises 'pb's OWN
+    // authorization, so this is inert everywhere but the seed.
+    await db.roleGrants.put('rg-pb-admin-b', {
+        organization_id: 'B', identity_id: 'pb',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system', at: T8_AT,
+    });
+    await seedChain(db, 'A', 'A', 'current');
+    await seedChain(db, 'B', 'B', 'pb');
+    // isA's message pair, on top of the raw row seedChain already
+    // wrote above: the flipped GET ideas/:id/submissions route
+    // (Phase 2 Task 5) derives from the ledger at this idea's
+    // submissions address, so the ideas LEAF_CASES case below
+    // needs a pair to find it. isB stays a raw row — it is read
+    // only through org A's facade, which the fence hides either
+    // way.
+    await handleRequest(db, req(
+        'PUT', '/organizations/A/ideas/iA/submissions/isA',
+        await devToken('current'),
+        { idea_id: 'iA', member_id: 'system', at: T8_AT },
+    ));
     return db;
 }
 

@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { createRequestContext } from
-    '../web-app/app/adapters/shared.ts';
+import {
+    createRequestContext,
+    type RequestContext,
+} from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     getBaselineScoresForProject,
@@ -16,6 +18,7 @@ import {
     postProjectBaselineScoring,
     postProjectActualMeasurement,
 } from '../web-app/app/adapters/project-scoring.ts';
+import { putProject } from '../web-app/app/adapters/projects.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
@@ -100,32 +103,36 @@ test('getProjectScoring returns both lists',
         assert.equal(r.actual[0]!.score, 33);
     });
 
+// Seeds both projects through the SAME document PUT the live
+// route uses (putProject), so a message pair exists at each
+// project's address — required for the flipped GET projects
+// route (Phase 3 Task 6), which getPortfolioImpactSummary /
+// getObjectiveScoringInputs / getProjectsScoreColumn read, to
+// derive them.
 async function seedTwoApprovedProjects(
     db: MemoryDbAdapter,
+    ctx: RequestContext,
 ): Promise<void> {
     const projectBody = {
-        organization_id: '1',
         description: 'd', progress: 0,
         start_date: '2026-05-14',
         target_end_date: '2026-05-14',
         estimated_cost: 0, actual_cost: 0,
     };
-    await db.projects.put('p1', {
+    await putProject(ctx, 'p1', {
         ...projectBody,
         title: 't1', position: 0,
+        state: 'approved',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'st-p1',
     });
-    await db.states.postEvent(
-        'st-p1', 'p1', 'approved', 'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
-    await db.projects.put('p2', {
+    await putProject(ctx, 'p2', {
         ...projectBody,
         title: 't2', position: 1,
+        state: 'approved',
+        stateAt: '2026-01-01T00:00:01.000000Z',
+        stateEventId: 'st-p2',
     });
-    await db.states.postEvent(
-        'st-p2', 'p2', 'approved', 'system',
-        '2026-01-01T00:00:01.000000Z',
-    );
     await db.objectives.put('o1', {
         organization_id: '1',
         position: 0,
@@ -159,8 +166,8 @@ test('getPortfolioImpactSummary averages project averages',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await seedTwoApprovedProjects(db);
         const ctx = createRequestContext(db, await devToken());
+        await seedTwoApprovedProjects(db, ctx);
         const r = await getPortfolioImpactSummary(ctx);
         assert.equal(r.projectCount, 2);
         assert.equal(r.baselineMean, 20); // (60 + -20) / 2
@@ -170,8 +177,8 @@ test('buildObjectiveAggregates returns per-objective rows',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await seedTwoApprovedProjects(db);
         const ctx = createRequestContext(db, await devToken());
+        await seedTwoApprovedProjects(db, ctx);
         const rows = buildObjectiveAggregates(
             await getObjectiveScoringInputs(ctx),
         );
@@ -185,8 +192,8 @@ test('getProjectsScoreColumn returns per-project rollup',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await seedTwoApprovedProjects(db);
         const ctx = createRequestContext(db, await devToken());
+        await seedTwoApprovedProjects(db, ctx);
         const rows = await getProjectsScoreColumn(ctx);
         const byId = new Map(
             rows.map(r => [r.projectId, r]),
@@ -200,7 +207,8 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await seedTwoApprovedProjects(db);
+        const ctx = createRequestContext(db, await devToken());
+        await seedTwoApprovedProjects(db, ctx);
         await db.projectObjectiveActualScores.put(
             'p1:o1:a1',
             {
@@ -219,7 +227,6 @@ test(
                 at: '2026-05-16T00:00:00.000000Z',
             },
         );
-        const ctx = createRequestContext(db, await devToken());
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );
@@ -248,7 +255,8 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await seedTwoApprovedProjects(db);
+        const ctx = createRequestContext(db, await devToken());
+        await seedTwoApprovedProjects(db, ctx);
         await db.projectObjectiveActualScores.put(
             'p1:o1:a1',
             {
@@ -258,7 +266,6 @@ test(
                 at: '2026-05-15T00:00:00.000000Z',
             },
         );
-        const ctx = createRequestContext(db, await devToken());
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );
@@ -278,7 +285,8 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await seedTwoApprovedProjects(db);
+        const ctx = createRequestContext(db, await devToken());
+        await seedTwoApprovedProjects(db, ctx);
         await db.projectObjectiveActualScores.put(
             'p1:o1:a1',
             {
@@ -297,7 +305,6 @@ test(
                 at: '2026-05-15T00:00:00.000000Z',
             },
         );
-        const ctx = createRequestContext(db, await devToken());
         const trendlines = buildObjectiveTrendlines(
             await getObjectiveScoringInputs(ctx),
         );

@@ -6,9 +6,8 @@ import { $required } from '../dom.ts';
 import { showToast } from '../toast.ts';
 import {
     sessionContext,
-    buildFlowPutBody,
-    buildFlowVersionSnapshot,
-    notifyFlowChange,
+    putFlow,
+    postFlowVersion,
     HumanMember,
     AIMember,
 } from '../adapters/index.ts';
@@ -224,26 +223,16 @@ export class FlowDesignerPresenter {
         versioned: boolean,
         snap: FlowSnapshot,
     ): Promise<void> {
-        const history = versioned
-            ? {
-                kind: 'snapshot' as const,
-                version: await buildFlowVersionSnapshot(
-                    ctx,
-                    generateCryptoSafeBase62(),
-                    snap.flowId,
-                ),
-            }
-            : { kind: 'none' as const };
-        await ctx.PUT(
-            `flows/${snap.flowId}`,
-            await buildFlowPutBody(
+        if (versioned) {
+            await postFlowVersion(
                 ctx,
+                generateCryptoSafeBase62(),
                 snap.flowId,
-                this.#buildSaveShape(snap),
-                history,
-            ),
+            );
+        }
+        await putFlow(
+            ctx, snap.flowId, this.#buildSaveShape(snap),
         );
-        notifyFlowChange();
     }
 
     withNameEditing(

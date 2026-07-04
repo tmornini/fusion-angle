@@ -45,7 +45,11 @@ function makeProject(id: string): InstanceType<
         estimated_cost: 0,
         actual_cost: 0,
         position: 0,
-    }, 'under_review');
+    }, {
+        state: 'under_review',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-' + id,
+    });
 }
 
 test(

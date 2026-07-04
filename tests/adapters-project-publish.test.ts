@@ -13,6 +13,8 @@ import {
 import {
     getProjectState,
 } from '../web-app/app/adapters/state-events.ts';
+import { putProject } from
+    '../web-app/app/adapters/projects.ts';
 import {
     seedCurrentMember,
     seedHumanMember,
@@ -21,8 +23,9 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 
+// organization_id EXCLUDED — the client never supplies it (the
+// org fence stamps it downstream); see ProjectDocumentFields.
 const SAMPLE_PROJECT_BODY = {
-    organization_id: '1',
     title: 't',
     description: 'd', progress: 0,
     start_date: '2026-05-14',
@@ -74,11 +77,18 @@ test('postProjectApproval moves state to approved',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        await db.projects.put('p1', SAMPLE_PROJECT_BODY);
-        await db.states.postEvent(
-            'st-init', 'p1', 'under_review', 'current',
-            '2026-01-01T00:00:00.000000Z',
-        );
+        const ctx = createRequestContext(db, await devToken());
+        // Seeded through the live document PUT (not a raw
+        // db.projects.put + db.states.postEvent) so p1's
+        // message pair exists — postProjectApproval /
+        // postProjectArchival gate on the flipped GET
+        // projects/:id existence check (Phase 3 Task 6).
+        await putProject(ctx, 'p1', {
+            ...SAMPLE_PROJECT_BODY,
+            state: 'under_review',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'st-init',
+        });
         await db.objectives.put('o1', {
             organization_id: '1', position: 0,
         });
@@ -89,7 +99,6 @@ test('postProjectApproval moves state to approved',
               member_id: 'w1',
               at: '2026-05-14T00:00:00.000000Z' },
         );
-        const ctx = createRequestContext(db, await devToken());
         await postProjectApproval(ctx, 'p1');
         const s = await getProjectState(ctx, 'p1');
         assert.equal(s, 'approved');
@@ -100,11 +109,18 @@ test('postProjectApproval throws when not ready',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        await db.projects.put('p1', SAMPLE_PROJECT_BODY);
+        const ctx = createRequestContext(db, await devToken());
+        // A SYNTHESIZED trio (this fixture never carried one) —
+        // the state itself is irrelevant to this test.
+        await putProject(ctx, 'p1', {
+            ...SAMPLE_PROJECT_BODY,
+            state: 'under_review',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'st-init',
+        });
         await db.objectives.put('o1', {
             organization_id: '1', position: 0,
         });
-        const ctx = createRequestContext(db, await devToken());
         await assert.rejects(
             () => postProjectApproval(ctx, 'p1'),
             /not ready|unscored/i,
@@ -116,11 +132,13 @@ test('postProjectArchival moves state to archived',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
-        await db.projects.put('p1', SAMPLE_PROJECT_BODY);
-        await db.states.postEvent(
-            'st-init', 'p1', 'approved', 'current',
-            '2026-01-01T00:00:00.000000Z',
-        );
+        const ctx = createRequestContext(db, await devToken());
+        await putProject(ctx, 'p1', {
+            ...SAMPLE_PROJECT_BODY,
+            state: 'approved',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'st-init',
+        });
         await db.objectives.put('o1', {
             organization_id: '1', position: 0,
         });
@@ -138,7 +156,6 @@ test('postProjectArchival moves state to archived',
               member_id: 'w1',
               at: '2026-05-15T00:00:00.000000Z' },
         );
-        const ctx = createRequestContext(db, await devToken());
         await postProjectArchival(ctx, 'p1');
         const s = await getProjectState(ctx, 'p1');
         assert.equal(s, 'archived');

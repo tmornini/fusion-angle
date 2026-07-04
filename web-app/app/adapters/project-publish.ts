@@ -92,7 +92,9 @@ export async function postProjectApproval(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<void> {
-    await ctx.GET<ProjectEntity>(
+    const {
+        id: _id, organization_id: _org, ...fields
+    } = await ctx.GET<ProjectEntity>(
         `projects/${projectId}`,
     );
     const [active, scoring] = await Promise.all([
@@ -106,7 +108,7 @@ export async function postProjectApproval(
         throw new ProjectNotReadyError(v.problems);
     }
     await postProjectStateChange(
-        ctx, projectId, 'approved',
+        ctx, projectId, fields, 'approved',
     );
 }
 
@@ -114,7 +116,9 @@ export async function postProjectArchival(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<void> {
-    await ctx.GET<ProjectEntity>(
+    const {
+        id: _id, organization_id: _org, ...fields
+    } = await ctx.GET<ProjectEntity>(
         `projects/${projectId}`,
     );
     const scoring = await getProjectScoring(
@@ -127,6 +131,6 @@ export async function postProjectArchival(
         throw new ProjectNotReadyError(v.problems);
     }
     await postProjectStateChange(
-        ctx, projectId, 'archived',
+        ctx, projectId, fields, 'archived',
     );
 }

@@ -43,6 +43,19 @@ function projectFields(title: string) {
     };
 }
 
+// PUT /projects/:id now takes the FULL document (Decision 7):
+// the entity fields plus the state trio. One fixed trio per
+// project id keeps every PUT below a same-state edit — none
+// of these exercise a genuine transition.
+function projectPutBody(projectId: string, title: string) {
+    return {
+        ...projectFields(title),
+        state: 'submitted',
+        state_at: '2026-01-01T00:00:00.000000Z',
+        state_event_id: 'ev-' + projectId,
+    };
+}
+
 function projectFlowFields(
     projectId: string,
     flowId: string,
@@ -61,7 +74,7 @@ test('a PUT to a fresh project appends its pair at the'
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/projects/proj-1', token,
-        projectFields('Fresh Project'),
+        projectPutBody('proj-1', 'Fresh Project'),
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
@@ -81,7 +94,7 @@ async () => {
     const token = await organizationToken();
     const first = await handleRequest(db, req(
         'PUT', '/projects/proj-2', token,
-        projectFields('First'),
+        projectPutBody('proj-2', 'First'),
     ));
     assert.equal(first.status, 200);
     const firstId = first.headers.get('Response-ID');
@@ -89,7 +102,7 @@ async () => {
     assert.equal(first.headers.get('Supersedes'), null);
     const second = await handleRequest(db, req(
         'PUT', '/projects/proj-2', token,
-        projectFields('Second'),
+        projectPutBody('proj-2', 'Second'),
     ));
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('Supersedes'), firstId);
@@ -147,7 +160,7 @@ test('each 200 route\'s wire body matches a direct domain '
     const token = await organizationToken();
     const project = await handleRequest(db, req(
         'PUT', '/projects/proj-5', token,
-        projectFields('Wired'),
+        projectPutBody('proj-5', 'Wired'),
     ));
     assert.equal(project.status, 200);
     const projectRow = await db.projects.getById('proj-5');
@@ -168,7 +181,10 @@ test('a failed PUT appends nothing', async () => {
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/projects/proj-6', token,
-        { ...projectFields('Doomed'), start_date: 'nope' },
+        {
+            ...projectPutBody('proj-6', 'Doomed'),
+            start_date: 'nope',
+        },
     ));
     assert.equal(res.status, 400);
     assert.equal((await db.requests.getAll()).length, 0);
@@ -179,7 +195,7 @@ test('a byte-identical resend returns the stored response '
 + 'and appends nothing', async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    const body = projectFields('Idempotent');
+    const body = projectPutBody('proj-7', 'Idempotent');
     const first = await handleRequest(db, req(
         'PUT', '/projects/proj-7', token, body,
     ));
@@ -198,7 +214,7 @@ async () => {
     const token = await organizationToken();
     await handleRequest(db, req(
         'PUT', '/projects/proj-8', token,
-        projectFields('Verify'),
+        projectPutBody('proj-8', 'Verify'),
     ));
     const at = '2026-01-01T00:00:00.000000Z';
     await handleRequest(db, req(
@@ -223,7 +239,7 @@ test('request and response counts stay equal across a mix'
     const token = await organizationToken();
     await handleRequest(db, req(
         'PUT', '/projects/proj-9', token,
-        projectFields('Mixed'),
+        projectPutBody('proj-9', 'Mixed'),
     ));
     const at = '2026-01-01T00:00:00.000000Z';
     await handleRequest(db, req(
@@ -235,7 +251,10 @@ test('request and response counts stay equal across a mix'
     ));
     const failed = await handleRequest(db, req(
         'PUT', '/projects/proj-9', token,
-        { ...projectFields('Bad'), progress: 'not-a-number' },
+        {
+            ...projectPutBody('proj-9', 'Bad'),
+            progress: 'not-a-number',
+        },
     ));
     assert.equal(failed.status, 400);
     const requests = await db.requests.getAll();

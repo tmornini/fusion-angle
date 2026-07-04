@@ -36,7 +36,12 @@ async () => {
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const put = await handleRequest(db, req(
-        'PUT', '/ideas/i1', token, ideaBody('1', 'mine')));
+        'PUT', '/ideas/i1', token, {
+            ...ideaBody('1', 'mine'),
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-i1',
+        }));
     assert.equal(put.status, 200);
     const list = await handleRequest(
         db, req('GET', '/ideas', token));

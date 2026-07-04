@@ -5,6 +5,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
@@ -53,32 +54,40 @@ function buildProject(
     return rest;
 }
 
+// Seeds a project through the SAME document PUT the live route
+// uses (putProject), so a message pair exists at this project's
+// address — required for the flipped GET projects / GET
+// projects/:id routes (Phase 3 Task 6) to derive it. A fixed
+// historical stateAt (matching the old raw-postEvent idiom this
+// replaces) rather than a real clock, mirroring
+// tests/adapters-ideas.test.ts's seedIdea precedent.
 async function seedProject(
-    db: MemoryDbAdapter,
+    ctx: RequestContext,
     id: string,
     title: string,
     state: ProjectState = 'approved',
     overrides?: Partial<ProjectEntity>,
 ): Promise<void> {
-    await db.projects.put(
-        id, buildProject(id, title, overrides),
-    );
-    await db.states.postEvent(
-        `st-${id}`, id, state, 'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
+    const { organization_id: _organizationId, ...entity } =
+        buildProject(id, title, overrides);
+    await putProject(ctx, id, {
+        ...entity,
+        state,
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: `st-${id}`,
+    });
 }
 
 test(
     'getProjectEntity round-trips all fields',
     async () => {
-        const { db, ctx } = await adminContext();
-        await db.projects.put('p1', buildProject(
-            'p1', 'Alpha', {
+        const { ctx } = await adminContext();
+        await seedProject(
+            ctx, 'p1', 'Alpha', undefined, {
                 progress: 73,
                 estimated_cost: 99000,
             },
-        ));
+        );
         const row = await getProjectEntity(ctx, 'p1');
         assert.equal(row.id, 'p1');
         assert.equal(row.title, 'Alpha');
@@ -108,13 +117,9 @@ test(
 test(
     'getProjectEntities returns persisted rows',
     async () => {
-        const { db, ctx } = await adminContext();
-        await db.projects.put(
-            'p1', buildProject('p1', 'Alpha'),
-        );
-        await db.projects.put(
-            'p2', buildProject('p2', 'Beta'),
-        );
+        const { ctx } = await adminContext();
+        await seedProject(ctx, 'p1', 'Alpha');
+        await seedProject(ctx, 'p2', 'Beta');
         const rows = await getProjectEntities(ctx);
         assert.equal(rows.length, 2);
         const titles = rows
@@ -136,8 +141,8 @@ test(
 test(
     'getProjects wraps rows in Project objects',
     async () => {
-        const { db, ctx } = await adminContext();
-        await seedProject(db, 'p1', 'Alpha');
+        const { ctx } = await adminContext();
+        await seedProject(ctx, 'p1', 'Alpha');
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
         assert.ok(projects[0] instanceof Project);
@@ -153,10 +158,10 @@ test(
 test(
     'getProjects excludes deleted-state rows',
     async () => {
-        const { db, ctx } = await adminContext();
-        await seedProject(db, 'keep', 'Keep');
+        const { ctx } = await adminContext();
+        await seedProject(ctx, 'keep', 'Keep');
         await seedProject(
-            db, 'gone', 'Gone', 'deleted',
+            ctx, 'gone', 'Gone', 'deleted',
         );
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
@@ -170,9 +175,23 @@ test(
     'getProjects excludes tombstoned rows',
     async () => {
         const { db, ctx } = await adminContext();
-        await seedProject(db, 'keep', 'Keep');
-        await seedProject(db, 'gone', 'Gone');
-        await db.projects.delete('gone');
+        await seedProject(ctx, 'keep', 'Keep');
+        await seedProject(ctx, 'gone', 'Gone');
+        // NAMED re-pin (Phase 3 Task 6, Step 2b): physical row
+        // removal has no ledger analogue — the flipped GET
+        // derives visibility from the lifecycle trio, not a raw
+        // db.projects.delete row removal — so the tombstone must
+        // land as a state-'deleted' document PUT like any other
+        // transition (mirrors drift-projects.test.ts's lifecycle
+        // case). The wire-level covenant (deleted projects
+        // excluded from lists) is preserved on both planes: the
+        // old-plane store tombstone-filters state-'deleted' too.
+        const {
+            id: _id, organization_id: _org, ...fields
+        } = await db.projects.getById('gone');
+        await postProjectStateChange(
+            ctx, 'gone', fields, 'deleted',
+        );
         const projects = await getProjects(ctx);
         assert.equal(projects.length, 1);
         assert.equal(
@@ -183,10 +202,17 @@ test(
     },
 );
 
+const TRIO = {
+    state: 'approved' as ProjectState,
+    stateAt: '2026-01-01T00:00:00.000000Z',
+    stateEventId: 'ev-p1',
+};
+
 test('putProject persists a new project', async () => {
     const { db, ctx } = await adminContext();
     await putProject(
-        ctx, 'p1', buildProject('p1', 'Created'),
+        ctx, 'p1',
+        { ...buildProject('p1', 'Created'), ...TRIO },
     );
     const stored = await db.projects.getById('p1');
     assert.equal(stored.title, 'Created');
@@ -197,11 +223,14 @@ test('putProject updates an existing project', async () => {
     await db.projects.put(
         'p1', buildProject('p1', 'Before'),
     );
-    await putProject(ctx, 'p1', buildProject(
-        'p1', 'After', {
-            progress: 100,
-        },
-    ));
+    await putProject(ctx, 'p1', {
+        ...buildProject(
+            'p1', 'After', {
+                progress: 100,
+            },
+        ),
+        ...TRIO,
+    });
     const stored = await db.projects.getById('p1');
     assert.equal(stored.title, 'After');
     assert.equal(stored.progress, 100);
@@ -211,9 +240,10 @@ test(
     'putProject changes are visible to a fresh ctx',
     async () => {
         const { db, ctx } = await adminContext();
-        await putProject(ctx, 'p1', buildProject(
-            'p1', 'Persisted',
-        ));
+        await putProject(ctx, 'p1', {
+            ...buildProject('p1', 'Persisted'),
+            ...TRIO,
+        });
         const fresh = createRequestContext(db, await devToken());
         const row = await getProjectEntity(fresh, 'p1');
         assert.equal(row.title, 'Persisted');
@@ -225,11 +255,11 @@ test(
     + ' the stored row, keeping untouched columns',
     async () => {
         const { db, ctx } = await adminContext();
-        await db.projects.put(
-            'p1', buildProject('p1', 'Before', {
+        await seedProject(
+            ctx, 'p1', 'Before', undefined, {
                 position: 7,
                 progress: 40,
-            }),
+            },
         );
         await putProjectFields(ctx, 'p1', {
             title: 'After',
@@ -237,7 +267,7 @@ test(
             startDate: '2026-02-01',
             targetEndDate: '2026-11-30',
             estimatedCost: 75000,
-        });
+        }, TRIO);
         const stored =
             await db.projects.getById('p1');
         assert.equal(stored.title, 'After');
@@ -262,12 +292,12 @@ test(
     'putProjectPosition writes only the position',
     async () => {
         const { db, ctx } = await adminContext();
-        await db.projects.put(
-            'p1', buildProject('p1', 'Stay', {
+        await seedProject(
+            ctx, 'p1', 'Stay', undefined, {
                 position: 1,
-            }),
+            },
         );
-        await putProjectPosition(ctx, 'p1', 9.5);
+        await putProjectPosition(ctx, 'p1', 9.5, TRIO);
         const stored =
             await db.projects.getById('p1');
         assert.equal(stored.position, 9.5);
@@ -286,7 +316,7 @@ test(
                 actual_cost: 2000,
             }),
             id: 'p1',
-        }, 'approved');
+        }, TRIO);
         const view = new ProjectView(project, [], [], []);
         assert.equal(view.idForLink(), 'p1');
         assert.equal(view.titleText(), 'Viewable');
@@ -315,13 +345,18 @@ test(
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
         await seedProject(
-            db, 'p1', 'Original', 'approved',
+            ctx, 'p1', 'Original', 'approved',
         );
         const before =
             await db.projects.getById('p1');
+        const {
+            id: _id,
+            organization_id: _org,
+            ...fields
+        } = before;
 
         await postProjectStateChange(
-            ctx, 'p1', 'archived',
+            ctx, 'p1', fields, 'archived',
         );
 
         const after =
@@ -344,7 +379,7 @@ test(
                 target_end_date: '2026-01-11',
             }),
             id: 'p1',
-        }, 'approved');
+        }, TRIO);
         const view = new ProjectView(project, [], [], []);
         assert.equal(view.timeBaselineDays(), 10);
     },

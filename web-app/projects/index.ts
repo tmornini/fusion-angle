@@ -158,9 +158,19 @@ async function onProjectsLoaded(
         '[data-project-card]',
         'data-project-card',
         async (id, newPosition) => {
+            if (!projectState) return;
+            const project = projectState.projects
+                .find(p => p.idForLink() === id);
+            if (!project) return;
             await putProjectPosition(
                 sessionContext(), id,
                 newPosition,
+                {
+                    state: project.stateValue(),
+                    stateAt: project.stateAtValue(),
+                    stateEventId:
+                        project.stateEventIdValue(),
+                },
             );
         },
     );

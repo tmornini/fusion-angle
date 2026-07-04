@@ -1,20 +1,17 @@
 import type {
     DbAdapter,
-    EntityStore,
 } from './db.ts';
 import type {
     FlowGraphDelta,
+    FlowCreateBody,
 } from './validators.ts';
 import type {
     Id,
     AIMemberEntity,
     FlowEntity,
-    FlowWithGraph,
     FlowVersionEntity,
     FlowWorkOrderEntity,
     FlowRecordEntity,
-    FlowNodeMemberEntity,
-    FlowNodeAttributeEntity,
     HumanMemberEntity,
     IdentityEntity,
     IdentityPiiEntity,
@@ -45,16 +42,15 @@ import {
     validateAIMemberEntity,
     validateHumanMemberCreateBody,
     validateHumanMemberEditBody,
+    validateMemberEntity,
     validateFlowCreateBody,
-    validateFlowEntity,
+    validateFlowDocumentBody,
+    validateFlowVersionEntity,
     validateFlowVersionPublishBody,
     validateFlowWorkOrderEntity,
-    validateFlowPutBody,
     validateFlowUndoBody,
-    validateFlowRedoBody,
-    validateIdeaCreateBody,
     validateIdeaConversionBody,
-    validateIdeaEntity,
+    validateIdeaDocumentBody,
     validateIdeaSubmissionEntity,
     validateIdentityCreateBody,
     validateIdentityEntity,
@@ -65,11 +61,12 @@ import {
     validateIdentityTokenRevocationEntity,
     validateMembershipEntity,
     validateObjectiveCreateBody,
+    validateObjectiveEntity,
     validateObjectiveRevisionEntity,
     validateBaselineScoreEntity,
     validateActualScoreEntity,
     validateOrganizationEntity,
-    validateProjectEntity,
+    validateProjectDocumentBody,
     validateProjectFlowEntity,
     validateFlowRecordEntity,
     validateRecordAttributeEntity,
@@ -83,9 +80,15 @@ import {
     validateWorkOrderEntity,
     validateWorkOrderTransitionBody,
     validateWorkOrderFlowGraphJson,
+    pickString,
+    pickBoolean,
+    pickNumber,
 } from './validators.ts';
 import {
     appendMessagePair,
+    canonicalUriPrefix,
+    formWritePair,
+    headPairIdAt,
     pairResponseBody,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
@@ -113,21 +116,130 @@ import {
     HTTP_CONFLICT,
 } from './http-errors.ts';
 import {
-    reassembleStoredGraph,
+    reduceCreateGraphDelta,
 } from './flow-graph-relations.ts';
 import {
     storedGraphField,
 } from './types.ts';
+import {
+    deriveIdeaSubmissions,
+    ideaEntityOf,
+} from './derive-ideas.ts';
+import { projectEntityOf } from './derive-projects.ts';
+import { flowEntityOf } from './derive-flows.ts';
+import { deriveProjectFlows } from './derive-project-flows.ts';
+import {
+    param,
+    requireOrganization,
+    withoutId,
+    documentCollectionGetHandler,
+    documentCollectionRoute,
+    documentEntityRoute,
+    documentWriteResponseSpec,
+    registerDocumentFamilyWiring,
+    type DocumentFamilyWiring,
+} from './document-family.ts';
+// Re-exported: param/requireOrganization/withoutId moved to
+// document-family.ts (see the import above and its own
+// comment), but api.ts and existing tests still import them
+// FROM here — this keeps that surface stable rather than
+// touching every external call site for an internal move.
+export { param, requireOrganization, withoutId };
+
+// The ideas/projects wiring rows — the ONE copy, built HERE
+// beside the ops/validators/entity-mappers they reference (all
+// local bindings, so no cycle), then handed to
+// registerDocumentFamilyWiring so document-family.ts's own
+// table (api.ts's gate consult, and every documentEntityRoute/
+// documentCollectionRoute/documentWriteResponseSpec call below)
+// sees the SAME row rather than a hand-maintained duplicate.
+// This import is a ONE-WAY dependency, not a cycle:
+// param/requireOrganization/withoutId now live IN
+// document-family.ts (moved there — see its own comment) rather
+// than being re-imported from here, so document-family.ts has NO
+// runtime import of routes.ts left (only the type-only Route/
+// GetHandler/PutHandler/WriteResponseSpec import, erased by
+// --strip-types) — document-family.ts is therefore always fully
+// evaluated before ANY of this module's own top-level code runs,
+// regardless of which of the two a future entry point happens to
+// reach first, so registerDocumentFamilyWiring below is safe to
+// call at module scope. (An earlier attempt that left
+// param/requireOrganization/withoutId here, calling
+// registerDocumentFamilyWiring across a genuine two-way value
+// cycle, reproduced the exact TDZ ReferenceError the ORIGINAL
+// lazy design existed to avoid — order-dependent on which module
+// an entry point reached first; see the fix report.)
+//
+// Decision 7 state-in-entity (Phase 2/3): the PUT body is the
+// FULL document — the entity's own fields plus the state trio —
+// validated once at the gate (documentWriteResponseSpec, via
+// validateDocument). The op DECOMPOSES it: the old-plane row and
+// the states event write land separately, in the SAME
+// transaction, so the row stays byte-identical to today. Genesis
+// is head-presence-defined — a fresh id's PUT simply finds no
+// head, so it authors like any other transition.
+//
+// MEMBER_ID CAVEAT: sameEvent (store-state.ts) compares member_id
+// too, so a state-UNCHANGED edit (the resent trio matches the
+// current head byte-for-byte) must replay the STORED head
+// event's member_id — never the editing actor — or a different
+// member plainly editing a field after someone else's transition
+// would 409 (LedgerImmutabilityError). A genuinely fabricated
+// trio still fails sameEvent on state/at and 409s, exactly as a
+// bare states/:id resend would.
+const IDEAS_WIRING: DocumentFamilyWiring = {
+    family: 'ideas',
+    validateDocument: validateIdeaDocumentBody,
+    documentOp: postIdeaDocumentOp,
+    entityOf: ideaEntityOf,
+};
+const PROJECTS_WIRING: DocumentFamilyWiring = {
+    family: 'projects',
+    validateDocument: validateProjectDocumentBody,
+    documentOp: postProjectDocumentOp,
+    entityOf: projectEntityOf,
+};
+// The flows wiring row — Task 3's flip commit, GET-wired at
+// Task 8. entityOf is derive-flows.ts's OWN flowEntityOf, not a
+// routes.ts-local mapper: it returns FlowWithGraph (the entity
+// plus the document's own `graph` field), the shape both
+// documentGetHandler (flows/:id) and documentCollectionRoute
+// (flows) now serve verbatim — no flows-special branch inside
+// either generic constructor. ideas/projects' own entityOf
+// mappers return their bare entity shape (no such extra field),
+// so this is the ONE per-family divergence document-family.ts's
+// `entityOf: (document, organization) => unknown` slot already
+// tolerates by design, not a widened interface.
+const FLOWS_WIRING: DocumentFamilyWiring = {
+    family: 'flows',
+    validateDocument: validateFlowDocumentBody,
+    documentOp: postFlowDocumentOp,
+    entityOf: flowEntityOf,
+};
+registerDocumentFamilyWiring(IDEAS_WIRING);
+registerDocumentFamilyWiring(PROJECTS_WIRING);
+registerDocumentFamilyWiring(FLOWS_WIRING);
 
 // Every handler receives the verified caller's id (actor) as
 // its final argument — the one place authorship is sourced.
 // The gate resolves it from the token; handlers that author
 // state events or identify the caller stamp it, and the rest
-// (the makeIdRoute closures) simply ignore the extra arg.
-type GetHandler = (
+// (the makeIdRoute closures) simply ignore the extra arg. A GET
+// handler also receives the fence organization — the verified
+// token claim the gate resolved, never the path — undefined for
+// a bearer-exempt or global route; a ledger-derived, org-owned
+// read requires it (see requireOrganization) while every other
+// GET handler ignores the extra trailing arg, the same
+// fewer-parameter-closure precedent actor already established.
+// Exported so api/document-family.ts's generic constructors
+// declare their return types with the SAME handler vocabulary
+// routes.ts itself uses, rather than a structurally-duplicated
+// alias.
+export type GetHandler = (
     adapter: DbAdapter,
     params: string[],
     actor: Id,
+    organization: Id | undefined,
 ) => Promise<unknown>;
 
 // PutHandler, PostHandler, and DeleteHandler carry a trailing
@@ -139,7 +251,7 @@ type GetHandler = (
 // there is a wiring bug — crash loud); an unwired handler
 // ignores the extra argument (TypeScript permits a closure
 // with fewer declared parameters than its assigned type).
-type PutHandler = (
+export type PutHandler = (
     adapter: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
@@ -154,12 +266,22 @@ type DeleteHandler = (
     pair: MessagePair | undefined,
 ) => Promise<void>;
 
+// PostHandler alone also carries a trailing fence
+// organization, mirroring GetHandler's rationale above: the
+// verified token claim the gate resolved, never the path.
+// Undefined for a bearer-exempt or global route. Only the
+// conversion handler consults it today (to form the created
+// project's OWN document-address pair beside the operation
+// pair above); every other POST handler ignores the extra
+// trailing arg, the same fewer-parameter-closure precedent
+// `pair` already established.
 type PostHandler = (
     adapter: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
     pair: MessagePair | undefined,
+    organization: Id | undefined,
 ) => Promise<unknown>;
 
 export interface Route {
@@ -185,31 +307,6 @@ export function route(
     };
 }
 
-export function param(
-    params: string[],
-    index: number,
-): string {
-    const value = params[index];
-    if (value === undefined || value === '') {
-        throw new Error(
-            'Missing route param at index '
-            + index,
-        );
-    }
-    return value;
-}
-
-// Strip `id` from the request body before
-// passing to entity validators. `id` is a
-// routing/storage key, not a body field;
-// validators enforce the exact body key set.
-function withoutId(
-    body: Record<string, unknown>,
-): Record<string, unknown> {
-    const { id: _id, ...rest } = body;
-    return rest;
-}
-
 // Project the opaque `secret` out of a credential before it
 // crosses the API boundary — reads expose existence and
 // lifecycle, never the hash. Makes true the non-leakage
@@ -219,54 +316,6 @@ function withoutSecret(
 ): Omit<IdentityCredentialEntity, 'secret'> {
     const { secret: _secret, ...rest } = cred;
     return rest;
-}
-
-// The `/noun/:id` resource over a standard EntityStore. The
-// verbs a resource exposes are data; each maps to its one fixed
-// store op (get→getById, put→put∘withoutId, delete→delete). The
-// optional getTransform is wired ONCE here at instantiation —
-// Dependency Inversion, not a per-request branch — so the
-// returned Route's handlers are fixed closures reused for the
-// life of the process. Validation runs in the store, which is
-// constructed with its entity validator — the route trusts it.
-// The states log keeps its own explicit routes (StateStore,
-// append-only, custom readers).
-interface IdRouteConfig<T extends { id: string }> {
-    noun: string;
-    store: (db: DbAdapter) => EntityStore<T>;
-    verbs: ReadonlyArray<'get' | 'put' | 'delete'>;
-    getTransform?: (row: T) => unknown;
-}
-
-function makeIdRoute<T extends { id: string }>(
-    config: IdRouteConfig<T>,
-): Route {
-    const { store, getTransform } = config;
-    const handlers: {
-        get?: GetHandler;
-        put?: PutHandler;
-        delete?: DeleteHandler;
-    } = {};
-    if (config.verbs.includes('get')) {
-        handlers.get = getTransform === undefined
-            ? (db, p) => store(db).getById(param(p, 0))
-            : async (db, p) =>
-                getTransform(
-                    await store(db).getById(param(p, 0)),
-                );
-    }
-    if (config.verbs.includes('put')) {
-        handlers.put = (db, p, body) =>
-            store(db).put(
-                param(p, 0),
-                withoutId(body) as unknown as Omit<T, 'id'>,
-            );
-    }
-    if (config.verbs.includes('delete')) {
-        handlers.delete = (db, p) =>
-            store(db).delete(param(p, 0));
-    }
-    return route(`${config.noun}/:id`, handlers);
 }
 
 // Record creation or edit, discriminated by payload.kind.
@@ -404,42 +453,214 @@ async function writeFlowGraphDelta(
     }
 }
 
-// Idea creation: the idea row and its initial state event
-// commit as ONE transaction — a mid-write failure rolls the
-// whole thing back rather than orphaning the row. Exported so
-// the seed can drive idea creation through the same gate the
-// route uses (Decision 6's below-facade carve-out) — this is
-// also Phase 1's dual-write insertion seam. `pair` is optional
-// (not `MessagePair | undefined` positionally required) so the
-// seed's below-facade call (api/mock-data.ts, no gate, no
-// pair) keeps compiling unchanged; the route always supplies
-// one, since 'ideas' is pair-wired and never bearer-exempt.
-export async function postIdeaCreationOp(
+// Idea document write (Decision 7): ONE shape serves create,
+// edit, and transition — genesis is head-presence-defined (a
+// fresh id's PUT simply finds no head, so the ternary below
+// falls to `actor`, authoring the birth like any other
+// transition). The idea row and its trio's state event commit
+// as ONE transaction — a mid-write failure rolls the whole
+// thing back rather than leaving a half-written document.
+// validateIdeaDocumentBody's typed `entity` never carries
+// organization_id (the org-scoped store stamps it from the
+// verified token for the LIVE, fenced route, overwriting
+// whatever it finds regardless); the seed's below-facade call
+// (api/mock-data.ts, no gate, no scoping wrapper) drives a RAW
+// store that has no such stamp, so it embeds organization_id in
+// the raw body and this op reads it straight back to merge it
+// in — inert for the fenced route (overwritten either way),
+// load-bearing for the seed. Exported so the seed can drive
+// idea creation through the same op the route uses (Decision
+// 6's below-facade carve-out) — this is also Phase 1's
+// dual-write insertion seam. `pair` is optional so the seed's
+// below-facade call keeps compiling unchanged; the route always
+// supplies one, since 'ideas/:id' is pair-wired and never
+// bearer-exempt.
+export async function postIdeaDocumentOp(
     db: DbAdapter,
+    id: Id,
     body: Record<string, unknown>,
     actor: Id,
     pair?: MessagePair,
-): Promise<void> {
-    const b = validateIdeaCreateBody(body);
+): Promise<IdeaEntity> {
+    const doc = validateIdeaDocumentBody(withoutId(body));
+    const organizationId = body['organization_id'];
     return db.transaction(
         ['ideas', 'states', 'requests', 'responses'],
         async (view) => {
-            await view.ideas.put(
-                b.id,
-                b.idea as unknown as Omit<IdeaEntity, 'id'>,
+            const head = await view.states.getCurrentFor(id);
+            const memberId = (
+                head !== null
+                && head.id === doc.state_event_id
+                && head.state === doc.state
+                && head.at === doc.state_at
+            ) ? head.member_id : actor;
+            const written = await view.ideas.put(
+                id,
+                {
+                    ...doc.entity,
+                    ...(typeof organizationId === 'string'
+                        ? { organization_id: organizationId }
+                        : {}),
+                } as unknown as Omit<IdeaEntity, 'id'>,
             );
             await view.states.postEvent(
-                b.initialStateEventId,
-                b.id,
-                b.initialState,
-                actor,
-                b.initialStateAt,
+                doc.state_event_id, id, doc.state,
+                memberId, doc.state_at,
             );
             if (pair !== undefined) {
                 await appendMessagePair(view, pair);
             }
+            return written;
         },
     );
+}
+
+// Project document write (Decision 7): ONE shape serves
+// create, edit, and transition — genesis is head-presence-
+// defined (a fresh id's PUT simply finds no head, so the
+// ternary below falls to `actor`, authoring the birth like any
+// other transition). The project row and its trio's state
+// event commit as ONE transaction — a mid-write failure rolls
+// the whole thing back rather than leaving a half-written
+// document. validateProjectDocumentBody's typed `entity` never
+// carries organization_id (the org-scoped store stamps it from
+// the verified token for the LIVE, fenced route, overwriting
+// whatever it finds regardless); the seed's below-facade call
+// (api/mock-data.ts, no gate, no scoping wrapper) drives a RAW
+// store that has no such stamp, so it embeds organization_id in
+// the raw body and this op reads it straight back to merge it
+// in — inert for the fenced route (overwritten either way),
+// load-bearing for the seed. Exported so the seed can drive
+// project creation through the same op the route uses (Decision
+// 6's below-facade carve-out) — this is also Phase 1's
+// dual-write insertion seam. `pair` is optional so the seed's
+// below-facade call keeps compiling unchanged; the route always
+// supplies one, since 'projects/:id' is pair-wired and never
+// bearer-exempt.
+export async function postProjectDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    actor: Id,
+    pair?: MessagePair,
+): Promise<ProjectEntity> {
+    const doc = validateProjectDocumentBody(withoutId(body));
+    const organizationId = body['organization_id'];
+    return db.transaction(
+        ['projects', 'states', 'requests', 'responses'],
+        async (view) => {
+            const head = await view.states.getCurrentFor(id);
+            const memberId = (
+                head !== null
+                && head.id === doc.state_event_id
+                && head.state === doc.state
+                && head.at === doc.state_at
+            ) ? head.member_id : actor;
+            const written = await view.projects.put(
+                id,
+                {
+                    ...doc.entity,
+                    ...(typeof organizationId === 'string'
+                        ? { organization_id: organizationId }
+                        : {}),
+                } as unknown as Omit<ProjectEntity, 'id'>,
+            );
+            await view.states.postEvent(
+                doc.state_event_id, id, doc.state,
+                memberId, doc.state_at,
+            );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Idea submission write: a genesis-only document address (an
+// idea is submitted once per sid; no edit/transition case
+// exists for this family) — the idea_submissions row and its
+// message pair commit as ONE transaction. Exported so the seed
+// can drive submission creation through the same op the route
+// uses (Decision 6's below-facade carve-out), exactly as
+// postIdeaDocumentOp does for ideas themselves. `pair` is
+// optional so a future below-facade caller with no pair keeps
+// compiling; the live route always supplies one, since
+// 'ideas/:id/submissions/:sid' is pair-wired and never
+// bearer-exempt.
+export async function postIdeaSubmissionOp(
+    db: DbAdapter,
+    sid: Id,
+    body: Record<string, unknown>,
+    pair?: MessagePair,
+): Promise<IdeaSubmissionEntity> {
+    return db.transaction(
+        ['idea_submissions', 'requests', 'responses'],
+        async (view) => {
+            const written = await view.ideaSubmissions.put(
+                sid,
+                withoutId(body) as unknown as
+                    Omit<IdeaSubmissionEntity, 'id'>,
+            );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// The create's synthesized document body (Task 5): the SAME
+// shape a live genesis PUT /flows/:id would carry — the flow's
+// own five fields, the initial-state trio, the reduced graph
+// (via reduceCreateGraphDelta, the ONE shared reduction the
+// live route and the seed both call — never two hand-rolled
+// constructions), and the two transitional decomposition
+// sidecars (graphDelta verbatim; revivals empty — a fresh flow
+// revives nothing). Exported so the seed's pass-1 pair
+// body-builder (api/mock-data/seed-message-pairs.ts) calls this
+// SAME function rather than reconstructing the document by
+// hand. Entity fields are picked directly (mirroring
+// flowEntityOf below) rather than spread from `b.flow` verbatim
+// — the seed's own `b.flow` also carries a tolerated
+// organization_id (validateFlowDocumentBody's optional extra)
+// that must never leak into the byte-compared document, so both
+// callers converge on the identical five-key shape regardless.
+export function flowCreateDocumentBody(
+    b: FlowCreateBody,
+): Record<string, unknown> {
+    return {
+        name: pickString(b.flow, 'name'),
+        is_locked: pickBoolean(b.flow, 'is_locked'),
+        is_auto_layout: pickBoolean(b.flow, 'is_auto_layout'),
+        is_auto_fit: pickBoolean(b.flow, 'is_auto_fit'),
+        lock_timeout: pickNumber(b.flow, 'lock_timeout'),
+        state: b.initialState,
+        state_at: b.initialStateAt,
+        state_event_id: b.initialStateEventId,
+        graph: storedGraphField(
+            reduceCreateGraphDelta(b.graphDelta),
+        ),
+        graphDelta: b.graphDelta,
+        revivals: [],
+    };
+}
+
+// The three pairs a live POST /flows forms (Task 5): the gate's
+// own operation pair (204, at the flows/:id address per Task 1's
+// createdEntityUriId override — POST 'flows' and PUT 'flows/:id'
+// collapse onto the SAME (uriPrefix, uriId), see derive-
+// documents.ts's DOCUMENT_METHODS filter for why the two never
+// collide as documents), plus the document and join pairs the
+// route pre-forms below. All three share ONE requestAt (the
+// create's own origination) yet strictly-later RESPONSE `at`
+// stamps (appendMessagePair's nowUtc() is monotonic), so the
+// document pair — appended after the operation pair — becomes
+// the address's head.
+export interface FlowCreationPairs {
+    readonly operation: MessagePair;
+    readonly document: MessagePair;
+    readonly join: MessagePair;
 }
 
 // Flow creation: the flows row, its project_flows join
@@ -460,15 +681,20 @@ export async function postIdeaCreationOp(
 // so the seed can drive flow creation through the same
 // gate the route uses (Decision 6's below-facade
 // carve-out) — this is also Phase 1's dual-write
-// insertion seam. `pair` is optional so the seed's below-
-// facade call (api/mock-data.ts, no gate, no pair) keeps
-// compiling unchanged; the route always supplies one,
-// since 'flows' is pair-wired and never bearer-exempt.
+// insertion seam. `pairs` is optional so the seed's below-
+// facade call (api/mock-data.ts, no gate, no pairs) keeps
+// compiling unchanged; the route always supplies the
+// triple, since 'flows' is pair-wired and never
+// bearer-exempt. The route (not this op) forms all three
+// pairs pre-tx — see route('flows', ...) below — since
+// forming the document/join pairs needs the fence
+// organization and the flows/:id + projects/:id/flows/:pfid
+// response specs, both route-table concerns.
 export async function postFlowCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     actor: Id,
-    pair?: MessagePair,
+    pairs?: FlowCreationPairs,
 ): Promise<void> {
     const b = validateFlowCreateBody(body);
     const delta = b.graphDelta;
@@ -505,9 +731,98 @@ export async function postFlowCreationOp(
             await writeFlowGraphDelta(
                 view, delta, actor,
             );
+            // Three pairs or none (Atomicity): the operation
+            // pair (the gate's own), the synthesized document
+            // pair, and the synthesized join pair — appended in
+            // that order, LAST, so the document pair's response
+            // `at` strictly follows the operation pair's.
+            if (pairs !== undefined) {
+                await appendMessagePair(view, pairs.operation);
+                await appendMessagePair(view, pairs.document);
+                await appendMessagePair(view, pairs.join);
+            }
+        },
+    );
+}
+
+// Flow document write (Decision 7, the LOCKED class — Task 3):
+// the flow row, its trio's state event, the graph delta to the
+// four relation tables, and any revivals commit as ONE
+// transaction — a mid-write failure rolls the whole thing back
+// rather than leaving a half-written document. UNLIKE
+// postIdeaDocumentOp/postProjectDocumentOp, this op carries NO
+// member_id ternary: flows mint a FRESH trio on every PUT
+// (design decision 2) — nothing here ever resends a STORED
+// trio verbatim, since the C6 client retry loop mints a new
+// state_event_id/state_at on every attempt (the E6 split).
+// A byte-identical resend is caught by the gate's pre-tx
+// idempotency fast path (never reaching this op at all); a
+// same-id, genuinely different-content collision still 409s
+// via LedgerImmutabilityError — today's covenant, unchanged.
+// version-publish (a flow_versions row) is NOT part of this op
+// (Decision 3) — it rides its own POST /flows/:id/versions
+// transaction. `graphDelta`/`revivals` are TRANSITIONAL
+// decomposition-only sidecars — the old-plane relation writer
+// alone consumes them; no derivation reads either one, and
+// both retire at Phase Final. `graph` is the client-authored
+// post-save working snapshot, carried verbatim (no transform)
+// — this op never touches it beyond passing validation; a
+// future derivation (Task 7) re-normalizes nodes[]/edges[] from
+// the relation tables, not from this field. The org-scoped
+// flows store stamps organization_id from the verified token
+// and re-validates through validateFlowEntity, so the entity
+// body OMITS it; the below-facade seed path (Task 6, no
+// scoping wrapper) embeds it in the raw body and this op reads
+// it straight back to merge it in — inert for the fenced route
+// (overwritten either way), load-bearing for the seed. Exported
+// so the seed can drive flow genesis through the same op the
+// route uses (Decision 6's below-facade carve-out). `pair` is
+// optional so a below-facade caller with no pair keeps
+// compiling; the live route always supplies one, since
+// 'flows/:id' is pair-wired and never bearer-exempt.
+export async function postFlowDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    actor: Id,
+    pair?: MessagePair,
+): Promise<FlowEntity> {
+    const doc = validateFlowDocumentBody(withoutId(body));
+    const organizationId = body['organization_id'];
+    const delta = doc.graphDelta;
+    return db.transaction(
+        [
+            'flows', 'states',
+            'flow_nodes', 'flow_edges',
+            'flow_node_members',
+            'flow_node_attributes',
+            'requests', 'responses',
+        ],
+        async (view) => {
+            const written = await view.flows.put(
+                id,
+                {
+                    ...doc.entity,
+                    ...(typeof organizationId === 'string'
+                        ? { organization_id: organizationId }
+                        : {}),
+                } as unknown as Omit<FlowEntity, 'id'>,
+            );
+            await view.states.postEvent(
+                doc.state_event_id, id, doc.state,
+                actor, doc.state_at,
+            );
+            await writeFlowGraphDelta(view, delta, actor);
+            for (const r of doc.revivals) {
+                await view.states.postEvent(
+                    r.eventId, r.entityId,
+                    'restored', actor, r.at,
+                );
+            }
             if (pair !== undefined) {
                 await appendMessagePair(view, pair);
             }
+            return written;
         },
     );
 }
@@ -980,17 +1295,12 @@ export const WRITE_RESPONSE_SPECS:
     Readonly<
         Record<string, WriteResponseSpec | PerVerbWriteResponseSpec>
     > = {
-    'ideas': { status: 204 },
-    'ideas/:id': {
-        status: 200,
-        successBody: (params, body, _actor, organization) => ({
-            id: param(params, 0),
-            ...validateIdeaEntity({
-                ...withoutId(body ?? {}),
-                organization_id: organization,
-            }),
-        }),
-    },
+    // The generic document-form builder (api/document-family.ts)
+    // absorbs the hand-written successBody: it validates the
+    // full wire document (entity + trio) through the wiring's
+    // OWN validator and discards the trio — the same GET/PUT
+    // symmetry Decision 7's wire-parity rule holds for reads.
+    'ideas/:id': documentWriteResponseSpec(IDEAS_WIRING),
     'ideas/:id/conversion': { status: 204 },
     'ideas/:id/submissions/:sid': {
         status: 200,
@@ -1009,16 +1319,10 @@ export const WRITE_RESPONSE_SPECS:
             member_id: actor,
         }),
     },
-    'projects/:id': {
-        status: 200,
-        successBody: (params, body, _actor, organization) => ({
-            id: param(params, 0),
-            ...validateProjectEntity({
-                ...withoutId(body ?? {}),
-                organization_id: organization,
-            }),
-        }),
-    },
+    // The generic document-form builder (api/document-family.ts)
+    // absorbs the hand-written successBody — see the ideas/:id
+    // entry above for the shared rationale.
+    'projects/:id': documentWriteResponseSpec(PROJECTS_WIRING),
     'projects/:id/flows/:pfid': {
         status: 200,
         successBody: (params, body) => ({
@@ -1029,24 +1333,26 @@ export const WRITE_RESPONSE_SPECS:
         }),
     },
     'flows': { status: 204 },
-    // The raw PUT body wraps the flow's own scalar fields
-    // under `.flow` (FlowPutBody) — unlike ideas/:id, whose
-    // body IS the flat entity — so the reconstruction reads
-    // body.flow, not body itself.
-    'flows/:id': {
+    // The generic document-form builder (api/document-family.ts)
+    // absorbs the hand-written successBody — see the ideas/:id
+    // entry above for the shared rationale. flows/:id is the
+    // FIRST locked-class entry (Task 3): the response shape is
+    // unchanged either way (RESPONSE-BYTE PARITY, verified at
+    // plan time) — only the gate's pre-dispatch four-outcome
+    // table (api.ts) differs for a locked family, never this
+    // successBody.
+    'flows/:id': documentWriteResponseSpec(FLOWS_WIRING),
+    'flows/:id/undo': { status: 204 },
+    'flows/:id/versions': { status: 204 },
+    'flows/:id/versions/:vid': {
         status: 200,
-        successBody: (params, body, _actor, organization) => ({
-            id: param(params, 0),
-            ...validateFlowEntity({
-                ...(body?.['flow'] as
-                    Record<string, unknown> ?? {}),
-                organization_id: organization,
-            }),
+        successBody: (params, body) => ({
+            id: param(params, 1),
+            ...validateFlowVersionEntity(
+                withoutId(body ?? {}),
+            ),
         }),
     },
-    'flows/:id/undo': { status: 204 },
-    'flows/:id/redo': { status: 204 },
-    'flows/:id/versions': { status: 204 },
     'work-orders': { status: 204 },
     'work-orders/:id': {
         status: 200,
@@ -1100,6 +1406,16 @@ export const WRITE_RESPONSE_SPECS:
         }),
     },
     'objectives': { status: 204 },
+    'objectives/:id': {
+        status: 200,
+        successBody: (params, body, _actor, organization) => ({
+            id: param(params, 0),
+            ...validateObjectiveEntity({
+                ...withoutId(body ?? {}),
+                organization_id: organization,
+            }),
+        }),
+    },
     'objectives/:id/revisions/:rid': {
         status: 200,
         successBody: (params, body) => ({
@@ -1125,6 +1441,13 @@ export const WRITE_RESPONSE_SPECS:
             ...validateActualScoreEntity(
                 withoutId(body ?? {}),
             ),
+        }),
+    },
+    'members/:id': {
+        status: 200,
+        successBody: (params, body) => ({
+            id: param(params, 0),
+            ...validateMemberEntity(withoutId(body ?? {})),
         }),
     },
     'ai-members': { status: 204 },
@@ -1714,16 +2037,16 @@ export const routes: Route[] = [
     // unknown path and 405s a non-POST verb on either pattern.
     route('authentication/token', {}),
     route('authentication/authorize', {}),
-    route('ideas', {
-        get: (db) => db.ideas.getAll(),
-        // The org-scoped store stamps organization_id from the
-        // verified token before validating the idea, so the
-        // body OMITS it. The initial event is authored by the
-        // verified caller (actor), never the body. See
-        // postIdeaCreationOp for the transaction shape.
-        post: (db, _p, body, actor, pair) =>
-            postIdeaCreationOp(db, body, actor, pair),
-    }),
+    // Create retired into the SAME document PUT ideas/:id
+    // already serves (Decision 7, Phase 2 Task 3, R1): genesis
+    // is head-presence-defined, so there is no longer a
+    // separate create verb here — POST now 405s exactly like
+    // any other method-absent route. GET is FLIPPED (Phase 2
+    // Task 5): the list derives from the message ledger rather
+    // than the old ideas table. Absorbed (Phase 4 Task 2) into
+    // the generic documentCollectionRoute — wire-identical to
+    // the hand-written deriveIdeas dispatch it replaces.
+    documentCollectionRoute(IDEAS_WIRING),
     // Convert an idea to a project (promotion): the LONE
     // cross-aggregate write. A new projects row, the promoted
     // ideas row, TWO state events (the idea's 'promoted' and the
@@ -1742,10 +2065,83 @@ export const routes: Route[] = [
     // event, project event, baselines). Member-tier POST —
     // isPermitted matches /ideas on the segment prefix, so
     // /ideas/:id/conversion is member-permitted.
+    //
+    // Phase 3 Task 4: the operation pair above lives at the
+    // ideas-family OPERATION address (uri_id '') — a projects-
+    // prefix scan finds no pair for a conversion-born project
+    // without a SECOND pair at the project's OWN document
+    // address. Synthesized below, BYTE-INDISTINGUISHABLE from a
+    // live PUT /projects/:id's pair at that same address (same
+    // response spec, same head-read), so derivation needs no
+    // conversion special case. Formed PRE-TX — crypto and the
+    // head-read stay outside db.transaction, the IndexedDB
+    // auto-commit constraint — then appended as the tx's LAST
+    // act, beside the operation pair. Formed ONLY when the gate
+    // supplied both a pair and a fence organization; a below-
+    // facade caller with neither (none exists for conversion
+    // today) skips both appends, preserving dual-write
+    // discipline. The idea's OWN 'promoted' transition still
+    // appends no ideas/:id document pair — a known, separately
+    // tracked deferral (work-orders/Phase Final) that cannot
+    // confuse this derivation: 'promoted' is not 'deleted'.
     route('ideas/:id/conversion', {
-        post: (db, p, body, actor, pair) => {
+        post: async (
+            db, p, body, actor, pair, organization,
+        ) => {
             const ideaId = param(p, 0);
             const b = validateIdeaConversionBody(body);
+            // The document a live PUT /projects/:id would
+            // carry: the entity's own fields plus the lifecycle
+            // trio this conversion assigns. Validated pre-tx —
+            // a malformed project body now 400s here instead of
+            // at the in-tx store re-validation; same observable,
+            // earlier.
+            const projectDocument = {
+                ...b.project,
+                state: b.projectState,
+                state_at: b.projectStateAt,
+                state_event_id: b.projectStateEventId,
+            };
+            validateProjectDocumentBody(projectDocument);
+            let projectPair: MessagePair | undefined;
+            if (
+                pair !== undefined
+                && organization !== undefined
+            ) {
+                const spec =
+                    WRITE_RESPONSE_SPECS['projects/:id'];
+                if (spec === undefined || !('status' in spec)) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' projects/:id',
+                    );
+                }
+                const projectHeadPairId = await headPairIdAt(
+                    db,
+                    canonicalUriPrefix(
+                        organization, '/projects/',
+                    ),
+                    b.projectId,
+                );
+                projectPair = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/projects/' + b.projectId,
+                    routePattern: 'projects/:id',
+                    routeSegments: ['projects', ':id'],
+                    pathSegments: ['projects', b.projectId],
+                    headerFields: [],
+                    body: projectDocument,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: 200,
+                    responseBody: spec.successBody?.(
+                        [b.projectId], projectDocument, actor,
+                        organization,
+                    ),
+                    headPairId: projectHeadPairId,
+                });
+            }
             return db.transaction(
                 [
                     'projects', 'ideas', 'states',
@@ -1791,251 +2187,183 @@ export const routes: Route[] = [
                     if (pair !== undefined) {
                         await appendMessagePair(view, pair);
                     }
+                    if (projectPair !== undefined) {
+                        await appendMessagePair(
+                            view, projectPair,
+                        );
+                    }
                 },
             );
         },
     }),
-    route('projects', {
-        get: (db) => db.projects.getAll(),
-    }),
+    // GET is FLIPPED (Phase 3 Task 6): the list derives from
+    // the message ledger rather than the old projects table.
+    // Absorbed (Phase 4 Task 2) into the generic
+    // documentCollectionRoute — wire-identical to the
+    // hand-written deriveProjects dispatch it replaces.
+    documentCollectionRoute(PROJECTS_WIRING),
     // Idea submissions nest under their parent idea: the idea id
     // is param 0, so the SERVER filters the collection to that
-    // idea (the org fence still rides the facade re-entry). The
-    // leaf id is param 1; only PUT is exposed, exactly as the flat
-    // makeIdRoute carried it.
+    // idea (the org fence still rides the facade re-entry). GET
+    // is FLIPPED (Phase 2 Task 5): the collection derives from
+    // the message ledger at this idea's submissions address
+    // rather than the old idea_submissions table. The leaf id is
+    // param 1; only PUT is exposed on ideas/:id/submissions/:sid,
+    // exactly as the flat makeIdRoute carried it.
     route('ideas/:id/submissions', {
-        get: (db, p) =>
-            db.ideaSubmissions.getAllWhere('idea_id', param(p, 0)),
+        get: (db, p, _actor, organization) =>
+            deriveIdeaSubmissions(
+                db, requireOrganization(organization),
+                param(p, 0),
+            ),
     }),
     route('ideas/:id/submissions/:sid', {
-        put: (db, p, body, _actor, pair) => {
-            const sid = param(p, 1);
-            return db.transaction(
-                ['idea_submissions', 'requests', 'responses'],
-                async (view) => {
-                    const written =
-                        await view.ideaSubmissions.put(
-                            sid,
-                            withoutId(body) as unknown as
-                                Omit<
-                                    IdeaSubmissionEntity, 'id'
-                                >,
-                        );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
-        },
+        put: (db, p, body, _actor, pair) =>
+            postIdeaSubmissionOp(db, param(p, 1), body, pair),
     }),
     route('flows', {
-        // Reassemble each flow's graph from the four relation
-        // tables inside one consistent read transaction —
-        // mirroring GET /flows/:id so the list and the single
-        // GET derive identically (one reassembly voice). The
-        // stored blob is never consulted. PERF: this adds
-        // per-flow relation reads to the list path; acceptable
-        // at demo scale and unmeasured — do not optimize before
-        // measuring (Commandment XI). IndexedDB auto-commit:
-        // only row ops are awaited inside the tx body;
-        // reassembleStoredGraph + storedGraphField are sync
-        // compute called AFTER the awaited reads.
-        get: async (db) => {
-            return db.transaction(
-                [
-                    'flows',
-                    'flow_nodes',
-                    'flow_edges',
-                    'flow_node_members',
-                    'flow_node_attributes',
-                    'states',
-                ],
-                async (view) => {
-                    const flows =
-                        await view.flows.getAll();
-                    const result: FlowWithGraph[] = [];
-                    for (const flow of flows) {
-                        const nodes =
-                            await view.flowNodes
-                                .getAllWhere(
-                                    'flow_id', flow.id,
-                                );
-                        const edges =
-                            await view.flowEdges
-                                .getAllWhere(
-                                    'flow_id', flow.id,
-                                );
-                        const members:
-                            FlowNodeMemberEntity[] = [];
-                        const attrs:
-                            FlowNodeAttributeEntity[] = [];
-                        for (const node of nodes) {
-                            const nm =
-                                await view.flowNodeMembers
-                                    .getAllWhere(
-                                        'flow_node_id',
-                                        node.id,
-                                    );
-                            const na =
-                                await view
-                                    .flowNodeAttributes
-                                    .getAllWhere(
-                                        'flow_node_id',
-                                        node.id,
-                                    );
-                            members.push(...nm);
-                            attrs.push(...na);
-                        }
-                        // SYNC compute — no await past here.
-                        const graph =
-                            reassembleStoredGraph(
-                                nodes, edges,
-                                members, attrs,
-                            );
-                        result.push({
-                            ...flow,
-                            graph: storedGraphField(graph),
-                        });
-                    }
-                    return result;
-                },
-            );
-        },
+        // GET is FLIPPED (Phase 4 Task 8): the list derives from
+        // the message ledger rather than the old flows table plus
+        // its relation tables. Rides the generic
+        // documentCollectionRoute — wire-identical to the
+        // hand-written deriveFlows dispatch it replaces (the
+        // wiring's own entityOf, derive-flows.ts's flowEntityOf,
+        // carries the `graph` field, so the list needs no
+        // flows-special reassembly step). POST stays this
+        // hand-written create — unlike ideas/projects, flows never
+        // folded genesis into the document PUT (Decision 6), so a
+        // separate create verb remains here.
+        get: documentCollectionGetHandler(FLOWS_WIRING),
         // Member-tier POST — /flows carries POST in
-        // MEMBER_VERBS. See postFlowCreationOp for the
-        // transaction shape.
-        post: (db, _p, body, actor, pair) =>
-            postFlowCreationOp(db, body, actor, pair),
-    }),
-    // Write a flow: an OPTIONAL version snapshot (the new
-    // flow_versions row PUT plus the named over-cap trim
-    // DELETEs), THEN the flow row PUT, THEN the 'updated' state
-    // event, THEN the graph delta to the four relation tables —
-    // all as ONE transaction. A mid-write failure rolls the
-    // whole thing back. Covers both the plain write (none — no
-    // flow_versions touch) and the versioned write. The
-    // org-scoped flows store stamps organization_id from the
-    // verified token and re-validates through validateFlowEntity,
-    // so the flow body OMITS it; flow_versions is parent-scoped
-    // and re-validates the snapshot through
-    // validateFlowVersionEntity. The event is authored by the
-    // verified caller (actor), never the body. The eventId and
-    // at are client-minted: a byte-identical replay lands as a
-    // ledger no-op via postEvent. graphDelta is pre-validated at
-    // the HTTP gate (validateFlowPutBody); the route writes its
-    // upsert rows, append-only member/attribute events, and the
-    // node/edge deletion events (authored by actor, never the
-    // body). The flow row carries no graph blob — the relations
-    // are the sole graph truth, reassembled on read.
-    // Member-tier PUT — MEMBER_VERBS['/flows'] includes 'PUT'.
-    route('flows/:id', {
-        // Reassemble the graph from the four relation tables
-        // inside a consistent read transaction — the stored
-        // blob is overridden by the live relation-derived graph
-        // so freeze, work-order creation, stats, hazard, export,
-        // and mermaid all derive from relations for free.
-        // IndexedDB auto-commit: only row ops are awaited inside
-        // the tx body; reassembleStoredGraph + storedGraphField
-        // are sync compute called AFTER the awaited reads.
-        get: async (db, p) => {
-            const id = param(p, 0);
-            return db.transaction(
-                [
-                    'flows',
-                    'flow_nodes',
-                    'flow_edges',
-                    'flow_node_members',
-                    'flow_node_attributes',
-                    'states',
-                ],
-                async (view) => {
-                    const flow =
-                        await view.flows.getById(id);
-                    const nodes =
-                        await view.flowNodes
-                            .getAllWhere('flow_id', id);
-                    const edges =
-                        await view.flowEdges
-                            .getAllWhere('flow_id', id);
-                    const members:
-                        FlowNodeMemberEntity[] = [];
-                    const attrs:
-                        FlowNodeAttributeEntity[] = [];
-                    for (const node of nodes) {
-                        const nm =
-                            await view.flowNodeMembers
-                                .getAllWhere(
-                                    'flow_node_id',
-                                    node.id,
-                                );
-                        const na =
-                            await view.flowNodeAttributes
-                                .getAllWhere(
-                                    'flow_node_id',
-                                    node.id,
-                                );
-                        members.push(...nm);
-                        attrs.push(...na);
-                    }
-                    // SYNC compute — no await past this point.
-                    // Reassemble unconditionally: the relation
-                    // tables are the read source of record. The
-                    // stored blob is never consulted here.
-                    const graph = reassembleStoredGraph(
-                        nodes, edges, members, attrs,
+        // MEMBER_VERBS. Forms the document + join pairs pre-tx
+        // (Task 5) beside the gate's own operation pair — the
+        // SAME shape a live genesis PUT /flows/:id and a live
+        // PUT /projects/:id/flows/:pfid would each carry — ONLY
+        // when the gate supplied both a pair and a fence
+        // organization (the Phase 3 condition verbatim); a
+        // below-facade caller (api/mock-data.ts, no gate) skips
+        // all three, preserving dual-write discipline. See
+        // postFlowCreationOp for the transaction shape.
+        post: async (
+            db, _p, body, actor, pair, organization,
+        ) => {
+            let pairs: FlowCreationPairs | undefined;
+            if (pair !== undefined && organization !== undefined) {
+                const b = validateFlowCreateBody(body);
+                const documentBody = flowCreateDocumentBody(b);
+                validateFlowDocumentBody(documentBody);
+                const documentSpec =
+                    WRITE_RESPONSE_SPECS['flows/:id'];
+                if (
+                    documentSpec === undefined
+                    || !('status' in documentSpec)
+                ) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' flows/:id',
                     );
-                    return {
-                        ...flow,
-                        graph: storedGraphField(graph),
-                    };
-                },
-            );
-        },
-        put: (db, p, body, actor, pair) => {
-            const id = param(p, 0);
-            const b = validateFlowPutBody(body);
-            const delta = b.graphDelta;
-            return db.transaction(
-                [
-                    'flows', 'flow_versions', 'states',
-                    'flow_nodes', 'flow_edges',
-                    'flow_node_members',
-                    'flow_node_attributes',
-                    'requests', 'responses',
-                ],
-                async (view) => {
-                    if (b.history.kind === 'snapshot') {
-                        const snap = b.history.version;
-                        await view.flowVersions.put(
-                            snap.id,
-                            snap.version as unknown as
-                                Omit<FlowVersionEntity, 'id'>,
-                        );
-                        for (const t of snap.trimIds) {
-                            await view.flowVersions.delete(t);
-                        }
-                    }
-                    const written = await view.flows.put(
-                        id,
-                        b.flow as unknown as
-                            Omit<FlowEntity, 'id'>,
+                }
+                const documentHeadPairId = await headPairIdAt(
+                    db,
+                    canonicalUriPrefix(organization, '/flows/'),
+                    b.id,
+                );
+                const document = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/flows/' + b.id,
+                    routePattern: 'flows/:id',
+                    routeSegments: ['flows', ':id'],
+                    pathSegments: ['flows', b.id],
+                    headerFields: [],
+                    body: documentBody,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: documentSpec.status,
+                    responseBody: documentSpec.successBody?.(
+                        [b.id], documentBody, actor, organization,
+                    ),
+                    headPairId: documentHeadPairId,
+                });
+                // The live :pfid PUT's request shape, verified by
+                // content: validateProjectFlowEntity accepts
+                // EXACTLY project_id/flow_id/at
+                // (api/validators.ts) — the same three keys
+                // b.projectFlow already carries, so it doubles as
+                // the join pair's body verbatim.
+                validateProjectFlowEntity(b.projectFlow);
+                const projectId = pickString(
+                    b.projectFlow, 'project_id',
+                );
+                const joinSpec = WRITE_RESPONSE_SPECS[
+                    'projects/:id/flows/:pfid'
+                ];
+                if (
+                    joinSpec === undefined
+                    || !('status' in joinSpec)
+                ) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' projects/:id/flows/:pfid',
                     );
-                    await view.states.postEvent(
-                        b.eventId, id, 'updated', actor,
-                        b.at,
-                    );
-                    await writeFlowGraphDelta(
-                        view, delta, actor,
-                    );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
+                }
+                const join = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/projects/' + projectId
+                        + '/flows/' + b.projectFlowId,
+                    routePattern: 'projects/:id/flows/:pfid',
+                    routeSegments: [
+                        'projects', ':id', 'flows', ':pfid',
+                    ],
+                    pathSegments: [
+                        'projects', projectId,
+                        'flows', b.projectFlowId,
+                    ],
+                    headerFields: [],
+                    body: b.projectFlow,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: joinSpec.status,
+                    responseBody: joinSpec.successBody?.(
+                        [projectId, b.projectFlowId],
+                        b.projectFlow, actor, organization,
+                    ),
+                    // Genesis-undefined: a flow's create-time
+                    // join is always fresh (design decision — no
+                    // duplicate-create carve-out at this address
+                    // through this task).
+                    headPairId: undefined,
+                });
+                pairs = { operation: pair, document, join };
+            }
+            return postFlowCreationOp(db, body, actor, pairs);
         },
     }),
+    // flows/:id is the FIRST locked-class route (Task 3). GET is
+    // FLIPPED (Phase 4 Task 8): absorbed into the generic
+    // documentEntityRoute — the SAME wiring row PUT already rides
+    // (Task 3), so this replaces the hand-written old-plane
+    // reassembly with documentGetHandler(FLOWS_WIRING), wire-
+    // identical to it (derive-flows.ts's flowEntityOf carries the
+    // `graph` field the entity route's generic shape needs, so no
+    // flows-special branch lives inside documentGetHandler
+    // itself). After this commit NO hand-written document-family
+    // route object remains for any registered family (ideas,
+    // projects, flows) — the third-family obligation's discharge.
+    // The gate's four-outcome table (api.ts, keyed off
+    // familyRegistration('flows').concurrency === 'locked')
+    // resolves genesis/412/follows entirely BEFORE dispatch;
+    // documentPutHandler carries no concurrency branch of its
+    // own — it dispatches straight to postFlowDocumentOp, which
+    // DECOMPOSES the document (flow row PUT, state event, graph
+    // delta, revivals) in one transaction. version-publish (a
+    // flow_versions row) no longer rides this PUT at all
+    // (Decision 3) — it is POST /flows/:id/versions's own
+    // transaction now (postFlowVersion, called separately by the
+    // client before the save). Member-tier PUT —
+    // MEMBER_VERBS['/flows'] includes 'PUT'.
+    documentEntityRoute(FLOWS_WIRING),
     // Undo a flow edit: the flow row PUT, the 'updated' state
     // event, the DELETE of the consumed version, the graph delta
     // to the four relation tables, and the revivals — all as ONE
@@ -2048,12 +2376,72 @@ export const routes: Route[] = [
     // 'restored' events (authored by actor) that supersede the
     // tombstones of the nodes/edges the target re-introduces, so
     // a node the user deleted reappears in reads on undo.
-    // Member-tier POST via the /flows segment prefix.
+    // Member-tier POST via the /flows segment prefix. Task 5: the
+    // op ALSO synthesizes its own document pair pre-tx, from the
+    // body alone (no reads beyond the pre-tx head lookup) — the
+    // flows family is LOCKED, so this document write takes the
+    // FOLLOWS slot (never supersedes; the op holds no echo of its
+    // own — design decision 5). On a follows collision (a save
+    // raced this undo for the SAME head) the whole transaction
+    // aborts via the responses.follows unique index →
+    // UniqueConstraintError → the gate's existing 412 mapping
+    // (api.ts) — performUndo (web-app) absorbs that with a
+    // jittered retry, rebuilding against a FRESH baseline.
     route('flows/:id/undo', {
-        post: (db, p, body, actor, pair) => {
+        post: async (
+            db, p, body, actor, pair, organization,
+        ) => {
             const id = param(p, 0);
             const b = validateFlowUndoBody(body);
             const delta = b.graphDelta;
+            let documentPair: MessagePair | undefined;
+            if (pair !== undefined && organization !== undefined) {
+                const documentBody = {
+                    name: pickString(b.flow, 'name'),
+                    is_locked: pickBoolean(b.flow, 'is_locked'),
+                    is_auto_layout:
+                        pickBoolean(b.flow, 'is_auto_layout'),
+                    is_auto_fit: pickBoolean(b.flow, 'is_auto_fit'),
+                    lock_timeout: pickNumber(b.flow, 'lock_timeout'),
+                    state: 'updated',
+                    state_at: b.at,
+                    state_event_id: b.eventId,
+                    graph: b.graph,
+                    graphDelta: b.graphDelta,
+                    revivals: b.revivals,
+                };
+                validateFlowDocumentBody(documentBody);
+                const prefix = canonicalUriPrefix(
+                    organization, '/flows/',
+                );
+                const head = await headPairIdAt(db, prefix, id);
+                const spec = WRITE_RESPONSE_SPECS['flows/:id'];
+                if (spec === undefined || !('status' in spec)) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' flows/:id',
+                    );
+                }
+                documentPair = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/flows/' + id,
+                    routePattern: 'flows/:id',
+                    routeSegments: ['flows', ':id'],
+                    pathSegments: ['flows', id],
+                    headerFields: [],
+                    body: documentBody,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: spec.status,
+                    responseBody: spec.successBody?.(
+                        [id], documentBody, actor, organization,
+                    ),
+                    headPairId: undefined,
+                    ...(head === undefined
+                        ? {} : { follows: head }),
+                });
+            }
             return db.transaction(
                 [
                     'flows', 'flow_versions', 'states',
@@ -2087,66 +2475,8 @@ export const routes: Route[] = [
                     if (pair !== undefined) {
                         await appendMessagePair(view, pair);
                     }
-                },
-            );
-        },
-    }),
-    // Redo a flow edit: a REQUIRED version snapshot (the new
-    // flow_versions row PUT plus the named over-cap trim
-    // DELETEs), THEN the flow row PUT, THEN the 'updated' state
-    // event, THEN the graph delta to the four relation tables,
-    // THEN the revivals — all as ONE transaction. The current
-    // state can never land archived as a version while the redo
-    // graph is lost. The org-scoped flows store stamps
-    // organization_id and re-validates the flow body (so it OMITS
-    // it); flow_versions re-validates the snapshot; the event is
-    // authored by the verified caller (actor). graphDelta lands
-    // the redo target graph in relations; the revivals THEN post
-    // 'restored' events that supersede the tombstones of the
-    // nodes/edges the redo target re-introduces. Member-tier POST
-    // via the /flows segment prefix.
-    route('flows/:id/redo', {
-        post: (db, p, body, actor, pair) => {
-            const id = param(p, 0);
-            const b = validateFlowRedoBody(body);
-            const delta = b.graphDelta;
-            return db.transaction(
-                [
-                    'flows', 'flow_versions', 'states',
-                    'flow_nodes', 'flow_edges',
-                    'flow_node_members',
-                    'flow_node_attributes',
-                    'requests', 'responses',
-                ],
-                async (view) => {
-                    await view.flowVersions.put(
-                        b.version.id,
-                        b.version.version as unknown as
-                            Omit<FlowVersionEntity, 'id'>,
-                    );
-                    for (const t of b.version.trimIds) {
-                        await view.flowVersions.delete(t);
-                    }
-                    await view.flows.put(
-                        id,
-                        b.flow as unknown as
-                            Omit<FlowEntity, 'id'>,
-                    );
-                    await view.states.postEvent(
-                        b.eventId, id, 'updated', actor,
-                        b.at,
-                    );
-                    await writeFlowGraphDelta(
-                        view, delta, actor,
-                    );
-                    for (const r of b.revivals) {
-                        await view.states.postEvent(
-                            r.eventId, r.entityId,
-                            'restored', actor, r.at,
-                        );
-                    }
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (documentPair !== undefined) {
+                        await appendMessagePair(view, documentPair);
                     }
                 },
             );
@@ -2193,25 +2523,67 @@ export const routes: Route[] = [
             );
         },
     }),
+    // PUT/DELETE each append their message pair in the same
+    // transaction as the write (message-pair.ts). DOCUMENT-
+    // class: a version row is a plain, revisitable row — a
+    // repeat PUT records Supersedes and a DELETE tombstones it,
+    // exactly like flow_work_orders/state_field_values above.
+    // The cap-trim machinery (flows.ts's save/undo/redo/publish
+    // ops) calls `flowVersions.delete` directly, inside ITS OWN
+    // transaction, for versions past the retention cap — that
+    // physical splice is untouched and stores no pair; only a
+    // request through THIS route (a client-addressed DELETE of
+    // one named version) appends one. The leaf nests under its
+    // parent flow (param 0); `vid` is param 1.
     route('flows/:id/versions/:vid', {
         get: (db, p) => db.flowVersions.getById(param(p, 1)),
-        put: (db, p, body) =>
-            db.flowVersions.put(
-                param(p, 1),
-                withoutId(body) as unknown as
-                    Omit<FlowVersionEntity, 'id'>,
-            ),
-        delete: (db, p) => db.flowVersions.delete(param(p, 1)),
+        put: (db, p, body, _actor, pair) => {
+            const id = param(p, 1);
+            return db.transaction(
+                ['flow_versions', 'requests', 'responses'],
+                async (view) => {
+                    const written = await view.flowVersions
+                        .put(
+                            id,
+                            withoutId(body) as unknown as
+                                Omit<FlowVersionEntity, 'id'>,
+                        );
+                    if (pair !== undefined) {
+                        await appendMessagePair(view, pair);
+                    }
+                    return written;
+                },
+            );
+        },
+        delete: (db, p, _actor, pair) => {
+            const id = param(p, 1);
+            return db.transaction(
+                ['flow_versions', 'requests', 'responses'],
+                async (view) => {
+                    await view.flowVersions.delete(id);
+                    if (pair !== undefined) {
+                        await appendMessagePair(view, pair);
+                    }
+                },
+            );
+        },
     }),
     // Project↔flow joins nest under their parent project: the
     // project id is param 0, so the SERVER filters the collection
     // to that project (the org fence still rides the facade
     // re-entry). The leaf id is param 1; PUT and DELETE are
-    // exposed exactly as the flat makeIdRoute carried them.
+    // exposed exactly as the flat makeIdRoute carried them. GET is
+    // FLIPPED (Phase 4 Task 8): the join list derives from the
+    // message ledger at this project's flows address rather than
+    // the old project_flows table — deriveProjectFlows is a
+    // bespoke derivation (not a DocumentFamilyWiring family; a
+    // join row carries no lifecycle trio of its own), so this
+    // calls it directly rather than through a generic constructor.
     route('projects/:id/flows', {
-        get: (db, p) =>
-            db.projectFlows.getAllWhere(
-                'project_id', param(p, 0),
+        get: (db, p, _actor, organization) =>
+            deriveProjectFlows(
+                db, requireOrganization(organization),
+                param(p, 0),
             ),
     }),
     route('projects/:id/flows/:pfid', {
@@ -2610,30 +2982,26 @@ export const routes: Route[] = [
             db.members.getById(actor),
     }),
 
-    makeIdRoute<MemberEntity>({
-        noun: 'members',
-        store: db => db.members,
-        verbs: ['get', 'put'],
-    }),
-    // Hand-written in place of makeIdRoute<IdeaEntity> so PUT
+    // Hand-written in place of makeIdRoute<MemberEntity> so PUT
     // can append its message pair in the same transaction as
     // the write — the factory's fixed closures have no
     // per-family pair selector (see message-pair.ts). GET
     // reproduces the factory closure byte-equivalently; verbs
-    // stay {get, put} — ideas/:id has no DELETE today, and
-    // this scaffolding does not add one (Phase 2 Task 3 amends
-    // this same entry; the registry eventually absorbs it).
-    route('ideas/:id', {
-        get: (db, p) => db.ideas.getById(param(p, 0)),
+    // stay {get, put} — members/:id has no DELETE today,
+    // mirroring the identities/:id precedent. Global plane: no
+    // organization stamping (the members directory row carries
+    // no organization_id).
+    route('members/:id', {
+        get: (db, p) => db.members.getById(param(p, 0)),
         put: (db, p, body, _actor, pair) => {
             const id = param(p, 0);
             return db.transaction(
-                ['ideas', 'requests', 'responses'],
+                ['members', 'requests', 'responses'],
                 async (view) => {
-                    const written = await view.ideas.put(
+                    const written = await view.members.put(
                         id,
                         withoutId(body) as unknown as
-                            Omit<IdeaEntity, 'id'>,
+                            Omit<MemberEntity, 'id'>,
                     );
                     if (pair !== undefined) {
                         await appendMessagePair(view, pair);
@@ -2643,33 +3011,18 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Hand-written in place of makeIdRoute<ProjectEntity> so
-    // PUT can append its message pair in the same transaction
-    // as the write — the factory's fixed closures have no
-    // per-family pair selector (see message-pair.ts). GET
-    // reproduces the factory closure byte-equivalently; verbs
-    // stay {get, put} — projects/:id has no DELETE today,
-    // mirroring the ideas/:id precedent.
-    route('projects/:id', {
-        get: (db, p) => db.projects.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['projects', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.projects.put(
-                        id,
-                        withoutId(body) as unknown as
-                            Omit<ProjectEntity, 'id'>,
-                    );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
-        },
-    }),
+    // Absorbed (Phase 4 Task 2) into the generic
+    // documentEntityRoute — GET dispatches to the derived
+    // entity, PUT to postIdeaDocumentOp, wire-identical to the
+    // hand-written {get, put} pair it replaces. The Decision-7/
+    // MEMBER_ID-CAVEAT prose that lived here moved to the
+    // IDEAS_WIRING block above.
+    documentEntityRoute(IDEAS_WIRING),
+    // Absorbed (Phase 4 Task 2) into the generic
+    // documentEntityRoute — see the ideas/:id entry above for
+    // the shared rationale; the Decision-7/MEMBER_ID-CAVEAT
+    // prose moved to the PROJECTS_WIRING block above.
+    documentEntityRoute(PROJECTS_WIRING),
     route('objectives', {
         get: (db) => db.objectives.getAll(),
         // See postObjectiveCreationOp for the transaction
@@ -2677,10 +3030,32 @@ export const routes: Route[] = [
         post: (db, _p, body, _actor, pair) =>
             postObjectiveCreationOp(db, body, pair),
     }),
-    makeIdRoute<ObjectiveEntity>({
-        noun: 'objectives',
-        store: db => db.objectives,
-        verbs: ['get', 'put'],
+    // Hand-written in place of makeIdRoute<ObjectiveEntity> so
+    // PUT can append its message pair in the same transaction
+    // as the write — the factory's fixed closures have no
+    // per-family pair selector (see message-pair.ts). GET
+    // reproduces the factory closure byte-equivalently; verbs
+    // stay {get, put} — objectives/:id has no DELETE today,
+    // mirroring the projects/:id precedent.
+    route('objectives/:id', {
+        get: (db, p) => db.objectives.getById(param(p, 0)),
+        put: (db, p, body, _actor, pair) => {
+            const id = param(p, 0);
+            return db.transaction(
+                ['objectives', 'requests', 'responses'],
+                async (view) => {
+                    const written = await view.objectives.put(
+                        id,
+                        withoutId(body) as unknown as
+                            Omit<ObjectiveEntity, 'id'>,
+                    );
+                    if (pair !== undefined) {
+                        await appendMessagePair(view, pair);
+                    }
+                    return written;
+                },
+            );
+        },
     }),
     // Objective revisions nest under their parent objective: the
     // objective id is param 0, so the SERVER filters the

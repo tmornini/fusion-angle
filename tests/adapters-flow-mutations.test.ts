@@ -53,6 +53,19 @@ const EMPTY_GRAPH_DELTA = {
     attributeEvents: [],
 };
 
+// flows/:id is locked-class (Task 3): a raw ctx.PUT that hand-
+// crafts its wire body (rather than riding putFlow's own C6
+// retry loop) must echo the current head itself, or a
+// non-genesis save 412s. Read once via GETWithResponseId and
+// thread the echo through PUT's headerFields.
+function ifResponseIdHeaders(
+    responseId: string | undefined,
+): readonly (readonly [string, string])[] | undefined {
+    return responseId === undefined
+        ? undefined
+        : [['if-response-id', responseId]];
+}
+
 function buildNode(
     id: string,
     overrides?: Partial<GraphNode>,
@@ -302,43 +315,52 @@ test(
 );
 
 test(
-    'PUT flows/:id with a snapshot writes version + flow + event',
+    'publishing a version then saving the document writes'
+    + ' version + flow + event',
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
-        await ctx.PUT('flows/flow-1', {
-            flow: buildFlowBody({
-                name: 'Snapped',
-                isLocked: false,
-                isAutoLayout: false,
-                isAutoFit: false,
-                lockTimeout: DEFAULT_LOCK_TIMEOUT,
-                nodes: [],
-                edges: [],
-            }),
-            eventId: 'put-ev-1',
-            at: '2099-01-01T00:00:00.000000Z',
-            history: {
-                kind: 'snapshot',
-                version: {
-                    id: 'ver-1',
-                    version: {
-                        flow_id: 'flow-1',
-                        name: 'snap',
-                        is_locked: false,
-                        is_auto_layout: false,
-                        is_auto_fit: false,
-                        lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                        graph: JSON.stringify({
-                            nodes: [], edges: [],
-                        }),
-                        at: '2026-01-01T00:00:00.000000Z',
-                    },
-                    trimIds: [],
-                },
+        // version-publish rides its own POST (Decision 3) — no
+        // longer an option embedded in the PUT.
+        await ctx.POST('flows/flow-1/versions', {
+            id: 'ver-1',
+            version: {
+                flow_id: 'flow-1',
+                name: 'snap',
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                graph: JSON.stringify({ nodes: [], edges: [] }),
+                at: '2026-01-01T00:00:00.000000Z',
             },
-            graphDelta: EMPTY_GRAPH_DELTA,
+            trimIds: [],
         });
+        const { responseId } =
+            await ctx.GETWithResponseId<FlowWithGraph>(
+                'flows/flow-1',
+            );
+        await ctx.PUT(
+            'flows/flow-1',
+            {
+                ...buildFlowBody({
+                    name: 'Snapped',
+                    isLocked: false,
+                    isAutoLayout: false,
+                    isAutoFit: false,
+                    lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                    nodes: [],
+                    edges: [],
+                }),
+                state: 'updated',
+                state_at: '2099-01-01T00:00:00.000000Z',
+                state_event_id: 'put-ev-1',
+                graph: JSON.stringify({ nodes: [], edges: [] }),
+                graphDelta: EMPTY_GRAPH_DELTA,
+                revivals: [],
+            },
+            ifResponseIdHeaders(responseId),
+        );
         const versions = await ctx.GET<unknown[]>(
             'flows/flow-1/versions',
         );
@@ -359,8 +381,12 @@ test(
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
+        const { responseId } =
+            await ctx.GETWithResponseId<FlowWithGraph>(
+                'flows/flow-1',
+            );
         const body = {
-            flow: buildFlowBody({
+            ...buildFlowBody({
                 name: 'Replayed',
                 isLocked: false,
                 isAutoLayout: false,
@@ -369,13 +395,16 @@ test(
                 nodes: [],
                 edges: [],
             }),
-            eventId: 'fixed-ev',
-            at: '2026-01-01T00:00:00.000000Z',
-            history: { kind: 'none' },
+            state: 'updated',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'fixed-ev',
+            graph: JSON.stringify({ nodes: [], edges: [] }),
             graphDelta: EMPTY_GRAPH_DELTA,
+            revivals: [],
         };
-        await ctx.PUT('flows/flow-1', body);
-        await ctx.PUT('flows/flow-1', body);
+        const headers = ifResponseIdHeaders(responseId);
+        await ctx.PUT('flows/flow-1', body, headers);
+        await ctx.PUT('flows/flow-1', body, headers);
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/flow-1/history',
         );
@@ -389,39 +418,21 @@ test(
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
-        // Seed a version row to consume
-        await ctx.PUT('flows/flow-1', {
-            flow: buildFlowBody({
+        // Seed a version row to consume — version-publish rides
+        // its own POST (Decision 3), so no PUT is needed here.
+        await ctx.POST('flows/flow-1/versions', {
+            id: 'ver-1',
+            version: {
+                flow_id: 'flow-1',
                 name: 'v1',
-                isLocked: false,
-                isAutoLayout: false,
-                isAutoFit: false,
-                lockTimeout: DEFAULT_LOCK_TIMEOUT,
-                nodes: [],
-                edges: [],
-            }),
-            eventId: 'seed-ev',
-            at: '2026-01-01T00:00:00.000000Z',
-            history: {
-                kind: 'snapshot',
-                version: {
-                    id: 'ver-1',
-                    version: {
-                        flow_id: 'flow-1',
-                        name: 'v1',
-                        is_locked: false,
-                        is_auto_layout: false,
-                        is_auto_fit: false,
-                        lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                        graph: JSON.stringify({
-                            nodes: [], edges: [],
-                        }),
-                        at: '2026-01-01T00:00:00.000000Z',
-                    },
-                    trimIds: [],
-                },
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                graph: JSON.stringify({ nodes: [], edges: [] }),
+                at: '2026-01-01T00:00:00.000000Z',
             },
-            graphDelta: EMPTY_GRAPH_DELTA,
+            trimIds: [],
         });
         await ctx.POST('flows/flow-1/undo', {
             flow: buildFlowBody({
@@ -436,6 +447,10 @@ test(
             eventId: 'undo-ev',
             at: '2099-01-02T00:00:00.000000Z',
             consumedVersionId: 'ver-1',
+            // Task 5: the post-undo reduced graph — REQUIRED
+            // plumbing, consumed only by the undo route's own
+            // synthesized document pair.
+            graph: JSON.stringify({ nodes: [], edges: [] }),
             graphDelta: EMPTY_GRAPH_DELTA,
             revivals: [],
         });
@@ -450,48 +465,199 @@ test(
 );
 
 test(
-    'POST flows/:id/redo posts the updated event'
-    + ' at the caller time',
+    'redo (versions-POST + document-PUT) posts the'
+    + ' updated event at the caller time',
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
-        await ctx.POST('flows/flow-1/redo', {
+        // Task 4 (R1/E5): POST /flows/:id/redo retired — redo
+        // now drives the SAME two writes performRedo composes:
+        // a versions POST (the archive), exactly like
+        // version-publish above, THEN a document PUT (the
+        // save), exactly like 'publishing a version then saving
+        // the document' above — never a single combined POST.
+        await ctx.POST('flows/flow-1/versions', {
+            id: 'ver-redo',
             version: {
-                id: 'ver-redo',
-                version: {
-                    flow_id: 'flow-1',
-                    name: 'redo-snap',
-                    is_locked: false,
-                    is_auto_layout: false,
-                    is_auto_fit: false,
-                    lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                    graph: JSON.stringify({
-                        nodes: [], edges: [],
-                    }),
-                    at: '2026-01-01T00:00:00.000000Z',
-                },
-                trimIds: [],
+                flow_id: 'flow-1',
+                name: 'redo-snap',
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: DEFAULT_LOCK_TIMEOUT,
+                graph: JSON.stringify({
+                    nodes: [], edges: [],
+                }),
+                at: '2026-01-01T00:00:00.000000Z',
             },
-            flow: buildFlowBody({
-                name: 'redone',
-                isLocked: false,
-                isAutoLayout: false,
-                isAutoFit: false,
-                lockTimeout: DEFAULT_LOCK_TIMEOUT,
-                nodes: [],
-                edges: [],
-            }),
-            eventId: 'redo-ev',
-            at: '2099-01-03T00:00:00.000000Z',
-            graphDelta: EMPTY_GRAPH_DELTA,
-            revivals: [],
+            trimIds: [],
         });
+        const { responseId } =
+            await ctx.GETWithResponseId<FlowWithGraph>(
+                'flows/flow-1',
+            );
+        await ctx.PUT(
+            'flows/flow-1',
+            {
+                ...buildFlowBody({
+                    name: 'redone',
+                    isLocked: false,
+                    isAutoLayout: false,
+                    isAutoFit: false,
+                    lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                    nodes: [],
+                    edges: [],
+                }),
+                state: 'updated',
+                state_at: '2099-01-03T00:00:00.000000Z',
+                state_event_id: 'redo-ev',
+                graph: JSON.stringify({ nodes: [], edges: [] }),
+                graphDelta: EMPTY_GRAPH_DELTA,
+                revivals: [],
+            },
+            ifResponseIdHeaders(responseId),
+        );
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/flow-1/history',
         );
         assert.equal(
             events.at(-1)!.at,
             '2099-01-03T00:00:00.000000Z',
+        );
+    },
+);
+
+// Fix wave 1 (Task 4 review, Critical): putFlow's C6 retry loop
+// rebuilds the graph delta fresh per attempt, but a prior bug
+// carried the CALLER's revivals list through unchanged across
+// every attempt. Between one attempt's 412 and the next, a
+// concurrent save can tombstone a node the revival target still
+// carries — the fresh delta re-upserts that node's ROW, but a
+// stale revivals list lacks the 'restored' EVENT needed to clear
+// the tombstone (append-only states: only 'restored' clears it),
+// so the node stays invisible forever even though the retry
+// "succeeded". The fix: putFlow takes a revivalTarget (the
+// target GRAPH, not a precomputed list) and buildFlowPutBody
+// derives the actual revivals fresh, every attempt, against that
+// attempt's OWN freshly-fetched baseline — exactly like the
+// delta already does. This test simulates the race for real (no
+// fabricated error): a concurrent putFlow (on the raw ctx) drops
+// 'mid' between this putFlow's attempt-1 read and its attempt-1
+// write, which genuinely 412s via the real gate since the head
+// has moved. The retry's SECOND attempt must recompute — not
+// replay — the revivals.
+test(
+    'putFlow C6 retry recomputes revivals per attempt:'
+    + ' a node tombstoned mid-retry is restored, not'
+    + ' left invisible by a stale (once-computed)'
+    + ' revivals list',
+    async () => {
+        const { ctx } = await setupMemDb();
+        await createBaseFlow(ctx, 'flow-1');
+        const flow0 = await ctx.GET<FlowWithGraph>(
+            'flows/flow-1',
+        );
+        const baseline0 =
+            JSON.parse(flow0.graph) as StoredGraph;
+        const start = baseline0.nodes.find(
+            n => n.isCreate,
+        )!;
+        const complete = baseline0.nodes.find(
+            n => n.isArchive,
+        )!;
+        const mid = buildNode('mid');
+
+        // 'mid' starts alive — an ordinary edit, no race yet.
+        await putFlow(ctx, 'flow-1', {
+            name: 'Test Flow',
+            isLocked: false,
+            isAutoLayout: false,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [start, complete, mid],
+            edges: [],
+        });
+
+        let putCalls = 0;
+        let secondBody: Record<string, unknown> | null = null;
+        // A concurrent editor's save lands between the tracked
+        // putFlow's attempt-1 read and its attempt-1 write: it
+        // drops 'mid' (tombstoning it) and moves the head, via
+        // the SAME real putFlow path any other caller rides —
+        // so attempt 1's now-stale echo genuinely 412s through
+        // the real gate.
+        const racingCtx: RequestContext = {
+            ...ctx,
+            PUT: async <T,>(
+                path: string,
+                body: Record<string, unknown>,
+                headerFields?:
+                    readonly (readonly [string, string])[],
+            ): Promise<T> => {
+                if (path === 'flows/flow-1') {
+                    putCalls += 1;
+                    if (putCalls === 1) {
+                        await putFlow(ctx, 'flow-1', {
+                            name: 'Test Flow',
+                            isLocked: false,
+                            isAutoLayout: false,
+                            isAutoFit: false,
+                            lockTimeout:
+                                DEFAULT_LOCK_TIMEOUT,
+                            nodes: [start, complete],
+                            edges: [],
+                        });
+                    } else {
+                        secondBody = body;
+                    }
+                }
+                return ctx.PUT<T>(path, body, headerFields);
+            },
+        };
+
+        await putFlow(
+            racingCtx,
+            'flow-1',
+            {
+                name: 'Test Flow',
+                isLocked: false,
+                isAutoLayout: false,
+                isAutoFit: false,
+                lockTimeout: DEFAULT_LOCK_TIMEOUT,
+                nodes: [start, complete, mid],
+                edges: [],
+            },
+            { nodes: [start, complete, mid], edges: [] },
+        );
+
+        assert.equal(
+            putCalls, 2,
+            'exactly one 412 retry happened',
+        );
+        assert.ok(
+            secondBody, 'the retry attempt PUT a body',
+        );
+        const revivals = (
+            secondBody as Record<string, unknown>
+        ).revivals as { entityId: string }[];
+        assert.ok(
+            revivals.some(r => r.entityId === 'mid'),
+            'the recomputed retry restores the node the'
+            + ' race just tombstoned — a revivals list'
+            + ' captured once (before the race) would'
+            + ' still be empty here',
+        );
+
+        // Behavioral confirmation: 'mid' is visible again.
+        const flow = await ctx.GET<FlowWithGraph>(
+            'flows/flow-1',
+        );
+        const graph =
+            JSON.parse(flow.graph) as StoredGraph;
+        assert.ok(
+            graph.nodes.some(n => n.id === 'mid'),
+            'mid reappears once its restore rides the'
+            + ' retry that actually lands',
         );
     },
 );

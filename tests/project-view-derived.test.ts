@@ -16,7 +16,11 @@ function makeProject(): Project {
         target_end_date: '2026-05-14',
         estimated_cost: 0, actual_cost: 0,
         position: 0,
-    }, 'approved');
+    }, {
+        state: 'approved',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-p1',
+    });
 }
 
 const T1 = '2026-05-14T00:00:00.000000Z';

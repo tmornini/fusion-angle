@@ -90,6 +90,68 @@ function credentialFields(identityId: string) {
     };
 }
 
+// ── members (the directory row, global plane) ──
+
+test('PUT members/:id appends its pair at the entity address,'
++ ' and a second PUT supersedes it', async () => {
+    const db = await freshDb();
+    const first = await handleRequest(db, req(
+        'PUT', '/members/mem-1', DEV_TOKEN, { type: 'human' },
+    ));
+    assert.equal(first.status, 200);
+    const firstId = first.headers.get('Response-ID');
+    assert.ok(firstId);
+    assert.equal(first.headers.get('Supersedes'), null);
+    const requests = await db.requests.getAll();
+    const row = requests.find(r => r.uri_id === 'mem-1');
+    assert.ok(row);
+    assert.equal(row!.uri_prefix, '/members/');
+    const domainRow = await db.members.getById('mem-1');
+    assert.deepEqual(await first.json(), domainRow);
+    const second = await handleRequest(db, req(
+        'PUT', '/members/mem-1', DEV_TOKEN, { type: 'ai' },
+    ));
+    assert.equal(second.status, 200);
+    assert.equal(second.headers.get('Supersedes'), firstId);
+});
+
+test('a byte-identical PUT resend to a member returns the'
++ ' stored response and appends nothing', async () => {
+    const db = await freshDb();
+    const body = { type: 'human' };
+    const first = await handleRequest(db, req(
+        'PUT', '/members/mem-2', DEV_TOKEN, body,
+    ));
+    const firstId = first.headers.get('Response-ID');
+    const second = await handleRequest(db, req(
+        'PUT', '/members/mem-2', DEV_TOKEN, body,
+    ));
+    assert.equal(second.headers.get('Response-ID'), firstId);
+    assert.equal((await db.requests.getAll()).length, 1);
+    assert.equal((await db.responses.getAll()).length, 1);
+});
+
+test('a PUT to members/:id verifies against its hash and'
++ ' keeps request/response counts balanced', async () => {
+    const db = await freshDb();
+    await handleRequest(db, req(
+        'PUT', '/members/mem-3', DEV_TOKEN, { type: 'human' },
+    ));
+    const requests = await db.requests.getAll();
+    const responses = await db.responses.getAll();
+    for (const row of requests) {
+        assert.equal(
+            await sha256Hex(row.message), row.message_hash,
+        );
+    }
+    for (const row of responses) {
+        assert.equal(
+            await sha256Hex(row.message), row.message_hash,
+        );
+    }
+    assert.equal(requests.length, responses.length);
+});
+
 // ── ai-members ──
 
 test('an ai-member create appends its pair at the entity'

@@ -4,6 +4,7 @@ import {
 } from '../../../api/types.ts';
 import {
     GET as httpGet,
+    GETWithResponseId as httpGetWithResponseId,
     PUT as httpPut,
     DELETE as httpDelete,
     POST as httpPost,
@@ -58,9 +59,16 @@ export interface RequestContext {
     readonly requestId: string;
     readonly identity: Principal;
     GET<T>(resource: string): Promise<T>;
+    // The locked-class baseline+echo read: the parsed body plus
+    // the Response-ID header to carry forward as If-Response-ID
+    // on the next save.
+    GETWithResponseId<T>(
+        resource: string,
+    ): Promise<{ body: T; responseId: string | undefined }>;
     PUT<T>(
         resource: string,
         body: Record<string, unknown>,
+        headerFields?: readonly (readonly [string, string])[],
     ): Promise<T>;
     DELETE(resource: string): Promise<void>;
     POST<T>(
@@ -110,11 +118,21 @@ function makeRequestContext(
         identity,
         GET: <T>(resource: string) =>
             run<T>(tok => httpGet<T>(adapter, resource, tok)),
+        GETWithResponseId: <T>(resource: string) =>
+            run<{ body: T; responseId: string | undefined }>(
+                tok => httpGetWithResponseId<T>(
+                    adapter, resource, tok,
+                ),
+            ),
         PUT: <T>(
             resource: string,
             body: Record<string, unknown>,
+            headerFields?:
+                readonly (readonly [string, string])[],
         ) => run<T>(
-            tok => httpPut<T>(adapter, resource, body, tok)),
+            tok => httpPut<T>(
+                adapter, resource, body, tok, headerFields,
+            )),
         DELETE: (resource: string) =>
             run<void>(
                 tok => httpDelete(adapter, resource, tok)),
@@ -125,6 +143,24 @@ function makeRequestContext(
             tok => httpPost<T>(adapter, resource, body, tok)),
     };
     return ctx;
+}
+
+// Exponential backoff with jitter for the C6 retry loop
+// (flow-mutations.ts's putFlow): attempt 1 waits one base
+// interval (plus jitter), attempt 2 waits two, doubling each
+// time — capped at MAX_PUT_ATTEMPTS (3) call sites, never
+// infinite (Commandment: retries only where the error is
+// transient, exponential backoff with jitter, capped).
+const BACKOFF_BASE_MS = 100;
+
+export async function jitteredBackoff(
+    attempt: number,
+): Promise<void> {
+    const base = BACKOFF_BASE_MS * 2 ** (attempt - 1);
+    const delay = base + Math.random() * base;
+    await new Promise<void>(
+        resolve => setTimeout(resolve, delay),
+    );
 }
 
 export function sessionContext(): RequestContext {

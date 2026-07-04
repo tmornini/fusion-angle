@@ -352,23 +352,34 @@ test(
         await seedKnownBaseline(ctx, flowId);
 
         const working = buildWorkingGraph();
-        // Capture ONE PUT body (with one graphDelta) and
-        // replay it. putFlow rebuilds the delta with fresh
-        // ids per call, so capture the wire body directly.
+        // Capture ONE PUT body (with one graphDelta) AND its
+        // If-Response-ID echo, and replay both. putFlow rebuilds
+        // the delta (and mints a fresh echo) per call, so capture
+        // the wire request directly. flows/:id is locked-class
+        // (Task 3): the echo header rides the request's canonical
+        // hash, so a replay omitting it would hash differently —
+        // no longer the SAME message, and thus not a byte-
+        // identical resend at all.
         let captured: Record<string, unknown> | null = null;
+        let capturedHeaders:
+            readonly (readonly [string, string])[]
+            | undefined;
         const origPut = ctx.PUT.bind(ctx);
         const spyCtx: RequestContext = {
             ...ctx,
             PUT: async <T,>(
                 path: string,
                 body?: unknown,
+                headerFields?:
+                    readonly (readonly [string, string])[],
             ): Promise<T> => {
                 if (path === 'flows/' + flowId
                     && captured === null) {
                     captured =
                         body as Record<string, unknown>;
+                    capturedHeaders = headerFields;
                 }
-                return origPut<T>(path, body);
+                return origPut<T>(path, body, headerFields);
             },
         };
         await putFlow(spyCtx, flowId, save(
@@ -387,8 +398,10 @@ test(
         const nodeCountBefore = afterFirst.nodeRows.length;
         const edgeCountBefore = afterFirst.edgeRows.length;
 
-        // Replay the EXACT captured body.
-        await origPut('flows/' + flowId, captured);
+        // Replay the EXACT captured body (and its echo header).
+        await origPut(
+            'flows/' + flowId, captured, capturedHeaders,
+        );
 
         const afterReplay = await relations(db, flowId);
         // No duplicate rows on any relation table.

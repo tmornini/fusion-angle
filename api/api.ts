@@ -26,8 +26,14 @@ import {
     PAIR_WIRED_ROUTE_PATTERNS,
     DOCUMENT_CLASS_ROUTE_PATTERNS,
     REPLAY_EXEMPT_ROUTE_PATTERNS,
+    IF_RESPONSE_ID_HEADER,
 } from './message-pair.ts';
 import type { MessagePair, AuthPairSeed } from './message-pair.ts';
+import { familyRegistration } from './family-registry.ts';
+import {
+    documentFamilyWiring,
+    documentHeadPairId,
+} from './document-family.ts';
 import {
     ANONYMOUS_ID,
     decodeAccessToken,
@@ -415,6 +421,44 @@ export async function handleRequest(
                         effective, canonicalPrefix, uriId,
                     )
                     : undefined;
+            // The locked/simple divide (spec §The two PUT
+            // classes): keyed by the route's family registration
+            // THROUGH THE WIRING CONSULT — never a blanket
+            // family-registry or DOCUMENT_CLASS_ROUTE_PATTERNS
+            // read — so a family whose registration says
+            // 'locked' but has no row in document-family.ts's
+            // wiring table (flows, through this task) never rides
+            // this arm; only a route actually served via
+            // documentPutHandler can. The routePattern check
+            // (not merely the first segment) matters once a
+            // family's OTHER routes share its prefix (e.g. a
+            // future locked family's own :id/sub-resource PUT
+            // must never inherit the entity route's four-outcome
+            // table) — documentEntityRoute's own pattern is
+            // always exactly `${family}/:id`. PUT-only: the two
+            // PUT classes govern PUT, never POST/DELETE.
+            const wiring = documentFamilyWiring(
+                matched.segments[0] ?? '',
+            );
+            const isLockedWrite = method === 'PUT'
+                && wiring !== undefined
+                && routePattern === wiring.family + '/:id'
+                && familyRegistration(wiring.family)
+                    ?.concurrency === 'locked';
+            // The hoisted echo: read directly (not merely via
+            // hoisted-header storage) so the gate can compare it
+            // against the head BEFORE dispatch. Only consulted
+            // for a locked write — inert (null) otherwise.
+            const echo = isLockedWrite
+                ? request.headers.get(IF_RESPONSE_ID_HEADER)
+                : null;
+            // follows is set ONLY when the echo matches the
+            // current head — the locked sibling of headPairId's
+            // supersedes; the two are mutually exclusive by
+            // construction (a locked write never supersedes).
+            const follows = isLockedWrite
+                && echo !== null && echo === headPairId
+                ? echo : undefined;
             // DELETE responses are UNIVERSALLY 204 with no
             // body — every wired DELETE handler returns void
             // (message-pair.ts resolution: DELETEs join their
@@ -451,7 +495,12 @@ export async function handleRequest(
                 responseBody: spec.successBody?.(
                     params, body, actor, organization,
                 ),
-                headPairId,
+                // A locked write never supersedes (its head-read
+                // decides genesis/412/follows, never a chain);
+                // a simple write carries headPairId exactly as
+                // today.
+                headPairId: isLockedWrite ? undefined : headPairId,
+                ...(follows === undefined ? {} : { follows }),
             });
             // The pre-tx idempotency fast-path: a byte-
             // identical resend never reaches the handler and
@@ -460,13 +509,48 @@ export async function handleRequest(
             // routes' own domain guard (or, from Task 3, their
             // redacted stored body) makes serving the cached
             // response wrong rather than merely redundant — see
-            // message-pair.ts.
+            // message-pair.ts. ORDERING IS LOAD-BEARING: this
+            // fast path runs BEFORE the locked four-outcome table
+            // below, so a byte-identical resend of an
+            // already-succeeded locked write (whose echo is now
+            // stale against the NEW head) replays instead of
+            // 412ing.
             if (!REPLAY_EXEMPT_ROUTE_PATTERNS.has(routePattern)) {
                 const replay = await storedResponseFor(
                     effective, pair.requestHash,
                 );
                 if (replay !== undefined) {
                     return responseFromStored(replay);
+                }
+            }
+            // The locked four-outcome table (spec §The two PUT
+            // classes), applied ONLY after the replay fast-path
+            // MISSES: head present + echo absent → 412; echo
+            // present + != head → 412; echo present + == head →
+            // follows already set above, proceed; head absent +
+            // echo absent → genesis, proceed. A 412 here returns
+            // BEFORE dispatch, and appendMessagePair only ever
+            // runs inside the op's own tx, so NOTHING is stored.
+            if (isLockedWrite) {
+                if (headPairId !== undefined && echo === null) {
+                    return Response.json(
+                        {
+                            error: 'If-Response-ID is required: '
+                                + 'a document already exists at '
+                                + pathname,
+                        },
+                        { status: HTTP_PRECONDITION_FAILED },
+                    );
+                }
+                if (echo !== null && echo !== headPairId) {
+                    return Response.json(
+                        {
+                            error: 'If-Response-ID does not '
+                                + 'match the current document '
+                                + 'at ' + pathname,
+                        },
+                        { status: HTTP_PRECONDITION_FAILED },
+                    );
                 }
             }
         }
@@ -483,13 +567,59 @@ export async function handleRequest(
                         { status: 405 },
                     );
                 }
-                return Response.json(
-                    await matched.get(
-                        effective,
-                        params,
-                        actor,
-                    ),
+                const result = await matched.get(
+                    effective,
+                    params,
+                    actor,
+                    organization,
                 );
+                // Response-ID attach (spec §The two PUT
+                // classes): a locked-family document GET
+                // carries the current head pair id as
+                // provenance — the C6 client save's baseline
+                // AND its echo source. Keyed through the SAME
+                // wiring consult + exact-pattern match the
+                // write side's four-outcome table uses above
+                // (never a blanket family-registry or
+                // DOCUMENT_CLASS_ROUTE_PATTERNS read, never a
+                // flows literal). Below the three-instance
+                // threshold with the write side's own inline
+                // check (Commandment IX Generality) — kept
+                // duplicated rather than prematurely shared.
+                const readWiring = documentFamilyWiring(
+                    matched.segments[0] ?? '',
+                );
+                if (
+                    readWiring !== undefined
+                    && routePattern
+                        === readWiring.family + '/:id'
+                    && familyRegistration(readWiring.family)
+                        ?.concurrency === 'locked'
+                ) {
+                    const prefix = canonicalUriPrefix(
+                        organization,
+                        '/' + readWiring.family + '/',
+                    );
+                    // The derivation's OWN head pair id (Phase 4
+                    // Task 8) — the SAME reduction the flipped GET
+                    // above just ran to build `result`, not a
+                    // second, divergent one (headPairIdAt's own
+                    // ANY-method LOCK head, still the write path's
+                    // source above). Same value for a document-
+                    // class address (tests/api-flow-document.test.ts
+                    // pins the equality); one mechanism now.
+                    const headPairId = await documentHeadPairId(
+                        effective, prefix, param(params, 0),
+                    );
+                    if (headPairId !== undefined) {
+                        return Response.json(result, {
+                            headers: {
+                                'Response-ID': headPairId,
+                            },
+                        });
+                    }
+                }
+                return Response.json(result);
             }
             case 'PUT': {
                 if (!matched.put) {
@@ -672,6 +802,7 @@ export async function handleRequest(
                         body!,
                         actor,
                         pair,
+                        organization,
                     );
                 }
                 if (pair !== undefined) {
@@ -827,25 +958,57 @@ async function unwrapResponse<T>(
     );
 }
 
+// The ONE await site for a GET-shaped facade call — GET and
+// GETWithResponseId are both thin wrappers over this, so the
+// simulateLatency literal-count pin (pair-write-coverage.test.ts)
+// stays at exactly 4 no matter how many GET-shaped verbs read
+// from it (delegation, not a copy-pasted fifth await site).
+async function getResponse(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+): Promise<Response> {
+    await adapter.simulateLatency();
+    return handleRequest(
+        adapter,
+        new Request(
+            `${BASE_URL}/${resource}`,
+            {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                },
+            },
+        ),
+    );
+}
+
 export async function GET<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
 ): Promise<T> {
-    await adapter.simulateLatency();
     return unwrapResponse<T>(
-        await handleRequest(
-            adapter,
-            new Request(
-                `${BASE_URL}/${resource}`,
-                {
-                    headers: {
-                        'Authorization': 'Bearer ' + token,
-                    },
-                },
-            ),
-        ),
+        await getResponse(adapter, resource, token),
     );
+}
+
+// The locked-class sibling of GET: the same wire round-trip,
+// plus the response's Response-ID header (attached by
+// handleRequest's GET case for a locked-family document read;
+// undefined for every other route today) — the baseline a C6
+// save both diffs against and echoes back as If-Response-ID.
+export async function GETWithResponseId<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+): Promise<{ body: T; responseId: string | undefined }> {
+    const response = await getResponse(adapter, resource, token);
+    const body = await unwrapResponse<T>(response);
+    return {
+        body,
+        responseId:
+            response.headers.get('Response-ID') ?? undefined,
+    };
 }
 
 export async function PUT<T>(
@@ -853,8 +1016,16 @@ export async function PUT<T>(
     resource: string,
     payload: Record<string, unknown>,
     token: string,
+    headerFields?: readonly (readonly [string, string])[],
 ): Promise<T> {
     await adapter.simulateLatency();
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+    };
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
     return unwrapResponse<T>(
         await handleRequest(
             adapter,
@@ -862,11 +1033,7 @@ export async function PUT<T>(
                 `${BASE_URL}/${resource}`,
                 {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type':
-                            'application/json',
-                        'Authorization': 'Bearer ' + token,
-                    },
+                    headers,
                     body: JSON.stringify(payload),
                 },
             ),

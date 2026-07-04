@@ -122,7 +122,11 @@ function makeProject(overrides: {
             overrides.estimatedCost ?? 50000,
         actual_cost: 25000,
         position: overrides.position ?? 0,
-    }, overrides.state ?? 'approved');
+    }, {
+        state: overrides.state ?? 'approved',
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-' + (overrides.id ?? 'pr-1'),
+    });
 }
 
 function makeOrganization() {

@@ -2,6 +2,9 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { adminContext } from './context-fixtures.ts';
+import { createRequestContext } from
+'../web-app/app/adapters/shared.ts';
+import { devToken } from './token-fixtures.ts';
 import {
     putFlowRecord,
     deleteFlowRecord,
@@ -11,24 +14,34 @@ import {
     getWorkOrdersForRecord,
 } from '../web-app/app/adapters/flow-records.ts';
 import {
+    postFlowCreation,
+} from '../web-app/app/adapters/flow-mutations.ts';
+import {
     jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 
 const AT = '2026-05-01T00:00:00.000000Z';
 
+// Seeds a flow through the SAME gate-driven create the live
+// route uses (postFlowCreation), so a message pair exists at
+// this flow's address — required for the flipped GET flows
+// route (Phase 4 Task 8), which getFlowSummariesForRecord /
+// getWorkOrdersForRecord read (via getFlowEntities), to derive
+// it. The default start/complete graph postFlowCreation seeds
+// is irrelevant here — every caller in this file reads only
+// the flow's id/name.
 async function seedFlow(
     db: MemoryDbAdapter,
     id: string,
     name: string,
 ): Promise<void> {
-    await db.flows.put(id, {
-        organization_id: '1',
+    const ctx = createRequestContext(db, await devToken());
+    await postFlowCreation(ctx, {
+        flowId: id,
+        linkId: id + '-link',
+        projectId: 'p-' + id,
         name,
-        is_locked: false,
-        is_auto_layout: true,
-        is_auto_fit: true,
-        lock_timeout: DEFAULT_LOCK_TIMEOUT,
     });
 }
 

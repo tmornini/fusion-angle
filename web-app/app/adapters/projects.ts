@@ -1,6 +1,7 @@
 import type {
     ProjectEntity,
     ProjectState,
+    ProjectStateDetail,
     ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
@@ -8,15 +9,18 @@ import {
     Project,
     projectStateIsNotDeleted,
     msSinceUtc,
+    nowUtc,
     COST_DIVISOR,
     MS_PER_DAY,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
-    postStateEvent,
-    getProjectState,
-    getProjectStates,
+    getProjectStateDetail,
+    getProjectStateDetails,
 } from './state-events.ts';
+import {
+    generateCryptoSafeBase62,
+} from '../../../shared/crypto-safe-base62.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -45,6 +49,7 @@ export {
     Project,
     type ProjectState,
     type ProjectEntity,
+    type ProjectStateDetail,
     isProjectState,
     COST_DIVISOR,
 } from '../../../api/types.ts';
@@ -58,23 +63,23 @@ export async function getProjectEntities(
 export async function getProjects(
     ctx: RequestContext,
 ): Promise<Project[]> {
-    const [rows, stateMap] = await Promise.all([
+    const [rows, detailMap] = await Promise.all([
         getProjectEntities(ctx),
-        getProjectStates(ctx),
+        getProjectStateDetails(ctx),
     ]);
     return rows
         .filter(row => {
-            const s = stateMap.get(row.id);
-            if (s === undefined) {
+            const detail = detailMap.get(row.id);
+            if (detail === undefined) {
                 throw new Error(
                     'Project has no state event: '
                     + row.id,
                 );
             }
-            return projectStateIsNotDeleted(s);
+            return projectStateIsNotDeleted(detail.state);
         })
         .map(row => new Project(
-            row, stateMap.get(row.id)!,
+            row, detailMap.get(row.id)!,
         ));
 }
 
@@ -82,11 +87,11 @@ export async function getProject(
     ctx: RequestContext,
     id: string,
 ): Promise<Project> {
-    const [row, state] = await Promise.all([
+    const [row, detail] = await Promise.all([
         getProjectEntity(ctx, id),
-        getProjectState(ctx, id),
+        getProjectStateDetail(ctx, id),
     ]);
-    return new Project(row, state);
+    return new Project(row, detail);
 }
 
 export class ProjectView {
@@ -150,6 +155,21 @@ export class ProjectView {
     stateValue(): ProjectState {
         return this.#project
             .stateValue();
+    }
+
+    // Trio echo only — see the DATA-CORRUPTION TRAP note on
+    // Project's other view accessors below (progressPercent,
+    // costActualK): those are display-transformed and MUST
+    // NOT feed a wire body. state/stateAt/stateEventId carry
+    // no such transform, so passing them through is safe.
+    stateAtValue(): string {
+        return this.#project
+            .stateAtValue();
+    }
+
+    stateEventIdValue(): string {
+        return this.#project
+            .stateEventIdValue();
     }
 
     isApproved(): boolean {
@@ -230,12 +250,33 @@ export async function getProjectEntity(
     );
 }
 
+// The wire document PUT /projects/:id now takes (Decision 7):
+// today's entity fields plus the lifecycle trio, camelCase on
+// this side of the adapter seam — the IdeaDocumentFields
+// precedent (adapters/ideas.ts). organization_id is EXCLUDED
+// too — the client never supplies it (the org fence stamps it
+// downstream).
+export type ProjectDocumentFields =
+    Omit<ProjectEntity, 'id' | 'organization_id'> & {
+        readonly state: ProjectState;
+        readonly stateAt: string;
+        readonly stateEventId: string;
+    };
+
 export async function putProject(
     ctx: RequestContext,
     id: string,
-    entity: Omit<ProjectEntity, 'id' | 'organization_id'>,
+    document: ProjectDocumentFields,
 ): Promise<void> {
-    await ctx.PUT(`projects/${id}`, entity);
+    const {
+        state, stateAt, stateEventId, ...entity
+    } = document;
+    await ctx.PUT(`projects/${id}`, {
+        ...entity,
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
+    });
     projectChanges.notify();
 }
 
@@ -269,6 +310,7 @@ export async function putProjectFields(
     ctx: RequestContext,
     id: string,
     patch: ProjectFieldsPatch,
+    detail: ProjectStateDetail,
 ): Promise<void> {
     const fields = await projectRowFields(ctx, id);
     await putProject(ctx, id, {
@@ -278,6 +320,9 @@ export async function putProjectFields(
         start_date: patch.startDate,
         target_end_date: patch.targetEndDate,
         estimated_cost: patch.estimatedCost,
+        state: detail.state,
+        stateAt: detail.stateAt,
+        stateEventId: detail.stateEventId,
     });
 }
 
@@ -285,26 +330,34 @@ export async function putProjectPosition(
     ctx: RequestContext,
     id: string,
     position: number,
+    detail: ProjectStateDetail,
 ): Promise<void> {
     const fields = await projectRowFields(ctx, id);
     await putProject(ctx, id, {
         ...fields,
         position,
+        state: detail.state,
+        stateAt: detail.stateAt,
+        stateEventId: detail.stateEventId,
     });
 }
 
-// State transition for an existing project: one
-// state event, nothing else. Per the doctrine
-// "every state is an event; the latest event is the
-// truth", lifecycle stage is the log, not a column
-// on the row. Pair with putProject in sequence
-// when a caller needs both an entity edit and a
-// transition (e.g., the project edit form).
+// State transition for an existing project (Decision 7):
+// mints a fresh trio and fires ONE document PUT via putProject
+// — hop count 1 → 1 (today it is one PUT states/:id). Callers
+// supply the eight fields they already hold FROM RAW SOURCES
+// ONLY — never from ProjectView's display-transformed
+// accessors (see the DATA-CORRUPTION TRAP note on ProjectView).
 export async function postProjectStateChange(
     ctx: RequestContext,
     id: string,
+    fields: Omit<ProjectEntity, 'id' | 'organization_id'>,
     state: ProjectState,
 ): Promise<void> {
-    await postStateEvent(ctx, id, state);
-    projectChanges.notify();
+    await putProject(ctx, id, {
+        ...fields,
+        state,
+        stateAt: nowUtc(),
+        stateEventId: generateCryptoSafeBase62(),
+    });
 }

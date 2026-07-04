@@ -163,6 +163,62 @@ test(
 );
 
 test(
+    'POST ideas/:id/conversion also appends a document pair'
+    + ' at the project\'s org-nested address',
+    async () => {
+        const db = await seededDb();
+        await POST(db, 'ideas/idea-1/conversion', {
+            projectId: 'p9',
+            project: projectFields('Promoted Project'),
+            idea: ideaFields('Source Idea'),
+            ideaStateEventId: 'ev-idea-promoted-9',
+            ideaState: 'promoted',
+            projectStateEventId: 'ev-project-init-9',
+            projectState: 'submitted',
+            ideaStateAt: '2099-06-03T00:00:00.000000Z',
+            projectStateAt: '2099-06-03T00:00:01.000000Z',
+            baselines: [],
+        }, DEV_TOKEN);
+
+        // Balance invariant: two REQUEST rows + two RESPONSE
+        // rows for one conversion (the operation pair plus the
+        // synthesized document pair).
+        const allRequests = await db.requests.getAll();
+        const allResponses = await db.responses.getAll();
+        assert.equal(allRequests.length, 2);
+        assert.equal(allResponses.length, 2);
+        assert.equal(allRequests.length, allResponses.length);
+
+        const atProjectAddress = allRequests.filter(
+            (r) =>
+                r.uri_prefix === '/organizations/1/projects/'
+                && r.uri_id === 'p9',
+        );
+        assert.equal(atProjectAddress.length, 1);
+        const responsesAtProjectAddress = allResponses.filter(
+            (r) =>
+                r.uri_prefix === '/organizations/1/projects/'
+                && r.uri_id === 'p9',
+        );
+        assert.equal(responsesAtProjectAddress.length, 1);
+
+        const request = atProjectAddress[0]!;
+        // The requester is the caller, never the idea's author.
+        assert.equal(request.requester_identity_id, 'current');
+
+        const parsed = JSON.parse(request.message) as {
+            body: Record<string, unknown>;
+        };
+        assert.deepEqual(parsed.body, {
+            ...projectFields('Promoted Project'),
+            state: 'submitted',
+            state_at: '2099-06-03T00:00:01.000000Z',
+            state_event_id: 'ev-project-init-9',
+        });
+    },
+);
+
+test(
     'POST ideas/:id/conversion rolls back EVERYTHING when'
     + ' a state event conflicts mid-op',
     async () => {

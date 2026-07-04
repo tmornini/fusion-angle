@@ -1,13 +1,17 @@
 import type { DbAdapter } from './db.ts';
 import { TABLE_NAMES } from './db.ts';
 import {
-    postIdeaCreationOp,
+    postIdeaDocumentOp,
+    postIdeaSubmissionOp,
+    postProjectDocumentOp,
     postFlowCreationOp,
+    postFlowDocumentOp,
     postRecordWriteOp,
     postObjectiveCreationOp,
     postAiMemberCreationOp,
     postHumanMemberCreationOp,
 } from './routes.ts';
+import type { FlowCreationPairs } from './routes.ts';
 import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
@@ -58,7 +62,6 @@ import {
     buildFlowGraphRelations,
 } from './mock-data/flows.ts';
 import {
-    l2cProjectId,
     buildProjects,
 } from './mock-data/projects.ts';
 import {
@@ -89,6 +92,7 @@ import {
 import {
     wfTimestamp,
     ideaStateEvents,
+    projectStateEvents,
     flowStateEvents,
     recordStateEvents,
     mockProjectFlows,
@@ -97,7 +101,12 @@ import {
     pickHumanMember,
     humanMemberSeedBody,
     ideaSeedBody,
+    ideaSubmissionSeedBody,
+    projectSeedBody,
+    projectOrg2,
+    projectOrganizationFor,
     flowSeedBody,
+    flowOrg2SeedBody,
     aiMemberSeedBody,
     recordSeedBody,
     objectiveSeedBody,
@@ -344,14 +353,16 @@ async function postMockDataLoadIn(
     const ideas = buildIdeas();
 
     // Each seeded idea's sole state event doubles as its
-    // creation event — driven through postIdeaCreationOp
-    // below so the seed writes exactly as POST /ideas does.
-    // Driving the op below the org fence, the unscoped store
-    // stamps nothing, so organization_id rides in the idea
-    // sub-body instead of the (route-only) omission.
-    // ideaStateEvents is imported from seed-message-pairs.ts —
-    // pass 1 there needs the SAME array to form each idea's
-    // pair before this transaction opens.
+    // genesis event — driven through postIdeaDocumentOp below
+    // so the seed writes exactly as the genesis case of PUT
+    // /ideas/:id does (Decision 7, Phase 2 Task 3: create is
+    // just the head-absent case of the document PUT). Driving
+    // the op below the org fence, the unscoped store stamps
+    // nothing, so organization_id rides in the seed body
+    // instead of the (route-only) omission. ideaStateEvents is
+    // imported from seed-message-pairs.ts — pass 1 there needs
+    // the SAME array to form each idea's pair before this
+    // transaction opens.
     const ideaStateEventById = new Map(
         ideaStateEvents.map(e => [e.entity_id, e]),
     );
@@ -359,8 +370,9 @@ async function postMockDataLoadIn(
     await Promise.all([
         ...ideas.map((idea, i) => {
             const event = ideaStateEventById.get(idea.id)!;
-            return postIdeaCreationOp(
+            return postIdeaDocumentOp(
                 adapter,
+                idea.id,
                 ideaSeedBody(idea, event, i),
                 event.member_id,
                 requirePair(
@@ -387,6 +399,40 @@ async function postMockDataLoadIn(
     ]);
 
     const projects = buildProjects();
+
+    // Each seeded project's sole state event doubles as its
+    // genesis event — driven through postProjectDocumentOp
+    // below exactly as ideas drive through postIdeaDocumentOp
+    // above (Decision 7, Phase 3 Task 3). Driving the op below
+    // the org fence, the unscoped store stamps nothing, so
+    // organization_id rides in the seed body instead of the
+    // (route-only) omission. projectStateEvents (including the
+    // org-2 override's own event) is imported from
+    // seed-message-pairs.ts — pass 1 there needs the SAME array
+    // to form each project's pair before this transaction opens.
+    // projectOrg2 extends projects[0] under organization '2' —
+    // the SAME construction pass 1 uses, so a seeded pair can
+    // never drift from what this write actually stores.
+    const projectStateEventById = new Map(
+        projectStateEvents.map(e => [e.entity_id, e]),
+    );
+
+    await Promise.all(
+        [...projects, projectOrg2(projects)].map(project => {
+            const event =
+                projectStateEventById.get(project.id)!;
+            const organization = projectOrganizationFor(project);
+            return postProjectDocumentOp(
+                adapter,
+                project.id,
+                projectSeedBody(project, event, organization),
+                event.member_id,
+                requirePair(
+                    pairs, seedPairKey('projects', project.id),
+                ),
+            );
+        }),
+    );
 
     const leadToCloseNodes = buildLeadToCloseNodes();
 
@@ -3139,203 +3185,82 @@ async function postMockDataLoadIn(
         });
 
     await Promise.all([
-        // projects is a bare makeIdRoute PUT (get/put only,
-        // no composed post op), so the validated
-        // EntityStore.put below IS the sanctioned write.
-        ...projects.map(project =>
-            adapter.projects.put(project.id, {
-                ...project, organization_id: STARK_ORGANIZATION,
-            }),
-        ),
         // Store only the flow's scalar fields — the authored
         // graph literal is the relation-seed input, decomposed
         // by postFlowCreationOp's graphDelta below — never a
         // stored column. Each of the four mockFlows carries a
         // project_flows join row (mockProjectFlows), so all
-        // four drive through the op; seed-flow-org2 (below) has
-        // no project link and stays a direct write.
+        // four drive through the op; seed-flow-org2 (below)
+        // has no project link, so it drives through
+        // postFlowDocumentOp instead (Task 6).
         ...mockFlows.map(flow => {
             const event = flowStateEventByFlowId.get(flow.id)!;
             const projectFlow = mockProjectFlows.find(
                 pf => pf.flow_id === flow.id,
             )!;
+            // Task 5: create threads the triple — the operation
+            // pair plus its two synthesized siblings, each
+            // pre-formed in pass 1 under its own deterministic
+            // key (seed-message-pairs.ts).
+            const flowPairs: FlowCreationPairs = {
+                operation: requirePair(
+                    pairs, seedPairKey('flows', flow.id),
+                ),
+                document: requirePair(
+                    pairs, seedPairKey('flows/:id', flow.id),
+                ),
+                join: requirePair(
+                    pairs,
+                    seedPairKey(
+                        'projects/:id/flows/:pfid',
+                        projectFlow.id,
+                    ),
+                ),
+            };
             return postFlowCreationOp(
                 adapter,
                 flowSeedBody(
                     flow, event, projectFlow, flowRelations,
                 ),
                 event.member_id,
-                requirePair(
-                    pairs, seedPairKey('flows', flow.id),
-                ),
+                flowPairs,
             );
         }),
         // Organization '2' owns a small, self-contained slice so each
-        // org owns at least one project and flow. The whole
+        // org owns at least one project (postProjectDocumentOp
+        // above seeds projectOrg2) and flow. The whole
         // work-order graph stays in org '1', so org '2' gets a
         // work-order-free flow and a flow-free project — no
-        // cross-org coupling. seed-flow-org2 has no project_flows
-        // join row, so it cannot drive through postFlowCreationOp
-        // (which requires one) — stays a direct write.
-        adapter.projects.put('seed-project-org2', {
-            ...projects[0]!,
-            organization_id: ORGANIZATION_TWO,
-            title: 'Wayne R&D Portfolio',
-        }),
-        adapter.flows.put('seed-flow-org2', {
-            organization_id: ORGANIZATION_TWO,
-            name: 'Wayne Onboarding',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        }),
-        adapter.states.put('seed-state-flow-org2', {
-            entity_id: 'seed-flow-org2',
-            state: 'active',
-            member_id: SYSTEM_MEMBER_ID,
-            at: MOCK_SEED_TIMESTAMP,
-        }),
+        // cross-org coupling. seed-flow-org2 has no
+        // project_flows join row, so it drives through
+        // postFlowDocumentOp (Task 6) instead of
+        // postFlowCreationOp, which requires one.
+        postFlowDocumentOp(
+            adapter,
+            'seed-flow-org2',
+            flowOrg2SeedBody(),
+            SYSTEM_MEMBER_ID,
+            requirePair(
+                pairs,
+                seedPairKey('flows/:id', 'seed-flow-org2'),
+            ),
+        ),
     ]);
 
     const ideaSubmissions = buildIdeaSubmissions();
-
-    const projectStateEvents: StateEntity[] = [
-        {
-            // 'submitted' so the scoring loop skips this org-'2'
-            // project — no cross-org score against org-'1'
-            // objectives.
-            id: 'seed-state-project-org2',
-            entity_id: 'seed-project-org2',
-            state: 'submitted',
-            member_id: SYSTEM_MEMBER_ID,
-            at: MOCK_SEED_TIMESTAMP,
-        },
-        {
-            id: 'pSe01Cu5tSegmAi5pEv01',
-            entity_id: 'u6YkHhlGc91oDMkr3x0isa',
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-60, 9, 0),
-        },
-        {
-            id: 'pSe02Aut0Rep0rtComp02',
-            entity_id: 'jRE2Tj32NHsFGZIeEADp0p',
-            state: 'archived',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-110, 9, 0),
-        },
-        {
-            id: 'pSe03SalesP1p3App03Z',
-            entity_id: l2cProjectId,
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-55, 9, 0),
-        },
-        {
-            id: 'pSe04PredMa1ntRev04AB',
-            entity_id: 'P04PredMa1ntzyXY010203',
-            state: 'under_review',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-18, 9, 0),
-        },
-        {
-            id: 'pSe05RtAna1ytComp05CD',
-            entity_id: 'P05RtAna1ytcsXY010203Z',
-            state: 'archived',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-95, 9, 0),
-        },
-        {
-            id: 'pSe06SmInvOptSnt06EF',
-            entity_id: 'P06SmInvOptZyXY010203A',
-            state: 'sent_back',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-38, 9, 0),
-        },
-        {
-            id: 'pSe07Empl0yTraRev07GH',
-            entity_id: 'P07Empl0yTrainZyXY00B0',
-            state: 'under_review',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-12, 9, 0),
-        },
-        {
-            id: 'pSe08CustSuppApp08IJ',
-            entity_id: 'P08CustSuppKn0wXY01C0D',
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-48, 9, 0),
-        },
-        {
-            id: 'pSe09C0mp1AudApp09KL',
-            entity_id: 'P09C0mp1AudAut0mXY01E0',
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-72, 9, 0),
-        },
-        {
-            id: 'pSe10MlRgD1s4App10MN',
-            entity_id: 'P10MlRgD1s4stRc1XY01FG',
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-82, 9, 0),
-        },
-        {
-            id: 'pSe11V0iceField11OPQ',
-            entity_id: 'P11V0iceField0psXY01HJ',
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-40, 9, 0),
-        },
-        {
-            id: 'pSe12CarbF00tCmp12RS',
-            entity_id: 'P12CarbF00tprXY01K0L0M',
-            state: 'archived',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-120, 9, 0),
-        },
-        {
-            id: 'pSe13W0rk4rcRev13TU',
-            entity_id: 'P13W0rk4rcF0r3castsXY1',
-            state: 'under_review',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-22, 9, 0),
-        },
-        {
-            id: 'pSe14SmartD0cAp14VWX',
-            entity_id: 'P14SmartD0cumtR0utngX1',
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-65, 9, 0),
-        },
-        {
-            id: 'pSe15Inv3st0rAp15YZA',
-            entity_id: 'P15Inv3st0rRep0rtP1Y00',
-            state: 'approved',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-58, 9, 0),
-        },
-        {
-            id: 'pSe16MktSentSubmt16BC',
-            entity_id: 'P16MktSent1mentXY01020',
-            state: 'submitted',
-            member_id: SYSTEM_MEMBER_ID,
-            at: daysFromNow(-5, 9, 0),
-        },
-    ];
 
     const aiMembers = buildAiMembers();
 
     await Promise.all([
         ...ideaSubmissions.map(r =>
-            adapter.ideaSubmissions.put(
-                r.id, r,
-            ),
-        ),
-        ...mockProjectFlows.map(r =>
-            adapter.projectFlows.put(
-                r.id, r,
+            postIdeaSubmissionOp(
+                adapter,
+                r.id,
+                ideaSubmissionSeedBody(r),
+                requirePair(
+                    pairs,
+                    seedPairKey('idea-submissions', r.id),
+                ),
             ),
         ),
         ...mockWorkOrders.map(r =>
@@ -3349,14 +3274,6 @@ async function postMockDataLoadIn(
             ),
         ),
         ...mockStateEvents.map(r =>
-            adapter.states.put(r.id, {
-                entity_id: r.entity_id,
-                state: r.state,
-                member_id: r.member_id,
-                at: r.at,
-            }),
-        ),
-        ...projectStateEvents.map(r =>
             adapter.states.put(r.id, {
                 entity_id: r.entity_id,
                 state: r.state,
