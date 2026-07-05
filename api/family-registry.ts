@@ -45,6 +45,24 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         concurrency: 'locked',
         createBodyIdField: 'id',
     },
+    {
+        family: 'work-orders',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    },
+    {
+        family: 'records',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    },
+    {
+        family: 'record-attributes',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    },
 ];
 
 export function familyRegistration(

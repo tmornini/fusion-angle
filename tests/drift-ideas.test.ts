@@ -348,3 +348,94 @@ test('live-write case: create + edit + transition + delete, '
     assert.deepEqual(derivedHistory, oldHistory);
     assert.equal(derivedHistory.length, 3);
 });
+
+// Phase 5 Task 5: the conversion now synthesizes a THIRD pair —
+// the idea's OWN document address — closing the standing
+// 'promoted' watch-point (Phase 2/3): before this task, a
+// converted idea's derived history MISSED its 'promoted' event
+// because no pair recorded it. A full approve -> convert chain
+// drives a live PUT (genesis) then a live PUT (approve) before
+// the conversion, so the idea's address already carries a head
+// pair — the conversion's own idea pair records Supersedes
+// against it, exactly like any other live PUT /ideas/:id would.
+test('live approve then convert: derived idea history'
++ ' includes \'promoted\' and matches the old plane',
+async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const ideaId = 'idea-drift-conversion-promoted';
+    const projectId = 'project-drift-conversion-promoted';
+
+    // Create.
+    await handleRequest(db, req(
+        'PUT', '/ideas/' + ideaId, token, {
+            title: 'Approve Then Convert',
+            position: 1,
+            problem_statement: 'p',
+            target_users: 't',
+            proposed_solution: 's',
+            expected_outcome: 'o',
+            success_metrics: 'm',
+            state: 'active',
+            state_at: '2026-06-01T00:00:00.000000Z',
+            state_event_id: 'ev-drift-conversion-active',
+        },
+    ));
+    // Approve.
+    await handleRequest(db, req(
+        'PUT', '/ideas/' + ideaId, token, {
+            title: 'Approve Then Convert',
+            position: 1,
+            problem_statement: 'p',
+            target_users: 't',
+            proposed_solution: 's',
+            expected_outcome: 'o',
+            success_metrics: 'm',
+            state: 'approved',
+            state_at: '2026-06-02T00:00:00.000000Z',
+            state_event_id: 'ev-drift-conversion-approved',
+        },
+    ));
+    // Convert.
+    await handleRequest(db, req(
+        'POST', '/ideas/' + ideaId + '/conversion', token, {
+            projectId,
+            project: {
+                title: 'Converted Project',
+                description: 'done when X',
+                progress: 0,
+                start_date: '2026-06-01',
+                target_end_date: '2026-09-01',
+                estimated_cost: 100,
+                actual_cost: 0,
+                position: 1,
+            },
+            idea: {
+                title: 'Approve Then Convert',
+                position: 1,
+                problem_statement: 'p',
+                target_users: 't',
+                proposed_solution: 's',
+                expected_outcome: 'o',
+                success_metrics: 'm',
+            },
+            ideaStateEventId: 'ev-drift-conversion-promoted',
+            ideaState: 'promoted',
+            projectStateEventId: 'ev-drift-conversion-project',
+            projectState: 'submitted',
+            ideaStateAt: '2026-06-03T00:00:00.000000Z',
+            projectStateAt: '2026-06-03T00:00:01.000000Z',
+            baselines: [],
+        },
+    ));
+
+    const derived = await deriveIdeaStateHistory(
+        db, '1', ideaId,
+    );
+    const old = await db.states.getAllFor(ideaId);
+    assert.deepEqual(derived, old);
+    assert.equal(derived.length, 3);
+    assert.ok(
+        derived.some((event) => event.state === 'promoted'),
+    );
+});

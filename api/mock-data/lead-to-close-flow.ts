@@ -1,5 +1,16 @@
-import type { GraphNode, GraphEdge } from '../types.ts';
-import type { PathProfile } from './flow-workload.ts';
+import type {
+    GraphNode,
+    GraphEdge,
+    Id,
+} from '../types.ts';
+import type {
+    PathProfile,
+    SojournProfile,
+    MemberSkill,
+    FlowSeedSpec,
+    GeneratedFlowData,
+} from './flow-workload.ts';
+import { generateFlowWorkload } from './flow-workload.ts';
 
 // Stable ids for the seeded Lead-to-Close flow: its flow and
 // project-flow binding, its 7 graph nodes, and its 9 graph
@@ -304,4 +315,94 @@ export function buildLeadToClosePaths(): PathProfile[] {
             weight: 0.08,
         },
     ];
+}
+
+// The generated (PRNG) work-order slice of Lead-to-Close's
+// demo data — moved verbatim out of postMockDataLoadIn
+// (mock-data.ts) so this file's pass-1 invocation list
+// (seed-message-pairs.ts) can call it too. generateFlowWorkload
+// is a pure function of its args (a fixed `now` literal from
+// seed-kit; a seeded mulberry32 PRNG; zero Math.random/Date.now),
+// so a second call from pass 1 is provably byte-identical to
+// this one — an ACCESS requirement, not a determinism fix.
+export function buildLeadToCloseWorkload(): GeneratedFlowData {
+    const leadToCloseNodes = buildLeadToCloseNodes();
+    const leadToCloseEdges = buildLeadToCloseEdges();
+    const leadToClosePaths = buildLeadToClosePaths();
+
+    const leadToCloseSojourn: SojournProfile = {
+        meanHoursByNodeId:
+            new Map<Id, number>([
+                [l2cTriageNodeId, 8],
+                [l2cDiscoveryNodeId, 36],
+                [l2cQualifNodeId, 22 * 24],
+                [l2cProposalNodeId, 24],
+                [l2cNegotNodeId, 24],
+            ]),
+        sigmaByNodeId:
+            new Map<Id, number>([
+                [l2cTriageNodeId, 0.5],
+                [l2cDiscoveryNodeId, 0.5],
+                [l2cQualifNodeId, 1.4],
+                [l2cProposalNodeId, 0.5],
+                [l2cNegotNodeId, 0.5],
+            ]),
+    };
+
+    const leadToCloseSkill: MemberSkill = {
+        byMemberAndNode: new Map<
+            Id, ReadonlyMap<Id, number>
+        >([
+            [memberSarah, new Map<
+                Id, number
+            >([
+                [l2cDiscoveryNodeId, 0.75],
+                [l2cQualifNodeId, 0.55],
+                [l2cProposalNodeId, 0.80],
+                [l2cNegotNodeId, 0.70],
+            ])],
+            [memberMarcus, new Map<
+                Id, number
+            >([
+                [l2cDiscoveryNodeId, 1.10],
+                [l2cQualifNodeId, 1.10],
+            ])],
+            [memberJessica, new Map<
+                Id, number
+            >([
+                [l2cProposalNodeId, 0.85],
+            ])],
+            [memberLisa, new Map<
+                Id, number
+            >([
+                [l2cTriageNodeId, 0.90],
+            ])],
+            [memberClaude, new Map<
+                Id, number
+            >([
+                [l2cTriageNodeId, 0.60],
+            ])],
+        ]),
+        jitterPct: 0.15,
+    };
+
+    const leadToCloseSpec: FlowSeedSpec = {
+        flowId: l2cFlowId,
+        name: 'Lead-to-Close',
+        nodes: leadToCloseNodes,
+        edges: leadToCloseEdges,
+        creator: leadToCloseNodes[0]!,
+        archive: leadToCloseNodes[6]!,
+    };
+
+    return generateFlowWorkload({
+        flow: leadToCloseSpec,
+        paths: leadToClosePaths,
+        sojourn: leadToCloseSojourn,
+        skill: leadToCloseSkill,
+        totalWorkOrders: 100,
+        oldestDaysAgo: 80,
+        newestDaysAgo: 5,
+        seed: 0xC0DEF00D,
+    });
 }

@@ -163,8 +163,8 @@ test(
 );
 
 test(
-    'POST ideas/:id/conversion also appends a document pair'
-    + ' at the project\'s org-nested address',
+    'POST ideas/:id/conversion also appends document pairs'
+    + ' at the project\'s and the idea\'s own addresses',
     async () => {
         const db = await seededDb();
         await POST(db, 'ideas/idea-1/conversion', {
@@ -180,13 +180,14 @@ test(
             baselines: [],
         }, DEV_TOKEN);
 
-        // Balance invariant: two REQUEST rows + two RESPONSE
-        // rows for one conversion (the operation pair plus the
-        // synthesized document pair).
+        // Balance invariant: three REQUEST rows + three RESPONSE
+        // rows for one conversion (the operation pair, the
+        // synthesized project document pair, and the synthesized
+        // idea document pair).
         const allRequests = await db.requests.getAll();
         const allResponses = await db.responses.getAll();
-        assert.equal(allRequests.length, 2);
-        assert.equal(allResponses.length, 2);
+        assert.equal(allRequests.length, 3);
+        assert.equal(allResponses.length, 3);
         assert.equal(allRequests.length, allResponses.length);
 
         const atProjectAddress = allRequests.filter(
@@ -214,6 +215,35 @@ test(
             state: 'submitted',
             state_at: '2099-06-03T00:00:01.000000Z',
             state_event_id: 'ev-project-init-9',
+        });
+
+        const atIdeaAddress = allRequests.filter(
+            (r) =>
+                r.uri_prefix === '/organizations/1/ideas/'
+                && r.uri_id === 'idea-1',
+        );
+        assert.equal(atIdeaAddress.length, 1);
+        const responsesAtIdeaAddress = allResponses.filter(
+            (r) =>
+                r.uri_prefix === '/organizations/1/ideas/'
+                && r.uri_id === 'idea-1',
+        );
+        assert.equal(responsesAtIdeaAddress.length, 1);
+
+        const ideaRequest = atIdeaAddress[0]!;
+        // The requester is the caller, never the idea's author.
+        assert.equal(
+            ideaRequest.requester_identity_id, 'current',
+        );
+
+        const ideaParsed = JSON.parse(ideaRequest.message) as {
+            body: Record<string, unknown>;
+        };
+        assert.deepEqual(ideaParsed.body, {
+            ...ideaFields('Source Idea'),
+            state: 'promoted',
+            state_at: '2099-06-03T00:00:00.000000Z',
+            state_event_id: 'ev-idea-promoted-9',
         });
     },
 );

@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { UniqueConstraintError } from '../api/db.ts';
+import {
+    EntityNotFoundError,
+    UniqueConstraintError,
+} from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { Id } from '../api/types.ts';
 import { handleRequest } from '../api/api.ts';
@@ -29,6 +32,8 @@ import {
 import {
     documentFamilyWiring,
     documentEntityRoute,
+    documentGetHandler,
+    documentCollectionGetHandler,
     documentWriteResponseSpec,
     DOCUMENT_FAMILY_WIRINGS,
     type DocumentFamilyWiring,
@@ -222,6 +227,13 @@ async function withSyntheticLockedFamily<T>(
     mutableRegistry.push(registration);
     const wiring: DocumentFamilyWiring = {
         family: TEST_FAMILY,
+        // Inert for these PUT-dispatch tests (the locked arm
+        // never exercises GET), but REQUIRED fields on the
+        // interface — this is the fourth DocumentFamilyWiring
+        // construction site (the other three are routes.ts's
+        // ideas/projects/flows rows).
+        lifecycle: 'trio',
+        notFoundTable: TEST_FAMILY,
         validateDocument: (body) => body,
         documentOp: testDocumentOp,
         entityOf: testEntityOf,
@@ -566,4 +578,146 @@ test('withSyntheticLockedFamily leaves no residue behind',
         ),
         undefined,
     );
+});
+
+// -- (d) the fourth-family wiring growth: `lifecycle` and
+// `notFoundTable` (work-orders evidence). A SYNTHETIC
+// 'stateless' registration proves derivedDocumentEntity and
+// documentCollectionGetHandler skip the lifecycle walk +
+// DELETED-state filter entirely for 'stateless' — a trio-less
+// body (no state/state_at/state_event_id) would make
+// documentLifecycleEvents' pickString throw if the 'trio' walk
+// ran, so a clean pass here is proof the branch is skipped, not
+// merely tolerant. A DELETE head still 404s (deriveDocumentsAt's
+// own head-absent semantics — the only tombstone a stateless
+// family has), and that 404 carries the registration's
+// notFoundTable, never its family, proving the two are
+// independent facts. Handlers are called DIRECTLY (no
+// registration/route-table ceremony) since GET derivation needs
+// only the wiring value itself. -----------------------------
+
+const STATELESS_FAMILY = 'stateless-test-docs';
+const STATELESS_TABLE = 'stateless_storage_table';
+
+function statelessEntityOf(
+    document: { uriId: string; body: Record<string, unknown> },
+    organization: Id,
+): unknown {
+    return {
+        id: document.uriId,
+        organization_id: organization,
+        ...document.body,
+    };
+}
+
+const statelessWiring: DocumentFamilyWiring = {
+    family: STATELESS_FAMILY,
+    lifecycle: 'stateless',
+    notFoundTable: STATELESS_TABLE,
+    validateDocument: (body) => body,
+    documentOp: testDocumentOp,
+    entityOf: statelessEntityOf,
+};
+
+async function putStatelessDocumentPair(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/' + STATELESS_FAMILY + '/' + id,
+        routePattern: STATELESS_FAMILY + '/:id',
+        routeSegments: [STATELESS_FAMILY, ':id'],
+        pathSegments: [STATELESS_FAMILY, id],
+        headerFields: [], body, requesterIdentityId: 'current',
+        requestAt: AT, organization: '1',
+        responseStatus: 200, responseBody: undefined,
+        headPairId: undefined,
+    });
+    await db.transaction(
+        ['requests', 'responses'],
+        (view) => appendMessagePair(view, pair),
+    );
+}
+
+async function deleteStatelessDocumentPair(
+    db: DbAdapter,
+    id: Id,
+): Promise<void> {
+    const pair = await formWritePair({
+        method: 'DELETE',
+        pathname: '/' + STATELESS_FAMILY + '/' + id,
+        routePattern: STATELESS_FAMILY + '/:id',
+        routeSegments: [STATELESS_FAMILY, ':id'],
+        pathSegments: [STATELESS_FAMILY, id],
+        headerFields: [], body: {},
+        requesterIdentityId: 'current',
+        requestAt: AT, organization: '1',
+        responseStatus: 200, responseBody: undefined,
+        headPairId: undefined,
+    });
+    await db.transaction(
+        ['requests', 'responses'],
+        (view) => appendMessagePair(view, pair),
+    );
+}
+
+test('stateless lifecycle: a trio-less document PUT derives'
++ ' through documentGetHandler with no throw', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await putStatelessDocumentPair(db, 'sl-1', { v: 'first' });
+    const got = await documentGetHandler(statelessWiring)(
+        db, ['sl-1'], 'current', '1',
+    );
+    assert.deepEqual(got, {
+        id: 'sl-1', organization_id: '1', v: 'first',
+    });
+});
+
+test('stateless lifecycle: documentCollectionGetHandler skips'
++ ' the per-document history walk too', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await putStatelessDocumentPair(db, 'sl-2', { v: 'listed' });
+    const rows = await documentCollectionGetHandler(
+        statelessWiring,
+    )(db, [], 'current', '1');
+    assert.deepEqual(rows, [
+        { id: 'sl-2', organization_id: '1', v: 'listed' },
+    ]);
+});
+
+test('stateless lifecycle: a DELETE head 404s carrying'
++ ' notFoundTable, never the family', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await putStatelessDocumentPair(db, 'sl-3', { v: 'first' });
+    await deleteStatelessDocumentPair(db, 'sl-3');
+    await assert.rejects(
+        documentGetHandler(statelessWiring)(
+            db, ['sl-3'], 'current', '1',
+        ),
+        (error: unknown) => {
+            assert.ok(error instanceof EntityNotFoundError);
+            assert.equal(
+                (error as EntityNotFoundError).table,
+                STATELESS_TABLE,
+            );
+            return true;
+        },
+    );
+});
+
+test('stateless lifecycle: a DELETE head is absent from the'
++ ' collection too', async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    await putStatelessDocumentPair(db, 'sl-4', { v: 'first' });
+    await deleteStatelessDocumentPair(db, 'sl-4');
+    const rows = await documentCollectionGetHandler(
+        statelessWiring,
+    )(db, [], 'current', '1');
+    assert.deepEqual(rows, []);
 });

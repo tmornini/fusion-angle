@@ -6,7 +6,17 @@ import { sha256Hex } from '../shared/digest.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
-import { customerProfileRecordId } from '../api/mock-data/records.ts';
+import {
+    customerProfileRecordId,
+    buildRecordAttributes,
+} from '../api/mock-data/records.ts';
+import {
+    buildWorkOrders,
+    buildFlowWorkOrderJoins,
+} from '../api/mock-data/work-orders.ts';
+import {
+    mockFlowRecords,
+} from '../api/mock-data/seed-message-pairs.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -29,9 +39,22 @@ import {
 // (flows: 4 creates × 3 + 1 document = 13 flow-family pairs —
 // Task 5's operation/document/join triple per create, plus
 // Task 6's seed-flow-org2 genesis document) + 4 ai-members +
-// 2 records + 5 objectives (4 STARK + seed-objective-org2)
-// = 74. A dropped or reordered invocation changes this count.
-const EXPECTED_PAIR_COUNT = 74;
+// 18 records-family (Phase 6 Task 4's bundle synthesis, the
+// migration's first VARIABLE-cardinality one: 2 operations + 2
+// documents + 14 attribute documents — one attribute-PUT
+// invocation per seeded attribute, generalized from flows'
+// fixed 1+1+1 to 1+1+N; every seeded attribute is genesis, so
+// no attribute-DELETE invocation exists in the seed) +
+// 3 flow-record joins (Phase 6 Task 5: the ONE genuine seed
+// gap this migration found — the 3 seeded flow_records rows
+// formed zero pairs before, one join pair per binding now,
+// closed through postFlowRecordDocumentOp) +
+// 5 objectives (4 STARK + seed-objective-org2) + 145 work-order
+// documents + 145 flow-work-order joins (Phase 5 Task 4: the
+// entity/join gap closed, one document pair and one join pair
+// per seeded work order) = 383. A dropped or reordered
+// invocation changes this count.
+const EXPECTED_PAIR_COUNT = 383;
 
 test('a mock-data seed populates balanced pairs',
 async () => {
@@ -128,6 +151,72 @@ test('a seeded record create pair sits at its org-nested'
     assert.equal(row!.uri_prefix, '/organizations/1/records/');
 });
 
+test('a seeded record\'s document pair sits at its'
++ ' entity address, its body carrying the entity plus the'
++ ' state trio (no id or organization_id key)', async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const requests = await db.requests.getAll();
+    const responseById = new Map(
+        (await db.responses.getAll()).map(r => [r.id, r]),
+    );
+    // The document pair shares its address with the operation
+    // pair (records' createBodyIdField collapses both onto the
+    // SAME uri_id) — distinguish it by its OWN 200 response, the
+    // operation pair's being 204.
+    const documentRow = requests.find(
+        r => r.uri_id === customerProfileRecordId
+            && r.uri_prefix === '/organizations/1/records/'
+            && responseById.get(r.id)?.status === 200,
+    );
+    assert.ok(
+        documentRow, 'no document pair for the seeded record',
+    );
+    // The id-strip covenant (verification finding, lens 4) made
+    // falsifiable: a spurious id/organization_id key riding the
+    // recorded body would drift from wire fidelity with no
+    // address-only check catching it.
+    const embedded = JSON.parse(documentRow!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(
+        Object.keys(embedded.body).sort(),
+        [
+            'description', 'name', 'position',
+            'state', 'state_at', 'state_event_id',
+        ],
+    );
+});
+
+test('a seeded record attribute\'s document pair sits at'
++ ' its own entity address, its body carrying no id or'
++ ' organization_id key', async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const firstAttribute = buildRecordAttributes()[0]!;
+    const requests = await db.requests.getAll();
+    const row = requests.find(
+        r => r.uri_id === firstAttribute.id,
+    );
+    assert.ok(
+        row, 'no request row for the seeded attribute',
+    );
+    assert.equal(
+        row!.uri_prefix,
+        '/organizations/1/record-attributes/',
+    );
+    const embedded = JSON.parse(row!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(
+        Object.keys(embedded.body).sort(),
+        [
+            'attribute_type', 'constraints', 'name',
+            'options', 'record_id', 'sort_order',
+        ],
+    );
+});
+
 test('a seeded objective create pair sits at its org-nested'
 + ' entity address, per org', async () => {
     const db = new MemoryDbAdapter();
@@ -149,6 +238,75 @@ test('a seeded objective create pair sits at its org-nested'
     assert.equal(
         org2Row!.uri_prefix,
         `/organizations/${ORGANIZATION_TWO}/objectives/`,
+    );
+});
+
+test('a seeded work-order document pair sits at its org-nested'
++ ' entity address, its body carrying no id key', async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const firstWorkOrder = buildWorkOrders()[0]!;
+    const requests = await db.requests.getAll();
+    const row = requests.find(
+        r => r.uri_id === firstWorkOrder.id,
+    );
+    assert.ok(row, 'no request row for the seeded work order');
+    assert.equal(row!.uri_prefix, '/organizations/1/work-orders/');
+    // The id-strip covenant (verification finding, lens 4): a
+    // spurious `id` key riding the recorded body would drift
+    // from wire fidelity with no address-only check catching
+    // it, so the key set itself is the falsifiable pin.
+    const embedded = JSON.parse(row!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(
+        Object.keys(embedded.body).sort(),
+        ['display_id', 'flow_graph', 'organization_id', 'position'],
+    );
+});
+
+test('a seeded flow-work-order join pair sits at its'
++ ' org-nested join address, its body carrying no id key',
+async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const firstJoin = buildFlowWorkOrderJoins()[0]!;
+    const requests = await db.requests.getAll();
+    const row = requests.find(r => r.uri_id === firstJoin.id);
+    assert.ok(row, 'no request row for the seeded join');
+    assert.equal(
+        row!.uri_prefix,
+        `/organizations/${STARK_ORGANIZATION}/flows/`
+            + `${firstJoin.flow_id}/work-orders/`,
+    );
+    const embedded = JSON.parse(row!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(
+        Object.keys(embedded.body).sort(),
+        ['at', 'flow_id', 'work_order_id'],
+    );
+});
+
+test('a seeded flow-record join pair sits at its org-nested'
++ ' join address, its body carrying no id key', async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const firstJoin = mockFlowRecords[0]!;
+    const requests = await db.requests.getAll();
+    const row = requests.find(r => r.uri_id === firstJoin.id);
+    assert.ok(row, 'no request row for the seeded join');
+    assert.equal(
+        row!.uri_prefix,
+        `/organizations/${STARK_ORGANIZATION}/flows/`
+            + `${firstJoin.flow_id}/records/`,
+    );
+    const embedded = JSON.parse(row!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(
+        Object.keys(embedded.body).sort(),
+        ['at', 'flow_id', 'record_id'],
     );
 });
 

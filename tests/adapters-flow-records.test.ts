@@ -17,8 +17,11 @@ import {
     postFlowCreation,
 } from '../web-app/app/adapters/flow-mutations.ts';
 import {
-    jsonObjectField,
+    putWorkOrder,
+} from '../web-app/app/adapters/work-orders-mutations.ts';
+import {
     DEFAULT_LOCK_TIMEOUT,
+    type WorkOrderFlowGraph,
 } from '../api/types.ts';
 
 const AT = '2026-05-01T00:00:00.000000Z';
@@ -55,20 +58,29 @@ async function seedWorkOrder(
     // The flow↔work-order join now nests under its parent flow,
     // so the parent flow must exist to be enumerated.
     await seedFlow(db, flowId, flowId);
-    const flowGraph = jsonObjectField({
+    const ctx = createRequestContext(db, await devToken());
+    const flowGraph: WorkOrderFlowGraph = {
         name: 'Flow',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: [],
         edges: [],
-    });
-    await db.workOrders.put(id, {
-        organization_id: '1',
-        display_id: displayId,
-        flow_graph: flowGraph,
+    };
+    // NAMED re-pin (Task 7): getWorkOrdersForRecord reads the
+    // work-orders collection through the flipped GET (this
+    // commit) — a raw db.workOrders.put leaves no message pair
+    // at this address, so the entity must land through the
+    // SAME wire-reachable PUT the live route serves.
+    await putWorkOrder(ctx, id, {
+        displayId,
+        flowGraph,
         position,
     });
-    await db.flowWorkOrders.put(
-        'fwo-' + id, {
+    // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
+    // flows/:id/work-orders through the flipped GET too — same
+    // reason, different address.
+    await ctx.PUT(
+        'flows/' + flowId + '/work-orders/fwo-' + id,
+        {
             flow_id: flowId,
             work_order_id: id,
             at: AT,

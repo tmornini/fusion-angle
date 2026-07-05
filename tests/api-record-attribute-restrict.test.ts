@@ -263,6 +263,8 @@ test(
             state_event_id: 'ev1', attribute_id: 'attr1',
             value: 'High',
         });
+        const requestsBefore = await db.requests.getAll();
+        const responsesBefore = await db.responses.getAll();
         await assert.rejects(
             () => POST(db, 'records', {
                 kind: 'edit',
@@ -273,6 +275,13 @@ test(
                     position: 1,
                 },
                 attributes: [],
+                // Echoes the SAME event pre-seeded above (ev1)
+                // — never a fresh mint — so the trio's own gate
+                // admits this body and the 409 below still
+                // proves the RESTRICT mechanism, not validation.
+                state: 'active',
+                state_at: AT,
+                state_event_id: 'ev1',
                 removedAttributeIds: ['attr1'],
             }, DEV_TOKEN),
             (err: unknown) =>
@@ -285,5 +294,16 @@ test(
         assert.equal(record.name, 'Asset');
         const attrs = await db.recordAttributes.getAll();
         assert.equal(attrs.length, 1);
+        // pair-balance: the whole bundle (operation + document
+        // + attribute pairs) is pairs-or-nothing, so a 409
+        // rollback appends NEITHER table any rows.
+        assert.equal(
+            (await db.requests.getAll()).length,
+            requestsBefore.length,
+        );
+        assert.equal(
+            (await db.responses.getAll()).length,
+            responsesBefore.length,
+        );
     },
 );

@@ -214,10 +214,18 @@ async function seedChain(
     await db.flows.put('f' + s, flowBody(organization));
     await db.objectives.put(
         'o' + s, { organization_id: organization, position: 0 });
+    // Stays raw (NAMED contrast to the flow-record join below):
+    // no flipped read in this file ever consumes the top-level
+    // records/:id entity — only the nested flows/:id/records
+    // JOIN is exercised here.
     await db.records.put('r' + s, {
         organization_id: organization, name: 'r',
         description: 'd', position: 0,
     });
+    // Stays raw (NAMED contrast to the flow-work-order join
+    // below): no flipped read in this file ever consumes the
+    // top-level work-orders/:id entity — only the nested
+    // flows/:id/work-orders JOIN is exercised here.
     await db.workOrders.put('wo' + s, workOrderBody(organization));
     await db.flowVersions.put('fv' + s, {
         flow_id: 'f' + s, name: 'v', is_locked: false,
@@ -231,19 +239,33 @@ async function seedChain(
     // the raw project_flows table — a raw db.projectFlows.put
     // leaves no pair at this address, so the link must land
     // through the SAME wire-reachable PUT the live route serves.
-    // The three OTHER nested-flow sub-collections (versions/
-    // records/work-orders) genuinely stay old-plane — untouched.
+    // The two OTHER nested-flow sub-collections (versions/
+    // records) genuinely stay old-plane, each with its own
+    // reason at its own phase; work-orders LEAVES this list
+    // below (Task 7).
     await handleRequest(db, req(
         'PUT', '/projects/p' + s + '/flows/pf' + s,
         await organizationToken(identity, organization),
         { project_id: 'p' + s, flow_id: 'f' + s, at: T8_AT },
     ));
-    await db.flowWorkOrders.put('fwo' + s, {
-        flow_id: 'f' + s, work_order_id: 'wo' + s, at: T8_AT,
-    });
-    await db.flowRecords.put('fr' + s, {
-        flow_id: 'f' + s, record_id: 'r' + s, at: T8_AT,
-    });
+    // NAMED re-pin (Task 7): the flipped GET flows/:id/
+    // work-orders derives from the message ledger too, the SAME
+    // reason as the project-flow join above — a raw
+    // db.flowWorkOrders.put leaves no pair at this address.
+    await handleRequest(db, req(
+        'PUT', '/flows/f' + s + '/work-orders/fwo' + s,
+        await organizationToken(identity, organization),
+        { flow_id: 'f' + s, work_order_id: 'wo' + s, at: T8_AT },
+    ));
+    // NAMED re-pin (Task 7): the flipped GET flows/:id/records
+    // derives from the message ledger too, the SAME reason as
+    // the flow-work-order join above — a raw db.flowRecords.put
+    // leaves no pair at this address.
+    await handleRequest(db, req(
+        'PUT', '/flows/f' + s + '/records/fr' + s,
+        await organizationToken(identity, organization),
+        { flow_id: 'f' + s, record_id: 'r' + s, at: T8_AT },
+    ));
     await db.ideaSubmissions.put('is' + s, {
         idea_id: 'i' + s, member_id: 'system', at: T8_AT,
     });

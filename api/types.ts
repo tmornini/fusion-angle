@@ -1629,22 +1629,38 @@ export class Project {
     }
 }
 
+// The lifecycle trio Decision 7 folds into the record
+// document: the current state plus its creator-minted `at` and
+// the (transitional — retires with the states log) event id. A
+// bare RecordState alone no longer carries enough to round-trip
+// a document PUT, so every reader that feeds a RecordModel
+// gains this shape.
+export interface RecordStateDetail {
+    readonly state: RecordState;
+    readonly stateAt: string;
+    readonly stateEventId: string;
+}
+
 export class RecordModel {
     readonly #id: string;
     readonly #name: string;
     readonly #description: string;
     readonly #position: number;
     readonly #state: RecordState;
+    readonly #stateAt: string;
+    readonly #stateEventId: string;
 
     constructor(
         entity: RecordEntity,
-        state: RecordState,
+        detail: RecordStateDetail,
     ) {
         this.#id = entity.id;
         this.#name = entity.name;
         this.#description = entity.description;
         this.#position = entity.position;
-        this.#state = state;
+        this.#state = detail.state;
+        this.#stateAt = detail.stateAt;
+        this.#stateEventId = detail.stateEventId;
     }
 
     idForLink(): string {
@@ -1653,6 +1669,14 @@ export class RecordModel {
 
     stateValue(): RecordState {
         return this.#state;
+    }
+
+    stateAtValue(): string {
+        return this.#stateAt;
+    }
+
+    stateEventIdValue(): string {
+        return this.#stateEventId;
     }
 
     isActive(): boolean {

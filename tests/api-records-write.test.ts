@@ -145,6 +145,13 @@ test(
                 position: 1,
             },
             attributes: [],
+            // Echoed from the create's own known head — NEVER
+            // a fresh mint — so the sameEvent decompose no-ops
+            // and this edit genuinely proves no state event was
+            // emitted.
+            state: 'active',
+            state_at: '2025-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-1',
             removedAttributeIds: [],
         }, DEV_TOKEN);
         const record = await GET<{
@@ -222,6 +229,10 @@ test(
                     ),
                 },
             ],
+            // Echoed from the create's own known head above.
+            state: 'active',
+            state_at: '2025-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-1',
             removedAttributeIds: ['a-old'],
         }, DEV_TOKEN);
         const all = await GET<{
@@ -289,6 +300,10 @@ test(
                     ),
                 },
             ],
+            // Echoed from the create's own known head above.
+            state: 'active',
+            state_at: '2025-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-1',
             removedAttributeIds: [],
         }, DEV_TOKEN);
         const stored = await GET<{

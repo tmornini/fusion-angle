@@ -191,12 +191,26 @@ export interface DocumentLifecycleEvent {
 // CAVEAT — an unchanged-state edit replays the STORED head's
 // member_id) is a duplicate, not a new lifecycle event, so its
 // own requester never surfaces as an author.
+//
+// A DELETE pair carries no trio — its stored body is empty
+// (design decision 6: DELETE tombstones the document, it never
+// carries wire fields), so it is skipped here entirely rather
+// than walked into pickString, which would throw on the missing
+// state_event_id key. The tombstone signal itself lives in
+// deriveDocumentsAt's head-absence check, not in this lifecycle
+// walk. Author gate 9: records is the first trio family whose
+// :id address carries a live DELETE route, so a delete-then-
+// recreate history (PUT, DELETE, PUT) is the first live case
+// that would otherwise crash here; behavior-preserving for
+// ideas/projects/flows, none of which has a DELETE at its own
+// document address.
 export function documentLifecycleEvents(
     pairs: readonly DocumentPair[],
 ): DocumentLifecycleEvent[] {
     const seen = new Set<Id>();
     const events: DocumentLifecycleEvent[] = [];
     for (const pair of pairs) {
+        if (pair.method === DELETE_METHOD) continue;
         const stateEventId = pickString(
             pair.body, 'state_event_id',
         );

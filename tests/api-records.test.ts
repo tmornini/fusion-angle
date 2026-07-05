@@ -43,6 +43,9 @@ test(
             name: 'Customer',
             description: 'A customer record',
             position: 1,
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-rec-1',
         }, DEV_TOKEN);
         const stored = await GET<{
             id: string;
@@ -66,6 +69,9 @@ test(
             name: 'X',
             description: '',
             position: 1,
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-rec-1',
         }, DEV_TOKEN);
         await DELETE(db, 'records/rec-1', DEV_TOKEN);
         await assert.rejects(

@@ -16,7 +16,9 @@ import {
     postFlowCreation,
 } from '../web-app/app/adapters/flow-mutations.ts';
 import {
-    storedWorkOrderFlowGraphField,
+    putWorkOrder,
+} from '../web-app/app/adapters/work-orders-mutations.ts';
+import {
     jsonArrayField,
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
@@ -86,17 +88,21 @@ function buildFlowGraph(
     };
 }
 
+// NAMED re-pin (Task 7): validateRecordTransition reads
+// work-orders/:id through the flipped GET (this commit), so
+// the fixture must land through the SAME wire-reachable PUT
+// the live route serves — a raw db.workOrders.put leaves no
+// message pair at this address.
 async function seedWorkOrder(
     db: MemoryDbAdapter,
     id: string,
     flowGraph: WorkOrderFlowGraph,
     currentNodeId: string,
 ): Promise<void> {
-    await db.workOrders.put(id, {
-        organization_id: '1',
-        display_id: 'WO-1',
-        flow_graph:
-            storedWorkOrderFlowGraphField(flowGraph),
+    const ctx = createRequestContext(db, await devToken());
+    await putWorkOrder(ctx, id, {
+        displayId: 'WO-1',
+        flowGraph,
         position: 0,
     });
     await db.states.put('t-create-' + id, {
@@ -107,16 +113,26 @@ async function seedWorkOrder(
     });
 }
 
+// NAMED re-pin (Task 7): the flipped GET flows/:id/records
+// derives from the message ledger too, the SAME reason as
+// seedFlowLink's own flows/:id/work-orders re-pin above — a raw
+// db.flowRecords.put leaves no pair at this address, so the
+// binding must land through the SAME wire-reachable PUT the
+// live route serves.
 async function seedBinding(
     db: MemoryDbAdapter,
     flowId: string,
     recordId: string,
 ): Promise<void> {
-    await db.flowRecords.put('fr-' + flowId, {
-        flow_id: flowId,
-        record_id: recordId,
-        at: AT_CREATED,
-    });
+    const ctx = createRequestContext(db, await devToken());
+    await ctx.PUT(
+        'flows/' + flowId + '/records/fr-' + flowId,
+        {
+            flow_id: flowId,
+            record_id: recordId,
+            at: AT_CREATED,
+        },
+    );
 }
 
 // DELTA (Phase 4 Task 8 — the inventory grep, not the brief,
@@ -142,8 +158,14 @@ async function seedFlowLink(
         projectId: 'p-' + flowId,
         name: flowId,
     });
-    await db.flowWorkOrders.put(
-        'fwo-' + workOrderId, {
+    // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
+    // flows/:id/work-orders through the flipped GET (this
+    // commit) — a raw db.flowWorkOrders.put leaves no message
+    // pair at this address, so the join must land through the
+    // SAME wire-reachable PUT the live route serves.
+    await ctx.PUT(
+        'flows/' + flowId + '/work-orders/fwo-' + workOrderId,
+        {
             flow_id: flowId,
             work_order_id: workOrderId,
             at: AT_CREATED,
@@ -151,6 +173,11 @@ async function seedFlowLink(
     );
 }
 
+// NAMED re-pin (Task 7): getRecordForWorkOrder's attribute
+// lookup reads record-attributes through the flipped GET (this
+// commit) — a raw db.recordAttributes.put leaves no message
+// pair at this address, so the fixture must land through the
+// SAME wire-reachable PUT the live route serves.
 async function seedAttribute(
     db: MemoryDbAdapter,
     id: string,
@@ -163,7 +190,8 @@ async function seedAttribute(
         constraints?: unknown[];
     } = {},
 ): Promise<void> {
-    await db.recordAttributes.put(id, {
+    const ctx = createRequestContext(db, await devToken());
+    await ctx.PUT('record-attributes/' + id, {
         organization_id: '1',
         record_id: recordId,
         name: options.name ?? 'Attr',

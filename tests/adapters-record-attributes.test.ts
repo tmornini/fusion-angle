@@ -27,9 +27,17 @@ test(
     'getRecordAttributesByRecord maps storage rows'
     + ' to the camelCase domain shape',
     async () => {
-        const { db, ctx } = await adminContext();
-        await db.recordAttributes.put(
-            'a-1', attributeRow('rec-1', 'A1', 3));
+        const { ctx } = await adminContext();
+        // NAMED re-pin (Task 7): getRecordAttributesByRecord
+        // reads record-attributes through the flipped GET (this
+        // commit) — a raw db.recordAttributes.put leaves no
+        // message pair at this address, so the fixture must land
+        // through the SAME wire-reachable PUT the live route
+        // serves.
+        await ctx.PUT(
+            'record-attributes/a-1',
+            attributeRow('rec-1', 'A1', 3),
+        );
         const [attr] = await
             getRecordAttributesByRecord(
                 ctx, 'rec-1',
@@ -51,13 +59,19 @@ test(
     'getRecordAttributesByRecord returns only the'
     + ' attributes for the given recordId',
     async () => {
-        const { db, ctx } = await adminContext();
-        await db.recordAttributes.put(
-            'a-1', attributeRow('rec-1', 'A1', 1));
-        await db.recordAttributes.put(
-            'a-2', attributeRow('rec-1', 'A2', 2));
-        await db.recordAttributes.put(
-            'b-1', attributeRow('rec-2', 'B1', 1));
+        const { ctx } = await adminContext();
+        await ctx.PUT(
+            'record-attributes/a-1',
+            attributeRow('rec-1', 'A1', 1),
+        );
+        await ctx.PUT(
+            'record-attributes/a-2',
+            attributeRow('rec-1', 'A2', 2),
+        );
+        await ctx.PUT(
+            'record-attributes/b-1',
+            attributeRow('rec-2', 'B1', 1),
+        );
         const rec1 = await
             getRecordAttributesByRecord(
                 ctx, 'rec-1',
@@ -71,13 +85,19 @@ test(
     'getRecordAttributesByRecord returns rows in'
     + ' sortOrder ascending',
     async () => {
-        const { db, ctx } = await adminContext();
-        await db.recordAttributes.put(
-            'a-mid', attributeRow('rec-1', 'middle', 5));
-        await db.recordAttributes.put(
-            'a-first', attributeRow('rec-1', 'first', 1));
-        await db.recordAttributes.put(
-            'a-last', attributeRow('rec-1', 'last', 10));
+        const { ctx } = await adminContext();
+        await ctx.PUT(
+            'record-attributes/a-mid',
+            attributeRow('rec-1', 'middle', 5),
+        );
+        await ctx.PUT(
+            'record-attributes/a-first',
+            attributeRow('rec-1', 'first', 1),
+        );
+        await ctx.PUT(
+            'record-attributes/a-last',
+            attributeRow('rec-1', 'last', 10),
+        );
         const rows = await
             getRecordAttributesByRecord(
                 ctx, 'rec-1',

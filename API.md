@@ -204,6 +204,12 @@ Legend for classification:
 ### 2.7 Work orders
 
 - `GET /work-orders` · `GET|PUT /work-orders/:id` — primitive.
+  `PUT` is a document write (§5.6) — the fourth family, and the
+  FIRST `'stateless'` one (§5.6): unlike ideas/projects/flows,
+  its body carries no lifecycle trio. `GET` now rides the SAME generic
+  document machinery `PUT` does — both the list (`GET /work-orders`) and the
+  entity read (`GET /work-orders/:id`) derive from the message ledger (Task
+  7, Phase 5), not a hand-written dispatch.
 - `POST /work-orders` — operation (§3.17). Member-tier.
 - `POST /work-orders/:id/claim` — operation (§3.18).
 - `POST /work-orders/:id/transition` — operation (§3.19).
@@ -211,6 +217,11 @@ Legend for classification:
 ### 2.8 Records & attributes
 
 - `GET /records` · `GET|PUT|DELETE /records/:id` — primitive.
+  `PUT` is a document write (§3.33/§5.7) — the fifth family,
+  and the first `'trio'` family whose `:id` address also
+  carries a live `DELETE`. `GET` stays hand-written, old-plane,
+  through this task (Task 7 flips it); `DELETE` stays
+  hand-written too, unchanged.
 - `POST /records` — operation, create-or-edit write (§3.20).
   Member-tier.
 - `GET /record-attributes` · `GET|PUT /record-attributes/:id` —
@@ -499,12 +510,43 @@ The lone cross-aggregate write.
   4. `states.postEvent(projectStateEventId, projectId, projectState,
      actor)`
   5. for each baseline: `projectObjectiveBaselineScores.put(...)`
-  6. `appendMessagePair(pair)`
+  6. three `appendMessagePair` calls (below).
 - doctrinal: `put_project` + `put_idea` + two `post_state_event` + N
   `put_baseline_score` as `post_convert_idea`.
 - props: atomic (project never lands without its baselines, nor an
   idea promoted without its project); member-tier (segment-prefix
   match on `/ideas`); `validateIdeaConversionBody`.
+
+**Three pairs, one tx (Phase 3 Task 4 + Phase 5 Task 5).** The
+route pre-forms two extra pairs beside the gate's own operation
+pair, ONLY when the gate supplied both a pair and a fence
+organization — a below-facade caller (`api/mock-data.ts`) skips
+all three:
+
+- **The project pair (Phase 3 Task 4)** — PUT-shaped, at
+  `projects/:id`'s own address, body the entity's own fields
+  plus the lifecycle trio, validated through
+  `validateProjectDocumentBody` — byte-indistinguishable from a
+  live genesis `PUT /projects/:id` (a fresh address;
+  `headPairIdAt` finds no head, so this pair carries no
+  `Supersedes`).
+- **The idea pair (Phase 5 Task 5)** — PUT-shaped, at
+  `ideas/:id`'s OWN address, body the promoted entity's own
+  fields plus the `promoted` trio, validated through
+  `validateIdeaDocumentBody` — byte-indistinguishable from a
+  live `PUT /ideas/:id`. UNLIKE the project pair, the idea's
+  address is NOT fresh — the idea already exists, so
+  `headPairIdAt` finds its prior document pair and this one
+  records `Supersedes` against it. **This closes the standing
+  'promoted' watch-point** (named at Phase 2/3): before this
+  task, a converted idea's derived state history MISSED its
+  'promoted' event, because no pair recorded it.
+
+All three pairs share ONE `requestAt` (the conversion's own
+origination) yet strictly-later response `at` stamps. Three
+pairs commit or none: a mid-transaction failure (a state-ledger
+collision, say) leaves zero of the three, exactly like every
+other atomic write in this catalog.
 
 ### 3.12 `POST /flows` — create flow
 
@@ -512,10 +554,49 @@ The lone cross-aggregate write.
 - actual: `flows.put(id, flow)` (org-scoped stamps org) →
   `projectFlows.put(projectFlowId, projectFlow)` →
   `states.postEvent(initialStateEventId, id, initialState, actor)` →
-  `appendMessagePair(pair)`.
+  three `appendMessagePair` calls (below).
 - doctrinal: `put_flow` + `put_project_flow` + `post_state_event` as
   `post_create_flow`.
 - props: atomic; member-tier; `validateFlowCreateBody`.
+
+**Three pairs, one tx (Phase 4 Task 5), mirrored by work-orders'
+own create (§3.17).** The route pre-forms two extra pairs beside
+the gate's own operation pair, ONLY when the gate supplied both a
+pair and a fence organization — a below-facade caller
+(`api/mock-data.ts`) skips all three:
+
+- **The operation pair** — the gate's own, at the SAME address a
+  live genesis `PUT /flows/:id` would use: `createdEntityUriId`'s
+  override collapses `POST /flows` onto `flows/:id`'s own
+  (uriPrefix, uriId), so the two verbs chain against one address.
+- **The document pair** — PUT-shaped, at `flows/:id`'s own
+  address, body `flowCreateDocumentBody(b)` (the flow's own five
+  fields, the initial-state trio, the reduced graph via
+  `reduceCreateGraphDelta`, and the two transitional sidecars
+  `graphDelta`/`revivals`), validated through
+  `validateFlowDocumentBody` — byte-indistinguishable from a live
+  genesis `PUT /flows/:id`.
+- **The join pair** — PUT-shaped, at `projects/:id/flows/:pfid`'s
+  address, body the create's own `projectFlow` verbatim
+  (`validateProjectFlowEntity` accepts exactly `project_id`/
+  `flow_id`/`at`, so it doubles as the join pair's body without a
+  second construction) — byte-indistinguishable from a live
+  `PUT /projects/:id/flows/:pfid`. Genesis-undefined: a flow's
+  create-time join is always fresh.
+
+All three pairs share ONE `requestAt` (the create's own
+origination) yet strictly-later response `at` stamps, so the
+document pair — appended AFTER the operation pair — becomes the
+entity address's head. A duplicate create (same flow id) therefore
+records `Supersedes` on its own new document pair against the
+prior document pair; the duplicate's own operation pair, reading
+that SAME shared address fresh at gate entry, supersedes that same
+prior document pair too (`POST` never rides the locked
+four-outcome table — that arm is `PUT`-only on `flows/:id` itself,
+§5.4 — so a duplicate create always chains via `Supersedes`, never
+412s). Three pairs commit or none: a mid-transaction failure (a
+state-ledger collision, say) leaves zero of the three, exactly
+like every other atomic write in this catalog.
 
 ### 3.13 `PUT /flows/:id` — flow document write (not a POST)
 
@@ -649,12 +730,48 @@ The route LEAVES THE URI TREE entirely: a request against it now
 - actual: `workOrders.put(id, workOrder)` (org-scoped stamps org) →
   `flowWorkOrders.put(flowWorkOrderId, flowWorkOrder)` → loop i in
   0..2: `states.postEvent(stateEventIds[i], id, states[i], actor)` →
-  `appendMessagePair(pair)`.
+  three `appendMessagePair` calls (below).
 - doctrinal: `put_work_order` + `put_flow_work_order` + three
   `post_state_event` (start transition, post-start transition,
   creation-time `claimed`) as `post_create_work_order`.
 - props: atomic; the three events are applied in order; member-tier;
   `validateWorkOrderCreateBody`.
+
+**The create-triple (Phase 5 Task 3), mirroring flows' own create
+(§3.12).** The route (not `postWorkOrderCreationOp`) pre-forms two
+extra pairs beside the gate's own operation pair, ONLY when the
+gate supplied both a pair and a fence organization — a
+below-facade caller (`api/mock-data.ts`) skips all three:
+
+- **The document pair** — PUT-shaped, at `work-orders/:id`'s own
+  address (the SAME address `POST /work-orders` collapses onto,
+  via the registry's create-address override — §5.6), body
+  `{display_id, flow_graph, position}` picked directly from the
+  create body's `workOrder` (never spread verbatim, so a
+  tolerated `organization_id` never leaks in) and validated
+  through `validateWorkOrderDocumentBody` — byte-indistinguishable
+  from a live genesis `PUT /work-orders/:id`.
+- **The join pair** — PUT-shaped, at
+  `flows/:id/work-orders/:woid`'s address, body the create's own
+  `flowWorkOrder` verbatim (`validateFlowWorkOrderEntity` accepts
+  exactly `flow_id`/`work_order_id`/`at`, so it doubles as the
+  join pair's body without a second construction) —
+  byte-indistinguishable from a live
+  `PUT /flows/:id/work-orders/:woid`. Genesis-undefined: a work
+  order's create-time join is always fresh.
+
+All three pairs share ONE `requestAt` (the create's own
+origination) yet strictly-later response `at` stamps, so the
+document pair — appended AFTER the operation pair — becomes the
+entity address's head. A duplicate create (same work-order id)
+therefore records `Supersedes` on its OWN new document pair
+against the PRIOR document pair; the duplicate's own operation
+pair, reading that SAME shared address fresh at gate entry,
+supersedes that same prior document pair too (`work-orders` is
+`'simple'` concurrency, §5.4 — it chains via `Supersedes`, never
+`Follows`). Three pairs commit or none: a mid-transaction failure
+(a state-ledger collision, say) leaves zero of the three, exactly
+like every other atomic write in this catalog.
 
 ### 3.18 `POST /work-orders/:id/claim` — claim
 
@@ -692,7 +809,7 @@ The route LEAVES THE URI TREE entirely: a request against it now
 
 ### 3.20 `POST /records` — record write (create or edit)
 
-`applyRecordWrite` (`api/routes.ts:220`).
+`postRecordWriteOp` (`api/routes.ts`).
 
 - tx (dynamic): `[records, record_attributes, states,
   ...ATTRIBUTE_RESTRICT_TABLES, requests, responses]`
@@ -701,17 +818,102 @@ The route LEAVES THE URI TREE entirely: a request against it now
      removals)
   2. `records.put(id, record)`
   3. if `create`: `states.postEvent(initialStateEventId, id,
-     initialState, actor)`
-  4. if removals: `collectAttributeReferrers(...)` → if any referrer,
+     initialState, actor)` — genesis, actor-authored, exactly
+     ONE event
+  4. if `edit`: the SAME sameEvent decompose `PUT /records/:id`
+     (§3.33) runs — read the current head, replay its
+     `member_id` on a byte-identical echo, else `actor` — then
+     `states.postEvent(state_event_id, id, state, memberId,
+     state_at)`; a genuine echo converges to a no-op write
+     (`states.put`'s own idempotency by id)
+  5. if removals: `collectAttributeReferrers(...)` → if any referrer,
      `throw 409` (rolls back the whole batch)
-  5. if entries or removals:
+  6. if entries or removals:
      `recordAttributes.putMany(entries, removedIds)`
-  6. `appendMessagePair(pair)`
+  7. the bundle's pairs (below), appended LAST, in order:
+     operation, document, N attribute-PUTs, M attribute-DELETEs
 - doctrinal: `put_record` + optional `post_state_event` + a
   put/delete batch over `record_attributes` as `post_write_record`.
 - props: atomic; **RESTRICT** (a removed attribute still referenced
   409s and rolls back the whole write, so no pair lands for it
   either); member-tier.
+
+**The bundle: 2+N (create) or 2+N+M (edit) pairs, one tx (Phase
+6 Task 4 — the migration's FIRST VARIABLE-CARDINALITY
+synthesis).** Unlike the flows/work-orders create-triple
+(§3.12/§3.17, always exactly three), a record write's pair count
+scales with its own attribute arrays: the operation pair, the
+document pair, one attribute-PUT pair per `attributes[]` entry
+(N), and — edit only — one attribute-DELETE pair per
+`removedAttributeIds` entry (M; a create body has no
+`removedAttributeIds` field at all, so M is always 0 there). The
+route pre-forms every non-operation pair beside the gate's own
+operation pair, ONLY when the gate supplied both a pair and a
+fence organization — a below-facade caller (`api/mock-data.ts`)
+skips them all:
+
+- **The document pair** — PUT-shaped, at `records/:id`'s own
+  address (the SAME address `POST /records` collapses onto, via
+  the registry's create-address override — §5.6), body
+  `recordDocumentBodyOf(b)`: the entity's own three fields
+  (`name`, `description`, `position`; `organization_id`
+  excluded) plus the lifecycle trio — mapped from
+  `initialState*` on create, carried verbatim from the body's
+  own echoed trio on edit — validated through
+  `validateRecordDocumentBody` (belt-and-suspenders:
+  `initialStateEventId` carries no non-empty rule of its own on
+  create, so an empty value 400s HERE rather than minting an
+  invalid pair) — byte-indistinguishable from a live
+  genesis/edit `PUT /records/:id`.
+- **N attribute-PUT pairs** — one per `attributes[]` entry,
+  PUT-shaped at `record-attributes/:id`'s own address, body
+  `recordAttributeDocumentBodyOf(attr)` (the id-strip
+  destructure: the entity fields minus `id` and
+  `organization_id`) — byte-indistinguishable from a live
+  `PUT /record-attributes/:id`.
+- **M attribute-DELETE pairs** (edit only) — one per
+  `removedAttributeIds` entry, DELETE-shaped at the SAME
+  `record-attributes/:id` address the attribute's own PUT pair
+  used, status 204 with no body — every DELETE response is
+  UNIVERSALLY 204 with no body (`api/api.ts`'s gate) —
+  byte-indistinguishable from a live
+  `DELETE /record-attributes/:id`.
+
+The shared BODY builders (`recordDocumentBodyOf`,
+`recordAttributeDocumentBodyOf`, `api/routes.ts`) are the
+ONE-voice seam: pure functions consumed by BOTH this
+route-inline formation and the seed's own invocation
+construction (`api/mock-data/seed-message-pairs.ts`) — never a
+shared pair-FORMER, since forming a pair itself needs the fence
+organization and the response specs, which only the route
+(and, independently, the seed) hold.
+
+All pairs share ONE `requestAt` (the write's own origination) yet
+strictly-later response `at` stamps, so the document pair —
+appended AFTER the operation pair — becomes the entity address's
+head, exactly like flows'/work-orders' own create (§3.12/§3.17).
+A duplicate create (same record id) therefore records
+`Supersedes` on its own new document pair against the PRIOR
+document pair; the duplicate's own operation pair, reading that
+SAME shared address fresh at gate entry, supersedes that same
+prior document pair too (`records` is `'simple'` concurrency,
+§5.4). The whole bundle commits or none: a mid-transaction
+failure (a state-ledger collision, or a RESTRICTed removal)
+leaves ZERO of the bundle's pairs, exactly like every other
+atomic write in this catalog.
+
+**The edit-only trio.** `RecordWriteEditBody` now carries the
+SAME `state`/`state_at`/`state_event_id` keys `PUT /records/:id`
+(§3.33) accepts, with the SAME validation rules — an edit body
+without them 400s before ever reaching the referrer check above
+(step 5): the RESTRICT proof depends on that ordering. The client
+(`postRecordChange`, `web-app/app/adapters/records.ts`) echoes
+the trio from the already-loaded detail model
+(`RecordChangeEdit.state`/`stateAt`/`stateEventId`) — zero new
+hops, mirroring the records list's/detail page's existing
+no-attribute-change echo (§3.33). Create's own keys are
+UNCHANGED (`initialState`/`initialStateEventId`/
+`initialStateAt` remain R2's byte-pinned birth names).
 
 ### 3.21 `POST /objectives` — create objective
 
@@ -935,6 +1137,40 @@ route stays for every other family.
   editing actor, so a different member editing a field after
   someone else's transition does not 409.
 
+### 3.33 `PUT /records/:id` — record document write (not a POST)
+
+One shape serves create, edit, and transition (Decision 7): the
+body is the entity's own three writable fields (`name`,
+`description`, `position`) plus the lifecycle trio (`state`,
+`state_at`, `state_event_id`). Genesis is head-presence-defined
+— the first PUT at an id IS the birth, though a record's
+genesis normally arrives through the composed `POST /records`
+(§3.20) instead; this PUT's genesis arm exists for a live
+PUT-first flow and mirrors ideas/projects exactly rather than
+special-casing records as PUT-only-for-edits.
+`postRecordStateChange` (the adapter's transition op) now mints
+a fresh trio and fires this SAME document PUT; records no
+longer ride the generic `PUT /states/:id` (§2.10) for a
+transition — that route stays for every family without its own
+document PUT. `GET`/`DELETE /records/:id` stay hand-written,
+old-plane, unchanged (Task 7 flips the `GET`).
+
+- tx: `[records, states, requests, responses]`
+- actual: read the current head event
+  (`states.getCurrentFor(id)`) → `records.put(id, entity)` (the
+  org-scoped store stamps `organization_id`, so the body omits
+  it) → `states.postEvent(state_event_id, id, state, memberId,
+  state_at)` → `appendMessagePair(pair)`.
+- doctrinal: `put_record` + `post_state_event` as
+  `put_record_document`.
+- props: atomic; member-tier; `validateRecordDocumentBody`;
+  idempotent (a byte-identical resend converges: one row, one
+  event, one pair); MEMBER_ID CAVEAT — a state-unchanged edit
+  (the resent trio matches the current head byte-for-byte)
+  replays the STORED head event's `member_id`, never the
+  editing actor, so a different member editing a field after
+  someone else's transition does not 409.
+
 ---
 
 ## 4. Why composition is store-level, not HTTP-level
@@ -1066,22 +1302,28 @@ one case) never a throw:
 
 `POST /snapshots/mock-data` and `POST /snapshots/bootstrap` are
 `BOOTSTRAP_ROUTES` — bearer-exempt and below the ledger for their OWN
-request (§3.26–§3.28). What they seed, though, is itself the output
-of six pair-capable write families (`human-members`, `ideas`,
-`flows`, `ai-members`, `records`, `objectives`), so the seed forms
-each family's pair the SAME way a live request would, then writes it
-alongside the seeded row:
+request (§3.26–§3.28). What they seed, though, is itself the output of TEN
+pair-capable write families, in dependency order: `human-members`, `ideas`,
+`idea-submissions`, `projects`, `flows`, `work-orders`, `flow-work-orders`,
+`ai-members`, `records`, and `objectives` (`buildMockDataInvocations`,
+`api/mock-data/seed-message-pairs.ts`), so the seed forms each family's pair
+the SAME way a live request would, then writes it alongside the seeded row:
 
-- The mock-data seed pre-forms **37** message pairs — one per seeded
-  human-member, idea, flow, AI member, record, and objective
-  (`buildMockDataInvocations`,
-  `api/mock-data/seed-message-pairs.ts`) — in a first pass, BEFORE
-  the seed's own big transaction opens (`formWritePair`'s hashing is
-  async crypto, which would auto-commit an IndexedDB transaction
-  early if awaited inside one); a second pass then writes the seeded
-  rows and appends each pre-formed pair in the SAME transaction the
-  row lands in. The bootstrap seed forms exactly one such pair, for
-  its lone `current` human-member create.
+- The mock-data seed pre-forms **380** message pairs — one pair per seeded
+  row for most families, but each seeded flow folds in an
+  operation/document/join triple (4 creates × 3 pair triples + 1 genesis
+  document = 13, §3.12), each seeded work order forms both a document
+  pair and a join pair (145 + 145, §3.17), and each seeded record folds
+  in its OWN document pair plus one attribute-PUT pair per seeded
+  attribute (2 operations + 2 documents + 14 attribute documents = 18,
+  §3.20's bundle synthesis, generalized from flows'/work-orders' fixed
+  1+1+1 to 1+1+N) — in a first pass, BEFORE the
+  seed's own big transaction opens (`formWritePair`'s hashing is async
+  crypto, which would auto-commit an IndexedDB transaction early if awaited
+  inside one); a second pass then writes the seeded rows and appends each
+  pre-formed pair in the SAME transaction the row lands in. The bootstrap
+  seed forms exactly one such pair, for its lone `current` human-member
+  create.
 - Every seed pair carries **no `Authorization` header** — a seed
   invocation is not a real HTTP request, so `headerFields` is empty
   rather than a synthesized fake bearer.
@@ -1105,9 +1347,9 @@ The gate (`handleRequest`) keys the class off the route's
 family can register `'locked'` (family-registry.ts) with no live
 route riding the arm until its OWN wiring row lands.
 
-- **`simple`** (`ideas`, `projects`): the existing head-read →
-  `Supersedes` chain (§5.1) — a repeat PUT ALWAYS succeeds and
-  ALWAYS supersedes the current head.
+- **`simple`** (`ideas`, `projects`, `work-orders` — §5.6): the
+  existing head-read → `Supersedes` chain (§5.1) — a repeat PUT
+  ALWAYS succeeds and ALWAYS supersedes the current head.
 - **`locked`** (`flows`, live since Task 3 — §3.13): a repeat PUT
   must ECHO the current head via the request header
   `If-Response-ID`, or 412s.
@@ -1165,15 +1407,126 @@ its response additionally carries the `Response-ID` header
 their `WRITE_RESPONSE_SPECS` entries — dispatch through
 `api/document-family.ts`'s generic `documentEntityRoute`/
 `documentCollectionRoute`/`documentWriteResponseSpec`, driven
-by a per-family `DocumentFamilyWiring` (a validator, a
-decompose op, and an entity mapper) rather than hand-written
-route objects. For `ideas`/`projects` (`simple` concurrency,
-§5.4) the wire is byte-identical to the routes it replaces.
-`flows` rides the SAME generic dispatch as `locked` concurrency
-(§5.4) — its document PUT alone carries the `If-Response-ID`/
+by a per-family `DocumentFamilyWiring` (a lifecycle class, a
+not-found table, a validator, a decompose op, and an entity
+mapper — §5.6) rather than hand-written route objects. For
+`ideas`/`projects` (`simple` concurrency, §5.4) the wire is
+byte-identical to the routes it replaces. `flows` rides the
+SAME generic dispatch as `locked` concurrency (§5.4) — its
+document PUT alone carries the `If-Response-ID`/
 `Follows` four-outcome machinery the other two families never
 need; `flows` also keeps its own hand-written `POST /flows`
 (create, §3.12) and `POST /flows/:id/undo` (§3.14) outside this
 generic dispatch. The untouched existing suite plus
 `tests/document-family.test.ts`'s successBody and dispatch pins
 are the absorption's proof.
+
+### 5.6 The fourth family: work-orders and the stateless class
+
+Task 2 (Phase 5) registers `work-orders` as the fourth
+`DocumentFamilyWiring` row (`WORK_ORDERS_WIRING`, beside
+ideas/projects/flows in `api/routes.ts`) and, on its evidence,
+grows the wiring interface by two REQUIRED facts every family
+now declares:
+
+- **`lifecycle`: `'trio' | 'stateless'`.** ideas/projects/flows
+  are `'trio'` — every document body folds in the Decision 7
+  `state`/`state_at`/`state_event_id` trio, and a GET walks that
+  history (`documentLifecycleEvents`/`stateHistoryFrom`/
+  `currentDocumentState`) to 404 a lifecycle-deleted document
+  too. `work-orders` is the FIRST `'stateless'` family: a work
+  order's lifecycle is written ONLY by `POST /work-orders`
+  (§3.17), `POST /work-orders/:id/claim` (§3.18), `POST
+  /work-orders/:id/transition` (§3.19), and the `states/:id`
+  unclaim path — never by a document PUT — so
+  `validateWorkOrderDocumentBody` 400s a body carrying any trio
+  key (the stateless covenant is validator-enforced, not caller
+  discipline), and the generic GET-side lifecycle walk is
+  skipped entirely for a `'stateless'` wiring (its only
+  tombstone signal is a DELETE-method head, already absent via
+  `deriveDocumentsAt` — the SAME reduction every family shares).
+- **`notFoundTable`: the identifier the wire 404 body speaks**
+  (`EntityNotFoundError`'s table, rendered `Not found:
+  <table>/<id>`). Family name for ideas/projects/flows;
+  `'work_orders'` for work-orders — the FIRST family whose
+  storage table name (the `EntityStore` key in `db-backed.ts`)
+  differs from its family name (`work-orders`, the URI segment).
+
+**PUT /work-orders/:id** now dispatches through
+`documentPutHandler(WORK_ORDERS_WIRING)` — the SAME `'simple'`
+concurrency class ideas/projects ride (§5.4) — and
+`WRITE_RESPONSE_SPECS['work-orders/:id']` is
+`documentWriteResponseSpec(WORK_ORDERS_WIRING)`. **GET /work-orders/:id**
+rides the SAME wiring row through `documentGetHandler` (Task 7, Phase 5) —
+the flip that retired the last hand-written document-family route object;
+`entityOf` is now a live reader for both verbs, not merely future-proofing.
+
+**The wire is unchanged.** The response's `{id, organization_id,
+display_id, flow_graph, position}` keys and the 404 body
+(`Not found: work_orders/<id>`) are byte-identical to the prior
+hand-written route — the untouched existing suite (including
+`tests/api-work-orders-create.test.ts`) plus
+`tests/api-work-order-document.test.ts`'s below-gate op pin and
+byte-identical-resend case are the absorption's proof;
+`tests/api-work-orders-verb-gaps.test.ts` additionally pins
+every deliberate verb gap the family still carries (PUT/DELETE
+`work-orders`; POST/DELETE `work-orders/:id`; every verb on
+`/claim` and `/transition` but their own POST; POST/PUT/DELETE
+`flows/:id/work-orders`; GET/POST `flows/:id/work-orders/:woid`
+— its DELETE already pinned in `api-flows-verb-gaps.test.ts`).
+
+### 5.7 The fifth family: records and the DELETE-pair filter
+
+Task 2 (Phase 6) registers `records` as the fifth
+`DocumentFamilyWiring` row (`RECORDS_WIRING`, beside
+ideas/projects/flows/work-orders in `api/routes.ts`). `records`
+is `'trio'` — Decision 7's election as amended: a family is
+`'trio'` when its lifecycle fits the trio (a single current
+state, authored once per transition, folded into the SAME
+document PUT that edits its entity fields) rather than
+`'stateless'` (a lifecycle written by its own dedicated ops,
+never a document PUT) — records' active/archived/deleted
+lifecycle fits the trio exactly as ideas/projects/flows' does,
+so the amendment stays narrow: it elects records into the
+EXISTING `'trio'` class rather than widening the class itself.
+
+`records` is also the FIRST family whose `:id` address carries
+a live `DELETE` route alongside a `'trio'` PUT.
+`documentLifecycleEvents` (`api/derive-documents.ts`) walked
+every 2xx PUT/DELETE pair at a document address and
+`pickString`-threw on a DELETE pair's body — always EMPTY
+(design decision 6: DELETE tombstones a document, it carries no
+wire fields) — since no `'trio'` family before records ever had
+a live DELETE at its own document address for the throw to
+reach. Author gate 9's fix: the walk now SKIPS a DELETE-method
+pair entirely, so a delete-then-recreate history (`PUT`,
+`DELETE`, `PUT`) yields the two PUT trios rather than crashing —
+behavior-preserving for ideas/projects/flows (none has a DELETE
+at its own document address). `GET /records/:id` and `GET
+/records` stay hand-written, old-plane, through this task
+(`RECORDS_WIRING`'s `entityOf` is unreached until Task 7 flips
+them), so the fix is proven directly against fabricated pairs
+(`tests/api-record-document.test.ts`), not through a live route.
+
+**PUT /records/:id** now dispatches through
+`documentPutHandler(RECORDS_WIRING)` — the SAME `'simple'`
+concurrency class ideas/projects/work-orders ride (§5.4) — and
+`WRITE_RESPONSE_SPECS['records/:id']` is
+`documentWriteResponseSpec(RECORDS_WIRING)`.
+
+**The wire is unchanged except the named trio delta.** The
+response's `{id, organization_id, name, description, position}`
+keys are byte-identical to the prior hand-written route — the
+entity/trio separation in `RecordDocumentBody` guarantees it.
+The three named wire deltas: (1) the PUT request body now
+carries the trio; (2) `putRecord`/`postRecordStateChange`
+(`web-app/app/adapters/records.ts`) speak the trio in
+camelCase, translating to snake_case at the wire seam; (3) the
+records list's drag-reorder and the detail page's no-attribute-
+change save each echo the trio from data already loaded (the
+list model's `RecordModel` accessors; `currentView.record`) —
+zero new hops. `tests/api-record-document.test.ts` (the
+below-gate op/validator/DELETE-filter pins) plus the untouched
+existing suite (byte-identical GET/DELETE, the deleted-
+exclusion test, `postRecordStateChange`'s states-log assertions)
+are the fold's proof.

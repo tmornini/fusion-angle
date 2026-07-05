@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { sha256Hex } from '../shared/digest.ts';
+import { latestByKey } from '../shared/ledger-reduction.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { jsonArrayField } from '../api/types.ts';
@@ -32,7 +33,11 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-function createRecordBody(id: string, eventId: string) {
+function createRecordBody(
+    id: string,
+    eventId: string,
+    attributes: Record<string, unknown>[] = [],
+) {
     return {
         kind: 'create',
         id,
@@ -42,14 +47,16 @@ function createRecordBody(id: string, eventId: string) {
             description: 'd',
             position: 1,
         },
-        attributes: [],
+        attributes,
         initialState: 'active',
         initialStateEventId: eventId,
         initialStateAt: AT,
     };
 }
 
-function editRecordBody(id: string) {
+// Echoes the SAME trio the create above minted for `eventId` —
+// never a fresh mint, so the sameEvent decompose no-ops.
+function editRecordBody(id: string, eventId: string) {
     return {
         kind: 'edit',
         id,
@@ -60,7 +67,25 @@ function editRecordBody(id: string) {
             position: 1,
         },
         attributes: [],
+        state: 'active',
+        state_at: AT,
+        state_event_id: eventId,
         removedAttributeIds: [],
+    };
+}
+
+function recordAttribute(
+    id: string, recordId: string, name: string,
+) {
+    return {
+        id,
+        organization_id: '1',
+        record_id: recordId,
+        name,
+        attribute_type: 'text',
+        sort_order: 0,
+        options: jsonArrayField([]),
+        constraints: jsonArrayField([]),
     };
 }
 
@@ -70,6 +95,19 @@ function recordFields(name: string) {
         name,
         description: 'd',
         position: 1,
+    };
+}
+
+// PUT /records/:id now takes the FULL document (Decision 7):
+// the entity fields plus the state trio. One fixed trio per
+// record id keeps every PUT below a same-state edit — none of
+// these exercise a genuine transition.
+function recordPutBody(recordId: string, name: string) {
+    return {
+        ...recordFields(name),
+        state: 'active',
+        state_at: '2026-01-01T00:00:00.000000Z',
+        state_event_id: 'ev-' + recordId,
     };
 }
 
@@ -95,15 +133,20 @@ test('a record create appends its pair at the entity'
     ));
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(
-        requests[0]!.uri_prefix,
-        '/organizations/1/records/',
+    // Create balance: operation + document (2+N; zero
+    // attributes here) — the H7/arrival-order hazard class
+    // means a positional requests[0] read is unsafe once TWO
+    // pairs share this address, so filter/count instead.
+    assert.equal(requests.length, 2);
+    const atAddress = requests.filter(
+        r => r.uri_prefix === '/organizations/1/records/'
+            && r.uri_id === 'rec-1',
     );
-    assert.equal(requests[0]!.uri_id, 'rec-1');
+    assert.equal(atAddress.length, 2);
 });
 
-test('a failed record create appends nothing', async () => {
+test('a failed record create appends nothing, the whole'
++ ' bundle (operation + document + attribute)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await db.states.put('ev-x', {
@@ -114,7 +157,9 @@ test('a failed record create appends nothing', async () => {
     });
     const res = await handleRequest(db, req(
         'POST', '/records', token,
-        createRecordBody('rec-doomed', 'ev-x'),
+        createRecordBody('rec-doomed', 'ev-x', [
+            recordAttribute('attr-doomed', 'rec-doomed', 'X'),
+        ]),
     ));
     assert.equal(res.status, 409);
     assert.equal((await db.requests.getAll()).length, 0);
@@ -122,20 +167,166 @@ test('a failed record create appends nothing', async () => {
 });
 
 test('an edit POST shares the SAME address as create and'
-+ ' supersedes it', async () => {
++ ' supersedes the create\'s true head', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const created = await handleRequest(db, req(
         'POST', '/records', token,
         createRecordBody('rec-2', 'ev-2'),
     ));
-    const createdId = created.headers.get('Response-ID');
-    assert.ok(createdId);
+    assert.equal(created.status, 204);
+    // The create's OWN document pair — appended strictly after
+    // the operation pair within the same tx — becomes the
+    // shared address's true head (nowUtc monotonicity). Read it
+    // BELOW-WIRE rather than trusting the create response's own
+    // Response-ID header: that header names the OPERATION pair,
+    // not the head the edit will supersede. The flows fresh-GET
+    // fix (headResponseId) is unavailable here — Response-ID
+    // attaches on GET only for 'locked' families, and records
+    // is 'simple'.
+    const prefix = '/organizations/1/records/';
+    const atAddress = (await db.responses.getAll()).filter(
+        r => r.uri_prefix === prefix && r.uri_id === 'rec-2',
+    );
+    const trueHead = latestByKey(
+        atAddress, () => 'head',
+    ).get('head');
+    assert.ok(trueHead, 'no stored response at the address');
     const edited = await handleRequest(db, req(
-        'POST', '/records', token, editRecordBody('rec-2'),
+        'POST', '/records', token,
+        editRecordBody('rec-2', 'ev-2'),
     ));
     assert.equal(edited.status, 204);
-    assert.equal(edited.headers.get('Supersedes'), createdId);
+    assert.equal(
+        edited.headers.get('Supersedes'), trueHead!.id,
+    );
+});
+
+test('a record create with attributes appends the'
++ ' document pair and one attribute pair per attribute',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'POST', '/records', token,
+        createRecordBody('rec-11', 'ev-11', [
+            recordAttribute('attr-11a', 'rec-11', 'A'),
+            recordAttribute('attr-11b', 'rec-11', 'B'),
+        ]),
+    ));
+    assert.equal(res.status, 204);
+    const requests = await db.requests.getAll();
+    // 2 (operation + document) + 2 attributes = 4.
+    assert.equal(requests.length, 4);
+    const recordsPrefix = '/organizations/1/records/';
+    const atRecordAddress = requests.filter(
+        r => r.uri_prefix === recordsPrefix
+            && r.uri_id === 'rec-11',
+    );
+    assert.equal(atRecordAddress.length, 2);
+    const attributesPrefix =
+        '/organizations/1/record-attributes/';
+    assert.equal(
+        requests.filter(
+            r => r.uri_prefix === attributesPrefix
+                && r.uri_id === 'attr-11a',
+        ).length,
+        1,
+    );
+    assert.equal(
+        requests.filter(
+            r => r.uri_prefix === attributesPrefix
+                && r.uri_id === 'attr-11b',
+        ).length,
+        1,
+    );
+    // The synthesized document pair is byte-indistinguishable
+    // from a live PUT records/:id genesis pair: 200, entity
+    // fields plus the trio, no id/organization_id key.
+    const responses = await db.responses.getAll();
+    const documentResponse = responses.find(
+        r => r.uri_prefix === recordsPrefix
+            && r.uri_id === 'rec-11'
+            && r.status === 200,
+    );
+    assert.ok(documentResponse, 'no document pair response');
+    const documentRequest = requests.find(
+        r => r.id === documentResponse!.id,
+    );
+    const embeddedDocument = JSON.parse(
+        documentRequest!.message,
+    ) as { body: Record<string, unknown> };
+    assert.deepEqual(
+        Object.keys(embeddedDocument.body).sort(),
+        [
+            'description', 'name', 'position',
+            'state', 'state_at', 'state_event_id',
+        ],
+    );
+    // Same check for one attribute pair: byte-indistinguishable
+    // from a live PUT record-attributes/:id pair (the id-strip
+    // covenant).
+    const attributeRequest = requests.find(
+        r => r.uri_prefix === attributesPrefix
+            && r.uri_id === 'attr-11a',
+    );
+    const embeddedAttribute = JSON.parse(
+        attributeRequest!.message,
+    ) as { body: Record<string, unknown> };
+    assert.deepEqual(
+        Object.keys(embeddedAttribute.body).sort(),
+        [
+            'attribute_type', 'constraints', 'name',
+            'options', 'record_id', 'sort_order',
+        ],
+    );
+});
+
+test('a record edit removing an attribute appends a'
++ ' DELETE-shaped pair at the attribute\'s own address',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await handleRequest(db, req(
+        'POST', '/records', token,
+        createRecordBody('rec-12', 'ev-12', [
+            recordAttribute('attr-12', 'rec-12', 'Gone'),
+        ]),
+    ));
+    const edited = await handleRequest(db, req(
+        'POST', '/records', token, {
+            kind: 'edit',
+            id: 'rec-12',
+            record: {
+                organization_id: '1',
+                name: 'Edited Record',
+                description: 'd2',
+                position: 1,
+            },
+            attributes: [],
+            state: 'active',
+            state_at: AT,
+            state_event_id: 'ev-12',
+            removedAttributeIds: ['attr-12'],
+        },
+    ));
+    assert.equal(edited.status, 204);
+    const attributesPrefix =
+        '/organizations/1/record-attributes/';
+    const responses = (await db.responses.getAll()).filter(
+        r => r.uri_prefix === attributesPrefix
+            && r.uri_id === 'attr-12',
+    );
+    // one PUT-shaped (the create's own attribute pair, 200)
+    // plus one DELETE-shaped (the edit's removal, 204) at the
+    // SAME address.
+    assert.equal(responses.length, 2);
+    assert.equal(
+        responses.filter(r => r.status === 200).length, 1,
+    );
+    assert.equal(
+        responses.filter(r => r.status === 204).length, 1,
+    );
 });
 
 test('a PUT to a fresh record appends its pair, and a'
@@ -144,14 +335,14 @@ test('a PUT to a fresh record appends its pair, and a'
     const token = await organizationToken();
     const first = await handleRequest(db, req(
         'PUT', '/records/rec-3', token,
-        recordFields('First'),
+        recordPutBody('rec-3', 'First'),
     ));
     assert.equal(first.status, 200);
     const firstId = first.headers.get('Response-ID');
     assert.ok(firstId);
     const second = await handleRequest(db, req(
         'PUT', '/records/rec-3', token,
-        recordFields('Second'),
+        recordPutBody('rec-3', 'Second'),
     ));
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('Supersedes'), firstId);
@@ -163,7 +354,7 @@ test('DELETE records/:id appends its tombstone pair,'
     const token = await organizationToken();
     const put = await handleRequest(db, req(
         'PUT', '/records/rec-4', token,
-        recordFields('Doomed'),
+        recordPutBody('rec-4', 'Doomed'),
     ));
     const putId = put.headers.get('Response-ID');
     const del = await handleRequest(db, req(
@@ -180,7 +371,7 @@ test('each 200 route\'s wire body matches a direct domain '
     const token = await organizationToken();
     const record = await handleRequest(db, req(
         'PUT', '/records/rec-5', token,
-        recordFields('Wired'),
+        recordPutBody('rec-5', 'Wired'),
     ));
     assert.equal(record.status, 200);
     const recordRow = await db.records.getById('rec-5');

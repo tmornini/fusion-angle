@@ -14,6 +14,9 @@ import {
     postRecordStateChange,
 } from '../web-app/app/adapters/records.ts';
 import {
+    getRecordStateDetail,
+} from '../web-app/app/adapters/state-events.ts';
+import {
     jsonArrayField,
 } from '../api/types.ts';
 import {
@@ -109,6 +112,9 @@ test(
             name: 'B',
             description: 'second',
             position: 1,
+            state: 'active',
+            stateAt: '2026-01-02T00:00:00.000000Z',
+            stateEventId: 'ev-rec-1-b',
         });
         const stored = await getRecord(ctx, 'rec-1');
         assert.equal(stored.name, 'B');
@@ -143,6 +149,9 @@ test(
             ],
             initialState: 'active',
         });
+        // Echo the create's own known head — never a fresh
+        // mint (the RecordChangeEdit trio Task 4 added).
+        const head = await getRecordStateDetail(ctx, 'rec-1');
         await postRecordChange(ctx, 'rec-1', {
             kind: 'edit',
             record: {
@@ -160,6 +169,9 @@ test(
                     constraints: jsonArrayField([]),
                 },
             ],
+            state: head.state,
+            stateAt: head.stateAt,
+            stateEventId: head.stateEventId,
             removedAttributeIds: ['a-old'],
         });
         const attrs = await ctx.GET<
@@ -198,8 +210,9 @@ test(
             attributes: [],
             initialState: 'active',
         });
+        const rec2 = await getRecord(ctx, 'rec-2');
         await postRecordStateChange(
-            ctx, 'rec-2', 'deleted',
+            ctx, rec2, 'deleted',
         );
         const records = await getRecords(ctx);
         const ids = records
@@ -227,8 +240,9 @@ test(
             attributes: [],
             initialState: 'active',
         });
+        const rec1 = await getRecord(ctx, 'rec-1');
         await postRecordStateChange(
-            ctx, 'rec-1', 'archived',
+            ctx, rec1, 'archived',
         );
         const stored = await getRecord(ctx, 'rec-1');
         assert.equal(stored.description, 'orig');
@@ -271,8 +285,9 @@ test(
             attributes: [],
             initialState: 'active',
         });
+        const rec1 = await getRecord(ctx, 'rec-1');
         await postRecordStateChange(
-            ctx, 'rec-1', 'archived',
+            ctx, rec1, 'archived',
         );
         const events = await db.states.getAllFor(
             'rec-1',

@@ -10,9 +10,20 @@ import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
-import type { WorkOrderFlowGraph } from '../api/types.ts';
+import type {
+    WorkOrderFlowGraph,
+    RequestEntity,
+} from '../api/types.ts';
 import { generateCryptoSafeBase62 } from
     '../shared/crypto-safe-base62.ts';
+import { parseJson } from '../shared/http-message/json-codec.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
+import {
+    defaultBodyRegistry,
+} from '../shared/http-message/media-registry.ts';
+import {
+    validateWorkOrderDocumentBody,
+} from '../api/validators.ts';
 
 const BASE = 'http://localhost';
 
@@ -124,23 +135,113 @@ function transitionBody() {
     };
 }
 
-test('a work-order create appends its pair at the entity'
-+ ' address', async () => {
+// Decode a stored request row's canonical message back into
+// its method + body — the SAME decode
+// tests/api-flow-document.test.ts's own decodeRequestMessage
+// performs, reconstructed here read-only (each test file is
+// an isolated world).
+function decodeRequestMessage(message: string): {
+    readonly method: string;
+    readonly body: Record<string, unknown>;
+} {
+    const model = parseJson(message, defaultBodyRegistry());
+    if (model.startLine.kind !== 'request') {
+        throw new Error(
+            'stored message carries no request line',
+        );
+    }
+    const body = HttpMessage.fromModel(model).body();
+    return {
+        method: model.startLine.method,
+        body: body.exists()
+            ? JSON.parse(body.toText()) as
+                Record<string, unknown>
+            : {},
+    };
+}
+
+// The PUT-shaped row at a given address — never positional
+// (Task 3: two rows, the operation pair and the synthesized
+// document pair, now share the WO's own address, so an
+// index-0 read is an implicit arrival-order dependency, the
+// H7 hazard class). Filter by address AND method instead.
+function putShapedRowsAt(
+    requests: readonly RequestEntity[],
+    prefix: string,
+    uriId: string,
+): RequestEntity[] {
+    return requests.filter(
+        r => r.uri_prefix === prefix
+            && r.uri_id === uriId
+            && decodeRequestMessage(r.message).method === 'PUT',
+    );
+}
+
+test('a work-order create appends three pairs: the operation'
++ ' and document pairs share the entity address, the join'
++ ' pair lands at its own address', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await createWorkOrder(db, token, 'wo-1');
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(
-        requests[0]!.uri_prefix,
-        '/organizations/1/work-orders/',
+    const responses = await db.responses.getAll();
+    assert.equal(requests.length, 3);
+    assert.equal(responses.length, 3);
+
+    const atEntityAddress = requests.filter(
+        r => r.uri_prefix === '/organizations/1/work-orders/'
+            && r.uri_id === 'wo-1',
     );
-    assert.equal(requests[0]!.uri_id, 'wo-1');
+    assert.equal(atEntityAddress.length, 2);
+    const putRowsAtEntityAddress = putShapedRowsAt(
+        requests, '/organizations/1/work-orders/', 'wo-1',
+    );
+    assert.equal(putRowsAtEntityAddress.length, 1);
 });
 
-test('a failed work-order create appends nothing',
+test('a work-order create\'s document pair body validates as'
++ ' a WorkOrderDocumentBody matching the created work'
++ ' order\'s own fields', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await createWorkOrder(db, token, 'wo-1b');
+    assert.equal(res.status, 204);
+    const requests = await db.requests.getAll();
+    const documentRows = putShapedRowsAt(
+        requests, '/organizations/1/work-orders/', 'wo-1b',
+    );
+    assert.equal(documentRows.length, 1);
+    const documentBody =
+        decodeRequestMessage(documentRows[0]!.message).body;
+    assert.deepEqual(
+        validateWorkOrderDocumentBody(documentBody).entity,
+        {
+            display_id: 'abcd',
+            flow_graph: flowGraph(),
+            position: 1,
+        },
+    );
+});
+
+test('a work-order create\'s join pair lands at the'
++ ' flow/work-orders address, PUT-shaped, at the join id',
 async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await createWorkOrder(db, token, 'wo-1c');
+    assert.equal(res.status, 204);
+    const requests = await db.requests.getAll();
+    const joinRows = putShapedRowsAt(
+        requests,
+        '/organizations/1/flows/flow-1/work-orders/',
+        'wo-1c-fwo',
+    );
+    assert.equal(joinRows.length, 1);
+});
+
+test('a failed work-order create appends none of the three'
++ ' pairs (whole-tx abort)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await db.states.put('ev-2-wo-doomed', {
@@ -233,9 +334,16 @@ test('PUT a flow-work-order join appends its pair at the'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
+    // Task 3: createWorkOrder above ALSO synthesizes a join
+    // pair at this same prefix (its own flowWorkOrderId
+    // 'wo-5-fwo') — a prefix-only find() would match that row
+    // first (inserted before this explicit PUT) instead of
+    // this test's own pair, so the uri_id filter is required,
+    // not merely defensive.
     const row = requests.find(
         r => r.uri_prefix
-            === '/organizations/1/flows/flow-1/work-orders/',
+            === '/organizations/1/flows/flow-1/work-orders/'
+            && r.uri_id === 'fwo-join',
     );
     assert.ok(row);
     assert.equal(row!.uri_id, 'fwo-join');

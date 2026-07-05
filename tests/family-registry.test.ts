@@ -34,8 +34,38 @@ test('flows is the third registered family, the first'
     });
 });
 
+test('work-orders is the fourth registered family,'
++ ' simple like ideas and projects', () => {
+    assert.deepEqual(familyRegistration('work-orders'), {
+        family: 'work-orders',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('records is the fifth registered family, simple'
++ ' like ideas, projects, and work-orders', () => {
+    assert.deepEqual(familyRegistration('records'), {
+        family: 'records',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('record-attributes is the sixth registered family,'
++ ' simple like records', () => {
+    assert.deepEqual(familyRegistration('record-attributes'), {
+        family: 'record-attributes',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
 test('an unregistered family returns undefined', () => {
-    assert.equal(familyRegistration('records'), undefined);
+    assert.equal(familyRegistration('objectives'), undefined);
 });
 
 test('every registered family names a concurrency class',

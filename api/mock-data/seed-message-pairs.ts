@@ -15,17 +15,26 @@
 // literals that merely happen to agree, so a stored pair can
 // never drift from what was actually written.
 //
-// Only the eight seed op-invocations that already accept a
-// `pair?` parameter are covered here (traced against every
+// The seed op-invocation families that accept a `pair?`
+// parameter are covered here (traced against every
 // postXxxCreationOp / postRecordWriteOp call site in
 // mock-data.ts): human-members, ideas, idea-submissions,
-// projects, flows, ai-members, records, objectives.
-// Memberships, project_objective_baseline_scores, and
-// work-order historical traces are direct writes the seed
-// never routes through a pair-capable op — the three named
-// deferrals stay untouched. A fourth, previously-unlisted
-// direct write — seed-flow-org2 — is now ALSO covered here,
-// closed through postFlowDocumentOp (Task 6).
+// projects, flows, work-orders, flow-work-orders, ai-members,
+// records, objectives, flow-records. Memberships and
+// project_objective_baseline_scores stay whole-slice
+// deferrals — direct writes the seed never routes through a
+// pair-capable op. The work-order deferral NARROWS this phase
+// to its historical traces alone (states events +
+// state_field_values, still direct — a NAMED carve-out now
+// bound to the states-consumers flip, not "the work-orders
+// phase"); the entity and join rows leave the deferral list
+// this phase, closed through postWorkOrderDocumentOp /
+// postFlowWorkOrderDocumentOp. A further, previously-unlisted
+// direct write — seed-flow-org2 — is ALSO covered here, closed
+// through postFlowDocumentOp (Task 6). The 3 seeded flow_records
+// join rows are the ONE genuine seed gap this phase closes last
+// (Task 5): they formed zero message pairs before, now closed
+// through postFlowRecordDocumentOp.
 
 import type {
     Id,
@@ -37,6 +46,9 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
     ProjectFlowEntity,
+    WorkOrderEntity,
+    FlowWorkOrderEntity,
+    FlowRecordEntity,
 } from '../types.ts';
 import {
     jsonArrayField,
@@ -52,8 +64,13 @@ import type { MessagePair } from '../message-pair.ts';
 import {
     WRITE_RESPONSE_SPECS,
     flowCreateDocumentBody,
+    recordDocumentBodyOf,
+    recordAttributeDocumentBodyOf,
 } from '../routes.ts';
-import { validateFlowCreateBody } from '../validators.ts';
+import {
+    validateFlowCreateBody,
+    validateRecordWriteBody,
+} from '../validators.ts';
 import {
     MOCK_SEED_TIMESTAMP,
     STARK_ORGANIZATION,
@@ -77,8 +94,14 @@ import { OBJECTIVE_SEEDS } from './objectives.ts';
 import {
     l2cFlowId,
     l2cProjectFlowId,
+    buildLeadToCloseWorkload,
 } from './lead-to-close-flow.ts';
 import { l2cProjectId, buildProjects } from './projects.ts';
+import {
+    buildWorkOrders,
+    buildFlowWorkOrderJoins,
+    buildWorkOrderStateEvents,
+} from './work-orders.ts';
 
 // ---- hoisted static seed-event data ----
 //
@@ -87,9 +110,9 @@ import { l2cProjectId, buildProjects } from './projects.ts';
 // writes share ONE declaration apiece — pure literals, so the
 // move changes nothing about when or how they're computed.
 
-// Shared with mock-data.ts's own direct writes that fall on
-// this same moment (mockFlowRecords) — exported so there is
-// exactly one `daysFromNow(-60, 9, 0)` call, not two.
+// Shared with every same-moment array below (flowStateEvents,
+// mockProjectFlows, mockFlowRecords) — exported so there is
+// exactly one `daysFromNow(-60, 9, 0)` call, not several.
 export const wfTimestamp = daysFromNow(-60, 9, 0);
 
 // One state event per seeded idea — the creation moment of
@@ -388,6 +411,40 @@ export const mockProjectFlows: ProjectFlowEntity[] = [
     },
 ];
 
+// Flow ↔ Record bindings. Customer Profile (org '1') is bound
+// to two flows (Customer Onboarding and Lead-to-Close); Project
+// Brief (org '2') is bound to the org-'2' flow so every binding
+// stays within one org. The Layout Test flow is left unbound —
+// it exists to exercise Auto Layout. Shared with mock-data.ts's
+// own pass-2 write of the SAME rows (through
+// postFlowRecordDocumentOp, Phase 6 Task 5) — exported so there
+// is exactly one declaration, not two.
+export const mockFlowRecords: FlowRecordEntity[] = [
+    {
+        id: 'frb01CustOnbCustProfA1',
+        flow_id: 'h5mErVBQhwdMKwi1co30jB',
+        record_id: customerProfileRecordId,
+        at: wfTimestamp,
+    },
+    {
+        id: 'frb02L3adt0ClCustProf2',
+        flow_id: l2cFlowId,
+        record_id: customerProfileRecordId,
+        at: wfTimestamp,
+    },
+    {
+        // Project Brief lives in org '2'
+        // (assignOrganization(index 1)), so it binds to
+        // the org-'2' flow — flowOrganization ===
+        // recordOrganization keeps the binding visible
+        // behind the org fence.
+        id: 'frb03Fus10nPr0jBri3f03',
+        flow_id: 'seed-flow-org2',
+        record_id: projectBriefRecordId,
+        at: wfTimestamp,
+    },
+];
+
 // ---- deterministic pick helper ----
 //
 // Moved verbatim out of postMockDataLoadIn so both this file's
@@ -667,6 +724,62 @@ export function flowOrg2SeedBody(): Record<string, unknown> {
     };
 }
 
+// The genesis case of the document PUT work-orders/:id
+// (Phase 5 Task 4): the flat entity fields, no `id` (a route
+// param, not a body field). organization_id rides along as
+// the validator's tolerated-but-ignored extra — load-bearing
+// here since the seed drives postWorkOrderDocumentOp below the
+// org fence (no scoping wrapper to stamp it). Every seeded work
+// order is Stark (finding 7) — hand-authored rows omit
+// organization_id entirely (the composition root's own job);
+// generated rows already carry it (STARK_ORGANIZATION, set by
+// generateFlowWorkload) — either way the merge below re-asserts
+// the same value, so ONE construction serves both sources.
+export function workOrderDocumentSeedBody(
+    row: Omit<WorkOrderEntity, 'organization_id'>,
+): Record<string, unknown> {
+    const { id: _id, ...fields } = row;
+    return { ...fields, organization_id: STARK_ORGANIZATION };
+}
+
+// The genesis case of the document PUT
+// flows/:id/work-orders/:woid (Phase 5 Task 4): the flat join
+// fields, no `id` (a route param, not a body field) — the SAME
+// three keys (flow_id, work_order_id, at) the live :woid PUT's
+// validateFlowWorkOrderEntity accepts.
+export function flowWorkOrderJoinSeedBody(
+    row: FlowWorkOrderEntity,
+): Record<string, unknown> {
+    const { id: _id, ...fields } = row;
+    return { ...fields };
+}
+
+// The genesis case of the document PUT
+// flows/:id/records/:frid (Phase 6 Task 5): the flat join
+// fields, no `id` (a route param, not a body field) — the SAME
+// three keys (flow_id, record_id, at) the live :frid PUT's
+// validateFlowRecordEntity accepts.
+export function flowRecordJoinSeedBody(
+    row: FlowRecordEntity,
+): Record<string, unknown> {
+    const { id: _id, ...fields } = row;
+    return { ...fields };
+}
+
+// Every seeded flow-record join binds within one org (mirrors
+// mockFlowRecords' own comment: flowOrganization ===
+// recordOrganization keeps the binding visible behind the org
+// fence). Only 'seed-flow-org2' sits in org '2'; every other
+// seeded flow is Stark — mirrors projectOrganizationFor's own
+// single-override shape above.
+export function flowRecordOrganizationFor(
+    join: FlowRecordEntity,
+): Id {
+    return join.flow_id === 'seed-flow-org2'
+        ? ORGANIZATION_TWO
+        : STARK_ORGANIZATION;
+}
+
 export function aiMemberSeedBody(
     m: AIMemberEntity,
 ): Record<string, unknown> {
@@ -814,9 +927,10 @@ interface MockDataInvocation {
 
 // Dependency-ordered (matches postMockDataLoadIn's write order):
 // human-members, ideas, idea-submissions, projects, flows,
-// ai-members, records, objectives. A dropped or reordered
-// invocation here is caught by tests/mock-data-pairs.test.ts's
-// pinned invocation count.
+// work-orders, flow-work-orders, ai-members, records,
+// flow-records, objectives. A dropped or reordered invocation
+// here is caught by tests/mock-data-pairs.test.ts's pinned
+// invocation count.
 export function buildMockDataInvocations():
     readonly MockDataInvocation[] {
     const members = buildMembers();
@@ -842,6 +956,28 @@ export function buildMockDataInvocations():
         recordStateEvents.map(e => [e.entity_id, e]),
     );
     const pools = humanMemberPoolsByOrganization(members);
+    const workOrders = buildWorkOrders();
+    const flowWorkOrderJoins = buildFlowWorkOrderJoins();
+    const workOrderStateEvents = buildWorkOrderStateEvents();
+    const leadToCloseWorkload = buildLeadToCloseWorkload();
+    // First-occurrence-wins: the WO's first seeded states event's
+    // member_id (the flows genesis-member precedent), read off
+    // the SAME two state-event arrays mock-data.ts's historical-
+    // trace carve-out still writes directly. Empirically verified
+    // (lens 4): all 145 work orders carry at least one event, and
+    // first-in-array-order equals earliest-by-`at` for every one —
+    // the lookup is unambiguous.
+    const workOrderFirstEventMemberId = new Map<Id, Id>();
+    for (const event of [
+        ...workOrderStateEvents,
+        ...leadToCloseWorkload.stateEvents,
+    ]) {
+        if (!workOrderFirstEventMemberId.has(event.entity_id)) {
+            workOrderFirstEventMemberId.set(
+                event.entity_id, event.member_id,
+            );
+        }
+    }
 
     const invocations: MockDataInvocation[] = [];
 
@@ -947,6 +1083,52 @@ export function buildMockDataInvocations():
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: flowOrg2SeedBody(),
     });
+    // Phase 5 Task 4: the entity/join gap closed — one document
+    // pair per seeded work order (hand-authored + generated) and
+    // one join pair per seeded flow-work-order join, mirroring
+    // the flows family's document-genesis shape. The work-order
+    // HISTORICAL TRACES (states events + state_field_values) stay
+    // a direct write — a NAMED carve-out (op-replay would
+    // rearrange the pinned states fingerprint; no Phase 5 read
+    // consumes trace pairs).
+    for (
+        const wo of [
+            ...workOrders, ...leadToCloseWorkload.workOrders,
+        ]
+    ) {
+        invocations.push({
+            key: seedPairKey('work-orders/:id', wo.id),
+            routePattern: 'work-orders/:id',
+            idParams: [wo.id],
+            organization: STARK_ORGANIZATION,
+            requesterIdentityId:
+                workOrderFirstEventMemberId.get(wo.id)!,
+            body: workOrderDocumentSeedBody(wo),
+        });
+    }
+    for (
+        const join of [
+            ...flowWorkOrderJoins,
+            ...leadToCloseWorkload.flowWorkOrders,
+        ]
+    ) {
+        invocations.push({
+            key: seedPairKey(
+                'flows/:id/work-orders/:woid', join.id,
+            ),
+            routePattern: 'flows/:id/work-orders/:woid',
+            idParams: [join.flow_id, join.id],
+            organization: STARK_ORGANIZATION,
+            // The SAME member as the join's own work order's
+            // document pair — the requesting identity is who
+            // brought the work order into being, not a second,
+            // independently-picked author.
+            requesterIdentityId: workOrderFirstEventMemberId.get(
+                join.work_order_id,
+            )!,
+            body: flowWorkOrderJoinSeedBody(join),
+        });
+    }
     for (const m of aiMembers) {
         invocations.push({
             key: seedPairKey('ai-members', m.id),
@@ -961,14 +1143,70 @@ export function buildMockDataInvocations():
         const attributes = mockRecordAttributes.filter(
             a => a.record_id === r.id,
         );
+        const organization = assignOrganization(i);
+        const createBody = recordSeedBody(
+            r, i, event, attributes,
+        );
         invocations.push({
             key: seedPairKey('records', r.id),
             routePattern: 'records',
-            organization: assignOrganization(i),
+            organization,
             requesterIdentityId: event.member_id,
-            body: recordSeedBody(r, i, event, attributes),
+            body: createBody,
         });
+        // Phase 6 Task 4: create appends the document pair (at
+        // the record's own address) and one attribute-PUT pair
+        // per seeded attribute, each keyed by its OWN
+        // deterministic invocation entry — the flows document +
+        // join precedent above, generalized from fixed
+        // cardinality to 1+1+N. Bodies via the shared BODY
+        // builders (api/routes.ts) — never a second, hand-rolled
+        // copy. Every seeded attribute is genesis, so no
+        // attribute-DELETE invocation exists here (the seed
+        // never removes an attribute it just created).
+        const b = validateRecordWriteBody(createBody);
+        invocations.push({
+            key: seedPairKey('records/:id', r.id),
+            routePattern: 'records/:id',
+            idParams: [r.id],
+            organization,
+            requesterIdentityId: event.member_id,
+            body: recordDocumentBodyOf(b),
+        });
+        for (const a of attributes) {
+            invocations.push({
+                key: seedPairKey('record-attributes/:id', a.id),
+                routePattern: 'record-attributes/:id',
+                idParams: [a.id],
+                organization,
+                requesterIdentityId: event.member_id,
+                body: recordAttributeDocumentBodyOf(
+                    a as unknown as Record<string, unknown>,
+                ),
+            });
+        }
     });
+    // Phase 6 Task 5: the flow_records seed gap closed — one
+    // join pair per seeded flow-record binding, mirroring the
+    // flow-work-order joins' shape above. The requesting
+    // identity is the bound RECORD's own state-event member —
+    // the same identity that seeded the record itself (verified
+    // by content: every recordStateEvents row above is authored
+    // by SYSTEM_MEMBER_ID), not a second, independently-picked
+    // author.
+    for (const join of mockFlowRecords) {
+        invocations.push({
+            key: seedPairKey(
+                'flows/:id/records/:frid', join.id,
+            ),
+            routePattern: 'flows/:id/records/:frid',
+            idParams: [join.flow_id, join.id],
+            organization: flowRecordOrganizationFor(join),
+            requesterIdentityId: recordStateEventByRecordId
+                .get(join.record_id)!.member_id,
+            body: flowRecordJoinSeedBody(join),
+        });
+    }
     for (const seed of OBJECTIVE_SEEDS) {
         const memberId = pickHumanMember(
             pools, STARK_ORGANIZATION,

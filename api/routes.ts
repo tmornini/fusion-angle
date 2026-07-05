@@ -4,6 +4,8 @@ import type {
 import type {
     FlowGraphDelta,
     FlowCreateBody,
+    WorkOrderCreateBody,
+    RecordWriteBody,
 } from './validators.ts';
 import type {
     Id,
@@ -69,15 +71,15 @@ import {
     validateProjectDocumentBody,
     validateProjectFlowEntity,
     validateFlowRecordEntity,
-    validateRecordAttributeEntity,
-    validateRecordEntity,
+    validateRecordAttributeDocumentBody,
+    validateRecordDocumentBody,
     validateRecordWriteBody,
     validateRoleGrantEntity,
     validateStateBody,
     validateStateFieldValueEntity,
     validateWorkOrderClaimBody,
     validateWorkOrderCreateBody,
-    validateWorkOrderEntity,
+    validateWorkOrderDocumentBody,
     validateWorkOrderTransitionBody,
     validateWorkOrderFlowGraphJson,
     pickString,
@@ -129,16 +131,26 @@ import { projectEntityOf } from './derive-projects.ts';
 import { flowEntityOf } from './derive-flows.ts';
 import { deriveProjectFlows } from './derive-project-flows.ts';
 import {
+    deriveFlowWorkOrders,
+} from './derive-flow-work-orders.ts';
+import {
+    deriveFlowRecords,
+    deriveFlowRecord,
+} from './derive-flow-records.ts';
+import {
     param,
     requireOrganization,
     withoutId,
     documentCollectionGetHandler,
     documentCollectionRoute,
     documentEntityRoute,
+    documentGetHandler,
+    documentPutHandler,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
     type DocumentFamilyWiring,
 } from './document-family.ts';
+import type { DerivedDocument } from './derive-documents.ts';
 // Re-exported: param/requireOrganization/withoutId moved to
 // document-family.ts (see the import above and its own
 // comment), but api.ts and existing tests still import them
@@ -189,12 +201,16 @@ export { param, requireOrganization, withoutId };
 // bare states/:id resend would.
 const IDEAS_WIRING: DocumentFamilyWiring = {
     family: 'ideas',
+    lifecycle: 'trio',
+    notFoundTable: 'ideas',
     validateDocument: validateIdeaDocumentBody,
     documentOp: postIdeaDocumentOp,
     entityOf: ideaEntityOf,
 };
 const PROJECTS_WIRING: DocumentFamilyWiring = {
     family: 'projects',
+    lifecycle: 'trio',
+    notFoundTable: 'projects',
     validateDocument: validateProjectDocumentBody,
     documentOp: postProjectDocumentOp,
     entityOf: projectEntityOf,
@@ -212,13 +228,131 @@ const PROJECTS_WIRING: DocumentFamilyWiring = {
 // tolerates by design, not a widened interface.
 const FLOWS_WIRING: DocumentFamilyWiring = {
     family: 'flows',
+    lifecycle: 'trio',
+    notFoundTable: 'flows',
     validateDocument: validateFlowDocumentBody,
     documentOp: postFlowDocumentOp,
     entityOf: flowEntityOf,
 };
+// The work-orders wiring row — the fourth family, and the
+// FIRST 'stateless' one (Decision 7's lifecycle trio does not
+// apply to a work-order document; see postWorkOrderDocumentOp's
+// own comment for why). Both PUT (Task 2/3) and GET (Task 7)
+// now ride the generic machinery, so entityOf serves a live GET
+// reader (documentGetHandler / documentCollectionGetHandler)
+// exactly as ideaEntityOf/projectEntityOf/flowEntityOf each
+// serve their OWN family's GET path: the head pair's body,
+// stamped with id and organization_id, already carries exactly
+// the {display_id, flow_graph, position} keys
+// validateWorkOrderDocumentBody's gate admits, so no per-field
+// picking is needed. notFoundTable is 'work_orders' — the first
+// family whose storage table name (db-backed.ts's EntityStore
+// key) differs from its family name.
+function workOrderDocumentEntityOf(
+    document: DerivedDocument,
+    organization: Id,
+): unknown {
+    return {
+        id: document.uriId,
+        organization_id: organization,
+        ...document.body,
+    };
+}
+const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
+    family: 'work-orders',
+    lifecycle: 'stateless',
+    notFoundTable: 'work_orders',
+    validateDocument: validateWorkOrderDocumentBody,
+    documentOp: postWorkOrderDocumentOp,
+    entityOf: workOrderDocumentEntityOf,
+};
+// The generic GET machinery (documentGetHandler/
+// documentCollectionGetHandler) this entityOf serves flips onto
+// records at Task 7 (this commit): GET records/:id and GET
+// records now ride it, exactly as ideaEntityOf/projectEntityOf/
+// flowEntityOf/workOrderDocumentEntityOf each serve their OWN
+// family's GET path. It still picks fields explicitly (never a
+// body spread) rather than standing in as a placeholder, the
+// SAME shape ideaEntityOf/projectEntityOf already use, so the
+// Task 7 flip finds it already correct instead of inheriting a
+// trio-leaking stand-in.
+function recordDocumentEntityOf(
+    document: DerivedDocument,
+    organization: Id,
+): RecordEntity {
+    const body = document.body;
+    return {
+        id: document.uriId,
+        organization_id: organization,
+        name: pickString(body, 'name'),
+        description: pickString(body, 'description'),
+        position: pickNumber(body, 'position'),
+    };
+}
+// The records wiring row — the fifth family, and the first
+// 'trio' family whose :id address also carries a live DELETE
+// route (Author gate 9: documentLifecycleEvents now skips a
+// DELETE-method pair — see its own comment in derive-
+// documents.ts). notFoundTable is 'records' (its storage table
+// name matches its family name, like ideas/projects/flows).
+const RECORDS_WIRING: DocumentFamilyWiring = {
+    family: 'records',
+    lifecycle: 'trio',
+    notFoundTable: 'records',
+    validateDocument: validateRecordDocumentBody,
+    documentOp: postRecordDocumentOp,
+    entityOf: recordDocumentEntityOf,
+};
+// The generic GET machinery this entityOf serves flips onto
+// record-attributes at Task 7 too (this commit, the SAME
+// commit as RECORDS_WIRING's own flip above): GET
+// record-attributes/:id and GET record-attributes now ride it.
+// A body spread is safe here exactly as
+// workOrderDocumentEntityOf's own comment argues: the head
+// pair's body, stamped with id and organization_id, already
+// carries exactly the {record_id, name, attribute_type,
+// sort_order, options, constraints} keys
+// validateRecordAttributeDocumentBody's gate admits — no
+// per-field picking needed, and (UNLIKE a 'trio' family) there
+// is no trio to leak, since 'stateless' rejects one at the gate.
+function recordAttributeDocumentEntityOf(
+    document: DerivedDocument,
+    organization: Id,
+): unknown {
+    return {
+        id: document.uriId,
+        organization_id: organization,
+        ...document.body,
+    };
+}
+// The record-attributes wiring row — the sixth family, and the
+// SECOND 'stateless' one (work-orders is the first). Sharper
+// evidence than work-orders': a work order's lifecycle CAN be
+// (and is) authored — just never through the document address —
+// so ITS 'stateless' classification is vacuous-in-PRACTICE
+// (WORK_ORDERS_WIRING's own comment). A record attribute carries
+// no lifecycle concept AT ALL: no RecordAttributeState alphabet
+// exists anywhere in types.ts, and no call site posts a states
+// event keyed to an attribute id (grep-proven at research) — its
+// 'stateless' classification is vacuous BY CONSTRUCTION, the
+// stronger of the two. notFoundTable is 'record_attributes' —
+// the SECOND family whose storage table name (db-backed.ts's
+// EntityStore key) differs from its hyphenated family/route name
+// (work-orders/work_orders was the first).
+const RECORD_ATTRIBUTES_WIRING: DocumentFamilyWiring = {
+    family: 'record-attributes',
+    lifecycle: 'stateless',
+    notFoundTable: 'record_attributes',
+    validateDocument: validateRecordAttributeDocumentBody,
+    documentOp: postRecordAttributeDocumentOp,
+    entityOf: recordAttributeDocumentEntityOf,
+};
 registerDocumentFamilyWiring(IDEAS_WIRING);
 registerDocumentFamilyWiring(PROJECTS_WIRING);
 registerDocumentFamilyWiring(FLOWS_WIRING);
+registerDocumentFamilyWiring(WORK_ORDERS_WIRING);
+registerDocumentFamilyWiring(RECORDS_WIRING);
+registerDocumentFamilyWiring(RECORD_ATTRIBUTES_WIRING);
 
 // Every handler receives the verified caller's id (actor) as
 // its final argument — the one place authorship is sourced.
@@ -318,19 +452,98 @@ function withoutSecret(
     return rest;
 }
 
+// The bundle a live POST /records forms (Phase 6 Task 4, the
+// migration's first VARIABLE-CARDINALITY synthesis): the gate's
+// own operation pair, the synthesized document pair (at the
+// record's own records/:id address — the SAME address the
+// operation pair shares, since records' createBodyIdField
+// override collapses the two onto one uri_id, the flows
+// precedent), one synthesized attribute-PUT pair per
+// attributes[] entry, and one synthesized attribute-DELETE pair
+// per removedAttributeIds entry (edit only — removedAttributeIds
+// does not exist on RecordWriteCreateBody, so a create's
+// attributeDeletes is always empty). All pairs share ONE
+// requestAt (the write's own origination) yet strictly-later
+// RESPONSE `at` stamps (appendMessagePair's nowUtc() is
+// monotonic), so the document pair — appended after the
+// operation pair — becomes the address's head; a duplicate
+// create's Supersedes therefore resolves against the prior
+// DOCUMENT pair, not the prior operation pair (the Phase 5
+// shared-address mechanism, re-pinned here).
+export interface RecordWritePairs {
+    readonly operation: MessagePair;
+    readonly document: MessagePair;
+    readonly attributePuts: readonly MessagePair[];
+    readonly attributeDeletes: readonly MessagePair[];
+}
+
+// The shared BODY builders — the ONE-voice seam: pure functions
+// consumed by BOTH the live route-inline formation
+// (route('records', ...) below) and the seed's invocation
+// construction (api/mock-data/seed-message-pairs.ts). NOT a
+// shared pair-FORMER (Premature Generalization, verification-
+// corrected against an earlier draft): the route needs the
+// fence organization and the response specs to form a pair; the
+// seed needs neither. Pair formation stays two pipelines,
+// sharing only these bodies.
+
+// The wire body a live PUT records/:id would carry for this
+// SAME write: the entity fields (organization_id excluded, like
+// every genuine client PUT — validateRecordDocumentBody's own
+// comment) plus the lifecycle trio. Create maps the trio from
+// initialState*; edit carries the body's own echoed trio
+// verbatim (never re-derived), so a synthesized document pair
+// is byte-indistinguishable from what a live PUT would have
+// stored for the identical write.
+export function recordDocumentBodyOf(
+    writeBody: RecordWriteBody,
+): Record<string, unknown> {
+    const {
+        organization_id: _organizationId, ...entity
+    } = writeBody.record;
+    return writeBody.kind === 'create'
+        ? {
+            ...entity,
+            state: writeBody.initialState,
+            state_at: writeBody.initialStateAt,
+            state_event_id: writeBody.initialStateEventId,
+        }
+        : {
+            ...entity,
+            state: writeBody.state,
+            state_at: writeBody.state_at,
+            state_event_id: writeBody.state_event_id,
+        };
+}
+
+// The id-strip destructure precedent (Task 3's Step 0 finding):
+// a live PUT record-attributes/:id's stored body is the entity
+// fields minus `id` and `organization_id` — reproduced here
+// rather than re-derived, so a synthesized attribute pair's
+// body can never drift from what the live route would have
+// stored for the identical row.
+export function recordAttributeDocumentBodyOf(
+    row: Record<string, unknown>,
+): Record<string, unknown> {
+    const {
+        id: _id, organization_id: _organizationId, ...rest
+    } = row;
+    return rest;
+}
+
 // Record creation or edit, discriminated by payload.kind.
 // Exported so the seed can drive record creation through
 // the same gate the route uses (Decision 6's below-facade
 // carve-out) — this is also Phase 1's dual-write insertion
-// seam. `pair` is optional so the seed's below-facade call
-// (api/mock-data.ts, no gate, no pair) keeps compiling
-// unchanged; the route always supplies one, since 'records'
-// is pair-wired and never bearer-exempt.
+// seam. `pairs` is optional so the seed's below-facade call
+// (api/mock-data.ts, no gate, no pairs) keeps compiling
+// unchanged; the route always supplies the bundle, since
+// 'records' is pair-wired and never bearer-exempt.
 export async function postRecordWriteOp(
     db: DbAdapter,
     payload: Record<string, unknown>,
     actor: Id,
-    pair?: MessagePair,
+    pairs?: RecordWritePairs,
 ): Promise<void> {
     const body = validateRecordWriteBody(payload);
     const entries = body.attributes.map(attr => {
@@ -341,14 +554,11 @@ export async function postRecordWriteOp(
         body.kind === 'edit'
             ? body.removedAttributeIds
             : [];
-    // The record, its initial state event, and its
-    // attributes commit as one transaction — a mid-write
-    // failure rolls the whole thing back rather than
-    // orphaning the record. The initial state event is
-    // authored by the verified caller (actor), never a
-    // client-supplied member. Removed attributes are
-    // RESTRICTED inside the same tx: a referenced attribute
-    // 409s and the whole batch rolls back
+    // The record, its state event, and its attributes commit
+    // as one transaction — a mid-write failure rolls the whole
+    // thing back rather than orphaning the record. Removed
+    // attributes are RESTRICTED inside the same tx: a
+    // referenced attribute 409s and the whole batch rolls back
     // (api/record-attribute-refs.ts).
     await db.transaction(
         [...new Set([
@@ -359,12 +569,41 @@ export async function postRecordWriteOp(
         async (view) => {
             await view.records.put(body.id, body.record);
             if (body.kind === 'create') {
+                // Genesis: exactly ONE state event, authored by
+                // the verified caller (actor), never a client-
+                // supplied member.
                 await view.states.postEvent(
                     body.initialStateEventId,
                     body.id,
                     body.initialState,
                     actor,
                     body.initialStateAt,
+                );
+            } else {
+                // The SAME sameEvent decompose
+                // postRecordDocumentOp runs: the edit body now
+                // carries the echoed trio, so the synthesized
+                // document pair forms purely from the body. A
+                // byte-identical echo of the stored head
+                // converges to a no-op write (states.put's own
+                // idempotency by id); a genuinely different
+                // trio at the SAME id still 409s via
+                // LedgerImmutabilityError, exactly as before.
+                const head = await view.states.getCurrentFor(
+                    body.id,
+                );
+                const memberId = (
+                    head !== null
+                    && head.id === body.state_event_id
+                    && head.state === body.state
+                    && head.at === body.state_at
+                ) ? head.member_id : actor;
+                await view.states.postEvent(
+                    body.state_event_id,
+                    body.id,
+                    body.state,
+                    memberId,
+                    body.state_at,
                 );
             }
             if (removedIds.length > 0) {
@@ -389,8 +628,22 @@ export async function postRecordWriteOp(
                     entries, removedIds,
                 );
             }
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            // The whole bundle or none (Atomicity): the
+            // operation pair, the document pair, N attribute-
+            // PUT pairs, and M attribute-DELETE pairs — appended
+            // LAST, in that order, so each pair's response `at`
+            // strictly follows the one before it (nowUtc
+            // monotonicity) and the document pair becomes the
+            // shared address's head.
+            if (pairs !== undefined) {
+                await appendMessagePair(view, pairs.operation);
+                await appendMessagePair(view, pairs.document);
+                for (const p of pairs.attributePuts) {
+                    await appendMessagePair(view, p);
+                }
+                for (const p of pairs.attributeDeletes) {
+                    await appendMessagePair(view, p);
+                }
             }
         },
     );
@@ -453,6 +706,28 @@ async function writeFlowGraphDelta(
     }
 }
 
+// The organization_id extraction/merge shape every document op
+// below needs: the org-scoped store stamps organization_id from
+// the verified token and re-validates through its own entity
+// validator, so a fenced write's `doc.entity` never carries it;
+// the below-facade seed path (no scoping wrapper) has no such
+// stamp, so it embeds organization_id in the RAW request body
+// instead, and this helper reads it straight back so the seed's
+// write still carries it — inert for the fenced route
+// (overwritten either way regardless of what this returns),
+// load-bearing for the seed. Six sites now share this exact
+// shape (ideas, projects, flows, work-orders, records,
+// record-attributes) — past the rule-of-three, so it is
+// extracted once rather than duplicated a sixth time.
+function documentOperationOrganization(
+    body: Record<string, unknown>,
+): Record<string, unknown> {
+    const organizationId = body['organization_id'];
+    return typeof organizationId === 'string'
+        ? { organization_id: organizationId }
+        : {};
+}
+
 // Idea document write (Decision 7): ONE shape serves create,
 // edit, and transition — genesis is head-presence-defined (a
 // fresh id's PUT simply finds no head, so the ternary below
@@ -483,7 +758,6 @@ export async function postIdeaDocumentOp(
     pair?: MessagePair,
 ): Promise<IdeaEntity> {
     const doc = validateIdeaDocumentBody(withoutId(body));
-    const organizationId = body['organization_id'];
     return db.transaction(
         ['ideas', 'states', 'requests', 'responses'],
         async (view) => {
@@ -498,9 +772,7 @@ export async function postIdeaDocumentOp(
                 id,
                 {
                     ...doc.entity,
-                    ...(typeof organizationId === 'string'
-                        ? { organization_id: organizationId }
-                        : {}),
+                    ...documentOperationOrganization(body),
                 } as unknown as Omit<IdeaEntity, 'id'>,
             );
             await view.states.postEvent(
@@ -545,7 +817,6 @@ export async function postProjectDocumentOp(
     pair?: MessagePair,
 ): Promise<ProjectEntity> {
     const doc = validateProjectDocumentBody(withoutId(body));
-    const organizationId = body['organization_id'];
     return db.transaction(
         ['projects', 'states', 'requests', 'responses'],
         async (view) => {
@@ -560,15 +831,113 @@ export async function postProjectDocumentOp(
                 id,
                 {
                     ...doc.entity,
-                    ...(typeof organizationId === 'string'
-                        ? { organization_id: organizationId }
-                        : {}),
+                    ...documentOperationOrganization(body),
                 } as unknown as Omit<ProjectEntity, 'id'>,
             );
             await view.states.postEvent(
                 doc.state_event_id, id, doc.state,
                 memberId, doc.state_at,
             );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Record document write (Decision 7, the fifth family): ONE
+// shape serves create, edit, and transition — genesis is
+// head-presence-defined, byte-identical to postIdeaDocumentOp/
+// postProjectDocumentOp above (the SAME member_id ternary, the
+// SAME sameEvent MEMBER_ID CAVEAT). UNLIKE those two, a record's
+// genesis normally arrives through the composed create
+// (postRecordWriteOp, POST /records) rather than this PUT — this
+// op's genesis arm exists for a live PUT-first flow, and mirrors
+// ideas/projects exactly rather than special-casing records as
+// PUT-only-for-edits. Not yet wired to any route (the fold
+// commit adds RECORDS_WIRING + the route swap); exported so its
+// below-gate decompose behavior can be pinned ahead of that wire,
+// mirroring postFlowDocumentOp's own Task-2-era convention.
+export async function postRecordDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    actor: Id,
+    pair?: MessagePair,
+): Promise<RecordEntity> {
+    const doc = validateRecordDocumentBody(withoutId(body));
+    return db.transaction(
+        ['records', 'states', 'requests', 'responses'],
+        async (view) => {
+            const head = await view.states.getCurrentFor(id);
+            const memberId = (
+                head !== null
+                && head.id === doc.state_event_id
+                && head.state === doc.state
+                && head.at === doc.state_at
+            ) ? head.member_id : actor;
+            const written = await view.records.put(
+                id,
+                {
+                    ...doc.entity,
+                    ...documentOperationOrganization(body),
+                } as unknown as Omit<RecordEntity, 'id'>,
+            );
+            await view.states.postEvent(
+                doc.state_event_id, id, doc.state,
+                memberId, doc.state_at,
+            );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Record attribute document write — the sixth family, and the
+// SECOND 'stateless' one (RECORD_ATTRIBUTES_WIRING's own
+// comment: vacuous BY CONSTRUCTION, not merely in practice, the
+// sharper contrast against work-orders). A document PUT here is
+// a pure entity edit: the record_attributes row and its pair
+// commit as ONE transaction — a mid-write failure rolls the
+// whole thing back rather than leaving a half-written attribute.
+// validateRecordAttributeDocumentBody rejects a body carrying
+// the trio at the gate, so this op never needs to defend against
+// one downstream. documentOperationOrganization's merge mirrors
+// postWorkOrderDocumentOp's own shape for uniformity, though it
+// is DORMANT here: zero client callers exist for this PUT (this
+// task's own premise), and the seed batches attribute creation
+// through postRecordWriteOp instead — never this op — so the
+// merge is inert rather than load-bearing. `pair` is optional so
+// a future below-facade caller keeps compiling; the live route
+// always supplies one, since 'record-attributes/:id' is
+// pair-wired and never bearer-exempt. The actor parameter is
+// spelled `_actor` for the same reason postWorkOrderDocumentOp
+// spells it that way: there is no state event here to author.
+export async function postRecordAttributeDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<RecordAttributeEntity> {
+    const doc = validateRecordAttributeDocumentBody(
+        withoutId(body),
+    );
+    return db.transaction(
+        ['record_attributes', 'requests', 'responses'],
+        async (view) => {
+            const written = await view
+                .recordAttributes.put(
+                    id,
+                    {
+                        ...doc.entity,
+                        ...documentOperationOrganization(body),
+                    } as unknown as
+                        Omit<RecordAttributeEntity, 'id'>,
+                );
             if (pair !== undefined) {
                 await appendMessagePair(view, pair);
             }
@@ -788,7 +1157,6 @@ export async function postFlowDocumentOp(
     pair?: MessagePair,
 ): Promise<FlowEntity> {
     const doc = validateFlowDocumentBody(withoutId(body));
-    const organizationId = body['organization_id'];
     const delta = doc.graphDelta;
     return db.transaction(
         [
@@ -803,9 +1171,7 @@ export async function postFlowDocumentOp(
                 id,
                 {
                     ...doc.entity,
-                    ...(typeof organizationId === 'string'
-                        ? { organization_id: organizationId }
-                        : {}),
+                    ...documentOperationOrganization(body),
                 } as unknown as Omit<FlowEntity, 'id'>,
             );
             await view.states.postEvent(
@@ -1053,6 +1419,43 @@ export async function postIdentityCreationOp(
     );
 }
 
+// The create's synthesized document body (Task 3, the
+// flow-creation-triple precedent): the SAME shape a live
+// genesis PUT /work-orders/:id would carry — the work
+// order's own three fields, picked directly from b.workOrder
+// (never spread verbatim) so a below-facade caller's
+// tolerated organization_id (validateWorkOrderCreateBody
+// never restricts workOrder's own keys) never leaks into the
+// byte-compared document. The ONE construction both the
+// route's pre-tx pair body and this comment's own covenant
+// describe — never a second, divergently-picked literal.
+function workOrderCreateDocumentBody(
+    b: WorkOrderCreateBody,
+): Record<string, unknown> {
+    return {
+        display_id: pickString(b.workOrder, 'display_id'),
+        flow_graph: pickString(b.workOrder, 'flow_graph'),
+        position: pickNumber(b.workOrder, 'position'),
+    };
+}
+
+// The three pairs a live POST /work-orders forms (Task 3):
+// the gate's own operation pair (204, at the work-orders/:id
+// address per the registry's createBodyIdField — POST
+// 'work-orders' and PUT 'work-orders/:id' collapse onto the
+// SAME (uriPrefix, uriId), exactly as flows/:id did for its
+// own create), plus the document and join pairs the route
+// pre-forms below. All three share ONE requestAt (the
+// create's own origination) yet strictly-later RESPONSE `at`
+// stamps (appendMessagePair's nowUtc() is monotonic), so the
+// document pair — appended after the operation pair — becomes
+// the address's head.
+export interface WorkOrderCreationPairs {
+    readonly operation: MessagePair;
+    readonly document: MessagePair;
+    readonly join: MessagePair;
+}
+
 // Work-order creation: the work_orders row, its
 // flow_work_orders join row, and THREE initial state
 // events (the start transition, the post-start
@@ -1065,19 +1468,25 @@ export async function postIdentityCreationOp(
 // OMITS it; the join row derives org from its flow and is
 // re-validated by the flow_work_orders store. The three
 // events are applied IN ORDER and authored by the verified
-// caller (actor), never the body. Exported so the seed can
-// drive work-order creation through the same gate the
-// route uses (Decision 6's below-facade carve-out) — this
-// is also Phase 1's dual-write insertion seam. `pair` is
-// optional so the seed's below-facade call (api/mock-data.ts,
-// no gate, no pair) keeps compiling unchanged; the route
-// always supplies one, since 'work-orders' is pair-wired and
-// never bearer-exempt.
+// caller (actor), never the body. `pairs` stays optional on
+// the signature; today only the live route ever calls this
+// op — since Phase 5 Task 4 the seed (api/mock-data.ts) drives
+// work-order creation through postWorkOrderDocumentOp /
+// postFlowWorkOrderDocumentOp instead, with its
+// states/state_field_values traces staying direct writes,
+// never through this op. The route always supplies the
+// triple, since 'work-orders' is pair-wired and never
+// bearer-exempt. The route (not this op) forms all three
+// pairs pre-tx — see route('work-orders', ...) below — since
+// forming the document/join pairs needs the fence
+// organization and the work-orders/:id +
+// flows/:id/work-orders/:woid response specs, both
+// route-table concerns.
 export async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     actor: Id,
-    pair?: MessagePair,
+    pairs?: WorkOrderCreationPairs,
 ): Promise<void> {
     const b = validateWorkOrderCreateBody(body);
     return db.transaction(
@@ -1105,8 +1514,16 @@ export async function postWorkOrderCreationOp(
                     b.stateEventAts[i]!,
                 );
             }
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            // Three pairs or none (Atomicity): the operation
+            // pair (the gate's own), the synthesized document
+            // pair, and the synthesized join pair — appended
+            // in that order, LAST, so the document pair's
+            // response `at` strictly follows the operation
+            // pair's.
+            if (pairs !== undefined) {
+                await appendMessagePair(view, pairs.operation);
+                await appendMessagePair(view, pairs.document);
+                await appendMessagePair(view, pairs.join);
             }
         },
     );
@@ -1254,6 +1671,138 @@ export async function postWorkOrderTransitionOp(
     );
 }
 
+// Work-order document write — the fourth family's evidence for
+// the 'stateless' lifecycle class (Decision 7 does NOT apply
+// here): a work order's lifecycle is written ONLY by the
+// create/claim/transition ops above and the states/:id unclaim
+// path, never by a document PUT, so this op posts NO states
+// event of its own — UNLIKE postIdeaDocumentOp/
+// postProjectDocumentOp/postFlowDocumentOp, which each fold a
+// lifecycle trio into the SAME transaction. A document PUT here
+// is a pure entity edit: the work_orders row and its pair
+// commit as ONE transaction — a mid-write failure rolls the
+// whole thing back rather than leaving a half-written document.
+// validateWorkOrderDocumentBody rejects a body carrying the
+// trio at the gate (the stateless covenant is validator-
+// enforced, not caller discipline), so this op never needs to
+// defend against one downstream. The org-scoped work_orders
+// store stamps organization_id from the verified token and
+// re-validates through validateWorkOrderEntity, so the entity
+// body OMITS it; the below-facade seed path (no scoping
+// wrapper) embeds it in the raw body and this op reads it
+// straight back to merge it in — inert for the fenced route
+// (overwritten either way), load-bearing for the seed. Exported
+// so the seed can drive a work-order document write through the
+// same op the route uses (Decision 6's below-facade carve-out).
+// `pair` is optional so a below-facade caller with no pair keeps
+// compiling; the live route always supplies one, since
+// 'work-orders/:id' is pair-wired and never bearer-exempt. The
+// actor parameter is spelled `_actor`: it exists for the
+// wiring's documentOp signature uniformity only (every
+// DocumentFamilyWiring.documentOp takes one) — there is no
+// state event here to author, so the pair's own
+// requesterIdentityId is the only authorship this write carries.
+export async function postWorkOrderDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<WorkOrderEntity, 'id'>> {
+    const doc = validateWorkOrderDocumentBody(withoutId(body));
+    return db.transaction(
+        ['work_orders', 'requests', 'responses'],
+        async (view) => {
+            const written = await view.workOrders.put(
+                id,
+                {
+                    ...doc.entity,
+                    ...documentOperationOrganization(body),
+                } as unknown as Omit<WorkOrderEntity, 'id'>,
+            );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Flow work-order join document write — extracted byte-for-
+// byte from the hand-written flows/:id/work-orders/:woid PUT
+// handler (Phase 1 fix-3 / Phase 4 0a950480's extract-function
+// idiom: bundle the definition with its one call-site re-
+// point, own commit) so the seed can drive the same write path
+// (Decision 6's below-facade carve-out). A document PUT here is
+// a pure entity edit: the flow_work_orders row and its pair
+// commit as ONE transaction. `pair` is optional so a below-
+// facade caller with no pair keeps compiling; the live route
+// always supplies one, since 'flows/:id/work-orders/:woid' is
+// pair-wired and never bearer-exempt. The actor parameter is
+// spelled `_actor` for the same reason postWorkOrderDocumentOp
+// spells it that way: there is no state event here to author.
+export async function postFlowWorkOrderDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<FlowWorkOrderEntity, 'id'>> {
+    return db.transaction(
+        ['flow_work_orders', 'requests', 'responses'],
+        async (view) => {
+            const written = await view.flowWorkOrders
+                .put(
+                    id,
+                    withoutId(body) as unknown as
+                        Omit<FlowWorkOrderEntity, 'id'>,
+                );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Flow record join document write — extracted byte-for-byte
+// from the hand-written flows/:id/records/:frid PUT handler
+// (Phase 1 fix-3 / Phase 4 0a950480's extract-function idiom:
+// bundle the definition with its one call-site re-point, own
+// commit) so the seed can drive the same write path (Decision
+// 6's below-facade carve-out, mirroring
+// postFlowWorkOrderDocumentOp above). A document PUT here is a
+// pure entity edit: the flow_records row and its pair commit
+// as ONE transaction. `pair` is optional so a below-facade
+// caller with no pair keeps compiling; the live route always
+// supplies one, since 'flows/:id/records/:frid' is pair-wired
+// and never bearer-exempt. The actor parameter is spelled
+// `_actor` for the same reason postFlowWorkOrderDocumentOp
+// spells it that way: there is no state event here to author.
+export async function postFlowRecordDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<FlowRecordEntity, 'id'>> {
+    return db.transaction(
+        ['flow_records', 'requests', 'responses'],
+        async (view) => {
+            const written = await view.flowRecords
+                .put(
+                    id,
+                    withoutId(body) as unknown as
+                        Omit<FlowRecordEntity, 'id'>,
+                );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
 // The pre-tx response body for each pair-wired write —
 // computed through the SAME validator/stamp its own handler
 // applies, so the gate's precomputed body is byte-identical to
@@ -1354,16 +1903,8 @@ export const WRITE_RESPONSE_SPECS:
         }),
     },
     'work-orders': { status: 204 },
-    'work-orders/:id': {
-        status: 200,
-        successBody: (params, body, _actor, organization) => ({
-            id: param(params, 0),
-            ...validateWorkOrderEntity({
-                ...withoutId(body ?? {}),
-                organization_id: organization,
-            }),
-        }),
-    },
+    'work-orders/:id':
+        documentWriteResponseSpec(WORK_ORDERS_WIRING),
     'work-orders/:id/claim': { status: 204 },
     'work-orders/:id/transition': { status: 204 },
     'flows/:id/work-orders/:woid': {
@@ -1376,26 +1917,25 @@ export const WRITE_RESPONSE_SPECS:
         }),
     },
     'records': { status: 204 },
-    'records/:id': {
-        status: 200,
-        successBody: (params, body, _actor, organization) => ({
-            id: param(params, 0),
-            ...validateRecordEntity({
-                ...withoutId(body ?? {}),
-                organization_id: organization,
-            }),
-        }),
-    },
-    'record-attributes/:id': {
-        status: 200,
-        successBody: (params, body, _actor, organization) => ({
-            id: param(params, 0),
-            ...validateRecordAttributeEntity({
-                ...withoutId(body ?? {}),
-                organization_id: organization,
-            }),
-        }),
-    },
+    // The generic document-form builder (api/document-family.ts)
+    // absorbs the hand-written successBody — see the ideas/:id
+    // entry above for the shared rationale. records/:id emits the
+    // SAME bytes as before ({id, organization_id, name,
+    // description, position}): validateRecordDocumentBody's
+    // entity/trio separation guarantees doc.entity never carries
+    // the trio, byte-identical to today's hand-built body.
+    'records/:id': documentWriteResponseSpec(RECORDS_WIRING),
+    // The generic document-form builder (api/document-family.ts)
+    // absorbs the hand-written successBody — see the ideas/:id
+    // entry above for the shared rationale. record-attributes/:id
+    // emits the SAME bytes as before ({id, organization_id,
+    // record_id, name, attribute_type, sort_order, options,
+    // constraints}): validateRecordAttributeDocumentBody's
+    // entity/organization_id separation guarantees doc.entity
+    // never carries the key, byte-identical to today's
+    // hand-built body.
+    'record-attributes/:id':
+        documentWriteResponseSpec(RECORD_ATTRIBUTES_WIRING),
     'flows/:id/records/:frid': {
         status: 200,
         successBody: (params, body) => ({
@@ -2073,17 +2613,21 @@ export const routes: Route[] = [
     // address. Synthesized below, BYTE-INDISTINGUISHABLE from a
     // live PUT /projects/:id's pair at that same address (same
     // response spec, same head-read), so derivation needs no
-    // conversion special case. Formed PRE-TX — crypto and the
-    // head-read stay outside db.transaction, the IndexedDB
-    // auto-commit constraint — then appended as the tx's LAST
-    // act, beside the operation pair. Formed ONLY when the gate
-    // supplied both a pair and a fence organization; a below-
-    // facade caller with neither (none exists for conversion
-    // today) skips both appends, preserving dual-write
-    // discipline. The idea's OWN 'promoted' transition still
-    // appends no ideas/:id document pair — a known, separately
-    // tracked deferral (work-orders/Phase Final) that cannot
-    // confuse this derivation: 'promoted' is not 'deleted'.
+    // conversion special case. Phase 5 Task 5: the idea's OWN
+    // 'promoted' transition gets a THIRD pair the same way, at
+    // the idea's EXISTING document address — unlike the project
+    // pair above (a fresh address, genesis), the idea's head-
+    // read finds its prior pair, so this one records Supersedes
+    // provenance. This closes the standing watch-point: before
+    // this task, a converted idea's derived history MISSED its
+    // 'promoted' event because no pair recorded it. All three
+    // formed PRE-TX — crypto and the head-reads stay outside
+    // db.transaction, the IndexedDB auto-commit constraint —
+    // then appended as the tx's LAST acts, beside the operation
+    // pair. Formed ONLY when the gate supplied both a pair and
+    // a fence organization; a below-facade caller with neither
+    // (none exists for conversion today) skips all three
+    // appends, preserving dual-write discipline.
     route('ideas/:id/conversion', {
         post: async (
             db, p, body, actor, pair, organization,
@@ -2103,7 +2647,20 @@ export const routes: Route[] = [
                 state_event_id: b.projectStateEventId,
             };
             validateProjectDocumentBody(projectDocument);
+            // The document a live PUT /ideas/:id would carry for
+            // this SAME conversion: the promoted idea's own
+            // fields plus the 'promoted' trio this conversion
+            // assigns. Validated pre-tx, mirroring projectDocument
+            // above.
+            const ideaDocument = {
+                ...b.idea,
+                state: b.ideaState,
+                state_at: b.ideaStateAt,
+                state_event_id: b.ideaStateEventId,
+            };
+            validateIdeaDocumentBody(ideaDocument);
             let projectPair: MessagePair | undefined;
+            let ideaPair: MessagePair | undefined;
             if (
                 pair !== undefined
                 && organization !== undefined
@@ -2140,6 +2697,45 @@ export const routes: Route[] = [
                         organization,
                     ),
                     headPairId: projectHeadPairId,
+                });
+                // The idea's OWN document pair, at its EXISTING
+                // address (the idea was created earlier, through
+                // a live PUT /ideas/:id) — this head-read finds
+                // that prior pair, so this one records Supersedes,
+                // unlike the project pair above (a fresh address,
+                // genesis).
+                const ideaSpec = WRITE_RESPONSE_SPECS['ideas/:id'];
+                if (
+                    ideaSpec === undefined
+                    || !('status' in ideaSpec)
+                ) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' ideas/:id',
+                    );
+                }
+                const ideaHeadPairId = await headPairIdAt(
+                    db,
+                    canonicalUriPrefix(organization, '/ideas/'),
+                    ideaId,
+                );
+                ideaPair = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/ideas/' + ideaId,
+                    routePattern: 'ideas/:id',
+                    routeSegments: ['ideas', ':id'],
+                    pathSegments: ['ideas', ideaId],
+                    headerFields: [],
+                    body: ideaDocument,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: 200,
+                    responseBody: ideaSpec.successBody?.(
+                        [ideaId], ideaDocument, actor,
+                        organization,
+                    ),
+                    headPairId: ideaHeadPairId,
                 });
             }
             return db.transaction(
@@ -2190,6 +2786,11 @@ export const routes: Route[] = [
                     if (projectPair !== undefined) {
                         await appendMessagePair(
                             view, projectPair,
+                        );
+                    }
+                    if (ideaPair !== undefined) {
+                        await appendMessagePair(
+                            view, ideaPair,
                         );
                     }
                 },
@@ -2624,43 +3225,161 @@ export const routes: Route[] = [
             );
         },
     }),
+    // GET is FLIPPED (Task 7): the list derives from the
+    // message ledger rather than the old work_orders table.
+    // Rides the generic documentCollectionGetHandler —
+    // wire-identical to the hand-written
+    // db.workOrders.getAll() dispatch it replaces
+    // (WORK_ORDERS_WIRING's own entityOf,
+    // workOrderDocumentEntityOf, already carries the bare
+    // entity shape, so the list needs no work-orders-special
+    // reassembly step). POST stays this hand-written create —
+    // unlike ideas/projects, work-orders never folded genesis
+    // into the document PUT (Decision 6), mirroring flows'
+    // own precedent, so a separate create verb remains here.
     route('work-orders', {
-        get: (db) =>
-            db.workOrders.getAll(),
+        get: documentCollectionGetHandler(WORK_ORDERS_WIRING),
         // Member-tier POST — /work-orders carries POST in
         // MEMBER_VERBS (the claim sub-route is also a member
-        // POST). See postWorkOrderCreationOp for the
+        // POST). Forms the document + join pairs pre-tx
+        // (Task 3) beside the gate's own operation pair — the
+        // SAME shape a live genesis PUT /work-orders/:id and a
+        // live PUT /flows/:id/work-orders/:woid would each
+        // carry — ONLY when the gate supplied both a pair and
+        // a fence organization (the Phase 3 condition
+        // verbatim); a below-facade caller (api/mock-data.ts,
+        // no gate) skips all three, preserving dual-write
+        // discipline. See postWorkOrderCreationOp for the
         // transaction shape.
-        post: (db, _p, body, actor, pair) =>
-            postWorkOrderCreationOp(db, body, actor, pair),
-    }),
-    // Hand-written in place of makeIdRoute<WorkOrderEntity> so
-    // PUT can append its message pair in the same transaction
-    // as the write — the factory's fixed closures have no
-    // per-family pair selector (see message-pair.ts). GET
-    // reproduces the factory closure byte-equivalently; verbs
-    // stay {get, put} — work-orders/:id has no DELETE today,
-    // mirroring the projects/:id precedent.
-    route('work-orders/:id', {
-        get: (db, p) => db.workOrders.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['work_orders', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.workOrders.put(
-                        id,
-                        withoutId(body) as unknown as
-                            Omit<WorkOrderEntity, 'id'>,
+        post: async (
+            db, _p, body, actor, pair, organization,
+        ) => {
+            let pairs: WorkOrderCreationPairs | undefined;
+            if (pair !== undefined && organization !== undefined) {
+                const b = validateWorkOrderCreateBody(body);
+                const documentBody =
+                    workOrderCreateDocumentBody(b);
+                validateWorkOrderDocumentBody(documentBody);
+                const documentSpec =
+                    WRITE_RESPONSE_SPECS['work-orders/:id'];
+                if (
+                    documentSpec === undefined
+                    || !('status' in documentSpec)
+                ) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' work-orders/:id',
                     );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
+                }
+                const documentHeadPairId = await headPairIdAt(
+                    db,
+                    canonicalUriPrefix(
+                        organization, '/work-orders/',
+                    ),
+                    b.id,
+                );
+                const document = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/work-orders/' + b.id,
+                    routePattern: 'work-orders/:id',
+                    routeSegments: ['work-orders', ':id'],
+                    pathSegments: ['work-orders', b.id],
+                    headerFields: [],
+                    body: documentBody,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: documentSpec.status,
+                    responseBody: documentSpec.successBody?.(
+                        [b.id], documentBody, actor,
+                        organization,
+                    ),
+                    headPairId: documentHeadPairId,
+                });
+                // The live :woid PUT's request shape, verified
+                // by content: validateFlowWorkOrderEntity
+                // accepts EXACTLY flow_id/work_order_id/at —
+                // the same three keys b.flowWorkOrder already
+                // carries, so it doubles as the join pair's
+                // body verbatim.
+                validateFlowWorkOrderEntity(b.flowWorkOrder);
+                const flowId = pickString(
+                    b.flowWorkOrder, 'flow_id',
+                );
+                const joinSpec = WRITE_RESPONSE_SPECS[
+                    'flows/:id/work-orders/:woid'
+                ];
+                if (
+                    joinSpec === undefined
+                    || !('status' in joinSpec)
+                ) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' flows/:id/work-orders/:woid',
+                    );
+                }
+                const join = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/flows/' + flowId
+                        + '/work-orders/' + b.flowWorkOrderId,
+                    routePattern: 'flows/:id/work-orders/:woid',
+                    routeSegments: [
+                        'flows', ':id',
+                        'work-orders', ':woid',
+                    ],
+                    pathSegments: [
+                        'flows', flowId,
+                        'work-orders', b.flowWorkOrderId,
+                    ],
+                    headerFields: [],
+                    body: b.flowWorkOrder,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: joinSpec.status,
+                    responseBody: joinSpec.successBody?.(
+                        [flowId, b.flowWorkOrderId],
+                        b.flowWorkOrder, actor, organization,
+                    ),
+                    // Genesis-undefined: a work order's
+                    // create-time join is always fresh (design
+                    // decision — no duplicate-create carve-out
+                    // at this address through this task).
+                    headPairId: undefined,
+                });
+                pairs = { operation: pair, document, join };
+            }
+            return postWorkOrderCreationOp(
+                db, body, actor, pairs,
             );
         },
     }),
+    // work-orders/:id is the fourth family. GET is FLIPPED
+    // (Task 7): absorbed into the generic documentEntityRoute
+    // — the SAME wiring row PUT already rides (Task 3), so
+    // this replaces the hand-written db.workOrders.getById
+    // dispatch with documentGetHandler(WORK_ORDERS_WIRING),
+    // wire-identical to it (workOrderDocumentEntityOf
+    // reproduces the head pair's stamped {id, organization_id,
+    // ...body} shape verbatim, so no work-orders-special
+    // branch lives inside documentGetHandler itself — the
+    // 'stateless' lifecycle also skips the trio walk
+    // derivedDocumentEntity runs for ideas/projects/flows).
+    // After this commit NO hand-written document-family route
+    // object remains for ANY registered family (ideas,
+    // projects, flows, work-orders) — the fourth-family
+    // obligation's discharge, and the LAST: every registered
+    // family now rides the generic documentEntityRoute /
+    // documentCollectionRoute pair. work-orders/:id is
+    // 'simple' concurrency (Decision 7's lifecycle trio does
+    // not apply to a stateless document), so documentPutHandler
+    // dispatches straight through with no concurrency branch,
+    // matching the projects/:id precedent. Verbs stay {get,
+    // put} — work-orders/:id has no DELETE, mirroring
+    // documentEntityRoute's shape (no change from before this
+    // flip). Member-tier PUT — MEMBER_VERBS['/work-orders']
+    // includes 'PUT'.
+    documentEntityRoute(WORK_ORDERS_WIRING),
     // See postWorkOrderClaimOp for the transaction shape.
     route('work-orders/:id/claim', {
         post: (db, p, body, actor, pair) =>
@@ -2682,33 +3401,26 @@ export const routes: Route[] = [
     // Flow work-order joins nest under their parent flow: the
     // flow id is param 0, so the SERVER filters the collection to
     // that flow. The leaf id is param 1; only PUT is exposed (the
-    // flat route never carried GET/DELETE on the leaf). Reads
-    // stay old-plane until the WORK-ORDERS phase; their GET
-    // flows/:id dependency already rides the Phase 4 flip
-    // transitively.
+    // flat route never carried GET/DELETE on the leaf). GET is
+    // FLIPPED (Task 7): the join list derives from the message
+    // ledger at this flow's work-orders address rather than the
+    // old flow_work_orders table — deriveFlowWorkOrders is a
+    // bespoke derivation (not a DocumentFamilyWiring family; a
+    // join row carries no lifecycle trio of its own), so this
+    // calls it directly rather than through a generic
+    // constructor, mirroring deriveProjectFlows' own precedent.
     route('flows/:id/work-orders', {
-        get: (db, p) =>
-            db.flowWorkOrders.getAllWhere('flow_id', param(p, 0)),
+        get: (db, p, _actor, organization) =>
+            deriveFlowWorkOrders(
+                db, requireOrganization(organization),
+                param(p, 0),
+            ),
     }),
     route('flows/:id/work-orders/:woid', {
-        put: (db, p, body, _actor, pair) => {
-            const woid = param(p, 1);
-            return db.transaction(
-                ['flow_work_orders', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.flowWorkOrders
-                        .put(
-                            woid,
-                            withoutId(body) as unknown as
-                                Omit<FlowWorkOrderEntity, 'id'>,
-                        );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
-        },
+        put: (db, p, body, actor, pair) =>
+            postFlowWorkOrderDocumentOp(
+                db, param(p, 1), body, actor, pair,
+            ),
     }),
     // Field values nest under their parent STATE EVENT: the
     // state event id is param 0, so the SERVER filters the
@@ -2772,36 +3484,192 @@ export const routes: Route[] = [
             );
         },
     }),
+    // GET is FLIPPED (Task 7): the collection derives from the
+    // message ledger rather than the old records table. Rides
+    // the generic documentCollectionGetHandler — wire-identical
+    // to the hand-written db.records.getAll() dispatch it
+    // replaces (RECORDS_WIRING's own entityOf,
+    // recordDocumentEntityOf, already picks the exact {id,
+    // organization_id, name, description, position} shape, so
+    // the list needs no records-special reassembly step). POST
+    // stays this hand-written bundle — records' own create forms
+    // the document PLUS N attribute pairs in one pass
+    // (postRecordWriteOp), unlike ideas/projects' bare genesis
+    // fold, so a separate create verb remains here, mirroring
+    // work-orders' and flows' own precedent.
     route('records', {
-        get: (db) => db.records.getAll(),
-        post: (db, _p, body, actor, pair) =>
-            postRecordWriteOp(db, body, actor, pair),
-    }),
-    // Hand-written in place of makeIdRoute<RecordEntity> so
-    // PUT and DELETE can each append their message pair in
-    // the same transaction as the write — the factory's fixed
-    // closures have no per-family pair selector (see
-    // message-pair.ts). GET reproduces the factory closure
-    // byte-equivalently; verbs stay {get, put, delete}.
-    route('records/:id', {
-        get: (db, p) => db.records.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['records', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.records.put(
-                        id,
-                        withoutId(body) as unknown as
-                            Omit<RecordEntity, 'id'>,
+        get: documentCollectionGetHandler(RECORDS_WIRING),
+        // Member-tier POST — /records carries POST in
+        // MEMBER_VERBS. Forms the document pair, one
+        // attribute-PUT pair per attributes[] entry, and one
+        // attribute-DELETE pair per removedAttributeIds entry
+        // (edit only) pre-tx, beside the gate's own operation
+        // pair — the SAME shape a live PUT records/:id and N/M
+        // live PUT/DELETE record-attributes/:id requests would
+        // each carry — ONLY when the gate supplied both a pair
+        // and a fence organization (the route('flows') condition
+        // verbatim); a below-facade caller (api/mock-data.ts, no
+        // gate) skips all pairs, preserving dual-write
+        // discipline. See postRecordWriteOp for the transaction
+        // shape.
+        post: async (
+            db, _p, body, actor, pair, organization,
+        ) => {
+            let pairs: RecordWritePairs | undefined;
+            if (pair !== undefined && organization !== undefined) {
+                const b = validateRecordWriteBody(body);
+                const documentBody = recordDocumentBodyOf(b);
+                // Belt-and-suspenders (the flows precedent): a
+                // create's initialStateEventId carries no
+                // non-empty check of its own (R2's byte-pinned
+                // birth names), so an empty value must still
+                // 400 here — at the document trio's own gate —
+                // rather than silently minting an invalid
+                // synthesized pair.
+                validateRecordDocumentBody(documentBody);
+                const documentSpec =
+                    WRITE_RESPONSE_SPECS['records/:id'];
+                if (
+                    documentSpec === undefined
+                    || !('status' in documentSpec)
+                ) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' records/:id',
                     );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
+                }
+                const recordsPrefix = canonicalUriPrefix(
+                    organization, '/records/',
+                );
+                const documentHeadPairId = await headPairIdAt(
+                    db, recordsPrefix, b.id,
+                );
+                const document = await formWritePair({
+                    method: 'PUT',
+                    pathname: '/records/' + b.id,
+                    routePattern: 'records/:id',
+                    routeSegments: ['records', ':id'],
+                    pathSegments: ['records', b.id],
+                    headerFields: [],
+                    body: documentBody,
+                    requesterIdentityId: actor,
+                    requestAt: pair.requestAt,
+                    organization,
+                    responseStatus: documentSpec.status,
+                    responseBody: documentSpec.successBody?.(
+                        [b.id], documentBody, actor, organization,
+                    ),
+                    headPairId: documentHeadPairId,
+                });
+                const attributeSpec = WRITE_RESPONSE_SPECS[
+                    'record-attributes/:id'
+                ];
+                if (
+                    attributeSpec === undefined
+                    || !('status' in attributeSpec)
+                ) {
+                    throw new Error(
+                        'no per-write response spec for'
+                        + ' record-attributes/:id',
+                    );
+                }
+                const attributesPrefix = canonicalUriPrefix(
+                    organization, '/record-attributes/',
+                );
+                const attributePuts = await Promise.all(
+                    b.attributes.map(async (attr) => {
+                        const attributeBody =
+                            recordAttributeDocumentBodyOf(
+                                attr as unknown as
+                                    Record<string, unknown>,
+                            );
+                        const headPairId = await headPairIdAt(
+                            db, attributesPrefix, attr.id,
+                        );
+                        return formWritePair({
+                            method: 'PUT',
+                            pathname:
+                                '/record-attributes/' + attr.id,
+                            routePattern: 'record-attributes/:id',
+                            routeSegments:
+                                ['record-attributes', ':id'],
+                            pathSegments:
+                                ['record-attributes', attr.id],
+                            headerFields: [],
+                            body: attributeBody,
+                            requesterIdentityId: actor,
+                            requestAt: pair.requestAt,
+                            organization,
+                            responseStatus: attributeSpec.status,
+                            responseBody:
+                                attributeSpec.successBody?.(
+                                    [attr.id], attributeBody,
+                                    actor, organization,
+                                ),
+                            headPairId,
+                        });
+                    }),
+                );
+                const removedIds = b.kind === 'edit'
+                    ? b.removedAttributeIds : [];
+                const attributeDeletes = await Promise.all(
+                    removedIds.map(async (id) => {
+                        // DELETE responses are UNIVERSALLY 204
+                        // with no body (message-pair.ts
+                        // resolution, mirrored here for the
+                        // synthesized removal pair).
+                        const headPairId = await headPairIdAt(
+                            db, attributesPrefix, id,
+                        );
+                        return formWritePair({
+                            method: 'DELETE',
+                            pathname:
+                                '/record-attributes/' + id,
+                            routePattern: 'record-attributes/:id',
+                            routeSegments:
+                                ['record-attributes', ':id'],
+                            pathSegments:
+                                ['record-attributes', id],
+                            headerFields: [],
+                            body: undefined,
+                            requesterIdentityId: actor,
+                            requestAt: pair.requestAt,
+                            organization,
+                            responseStatus: 204,
+                            responseBody: undefined,
+                            headPairId,
+                        });
+                    }),
+                );
+                pairs = {
+                    operation: pair,
+                    document,
+                    attributePuts,
+                    attributeDeletes,
+                };
+            }
+            return postRecordWriteOp(db, body, actor, pairs);
         },
+    }),
+    // records/:id is the fifth family, and the FIRST whose own
+    // :id address also carries a live DELETE (RECORDS_WIRING's
+    // own comment names why). GET is FLIPPED (Task 7): absorbed
+    // into the generic documentGetHandler(RECORDS_WIRING) — the
+    // SAME wiring row PUT already rides — wire-identical to the
+    // hand-written db.records.getById dispatch it replaces
+    // (recordDocumentEntityOf reproduces the shape verbatim, and
+    // the 'trio' lifecycle walk 404s a lifecycle-deleted record
+    // exactly as the old physical-delete plane did). PUT stays
+    // documentPutHandler(RECORDS_WIRING) — the Decision 7 trio
+    // fold, unchanged from before this flip. DELETE stays
+    // hand-written — a splice + pair append in the same
+    // transaction, exactly as before (the factory's fixed
+    // closures have no per-family pair selector; see
+    // message-pair.ts) — a splice route is not a document
+    // verb-class member (Task 9 covers the DELETE pattern).
+    route('records/:id', {
+        get: documentGetHandler(RECORDS_WIRING),
+        put: documentPutHandler(RECORDS_WIRING),
         delete: (db, p, _actor, pair) => {
             const id = param(p, 0);
             return db.transaction(
@@ -2815,36 +3683,41 @@ export const routes: Route[] = [
             );
         },
     }),
+    // GET is FLIPPED (Task 7): the collection derives from the
+    // message ledger rather than the old record_attributes
+    // table. Rides the generic documentCollectionGetHandler —
+    // wire-identical to the hand-written
+    // db.recordAttributes.getAll() dispatch it replaces
+    // (RECORD_ATTRIBUTES_WIRING's own entityOf,
+    // recordAttributeDocumentEntityOf, already spreads the head
+    // pair's body verbatim, so the list needs no
+    // record-attributes-special reassembly step). No POST here —
+    // record-attributes carries no create verb of its own,
+    // unchanged from before this flip.
     route('record-attributes', {
-        get: (db) =>
-            db.recordAttributes.getAll(),
+        get: documentCollectionGetHandler(
+            RECORD_ATTRIBUTES_WIRING,
+        ),
     }),
+    // record-attributes/:id is the sixth family. GET is FLIPPED
+    // (Task 7): absorbed into the generic
+    // documentGetHandler(RECORD_ATTRIBUTES_WIRING) — the SAME
+    // wiring row PUT already rides — wire-identical to the
+    // hand-written db.recordAttributes.getById dispatch it
+    // replaces (recordAttributeDocumentEntityOf reproduces the
+    // shape verbatim; the 'stateless' lifecycle skips the trio
+    // walk entirely, so a DELETE head is the only tombstone
+    // signal, already 404-absent via deriveDocumentsAt). PUT
+    // stays documentPutHandler(RECORD_ATTRIBUTES_WIRING),
+    // unchanged from before this flip. DELETE stays
+    // hand-written — the RESTRICT check and the pair append ride
+    // the SAME transaction, exactly as before (the factory's
+    // fixed closures have no per-family pair selector; see
+    // message-pair.ts) — a splice route is not a document
+    // verb-class member (Task 9 covers the DELETE pattern).
     route('record-attributes/:id', {
-        get: (db, p) =>
-            db.recordAttributes.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                [
-                    'record_attributes',
-                    'requests', 'responses',
-                ],
-                async (view) => {
-                    const written = await view
-                        .recordAttributes.put(
-                            id,
-                            withoutId(body) as unknown as
-                                Omit<
-                                    RecordAttributeEntity, 'id'
-                                >,
-                        );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
-        },
+        get: documentGetHandler(RECORD_ATTRIBUTES_WIRING),
+        put: documentPutHandler(RECORD_ATTRIBUTES_WIRING),
         // DELETE is RESTRICT, not cascade: an attribute
         // still named by state_field_values rows or bound
         // in a flow / work-order graph refuses to die (409
@@ -2873,32 +3746,33 @@ export const routes: Route[] = [
     }),
     // Flow↔record bindings nest under their parent flow: the flow
     // id is param 0, so the SERVER filters the collection to that
-    // flow. The leaf id is param 1. Reads stay old-plane until the
-    // RECORDS phase.
+    // flow. The leaf id is param 1. GET is FLIPPED (Task 7): both
+    // the collection and the by-id read now ride deriveFlowRecords
+    // / deriveFlowRecord — a bespoke derivation (not a
+    // DocumentFamilyWiring family; a join row carries no lifecycle
+    // trio of its own), so this calls it directly rather than
+    // through a generic constructor, mirroring deriveFlowWorkOrders'
+    // own precedent above. This closes the LAST deferred old-plane
+    // nested read under flows — the one remaining table-backed
+    // nested read, flows/:id/versions above, stays that way BY
+    // DESIGN (its own comment), never a deferral this phase closes.
     route('flows/:id/records', {
-        get: (db, p) =>
-            db.flowRecords.getAllWhere('flow_id', param(p, 0)),
+        get: (db, p, _actor, organization) =>
+            deriveFlowRecords(
+                db, requireOrganization(organization),
+                param(p, 0),
+            ),
     }),
     route('flows/:id/records/:frid', {
-        get: (db, p) => db.flowRecords.getById(param(p, 1)),
-        put: (db, p, body, _actor, pair) => {
-            const frid = param(p, 1);
-            return db.transaction(
-                ['flow_records', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.flowRecords
-                        .put(
-                            frid,
-                            withoutId(body) as unknown as
-                                Omit<FlowRecordEntity, 'id'>,
-                        );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
-        },
+        get: (db, p, _actor, organization) =>
+            deriveFlowRecord(
+                db, requireOrganization(organization),
+                param(p, 0), param(p, 1),
+            ),
+        put: (db, p, body, actor, pair) =>
+            postFlowRecordDocumentOp(
+                db, param(p, 1), body, actor, pair,
+            ),
         delete: (db, p, _actor, pair) => {
             const frid = param(p, 1);
             return db.transaction(

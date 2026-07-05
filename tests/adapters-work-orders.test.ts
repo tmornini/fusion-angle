@@ -12,8 +12,13 @@ import {
     postWorkOrderCreation,
     postWorkOrderTransition,
     postWorkOrderClaim,
+    putWorkOrder,
 } from
 '../web-app/app/adapters/work-orders-mutations.ts';
+import {
+    getWorkOrder,
+} from
+'../web-app/app/adapters/work-orders-queries.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -272,10 +277,14 @@ test(
 
         const firstId =
             await createWorkOrder(ctx, 'f1');
-        const first = (
-            await db.workOrders.getAll()
-        )[0]!;
-        await db.workOrders.put(firstId, {
+        // NAMED re-pin (Task 7): putWorkOrder is the wire
+        // PUT — it takes the DOMAIN shape ({displayId,
+        // flowGraph, position} with flowGraph PARSED), not
+        // the raw snake_case row, so the domain object is
+        // fetched first (getWorkOrder) and only its position
+        // is patched.
+        const first = await getWorkOrder(ctx, firstId);
+        await putWorkOrder(ctx, firstId, {
             ...first,
             position: 7.5,
         });
@@ -611,25 +620,24 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.flowWorkOrders.put(
-            'fwo1',
-            {
-                flow_id: 'flow1',
-                work_order_id: 'wo1',
-                at:
-                    '2024-01-01T00:00:00.000000Z',
-            },
-        );
-        await db.flowWorkOrders.put(
-            'fwo2',
-            {
-                flow_id: 'flow2',
-                work_order_id: 'wo2',
-                at:
-                    '2024-01-01T00:00:00.000000Z',
-            },
-        );
         const ctx = createRequestContext(db, await devToken());
+        // NAMED re-pin (Task 7, the projects/:id/flows
+        // precedent in tests/adapters-flow-queries.test.ts): the
+        // flipped GET flows/:id/work-orders derives from the
+        // message ledger, not the raw flow_work_orders table —
+        // a raw db.flowWorkOrders.put leaves no pair at this
+        // address, so each join must land through the SAME
+        // wire-reachable PUT the live route serves.
+        await ctx.PUT('flows/flow1/work-orders/fwo1', {
+            flow_id: 'flow1',
+            work_order_id: 'wo1',
+            at: '2024-01-01T00:00:00.000000Z',
+        });
+        await ctx.PUT('flows/flow2/work-orders/fwo2', {
+            flow_id: 'flow2',
+            work_order_id: 'wo2',
+            at: '2024-01-01T00:00:00.000000Z',
+        });
         // The server now filters the nested collection to its
         // parent flow — each flow surfaces only its own join.
         const flow1 =

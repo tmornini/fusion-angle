@@ -8,7 +8,7 @@ import { devToken } from './token-fixtures.ts';
 import {
     getIdeaStates,
     getProjectStates,
-    getRecordStates,
+    getRecordStateDetails,
     getMemberStates,
 } from '../web-app/app/adapters/state-events.ts';
 import {
@@ -126,23 +126,31 @@ test('getIdeaStates excludes a same-valued project',
         );
     });
 
-test('getRecordStates excludes a same-valued idea',
+test('getRecordStateDetails excludes a same-valued idea',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.records.put('r1', recordBody('R'));
-        await db.states.postEvent(
-            'ev-r1', 'r1', 'active', 'system',
-            '2026-01-01T00:00:00.000000Z',
-        );
+        const ctx = createRequestContext(db, await devToken());
+        // Seeded through the live document PUT (not a raw
+        // db.records.put) so r1's message pair exists — the
+        // flipped GET records route (Phase 6 Task 7), which
+        // getRecordStateDetails reads for its id set, derives
+        // from the ledger, not the old records table.
+        const { organization_id: _organizationId, ...r1Fields } =
+            recordBody('R');
+        await ctx.PUT('records/r1', {
+            ...r1Fields,
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-r1',
+        });
         await db.ideas.put('i1', ideaBody('I'));
         await db.states.postEvent(
             'ev-i1', 'i1', 'archived', 'system',
             '2026-01-01T00:00:01.000000Z',
         );
-        const ctx = createRequestContext(db, await devToken());
-        const states = await getRecordStates(ctx);
-        assert.equal(states.get('r1'), 'active');
+        const states = await getRecordStateDetails(ctx);
+        assert.equal(states.get('r1')?.state, 'active');
         assert.ok(
             !states.has('i1'),
             'idea must not leak into record states',

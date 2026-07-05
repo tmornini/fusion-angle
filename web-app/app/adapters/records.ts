@@ -18,8 +18,8 @@ import {
     latestByKey,
 } from '../../../shared/ledger-reduction.ts';
 import {
-    postStateEvent,
-    getRecordStates,
+    getRecordStateDetail,
+    getRecordStateDetails,
 } from './state-events.ts';
 import {
     createSubscriptionChannel,
@@ -116,16 +116,21 @@ export async function getRecordState(
 // The record detail page's read: one domain facet
 // carrying identity, content, and lifecycle state —
 // the raw row and its separate state never cross the
-// seam.
+// seam. Widened to the state DETAIL (Decision 7's trio)
+// so a plain field edit (the detail page's no-attribute-
+// change save) can echo it without minting a fresh event;
+// getRecordState (singular, above) remains for its own
+// test-pinned throws-on-absence covenant even though this
+// caller no longer reaches it.
 export async function getRecordModel(
     ctx: RequestContext,
     id: RecordId,
 ): Promise<RecordModel> {
-    const [row, state] = await Promise.all([
+    const [row, detail] = await Promise.all([
         getRecord(ctx, id),
-        getRecordState(ctx, id),
+        getRecordStateDetail(ctx, id),
     ]);
-    return new RecordModel(row, state);
+    return new RecordModel(row, detail);
 }
 
 export async function getRecords(
@@ -139,7 +144,7 @@ export async function getRecords(
             'record-attributes',
         ),
         getAllFlowRecords(ctx),
-        getRecordStates(ctx),
+        getRecordStateDetails(ctx),
     ]);
     const attrCountByRecord = new Map<
         string, number
@@ -162,15 +167,15 @@ export async function getRecords(
         );
     }
     return rows.map(row => {
-        const state = stateMap.get(row.id);
-        if (state === undefined) {
+        const detail = stateMap.get(row.id);
+        if (detail === undefined) {
             throw new Error(
                 'Record has no state event: '
                 + row.id,
             );
         }
         return {
-            record: new RecordModel(row, state),
+            record: new RecordModel(row, detail),
             attributeCount:
                 attrCountByRecord.get(row.id)
                 ?? 0,
@@ -181,13 +186,34 @@ export async function getRecords(
     });
 }
 
+// The wire document PUT /records/:id now takes (Decision 7):
+// today's entity fields plus the lifecycle trio, camelCase on
+// this side of the adapter seam. organization_id is EXCLUDED
+// too — the client never supplies it (the org fence stamps it
+// downstream). A state-UNCHANGED save (name/description/
+// position edited, trio echoed back unchanged) converges to a
+// no-op event write at the op; a genuine transition
+// (postRecordStateChange below) mints a fresh trio.
+export type RecordDocumentFields =
+    Omit<RecordEntity, 'id' | 'organization_id'> & {
+        readonly state: RecordState;
+        readonly stateAt: string;
+        readonly stateEventId: string;
+    };
+
 export async function putRecord(
     ctx: RequestContext,
     id: RecordId,
-    entity: Omit<RecordEntity, 'id' | 'organization_id'>,
+    document: RecordDocumentFields,
 ): Promise<void> {
+    const {
+        state, stateAt, stateEventId, ...entity
+    } = document;
     await ctx.PUT(`records/${id}`, {
         ...entity,
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
     });
     recordChanges.notify();
 }
@@ -210,6 +236,13 @@ export interface RecordChangeEdit {
         RecordAttributeEntity, 'organization_id'
     >[];
     readonly removedAttributeIds: readonly string[];
+    // The echoed trio (Phase 6 Task 4): the caller already
+    // holds the detail model (Task 2's plumbing), so this is a
+    // zero-extra-fetch echo of the stored head, exactly like
+    // putRecord's own RecordDocumentFields — never a fresh mint.
+    readonly state: RecordState;
+    readonly stateAt: string;
+    readonly stateEventId: string;
 }
 
 export type RecordChange =
@@ -249,6 +282,9 @@ export async function postRecordChange(
             id,
             record,
             attributes,
+            state: change.state,
+            state_at: change.stateAt,
+            state_event_id: change.stateEventId,
             removedAttributeIds:
                 change.removedAttributeIds,
         });
@@ -256,11 +292,21 @@ export async function postRecordChange(
     recordChanges.notify();
 }
 
+// A transition: composes the document PUT with a FRESH trio
+// (mint-once-reuse — a retry of the SAME transition resends
+// this same pinned pair, converging at the op) over the
+// record's CURRENT entity fields — hop count 1 -> 1 (one
+// ctx.PUT, via putRecord).
 export async function postRecordStateChange(
     ctx: RequestContext,
-    id: RecordId,
+    record: RecordEntity,
     state: RecordState,
 ): Promise<void> {
-    await postStateEvent(ctx, id, state);
-    recordChanges.notify();
+    const { id, ...entity } = record;
+    await putRecord(ctx, id, {
+        ...entity,
+        state,
+        stateAt: nowUtc(),
+        stateEventId: generateCryptoSafeBase62(),
+    });
 }

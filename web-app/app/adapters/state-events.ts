@@ -1,12 +1,13 @@
 import type {
     Id, IdeaEntity, IdeaState, IdeaStateDetail,
     ProjectEntity, ProjectState, ProjectStateDetail,
-    RecordEntity, RecordState,
+    RecordEntity, RecordStateDetail,
     StateEntity, MemberEntity, MemberState,
 } from '../../../api/types.ts';
 import {
     assertIdeaState,
     assertProjectState,
+    assertRecordState,
     assertMemberState,
     msSinceUtc,
     MS_PER_SECOND,
@@ -434,17 +435,57 @@ export async function getProjectStateDetails(
     return out;
 }
 
-// Bulk variant for getRecords, which calls this — so it
-// reads the records table directly to avoid recursing.
-export async function getRecordStates(
+// Single-record state read, widened to carry the STORED head
+// event's `at`/`id` alongside the state — the trio Decision 7
+// folds into the record document (state_at, state_event_id).
+// Consumed by getRecordModel (adapters/records.ts) to build the
+// RecordModel domain object.
+export async function getRecordStateDetail(
     ctx: RequestContext,
-): Promise<Map<Id, RecordState>> {
+    recordId: Id,
+): Promise<RecordStateDetail> {
+    const events = await ctx.GET<StateEntity[]>(
+        `entity-states/${recordId}/history`,
+    );
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(recordId);
+    if (latest === undefined) {
+        throw new Error(
+            'no state event for record ' + recordId,
+        );
+    }
+    return {
+        state: assertRecordState(
+            latest.state, 'record ' + recordId,
+        ),
+        stateAt: latest.at,
+        stateEventId: latest.id,
+    };
+}
+
+// Bulk sibling of getRecordStateDetail, widened the same way.
+// Consumed by getRecords (adapters/records.ts) so the records
+// LIST page can echo each row's trio on a plain field edit
+// (drag-reorder) without minting a fresh event.
+export async function getRecordStateDetails(
+    ctx: RequestContext,
+): Promise<Map<Id, RecordStateDetail>> {
     const [events, rows] = await Promise.all([
         ctx.GET<StateEntity[]>('states'),
         ctx.GET<RecordEntity[]>('records'),
     ]);
     const ids = new Set<Id>(rows.map(r => r.id));
-    return latestStatesForIds<RecordState>(events, ids);
+    const inScope = events.filter(ev => ids.has(ev.entity_id));
+    const latest = latestByKey(inScope, ev => ev.entity_id);
+    const out = new Map<Id, RecordStateDetail>();
+    for (const [id, ev] of latest) {
+        out.set(id, {
+            state: assertRecordState(ev.state, 'record ' + id),
+            stateAt: ev.at,
+            stateEventId: ev.id,
+        });
+    }
+    return out;
 }
 
 // Read the current state for one member from the

@@ -91,6 +91,19 @@ export function withoutId(
 // evidence.
 export interface DocumentFamilyWiring {
     readonly family: string;
+    // Fourth-family evidence (work-orders): 'trio' families
+    // carry the Decision 7 lifecycle trio in every document
+    // body and get the lifecycle walk + DELETED filter;
+    // 'stateless' families carry entity fields only and skip
+    // both (their lifecycle, if any, lives in operation-
+    // addressed event pairs, never the document address).
+    readonly lifecycle: 'trio' | 'stateless';
+    // The identifier the wire 404 body speaks —
+    // EntityNotFoundError's table. Family name for ideas/
+    // projects/flows; 'work_orders' for work-orders (the
+    // first family whose storage table name differs from its
+    // family name).
+    readonly notFoundTable: string;
     // Validates the full wire document (entity + trio [+ family
     // extras]); throws ValidationError.
     readonly validateDocument:
@@ -147,13 +160,16 @@ export function documentFamilyWiring(
 }
 
 // The generic per-id derivation: fetch the family's prefix ONCE,
-// reduce to the head document (deriveDocumentsAt) plus the
-// lifecycle history (documentLifecycleEvents/stateHistoryFrom/
-// currentDocumentState) over the SAME pairs, and 404 either
-// absent or lifecycle-deleted — byte-identical to what
-// deriveIdea/deriveProject already compute, since neither ever
-// carried family-specific logic beyond the prefix, the
-// not-found table name, and the entity mapper.
+// reduce to the head document (deriveDocumentsAt), and — for a
+// 'trio' family ONLY — walk the lifecycle history
+// (documentLifecycleEvents/stateHistoryFrom/currentDocumentState)
+// over the SAME pairs to 404 a lifecycle-deleted document too,
+// byte-identical to what deriveIdea/deriveProject already
+// compute. A 'stateless' family's document body carries no trio
+// (documentLifecycleEvents' pickString would throw on its
+// absence), so its ONLY tombstone signal is a DELETE-method head
+// — already 404-absent via deriveDocumentsAt above, needing no
+// further walk.
 async function derivedDocumentEntity(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
@@ -171,15 +187,19 @@ async function derivedDocumentEntity(
         requests, responses, prefix,
     ).get(id);
     if (document === undefined) {
-        throw new EntityNotFoundError(wiring.family, id);
+        throw new EntityNotFoundError(wiring.notFoundTable, id);
     }
-    const pairs = documentPairsAt(requests, responses, prefix)
-        .filter((pair) => pair.uriId === id);
-    const history = stateHistoryFrom(
-        documentLifecycleEvents(pairs), id,
-    );
-    if (currentDocumentState(history) === DELETED_STATE) {
-        throw new EntityNotFoundError(wiring.family, id);
+    if (wiring.lifecycle === 'trio') {
+        const pairs = documentPairsAt(requests, responses, prefix)
+            .filter((pair) => pair.uriId === id);
+        const history = stateHistoryFrom(
+            documentLifecycleEvents(pairs), id,
+        );
+        if (currentDocumentState(history) === DELETED_STATE) {
+            throw new EntityNotFoundError(
+                wiring.notFoundTable, id,
+            );
+        }
     }
     return wiring.entityOf(document, organization);
 }
@@ -270,30 +290,38 @@ export function documentCollectionGetHandler(
         const documents = deriveDocumentsAt(
             requests, responses, prefix,
         );
-        const pairs = documentPairsAt(
-            requests, responses, prefix,
-        );
+        // The per-document history walk (and its DELETED
+        // filter) runs for a 'trio' family ONLY — same gate as
+        // derivedDocumentEntity above, same reason: a
+        // 'stateless' body carries no trio to walk, and a
+        // DELETE head is already absent from `documents`.
         const pairsById = new Map<Id, DocumentPair[]>();
-        for (const pair of pairs) {
-            const list = pairsById.get(pair.uriId);
-            if (list === undefined) {
-                pairsById.set(pair.uriId, [pair]);
-            } else {
-                list.push(pair);
+        if (wiring.lifecycle === 'trio') {
+            for (const pair of documentPairsAt(
+                requests, responses, prefix,
+            )) {
+                const list = pairsById.get(pair.uriId);
+                if (list === undefined) {
+                    pairsById.set(pair.uriId, [pair]);
+                } else {
+                    list.push(pair);
+                }
             }
         }
         const rows: { id: Id }[] = [];
         for (const [id, document] of documents) {
-            const history = stateHistoryFrom(
-                documentLifecycleEvents(
-                    pairsById.get(id) ?? [],
-                ),
-                id,
-            );
-            if (
-                currentDocumentState(history)
-                    === DELETED_STATE
-            ) continue;
+            if (wiring.lifecycle === 'trio') {
+                const history = stateHistoryFrom(
+                    documentLifecycleEvents(
+                        pairsById.get(id) ?? [],
+                    ),
+                    id,
+                );
+                if (
+                    currentDocumentState(history)
+                        === DELETED_STATE
+                ) continue;
+            }
             rows.push(
                 wiring.entityOf(
                     document, organizationId,

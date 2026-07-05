@@ -159,13 +159,20 @@ test(
             position: 2,
         });
 
-        // wo1 belongs to f1; wo2 belongs to OTHER
-        await db.flowWorkOrders.put('fwo1', {
+        // wo1 belongs to f1; wo2 belongs to OTHER. NAMED re-pin
+        // (Task 7, the projects/:id/flows precedent): getFlowStats
+        // reads flows/:id/work-orders through the flipped GET —
+        // a raw db.flowWorkOrders.put leaves no message pair at
+        // this address, so each join must land through the SAME
+        // wire-reachable PUT the live route serves. The
+        // workOrders.put entity rows above STAY raw — getFlowStats
+        // never reads a flipped work-orders entity route.
+        await ctx.PUT('flows/f1/work-orders/fwo1', {
             flow_id: 'f1',
             work_order_id: 'wo1',
             at: daysAgo(45),
         });
-        await db.flowWorkOrders.put('fwo2', {
+        await ctx.PUT('flows/OTHER/work-orders/fwo2', {
             flow_id: 'OTHER',
             work_order_id: 'wo2',
             at: daysAgo(45),
@@ -256,7 +263,8 @@ test(
             }),
             position: 1,
         });
-        await db.flowWorkOrders.put('fwo1', {
+        // NAMED re-pin (Task 7): same reason as above.
+        await ctx.PUT('flows/f1/work-orders/fwo1', {
             flow_id: 'f1',
             work_order_id: 'wo1',
             at: daysAgo(10),

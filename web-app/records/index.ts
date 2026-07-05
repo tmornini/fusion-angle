@@ -128,6 +128,10 @@ function onRecordsLoaded(
                 );
             if (!found) return;
             const ctx = sessionContext();
+            // The entity fields still need a fresh fetch
+            // (this handler is 2-hop, unlike ideas' 1-hop
+            // reorder) — the trio alone comes from the
+            // already-loaded list model's accessors below.
             const fresh = await getRecord(
                 ctx, id,
             );
@@ -135,6 +139,12 @@ function onRecordsLoaded(
                 name: fresh.name,
                 description: fresh.description,
                 position: newPosition,
+                state: found.record.stateValue(),
+                stateAt:
+                    found.record.stateAtValue(),
+                stateEventId:
+                    found.record
+                        .stateEventIdValue(),
             });
         },
     );

@@ -1666,6 +1666,54 @@ export function validateWorkOrderEntity(
     };
 }
 
+const WORK_ORDER_DOCUMENT_BODY_KEYS: readonly string[] = [
+    'display_id', 'flow_graph', 'position',
+];
+
+export interface WorkOrderDocumentBody {
+    readonly entity:
+        Omit<WorkOrderEntity, 'id' | 'organization_id'>;
+}
+
+// The HTTP-body gate for PUT /work-orders/:id: UNLIKE every
+// other document family, this body carries NO lifecycle trio
+// (the fourth-family, 'stateless' evidence) — a work order's
+// lifecycle is written only by the create/claim/transition ops
+// and the states/:id unclaim path, never by a document PUT, so
+// state/state_at/state_event_id are absent from BOTH the
+// expected and optional sets: a body carrying any of them 400s
+// here (the stateless covenant is validator-enforced, not
+// caller discipline). organization_id is deliberately absent
+// from the expected set (like every other org-owned write, the
+// client never supplies it; the org fence stamps it downstream
+// when view.workOrders.put re-validates through
+// validateWorkOrderEntity) yet rides the `optional` allowance
+// rather than `expected` — a caller-forged organization_id is
+// tolerated-but-ignored, not rejected, because the fence's
+// stamp always overrides whatever key it finds. Entity fields
+// are picked directly rather than delegated to
+// validateWorkOrderEntity — that function REQUIRES
+// organization_id, which this body never carries pre-stamp.
+export function validateWorkOrderDocumentBody(
+    body: Record<string, unknown>,
+): WorkOrderDocumentBody {
+    assertOnlyKeys(
+        body, WORK_ORDER_DOCUMENT_BODY_KEYS,
+        'WorkOrderDocumentBody', ['organization_id'],
+    );
+    const flowGraph = pickJsonObjectField(body, 'flow_graph');
+    validateWorkOrderFlowGraphJson(
+        flowGraph, 'WorkOrderDocumentBody.flow_graph',
+    );
+    return {
+        entity: {
+            display_id: pickString(body, 'display_id'),
+            flow_graph: flowGraph,
+            position: pickNumber(body, 'position'),
+        },
+    };
+}
+
 const FLOW_WORK_ORDER_BODY_KEYS:
     readonly string[] = [
     'flow_id', 'work_order_id', 'at',
@@ -2162,6 +2210,74 @@ export function validateRecordEntity(
     };
 }
 
+const RECORD_DOCUMENT_ENTITY_KEYS: readonly string[] = [
+    'name', 'description', 'position',
+];
+
+const RECORD_DOCUMENT_BODY_KEYS: readonly string[] = [
+    ...RECORD_DOCUMENT_ENTITY_KEYS,
+    'state', 'state_at', 'state_event_id',
+];
+
+export interface RecordDocumentBody {
+    readonly entity:
+        Omit<RecordEntity, 'id' | 'organization_id'>;
+    readonly state: RecordState;
+    readonly state_at: string;
+    readonly state_event_id: string;
+}
+
+// The HTTP-body gate for PUT /records/:id (Decision 7): the
+// full wire document — the entity's own fields plus the
+// lifecycle trio folded in. organization_id is deliberately
+// absent from the expected set (like every other org-owned
+// write, the client never supplies it; the org fence stamps it
+// downstream when view.records.put re-validates through
+// validateRecordEntity) yet rides the `optional` allowance
+// rather than `expected` — a caller-forged organization_id is
+// tolerated-but-ignored, not rejected, because the fence's
+// stamp always overrides whatever key it finds. The trio holds
+// to the SAME rules the bare states/:id route applies to an
+// event (assertRecordState, an RFC-3339 `at`, a non-empty
+// event id), so a folded document and a bare event share one
+// shape. Entity fields are picked directly rather than
+// delegated to validateRecordEntity — that function REQUIRES
+// organization_id, which this body never carries pre-stamp
+// (name's own non-empty invariant still lands downstream, at
+// view.records.put's own re-validation — this gate gates the
+// WIRE SHAPE, not the entity's own rules).
+export function validateRecordDocumentBody(
+    body: Record<string, unknown>,
+): RecordDocumentBody {
+    assertOnlyKeys(
+        body, RECORD_DOCUMENT_BODY_KEYS,
+        'RecordDocumentBody', ['organization_id'],
+    );
+    const state = assertRecordState(
+        pickString(body, 'state'),
+        'RecordDocumentBody.state',
+    );
+    const stateEventId = pickString(body, 'state_event_id');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'RecordDocumentBody.state_event_id must be'
+            + ' non-empty',
+        );
+    }
+    return {
+        entity: {
+            name: pickString(body, 'name'),
+            description: pickString(body, 'description'),
+            position: pickNumber(body, 'position'),
+        },
+        state,
+        state_at: validateTimestampField(
+            body, 'state_at', 'RecordDocumentBody.state_at',
+        ),
+        state_event_id: stateEventId,
+    };
+}
+
 const RECORD_ATTRIBUTE_BODY_KEYS:
     readonly string[] = [
     'organization_id', 'record_id', 'name',
@@ -2249,6 +2365,115 @@ export function validateRecordAttributeEntity(
     };
 }
 
+const RECORD_ATTRIBUTE_DOCUMENT_BODY_KEYS:
+    readonly string[] = [
+    'record_id', 'name', 'attribute_type',
+    'sort_order', 'options', 'constraints',
+];
+
+export interface RecordAttributeDocumentBody {
+    readonly entity:
+        Omit<RecordAttributeEntity, 'id' | 'organization_id'>;
+}
+
+// The HTTP-body gate for PUT /record-attributes/:id: the
+// sixth family, and the SECOND 'stateless' one (work-orders is
+// the first) — no lifecycle trio is admitted, so a document PUT
+// here is a pure entity edit. organization_id is deliberately
+// absent from the expected set (like every other org-owned
+// write, the client never supplies it; the org fence stamps it
+// downstream when view.recordAttributes.put re-validates
+// through validateRecordAttributeEntity) yet rides the
+// `optional` allowance rather than `expected` — a caller-forged
+// organization_id is tolerated-but-ignored, not rejected,
+// because the fence's stamp always overrides whatever key it
+// finds. REASON this validator exists rather than wiring
+// validateRecordAttributeEntity straight into
+// documentWriteResponseSpec: that generic builder calls
+// validateDocument WITHOUT pre-stamping organization_id (the
+// stamp lands only in the RESPONSE, after validation), while
+// today's hand-written response spec pre-stamps the key BEFORE
+// calling validateRecordAttributeEntity — wiring the shipped
+// entity validator in directly would 500 any body lacking the
+// key, where today it 200s. Every existing fixture happens to
+// carry the key, so ./validate alone would not catch that
+// regression — this validator closes it by construction. Entity
+// fields are picked directly (the same constraints/options
+// rules validateRecordAttributeEntity enforces) rather than
+// delegated to it — that function REQUIRES organization_id,
+// which this body never carries pre-stamp.
+export function validateRecordAttributeDocumentBody(
+    body: Record<string, unknown>,
+): RecordAttributeDocumentBody {
+    assertOnlyKeys(
+        body, RECORD_ATTRIBUTE_DOCUMENT_BODY_KEYS,
+        'RecordAttributeDocumentBody', ['organization_id'],
+    );
+    const name = pickString(body, 'name');
+    if (name === '') {
+        throw new ValidationError(
+            'RecordAttributeDocumentBody.name'
+            + ' must be non-empty',
+        );
+    }
+    const attributeType = asAttributeType(
+        body['attribute_type'],
+        'RecordAttributeDocumentBody.attribute_type',
+    );
+    const constraintsField =
+        pickJsonArrayField(body, 'constraints');
+    const parsedConstraints = parseOrThrow(
+        constraintsField,
+        'RecordAttributeDocumentBody.constraints',
+    );
+    const constraintsArr = asArray(
+        parsedConstraints,
+        'RecordAttributeDocumentBody.constraints',
+    );
+    for (let i = 0; i < constraintsArr.length; i++) {
+        const constraint = asConstraint(
+            constraintsArr[i],
+            'RecordAttributeDocumentBody.constraints['
+            + i + ']',
+        );
+        assertConstraintAppliesTo(
+            constraint.kind,
+            attributeType,
+            'RecordAttributeDocumentBody.constraints['
+            + i + ']',
+        );
+    }
+    const optionsField = pickJsonArrayField(
+        body, 'options',
+    );
+    const parsedOptions = validateStringArrayJson(
+        optionsField,
+        'RecordAttributeDocumentBody.options',
+    );
+    if (
+        (attributeType === 'select'
+            || attributeType === 'radio')
+        && parsedOptions.length === 0
+    ) {
+        throw new ValidationError(
+            'RecordAttributeDocumentBody.options'
+            + ' must list at least one option'
+            + " for attribute_type '"
+            + attributeType + "'",
+        );
+    }
+    return {
+        entity: {
+            record_id: pickString(body, 'record_id'),
+            name,
+            attribute_type: attributeType,
+            sort_order: pickNumber(body, 'sort_order'),
+            options: optionsField,
+            constraints: constraintsField,
+        },
+    };
+}
+
 const FLOW_RECORD_BODY_KEYS: readonly string[] = [
     'flow_id', 'record_id', 'at',
 ];
@@ -2287,6 +2512,18 @@ export interface RecordWriteEditBody {
     readonly id: RecordId;
     readonly record: Omit<RecordEntity, 'id'>;
     readonly attributes: readonly RecordAttributeEntity[];
+    // The echoed lifecycle trio (Phase 6 Task 4, the SECOND
+    // named wire delta): an edit now carries the SAME
+    // state/state_at/state_event_id keys — and the SAME
+    // validation rules — as validateRecordDocumentBody's own
+    // trio, since the synthesized document pair forms purely
+    // from this body. A byte-identical echo of the stored head
+    // converges to a no-op event write at the op (the sameEvent
+    // decompose); a fresh mint would silently author a genuine
+    // transition instead.
+    readonly state: RecordState;
+    readonly state_at: string;
+    readonly state_event_id: string;
     readonly removedAttributeIds: readonly string[];
 }
 
@@ -2301,10 +2538,14 @@ const RECORD_WRITE_CREATE_KEYS:
     'initialStateEventId', 'initialStateAt',
 ];
 
+// The trio keys sit BEFORE removedAttributeIds (order is
+// load-bearing: assertOnlyKeys reports the first missing
+// required key it finds).
 const RECORD_WRITE_EDIT_KEYS:
     readonly string[] = [
-    'kind', 'id', 'record',
-    'attributes', 'removedAttributeIds',
+    'kind', 'id', 'record', 'attributes',
+    'state', 'state_at', 'state_event_id',
+    'removedAttributeIds',
 ];
 
 function validateRecordWriteAttribute(
@@ -2398,6 +2639,26 @@ export function validateRecordWriteBody(
                 + '.attributes[' + i + ']',
             ),
         );
+        // The document trio's OWN validation rules
+        // (validateRecordDocumentBody), reused verbatim: an
+        // edit's echoed trio is byte-identical wire shape to
+        // what a live PUT records/:id would carry.
+        const state = assertRecordState(
+            pickString(body, 'state'),
+            'RecordWriteEditBody.state',
+        );
+        const stateEventId = pickString(
+            body, 'state_event_id',
+        );
+        if (stateEventId === '') {
+            throw new ValidationError(
+                'RecordWriteEditBody.state_event_id must be'
+                + ' non-empty',
+            );
+        }
+        const stateAt = validateTimestampField(
+            body, 'state_at', 'RecordWriteEditBody.state_at',
+        );
         const removedRaw = asArray(
             body['removedAttributeIds'],
             'RecordWriteEditBody'
@@ -2413,6 +2674,9 @@ export function validateRecordWriteBody(
         return {
             kind: 'edit',
             id, record, attributes,
+            state,
+            state_at: stateAt,
+            state_event_id: stateEventId,
             removedAttributeIds,
         };
     }

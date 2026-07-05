@@ -19,8 +19,10 @@ import {
     getMemberMap,
     generateCryptoSafeBase62,
     getTransitionEventsByWorkOrder,
+    getWorkOrder,
     getWorkOrderActiveClaim,
     getWorkOrders,
+    putWorkOrder,
     type WorkOrder,
 } from '../web-app/app/adapters/index.ts';
 import {
@@ -344,11 +346,19 @@ test(
         // Mutate to explicit non-creation-order
         // fractional positions so the assertion
         // catches any caller that removes the sort.
+        // NAMED re-pin (Task 7): putWorkOrder is the wire
+        // PUT — it takes the DOMAIN shape ({displayId,
+        // flowGraph, position} with flowGraph PARSED), not
+        // the raw snake_case row, so the domain object is
+        // fetched first (getWorkOrder) and only its position
+        // is patched.
         const created = await db.workOrders.getAll();
         const explicit = [7.5, 2.5, 5];
         for (let i = 0; i < created.length; i++) {
-            await db.workOrders.put(created[i]!.id, {
-                ...created[i]!,
+            const id = created[i]!.id;
+            const workOrder = await getWorkOrder(ctx, id);
+            await putWorkOrder(ctx, id, {
+                ...workOrder,
                 position: explicit[i]!,
             });
         }

@@ -12,6 +12,7 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import {
     storedWorkOrderFlowGraphField,
+    jsonArrayField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 
@@ -80,6 +81,20 @@ function recordFields(name: string, organization: string) {
     };
 }
 
+// PUT /records/:id now takes the FULL document (Decision 7):
+// the entity fields plus the state trio. A fixed trio keeps
+// this PUT below a same-state edit.
+function recordPutBody(
+    recordId: string, name: string, organization: string,
+) {
+    return {
+        ...recordFields(name, organization),
+        state: 'active',
+        state_at: AT,
+        state_event_id: 'ev-' + recordId,
+    };
+}
+
 // Task 7's additive pin: a GENESIS-shaped flows document PUT.
 // A fresh id needs no If-Response-ID (the locked class's
 // genesis-with-neither-header-passes rule), so this addition is
@@ -119,8 +134,47 @@ function workOrderFields(displayId: string, organization: string) {
     };
 }
 
+// The workOrder facet reuses workOrderFields() — the SAME
+// construction the entity-PUT case above already exercises —
+// so the create's synthesized document pair and this literal
+// are ONE source, never two divergent builds.
+function workOrderCreateBody(
+    id: string,
+    flowWorkOrderId: string,
+    flowId: string,
+    organization: string,
+) {
+    return {
+        id,
+        workOrder: workOrderFields('INV-WO-CREATE', organization),
+        flowWorkOrderId,
+        flowWorkOrder: {
+            flow_id: flowId,
+            work_order_id: id,
+            at: AT,
+        },
+        stateEventIds: [
+            'ev-1-' + flowWorkOrderId,
+            'ev-2-' + flowWorkOrderId,
+            'ev-3-' + flowWorkOrderId,
+        ],
+        states: ['n-start', 'n-finish', 'claimed'],
+        stateEventAts: [
+            '2026-02-01T00:00:02.000000Z',
+            '2026-02-01T00:00:03.000000Z',
+            '2026-02-01T00:00:04.000000Z',
+        ],
+    };
+}
+
+// Task 4's bundle synthesis: `attributes` defaults to empty so
+// every prior call site is unaffected, but the mixed batch below
+// now passes one, so the records-family create's own document
+// and attribute pairs are exercised alongside the other six
+// families in this same mix — not merely in isolation.
 function createRecordBody(
     id: string, eventId: string, organization: string,
+    attributes: Record<string, unknown>[] = [],
 ) {
     return {
         kind: 'create',
@@ -131,24 +185,28 @@ function createRecordBody(
             description: 'd',
             position: 1,
         },
-        attributes: [],
+        attributes,
         initialState: 'active',
         initialStateEventId: eventId,
         initialStateAt: AT,
     };
 }
 
-// A mock-data seed (65 pre-formed pairs, see
+// A mock-data seed (EXPECTED_PAIR_COUNT pre-formed pairs, see
 // mock-data-pairs.test.ts) plus one live-write batch layered on
 // top via handleRequest: one document PUT (Supersedes minted,
 // ideas), one event-append PUT (states/:id), one FAILED write
-// (a state ledger conflict), one create POST (records), one
-// entity PUT (work-orders — Phase 1's final-review deferral,
-// folded in now that Phase 2's drift check has landed), one
-// DELETE (records, superseding its own PUT), one operation POST
-// (identity-tokens revocation), and one GENESIS document PUT
-// (flows — Task 7's additive pin) — five families beyond the
-// seed's own, spanning both seeded orgs.
+// (a state ledger conflict), one create POST (records — Phase 6
+// Task 4's own bundle: operation + document + one attribute
+// pair, not a single pair), one entity PUT (work-orders —
+// Phase 1's final-review deferral, folded in now that Phase 2's
+// drift check has landed), one DELETE (records, superseding its
+// own PUT), one operation POST (identity-tokens revocation), one
+// GENESIS document PUT (flows — Task 7's additive pin), and one
+// work-order CREATE (Phase 5 Task 3's own three-pair append — a
+// genesis POST needs no headers, so this addition is purely
+// additive) — five families beyond the seed's own, spanning
+// both seeded orgs.
 async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
@@ -201,11 +259,24 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     ));
     assert.equal(failed.status, 409);
 
-    // Create POST (records, org 2).
+    // Create POST (records, org 2) — Task 4's bundle: the
+    // operation pair, its synthesized document pair, and one
+    // synthesized attribute-PUT pair (the create balance is now
+    // 2+N, not 1).
     const created = await handleRequest(db, req(
         'POST', '/records', org2Token,
         createRecordBody(
             'inv-rec-1', 'inv-rec-1-ev', ORGANIZATION_TWO,
+            [{
+                id: 'inv-rec-1-attr',
+                organization_id: ORGANIZATION_TWO,
+                record_id: 'inv-rec-1',
+                name: 'Field',
+                attribute_type: 'text',
+                sort_order: 0,
+                options: jsonArrayField([]),
+                constraints: jsonArrayField([]),
+            }],
         ),
     ));
     assert.equal(created.status, 204);
@@ -213,7 +284,9 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // DELETE — a fresh PUT then its tombstone (records, org 2).
     const recordPut = await handleRequest(db, req(
         'PUT', '/records/inv-rec-2', org2Token,
-        recordFields('Invariant Record', ORGANIZATION_TWO),
+        recordPutBody(
+            'inv-rec-2', 'Invariant Record', ORGANIZATION_TWO,
+        ),
     ));
     assert.equal(recordPut.status, 200);
     const recordDeleted = await handleRequest(db, req(
@@ -249,6 +322,20 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         flowDocumentBody('Invariant Flow', 'inv-flow-1-ev'),
     ));
     assert.equal(flowGenesis.status, 200);
+
+    // Work-order CREATE (org 1) — a genesis POST, joined to the
+    // flow just created above: three pairs land (the operation
+    // pair, its synthesized document pair, its synthesized join
+    // pair), none of them route-exercised in this mixed batch
+    // before now.
+    const workOrderCreated = await handleRequest(db, req(
+        'POST', '/work-orders', org1Token,
+        workOrderCreateBody(
+            'inv-wo-create-1', 'inv-wo-create-1-fwo',
+            'inv-flow-1', STARK_ORGANIZATION,
+        ),
+    ));
+    assert.equal(workOrderCreated.status, 204);
 
     return db;
 }

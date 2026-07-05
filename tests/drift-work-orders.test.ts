@@ -1,0 +1,1449 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { handleRequest } from '../api/api.ts';
+import { EntityNotFoundError } from '../api/db.ts';
+import type { DbAdapter } from '../api/db.ts';
+import type {
+    Id,
+    WorkOrderEntity,
+    RequestEntity,
+    ResponseEntity,
+    StateEntity,
+} from '../api/types.ts';
+import {
+    jsonObjectField, MS_PER_SECOND, nowUtc,
+} from '../api/types.ts';
+import { postMockDataLoad } from '../api/mock-data.ts';
+import { organizationScopedAdapter } from
+    '../api/db-organization-scoped.ts';
+import { canonicalUriPrefix } from '../api/message-pair.ts';
+import {
+    documentPairsAt,
+    type DocumentPair,
+} from '../api/derive-documents.ts';
+import {
+    documentGetHandler,
+    documentCollectionGetHandler,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
+import {
+    pickString,
+    validateWorkOrderDocumentBody,
+    validateWorkOrderFlowGraphJson,
+} from '../api/validators.ts';
+import { postWorkOrderDocumentOp } from '../api/routes.ts';
+import {
+    latestClaimEvent,
+} from '../api/work-order-claims.ts';
+import { deriveFlowWorkOrders } from
+    '../api/derive-flow-work-orders.ts';
+import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
+import {
+    buildLeadToCloseWorkload,
+} from '../api/mock-data/lead-to-close-flow.ts';
+import { l2cFlowId } from '../api/mock-data/lead-to-close-flow.ts';
+import {
+    STARK_ORGANIZATION,
+    ORGANIZATION_TWO,
+} from '../api/mock-data/seed-constants.ts';
+import { organizationToken } from './token-fixtures.ts';
+import { seedOrganizationMember } from './root-admin-fixture.ts';
+import {
+    generateCryptoSafeBase62,
+} from '../shared/crypto-safe-base62.ts';
+import { parseJson } from '../shared/http-message/json-codec.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
+import {
+    defaultBodyRegistry,
+} from '../shared/http-message/media-registry.ts';
+
+// The E10 drift check (Phase 5 Task 6): message-derived reads
+// proven equal to the old-table-derived reads Task 7 flips onto
+// them. NOTHING reads the pairs in production yet — this file
+// alone gates that flip; it stays as a regression guard through
+// Phase Final.
+//
+// Work-orders is a SIMPLE, STATELESS family (family-registry.ts
+// / api/document-family.ts's DocumentFamilyWiring.lifecycle),
+// so the three-plane vocabulary the trio families (ideas,
+// projects, flows) each carry — a LOCK head (locked-class
+// concurrency), a DOCUMENT head (envelope (at,id) over PUT/
+// DELETE at the entity address), and a LIFECYCLE walk (the
+// Decision 7 state/state_at/state_event_id trio folded into
+// every document body) — collapses to DOCUMENT-head-only here:
+// LOCK is n/a (work-orders is 'simple' concurrency, never
+// 'locked'), and LIFECYCLE is n/a (a work order's lifecycle is
+// written ONLY by the create/claim/transition ops and the
+// states/:id unclaim path, never by the document PUT — see
+// postWorkOrderDocumentOp's own header for the stateless
+// rationale, and validateWorkOrderDocumentBody's for the
+// author-gate decision that rejects a trio-carrying body at the
+// wire). The entity/collection reads below reuse the Task 2
+// generic machinery (document-family.ts's documentGetHandler /
+// documentCollectionGetHandler) directly, parameterized by a
+// wiring object that mirrors routes.ts's private
+// WORK_ORDERS_WIRING by content (not exported — every family's
+// wiring row is module-private to routes.ts) — no new
+// production module was needed for the entity/collection arm,
+// only for the flow<->work-order JOIN (api/derive-flow-work-
+// orders.ts), which has no generic counterpart since a join
+// address nests one level deeper than a bare family prefix.
+//
+// H7: id-lex sorts are IndexedDB-invisible (a native index scan
+// already returns primary-key order) and memory-tier-load-
+// bearing (the memory/localStorage backends are arrival-
+// ordered) — every list comparison below normalizes the OLD
+// side to id-lex; the derived side is already id-lex by
+// construction (byIdAscending, shared by both generic read
+// paths and deriveFlowWorkOrders).
+
+const BASE = 'http://localhost';
+
+function req(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+): Request {
+    return new Request(`${BASE}${path}`, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+}
+
+function sortById<T extends { id: string }>(
+    rows: readonly T[],
+): T[] {
+    return [...rows].sort((a, b) =>
+        a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+// A genuine real-time wait — case 9's expired-takeover leg needs
+// REAL elapsed time to cross a tiny lockTimeout, since the LIVE
+// route's isClaimEventExpired checks real Date.now(), never a
+// body timestamp.
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function seededDb(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    return db;
+}
+
+// A frozen work-order flow-graph snapshot, sized for the
+// caller's own scenario: a linear start -> middle -> finish,
+// with a caller-chosen lockTimeout (seconds). Independent of any
+// seeded flow's own live graph — a work order's flow_graph is a
+// point-in-time capture, never a foreign key.
+function workOrderFlowGraph(lockTimeoutSeconds: number): string {
+    return jsonObjectField({
+        name: 'Drift Fixture Flow',
+        lockTimeout: lockTimeoutSeconds,
+        nodes: [
+            {
+                id: 'n-start', name: 'Start',
+                positionX: 0, positionY: 0,
+                isCreate: true, isArchive: false,
+                memberIds: [], attributes: [],
+                taskInstructions: '',
+            },
+            {
+                id: 'n-middle', name: 'Middle',
+                positionX: 0, positionY: 0,
+                isCreate: false, isArchive: false,
+                memberIds: [], attributes: [],
+                taskInstructions: '',
+            },
+            {
+                id: 'n-finish', name: 'Finish',
+                positionX: 0, positionY: 0,
+                isCreate: false, isArchive: true,
+                memberIds: [], attributes: [],
+                taskInstructions: '',
+            },
+        ],
+        edges: [
+            {
+                id: 'e1', name: '',
+                fromNodeId: 'n-start', toNodeId: 'n-middle',
+            },
+            {
+                id: 'e2', name: '',
+                fromNodeId: 'n-middle', toNodeId: 'n-finish',
+            },
+        ],
+    });
+}
+
+// Mirrors routes.ts's private WORK_ORDERS_WIRING by content —
+// that row is module-private (every family's wiring row is), so
+// this test reconstructs the three fields its OWN read path
+// consults (family, lifecycle, notFoundTable, entityOf);
+// documentOp/validateDocument ride along to satisfy the
+// interface but are never invoked by the two generic read
+// functions below.
+const WORK_ORDERS_TEST_WIRING: DocumentFamilyWiring = {
+    family: 'work-orders',
+    lifecycle: 'stateless',
+    notFoundTable: 'work_orders',
+    validateDocument: validateWorkOrderDocumentBody,
+    documentOp: postWorkOrderDocumentOp,
+    entityOf: (document, organization) => ({
+        id: document.uriId,
+        organization_id: organization,
+        ...document.body,
+    }),
+};
+
+// Any Id works here — both generic read paths ignore their
+// `actor` argument entirely.
+const READER_ACTOR: Id = 'drift-reader';
+
+async function derivedWorkOrders(
+    db: DbAdapter, organization: Id,
+): Promise<WorkOrderEntity[]> {
+    return documentCollectionGetHandler(WORK_ORDERS_TEST_WIRING)(
+        db, [], READER_ACTOR, organization,
+    ) as Promise<WorkOrderEntity[]>;
+}
+
+async function derivedWorkOrder(
+    db: DbAdapter, organization: Id, id: Id,
+): Promise<WorkOrderEntity> {
+    return documentGetHandler(WORK_ORDERS_TEST_WIRING)(
+        db, [id], READER_ACTOR, organization,
+    ) as Promise<WorkOrderEntity>;
+}
+
+// Every seeded work order's own id: the 45 hand-authored rows
+// (buildWorkOrders — 39 Customer Onboarding + 6 Proposal Review
+// Cycle) plus the 100 generated Lead-to-Close rows. All 145 land
+// in STARK_ORGANIZATION (mock-data.ts: "The whole work-order
+// graph stays in org '1'").
+const SEEDED_WORK_ORDER_IDS = [
+    ...buildWorkOrders().map((wo) => wo.id),
+    ...buildLeadToCloseWorkload().workOrders.map((wo) => wo.id),
+];
+
+// The three flows carrying seeded joins, paired with their own
+// join count (the 39/6/100 split) — 'E2BnBlZyrriqsQYkmS4usb'
+// (Fusion Flow) carries none, the empty case below.
+const SEEDED_JOIN_FLOWS = [
+    { flowId: 'h5mErVBQhwdMKwi1co30jB', count: 39 },
+    { flowId: '7COt7Kf4OaOBg6AjaNO04s', count: 6 },
+    { flowId: l2cFlowId, count: 100 },
+];
+const EMPTY_FLOW_ID = 'E2BnBlZyrriqsQYkmS4usb';
+
+// -- 1. work-orders collection parity, Stark org ---------------
+
+test('work-orders collection: message-derived equals'
++ ' old-table-derived, Stark org', async () => {
+    const db = await seededDb();
+    const derived = await derivedWorkOrders(
+        db, STARK_ORGANIZATION,
+    );
+    const old = sortById(
+        await organizationScopedAdapter(
+            db, STARK_ORGANIZATION,
+        ).workOrders.getAll(),
+    );
+    assert.equal(derived.length, 145);
+    assert.equal(old.length, 145);
+    assert.deepEqual(derived, old);
+});
+
+// -- 2. org-2 empty collection + foreign-org 404 parity --------
+
+test('org-2 carries no work orders; a foreign-org getById 404s'
++ ' identically on both planes', async () => {
+    const db = await seededDb();
+    const derivedEmpty = await derivedWorkOrders(
+        db, ORGANIZATION_TWO,
+    );
+    const oldEmpty = await organizationScopedAdapter(
+        db, ORGANIZATION_TWO,
+    ).workOrders.getAll();
+    assert.deepEqual(derivedEmpty, []);
+    assert.deepEqual(oldEmpty, []);
+
+    const foreignId = SEEDED_WORK_ORDER_IDS[0]!;
+    const expectedMessage =
+        'Not found: work_orders/' + foreignId;
+    await assert.rejects(
+        () => derivedWorkOrder(db, ORGANIZATION_TWO, foreignId),
+        (err: unknown) =>
+            err instanceof EntityNotFoundError
+            && err.message === expectedMessage,
+    );
+    await assert.rejects(
+        () => organizationScopedAdapter(db, ORGANIZATION_TWO)
+            .workOrders.getById(foreignId),
+        (err: unknown) =>
+            err instanceof EntityNotFoundError
+            && err.message === expectedMessage,
+    );
+});
+
+// -- 3. per-WO getById parity across every seeded WO -----------
+
+test('per-work-order getById parity across every seeded work'
++ ' order, flow_graph compared byte-exactly', async () => {
+    const db = await seededDb();
+    assert.equal(SEEDED_WORK_ORDER_IDS.length, 145);
+    for (const id of SEEDED_WORK_ORDER_IDS) {
+        const derived = await derivedWorkOrder(
+            db, STARK_ORGANIZATION, id,
+        );
+        const old = await organizationScopedAdapter(
+            db, STARK_ORGANIZATION,
+        ).workOrders.getById(id);
+        assert.deepEqual(derived, old);
+        assert.equal(derived.flow_graph, old.flow_graph);
+    }
+});
+
+// -- 4. join parity per flow (the 39/6/100 split) + empty ------
+
+test('flow-work-order join parity across every seeded flow'
++ ' (the 39/6/100 split)', async () => {
+    const db = await seededDb();
+    for (const { flowId, count } of SEEDED_JOIN_FLOWS) {
+        const derived = await deriveFlowWorkOrders(
+            db, STARK_ORGANIZATION, flowId,
+        );
+        const old = sortById(
+            await organizationScopedAdapter(
+                db, STARK_ORGANIZATION,
+            ).flowWorkOrders.getAllWhere('flow_id', flowId),
+        );
+        assert.equal(derived.length, count);
+        assert.equal(old.length, count);
+        assert.deepEqual(derived, old);
+    }
+});
+
+test('a flow with no work orders derives an empty join list'
++ ' on both planes', async () => {
+    const db = await seededDb();
+    const derived = await deriveFlowWorkOrders(
+        db, STARK_ORGANIZATION, EMPTY_FLOW_ID,
+    );
+    const old = await organizationScopedAdapter(
+        db, STARK_ORGANIZATION,
+    ).flowWorkOrders.getAllWhere('flow_id', EMPTY_FLOW_ID);
+    assert.deepEqual(derived, []);
+    assert.deepEqual(old, []);
+});
+
+// -- shared live-write helpers ----------------------------------
+
+function createWorkOrderBody(
+    id: string,
+    flowWorkOrderId: string,
+    flowId: string,
+    graph: string,
+    events: {
+        readonly ids: readonly [string, string, string];
+        readonly ats: readonly [string, string, string];
+        readonly states: readonly [string, string, string];
+    },
+    joinAt: string,
+): Record<string, unknown> {
+    return {
+        id,
+        workOrder: {
+            display_id: 'drift-' + id,
+            flow_graph: graph,
+            position: 1,
+        },
+        flowWorkOrderId,
+        flowWorkOrder: {
+            flow_id: flowId,
+            work_order_id: id,
+            at: joinAt,
+        },
+        stateEventIds: events.ids,
+        stateEventAts: events.ats,
+        states: events.states,
+    };
+}
+
+async function assertEntityAndJoinParity(
+    db: MemoryDbAdapter, workOrderId: string, flowId: string,
+): Promise<void> {
+    const derivedEntity = await derivedWorkOrder(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    const oldEntity = await organizationScopedAdapter(
+        db, STARK_ORGANIZATION,
+    ).workOrders.getById(workOrderId);
+    assert.deepEqual(derivedEntity, oldEntity);
+
+    const derivedJoins = await deriveFlowWorkOrders(
+        db, STARK_ORGANIZATION, flowId,
+    );
+    const oldJoins = sortById(
+        await organizationScopedAdapter(
+            db, STARK_ORGANIZATION,
+        ).flowWorkOrders.getAllWhere('flow_id', flowId),
+    );
+    assert.deepEqual(derivedJoins, oldJoins);
+}
+
+// -- 5. live-write chain, re-compared on both planes -----------
+
+test('live-write chain: birth-claimed create, two transitions'
++ ' (one releasing the claim), an entity PUT, a fresh'
++ ' re-claim, an idempotent re-claim, a rejected foreign claim,'
++ ' and an unclaim — re-compared on both planes at every step',
+async () => {
+    const db = await seededDb();
+    const tokenA = await organizationToken('current');
+    await seedOrganizationMember(db, 'member-b');
+    const tokenB = await organizationToken('member-b');
+
+    const workOrderId = 'wo-drift-chain-1';
+    const flowWorkOrderId = 'wo-drift-chain-1-fwo';
+    const flowId = EMPTY_FLOW_ID;
+    const graph = workOrderFlowGraph(8 * 60 * 60);
+
+    // Every `at`/`claimAt`/`expireAt` below is minted via
+    // nowUtc() at the point of use — exactly as a real client
+    // mints them (postStateEvent, deleteWorkOrderClaim) — NEVER
+    // a fixed past literal: the claim steps below are checked by
+    // the LIVE route's isClaimEventExpired against REAL
+    // Date.now(), so a fixed literal far from the sandbox's real
+    // clock would read as already-expired and corrupt the
+    // "fresh"/"idempotent" branches this chain drives. nowUtc()
+    // is globally strictly monotonic, so sequential mints stay
+    // ordered with no gap bookkeeping needed.
+
+    // Create by A: birth-claimed — the third event IS 'claimed'
+    // by the creator (verification finding, lens 3).
+    const created = await handleRequest(db, req(
+        'POST', '/work-orders', tokenA,
+        createWorkOrderBody(
+            workOrderId, flowWorkOrderId, flowId, graph,
+            {
+                ids: [
+                    'wo-drift-chain-1-ev1',
+                    'wo-drift-chain-1-ev2',
+                    'wo-drift-chain-1-ev3',
+                ],
+                ats: [nowUtc(), nowUtc(), nowUtc()],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            nowUtc(),
+        ),
+    ));
+    assert.equal(created.status, 204);
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // Transition with 2+ field values, no release.
+    const transition1 = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/transition',
+        tokenA, {
+            transitionEventId: 'wo-drift-chain-1-te1',
+            targetState: 'n-middle',
+            fieldValues: [
+                {
+                    id: 'wo-drift-chain-1-fv1',
+                    fields: {
+                        state_event_id: 'wo-drift-chain-1-te1',
+                        attribute_id: 'attr-severity',
+                        value: 'high',
+                    },
+                },
+                {
+                    id: 'wo-drift-chain-1-fv2',
+                    fields: {
+                        state_event_id: 'wo-drift-chain-1-te1',
+                        attribute_id: 'attr-notes',
+                        value: 'looks fine',
+                    },
+                },
+            ],
+            release: null,
+            transitionAt: nowUtc(),
+        },
+    ));
+    assert.equal(transition1.status, 204);
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // Transition WITH release — ends A's birth claim. Mint
+    // transitionAt before releaseAt so the at-ordered log
+    // matches route post order (the existing api-work-order-
+    // transition.test.ts idiom).
+    const transition2At = nowUtc();
+    const transition2ReleaseAt = nowUtc();
+    const transition2 = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/transition',
+        tokenA, {
+            transitionEventId: 'wo-drift-chain-1-te2',
+            targetState: 'n-finish',
+            fieldValues: [],
+            release: {
+                id: 'wo-drift-chain-1-rel1',
+                state: 'claim_released',
+                at: transition2ReleaseAt,
+            },
+            transitionAt: transition2At,
+        },
+    ));
+    assert.equal(transition2.status, 204);
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // Entity PUT: a position bump. Its own body's flow_graph
+    // MUST deep-equal the create's — the fixture invariant case
+    // 9's LOCKTIMEOUT SOURCING leans on, asserted explicitly.
+    // Compare the STORED, round-tripped create body's own
+    // workOrder.flow_graph against the entity PUT's STORED,
+    // round-tripped response — two independently re-encoded
+    // values, not the same in-memory literal.
+    const storedCreatePostRow = (await db.requests.getAllWhere(
+        'uri_prefix',
+        canonicalUriPrefix(STARK_ORGANIZATION, '/work-orders/'),
+    )).find(
+        (r) => r.uri_id === workOrderId
+            && decodeRequestMessage(r.message).method === 'POST',
+    )!;
+    const storedCreateFlowGraph = (
+        decodeRequestMessage(storedCreatePostRow.message)
+            .body['workOrder'] as { flow_graph: string }
+    ).flow_graph;
+    const entityPut = await handleRequest(db, req(
+        'PUT', '/work-orders/' + workOrderId, tokenA, {
+            display_id: 'drift-' + workOrderId,
+            flow_graph: graph,
+            position: 2,
+        },
+    ));
+    assert.equal(entityPut.status, 200);
+    const putBody = await entityPut.json() as {
+        flow_graph: string;
+    };
+    assert.deepEqual(putBody.flow_graph, storedCreateFlowGraph);
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // Claim by A — fresh: prior is 'claim_released', not live.
+    const claimFreshAt = nowUtc();
+    const claimFresh = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim',
+        tokenA, {
+            claimEventId: 'wo-drift-chain-1-ce1',
+            claimAt: claimFreshAt,
+            expireEventId: 'wo-drift-chain-1-ee1',
+            expireAt: claimFreshAt,
+        },
+    ));
+    assert.equal(claimFresh.status, 204);
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // Repeat-claim by A — idempotent no-op: the pair appends,
+    // but NO new state event lands. Fires milliseconds after the
+    // fresh claim above, well within the 8-hour DEFAULT_LOCK_
+    // TIMEOUT, so the LIVE route's real-clock isClaimEventExpired
+    // reads it as live.
+    const beforeRepeat =
+        (await db.states.getAllFor(workOrderId)).length;
+    const claimRepeatAt = nowUtc();
+    const claimRepeat = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim',
+        tokenA, {
+            claimEventId: 'wo-drift-chain-1-ce2',
+            claimAt: claimRepeatAt,
+            expireEventId: 'wo-drift-chain-1-ee2',
+            expireAt: claimRepeatAt,
+        },
+    ));
+    assert.equal(claimRepeat.status, 204);
+    assert.equal(
+        (await db.states.getAllFor(workOrderId)).length,
+        beforeRepeat,
+    );
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // Claim attempt by actor B — 409, nothing stored.
+    const beforeReject =
+        (await db.requests.getAll()).length;
+    const claimRejectAt = nowUtc();
+    const claimReject = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim',
+        tokenB, {
+            claimEventId: 'wo-drift-chain-1-ce3',
+            claimAt: claimRejectAt,
+            expireEventId: 'wo-drift-chain-1-ee3',
+            expireAt: claimRejectAt,
+        },
+    ));
+    assert.equal(claimReject.status, 409);
+    assert.equal(
+        (await db.requests.getAll()).length, beforeReject,
+    );
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // Unclaim by A via deleteWorkOrderClaim's wire path: a bare
+    // PUT states/:id recording 'claim_released'.
+    const unclaimEventId = generateCryptoSafeBase62();
+    const unclaim = await handleRequest(db, req(
+        'PUT', '/states/' + unclaimEventId, tokenA, {
+            entity_id: workOrderId,
+            state: 'claim_released',
+            at: nowUtc(),
+        },
+    ));
+    assert.equal(unclaim.status, 200);
+    await assertEntityAndJoinParity(db, workOrderId, flowId);
+
+    // The full chain: create(3) + transition1(1) +
+    // transition2(2) + entity PUT(0) + fresh claim(1) +
+    // repeat-claim(0) + rejected claim(0) + unclaim(1) = 8.
+    assert.equal(
+        (await db.states.getAllFor(workOrderId)).length, 8,
+    );
+});
+
+// -- 6. duplicate-create multiset -------------------------------
+
+test('duplicate-create: two creates, same work-order id, fresh'
++ ' join id + fresh event ids/ats on the second — ONE'
++ ' work_orders row both planes; TWO join rows; SIX birth'
++ ' events old-plane', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const workOrderId = 'wo-drift-dup-1';
+    const flowId = EMPTY_FLOW_ID;
+    const graph = workOrderFlowGraph(8 * 60 * 60);
+    const pfidA = 'wo-drift-dup-1-fwo-a';
+    const pfidB = 'wo-drift-dup-1-fwo-b';
+
+    const first = await handleRequest(db, req(
+        'POST', '/work-orders', token,
+        createWorkOrderBody(
+            workOrderId, pfidA, flowId, graph,
+            {
+                ids: [
+                    'wo-drift-dup-1-a-ev1',
+                    'wo-drift-dup-1-a-ev2',
+                    'wo-drift-dup-1-a-ev3',
+                ],
+                ats: [
+                    '2026-05-02T00:00:00.000000Z',
+                    '2026-05-02T00:00:00.000001Z',
+                    '2026-05-02T00:00:00.000002Z',
+                ],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            '2026-05-02T00:00:00.000000Z',
+        ),
+    ));
+    assert.equal(first.status, 204);
+
+    const second = await handleRequest(db, req(
+        'POST', '/work-orders', token,
+        createWorkOrderBody(
+            workOrderId, pfidB, flowId, graph,
+            {
+                ids: [
+                    'wo-drift-dup-1-b-ev1',
+                    'wo-drift-dup-1-b-ev2',
+                    'wo-drift-dup-1-b-ev3',
+                ],
+                ats: [
+                    '2026-05-02T00:00:01.000000Z',
+                    '2026-05-02T00:00:01.000001Z',
+                    '2026-05-02T00:00:01.000002Z',
+                ],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            '2026-05-02T00:00:01.000000Z',
+        ),
+    ));
+    // The create op holds no echo of its own — a duplicate
+    // create succeeds outright, never 412ing.
+    assert.equal(second.status, 204);
+
+    const derivedEntity = await derivedWorkOrder(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    const oldEntity = await organizationScopedAdapter(
+        db, STARK_ORGANIZATION,
+    ).workOrders.getById(workOrderId);
+    assert.deepEqual(derivedEntity, oldEntity);
+
+    assert.equal(
+        (await db.states.getAllFor(workOrderId)).length, 6,
+    );
+
+    const derivedJoins = (await deriveFlowWorkOrders(
+        db, STARK_ORGANIZATION, flowId,
+    )).filter((row) => row.id === pfidA || row.id === pfidB);
+    const oldJoins = (await organizationScopedAdapter(
+        db, STARK_ORGANIZATION,
+    ).flowWorkOrders.getAllWhere(
+        'flow_id', flowId,
+    )).filter((row) => row.id === pfidA || row.id === pfidB);
+    assert.equal(oldJoins.length, 2);
+    assert.deepEqual(sortById(derivedJoins), sortById(oldJoins));
+});
+
+// -- 7. document supersession (plain, NOT skew) -----------------
+
+// NAMED divergence from the trio families' skew tests: for a
+// stateless document, envelope order and arrival order are
+// STRUCTURALLY identical (nowUtc is globally strictly monotonic
+// and response `at` is minted synchronously pre-commit), so no
+// live two-PUT sequence can decouple them — and there is no body
+// timestamp to skew (the flows/ideas/projects skew tests skewed
+// the TRIO's state_at, which this stateless family does not
+// carry). This case asserts plain Simple-PUT supersession only.
+// Bare-req idiom, no header threading — a NAMED contrast to
+// derive-flows' locked-echo idiom (work-orders is 'simple'
+// concurrency, never 'locked').
+test('document supersession: PUT #2 (byte-divergent body)'
++ ' supersedes PUT #1; derivation returns PUT #2\'s body',
+async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const workOrderId = 'wo-drift-supersede-1';
+
+    const first = await handleRequest(db, req(
+        'PUT', '/work-orders/' + workOrderId, token, {
+            display_id: 'first',
+            flow_graph: workOrderFlowGraph(8 * 60 * 60),
+            position: 1,
+        },
+    ));
+    assert.equal(first.status, 200);
+    const firstId = first.headers.get('Response-ID');
+    assert.ok(firstId);
+
+    const second = await handleRequest(db, req(
+        'PUT', '/work-orders/' + workOrderId, token, {
+            display_id: 'second',
+            flow_graph: workOrderFlowGraph(4 * 60 * 60),
+            position: 2,
+        },
+    ));
+    assert.equal(second.status, 200);
+    assert.equal(second.headers.get('Supersedes'), firstId);
+
+    const derived = await derivedWorkOrder(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    const old = await organizationScopedAdapter(
+        db, STARK_ORGANIZATION,
+    ).workOrders.getById(workOrderId);
+    assert.deepEqual(derived, old);
+    assert.equal(derived.display_id, 'second');
+    assert.equal(derived.position, 2);
+});
+
+// -- 8. method-filter: the create's POST pair is never the -----
+// -- derived head (the shape-incompatibility mirror) -----------
+
+test('the create-op POST pair is not read as a document pair —'
++ ' documentPairsAt returns exactly one pair (the PUT), and the'
++ ' create/document bodies share zero top-level keys',
+async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const workOrderId = 'wo-drift-method-filter-1';
+    const flowWorkOrderId = 'wo-drift-method-filter-1-fwo';
+    const flowId = EMPTY_FLOW_ID;
+    const graph = workOrderFlowGraph(8 * 60 * 60);
+
+    const created = await handleRequest(db, req(
+        'POST', '/work-orders', token,
+        createWorkOrderBody(
+            workOrderId, flowWorkOrderId, flowId, graph,
+            {
+                ids: [
+                    'wo-drift-method-filter-1-ev1',
+                    'wo-drift-method-filter-1-ev2',
+                    'wo-drift-method-filter-1-ev3',
+                ],
+                ats: [
+                    '2026-05-03T00:00:00.000000Z',
+                    '2026-05-03T00:00:00.000001Z',
+                    '2026-05-03T00:00:00.000002Z',
+                ],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            '2026-05-03T00:00:00.000000Z',
+        ),
+    ));
+    assert.equal(created.status, 204);
+
+    const prefix = canonicalUriPrefix(
+        STARK_ORGANIZATION, '/work-orders/',
+    );
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', prefix),
+        db.responses.getAllWhere('uri_prefix', prefix),
+    ]);
+    const atAddress = requests.filter(
+        (r) => r.uri_prefix === prefix
+            && r.uri_id === workOrderId,
+    );
+    // Both an operation (POST, 204) pair and a document (PUT)
+    // pair share the SAME uriId.
+    assert.equal(atAddress.length, 2);
+
+    const documentPairs = documentPairsAt(
+        requests, responses, prefix,
+    ).filter((pair) => pair.uriId === workOrderId);
+    assert.equal(documentPairs.length, 1);
+    assert.equal(documentPairs[0]!.method, 'PUT');
+
+    const postRow = atAddress.find(
+        (r) => decodeRequestMessage(r.message).method === 'POST',
+    )!;
+    const createBodyKeys = new Set(
+        Object.keys(decodeRequestMessage(postRow.message).body),
+    );
+    const documentBodyKeys = new Set(
+        Object.keys(documentPairs[0]!.body),
+    );
+    const overlap = [...createBodyKeys].filter(
+        (key) => documentBodyKeys.has(key),
+    );
+    assert.deepEqual(overlap, []);
+});
+
+// -- decode helper (test-side; mirrors tests/api-shadow-ledger- -
+// -- work-orders.test.ts's own decodeRequestMessage) ------------
+
+function decodeRequestMessage(message: string): {
+    readonly method: string;
+    readonly body: Record<string, unknown>;
+} {
+    const model = parseJson(message, defaultBodyRegistry());
+    if (model.startLine.kind !== 'request') {
+        throw new Error(
+            'stored message carries no request line',
+        );
+    }
+    const body = HttpMessage.fromModel(model).body();
+    return {
+        method: model.startLine.method,
+        body: body.exists()
+            ? JSON.parse(body.toText()) as
+                Record<string, unknown>
+            : {},
+    };
+}
+
+// -- 9. THE TRACE-REPLAY PROOF -----------------------------------
+//
+// A test-side helper (BY DESIGN — its only consumer is this
+// proof; the production version, if ever needed, belongs to the
+// states-consumers phase against its own consumers) replays a
+// live work order's full state history from its MESSAGE PAIRS
+// ALONE, never from old-plane rows. Every replay rule below is
+// PINNED (verification findings, lens 3 — B1/P1/P2/P3 applied);
+// see the task brief for the authoritative wording.
+
+// Every successful pair at a prefix, ANY method — the test-side
+// counterpart of derive-documents.ts's documentPairsAt, which
+// deliberately EXCLUDES POST (the DOCUMENT head is PUT/DELETE
+// only). The create's own 3-slot birth arrays live in the POST
+// operation pair, so this replay needs the unfiltered read the
+// production reduction intentionally never exposes — named for
+// its role (every pair, any method) rather than "documentPairsAt
+// without the filter", so no reader mistakes it for a production
+// substitute.
+interface AnyPair {
+    readonly id: string;
+    readonly at: string;
+    readonly uriId: string;
+    readonly method: string;
+    readonly body: Record<string, unknown>;
+    readonly requesterIdentityId: string;
+}
+
+function atIdCompare(
+    a: { readonly at: string; readonly id: string },
+    b: { readonly at: string; readonly id: string },
+): number {
+    return a.at < b.at ? -1
+        : a.at > b.at ? 1
+            : a.id < b.id ? -1
+                : a.id > b.id ? 1
+                    : 0;
+}
+
+function allPairsAt(
+    requests: readonly RequestEntity[],
+    responses: readonly ResponseEntity[],
+    uriPrefix: string,
+): AnyPair[] {
+    const requestById = new Map(
+        requests.map((request) => [request.id, request]),
+    );
+    const pairs: AnyPair[] = [];
+    for (const response of responses) {
+        if (
+            response.uri_prefix !== uriPrefix
+            || response.status < 200
+            || response.status > 299
+        ) continue;
+        const request = requestById.get(response.id);
+        if (request === undefined) continue;
+        const decoded = decodeRequestMessage(request.message);
+        pairs.push({
+            id: response.id,
+            at: response.at,
+            uriId: response.uri_id,
+            method: decoded.method,
+            body: decoded.body,
+            requesterIdentityId: request.requester_identity_id,
+        });
+    }
+    return pairs.sort(atIdCompare);
+}
+
+// A pure Date-parse subtraction — the replay's own comparator,
+// reproducing the route's `>=` boundary EXACTLY WITHOUT importing
+// isClaimEventExpired (Date.now-coupled; barred by the brief).
+function msBetween(laterIso: string, earlierIso: string): number {
+    return Date.parse(laterIso) - Date.parse(earlierIso);
+}
+
+function isExpiredAsOf(
+    claimAt: string,
+    priorAt: string,
+    lockTimeoutSeconds: number,
+): boolean {
+    return msBetween(claimAt, priorAt)
+        >= lockTimeoutSeconds * MS_PER_SECOND;
+}
+
+// LOCKTIMEOUT SOURCING: the WO's DOCUMENT HEAD as of `momentAt`
+// — the (at, id) winner among PUT/DELETE pairs whose response
+// `at` strictly precedes it. `entityPairs` is ascending by (at,
+// id) already (documentPairsAt's own contract), so the last
+// entry passing the filter IS that winner.
+function documentHeadBefore(
+    entityPairs: readonly DocumentPair[],
+    momentAt: string,
+): DocumentPair | undefined {
+    const before = entityPairs.filter((p) => p.at < momentAt);
+    return before[before.length - 1];
+}
+
+function lockTimeoutAsOf(
+    entityPairs: readonly DocumentPair[],
+    momentAt: string,
+): number {
+    const head = documentHeadBefore(entityPairs, momentAt);
+    if (head === undefined) {
+        throw new Error(
+            'no document head before ' + momentAt,
+        );
+    }
+    return validateWorkOrderFlowGraphJson(
+        pickString(head.body, 'flow_graph'),
+        'trace-replay document head flow_graph',
+    ).lockTimeout;
+}
+
+interface FieldValueTriple {
+    readonly id: string;
+    readonly state_event_id: string;
+    readonly attribute_id: string;
+    readonly value: string;
+}
+
+// Each claim pair re-runs the 0/1/2-event decision with the
+// pair BODY's claimAt as the reference clock. PRIOR state
+// reduces from the REPLAYED events so far (never old-plane
+// rows) via latestClaimEvent's own CLAIM_STATES filter + (at,
+// id) max — the mechanics are pure and Date.now-free, so
+// reusing them here does not reintroduce the barred coupling.
+function applyClaimPair(
+    replayed: StateEntity[],
+    entityPairs: readonly DocumentPair[],
+    claim: AnyPair,
+    workOrderId: string,
+): void {
+    const claimEventId = pickString(claim.body, 'claimEventId');
+    const claimAt = pickString(claim.body, 'claimAt');
+    const expireEventId = pickString(
+        claim.body, 'expireEventId',
+    );
+    const expireAt = pickString(claim.body, 'expireAt');
+    const lockTimeout = lockTimeoutAsOf(entityPairs, claim.at);
+    const prior = latestClaimEvent(replayed, workOrderId);
+    const priorLive = prior !== null
+        && prior.state === 'claimed'
+        && !isExpiredAsOf(claimAt, prior.at, lockTimeout);
+
+    if (priorLive) {
+        // Idempotent re-claim by the SAME actor: the claim
+        // pair's requesterIdentityId is the only actor signal
+        // the body carries — 0 events. (A foreign live claim
+        // 409s before any pair forms — never reaches here.)
+        return;
+    }
+    if (prior !== null && prior.state === 'claimed') {
+        replayed.push({
+            id: expireEventId,
+            entity_id: workOrderId,
+            state: 'claim_expired',
+            // Recovered from the PRIOR claim pair's OWN
+            // replayed event author, never the current pair.
+            member_id: prior.member_id,
+            at: expireAt,
+        });
+    }
+    replayed.push({
+        id: claimEventId,
+        entity_id: workOrderId,
+        state: 'claimed',
+        member_id: claim.requesterIdentityId,
+        at: claimAt,
+    });
+}
+
+function applyTransitionPair(
+    replayed: StateEntity[],
+    replayedFieldValues: FieldValueTriple[],
+    transition: AnyPair,
+    workOrderId: string,
+): void {
+    const transitionEventId = pickString(
+        transition.body, 'transitionEventId',
+    );
+    const targetState = pickString(
+        transition.body, 'targetState',
+    );
+    const transitionAt = pickString(
+        transition.body, 'transitionAt',
+    );
+    replayed.push({
+        id: transitionEventId,
+        entity_id: workOrderId,
+        state: targetState,
+        member_id: transition.requesterIdentityId,
+        at: transitionAt,
+    });
+
+    const fieldValues = transition.body['fieldValues'] as
+        readonly { id: string; fields: Record<string, unknown> }[];
+    for (const row of fieldValues) {
+        replayedFieldValues.push({
+            id: row.id,
+            state_event_id: pickString(
+                row.fields, 'state_event_id',
+            ),
+            attribute_id: pickString(
+                row.fields, 'attribute_id',
+            ),
+            value: pickString(row.fields, 'value'),
+        });
+    }
+
+    const release = transition.body['release'];
+    if (release !== null) {
+        const releaseFields = release as {
+            id: string; state: string; at: string;
+        };
+        replayed.push({
+            id: releaseFields.id,
+            entity_id: workOrderId,
+            // VERBATIM from the pair body — the gate does not
+            // constrain release.state to 'claim_released';
+            // never hardcode the constant.
+            state: releaseFields.state,
+            member_id: transition.requesterIdentityId,
+            at: releaseFields.at,
+        });
+    }
+}
+
+interface ReplayResult {
+    readonly events: StateEntity[];
+    readonly fieldValues: FieldValueTriple[];
+}
+
+// The orchestrator: gather every message pair the live chain
+// could have formed for `workOrderId`, then replay them in
+// (at, id) order into a StateEntity[] — the SAME shape and the
+// SAME order db.states.getAllFor(workOrderId) returns.
+async function replayWorkOrderStates(
+    db: MemoryDbAdapter,
+    organization: string,
+    workOrderId: string,
+): Promise<ReplayResult> {
+    const woPrefix = canonicalUriPrefix(
+        organization, '/work-orders/',
+    );
+    const [woRequests, woResponses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', woPrefix),
+        db.responses.getAllWhere('uri_prefix', woPrefix),
+    ]);
+    const allWoPairs = allPairsAt(woRequests, woResponses, woPrefix);
+    const createPair = allWoPairs.find(
+        (p) => p.method === 'POST' && p.uriId === workOrderId,
+    );
+    if (createPair === undefined) {
+        throw new Error(
+            'no create pair found for ' + workOrderId,
+        );
+    }
+    const entityPairs = documentPairsAt(
+        woRequests, woResponses, woPrefix,
+    ).filter((pair) => pair.uriId === workOrderId);
+
+    const claimPrefix = canonicalUriPrefix(
+        organization,
+        '/work-orders/' + workOrderId + '/claim/',
+    );
+    const [claimRequests, claimResponses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', claimPrefix),
+        db.responses.getAllWhere('uri_prefix', claimPrefix),
+    ]);
+    const claimPairs = allPairsAt(
+        claimRequests, claimResponses, claimPrefix,
+    ).filter((p) => p.method === 'POST');
+
+    const transitionPrefix = canonicalUriPrefix(
+        organization,
+        '/work-orders/' + workOrderId + '/transition/',
+    );
+    const [
+        transitionRequests, transitionResponses,
+    ] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', transitionPrefix),
+        db.responses.getAllWhere('uri_prefix', transitionPrefix),
+    ]);
+    const transitionPairs = allPairsAt(
+        transitionRequests, transitionResponses,
+        transitionPrefix,
+    ).filter((p) => p.method === 'POST');
+
+    // The unclaim event recovers from the states/:id pair by
+    // BODY entity_id predicate — an UNINDEXED CROSS-FAMILY FULL
+    // SCAN of the organization's entire states/ prefix (four
+    // OTHER families — ideas, projects, flows, records — post
+    // through the same postStateEvent/states/:id address, so no
+    // keyed lookup by entity_id exists at the message plane).
+    // Test-tier only (E13-class); never a production pattern.
+    const statesPrefix = canonicalUriPrefix(
+        organization, '/states/',
+    );
+    const [stateRequests, stateResponses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', statesPrefix),
+        db.responses.getAllWhere('uri_prefix', statesPrefix),
+    ]);
+    const unclaimPairs = allPairsAt(
+        stateRequests, stateResponses, statesPrefix,
+    ).filter(
+        (p) => p.method === 'PUT'
+            && pickString(p.body, 'entity_id') === workOrderId,
+    );
+
+    // The create pair's 3-slot arrays synthesize the three birth
+    // events, all authored by the create pair's own
+    // requesterIdentityId.
+    const events: StateEntity[] = [];
+    const ids = createPair.body['stateEventIds'] as
+        readonly string[];
+    const ats = createPair.body['stateEventAts'] as
+        readonly string[];
+    const states = createPair.body['states'] as
+        readonly string[];
+    for (let i = 0; i < 3; i++) {
+        events.push({
+            id: ids[i]!,
+            entity_id: workOrderId,
+            state: states[i]!,
+            member_id: createPair.requesterIdentityId,
+            at: ats[i]!,
+        });
+    }
+
+    const fieldValues: FieldValueTriple[] = [];
+    type Kind = 'claim' | 'transition' | 'unclaim';
+    const actions: { kind: Kind; pair: AnyPair }[] = [
+        ...claimPairs.map((pair) => ({
+            kind: 'claim' as const, pair,
+        })),
+        ...transitionPairs.map((pair) => ({
+            kind: 'transition' as const, pair,
+        })),
+        ...unclaimPairs.map((pair) => ({
+            kind: 'unclaim' as const, pair,
+        })),
+    ].sort((a, b) => atIdCompare(a.pair, b.pair));
+
+    for (const action of actions) {
+        if (action.kind === 'claim') {
+            applyClaimPair(
+                events, entityPairs, action.pair, workOrderId,
+            );
+        } else if (action.kind === 'transition') {
+            applyTransitionPair(
+                events, fieldValues, action.pair, workOrderId,
+            );
+        } else {
+            events.push({
+                id: action.pair.uriId,
+                entity_id: workOrderId,
+                state: pickString(action.pair.body, 'state'),
+                member_id: action.pair.requesterIdentityId,
+                at: pickString(action.pair.body, 'at'),
+            });
+        }
+    }
+
+    events.sort(atIdCompare);
+    return { events, fieldValues };
+}
+
+test('THE TRACE-REPLAY PROOF: a test-side replay of a live'
++ ' work order\'s message pairs alone reproduces its full'
++ ' states history, event-for-event and (at, id)-ordered',
+async () => {
+    const db = await seededDb();
+    const tokenA = await organizationToken('current');
+    await seedOrganizationMember(db, 'member-b');
+    const tokenB = await organizationToken('member-b');
+
+    const workOrderId = 'wo-drift-trace-1';
+    const flowWorkOrderId = 'wo-drift-trace-1-fwo';
+    const flowId = EMPTY_FLOW_ID;
+    // A TINY lockTimeout: isClaimEventExpired checks the LIVE
+    // route's decision against REAL Date.now(), never a body
+    // timestamp, so every claim-related `at` below is minted via
+    // nowUtc() at the point of use (never a fixed literal — see
+    // case 5's own note) and the expired-takeover leg (5) waits
+    // out this tiny window for real, via sleep() below —
+    // client-minted ats far from the boundary either way, since
+    // the wait comfortably clears it.
+    const tinyLockTimeoutSeconds = 1;
+    const graph = workOrderFlowGraph(tinyLockTimeoutSeconds);
+
+    // Leg 1: birth-claimed create by A.
+    const created = await handleRequest(db, req(
+        'POST', '/work-orders', tokenA,
+        createWorkOrderBody(
+            workOrderId, flowWorkOrderId, flowId, graph,
+            {
+                ids: [
+                    'wo-drift-trace-1-ev1',
+                    'wo-drift-trace-1-ev2',
+                    'wo-drift-trace-1-ev3',
+                ],
+                ats: [nowUtc(), nowUtc(), nowUtc()],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            nowUtc(),
+        ),
+    ));
+    assert.equal(created.status, 204);
+
+    // Leg 2: release — a transition carrying release, ending
+    // A's birth claim (distinct from leg 8's direct unclaim).
+    // Mint transitionAt before releaseAt (the api-work-order-
+    // transition.test.ts idiom).
+    const releaseTransitionAt = nowUtc();
+    const releaseAt = nowUtc();
+    const release = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/transition',
+        tokenA, {
+            transitionEventId: 'wo-drift-trace-1-te1',
+            targetState: 'n-middle',
+            fieldValues: [],
+            release: {
+                id: 'wo-drift-trace-1-rel1',
+                state: 'claim_released',
+                at: releaseAt,
+            },
+            transitionAt: releaseTransitionAt,
+        },
+    ));
+    assert.equal(release.status, 204);
+
+    // The entity PUT: position bump, flow_graph held CONSTANT
+    // (case 5's named invariant) — LOCKTIMEOUT SOURCING is
+    // exercised across a document head change without a moving
+    // lock_timeout target. Compare the STORED, round-tripped
+    // create body's own workOrder.flow_graph against the entity
+    // PUT's STORED, round-tripped response body — two
+    // independently re-encoded values, not the same in-memory
+    // literal — so a canonical-JSON regression that mangled
+    // either differently would be caught.
+    const storedCreatePostRow = (await db.requests.getAllWhere(
+        'uri_prefix',
+        canonicalUriPrefix(STARK_ORGANIZATION, '/work-orders/'),
+    )).find(
+        (r) => r.uri_id === workOrderId
+            && decodeRequestMessage(r.message).method === 'POST',
+    )!;
+    const storedCreateFlowGraph = (
+        decodeRequestMessage(storedCreatePostRow.message)
+            .body['workOrder'] as { flow_graph: string }
+    ).flow_graph;
+    const entityPut = await handleRequest(db, req(
+        'PUT', '/work-orders/' + workOrderId, tokenA, {
+            display_id: 'drift-' + workOrderId,
+            flow_graph: graph,
+            position: 2,
+        },
+    ));
+    assert.equal(entityPut.status, 200);
+    const putBody = await entityPut.json() as {
+        flow_graph: string;
+    };
+    assert.deepEqual(putBody.flow_graph, storedCreateFlowGraph);
+
+    // Leg 3: re-claim by A — fresh (prior is 'claim_released').
+    const reclaimAt = nowUtc();
+    const reclaim = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim',
+        tokenA, {
+            claimEventId: 'wo-drift-trace-1-ce1',
+            claimAt: reclaimAt,
+            expireEventId: 'wo-drift-trace-1-ee1',
+            expireAt: reclaimAt,
+        },
+    ));
+    assert.equal(reclaim.status, 204);
+
+    // Leg 4: idempotent re-claim by A — fires milliseconds after
+    // leg 3, well within the tiny lockTimeout, same actor — 0
+    // events.
+    const idempotentAt = nowUtc();
+    const idempotent = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim',
+        tokenA, {
+            claimEventId: 'wo-drift-trace-1-ce2',
+            claimAt: idempotentAt,
+            expireEventId: 'wo-drift-trace-1-ee2',
+            expireAt: idempotentAt,
+        },
+    ));
+    assert.equal(idempotent.status, 204);
+
+    // Real wait, comfortably past the tiny lockTimeout, so leg
+    // 3's claim genuinely reads as expired to the LIVE route's
+    // real-clock isClaimEventExpired.
+    await sleep((tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
+
+    // Leg 5: expired takeover by B — 2 events ('claim_expired'
+    // naming A, 'claimed' naming B).
+    const takeoverExpireAt = nowUtc();
+    const takeoverClaimAt = nowUtc();
+    const takeover = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim',
+        tokenB, {
+            claimEventId: 'wo-drift-trace-1-ce3',
+            claimAt: takeoverClaimAt,
+            expireEventId: 'wo-drift-trace-1-ee3',
+            expireAt: takeoverExpireAt,
+        },
+    ));
+    assert.equal(takeover.status, 204);
+
+    // Leg 6: transition with values, by B.
+    const withValuesAt = nowUtc();
+    const withValues = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/transition',
+        tokenB, {
+            transitionEventId: 'wo-drift-trace-1-te2',
+            targetState: 'n-middle',
+            fieldValues: [
+                {
+                    id: 'wo-drift-trace-1-fv1',
+                    fields: {
+                        state_event_id: 'wo-drift-trace-1-te2',
+                        attribute_id: 'attr-severity',
+                        value: 'medium',
+                    },
+                },
+                {
+                    id: 'wo-drift-trace-1-fv2',
+                    fields: {
+                        state_event_id: 'wo-drift-trace-1-te2',
+                        attribute_id: 'attr-notes',
+                        value: 'reviewed',
+                    },
+                },
+            ],
+            release: null,
+            transitionAt: withValuesAt,
+        },
+    ));
+    assert.equal(withValues.status, 204);
+
+    // Leg 7: transition with release, by B — ends B's takeover
+    // claim. Mint transitionAt before releaseAt.
+    const withReleaseTransitionAt = nowUtc();
+    const withReleaseAt = nowUtc();
+    const withRelease = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/transition',
+        tokenB, {
+            transitionEventId: 'wo-drift-trace-1-te3',
+            targetState: 'n-finish',
+            fieldValues: [],
+            release: {
+                id: 'wo-drift-trace-1-rel2',
+                state: 'claim_released',
+                at: withReleaseAt,
+            },
+            transitionAt: withReleaseTransitionAt,
+        },
+    ));
+    assert.equal(withRelease.status, 204);
+
+    // Leg 8: unclaim — a bare PUT states/:id, by A.
+    const unclaimEventId = generateCryptoSafeBase62();
+    const unclaim = await handleRequest(db, req(
+        'PUT', '/states/' + unclaimEventId, tokenA, {
+            entity_id: workOrderId,
+            state: 'claim_released',
+            at: nowUtc(),
+        },
+    ));
+    assert.equal(unclaim.status, 200);
+
+    const replay = await replayWorkOrderStates(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    const oldHistory = await db.states.getAllFor(workOrderId);
+    assert.deepEqual(replay.events, oldHistory);
+    // create(3) + release-transition(2) + reclaim(1) +
+    // idempotent(0) + expired-takeover(2) + values-transition(1)
+    // + release-transition(2) + unclaim(1) = 12.
+    assert.equal(replay.events.length, 12);
+
+    // E10's in-message-field-values clause: the transition-with-
+    // values leg's triples compare byte-equal to the actual
+    // state_field_values rows.
+    const oldFieldValues = await db.stateFieldValues.getAllWhere(
+        'state_event_id', 'wo-drift-trace-1-te2',
+    );
+    assert.equal(replay.fieldValues.length, 2);
+    assert.deepEqual(
+        sortById(replay.fieldValues).map((row) => ({
+            state_event_id: row.state_event_id,
+            attribute_id: row.attribute_id,
+            value: row.value,
+        })),
+        sortById(oldFieldValues).map((row) => ({
+            state_event_id: row.state_event_id,
+            attribute_id: row.attribute_id,
+            value: row.value,
+        })),
+    );
+});
