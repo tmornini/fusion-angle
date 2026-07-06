@@ -19,6 +19,12 @@ import {
 import {
     firstProviderModel,
 } from './member-fixtures.ts';
+import {
+    postAiMemberDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
@@ -76,12 +82,48 @@ async () => {
     await postIdentityCreation(ctx, 's2', {
         kind: 'service', secret: 'shh',
     });
-    await db.aiMembers.put('s2', {
+    // The ai-members detail write is re-pointed onto the message
+    // pair postAiMemberDocumentOp appends (finding 18's fixture
+    // budget): getIdentityRoster reads ctx.GET('ai-members'),
+    // which is now ledger-derived, so a raw row here would never
+    // surface in the round-trip this test exercises.
+    const detail = {
         name: 'Grok 4.3',
         description: 'Fast reasoning model',
         skill_focus: '',
         model: firstProviderModel().id,
+    };
+    const entry = WRITE_RESPONSE_SPECS['ai-members/:id'];
+    if (
+        entry === undefined
+        || 'status' in entry
+        || entry.put === undefined
+    ) {
+        throw new Error(
+            'no per-write response spec for ai-members/:id',
+        );
+    }
+    const spec = entry.put;
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/ai-members/s2',
+        routePattern: 'ai-members/:id',
+        routeSegments: ['ai-members', ':id'],
+        pathSegments: ['ai-members', 's2'],
+        headerFields: [],
+        body: detail,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            ['s2'], detail, SYSTEM_MEMBER_ID, undefined,
+        ),
+        headPairId: undefined,
     });
+    await postAiMemberDocumentOp(
+        db, 's2', detail, SYSTEM_MEMBER_ID, pair,
+    );
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === 's2');
     assert.ok(row, 'roster row for s2 exists');

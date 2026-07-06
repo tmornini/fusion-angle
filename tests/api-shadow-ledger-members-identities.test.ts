@@ -154,8 +154,9 @@ test('a PUT to members/:id verifies against its hash and'
 
 // ── ai-members ──
 
-test('an ai-member create appends its pair at the entity'
-+ ' address', async () => {
+test('an ai-member create appends its bundle: operation +'
++ ' detail document share the entity address, member document'
++ ' sits at its own', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'POST', '/ai-members', DEV_TOKEN,
@@ -163,9 +164,46 @@ test('an ai-member create appends its pair at the entity'
     ));
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0]!.uri_prefix, '/ai-members/');
-    assert.equal(requests[0]!.uri_id, 'ai-1');
+    // Create balance: operation + detail document (both at the
+    // shared ai-members address) + member document (its own
+    // address) = 3 — the H7/arrival-order hazard means a
+    // positional requests[0] read is unsafe once an address
+    // holds two pairs, so filter/count instead (the
+    // objectives-family precedent).
+    assert.equal(requests.length, 3);
+    const atEntity = requests.filter(
+        r => r.uri_prefix === '/ai-members/'
+            && r.uri_id === 'ai-1',
+    );
+    assert.equal(atEntity.length, 2);
+    const atMember = requests.filter(
+        r => r.uri_prefix === '/members/' && r.uri_id === 'ai-1',
+    );
+    assert.equal(atMember.length, 1);
+    // The synthesized member document is byte-indistinguishable
+    // from a live PUT members/:id pair: `type` alone.
+    const memberBody = JSON.parse(atMember[0]!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(memberBody.body, { type: 'ai' });
+    // The synthesized detail document — distinguished from the
+    // operation pair by its OWN 200 response, the operation
+    // pair's being 204 — is byte-indistinguishable from a live
+    // PUT ai-members/:id pair: the four detail keys verbatim.
+    const responseById = new Map(
+        (await db.responses.getAll()).map(r => [r.id, r]),
+    );
+    const detailRow = atEntity.find(
+        r => responseById.get(r.id)?.status === 200,
+    );
+    assert.ok(detailRow, 'no detail document pair');
+    const detailBody = JSON.parse(detailRow!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(
+        Object.keys(detailBody.body).sort(),
+        ['description', 'model', 'name', 'skill_focus'],
+    );
 });
 
 test('a failed ai-member create appends nothing', async () => {
@@ -200,7 +238,7 @@ test('PUT ai-members/:id appends its pair, and the wire body'
     assert.deepEqual(await res.json(), domainRow);
 });
 
-test('POST ai-members/:id (composed edit) appends its pair'
+test('POST ai-members/:id (composed edit) appends its bundle'
 + ' at the SAME address as a prior PUT, and supersedes it',
 async () => {
     const db = await freshDb();
@@ -216,16 +254,54 @@ async () => {
     assert.equal(edit.status, 204);
     assert.equal(edit.headers.get('Supersedes'), firstId);
     const requests = await db.requests.getAll();
-    const editRow = requests.find(r => r.uri_id === 'ai-3'
-        && r.message.includes('Edited'));
-    assert.ok(editRow);
-    assert.equal(editRow!.uri_prefix, '/ai-members/');
+    // Edit balance: the PUT's own pair, plus the edit's own
+    // operation + detail document (both at the shared
+    // ai-members address) + member document (its own address)
+    // = 4.
+    assert.equal(requests.length, 4);
+    const atEntity = requests.filter(
+        r => r.uri_prefix === '/ai-members/'
+            && r.uri_id === 'ai-3',
+    );
+    assert.equal(atEntity.length, 3);
+    const atMember = requests.filter(
+        r => r.uri_prefix === '/members/' && r.uri_id === 'ai-3',
+    );
+    assert.equal(atMember.length, 1);
+    const responseById = new Map(
+        (await db.responses.getAll()).map(r => [r.id, r]),
+    );
+    const editDetailRow = atEntity.find(
+        r => responseById.get(r.id)?.status === 200
+            && r.message.includes('Edited'),
+    );
+    assert.ok(editDetailRow, 'no edit detail-document pair');
+    assert.equal(
+        responseById.get(editDetailRow!.id)?.supersedes, firstId,
+    );
+});
+
+test('a failed ai-member edit appends nothing', async () => {
+    const db = await freshDb();
+    await handleRequest(db, req(
+        'POST', '/ai-members', DEV_TOKEN,
+        aiCreateBody('ai-edit-fail', 'ev-ef', 'Base'),
+    ));
+    const before = (await db.requests.getAll()).length;
+    const res = await handleRequest(db, req(
+        'POST', '/ai-members/ai-edit-fail', DEV_TOKEN,
+        { detail: { ...aiDetail('Bad'), model: 'not-a-model' } },
+    ));
+    assert.equal(res.status, 400);
+    assert.equal((await db.requests.getAll()).length, before);
+    assert.equal((await db.responses.getAll()).length, before);
 });
 
 // ── human-members ──
 
-test('a human-member create appends its pair at the entity'
-+ ' address', async () => {
+test('a human-member create appends its bundle: operation +'
++ ' detail document share the entity address, member document'
++ ' sits at its own', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'POST', '/human-members', DEV_TOKEN,
@@ -233,27 +309,109 @@ test('a human-member create appends its pair at the entity'
     ));
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0]!.uri_prefix, '/human-members/');
-    assert.equal(requests[0]!.uri_id, 'hm-1');
+    // Create balance: operation + detail document (both at the
+    // shared human-members address) + member document (its own
+    // address) = 3 — the ai-members precedent above.
+    assert.equal(requests.length, 3);
+    const atEntity = requests.filter(
+        r => r.uri_prefix === '/human-members/'
+            && r.uri_id === 'hm-1',
+    );
+    assert.equal(atEntity.length, 2);
+    const atMember = requests.filter(
+        r => r.uri_prefix === '/members/' && r.uri_id === 'hm-1',
+    );
+    assert.equal(atMember.length, 1);
+    const memberBody = JSON.parse(atMember[0]!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(memberBody.body, { type: 'human' });
+    const responseById = new Map(
+        (await db.responses.getAll()).map(r => [r.id, r]),
+    );
+    const detailRow = atEntity.find(
+        r => responseById.get(r.id)?.status === 200,
+    );
+    assert.ok(detailRow, 'no detail document pair');
+    const detailBody = JSON.parse(detailRow!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(
+        Object.keys(detailBody.body).sort(),
+        ['department', 'strengths', 'team_dimensions', 'title'],
+    );
 });
 
 test('POST human-members/:id (composed edit) appends its'
-+ ' pair at the entity address and supersedes the create',
++ ' bundle at the entity address and supersedes the create',
 async () => {
     const db = await freshDb();
     const created = await handleRequest(db, req(
         'POST', '/human-members', DEV_TOKEN,
         humanCreateBody('hm-2', 'ev-3', 'Bob'),
     ));
-    const createdId = created.headers.get('Response-ID');
-    assert.ok(createdId);
+    assert.equal(created.status, 204);
+    // The create's OWN detail-document pair — appended strictly
+    // after the operation pair within the same tx — becomes the
+    // shared address's true head (nowUtc monotonicity), NOT the
+    // operation pair's own Response-ID (the objectives duplicate-
+    // create precedent).
+    const afterCreate = (await db.responses.getAll()).filter(
+        r => r.uri_prefix === '/human-members/'
+            && r.uri_id === 'hm-2',
+    );
+    assert.equal(afterCreate.length, 2);
+    const trueHead = afterCreate.find(r => r.status === 200);
+    assert.ok(trueHead, 'no detail document pair after create');
+    // Distinct detail values (the E6 fold note): the edit's own
+    // detail-document pair must differ from the create's, or it
+    // folds via message_hash and never lands.
     const edit = await handleRequest(db, req(
         'POST', '/human-members/hm-2', DEV_TOKEN,
-        { pii: humanPii('Bobby'), detail: humanDetail() },
+        {
+            pii: humanPii('Bobby'),
+            detail: { ...humanDetail(), title: 'Senior Engineer' },
+        },
     ));
     assert.equal(edit.status, 204);
-    assert.equal(edit.headers.get('Supersedes'), createdId);
+    assert.equal(edit.headers.get('Supersedes'), trueHead!.id);
+    // Balance: create's 3 + the edit's operation and detail
+    // document (2) = 5. The edit's OWN member-document pair
+    // folds: `type` is invariant per member (a human never
+    // becomes non-human across an edit), so its body ({type:
+    // 'human'}) is byte-identical to the create's own — the
+    // member-document address permanently folds after genesis,
+    // by construction, for every member.
+    const requests = await db.requests.getAll();
+    assert.equal(requests.length, 5);
+    const atEntity = requests.filter(
+        r => r.uri_prefix === '/human-members/'
+            && r.uri_id === 'hm-2',
+    );
+    assert.equal(atEntity.length, 4);
+    const atMember = requests.filter(
+        r => r.uri_prefix === '/members/' && r.uri_id === 'hm-2',
+    );
+    assert.equal(atMember.length, 1);
+});
+
+test('a failed human-member edit appends nothing', async () => {
+    const db = await freshDb();
+    await handleRequest(db, req(
+        'POST', '/human-members', DEV_TOKEN,
+        humanCreateBody('hm-edit-fail', 'ev-hf', 'Base'),
+    ));
+    const before = (await db.requests.getAll()).length;
+    const res = await handleRequest(db, req(
+        'POST', '/human-members/hm-edit-fail', DEV_TOKEN,
+        {
+            pii: humanPii('Base'),
+            detail: { ...humanDetail(), strengths: 'not-json' },
+        },
+    ));
+    assert.equal(res.status, 400);
+    assert.equal((await db.requests.getAll()).length, before);
+    assert.equal((await db.responses.getAll()).length, before);
 });
 
 // ── identities ──

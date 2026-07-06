@@ -1447,3 +1447,84 @@ async () => {
         })),
     );
 });
+
+// -- 10. same-join-id retry: the join stays chain-less ----------
+// (Phase 9 Task 2 Step 0(d') pin, additive and pass-first against
+// HEAD: the create route's join pair hardcodes headPairId:
+// undefined by design — no head-read at all — so a SECOND,
+// genuinely different create [a fresh work-order id, a fresh
+// operation] that happens to reuse a prior create's flow-work-
+// order id still appends a chain-less join pair, never a
+// Supersedes onto the first. Pinned BEFORE the shared former
+// absorbs this site, so a future uniform head-read regresses
+// here first.)
+
+test('same-join-id retry: two different work-order creates '
++ 'reusing one flow-work-order id each append a chain-less '
++ 'join pair (neither Supersedes nor Follows)', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const flowId = EMPTY_FLOW_ID;
+    const graph = workOrderFlowGraph(8 * 60 * 60);
+    const sharedFwoId = 'wo-drift-retry-fwo-shared';
+
+    const first = await handleRequest(db, req(
+        'POST', '/work-orders', token,
+        createWorkOrderBody(
+            'wo-drift-retry-a', sharedFwoId, flowId, graph,
+            {
+                ids: [
+                    'wo-drift-retry-a-ev1',
+                    'wo-drift-retry-a-ev2',
+                    'wo-drift-retry-a-ev3',
+                ],
+                ats: [
+                    '2026-05-03T00:00:00.000000Z',
+                    '2026-05-03T00:00:00.000001Z',
+                    '2026-05-03T00:00:00.000002Z',
+                ],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            '2026-05-03T00:00:00.000000Z',
+        ),
+    ));
+    assert.equal(first.status, 204);
+
+    // A DIFFERENT work order, a DIFFERENT operation (fresh event
+    // ids) — not a byte-identical resend, which would replay via
+    // the E6 fast path and append no second pair at all.
+    const second = await handleRequest(db, req(
+        'POST', '/work-orders', token,
+        createWorkOrderBody(
+            'wo-drift-retry-b', sharedFwoId, flowId, graph,
+            {
+                ids: [
+                    'wo-drift-retry-b-ev1',
+                    'wo-drift-retry-b-ev2',
+                    'wo-drift-retry-b-ev3',
+                ],
+                ats: [
+                    '2026-05-03T00:00:01.000000Z',
+                    '2026-05-03T00:00:01.000001Z',
+                    '2026-05-03T00:00:01.000002Z',
+                ],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            '2026-05-03T00:00:01.000000Z',
+        ),
+    ));
+    assert.equal(second.status, 204);
+
+    const joinPrefix = canonicalUriPrefix(
+        STARK_ORGANIZATION,
+        '/flows/' + flowId + '/work-orders/',
+    );
+    const joinResponses = (await db.responses.getAllWhere(
+        'uri_id', sharedFwoId,
+    )).filter((row) => row.uri_prefix === joinPrefix);
+    assert.equal(joinResponses.length, 2);
+    for (const response of joinResponses) {
+        assert.equal(response.supersedes, undefined);
+        assert.equal(response.follows, undefined);
+    }
+});

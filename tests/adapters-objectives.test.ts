@@ -30,16 +30,12 @@ function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db, DEV_TOKEN);
 }
 
-function objective(position: number) {
-    return { organization_id: '1', position };
-}
-
 test('getObjectives returns all', async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
-    await db.objectives.put('o1', objective(0));
-    await db.objectives.put('o2', objective(1));
     const ctx = ctxFor(db);
+    await ctx.PUT('objectives/o1', { position: 0 });
+    await ctx.PUT('objectives/o2', { position: 1 });
     const rows = await getObjectives(ctx);
     assert.equal(rows.length, 2);
 });
@@ -63,22 +59,23 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.objectiveRevisions.put(
-            'o1:t0',
+        const ctx = ctxFor(db);
+        await ctx.PUT(
+            'objectives/o1/revisions/o1:t0',
             revision(
                 'o1', 'A',
                 '2026-05-14T00:00:00.000000Z',
             ),
         );
-        await db.objectiveRevisions.put(
-            'o1:t1',
+        await ctx.PUT(
+            'objectives/o1/revisions/o1:t1',
             revision(
                 'o1', 'B',
                 '2026-05-15T00:00:00.000000Z',
             ),
         );
-        await db.objectiveRevisions.put(
-            'o2:t0',
+        await ctx.PUT(
+            'objectives/o2/revisions/o2:t0',
             revision(
                 'o2', 'C',
                 '2026-05-14T00:00:00.000000Z',
@@ -86,7 +83,7 @@ test(
         );
         const grouped =
             await getObjectiveRevisionsByObjective(
-                ctxFor(db), ['o1', 'o2'],
+                ctx, ['o1', 'o2'],
             );
         assert.equal(grouped.size, 2);
         assert.equal(grouped.get('o1')!.length, 2);
@@ -108,22 +105,23 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.objectiveRevisions.put(
-            'o1:t0',
+        const ctx = ctxFor(db);
+        await ctx.PUT(
+            'objectives/o1/revisions/o1:t0',
             revision(
                 'o1', 'Old',
                 '2026-05-14T00:00:00.000000Z',
             ),
         );
-        await db.objectiveRevisions.put(
-            'o1:t1',
+        await ctx.PUT(
+            'objectives/o1/revisions/o1:t1',
             revision(
                 'o1', 'New',
                 '2026-05-15T00:00:00.000000Z',
             ),
         );
-        await db.objectiveRevisions.put(
-            'o2:t0',
+        await ctx.PUT(
+            'objectives/o2/revisions/o2:t0',
             revision(
                 'o2', 'Other',
                 '2026-05-14T00:00:00.000000Z',
@@ -131,7 +129,7 @@ test(
         );
         const defs =
             await getCurrentObjectiveDefinitions(
-                ctxFor(db), ['o1', 'o2'],
+                ctx, ['o1', 'o2'],
             );
         assert.equal(defs.get('o1')!.name, 'New');
         assert.equal(
@@ -159,12 +157,12 @@ test(
 test('getArchivedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
-    await db.objectives.put('o1', objective(0));
+    const ctx = ctxFor(db);
+    await ctx.PUT('objectives/o1', { position: 0 });
     await db.states.postEvent(
         'e1', 'o1', 'archived', 'system',
         '2026-01-01T00:00:00.000000Z',
     );
-    const ctx = ctxFor(db);
     const ids = await getArchivedObjectiveIds(ctx);
     assert.ok(ids.has('o1'));
     assert.equal(ids.size, 1);

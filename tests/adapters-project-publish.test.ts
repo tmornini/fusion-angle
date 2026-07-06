@@ -89,11 +89,16 @@ test('postProjectApproval moves state to approved',
             stateAt: '2026-01-01T00:00:00.000000Z',
             stateEventId: 'st-init',
         });
-        await db.objectives.put('o1', {
-            organization_id: '1', position: 0,
-        });
-        await db.projectObjectiveBaselineScores.put(
-            'b1',
+        // The objective and its baseline score are seeded the
+        // SAME wire-reachable way (Phase 7 Task 7) — a raw
+        // db.objectives.put/db.projectObjectiveBaselineScores.put
+        // leaves no pair at these addresses, and
+        // validateProjectForApproval now reads them through the
+        // flipped GET objectives / GET projects/:id/objective-
+        // baseline-scores routes.
+        await ctx.PUT('objectives/o1', { position: 0 });
+        await ctx.PUT(
+            'projects/p1/objective-baseline-scores/b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
               member_id: 'w1',
@@ -118,9 +123,7 @@ test('postProjectApproval throws when not ready',
             stateAt: '2026-01-01T00:00:00.000000Z',
             stateEventId: 'st-init',
         });
-        await db.objectives.put('o1', {
-            organization_id: '1', position: 0,
-        });
+        await ctx.PUT('objectives/o1', { position: 0 });
         await assert.rejects(
             () => postProjectApproval(ctx, 'p1'),
             /not ready|unscored/i,
@@ -139,18 +142,16 @@ test('postProjectArchival moves state to archived',
             stateAt: '2026-01-01T00:00:00.000000Z',
             stateEventId: 'st-init',
         });
-        await db.objectives.put('o1', {
-            organization_id: '1', position: 0,
-        });
-        await db.projectObjectiveBaselineScores.put(
-            'b1',
+        await ctx.PUT('objectives/o1', { position: 0 });
+        await ctx.PUT(
+            'projects/p1/objective-baseline-scores/b1',
             { project_id: 'p1', objective_id: 'o1',
               score: 50,
               member_id: 'w1',
               at: '2026-05-14T00:00:00.000000Z' },
         );
-        await db.projectObjectiveActualScores.put(
-            'a1',
+        await ctx.PUT(
+            'projects/p1/objective-actual-scores/a1',
             { project_id: 'p1', objective_id: 'o1',
               score: 40,
               member_id: 'w1',

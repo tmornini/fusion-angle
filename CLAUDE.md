@@ -249,7 +249,7 @@ The dependency is one-way: `shared/` NEVER imports `api/`.
 subdirectories `adapters/` (data-access + platform shims, both
 kinds share the folder), `presenters/` (presenter classes
 producing `SafeHtml`), and `styles/` (cascade-ordered CSS
-modules); `org-switcher.ts` is the sidebar-footer org
+modules); `organization-switcher.ts` is the sidebar-footer org
 `<select>` (multi-org only) and `core.ts` scopes boot to the
 active org. `adapters/invitations.ts` is the invitation
 adapter; the top-bar pending-invitations bell lives in

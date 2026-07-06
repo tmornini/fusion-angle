@@ -26,6 +26,12 @@ import {
     seedAdminSchema,
     organizationRow,
 } from './test-fixtures.ts';
+import {
+    postMembershipDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 function buildProject(
     id: string,
@@ -115,6 +121,48 @@ async function seedMember(
 ): Promise<void> {
     await seedHumanMember(
         db, id, 'Member ' + id, state,
+    );
+}
+
+// Re-pointed onto the message pair postMembershipDocumentOp
+// appends (finding 18's fixture budget): getOrganization's
+// deriveOrganizationFacts reads ctx.GET('memberships'), which
+// is now ledger-derived, so a raw row here would never surface
+// in the usedSeats() count this file's seat-usage test exercises.
+async function seedMembership(
+    db: MemoryDbAdapter,
+    id: string, identityId: string, at: string,
+): Promise<void> {
+    const body = {
+        organization_id: '1',
+        identity_id: identityId,
+        at,
+    };
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: '1',
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, '1',
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
     );
 }
 
@@ -223,21 +271,15 @@ test(
         await db.organizations.put('1', organizationRow('Acme'));
         // two rows for one identity + one other:
         // DISTINCT identities = 2, not 3
-        await db.memberships.put('m1', {
-            organization_id: '1',
-            identity_id: 'current',
-            at: '2026-01-01T00:00:00.000000Z',
-        });
-        await db.memberships.put('m2', {
-            organization_id: '1',
-            identity_id: 'current',
-            at: '2026-02-01T00:00:00.000000Z',
-        });
-        await db.memberships.put('m3', {
-            organization_id: '1',
-            identity_id: 'other',
-            at: '2026-03-01T00:00:00.000000Z',
-        });
+        await seedMembership(
+            db, 'm1', 'current', '2026-01-01T00:00:00.000000Z',
+        );
+        await seedMembership(
+            db, 'm2', 'current', '2026-02-01T00:00:00.000000Z',
+        );
+        await seedMembership(
+            db, 'm3', 'other', '2026-03-01T00:00:00.000000Z',
+        );
         const ctx = createRequestContext(
             db, await organizationToken(),
         );
@@ -253,6 +295,10 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await db.organizations.put('1', organizationRow('Acme'));
+        // Stays raw: this test never asserts usedSeats(), only
+        // lastActivityText() (derived from states, not
+        // memberships) — an invisible-to-the-ledger membership
+        // row here changes nothing this test checks.
         await db.memberships.put('m1', {
             organization_id: '1',
             identity_id: 'current',

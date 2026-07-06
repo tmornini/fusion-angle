@@ -24,9 +24,10 @@ import {
 // (deriveFlowRecord) is needed alongside the collection read —
 // deriveIdea/deriveFlow's own absent/DELETE-head -> Entity
 // NotFoundError shape, applied to a join rather than a document
-// family. Read-only and additive — no route reads this yet
-// (Task 7 wires it); tests/drift-records.test.ts proves equality
-// against flow_records.getAllWhere('flow_id', ...) and
+// family. LIVE: GET flows/:id/records and GET flows/:id/
+// records/:frid are wired to deriveFlowRecords/deriveFlowRecord
+// below (Phase 6 Task 7); tests/drift-records.test.ts proves
+// equality against flow_records.getAllWhere('flow_id', ...) and
 // flow_records.getById(...).
 
 const FLOW_RECORDS_TABLE = 'flow_records';
@@ -73,7 +74,8 @@ async function fetchFlowRecordDocuments(
 
 // id-lex ordered (the IndexedDB reference); a DELETE head
 // excludes the row exactly as the old plane's physical splice
-// does (parity, not a new mechanism). NOT routed yet (Task 7).
+// does (parity, not a new mechanism). Serves the live GET
+// flows/:id/records route (Phase 6 Task 7).
 export async function deriveFlowRecords(
     db: DbAdapter,
     organization: Id,
@@ -89,12 +91,12 @@ export async function deriveFlowRecords(
     return rows.sort(byIdAscending);
 }
 
-// The :frid GET's by-id read: the head document body + id;
-// absent (never written under this flow/organization) or a
-// DELETE head throws EntityNotFoundError('flow_records', id) —
-// deriveDocumentsAt's own DELETE-head exclusion already collapses
-// both cases into "no document at this uriId". NOT routed yet
-// (Task 7).
+// Serves the live GET flows/:id/records/:frid route (Phase 6
+// Task 7): the head document body + id; absent (never written
+// under this flow/organization) or a DELETE head throws
+// EntityNotFoundError('flow_records', id) — deriveDocumentsAt's
+// own DELETE-head exclusion already collapses both cases into
+// "no document at this uriId".
 export async function deriveFlowRecord(
     db: DbAdapter,
     organization: Id,

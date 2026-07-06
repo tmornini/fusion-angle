@@ -13,17 +13,23 @@ import {
     postObjectiveCreationOp,
     postAiMemberCreationOp,
     postHumanMemberCreationOp,
+    postBaselineScoreDocumentOp,
+    postActualScoreDocumentOp,
+    postMembershipDocumentOp,
+    postMemberDocumentOp,
+    memberDocumentBodyOf,
 } from './routes.ts';
 import type {
     FlowCreationPairs,
     RecordWritePairs,
+    ObjectiveCreationPairs,
+    MemberWritePairs,
 } from './routes.ts';
 import type {
     StateEntity,
     StateFieldValueEntity,
 } from './types.ts';
 import {
-    MS_PER_DAY,
     SYSTEM_MEMBER_ID,
     nowUtc,
 } from './types.ts';
@@ -34,7 +40,8 @@ import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
 import {
     daysFromNow,
-    isoFromMs,
+    humanMemberPoolsByOrganization,
+    pickHumanMember,
 } from './mock-data/seed-kit.ts';
 import {
     MOCK_SEED_TIMESTAMP,
@@ -77,15 +84,13 @@ import {
     recordStateEvents,
     mockProjectFlows,
     mockFlowRecords,
-    deterministicScore,
-    humanMemberPoolsByOrganization,
-    pickHumanMember,
     humanMemberSeedBody,
     ideaSeedBody,
     ideaSubmissionSeedBody,
     projectSeedBody,
     projectOrg2,
     projectOrganizationFor,
+    buildScoreSeedProjects,
     flowSeedBody,
     flowOrg2SeedBody,
     workOrderDocumentSeedBody,
@@ -98,7 +103,10 @@ import {
     formBootstrapMessagePair,
     seedPairKey,
     ORGANIZATION_TWO_OBJECTIVE,
+    membershipSeedBody,
+    bootstrapMembershipId,
 } from './mock-data/seed-message-pairs.ts';
+import { buildSeedScoreRows } from './mock-data/scores.ts';
 
 const TIER_SEATS_LIMIT = 200;
 const TIER_PROJECTS_LIMIT = 50;
@@ -247,14 +255,29 @@ async function postMockDataLoadIn(
                 ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
                 : [assignOrganization(index)];
             return [
+                // Task 5: memberships close their LAST
+                // whole-slice seed deferral — the SAME row, now
+                // driven through postMembershipDocumentOp so it
+                // forms a message pair too (Path A). The body is
+                // membershipSeedBody's own construction — the
+                // SAME one seed-message-pairs.ts used to form
+                // this row's pair, so the two can never drift.
                 ...organizations.map((organization, n) =>
-                    adapter.memberships.put(
+                    postMembershipDocumentOp(
+                        adapter,
                         'seed-membership-'
-                        + member.id + '-' + n, {
-                            organization_id: organization,
-                            identity_id: member.id,
-                            at: MOCK_SEED_TIMESTAMP,
-                        })),
+                        + member.id + '-' + n,
+                        membershipSeedBody(organization, member.id),
+                        SYSTEM_MEMBER_ID,
+                        requirePair(
+                            pairs,
+                            seedPairKey(
+                                'memberships/:id',
+                                'seed-membership-'
+                                + member.id + '-' + n,
+                            ),
+                        ),
+                    )),
                 adapter.identityDefaultOrganizations.put(
                     'seed-default-org-' + member.id, {
                         identity_id: member.id,
@@ -265,18 +288,45 @@ async function postMockDataLoadIn(
                     adapter,
                     humanMemberSeedBody(member),
                     SYSTEM_MEMBER_ID,
-                    requirePair(
-                        pairs,
-                        seedPairKey(
-                            'human-members', member.id,
+                    {
+                        operation: requirePair(
+                            pairs,
+                            seedPairKey(
+                                'human-members', member.id,
+                            ),
                         ),
-                    ),
+                        memberDocument: requirePair(
+                            pairs,
+                            seedPairKey(
+                                'members/:id', member.id,
+                            ),
+                        ),
+                        detailDocument: requirePair(
+                            pairs,
+                            seedPairKey(
+                                'human-members/:id', member.id,
+                            ),
+                        ),
+                    },
                 ),
             ];
         }),
-        adapter.members.put(SYSTEM_MEMBER_ID, {
-            type: 'system',
-        }),
+        // Task 5: the system member's own members/:id row closes
+        // the last raw members.put site — driven through
+        // postMemberDocumentOp so it forms a message pair too
+        // (Path A), the SAME op the human/AI member-document
+        // invocations above already ride. Its identities row
+        // stays a raw put — the identity spine itself is Phase
+        // 9's own scope, untouched here.
+        postMemberDocumentOp(
+            adapter,
+            SYSTEM_MEMBER_ID,
+            memberDocumentBodyOf('system'),
+            SYSTEM_MEMBER_ID,
+            requirePair(
+                pairs, seedPairKey('members/:id', SYSTEM_MEMBER_ID),
+            ),
+        ),
         adapter.identities.put(SYSTEM_MEMBER_ID, {
             kind: 'service',
         }),
@@ -683,12 +733,23 @@ async function postMockDataLoadIn(
         // same "leave and note" carve-out as projects.
         ...aiMembers.flatMap(m => {
             return [
-                adapter.memberships.put(
-                    'seed-membership-' + m.id, {
-                        organization_id: STARK_ORGANIZATION,
-                        identity_id: m.id,
-                        at: MOCK_SEED_TIMESTAMP,
-                    }),
+                // Task 5: the same memberships closure as the
+                // human-members loop above, driven through
+                // postMembershipDocumentOp with membershipSeedBody's
+                // shared construction.
+                postMembershipDocumentOp(
+                    adapter,
+                    'seed-membership-' + m.id,
+                    membershipSeedBody(STARK_ORGANIZATION, m.id),
+                    SYSTEM_MEMBER_ID,
+                    requirePair(
+                        pairs,
+                        seedPairKey(
+                            'memberships/:id',
+                            'seed-membership-' + m.id,
+                        ),
+                    ),
+                ),
                 adapter.identities.put(m.id, {
                     kind: 'service',
                 }),
@@ -696,10 +757,20 @@ async function postMockDataLoadIn(
                     adapter,
                     aiMemberSeedBody(m),
                     SYSTEM_MEMBER_ID,
-                    requirePair(
-                        pairs,
-                        seedPairKey('ai-members', m.id),
-                    ),
+                    {
+                        operation: requirePair(
+                            pairs,
+                            seedPairKey('ai-members', m.id),
+                        ),
+                        memberDocument: requirePair(
+                            pairs,
+                            seedPairKey('members/:id', m.id),
+                        ),
+                        detailDocument: requirePair(
+                            pairs,
+                            seedPairKey('ai-members/:id', m.id),
+                        ),
+                    },
                 ),
             ];
         }),
@@ -789,41 +860,21 @@ async function postMockDataLoadIn(
         ),
     ]);
 
-    const humanIds = new Set(
-        (await adapter.members.getAll())
-            .filter(w => w.type === 'human')
-            .map(w => w.id),
-    );
     // A score or revision author is always a member of the
     // scored entity's org. Seed authors from that org ONLY:
     // picking across orgs produced authors outside the
     // org-scoped roster, and memberName (strict by design)
     // then threw when the project-history modal resolved them.
-    const humansByOrganization = new Map<string, string[]>();
-    for (const m of await adapter.memberships.getAll()) {
-        if (!humanIds.has(m.identity_id)) continue;
-        const pool =
-            humansByOrganization.get(m.organization_id) ?? [];
-        pool.push(m.identity_id);
-        humansByOrganization.set(m.organization_id, pool);
-    }
-    const memberFor = (
-        organization: string, seed: string,
-    ): string => {
-        const pool = humansByOrganization.get(organization) ?? [];
-        return pool[
-            deterministicScore(seed, 0, pool.length - 1)
-        ] ?? SYSTEM_MEMBER_ID;
-    };
-
-    // The STARK-org objective revisions' author cannot use the
-    // in-tx memberFor above: its pair was already formed pre-tx
+    //
+    // The STARK-org objective revisions' author cannot read
+    // memberships back in-tx: its pair was already formed pre-tx
     // (pass 1, before any membership row existed to read back),
     // so pass 2 must pick from the SAME pure pool pass 1 used —
     // see humanMemberPoolsByOrganization's doc comment for why
-    // the two are proven to agree. memberFor (DB-read-based)
-    // stays exactly as it was for the baseline/actual-score
-    // deferral below.
+    // the two are proven to agree. The baseline/actual-score
+    // deferral below (buildSeedScoreRows) draws from this SAME
+    // pool now too — the former in-tx memberFor DB-read retired
+    // once its pick moved onto pickHumanMember (Phase 7 Task 5).
     const objectiveMemberPools =
         humanMemberPoolsByOrganization(members);
     for (const seed of OBJECTIVE_SEEDS) {
@@ -831,164 +882,135 @@ async function postMockDataLoadIn(
             objectiveMemberPools, STARK_ORGANIZATION,
             `${seed.id}:revision`,
         );
+        // Task 3: create threads the triple — the operation
+        // pair plus its two synthesized siblings (document,
+        // revision), each pre-formed in pass 1 under its own
+        // deterministic key (seed-message-pairs.ts) — the
+        // flows precedent, objectives' own fixed 1+1+1. The
+        // revision id is recomputed identically to
+        // objectiveSeedBody's own construction (deterministic,
+        // never random), the mock-data-pairs.test.ts precedent.
+        const revisionId = `${seed.id}:${MOCK_SEED_TIMESTAMP}`;
+        const objectivePairs: ObjectiveCreationPairs = {
+            operation: requirePair(
+                pairs, seedPairKey('objectives', seed.id),
+            ),
+            document: requirePair(
+                pairs, seedPairKey('objectives/:id', seed.id),
+            ),
+            revision: requirePair(
+                pairs,
+                seedPairKey(
+                    'objectives/:id/revisions/:rid', revisionId,
+                ),
+            ),
+        };
         await postObjectiveCreationOp(
             adapter,
             objectiveSeedBody(
                 seed, STARK_ORGANIZATION, memberId,
             ),
-            requirePair(
-                pairs, seedPairKey('objectives', seed.id),
-            ),
+            objectivePairs,
         );
     }
 
     // Organization '2' owns one objective so each org owns at least one.
+    const org2RevisionId =
+        `${ORGANIZATION_TWO_OBJECTIVE.id}:${MOCK_SEED_TIMESTAMP}`;
     await postObjectiveCreationOp(
         adapter,
         objectiveSeedBody(
             ORGANIZATION_TWO_OBJECTIVE, ORGANIZATION_TWO,
             SYSTEM_MEMBER_ID,
         ),
-        requirePair(
-            pairs,
-            seedPairKey('objectives', ORGANIZATION_TWO_OBJECTIVE.id),
-        ),
+        {
+            operation: requirePair(
+                pairs,
+                seedPairKey(
+                    'objectives', ORGANIZATION_TWO_OBJECTIVE.id,
+                ),
+            ),
+            document: requirePair(
+                pairs,
+                seedPairKey(
+                    'objectives/:id',
+                    ORGANIZATION_TWO_OBJECTIVE.id,
+                ),
+            ),
+            revision: requirePair(
+                pairs,
+                seedPairKey(
+                    'objectives/:id/revisions/:rid',
+                    org2RevisionId,
+                ),
+            ),
+        },
     );
 
-    const allProjects = await adapter.projects.getAll();
-    const projectStateById = new Map(
-        projectStateEvents.map(
-            ev => [ev.entity_id, ev.state],
-        ),
+    // The baseline/actual-score rows — hoisted VERBATIM into a
+    // pure builder (Phase 7 Task 5) so pass 1 (seed-message-
+    // pairs.ts) forms each row's message pair before this
+    // transaction opens, the SAME split every other seeded
+    // family already uses. buildScoreSeedProjects resolves each
+    // project's organization_id/state PURELY (never a DB read
+    // back). This closes the scores half of the Phase 0 seed
+    // deferral WHOLE — baselines AND actuals — one document pair
+    // per row, driven through postBaselineScoreDocumentOp /
+    // postActualScoreDocumentOp exactly as every other seeded
+    // family drives through its own extracted op.
+    const baselineScorePattern =
+        'projects/:id/objective-baseline-scores/:sid';
+    const actualScorePattern =
+        'projects/:id/objective-actual-scores/:sid';
+    const scoreRows = buildSeedScoreRows(
+        buildScoreSeedProjects(), objectiveMemberPools,
     );
-
-    for (const p of allProjects) {
-        const state = projectStateById.get(p.id);
-        if (state === undefined) {
-            throw new Error(
-                'seeded project has no state event: '
-                + p.id,
-            );
-        }
-        if (
-            state === 'submitted'
-            || state === 'declined'
-            || state === 'deleted'
-        ) {
-            continue;
-        }
-
-        const baselineCoverage =
-            state === 'approved'
-            || state === 'archived'
-                ? OBJECTIVE_SEEDS.length
-                : deterministicScore(
-                    p.id + ':coverage',
-                    0,
-                    OBJECTIVE_SEEDS.length - 1,
-                );
-
-        const baselineStart =
-            new Date(p.start_date).getTime();
-        // Committed work (approved + archived) is
-        // expected to advance objectives; baselines
-        // skew positive. Drafts (under_review +
-        // sent_back) can dip negative — a flagged
-        // risk worth surfacing on the dashboard.
-        const baselineMin =
-            state === 'approved'
-            || state === 'archived'
-                ? 0
-                : -100;
-        for (let i = 0; i < baselineCoverage; i++) {
-            const obj = OBJECTIVE_SEEDS[i]!;
-            const score = deterministicScore(
-                `${p.id}:${obj.id}:baseline`,
-                baselineMin,
-                100,
-            );
-            const scoredAt = isoFromMs(
-                baselineStart + i * 1000,
-            );
-            await adapter
-                .projectObjectiveBaselineScores
-                .put(
-                    `${p.id}:${obj.id}:${scoredAt}`,
-                    {
-                        project_id: p.id,
-                        objective_id: obj.id,
-                        score,
-                        member_id: memberFor(
-                            p.organization_id,
-                            `${p.id}:${obj.id}:baseline`,
-                        ),
-                        at: scoredAt,
-                    },
-                );
-        }
-
-        if (
-            state === 'approved'
-            || state === 'archived'
-        ) {
-            const minActuals = 1;
-            const baseActualTime =
-                baselineStart + MS_PER_DAY;
-            for (
-                let i = 0; i < OBJECTIVE_SEEDS.length; i++
-            ) {
-                const obj = OBJECTIVE_SEEDS[i]!;
-                const nActuals =
-                    minActuals
-                    + deterministicScore(
-                        `${p.id}:${obj.id}:nactual`,
-                        0,
-                        2,
-                    );
-                for (let k = 0; k < nActuals; k++) {
-                    const score = deterministicScore(
-                        `${p.id}:${obj.id}:actual:${k}`,
-                        -100,
-                        100,
-                    );
-                    const scoredAt = isoFromMs(
-                        baseActualTime
-                            + (i * 10 + k) * 1000,
-                    );
-                    await adapter
-                        .projectObjectiveActualScores
-                        .put(
-                            `${p.id}:${obj.id}:${scoredAt}`,
-                            {
-                                project_id: p.id,
-                                objective_id: obj.id,
-                                score,
-                                member_id: memberFor(
-                                    p.organization_id,
-                                    `${p.id}:${obj.id}:actual:${k}`,
-                                ),
-                                at: scoredAt,
-                            },
-                        );
-                }
-            }
-        }
-    }
+    await Promise.all([
+        ...scoreRows.baselines.map(row =>
+            postBaselineScoreDocumentOp(
+                adapter, row.id, row.fields,
+                row.fields.member_id,
+                requirePair(
+                    pairs,
+                    seedPairKey(baselineScorePattern, row.id),
+                ),
+            )),
+        ...scoreRows.actuals.map(row =>
+            postActualScoreDocumentOp(
+                adapter, row.id, row.fields,
+                row.fields.member_id,
+                requirePair(
+                    pairs,
+                    seedPairKey(actualScorePattern, row.id),
+                ),
+            )),
+    ]);
 }
 
 export async function postBootstrap(
     adapter: DbAdapter,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): the lone 'current' human-member create's
-    // pair, formed up front — see postMockDataLoad's pass 1 for
+    // bundle, formed up front — see postMockDataLoad's pass 1 for
     // why (formWritePair's hashing is async crypto, which would
     // auto-commit an IndexedDB transaction early if awaited
     // inside one). Bootstrap's body embeds nowUtc() (there is
     // no fixed seed timestamp here), so it is minted ONCE inside
     // formBootstrapMessagePair and reused verbatim by pass 2
     // below — never a second, independently timestamped body.
-    const { body: currentMemberBody, pair: currentMemberPair } =
-        await formBootstrapMessagePair(nowUtc());
+    // Task 4: the bundle grows from one pair to three (operation,
+    // member document, detail document), the SAME triple every
+    // other seeded human-member create forms. Task 5: ALSO forms
+    // bootstrap's own membership pair and the system member's own
+    // members/:id document pair — the last two raw bootstrap
+    // writes, now closed the SAME way postMockDataLoad's own
+    // memberships/system-member sites are.
+    const {
+        body: currentMemberBody,
+        pairs: currentMemberPairs,
+        membershipPair,
+        systemMemberPair,
+    } = await formBootstrapMessagePair(nowUtc());
     // Pass 2: seed the pristine bootstrap data in one
     // transaction. Credentials seed after it commits — PBKDF2
     // hashing is ALSO async crypto and cannot run inside the tx.
@@ -998,7 +1020,8 @@ export async function postBootstrap(
     await adapter.transaction(
         TABLE_NAMES,
         (view) => postBootstrapIn(
-            view, currentMemberBody, currentMemberPair,
+            view, currentMemberBody, currentMemberPairs,
+            membershipPair, systemMemberPair,
         ),
     );
     const creds = await seedHumanCredentials(adapter);
@@ -1009,7 +1032,9 @@ export async function postBootstrap(
 async function postBootstrapIn(
     adapter: DbAdapter,
     currentMemberBody: Record<string, unknown>,
-    currentMemberPair: MessagePair,
+    currentMemberPairs: MemberWritePairs,
+    membershipPair: MessagePair,
+    systemMemberPair: MessagePair,
 ): Promise<void> {
     // The pristine seed plants only what the app needs
     // to render its shell: the system actor that authors
@@ -1018,18 +1043,33 @@ async function postBootstrapIn(
     // the correct pristine state; sample Records are demo
     // content loaded by postMockDataLoad, not bootstrap.
     await Promise.all([
-        adapter.members.put(SYSTEM_MEMBER_ID, {
-            type: 'system',
-        }),
+        // Task 5: the system member's own members/:id row closes
+        // the last raw members.put site bootstrap held — driven
+        // through postMemberDocumentOp, the SAME op
+        // postMockDataLoadIn's own system-member site now rides.
+        // Its identities row stays a raw put — the identity
+        // spine itself is Phase 9's own scope, untouched here.
+        postMemberDocumentOp(
+            adapter,
+            SYSTEM_MEMBER_ID,
+            memberDocumentBodyOf('system'),
+            SYSTEM_MEMBER_ID,
+            systemMemberPair,
+        ),
         adapter.identities.put(SYSTEM_MEMBER_ID, {
             kind: 'service',
         }),
-        adapter.memberships.put(
-            'bootstrap-membership-current', {
-                organization_id: STARK_ORGANIZATION,
-                identity_id: 'current',
-                at: MOCK_SEED_TIMESTAMP,
-            }),
+        // Task 5: bootstrap's own membership closes the SAME
+        // whole-slice deferral as postMockDataLoadIn's memberships
+        // — driven through postMembershipDocumentOp with
+        // membershipSeedBody's shared construction.
+        postMembershipDocumentOp(
+            adapter,
+            bootstrapMembershipId,
+            membershipSeedBody(STARK_ORGANIZATION, 'current'),
+            SYSTEM_MEMBER_ID,
+            membershipPair,
+        ),
         adapter.identityDefaultOrganizations.put(
             'bootstrap-default-org-current', {
                 identity_id: 'current',
@@ -1039,15 +1079,15 @@ async function postBootstrapIn(
         // The 'current' human member row shares its shape
         // with postMockDataLoadIn's human-member seed —
         // driven through postHumanMemberCreationOp with the
-        // explicit actor SYSTEM_MEMBER_ID (the named
-        // bootstrap genesis carve-out only exempts the
-        // SYSTEM member itself and the schema marker).
-        // currentMemberBody is pass 1's frozen body (see
+        // explicit actor SYSTEM_MEMBER_ID (the named bootstrap
+        // genesis carve-out now exempts only the schema marker —
+        // the system member and the membership row closed this
+        // task). currentMemberBody is pass 1's frozen body (see
         // postBootstrap) — never rebuilt here, so it can never
-        // drift from what currentMemberPair was hashed from.
+        // drift from what currentMemberPairs was hashed from.
         postHumanMemberCreationOp(
             adapter, currentMemberBody,
-            SYSTEM_MEMBER_ID, currentMemberPair,
+            SYSTEM_MEMBER_ID, currentMemberPairs,
         ),
         adapter.states.postEvent(
             'bootstrap-system-active',

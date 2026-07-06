@@ -3,6 +3,7 @@ import { EntityNotFoundError } from './db.ts';
 import type { Id } from './types.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
+import { familyRegistration } from './family-registry.ts';
 import {
     deriveDocumentsAt,
     documentPairsAt,
@@ -121,19 +122,20 @@ export interface DocumentFamilyWiring {
     ) => unknown;
 }
 
-// The per-family wiring table — grown family by family (Task 3
-// adds the flows row) — never consulted through anything but
-// documentFamilyWiring: the gate's locked/simple keying (api.ts)
-// treats membership here, ANDed with a 'locked' registration, as
-// "this route is served via documentPutHandler" — never a
-// blanket family-registry or DOCUMENT_CLASS_ROUTE_PATTERNS
-// consult, so an unregistered-here family (flows, through this
-// task) never rides the locked arm no matter what
+// The per-family wiring table — grown family by family (ideas,
+// projects, flows, work-orders, records, record-attributes) —
+// never consulted through anything but documentFamilyWiring: the
+// gate's locked/simple keying (api.ts) treats membership here,
+// ANDed with a 'locked' registration, as "this route is served
+// via documentPutHandler" — never a blanket family-registry or
+// DOCUMENT_CLASS_ROUTE_PATTERNS consult, so an unregistered-here
+// family never rides the locked arm no matter what
 // family-registry.ts declares. Exported (a mutable table, like
 // FAMILY_REGISTRY) so the locked-arm's own tests can register a
-// SYNTHETIC family for the duration of a test — no live family
-// rides the locked arm through this task, since only ideas and
-// projects are registered here, and both are 'simple'.
+// SYNTHETIC family for the duration of a test — flows is the
+// live family that rides the locked arm today (registered here
+// AND 'locked' in family-registry.ts); every other registered
+// family is 'simple'.
 export const DOCUMENT_FAMILY_WIRINGS:
     Record<string, DocumentFamilyWiring> = {};
 
@@ -341,20 +343,44 @@ export function documentCollectionRoute(
     };
 }
 
+// The registration-first consult (Phase 8 Task 3, the first
+// global-plane families: members/ai-members/human-members,
+// organizationNested:false) — mirrors canonicalUriPrefix's own
+// registration-first pattern (message-pair.ts): a family's
+// registration decides whether organization_id belongs on the
+// wire response AT ALL, never a blanket stamp. For the eight
+// org-nested families registered before this task, the stamp
+// below was a no-op — their entities already carry
+// organization_id, so the spread overwrote the stamp with the
+// SAME value the fence resolved (Step 0(a) of the task that
+// added this consult re-confirmed key-set/value equality against
+// today's hand-written bodies). But for a organizationNested:
+// false family, the entity carries NO such field, so the
+// unconditional stamp was a wire-visible EXTRA KEY with no
+// hand-written counterpart — this consult omits the line
+// entirely for that class instead of spreading over it.
 export function documentWriteResponseSpec(
     wiring: DocumentFamilyWiring,
 ): WriteResponseSpec {
+    const organizationNested =
+        familyRegistration(wiring.family)?.organizationNested
+            !== false;
     return {
         status: 200,
         successBody: (params, body, _actor, organization) => {
             const doc = wiring.validateDocument(
                 withoutId(body ?? {}),
             ) as { entity: Record<string, unknown> };
-            return {
-                id: param(params, 0),
-                organization_id: organization,
-                ...doc.entity,
-            };
+            return organizationNested
+                ? {
+                    id: param(params, 0),
+                    organization_id: organization,
+                    ...doc.entity,
+                }
+                : {
+                    id: param(params, 0),
+                    ...doc.entity,
+                };
         },
     };
 }

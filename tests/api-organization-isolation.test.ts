@@ -212,6 +212,10 @@ async function seedChain(
     await db.ideas.put('i' + s, ideaBody(organization, 'idea'));
     await db.projects.put('p' + s, projectBody(organization));
     await db.flows.put('f' + s, flowBody(organization));
+    // Stays raw (NAMED contrast to the revisions/scores re-pins
+    // below, Task 7): no test in this file reads GET
+    // /objectives — only the nested objectives/:id/revisions and
+    // projects/:id/objective-<kind>-scores JOINs are exercised.
     await db.objectives.put(
         'o' + s, { organization_id: organization, position: 0 });
     // Stays raw (NAMED contrast to the flow-record join below):
@@ -269,18 +273,40 @@ async function seedChain(
     await db.ideaSubmissions.put('is' + s, {
         idea_id: 'i' + s, member_id: 'system', at: T8_AT,
     });
-    await db.objectiveRevisions.put('orev' + s, {
-        objective_id: 'o' + s, name: 'n',
-        description: 'd', member_id: 'system', at: T8_AT,
-    });
-    await db.projectObjectiveBaselineScores.put('bs' + s, {
-        project_id: 'p' + s, objective_id: 'o' + s,
-        score: 1, member_id: 'system', at: T8_AT,
-    });
-    await db.projectObjectiveActualScores.put('as' + s, {
-        project_id: 'p' + s, objective_id: 'o' + s,
-        score: 2, member_id: 'system', at: T8_AT,
-    });
+    // NAMED re-pin (Task 7): the flipped GET objectives/:id/
+    // revisions and GET projects/:id/objective-<kind>-scores
+    // routes derive from the message ledger too, the SAME
+    // reason as the flow-record join above — a raw
+    // db.objectiveRevisions.put/db.projectObjectiveBaselineScores
+    // .put/db.projectObjectiveActualScores.put leaves no pair at
+    // these addresses (db.objectives.put above stays raw — see
+    // its own comment).
+    await handleRequest(db, req(
+        'PUT', '/objectives/o' + s + '/revisions/orev' + s,
+        await organizationToken(identity, organization),
+        {
+            objective_id: 'o' + s, name: 'n',
+            description: 'd', member_id: 'system', at: T8_AT,
+        },
+    ));
+    await handleRequest(db, req(
+        'PUT',
+        '/projects/p' + s + '/objective-baseline-scores/bs' + s,
+        await organizationToken(identity, organization),
+        {
+            project_id: 'p' + s, objective_id: 'o' + s,
+            score: 1, member_id: 'system', at: T8_AT,
+        },
+    ));
+    await handleRequest(db, req(
+        'PUT',
+        '/projects/p' + s + '/objective-actual-scores/as' + s,
+        await organizationToken(identity, organization),
+        {
+            project_id: 'p' + s, objective_id: 'o' + s,
+            score: 2, member_id: 'system', at: T8_AT,
+        },
+    ));
     await db.states.put('se' + s, {
         entity_id: 'i' + s, state: 'active',
         member_id: 'system', at: T8_AT,

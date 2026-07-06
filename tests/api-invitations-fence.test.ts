@@ -4,6 +4,13 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { organizationRow } from './test-fixtures.ts';
+import {
+    postMemberDocumentOp,
+    memberDocumentBodyOf,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -52,13 +59,47 @@ async function seed(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+// The member document write is re-pointed onto the message
+// pair postMemberDocumentOp appends (finding 18's fixture
+// budget): rosterIds below reads GET /members, which is now
+// ledger-derived, so an identity absent from the message plane
+// would never surface as a member-parent regardless of its
+// membership. identities/identityPii stay raw — they feed only
+// old-plane reads (identity-pii, and Step 3's invitation
+// enrichment joins), neither of which is ledger-derived here.
 async function person(
     db: MemoryDbAdapter,
     id: string,
     name: string,
     email: string,
 ): Promise<void> {
-    await db.members.put(id, { type: 'human' });
+    const body = memberDocumentBodyOf('human');
+    const spec = WRITE_RESPONSE_SPECS['members/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for members/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/members/' + id,
+        routePattern: 'members/:id',
+        routeSegments: ['members', ':id'],
+        pathSegments: ['members', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, undefined,
+        ),
+        headPairId: undefined,
+    });
+    await postMemberDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
     await db.identities.put(id, { kind: 'person' });
     await db.identityPii.put(id, {
         name, email, phone: '', bio: '',
@@ -482,6 +523,54 @@ test('decline: missing declineAt is rejected (400)', async () => {
             // declineAt intentionally absent
         }));
     assert.equal(res.status, 400);
+});
+
+// KEEP-ATOMIC (Author gate 6e): a removed member cannot
+// re-admit themselves by merely replaying their old acceptance.
+// currentInvitationState's 'accepted' branch short-circuits to
+// a no-op BEFORE the membership-existence check ever runs, so
+// the property holds today already — this pin proves it against
+// TODAY's code, before Phase 8 Task 6 adds the document-plane
+// synthesis around this same accept path.
+test('a removed member who re-accepts gets a no-op — not a'
++ ' silent re-admission (KEEP-ATOMIC)', async () => {
+    // Distinct, strictly-increasing `at` stamps: grant/accept
+    // share one invitation entity_id in the states log, so a tied
+    // `at` would fall to the (at, id) reduction's id tie-break —
+    // the SAME reduction currentInvitationState reads — rather
+    // than proving the property this test exists to pin.
+    const db = await seed();
+    const id = await grantSarahToWayne(db);
+    const accept = await handleRequest(db, req(
+        'POST', '/invitations/' + id + '/acceptance',
+        await organizationToken('sarah', '1'),
+        {
+            membershipId: 'ms-sarah-removed',
+            acceptEventId: 'ev-acc-removed',
+            acceptAt: '2026-01-01T00:00:01.000000Z',
+        }));
+    assert.equal(accept.status, 204);
+    const del = await handleRequest(db, req(
+        'DELETE', '/memberships/ms-sarah-removed',
+        await organizationToken('current', '2')));
+    assert.equal(del.status, 204);
+    const statesBefore = (await db.states.getAllFor(id)).length;
+    const reaccept = await handleRequest(db, req(
+        'POST', '/invitations/' + id + '/acceptance',
+        await organizationToken('sarah', '1'),
+        {
+            membershipId: 'ms-sarah-again',
+            acceptEventId: 'ev-acc-again',
+            acceptAt: '2026-01-01T00:00:02.000000Z',
+        }));
+    assert.equal(reaccept.status, 204);
+    const sarahInWayne = (await db.memberships.getAll())
+        .filter(m => m.identity_id === 'sarah'
+            && m.organization_id === '2');
+    assert.deepEqual(sarahInWayne, []);
+    assert.equal(
+        (await db.states.getAllFor(id)).length, statesBefore,
+    );
 });
 
 test('revoke: missing revokeAt is rejected (400)', async () => {

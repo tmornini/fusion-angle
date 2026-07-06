@@ -214,3 +214,56 @@ test('submitted projects have zero scores', async () => {
         assert.equal(baselines.length, 0);
     }
 });
+
+// Phase 7 Task 5's STANDING content pins: the id-only fingerprint
+// (tests/mock-data-fingerprint.test.ts) hashes row ids ONLY —
+// member_id never enters it — so a regression in the author pick
+// (buildSeedScoreRows's pickHumanMember over a pre-tx pool,
+// replacing the old in-tx memberFor DB-read) would pass every
+// existing check yet silently hand out the WRONG author. Both
+// literals below were read from the PRE-hoist seed (memberFor's
+// own picks, recorded before api/mock-data/scores.ts existed) —
+// the k-suffix divergence guard: omitting the actual's `:${k}`
+// per-index suffix reproduces only 24 of 92 actual authors
+// correctly, invisibly to every other test in this suite.
+test('a seeded baseline score\'s author matches the pinned'
++ ' pre-hoist pick', async () => {
+    const db = new MemoryDbAdapter();
+    await seedAdminSchema(db);
+    await postMockDataLoad(db);
+    const baselines = await
+        db.projectObjectiveBaselineScores.getAll();
+    const row = baselines.find(
+        b => b.project_id === 'u6YkHhlGc91oDMkr3x0isa'
+            && b.objective_id === 'JkW7aEqFdX3nOiPtVhMrCy',
+    );
+    assert.ok(row, 'no baseline row for the pinned pair');
+    assert.equal(row!.member_id, 'current');
+});
+
+test('a seeded actual-score triple\'s per-index authors match'
++ ' the pinned pre-hoist picks', async () => {
+    const db = new MemoryDbAdapter();
+    await seedAdminSchema(db);
+    await postMockDataLoad(db);
+    const actuals = await
+        db.projectObjectiveActualScores.getAll();
+    const rows = actuals
+        .filter(
+            a => a.project_id === 'jRE2Tj32NHsFGZIeEADp0p'
+                && a.objective_id === 'RgT2mNvKpQ8xLsYwBzHcUe',
+        )
+        .sort((a, b) => a.at.localeCompare(b.at));
+    assert.equal(rows.length, 3);
+    // Sorted by `at` ascending resolves the per-actual index
+    // k = 0, 1, 2 (buildSeedScoreRows mints each k's scoredAt
+    // strictly increasing within a (project, objective) pair).
+    assert.deepEqual(
+        rows.map(r => r.member_id),
+        [
+            '53J8h9dr76XFqCjYcNVwIR',
+            'WxQn4LVWb76YkmqK5B0EPp',
+            'Trf1Up2jMsPhEnjbW4Ji1n',
+        ],
+    );
+});

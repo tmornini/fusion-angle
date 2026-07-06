@@ -159,7 +159,7 @@ disjoint subset of tables:
 | Agent-E | `projects` (plus one flow via the project-detail New Flow path) |
 | Agent-F | `flows`, `flow_versions` |
 | Agent-F2 | `work_orders`, `flow_work_orders`, `states` (work-order entity_ids), `state_field_values`, plus its own private flow in `flows`/`flow_versions` |
-| Agent-G | `members`, `ai_members`, `organizations`, `identities`, `identity_pii`, `identity_credentials` (the global identity spine — disjoint from every other agent's domain; creating/erasing identities and PII does not touch the org-owned entity tables, so no write-domain collision) |
+| Agent-G | `members`, `human_members`, `ai_members`, `memberships`, `invitations`, `role_grants`, `organizations`, `identities`, `identity_pii`, `identity_credentials` (the global identity spine + the org-nested roster join tables — disjoint from every other agent's domain; creating/erasing identities and PII does not touch the org-owned entity tables, and roster mutations — Add Member, Invite/accept/decline, membership writes — stay within this agent, so no write-domain collision. Post-roster-flip: `members`/`human_members`/`ai_members`/`memberships` GETs derive from the message ledger, `invitations` derives via the permanent side channel; the drift check `tests/drift-roster.test.ts` pins parity) |
 | Agent-CH | none (read-only) |
 
 Agent-F2 owns its source flow because `postWorkOrderCreation`

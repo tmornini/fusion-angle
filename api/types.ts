@@ -480,9 +480,12 @@ export type IdentityCredentialStatus =
 // projected out at every read route (api.ts `withoutSecret`),
 // so it never crosses the API boundary — never rendered.
 // Revocation is a NEW 'revoked' event, never a splice
-// (contrast identity_pii). Real crypto and the OAuth
-// stores (clients, identity_tokens, identity_providers)
-// are SP-5; this is only the seam.
+// (contrast identity_pii). The client-assertion crypto is
+// REAL (RFC 7523 JWS, RS256/ES256) and the OAuth stores
+// (clients, identity_tokens, identity_providers) are live;
+// the remaining SP-5 items are the ones access-token.ts
+// names: per-client multi-audience, DPoP cnf binding, jti
+// reuse-detection.
 export interface IdentityCredentialEntity {
     id: Id;
     identity_id: Id;

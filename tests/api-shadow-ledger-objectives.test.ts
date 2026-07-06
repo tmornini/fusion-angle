@@ -90,12 +90,123 @@ test('an objective create appends its pair at the entity'
     ));
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(
-        requests[0]!.uri_prefix,
-        '/organizations/1/objectives/',
+    // Create balance: operation + document (both at the shared
+    // objective address) + revision (its own address) = 3 —
+    // the H7/arrival-order hazard class means a positional
+    // requests[0] read is unsafe once an address holds two
+    // pairs, so filter/count instead.
+    assert.equal(requests.length, 3);
+    const atAddress = requests.filter(
+        r => r.uri_prefix === '/organizations/1/objectives/'
+            && r.uri_id === 'obj-1',
     );
-    assert.equal(requests[0]!.uri_id, 'obj-1');
+    assert.equal(atAddress.length, 2);
+    // The synthesized document pair is byte-indistinguishable
+    // from a live PUT objectives/:id genesis pair: {position}
+    // alone, no organization_id key.
+    const documentRow = atAddress.find(r => {
+        const parsed = JSON.parse(r.message) as {
+            body: Record<string, unknown>;
+        };
+        return 'position' in parsed.body;
+    });
+    assert.ok(documentRow, 'no document pair at the address');
+    const embeddedDocument = JSON.parse(
+        documentRow!.message,
+    ) as { body: Record<string, unknown> };
+    assert.deepEqual(
+        Object.keys(embeddedDocument.body), ['position'],
+    );
+    // The synthesized revision pair, at its own address, is
+    // byte-indistinguishable from a live PUT revisions/:rid
+    // pair: the five revision keys verbatim.
+    const revisionRow = requests.find(
+        r => r.uri_prefix
+                === '/organizations/1/objectives/obj-1/'
+                    + 'revisions/'
+            && r.uri_id === 'rev-1',
+    );
+    assert.ok(revisionRow, 'no revision pair at the address');
+    const embeddedRevision = JSON.parse(
+        revisionRow!.message,
+    ) as { body: Record<string, unknown> };
+    assert.deepEqual(
+        Object.keys(embeddedRevision.body).sort(),
+        ['at', 'description', 'member_id', 'name', 'objective_id'],
+    );
+});
+
+// Distinct `position` values per create (the E6 fold note): a
+// byte-identical synthesized document pair ({position: same
+// value}) would REPLAY-SKIP via message_hash, silently dropping
+// the second create's own document pair and defeating this
+// test's balance count.
+function duplicateCreateBody(
+    id: string, revisionId: string, name: string, position: number,
+) {
+    return {
+        id,
+        objective: { position },
+        revisionId,
+        revision: {
+            objective_id: id,
+            name,
+            description: 'd',
+            member_id: 'current',
+            at: AT,
+        },
+    };
+}
+
+test('a duplicate objective create supersedes the first'
++ ' create\'s document pair on both its document and'
++ ' operation pairs', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const prefix = '/organizations/1/objectives/';
+
+    const first = await handleRequest(db, req(
+        'POST', '/objectives', token,
+        duplicateCreateBody('obj-dup-1', 'rev-dup-1a', 'First', 1),
+    ));
+    assert.equal(first.status, 204);
+
+    // The create's OWN document pair — appended strictly after
+    // the operation pair within the same tx — becomes the
+    // shared address's true head (nowUtc monotonicity).
+    const firstAtAddress = (await db.responses.getAll()).filter(
+        r => r.uri_prefix === prefix && r.uri_id === 'obj-dup-1',
+    );
+    assert.equal(firstAtAddress.length, 2);
+    const trueHead = firstAtAddress.find(r => r.status === 200);
+    assert.ok(trueHead, 'no document pair response after create 1');
+    const firstIds = new Set(firstAtAddress.map(r => r.id));
+
+    const second = await handleRequest(db, req(
+        'POST', '/objectives', token,
+        duplicateCreateBody('obj-dup-1', 'rev-dup-1b', 'Second', 2),
+    ));
+    assert.equal(
+        second.status, 204,
+        'the create op holds no echo — no 412',
+    );
+
+    // Every response at the shared address, minus the first
+    // create's own two, is exactly the second create's own two
+    // (operation + document) — neither pre-existed create 1.
+    const afterSecond = (await db.responses.getAll()).filter(
+        r => r.uri_prefix === prefix && r.uri_id === 'obj-dup-1',
+    );
+    const secondOnly = afterSecond.filter(
+        r => !firstIds.has(r.id),
+    );
+    assert.equal(secondOnly.length, 2);
+    const secondDocument = secondOnly.find(r => r.status === 200);
+    const secondOperation = secondOnly.find(r => r.status === 204);
+    assert.ok(secondDocument, 'no second document pair');
+    assert.ok(secondOperation, 'no second operation pair');
+    assert.equal(secondDocument!.supersedes, trueHead!.id);
+    assert.equal(secondOperation!.supersedes, trueHead!.id);
 });
 
 test('a failed objective create appends nothing', async () => {
@@ -193,9 +304,14 @@ test('a PUT to a fresh objective revision appends its pair,'
     assert.ok(firstId);
     assert.equal(first.headers.get('Supersedes'), null);
     const requests = await db.requests.getAll();
+    // uri_id-qualified (not uri_prefix alone): the create above
+    // ALSO synthesizes a first-revision pair at this SAME
+    // sub-address (rev-2), so a prefix-only filter would match
+    // it instead of this PUT's own rev-2b pair.
     const row = requests.find(
         r => r.uri_prefix
-            === '/organizations/1/objectives/obj-2/revisions/',
+            === '/organizations/1/objectives/obj-2/revisions/'
+            && r.uri_id === 'rev-2b',
     );
     assert.ok(row);
     assert.equal(row!.uri_id, 'rev-2b');

@@ -4,6 +4,15 @@
 // through them so the seeded world stays byte-for-byte stable
 // (pinned by tests/mock-data-fingerprint.test.ts).
 
+import type { Id } from '../types.ts';
+import { SYSTEM_MEMBER_ID } from '../types.ts';
+import {
+    STARK_ORGANIZATION,
+    ORGANIZATION_TWO,
+    assignOrganization,
+} from './seed-constants.ts';
+import type { SeedHumanMember } from './members.ts';
+
 // A FIXED anchor, never the wall clock: date-derived seed ids
 // (objective scores embed scoredAt) must not drift across UTC
 // days, or the fingerprint becomes a false prophet. Bump
@@ -147,4 +156,74 @@ export function isoFromMs(ms: number): string {
     const second = pad(date.getUTCSeconds());
     return `${year}-${month}-${day}`
         + `T${hour}:${minute}:${second}.000000Z`;
+}
+
+// ---- deterministic pick helper ----
+//
+// Moved verbatim out of postMockDataLoadIn so both this file's
+// objective-author pick and mock-data.ts's baseline/actual-score
+// picks share one implementation.
+export function deterministicScore(
+    seed: string,
+    min: number,
+    max: number,
+): number {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+    }
+    const range = max - min + 1;
+    const wrapped = ((hash % range) + range) % range;
+    return min + wrapped;
+}
+
+// The STARK/org-2 human pools an objective revision's author is
+// drawn from — a PURE reconstruction of the same pools
+// postMockDataLoadIn's in-tx `humansByOrganization` (still used,
+// unchanged, for the project_objective_baseline/actual-score
+// deferral) derives by reading the memberships it just wrote
+// back from the open transaction. Pass 1 forms an objective's
+// pair before any transaction opens, so it has nothing to read
+// back; this computes the identical pool straight from the
+// seed's own membership assignment (member -> assignOrganization
+// (index), 'current' -> both orgs — see postMockDataLoadIn's
+// membership Promise.all) instead of a DB round trip.
+//
+// The two computations are proven to agree: the buffered-tx
+// backend's getAll() is insertion-order (backend-buffer-tx.ts),
+// and every put the membership Promise.all issues resolves
+// synchronously in call order, so "read back what was just
+// written" and "recompute from the same static inputs, in the
+// same order" are the same list. tests/mock-data-pairs.test.ts
+// spot-checks a seeded objective's pair-embedded member_id
+// against the written revision row, so a future divergence
+// (e.g. a reordered membership Promise.all) fails loudly there
+// instead of silently.
+export function humanMemberPoolsByOrganization(
+    members: readonly SeedHumanMember[],
+): ReadonlyMap<Id, readonly Id[]> {
+    const pools = new Map<Id, Id[]>();
+    members.forEach((member, index) => {
+        const organizations = member.id === 'current'
+            ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
+            : [assignOrganization(index)];
+        for (const organization of organizations) {
+            const pool = pools.get(organization) ?? [];
+            pool.push(member.id);
+            pools.set(organization, pool);
+        }
+    });
+    return pools;
+}
+
+export function pickHumanMember(
+    pools: ReadonlyMap<Id, readonly Id[]>,
+    organization: Id,
+    seed: string,
+): Id {
+    const pool = pools.get(organization) ?? [];
+    if (pool.length === 0) return SYSTEM_MEMBER_ID;
+    return pool[
+        deterministicScore(seed, 0, pool.length - 1)
+    ]!;
 }

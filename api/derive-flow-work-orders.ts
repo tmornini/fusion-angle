@@ -22,10 +22,10 @@ import {
 // DELETE-head exclusion mirrors the old plane's physical
 // splice; parity, not a new mechanism — no DELETE route exists
 // for this join today, so the exclusion is defense-in-depth,
-// the deriveProjectFlows mechanics verbatim). Read-only and
-// additive — no route reads this yet (Task 7 wires it);
-// tests/drift-work-orders.test.ts proves equality against
-// flow_work_orders.getAllWhere('flow_id', ...).
+// the deriveProjectFlows mechanics verbatim). LIVE: GET
+// flows/:id/work-orders is wired to deriveFlowWorkOrders below
+// (Phase 5 Task 7); tests/drift-work-orders.test.ts proves
+// equality against flow_work_orders.getAllWhere('flow_id', ...).
 
 function flowWorkOrdersUriPrefix(
     organization: Id,
@@ -56,7 +56,8 @@ function flowWorkOrderEntityOf(
 
 // id-lex ordered (the IndexedDB reference); a DELETE head
 // excludes the row exactly as the old plane's physical splice
-// does (parity, not a new mechanism). NOT routed yet (Task 7).
+// does (parity, not a new mechanism). Serves the live GET
+// flows/:id/work-orders route (Phase 5 Task 7).
 export async function deriveFlowWorkOrders(
     db: DbAdapter,
     organization: Id,

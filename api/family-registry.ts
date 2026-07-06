@@ -63,6 +63,46 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         concurrency: 'simple',
         createBodyIdField: 'id',
     },
+    {
+        family: 'objectives',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    },
+    {
+        family: 'memberships',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id', // INERT — no collection POST
+            // exists for memberships; a row is created only
+            // when an invitee accepts an invitation (see
+            // adapters/invitations.ts) — the projects-precedent
+            // inert slot (message-pair.ts): this lookup never
+            // fires.
+    },
+    {
+        family: 'members',
+        organizationNested: false, // the FIRST global-plane
+            // row: the members roster is derived from the
+            // memberships ledger across every organization,
+            // never an organization-scoped store.
+        concurrency: 'simple',
+        createBodyIdField: 'id', // INERT — no collection POST
+            // exists for members either; the same inert slot
+            // as memberships above.
+    },
+    {
+        family: 'ai-members',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    },
+    {
+        family: 'human-members',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    },
 ];
 
 export function familyRegistration(

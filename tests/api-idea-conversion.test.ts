@@ -177,17 +177,27 @@ test(
             projectState: 'submitted',
             ideaStateAt: '2099-06-03T00:00:00.000000Z',
             projectStateAt: '2099-06-03T00:00:01.000000Z',
-            baselines: [],
+            baselines: [
+                {
+                    id: 'bl-9a',
+                    fields: baselineFields('obj-1', 10),
+                },
+                {
+                    id: 'bl-9b',
+                    fields: baselineFields('obj-2', -5),
+                },
+            ],
         }, DEV_TOKEN);
 
-        // Balance invariant: three REQUEST rows + three RESPONSE
+        // Balance invariant: five REQUEST rows + five RESPONSE
         // rows for one conversion (the operation pair, the
-        // synthesized project document pair, and the synthesized
-        // idea document pair).
+        // synthesized project document pair, the synthesized
+        // idea document pair, and TWO synthesized baseline
+        // pairs — Phase 7 Task 4's 3+N widening, N=2 here).
         const allRequests = await db.requests.getAll();
         const allResponses = await db.responses.getAll();
-        assert.equal(allRequests.length, 3);
-        assert.equal(allResponses.length, 3);
+        assert.equal(allRequests.length, 5);
+        assert.equal(allResponses.length, 5);
         assert.equal(allRequests.length, allResponses.length);
 
         const atProjectAddress = allRequests.filter(
@@ -245,6 +255,47 @@ test(
             state_at: '2099-06-03T00:00:00.000000Z',
             state_event_id: 'ev-idea-promoted-9',
         });
+
+        // The baseline pairs (Phase 7 Task 4): one PUT-shaped
+        // pair per baseline, at that baseline's OWN address —
+        // every baseline id is client-minted FRESH for this
+        // conversion, so each pair is genesis there.
+        const baselinesPrefix =
+            '/organizations/1/projects/p9'
+            + '/objective-baseline-scores/';
+        const baselineCases = [
+            { id: 'bl-9a', fields: baselineFields('obj-1', 10) },
+            { id: 'bl-9b', fields: baselineFields('obj-2', -5) },
+        ];
+        for (const { id, fields } of baselineCases) {
+            const atBaselineAddress = allRequests.filter(
+                (r) =>
+                    r.uri_prefix === baselinesPrefix
+                    && r.uri_id === id,
+            );
+            assert.equal(atBaselineAddress.length, 1);
+            const responsesAtBaselineAddress = allResponses
+                .filter(
+                    (r) =>
+                        r.uri_prefix === baselinesPrefix
+                        && r.uri_id === id,
+                );
+            assert.equal(responsesAtBaselineAddress.length, 1);
+
+            const baselineRequest = atBaselineAddress[0]!;
+            assert.equal(
+                baselineRequest.requester_identity_id,
+                'current',
+            );
+            const baselineParsed = JSON.parse(
+                baselineRequest.message,
+            ) as { body: Record<string, unknown> };
+            // KEY-SET spot-check: the wire body is the
+            // baseline's `fields` VERBATIM — exactly
+            // {project_id, objective_id, score, member_id,
+            // at}, no more, no less.
+            assert.deepEqual(baselineParsed.body, fields);
+        }
     },
 );
 
@@ -293,6 +344,15 @@ test(
         const baselines =
             await db.projectObjectiveBaselineScores.getAll();
         assert.equal(baselines.length, 0);
+
+        // Zero-pair assertion (Phase 7 Task 4): a failed
+        // conversion appends NOTHING of the widened bundle —
+        // not the operation pair, not the synthesized project/
+        // idea pairs, not one of the synthesized baseline pairs.
+        const allRequests = await db.requests.getAll();
+        const allResponses = await db.responses.getAll();
+        assert.equal(allRequests.length, 0);
+        assert.equal(allResponses.length, 0);
 
         // The idea stayed at 'approved' — the 'promoted' event
         // rolled back with the rest.

@@ -123,7 +123,9 @@ async () => {
     const res = await grant(db, 'inv-1');
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
+    // Operation pair + the invitation document pair (Phase 8
+    // Task 6), both at this SAME address.
+    assert.equal(requests.length, 2);
     assert.equal(requests[0]!.uri_prefix, '/invitations/');
     assert.equal(requests[0]!.uri_id, 'inv-1');
 });
@@ -154,11 +156,15 @@ async () => {
     assert.equal(firstBody.id, 'inv-2a');
     assert.equal(secondBody.id, 'inv-2a');
     // ...but each HTTP call still gets its OWN pair, addressed
-    // at the id ITS OWN request body proposed.
+    // at the id ITS OWN request body proposed. The FIRST call is
+    // 'fresh' — its operation pair AND the invitation document
+    // pair both land at 'inv-2a'; the SECOND is a duplicate echo
+    // — ONLY its operation pair lands at 'inv-2b', no document
+    // (a duplicate never synthesizes one).
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 2);
+    assert.equal(requests.length, 3);
     const ids = requests.map(r => r.uri_id).sort();
-    assert.deepEqual(ids, ['inv-2a', 'inv-2b']);
+    assert.deepEqual(ids, ['inv-2a', 'inv-2a', 'inv-2b']);
 });
 
 test('a byte-identical grant resend returns the stored'
@@ -168,8 +174,9 @@ test('a byte-identical grant resend returns the stored'
     const firstId = first.headers.get('Response-ID');
     const second = await grant(db, 'inv-3');
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    // 2 (operation + document); the resend appends nothing.
+    assert.equal((await db.requests.getAll()).length, 2);
+    assert.equal((await db.responses.getAll()).length, 2);
 });
 
 // ── invitations: acceptance/decline/revocation ──
@@ -195,6 +202,15 @@ async () => {
     );
     assert.ok(row);
     assert.equal(row!.uri_id, '');
+    // The B2 closure (Phase 8 Task 6): a fresh membership-writing
+    // accept ALSO appends the memberships document, at the
+    // INVITATION-org-nested address, keyed by the caller's own
+    // membershipId.
+    const document = requests.find(
+        r => r.uri_prefix === '/organizations/1/memberships/'
+            && r.uri_id === 'ms-acc',
+    );
+    assert.ok(document);
 });
 
 test('a repeat (no-op) accept still appends its own pair,'
@@ -223,6 +239,15 @@ test('a repeat (no-op) accept still appends its own pair,'
             === '/invitations/' + id + '/acceptance/',
     );
     assert.equal(rows.length, 2);
+    // The no-op re-accept writes no membership row, so it
+    // synthesizes no document either (the security property's
+    // message-plane mirror) — exactly ONE memberships document
+    // exists, at the FIRST (fresh) accept's own membershipId.
+    const documents = requests.filter(
+        r => r.uri_prefix === '/organizations/1/memberships/',
+    );
+    assert.equal(documents.length, 1);
+    assert.equal(documents[0]!.uri_id, 'ms-5');
 });
 
 test('a conflicting (already-revoked) accept 409s and'

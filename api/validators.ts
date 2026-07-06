@@ -771,6 +771,48 @@ export function validateMemberEntity(
     };
 }
 
+const MEMBER_DOCUMENT_BODY_KEYS: readonly string[] = [
+    'type',
+];
+
+export interface MemberDocumentBody {
+    readonly entity: Omit<MemberEntity, 'id'>;
+}
+
+// The HTTP-body gate for PUT /members/:id: the ninth family,
+// and the FIRST of the roster's shared-log-with-genesis
+// 'stateless' bucket (see MEMBERS_WIRING in routes.ts for the
+// full rationale-contrast). THE LABEL MANDATE (the Phase 7
+// Objective precedent, a NAMED byte-parity-over-convention
+// choice): the assertOnlyKeys label is 'MemberEntity', matching
+// TODAY'S store validator (validateMemberEntity) byte-for-byte,
+// NOT the 'MemberDocumentBody' naming convention every other
+// *DocumentBody validator uses — the label appears in the wire
+// 400 body ("unexpected key ... for MemberEntity"), and the
+// convention's label would change those bytes. `type`'s own
+// rule (validateEnumField over the SAME three-member enum) is
+// IDENTICAL to validateMemberEntity's, so the missing/stray-key
+// 400s stay byte-identical on both paths too. Global plane
+// (family-registry.ts: organizationNested:false) — no
+// organization_id exists on this entity, so nothing is
+// tolerated beyond `type`.
+export function validateMemberDocumentBody(
+    body: Record<string, unknown>,
+): MemberDocumentBody {
+    assertOnlyKeys(
+        body, MEMBER_DOCUMENT_BODY_KEYS, 'MemberEntity',
+    );
+    const type = validateEnumField(
+        body, 'type', ['human', 'ai', 'system'],
+        'member type', 'MemberEntity',
+    );
+    return {
+        entity: {
+            type,
+        },
+    };
+}
+
 const IDENTITY_BODY_KEYS: readonly string[] = ['kind'];
 
 export function validateIdentityEntity(
@@ -1060,6 +1102,70 @@ export function validateHumanMemberEntity(
     };
 }
 
+const HUMAN_MEMBER_DOCUMENT_BODY_KEYS:
+    readonly string[] = [
+    'title', 'department',
+    'strengths', 'team_dimensions',
+];
+
+export interface HumanMemberDocumentBody {
+    readonly entity: Omit<HumanMemberEntity, 'id'>;
+}
+
+// The HTTP-body gate for PUT /human-members/:id: the eleventh
+// family, and the THIRD (last) member of MEMBERS_WIRING's
+// shared-log-with-genesis 'stateless' bucket (see MEMBERS_WIRING
+// in routes.ts for the full rationale-contrast) — but UNLIKE
+// members/ai-members, no live PUT route exists to serve this
+// validator today (human-members/:id carries only {get, post});
+// it exists for a future synthesis/seed caller only, mirroring
+// validateAiMemberDocumentBody's shape exactly. THE LABEL
+// MANDATE: the assertOnlyKeys label is 'HumanMemberEntity',
+// matching TODAY'S store validator (validateHumanMemberEntity)
+// byte-for-byte, NOT the 'HumanMemberDocumentBody' naming
+// convention every other *DocumentBody validator uses. The
+// strengths/team_dimensions structural gates (validateStringArrayJson/
+// validateStringNumberRecordJson) are the SAME calls
+// validateHumanMemberEntity makes, so every 400 this validator
+// can raise stays byte-identical to its store counterpart. Global
+// plane (family-registry.ts: organizationNested:false) — no
+// organization_id exists on this entity, so nothing is tolerated
+// beyond the four fields above.
+export function validateHumanMemberDocumentBody(
+    body: Record<string, unknown>,
+): HumanMemberDocumentBody {
+    assertOnlyKeys(
+        body,
+        HUMAN_MEMBER_DOCUMENT_BODY_KEYS,
+        'HumanMemberEntity',
+    );
+    const strengths = pickJsonArrayField(
+        body, 'strengths',
+    );
+    validateStringArrayJson(
+        strengths, 'HumanMemberEntity.strengths',
+    );
+    const teamDimensions = pickJsonObjectField(
+        body, 'team_dimensions',
+    );
+    validateStringNumberRecordJson(
+        teamDimensions,
+        'HumanMemberEntity.team_dimensions',
+    );
+    return {
+        entity: {
+            title: pickString(
+                body, 'title',
+            ),
+            department: pickString(
+                body, 'department',
+            ),
+            strengths,
+            team_dimensions: teamDimensions,
+        },
+    };
+}
+
 const AI_MEMBER_BODY_KEYS:
     readonly string[] = [
     'name', 'description', 'model', 'skill_focus',
@@ -1093,6 +1199,59 @@ export function validateAIMemberEntity(
             body, 'skill_focus',
         ),
         model,
+    };
+}
+
+const AI_MEMBER_DOCUMENT_BODY_KEYS:
+    readonly string[] = [
+    'name', 'description', 'model', 'skill_focus',
+];
+
+export interface AiMemberDocumentBody {
+    readonly entity: Omit<AIMemberEntity, 'id'>;
+}
+
+// The HTTP-body gate for PUT /ai-members/:id: the tenth family,
+// joining MEMBERS_WIRING's shared-log-with-genesis 'stateless'
+// bucket (see MEMBERS_WIRING in routes.ts for the full
+// rationale-contrast; the fifth bucket's SECOND member — no new
+// rationale, no new bucket). THE LABEL MANDATE: the
+// assertOnlyKeys label is 'AIMemberEntity', matching TODAY'S
+// store validator (validateAIMemberEntity) byte-for-byte, NOT
+// the 'AiMemberDocumentBody' naming convention every other
+// *DocumentBody validator uses. `model`'s own rule
+// (isProviderModelId, the SAME catalog-membership gate) is
+// IDENTICAL to validateAIMemberEntity's, so the missing/stray-
+// key 400s AND the model-rejection 400 stay byte-identical on
+// both paths. Global plane (family-registry.ts:
+// organizationNested:false) — no organization_id exists on this
+// entity, so nothing is tolerated beyond the four fields above.
+export function validateAiMemberDocumentBody(
+    body: Record<string, unknown>,
+): AiMemberDocumentBody {
+    assertOnlyKeys(
+        body,
+        AI_MEMBER_DOCUMENT_BODY_KEYS,
+        'AIMemberEntity',
+    );
+    const model = pickString(body, 'model');
+    if (!isProviderModelId(model)) {
+        throw new ValidationError(
+            'model must be a known provider'
+            + ' model id on AIMemberEntity',
+        );
+    }
+    return {
+        entity: {
+            name: pickString(body, 'name'),
+            description: pickString(
+                body, 'description',
+            ),
+            skill_focus: pickString(
+                body, 'skill_focus',
+            ),
+            model,
+        },
     };
 }
 
@@ -1825,6 +1984,57 @@ export function validateMembershipEntity(
     };
 }
 
+const MEMBERSHIP_DOCUMENT_BODY_KEYS: readonly string[] = [
+    'organization_id', 'identity_id', 'at',
+];
+
+export interface MembershipDocumentBody {
+    readonly entity: Omit<MembershipEntity, 'id'>;
+}
+
+// The HTTP-body gate for PUT /memberships/:id: the eighth
+// family, and the FOURTH 'stateless' one — but unlike work-
+// orders/record-attributes/objectives, no lifecycle concept
+// exists for a membership row AT ALL: it is a pure join
+// relation, joining record-attributes' vacuous-BY-CONSTRUCTION
+// bucket as its actual sibling (see RECORD_ATTRIBUTES_WIRING's
+// own comment in routes.ts). THE LABEL MANDATE (a NAMED byte-
+// parity-over-convention choice, the Phase 7 Objective
+// precedent): the assertOnlyKeys label is 'MembershipEntity',
+// matching TODAY'S store validator (validateMembershipEntity)
+// byte-for-byte, NOT the 'MembershipDocumentBody' naming
+// convention every other *DocumentBody validator uses — the
+// label appears in the wire 400 body ("unexpected key ... for
+// MembershipEntity"), and the convention's label would change
+// those bytes. UNLIKE objectives' tolerated-but-ignored
+// organization_id, every key here is REQUIRED: memberships'
+// live wire PUT body carries its OWN organization_id today (the
+// org-scoped store stamps over it at write time regardless —
+// the objectives fence-stamp analogue — but this gate mirrors
+// today's acceptance either way). position/state rules do not
+// apply; the fields are the SAME three pickString/timestamp
+// calls validateMembershipEntity already makes, so the missing-
+// key 400 stays byte-identical on both paths too.
+export function validateMembershipDocumentBody(
+    body: Record<string, unknown>,
+): MembershipDocumentBody {
+    assertOnlyKeys(
+        body, MEMBERSHIP_DOCUMENT_BODY_KEYS, 'MembershipEntity',
+    );
+    const at = validateTimestampField(
+        body, 'at', 'MembershipEntity',
+    );
+    return {
+        entity: {
+            organization_id: pickString(
+                body, 'organization_id',
+            ),
+            identity_id: pickString(body, 'identity_id'),
+            at,
+        },
+    };
+}
+
 const INVITATION_BODY_KEYS: readonly string[] = [
     'organization_id', 'identity_id', 'at',
 ];
@@ -1912,6 +2122,59 @@ export function validateObjectiveEntity(
     return {
         organization_id: pickString(body, 'organization_id'),
         position: pickNumber(body, 'position'),
+    };
+}
+
+const OBJECTIVE_DOCUMENT_BODY_KEYS: readonly string[] = [
+    'position',
+];
+
+export interface ObjectiveDocumentBody {
+    readonly entity:
+        Omit<ObjectiveEntity, 'id' | 'organization_id'>;
+}
+
+// The HTTP-body gate for PUT /objectives/:id: the seventh
+// family, and the THIRD 'stateless' one (work-orders and
+// record-attributes are the first two) — Author gate 3's
+// SECOND named partial amendment to Decision 7. The trio
+// COULD represent the objective alphabet, but is FORBIDDEN
+// three ways: the wire body would have to grow it (the
+// unavoidable zero-delta violation); a minted genesis event
+// would abort the states 911 pin at reseed (the genesis
+// dilemma); and absence-as-active is R2's named covenant. So
+// this validator admits the entity field alone, exactly as
+// the other two 'stateless' document bodies do — no trio, no
+// exceptions. THE LABEL MANDATE (a NAMED byte-parity-over-
+// convention choice): the assertOnlyKeys label is 'Objective',
+// matching TODAY'S store validator (validateObjectiveEntity)
+// byte-for-byte, NOT the 'ObjectiveDocumentBody' naming
+// convention every other *DocumentBody validator uses — the
+// label appears in the wire 400 body ("unexpected key ... for
+// Objective"), and the convention's label would change those
+// bytes. organization_id is a TOLERATED-BUT-IGNORED optional
+// allowance, never expected: the live client's PUT body is
+// `{position}` alone, but the seed's below-facade create
+// bodies carry organization_id too (documentOperationOrganization's
+// read-back shape in routes.ts, mirrored by every sibling
+// *DocumentBody validator), and the org-scoped store always
+// stamps organization_id downstream regardless of what it
+// finds — so a caller-forged value is tolerated, never
+// rejected. position's own rule (pickNumber) is IDENTICAL to
+// validateObjectiveEntity's — the missing-position 400 is the
+// SAME assertOnlyKeys call with the SAME label, so its message
+// stays byte-identical on both paths.
+export function validateObjectiveDocumentBody(
+    body: Record<string, unknown>,
+): ObjectiveDocumentBody {
+    assertOnlyKeys(
+        body, OBJECTIVE_DOCUMENT_BODY_KEYS, 'Objective',
+        ['organization_id'],
+    );
+    return {
+        entity: {
+            position: pickNumber(body, 'position'),
+        },
     };
 }
 

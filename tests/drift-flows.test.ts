@@ -1094,3 +1094,50 @@ async () => {
     );
     assertFlowsEqual(derived, old);
 });
+
+// -- 13. same-join-id retry: the join stays chain-less ----------
+// (Phase 9 Task 2 Step 0(d') pin, additive and pass-first against
+// HEAD: the create route's join pair hardcodes headPairId:
+// undefined by design — no head-read at all — so a SECOND,
+// genuinely different create [a fresh flow id, a fresh operation]
+// that happens to reuse a prior create's project-flow id still
+// appends a chain-less join pair, never a Supersedes onto the
+// first. Pinned BEFORE the shared former absorbs this site, so a
+// future uniform head-read regresses here first.)
+
+test('same-join-id retry: two different flow creates reusing '
++ 'one project-flow id each append a chain-less join pair '
++ '(neither Supersedes nor Follows)', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const projectId = l2cProjectId;
+    const sharedPfid = 'flow-drift-retry-pf-shared';
+
+    const first = await createFlow(
+        db, token, 'flow-drift-retry-a', sharedPfid, projectId,
+        'flow-drift-retry-ev-a',
+    );
+    assert.equal(first.status, 204);
+
+    // A DIFFERENT flow, a DIFFERENT operation (fresh event id) —
+    // not a byte-identical resend, which would replay via the E6
+    // fast path and append no second pair at all.
+    const second = await createFlow(
+        db, token, 'flow-drift-retry-b', sharedPfid, projectId,
+        'flow-drift-retry-ev-b',
+    );
+    assert.equal(second.status, 204);
+
+    const joinPrefix = canonicalUriPrefix(
+        STARK_ORGANIZATION,
+        '/projects/' + projectId + '/flows/',
+    );
+    const joinResponses = (await db.responses.getAllWhere(
+        'uri_id', sharedPfid,
+    )).filter((row) => row.uri_prefix === joinPrefix);
+    assert.equal(joinResponses.length, 2);
+    for (const response of joinResponses) {
+        assert.equal(response.supersedes, undefined);
+        assert.equal(response.follows, undefined);
+    }
+});

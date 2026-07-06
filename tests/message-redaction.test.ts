@@ -61,6 +61,52 @@ async () => {
         .includes('REFRESH-SECRET'));
 });
 
+test('a live authorization code is fingerprinted on the'
++ ' token request arm', async () => {
+    const model = buildRequestModel({
+        method: 'POST',
+        target: '/authentication/token',
+        fields: [],
+        body: {
+            grant_type: 'authorization_code',
+            code: 'AUTH-CODE-SECRET',
+        },
+    });
+    const redacted = await redactAuthenticationRequest(
+        'authentication/token', model,
+    );
+    const body = bodyOf(redacted);
+    assert.equal(
+        body.code,
+        'sha256:' + await sha256Hex('AUTH-CODE-SECRET'),
+    );
+    assert.ok(!canonicalJson(redacted)
+        .includes('AUTH-CODE-SECRET'));
+});
+
+test('a present code on the authorize request arm is'
++ ' equally fingerprinted', async () => {
+    const model = buildRequestModel({
+        method: 'POST',
+        target: '/authentication/authorize',
+        fields: [],
+        body: {
+            method: 'authorization_code',
+            code: 'AUTH-CODE-SECRET',
+        },
+    });
+    const redacted = await redactAuthenticationRequest(
+        'authentication/authorize', model,
+    );
+    const body = bodyOf(redacted);
+    assert.equal(
+        body.code,
+        'sha256:' + await sha256Hex('AUTH-CODE-SECRET'),
+    );
+    assert.ok(!canonicalJson(redacted)
+        .includes('AUTH-CODE-SECRET'));
+});
+
 test('the password is PBKDF2-fingerprinted, never sha256',
 async () => {
     const model = buildRequestModel({
@@ -98,6 +144,24 @@ async () => {
     const json = canonicalJson(redacted);
     assert.ok(!json.includes('ACCESS-SECRET'));
     assert.ok(!json.includes('REFRESH-SECRET'));
+});
+
+test('a minted authorization code is fingerprinted on the'
++ ' authorize response arm', async () => {
+    const model = buildResponseModel({
+        status: 200, fields: [],
+        body: { code: 'AUTH-CODE-SECRET' },
+    });
+    const redacted = await redactAuthenticationResponse(
+        'authentication/authorize', model,
+    );
+    const body = bodyOf(redacted);
+    assert.equal(
+        body.code,
+        'sha256:' + await sha256Hex('AUTH-CODE-SECRET'),
+    );
+    assert.ok(!canonicalJson(redacted)
+        .includes('AUTH-CODE-SECRET'));
 });
 
 test('a non-authentication route passes through untouched',

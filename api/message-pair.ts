@@ -129,7 +129,7 @@ const RESPONSE_ID_FIELD = 'response-id';
 // here is deleted, never kept as a parallel truth.
 const ORGANIZATION_NESTED_FIRST_SEGMENTS: ReadonlySet<string> =
     new Set([
-        'objectives', 'memberships', 'states',
+        'states',
     ]);
 
 // The tier rule, exported so gate, seed, and derivations share
@@ -440,9 +440,6 @@ export async function appendMessagePair(
 // registry.ts) answers ONLY from its own createBodyIdField —
 // its entry here is deleted, never kept as a parallel truth.
 const CREATE_BODY_ID_FIELDS: Record<string, string> = {
-    'objectives': 'id',
-    'ai-members': 'id',
-    'human-members': 'id',
     'identities': 'id',
     // Not gate-dispatched (the invitations side channel forms
     // its own pair directly in invitations-domain.ts) but reuses
@@ -457,7 +454,7 @@ export function createdEntityUriId(
 ): string | undefined {
     // A registered family's createBodyIdField serves a bare
     // collection-POST create route whose pattern IS the family
-    // name (e.g. 'objectives' below, still an unregistered
+    // name (e.g. 'identities' below, still an unregistered
     // literal). Ideas registered this slot in Task 1 for its own
     // POST /ideas, which Phase 2 Task 3 (R1) retired — genesis
     // folded into the document-class PUT ideas/:id, whose uriId

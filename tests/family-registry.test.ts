@@ -64,8 +64,58 @@ test('record-attributes is the sixth registered family,'
     });
 });
 
+test('objectives is the seventh registered family, simple'
++ ' like records and record-attributes', () => {
+    assert.deepEqual(familyRegistration('objectives'), {
+        family: 'objectives',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('memberships is the eighth registered family,'
++ ' organization-nested like the rest', () => {
+    assert.deepEqual(familyRegistration('memberships'), {
+        family: 'memberships',
+        organizationNested: true,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('members is the ninth registered family, the first'
++ ' global-plane (organizationNested false) row', () => {
+    assert.deepEqual(familyRegistration('members'), {
+        family: 'members',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('ai-members is the tenth registered family,'
++ ' global-plane like members', () => {
+    assert.deepEqual(familyRegistration('ai-members'), {
+        family: 'ai-members',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('human-members is the eleventh registered family,'
++ ' global-plane like ai-members', () => {
+    assert.deepEqual(familyRegistration('human-members'), {
+        family: 'human-members',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
 test('an unregistered family returns undefined', () => {
-    assert.equal(familyRegistration('objectives'), undefined);
+    assert.equal(familyRegistration('identities'), undefined);
 });
 
 test('every registered family names a concurrency class',

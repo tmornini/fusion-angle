@@ -200,6 +200,24 @@ test('an edit POST shares the SAME address as create and'
     assert.equal(
         edited.headers.get('Supersedes'), trueHead!.id,
     );
+    // The edit's OWN operation pair — read BELOW-WIRE via the
+    // SAME idiom, filtered to the operation shape (status 204,
+    // never the document pair's 200) — also supersedes
+    // trueHead's id: the gate's headPairIdAt read, at this
+    // shared address, resolves to the SAME create's document
+    // pair the wire Supersedes header above already names. Pins
+    // the below-wire parity the wire header alone cannot prove.
+    const editOperationPair = latestByKey(
+        (await db.responses.getAll()).filter(
+            r => r.uri_prefix === prefix && r.uri_id === 'rec-2'
+                && r.status !== 200,
+        ),
+        () => 'head',
+    ).get('head');
+    assert.ok(
+        editOperationPair, 'no stored operation-pair response',
+    );
+    assert.equal(editOperationPair!.supersedes, trueHead!.id);
 });
 
 test('a record create with attributes appends the'

@@ -46,6 +46,8 @@ import {
     storedPairResponse,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
+import { formDocumentPairFor } from './routes.ts';
+import { deriveInvitations } from './derive-invitations.ts';
 
 // The active org of the caller: the verified token claim, else
 // the identity's resolved default. Null when the identity can
@@ -141,10 +143,26 @@ export async function invitationsRequest(
 // grant (its actor is the inviter); the last event is the
 // current state. The whole result is the caller's own — never
 // another identity's.
+//
+// GET is FLIPPED (Task 8): the invitation row + its current
+// state are derived via deriveInvitations(ctx.base) — wire-
+// identical to the hand-written ctx.base.invitations.getAll()
+// + states-derived-current-state dispatch it replaces (every
+// row deriveInvitations returns already carries a resolved
+// state, defaulting to 'pending', so the old "no state event
+// yet" skip is now unreachable — no live write path ever grants
+// without its genesis pending event). The enrichment joins
+// (organization_name, identityPii for invited_by_name) stay
+// old-plane reads — NAMED transitive rides. The states read
+// below is NOT the current-state source anymore; it survives
+// ONLY to find each invitation's grant ('pending') event so its
+// author (the inviter) can be named — a lookup deriveInvitations
+// cannot answer, since it derives a resolved current state, not
+// per-event authorship.
 async function invitationsForInvitee(
     ctx: AuthenticatedContext,
 ): Promise<Response> {
-    const mine = (await ctx.base.invitations.getAll())
+    const mine = (await deriveInvitations(ctx.base))
         .filter(inv =>
             inv.identity_id === ctx.principal.id);
     if (mine.length === 0) return Response.json([]);
@@ -158,18 +176,15 @@ async function invitationsForInvitee(
     // getAllFor opened one transaction per invitation for the
     // same log.
     const events = await ctx.base.states.getAll();
-    const latest = latestByKey(events, ev => ev.entity_id);
     const eventsFor = Map.groupBy(events, ev => ev.entity_id);
     const out = [];
     for (const inv of mine) {
-        const current = latest.get(inv.id);
-        if (current === undefined) continue;
         // The inviter is the actor of the grant ('pending') event —
         // found by state, not position, so a same-`at` tie cannot
         // misattribute it. An absent related row (erased PII,
         // vanished org) omits its key — absence on the wire is
         // the absent key, never a '' sentinel.
-        const grant = eventsFor.get(inv.id)!
+        const grant = (eventsFor.get(inv.id) ?? [])
             .find(ev => ev.state === 'pending');
         const name = organizationName.get(inv.organization_id);
         const inviter = grant === undefined
@@ -186,8 +201,7 @@ async function invitationsForInvitee(
                 ? { invited_by_name: inviter }
                 : {}),
             at: inv.at,
-            state: assertInvitationState(
-                current.state, 'invitation ' + inv.id),
+            state: inv.state,
         });
     }
     return Response.json(out);
@@ -196,6 +210,17 @@ async function invitationsForInvitee(
 // The active org's outstanding (pending) invitations, for an
 // admin. The invitee email rides along because the admin
 // supplied it at grant time — need-to-know, not a PII leak.
+//
+// GET is FLIPPED (Task 8): the invitation row + its current
+// state are derived via deriveInvitations(ctx.base) — wire-
+// identical to the hand-written ctx.base.invitations.getAll()
+// + states-derived-current-state dispatch it replaces (every
+// row deriveInvitations returns already carries a resolved
+// state, so the old "no state event yet" skip is unreachable,
+// the same reason invitationsForInvitee's own comment gives).
+// The pending-only + active-org + admin filters are preserved
+// exactly. The invitee-email enrichment join (identityPii)
+// stays an old-plane read — a NAMED transitive ride.
 async function sentInvitations(
     ctx: AuthenticatedContext,
 ): Promise<Response> {
@@ -210,24 +235,15 @@ async function sentInvitations(
             'forbidden: listing sent invitations requires'
             + ' an admin role', HTTP_FORBIDDEN);
     }
-    const organizationInvites =
-        (await ctx.base.invitations.getAll())
-            .filter(inv => inv.organization_id === organization);
+    const organizationInvites = (await deriveInvitations(ctx.base))
+        .filter(inv => inv.organization_id === organization
+            && inv.state === 'pending');
     if (organizationInvites.length === 0) return Response.json([]);
     const email = new Map(
         (await ctx.base.identityPii.getAll())
             .map(p => [p.id, p.email]));
-    // One states read serves every row — getCurrentFor per
-    // invitation opened one transaction each for the same log.
-    const latest = latestByKey(
-        await ctx.base.states.getAll(), ev => ev.entity_id);
     const out = [];
     for (const inv of organizationInvites) {
-        const current = latest.get(inv.id);
-        if (current === undefined) continue;
-        const state = assertInvitationState(
-            current.state, 'invitation ' + inv.id);
-        if (state !== 'pending') continue;
         // Erased invitee PII omits the key — absence on the
         // wire is the absent key, never a '' sentinel.
         const inviteeEmail = email.get(inv.identity_id);
@@ -359,6 +375,8 @@ async function grantInvitation(
         canonicalUriPrefix(undefined, address.uriPrefix);
     const uriId =
         createdEntityUriId('invitations', body) ?? address.uriId;
+    const headPairId = await headPairIdAt(
+        ctx.base, canonicalPrefix, uriId);
     const pair = await formWritePair({
         method: 'POST', pathname: '/invitations',
         routePattern: 'invitations',
@@ -367,14 +385,50 @@ async function grantInvitation(
         body, requesterIdentityId: ctx.principal.id,
         requestAt: ctx.requestAt, organization: undefined,
         responseStatus: 200, responseBody,
-        headPairId: await headPairIdAt(
-            ctx.base, canonicalPrefix, uriId),
+        headPairId,
     });
     const replay = await storedResponseFor(
         ctx.base, pair.requestHash);
     if (replay !== undefined) {
         return responseFromStored(replay);
     }
+    // The invitation DOCUMENT pair (Phase 8 Task 6): PUT-shaped,
+    // at the SAME (uriPrefix, uriId) as the operation pair above
+    // — the entity minus id, so the wire NEVER carries the
+    // invitee's email (the invitee is already resolved to
+    // identity_id above; the document stores only the
+    // reference). Formed ONLY on the 'fresh' outcome — a
+    // duplicate echo's operation pair sits at the duplicate's
+    // own submitted id, and no document is ever formed for it,
+    // so no phantom document can exist there. There is no live
+    // PUT route this mirrors (Author gate 2 — the side channel
+    // never joins the route table), so the response body is
+    // hand-built to the stored-row shape (id-first), like the
+    // human-members detail document's own synthesized-only class
+    // (Phase 8 Task 4) — no WRITE_RESPONSE_SPECS entry exists for
+    // 'invitations/:id' to consult.
+    const documentBody = {
+        organization_id: organization,
+        identity_id: identityId,
+        at: grantAt,
+    };
+    const document = preOutcome.kind === 'fresh'
+        ? await formWritePair({
+            method: 'PUT',
+            pathname: '/invitations/' + invitationId,
+            routePattern: 'invitations/:id',
+            routeSegments: ['invitations', ':id'],
+            pathSegments: ['invitations', invitationId],
+            headerFields: [],
+            body: documentBody,
+            requesterIdentityId: ctx.principal.id,
+            requestAt: ctx.requestAt,
+            organization: undefined,
+            responseStatus: 200,
+            responseBody: { id: invitationId, ...documentBody },
+            headPairId,
+        })
+        : undefined;
     // The member/pending checks and the write run in ONE transaction so
     // two concurrent grants cannot both pass the check and each append a
     // pending invitation (Commandment VII).
@@ -409,6 +463,9 @@ async function grantInvitation(
                     'pending', ctx.principal.id, grantAt);
             }
             await appendMessagePair(view, pair);
+            if (document !== undefined) {
+                await appendMessagePair(view, document);
+            }
         },
     );
     if (preOutcome.kind === 'fresh') {
@@ -568,6 +625,35 @@ async function acceptInvitation(
     if (replay !== undefined) {
         return responseFromStored(replay);
     }
+    // The memberships DOCUMENT pair (Phase 8 Task 6, the B2
+    // closure — the third memberships writer to join the
+    // document plane, after the live PUT route and the seed):
+    // PUT-shaped, at the INVITATION's org-nested memberships
+    // address — never the caller's active org, mirroring the
+    // domain write's own organization choice below. Formed
+    // pre-tx (crypto cannot run inside a transaction body) but
+    // appended ONLY inside the `!already` branch, beside the
+    // memberships.put it mirrors — a no-op re-accept or a
+    // conflict writes no membership row, so it appends no
+    // document either. Rides the shared former (Phase 9 Task 2),
+    // which resolves the SAME WRITE_RESPONSE_SPECS
+    // ['memberships/:id'] entry a live PUT /memberships/:id
+    // resolves (documentWriteResponseSpec(MEMBERSHIPS_WIRING)).
+    const membershipDocumentBody = {
+        organization_id: inv.organization_id,
+        identity_id: ctx.principal.id,
+        at,
+    };
+    const membershipDocument = await formDocumentPairFor(
+        ctx.base, {
+            routePattern: 'memberships/:id',
+            params: [membershipId],
+            body: membershipDocumentBody,
+            requesterIdentityId: ctx.principal.id,
+            requestAt: ctx.requestAt,
+            organization: inv.organization_id,
+        },
+    );
     // The pending check rides INSIDE the write transaction so a
     // concurrent revoke/decline cannot slip between the check and the
     // membership write — a revoke must actually stop access (Commandment
@@ -598,6 +684,7 @@ async function acceptInvitation(
                     identity_id: ctx.principal.id,
                     at,
                 });
+                await appendMessagePair(view, membershipDocument);
             }
             await view.states.postEvent(
                 eventId, id, 'accepted', ctx.principal.id, at);
