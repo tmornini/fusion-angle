@@ -204,7 +204,7 @@ global members directory to ids present in `effective
 unconditionally) — so there is no `organization_id` column
 on `members` and an org switch re-scopes the roster with no
 denormalized column to sync. Per-org roles resolve via
-`currentRolesForInOrg` (`api/authorization.ts`): the latest
+`currentRolesForInOrganization` (`api/authorization.ts`): the latest
 action per `(organization_id, identity_id, role)`, fenced to
 the request's org.
 

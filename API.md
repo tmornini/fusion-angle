@@ -427,11 +427,14 @@ like every prior bundle.**
   never a real client PUT.
 
 The shared BODY builders (`memberDocumentBodyOf`,
-`aiMemberDetailBodyOf`, `humanMemberDetailBodyOf`, `api/routes.ts`)
-are the ONE-voice seam: pure functions consumed by BOTH the four
-routes' inline formation above and the seed's own invocation
-construction (`api/mock-data/seed-message-pairs.ts`) — the
-objectives precedent (§3.21), never a shared pair-FORMER.
+`aiMemberDetailBodyOf`, `humanMemberDetailBodyOf`) feed
+`formDocumentPairFor` (`api/routes.ts`), the shared pair-FORMER
+the four routes above now call directly (Phase 9 Task 2 retired
+their own route-inline formation). The seed's own invocation
+construction (`api/mock-data/seed-message-pairs.ts`) still forms
+its pairs independently — a different pipeline by design, with no
+dispatched route to resolve a fence organization or response spec
+from.
 
 All three pairs share ONE `requestAt` yet strictly-later response
 `at` stamps, so each address's LAST-appended pair becomes its
@@ -1018,13 +1021,17 @@ skips them all:
   `DELETE /record-attributes/:id`.
 
 The shared BODY builders (`recordDocumentBodyOf`,
-`recordAttributeDocumentBodyOf`, `api/routes.ts`) are the
-ONE-voice seam: pure functions consumed by BOTH this
-route-inline formation and the seed's own invocation
-construction (`api/mock-data/seed-message-pairs.ts`) — never a
-shared pair-FORMER, since forming a pair itself needs the fence
-organization and the response specs, which only the route
-(and, independently, the seed) hold.
+`recordAttributeDocumentBodyOf`) feed `formDocumentPairFor`
+(`api/routes.ts`), the shared pair-FORMER this route now calls
+directly for all three pair shapes above — including the
+attribute-DELETE tombstones, via an explicit response override
+(they stay SPEC-LESS, skipping `WRITE_RESPONSE_SPECS`) — Phase 9
+Task 2 retired this route's own route-inline formation. The
+seed's own invocation construction
+(`api/mock-data/seed-message-pairs.ts`) still forms its pairs
+independently — a different pipeline by design, with no
+dispatched route to resolve a fence organization or response
+spec from.
 
 All pairs share ONE `requestAt` (the write's own origination) yet
 strictly-later response `at` stamps, so the document pair —
@@ -1097,11 +1104,15 @@ below-facade caller (`api/mock-data.ts`) skips all three:
   create), never `Supersedes`.
 
 The shared BODY builders (`objectiveDocumentBodyOf`,
-`objectiveRevisionBodyOf`, `api/routes.ts`) are the ONE-voice
-seam: pure functions consumed by BOTH this route-inline formation
-and the seed's own invocation construction
-(`api/mock-data/seed-message-pairs.ts`) — the records precedent
-(§3.20), never a shared pair-FORMER.
+`objectiveRevisionBodyOf`) feed `formDocumentPairFor`
+(`api/routes.ts`), the shared pair-FORMER this route now calls
+directly for both pair shapes above — the records precedent
+(§3.20); Phase 9 Task 2 retired this route's own route-inline
+formation. The seed's own invocation construction
+(`api/mock-data/seed-message-pairs.ts`) still forms its pairs
+independently — a different pipeline by design, with no
+dispatched route to resolve a fence organization or response
+spec from.
 
 All three pairs share ONE `requestAt` (the create's own
 origination) yet strictly-later response `at` stamps, so the

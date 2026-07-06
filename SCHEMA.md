@@ -253,7 +253,7 @@ action per `(organization_id, identity_id, role)` — a
 Append-only: a revoke is a NEW `revoked` row, never a
 splice. `by_member_id` is the actor (== their identity
 id). Authorization derives roles from THIS ledger fresh
-at the gate (`currentRolesForInOrg` in
+at the gate (`currentRolesForInOrganization` in
 `api/authorization.ts`, filtered to the request's org)
 — never from a token claim, so a revoke takes effect on
 the next request. `at` is the RFC-3339 zulu moment,

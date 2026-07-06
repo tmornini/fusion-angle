@@ -122,7 +122,7 @@ is HTTP-only.
   write; `web-app/app/adapters/invitations.ts` + the
   `invitations` facade in `api/api.ts`) — accept stamps the
   INVITATION's org, not the caller's active org. Per-org roles
-  via `currentRolesForInOrg`. See [SCHEMA.md](SCHEMA.md) /
+  via `currentRolesForInOrganization`. See [SCHEMA.md](SCHEMA.md) /
   [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over IndexedDB. Adapters
   in `web-app/app/adapters/` shape rows for pages. The live

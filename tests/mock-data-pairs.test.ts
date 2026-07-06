@@ -215,6 +215,26 @@ test('a seeded ai-member\'s detail-document pair sits at its'
     );
 });
 
+test('a seeded system member\'s member-document pair sits at'
++ ' the shared members/:id address, its body carrying `type`'
++ ' alone', async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const requests = await db.requests.getAll();
+    const memberRow = requests.find(
+        r => r.uri_id === SYSTEM_MEMBER_ID
+            && r.uri_prefix === '/members/',
+    );
+    assert.ok(
+        memberRow,
+        'no member-document pair for the seeded system member',
+    );
+    const embedded = JSON.parse(memberRow!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(embedded.body, { type: 'system' });
+});
+
 test('a seeded membership document pair sits at its org-nested'
 + ' entity address, its body carrying the three membership'
 + ' keys', async () => {

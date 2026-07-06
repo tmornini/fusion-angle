@@ -348,17 +348,22 @@ export function documentCollectionRoute(
 // organizationNested:false) — mirrors canonicalUriPrefix's own
 // registration-first pattern (message-pair.ts): a family's
 // registration decides whether organization_id belongs on the
-// wire response AT ALL, never a blanket stamp. For the eight
-// org-nested families registered before this task, the stamp
-// below was a no-op — their entities already carry
-// organization_id, so the spread overwrote the stamp with the
-// SAME value the fence resolved (Step 0(a) of the task that
-// added this consult re-confirmed key-set/value equality against
-// today's hand-written bodies). But for a organizationNested:
-// false family, the entity carries NO such field, so the
-// unconditional stamp was a wire-visible EXTRA KEY with no
-// hand-written counterpart — this consult omits the line
-// entirely for that class instead of spreading over it.
+// wire response AT ALL, never a blanket stamp. One clause
+// overstates the mirror: their UNREGISTERED-family fallbacks
+// point opposite ways — this consult defaults to STAMPING
+// organization_id, while canonicalUriPrefix defaults per its
+// own tier rule instead (dead code today — every wired family
+// is registered). For the eight org-nested families registered
+// before this task, the stamp below was a no-op — their
+// entities already carry organization_id, so the spread
+// overwrote the stamp with the SAME value the fence resolved
+// (Step 0(a) of the task that added this consult re-confirmed
+// key-set/value equality against today's hand-written bodies).
+// But for a organizationNested: false family, the entity
+// carries NO such field, so the unconditional stamp was a
+// wire-visible EXTRA KEY with no hand-written counterpart —
+// this consult omits the line entirely for that class instead
+// of spreading over it.
 export function documentWriteResponseSpec(
     wiring: DocumentFamilyWiring,
 ): WriteResponseSpec {

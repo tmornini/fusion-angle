@@ -281,6 +281,58 @@ async () => {
     );
 });
 
+test('POST ai-members/:id (composed edit after a create)'
++ ' folds the member-document pair and supersedes the create',
+async () => {
+    const db = await freshDb();
+    const created = await handleRequest(db, req(
+        'POST', '/ai-members', DEV_TOKEN,
+        aiCreateBody('ai-4', 'ev-4', 'Cassandra'),
+    ));
+    assert.equal(created.status, 204);
+    // The create's OWN detail-document pair — appended strictly
+    // after the operation pair within the same tx — becomes the
+    // shared address's true head (nowUtc monotonicity), NOT the
+    // operation pair's own Response-ID (the human-members
+    // create-then-edit precedent above).
+    const afterCreate = (await db.responses.getAll()).filter(
+        r => r.uri_prefix === '/ai-members/'
+            && r.uri_id === 'ai-4',
+    );
+    assert.equal(afterCreate.length, 2);
+    const trueHead = afterCreate.find(r => r.status === 200);
+    assert.ok(trueHead, 'no detail document pair after create');
+    // Distinct detail values (the E6 fold note, AI-symmetric):
+    // the edit's own detail-document pair must differ from the
+    // create's, or it folds via message_hash and never lands.
+    const edit = await handleRequest(db, req(
+        'POST', '/ai-members/ai-4', DEV_TOKEN,
+        { detail: aiDetail('Cass') },
+    ));
+    assert.equal(edit.status, 204);
+    assert.equal(edit.headers.get('Supersedes'), trueHead!.id);
+    // Balance: create's 3 + the edit's operation and detail
+    // document (2) = 5. The edit's OWN member-document pair
+    // folds: `type` is invariant per member (an AI never
+    // becomes non-AI across an edit), so its body ({type: 'ai'})
+    // is byte-identical to the create's own — the member-
+    // document address permanently folds after genesis, by
+    // construction, for every member (the human-members
+    // precedent's cross-family code-identity, confirmed at
+    // Phase 8).
+    const requests = await db.requests.getAll();
+    assert.equal(requests.length, 5);
+    const atEntity = requests.filter(
+        r => r.uri_prefix === '/ai-members/'
+            && r.uri_id === 'ai-4',
+    );
+    assert.equal(atEntity.length, 4);
+    const atMember = requests.filter(
+        r => r.uri_prefix === '/members/' && r.uri_id === 'ai-4',
+    );
+    assert.equal(atMember.length, 1);
+});
+
 test('a failed ai-member edit appends nothing', async () => {
     const db = await freshDb();
     await handleRequest(db, req(
