@@ -38,6 +38,45 @@ const AUTHENTICATION_ROUTE_PATTERNS = new Set([
     'authentication/token', 'authentication/authorize',
 ]);
 
+// PII strip map (gate 2): route pattern -> field list. Unlike
+// the high-entropy secrets above — a token or code carries
+// enough entropy that its sha256 fingerprint is effectively
+// irreversible, so fingerprinting preserves an auditable,
+// non-reproducible trace — an email or username is a LOW-
+// entropy identifying value: fingerprinting it is trivially
+// reversible by dictionary/rainbow-table attack against the
+// small space of real addresses, so a fingerprint would leak
+// exactly what it claims to protect. The only safe treatment
+// for this entropy class is REMOVAL — absence, never a
+// sentinel, never '' or null. NO 'authentication/token' entry:
+// its dispatch (postToken, authentication.ts) has exactly four
+// grant_type cases (authorization_code, refresh, token-
+// exchange, client_credentials), none of which reads
+// `username` — verified at authoring and re-verified at
+// Task-1 Step 0.
+//
+// The requestHash the whole stored plane keys request identity
+// on (message-pair.ts's pre-tx fold, appendMessagePair's in-tx
+// dedup, and storedPairResponse's final read) derives from the
+// STORED body — so a bare strip is not neutral where a field
+// this map removes is the ONLY thing distinguishing two
+// otherwise-identical requests: for 'invitations', the grant
+// handler (invitations-domain.ts) compensates by substituting
+// the resolved identity_id (a non-PII join reference) for
+// `email` BEFORE pair formation, restoring hash distinctness by
+// construction — this map's 'invitations' entry strips nothing
+// on that path today (the substitution already removed `email`)
+// but remains the gate for any FUTURE email-bearing sender that
+// does not perform the same substitution. `authentication/
+// authorize`'s stored password is independently high-entropy
+// per call (a fresh PBKDF2 salt each time), so no such
+// substitution is needed there — a genuine hash collision
+// between two different callers is not a practical concern.
+const PII_STRIP_REQUEST_FIELDS: Record<string, readonly string[]> = {
+    'invitations': ['email'],
+    'authentication/authorize': ['username'],
+};
+
 // The same modelOf round trip as message-form.ts: HttpMessage
 // has no model accessor, so rebuilding a MessageModel after a
 // withBody derivation goes through the library's own
@@ -176,6 +215,58 @@ export async function redactAuthenticationRequest(
     return redactBody(
         model, HIGH_ENTROPY_REQUEST_FIELDS, true,
     );
+}
+
+// The strip sibling of redactBody: DELETES each PRESENT field
+// named in `fieldNames` outright, leaving every other field
+// untouched and every absent field absent — never a sentinel,
+// never a fingerprint. Same parse/decode/re-encode shape as
+// redactBody (a bodyless message or a non-object body returns
+// unchanged; a body that fails to parse as JSON throws), since
+// this module speaks one voice for both the redact and strip
+// arms.
+async function stripBody(
+    model: MessageModel,
+    fieldNames: readonly string[],
+): Promise<MessageModel> {
+    const message = HttpMessage.fromModel(model);
+    if (!message.body().exists()) return model;
+    let decoded: unknown;
+    try {
+        decoded = parsePreservingNumbers(
+            message.body().toText(),
+        );
+    } catch {
+        throw new HttpMessageError('malformed JSON body');
+    }
+    if (
+        typeof decoded !== 'object'
+        || decoded === null
+        || Array.isArray(decoded)
+    ) {
+        return model;
+    }
+    const source = decoded as Record<string, unknown>;
+    const stripped: Record<string, unknown> = { ...source };
+    for (const name of fieldNames) {
+        delete stripped[name];
+    }
+    return modelOf(
+        message.withBody(JSON_MEDIA_TYPE, stripped),
+    );
+}
+
+// Sibling of redactAuthenticationRequest, same dispatch shape:
+// a route-pattern lookup gates whether the body is touched at
+// all. STORAGE-ONLY — the wire carries what it always carried;
+// only the STORED request body (the model this function
+// returns) loses the named field.
+export async function stripPiiRequest(
+    routePattern: string, model: MessageModel,
+): Promise<MessageModel> {
+    const fields = PII_STRIP_REQUEST_FIELDS[routePattern];
+    if (fields === undefined) return model;
+    return stripBody(model, fields);
 }
 
 export async function redactAuthenticationResponse(

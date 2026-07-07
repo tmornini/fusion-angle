@@ -12,6 +12,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getProvidersFor,
 } from '../web-app/app/adapters/identity-providers.ts';
+import { seedIdentityProvider } from './identity-fixtures.ts';
 
 async function adminCtx() {
     const db = new MemoryDbAdapter();
@@ -75,11 +76,20 @@ async () => {
     // Appended in REVERSE chronological order: the later
     // 'linked' precedes the earlier 'unlinked', so
     // array-order "last wins" would wrongly drop it.
-    await db.identityProviders.put('pl', {
+    //
+    // Re-pointed (Phase 10 Task 8 Session B, closing session A's
+    // named gap): getProvidersFor reads GET /identity-providers,
+    // now flipped to derive-identity-spine.ts's
+    // deriveIdentityProviders, so a raw put with no message pair
+    // would go derivation-invisible. seedIdentityProvider forms
+    // both — the SAME below-facade mechanism identity-fixtures.ts
+    // uses throughout, riding the postIdentityProviderDocumentOp
+    // extraction this session lands.
+    await seedIdentityProvider(db, 'pl', {
         ...goodRow, identity_id: 'p2', action: 'linked',
         at: '2026-02-01T00:00:00.000000Z',
     });
-    await db.identityProviders.put('pe', {
+    await seedIdentityProvider(db, 'pe', {
         ...goodRow, identity_id: 'p2', action: 'unlinked',
         at: '2026-01-01T00:00:00.000000Z',
     });

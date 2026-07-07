@@ -114,8 +114,19 @@ test('human-members is the eleventh registered family,'
     });
 });
 
-test('an unregistered family returns undefined', () => {
-    assert.equal(familyRegistration('identities'), undefined);
+test('identities is the twelfth registered family,'
++ ' global-plane like members', () => {
+    assert.deepEqual(familyRegistration('identities'), {
+        family: 'identities',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('an unregistered family returns undefined'
++ ' (organizations stays unregistered by design)', () => {
+    assert.equal(familyRegistration('organizations'), undefined);
 });
 
 test('every registered family names a concurrency class',

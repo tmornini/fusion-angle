@@ -8,7 +8,21 @@ import {
     organizationRow,
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { jsonObjectField } from '../api/types.ts';
+import { jsonObjectField, nowUtc, SYSTEM_MEMBER_ID } from
+    '../api/types.ts';
+import {
+    seedIdentityCredential,
+    seedIdentityPii,
+    seedPersonIdentity,
+} from './identity-fixtures.ts';
+import {
+    postMembershipDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import {
+    formWritePair,
+    type MessagePair,
+} from '../api/message-pair.ts';
 
 const BASE = 'http://localhost';
 
@@ -209,7 +223,26 @@ async function seedChain(
     db: MemoryDbAdapter, organization: string, s: string,
     identity: string,
 ): Promise<void> {
-    await db.ideas.put('i' + s, ideaBody(organization, 'idea'));
+    // Seeded through the wire (NAMED re-pin: the READ-side
+    // pair-plane fence, api/derive-states.ts's
+    // resolveOwningOrganization, resolves an org-nested entity's
+    // owner ONLY from a genuine response row at its own uri_id —
+    // a raw db.ideas.put leaves none, so 'i'+s's own 'se'+s
+    // state event would resolve as a visible ORPHAN, not a
+    // fenced-hidden foreign row, once GET /states is flipped),
+    // mirroring twoOrganizations()'s own a1 precedent above.
+    const { organization_id: _organizationId, ...ideaFields } =
+        ideaBody(organization, 'idea');
+    await handleRequest(db, req(
+        'PUT', '/organizations/' + organization + '/ideas/i' + s,
+        await organizationToken(identity, organization),
+        {
+            ...ideaFields,
+            state: 'active',
+            state_at: T8_AT,
+            state_event_id: 'i' + s + '-genesis',
+        },
+    ));
     await db.projects.put('p' + s, projectBody(organization));
     await db.flows.put('f' + s, flowBody(organization));
     // Stays raw (NAMED contrast to the revisions/scores re-pins
@@ -307,10 +340,17 @@ async function seedChain(
             score: 2, member_id: 'system', at: T8_AT,
         },
     ));
-    await db.states.put('se' + s, {
-        entity_id: 'i' + s, state: 'active',
-        member_id: 'system', at: T8_AT,
-    });
+    // NAMED re-pin (Task 7): the flipped GET /states route
+    // derives from the message ledger, not the raw states
+    // table — a raw db.states.put leaves no pair at this
+    // address, so the 'states lists only the bound org events'
+    // test must land through the SAME wire-reachable PUT the
+    // live route serves.
+    await handleRequest(db, req(
+        'PUT', '/states/se' + s,
+        await organizationToken(identity, organization),
+        { entity_id: 'i' + s, state: 'active', at: T8_AT },
+    ));
     await db.stateFieldValues.put('sfv' + s, {
         state_event_id: 'se' + s, attribute_id: 'x', value: 'v',
     });
@@ -321,6 +361,57 @@ async function seedChain(
 // member of B only, so its PII / credentials / member-lifecycle
 // events stay invisible to A. Member events name the org-less
 // member id directly (member.id === identity.id).
+//
+// Below-facade pair formation for pa/pb's memberships (Phase 10
+// Task 8 Session B): gate 15's THREE-WAY fence derives visibility
+// from the membership PAIR PLANE (api/routes.ts), so a raw
+// db.memberships.put with no pair reads as an orphan (null owner,
+// visible everywhere) rather than a foreign-org member — silently
+// defeating the co-member/foreign distinction the tests below
+// assert. Mirrors tests/member-fixtures.ts's own seedMembership,
+// parameterized by organization (that fixture is hardcoded to
+// ONE org; this file seeds two). Every id/field value stays
+// IDENTICAL to the raw put this replaces — only the write
+// mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    membershipId: string,
+    organization: string,
+    identityId: string,
+): Promise<void> {
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const body = {
+        organization_id: organization,
+        identity_id: identityId,
+        at: T8_AT,
+    };
+    const pair: MessagePair = await formWritePair({
+        method: 'PUT',
+        pathname: `/memberships/${membershipId}`,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', membershipId],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [membershipId], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, membershipId, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
 async function deepDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
@@ -339,22 +430,21 @@ async function deepDb(): Promise<MemoryDbAdapter> {
         ['pa', 'A'], ['pb', 'B'],
     ] as const) {
         await db.members.put(id, { type: 'human' });
-        await db.identities.put(id, { kind: 'person' });
-        await db.identityPii.put(id, {
+        // Re-pointed onto the SAME exported ops the live
+        // identities/:id, identities/:id/pii and identities/:id/
+        // credentials/:cid PUT routes use (finding 18's fixture
+        // budget): the identity-pii/credentials facade GETs
+        // exercised below are flip targets, so a raw put with no
+        // pair would go derivation-invisible once Task 8 lands.
+        await seedPersonIdentity(db, id, {
             name: id, email: id + '@x.com',
             phone: '', bio: '',
         });
-        await db.identityCredentials.put('cred-' + id, {
+        await seedIdentityCredential(db, id, 'cred-' + id, {
             identity_id: id, kind: 'password',
             status: 'set', secret: 'HASH-' + id, at: T8_AT,
         });
-        await db.memberships.put('mem-' + id, {
-            organization_id: organization, identity_id: id, at: T8_AT,
-        });
-        await db.states.put('seMem-' + id, {
-            entity_id: id, state: 'active',
-            member_id: 'system', at: T8_AT,
-        });
+        await seedMembershipPair(db, 'mem-' + id, organization, id);
     }
     // Grants 'pb' admin in B TOO (on top of its plain
     // membership above) — solely so seedChain's project-flow
@@ -367,6 +457,24 @@ async function deepDb(): Promise<MemoryDbAdapter> {
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: T8_AT,
     });
+    // NAMED re-pin (Task 7): the flipped GET /states route
+    // derives from the message ledger, not the raw states
+    // table — a raw db.states.put leaves no pair at this
+    // address. Landed here (after pb's own admin grant above,
+    // the only identity authorized to write in B) so both pa's
+    // and pb's genesis event can ride the SAME wire-reachable
+    // PUT the live route serves. pa's own event is authored by
+    // 'current' (admin in A already) — no case in this file
+    // exercises pa's OWN authorization either.
+    for (const [id, organization, author] of [
+        ['pa', 'A', 'current'], ['pb', 'B', 'pb'],
+    ] as const) {
+        await handleRequest(db, req(
+            'PUT', '/states/seMem-' + id,
+            await organizationToken(author, organization),
+            { entity_id: id, state: 'active', at: T8_AT },
+        ));
+    }
     await seedChain(db, 'A', 'A', 'current');
     await seedChain(db, 'B', 'B', 'pb');
     // isA's message pair, on top of the raw row seedChain already
@@ -716,7 +824,7 @@ test('organizations/:id 404s a non-member org', async () => {
 test('identity-pii shows an orphan with no membership',
 async () => {
     const db = await deepDb();
-    await db.identityPii.put('orphan', {
+    await seedIdentityPii(db, 'orphan', {
         name: 'orphan', email: 'orphan@x.com',
         phone: '', bio: '',
     });
@@ -731,7 +839,7 @@ async () => {
 test('nested credentials show an orphan with no membership',
 async () => {
     const db = await deepDb();
-    await db.identityCredentials.put('cred-orphan', {
+    await seedIdentityCredential(db, 'orphan', 'cred-orphan', {
         identity_id: 'orphan', kind: 'password',
         status: 'set', secret: 'HASH-orphan', at: T8_AT,
     });
@@ -748,10 +856,15 @@ async () => {
 
 test('states show an orphan event with no owner', async () => {
     const db = await deepDb();
-    await db.states.put('seGhost', {
-        entity_id: 'ghost', state: 'active',
-        member_id: 'system', at: T8_AT,
-    });
+    // NAMED re-pin (Task 7): the flipped GET /states route
+    // derives from the message ledger, not the raw states
+    // table — a raw db.states.put leaves no pair at this
+    // address.
+    await handleRequest(db, req(
+        'PUT', '/states/seGhost',
+        await organizationToken('current', 'A'),
+        { entity_id: 'ghost', state: 'active', at: T8_AT },
+    ));
     const res = await facadeGet(db, '/states');
     assert.equal(res.status, 200);
     const ids = new Set(

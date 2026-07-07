@@ -210,14 +210,37 @@ export type IdentityCreationSpec =
         readonly secret: string;
     };
 
+// A person identity's second hop (its PII intake, PUT
+// identities/:id/pii) failed after the first hop (the bare
+// identity create) already landed — the torn-state acceptance
+// Phase 10 Task 2 names: the identity now exists PII-less until
+// a retry succeeds. Distinguished from a first-hop failure so
+// the caller can name the partial state rather than reporting a
+// blanket "failed to add identity".
+export class IdentityPiiIntakeFailedError extends Error {
+    readonly id: Id;
+    constructor(id: Id, cause: unknown) {
+        super(
+            `identity ${id} was created, but its PII intake`
+            + ' failed — it now carries no PII until a retry'
+            + ' succeeds',
+            { cause },
+        );
+        this.id = id;
+    }
+}
+
 // Mint an identity by client-minted id + named POST
 // (Commandment VII — no server INSERT; the composing puts
 // are idempotent). The identity stores carry no
 // organization_id, so creation rides the GLOBAL spine, OFF
-// the org facade. Person → identity + PII; service →
-// identity + a hashed client_secret credential. Both halves
-// ride one POST /identities transaction. The secret is
-// hashed HERE (client-side); the route touches no crypto.
+// the org facade. Person → identity, then its PII via a
+// separate PUT identities/:id/pii (Phase 10 Task 2's intake
+// decomposition — the two hops are no longer one transaction,
+// so a bad PII sub-object can no longer roll the identity back);
+// service → identity + a hashed client_secret credential, still
+// one POST /identities transaction. The secret is hashed HERE
+// (client-side); the route touches no crypto.
 export async function postIdentityCreation(
     ctx: RequestContext,
     id: Id,
@@ -227,8 +250,14 @@ export async function postIdentityCreation(
         await ctx.POST('identities', {
             id,
             kind: 'person',
-            pii: { ...spec.pii },
         });
+        try {
+            await ctx.PUT(`identities/${id}/pii`, {
+                ...spec.pii,
+            });
+        } catch (err) {
+            throw new IdentityPiiIntakeFailedError(id, err);
+        }
     } else {
         // Deterministic credential id off the identity id
         // so a retry overwrites the same row — no INSERT on

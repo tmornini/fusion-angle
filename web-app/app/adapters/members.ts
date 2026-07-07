@@ -191,34 +191,60 @@ export async function getHumanMemberEntity(
     );
 }
 
-// Split a human-member write across the parent (type), the
-// identity, the PII row, and the detail row. Used by edits;
-// creation goes through postHumanMemberCreation. The named
-// composing POST /human-members/:id lands all four facet puts
-// in ONE transaction; no state event (an edit does not move the
-// member's lifecycle).
+// A human member's create's second hop (its PII intake, PUT
+// identities/:id/pii) failed — the member's other facets already
+// landed. Distinguished from a first-hop failure so the caller
+// can name the partial state rather than a blanket "failed to
+// add member" (mirrors identities.ts's own
+// IdentityPiiIntakeFailedError for identity create).
+export class HumanMemberPiiIntakeFailedError extends Error {
+    readonly id: string;
+    constructor(id: string, cause: unknown) {
+        super(
+            `human member ${id} was created, but its PII`
+            + ' intake failed — it now carries no PII until a'
+            + ' retry succeeds',
+            { cause },
+        );
+        this.id = id;
+    }
+}
+
+// Re-put the human-member detail facet (the parent member type
+// and identity kind are server-supplied facts the composing
+// POST re-pins; the named composing POST /human-members/:id
+// lands them in ONE transaction; no state event — an edit does
+// not move the member's lifecycle). PII changes via a separate
+// PUT identities/:id/pii second hop, fired IFF the caller
+// supplies a `pii` arg — the dirty check (members/detail.ts's
+// saveHumanMember) decides, so a detail-only save stays ONE hop
+// (Phase 10 Task 2's intake decomposition).
 export async function putHumanMember(
     ctx: RequestContext,
     id: string,
-    input: HumanMemberDraft,
+    detail: Omit<HumanMemberEntity, 'id'>,
+    pii?: Omit<IdentityPiiEntity, 'id'>,
 ): Promise<void> {
-    const { name, email, phone, bio, ...detail } =
-        input;
     await ctx.POST(`human-members/${id}`, {
-        pii: { name, email, phone, bio },
         detail: detail as unknown as
             Record<string, unknown>,
     });
+    if (pii !== undefined) {
+        await ctx.PUT(`identities/${id}/pii`, { ...pii });
+    }
     humanMemberChanges.notify();
 }
 
-// Human-member creation: parent row + identity + PII row +
-// detail row + initial state event, composed by the named
-// POST /human-members into ONE transaction. Use only at the
-// Add Member call site; transitions of an existing member go
-// through postHumanMemberStateChange. The initial event's
-// author is stamped server-side from the verified token; the
-// client mints the event id, so a retry hits one row.
+// Human-member creation: parent row + identity + detail row +
+// initial state event, composed by the named POST /human-
+// members into ONE transaction; PII enters via a separate PUT
+// identities/:id/pii second hop (Phase 10 Task 2's intake
+// decomposition — a bad PII sub-object can no longer roll the
+// member back). Use only at the Add Member call site;
+// transitions of an existing member go through
+// postHumanMemberStateChange. The initial event's author is
+// stamped server-side from the verified token; the client mints
+// the event id, so a retry hits one row.
 export async function postHumanMemberCreation(
     ctx: RequestContext,
     id: string,
@@ -229,13 +255,19 @@ export async function postHumanMemberCreation(
         input;
     await ctx.POST('human-members', {
         id,
-        pii: { name, email, phone, bio },
         detail: detail as unknown as
             Record<string, unknown>,
         initialState,
         initialStateEventId: generateCryptoSafeBase62(),
         initialStateAt: nowUtc(),
     });
+    try {
+        await ctx.PUT(`identities/${id}/pii`, {
+            name, email, phone, bio,
+        });
+    } catch (err) {
+        throw new HumanMemberPiiIntakeFailedError(id, err);
+    }
     humanMemberChanges.notify();
 }
 

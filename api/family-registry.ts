@@ -103,6 +103,18 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         concurrency: 'simple',
         createBodyIdField: 'id',
     },
+    {
+        family: 'identities',
+        organizationNested: false, // GLOBAL plane, like
+            // members/ai-members/human-members: the identity
+            // spine spans every organization, never scoped to
+            // one.
+        concurrency: 'simple',
+        createBodyIdField: 'id', // LIVE — POST /identities
+            // consults this slot for its bare collection-POST
+            // create route (unlike the projects/members-family
+            // inert-slot precedent above).
+    },
 ];
 
 export function familyRegistration(

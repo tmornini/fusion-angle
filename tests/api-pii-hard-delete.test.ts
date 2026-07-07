@@ -1,0 +1,344 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { handleRequest } from '../api/api.ts';
+import { DEV_TOKEN, organizationToken } from './token-fixtures.ts';
+import {
+    seedAdminSchema,
+    organizationRow,
+} from './test-fixtures.ts';
+
+// Phase 10 Task 3: the /pii message-plane HARD-DELETE ZONE — the
+// sanctioned non-append-only exception (gate 4's chainless
+// single-slot register + gate 5's erasure-completeness theorem).
+// Every write at identities/:id/pii physically replaces whatever
+// pair occupies the slot; supersession and erasure are the same
+// mechanism (api/pii-hard-delete.ts).
+
+const BASE = 'http://localhost';
+const AT = '2026-01-01T00:00:00.000000Z';
+
+function req(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+): Request {
+    return new Request(`${BASE}${path}`, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+}
+
+async function freshDb(): Promise<MemoryDbAdapter> {
+    const db = new MemoryDbAdapter();
+    await seedAdminSchema(db);
+    await db.organizations.put('1', organizationRow('Stark'));
+    return db;
+}
+
+function humanPii(name: string) {
+    return {
+        name,
+        email: `${name}@example.com`.toLowerCase(),
+        phone: '',
+        bio: '',
+    };
+}
+
+function humanDetail() {
+    return {
+        title: 'Engineer',
+        department: 'Product',
+        strengths: '[]',
+        team_dimensions: '{}',
+    };
+}
+
+function humanCreateBody(id: string, eventId: string) {
+    return {
+        id,
+        detail: humanDetail(),
+        initialState: 'active',
+        initialStateEventId: eventId,
+        initialStateAt: AT,
+    };
+}
+
+async function allMessages(
+    db: MemoryDbAdapter,
+): Promise<string[]> {
+    const requests = await db.requests.getAll();
+    const responses = await db.responses.getAll();
+    return [
+        ...requests.map(r => r.message),
+        ...responses.map(r => r.message),
+    ];
+}
+
+// ── 1. PUT-PUT: exactly ONE pair (the latest); balance holds ──
+
+test('PUT-PUT at one address leaves exactly ONE pair (the'
++ ' latest); requests == responses balance holds', async () => {
+    const db = await freshDb();
+    await db.identities.put('slot-1', { kind: 'person' });
+    const first = await handleRequest(db, req(
+        'PUT', '/identities/slot-1/pii', DEV_TOKEN,
+        humanPii('Ann'),
+    ));
+    assert.equal(first.status, 200);
+    const second = await handleRequest(db, req(
+        'PUT', '/identities/slot-1/pii', DEV_TOKEN,
+        humanPii('Ann Marie'),
+    ));
+    assert.equal(second.status, 200);
+    // Case 7: the tombstone/chain-Supersedes pin re-pinned to its
+    // ABSENCE — stated explicitly, not merely the old assertion
+    // deleted.
+    assert.equal(second.headers.get('Supersedes'), null);
+    const requests = await db.requests.getAll();
+    const responses = await db.responses.getAll();
+    const atAddress = requests.filter(
+        r => r.uri_prefix === '/identities/slot-1/pii/',
+    );
+    assert.equal(atAddress.length, 1);
+    assert.equal(
+        atAddress[0]!.id, second.headers.get('Response-ID'),
+    );
+    assert.equal(requests.length, responses.length);
+    const domainRow = await db.identityPii.getById('slot-1');
+    assert.equal(domainRow.name, 'Ann Marie');
+});
+
+// ── 2. PUT-DELETE: exactly ONE bodyless tombstone pair ──
+
+test('PUT-DELETE leaves exactly ONE bodyless DELETE pair (the'
++ ' erasure tombstone; no PII bytes anywhere in the ledger)',
+async () => {
+    const db = await freshDb();
+    await db.identities.put('slot-2', { kind: 'person' });
+    const put = await handleRequest(db, req(
+        'PUT', '/identities/slot-2/pii', DEV_TOKEN,
+        humanPii('Bob'),
+    ));
+    assert.equal(put.status, 200);
+    const del = await handleRequest(db, req(
+        'DELETE', '/identities/slot-2/pii', DEV_TOKEN,
+    ));
+    assert.equal(del.status, 204);
+    // Case 7 (the DELETE half): the tombstone carries no
+    // Supersedes either — chainless applies to BOTH verbs.
+    assert.equal(del.headers.get('Supersedes'), null);
+    const requests = await db.requests.getAll();
+    const atAddress = requests.filter(
+        r => r.uri_prefix === '/identities/slot-2/pii/',
+    );
+    assert.equal(atAddress.length, 1);
+    const messages = await allMessages(db);
+    assert.ok(!messages.some(m => m.includes('Bob')));
+    assert.ok(!messages.some(m => m.includes('bob@example.com')));
+    await assert.rejects(() => db.identityPii.getById('slot-2'));
+});
+
+// ── 3. DELETE-PUT: the slot re-sets (one PUT pair) ──
+
+test('DELETE-PUT re-sets the slot to exactly one PUT pair',
+async () => {
+    const db = await freshDb();
+    await db.identities.put('slot-3', { kind: 'person' });
+    const del = await handleRequest(db, req(
+        'DELETE', '/identities/slot-3/pii', DEV_TOKEN,
+    ));
+    assert.equal(del.status, 204);
+    assert.equal(del.headers.get('Supersedes'), null);
+    const put = await handleRequest(db, req(
+        'PUT', '/identities/slot-3/pii', DEV_TOKEN,
+        humanPii('Cara'),
+    ));
+    assert.equal(put.status, 200);
+    assert.equal(put.headers.get('Supersedes'), null);
+    const requests = await db.requests.getAll();
+    const atAddress = requests.filter(
+        r => r.uri_prefix === '/identities/slot-3/pii/',
+    );
+    assert.equal(atAddress.length, 1);
+    assert.equal(
+        atAddress[0]!.id, put.headers.get('Response-ID'),
+    );
+    const domainRow = await db.identityPii.getById('slot-3');
+    assert.equal(domainRow.name, 'Cara');
+});
+
+// ── 4. The E6 branches (finding 15) ──
+
+test('a byte-identical resend against the LIVE slot replays'
++ ' the stored response and appends nothing', async () => {
+    const db = await freshDb();
+    await db.identities.put('slot-4a', { kind: 'person' });
+    const first = await handleRequest(db, req(
+        'PUT', '/identities/slot-4a/pii', DEV_TOKEN,
+        humanPii('Dana'),
+    ));
+    assert.equal(first.status, 200);
+    const firstId = first.headers.get('Response-ID');
+    const countAfterFirst = (await db.requests.getAll()).length;
+    const resend = await handleRequest(db, req(
+        'PUT', '/identities/slot-4a/pii', DEV_TOKEN,
+        humanPii('Dana'),
+    ));
+    assert.equal(resend.status, 200);
+    // storedResponseFor's WHOLE-pair match (message-pair.ts) —
+    // the pre-dispatch fast path, never replacePiiSlot — is what
+    // answers this resend; the live slot's row is untouched.
+    assert.equal(resend.headers.get('Response-ID'), firstId);
+    assert.equal(
+        (await db.requests.getAll()).length, countAfterFirst,
+    );
+});
+
+test('a byte-identical resend AFTER supersession finds no'
++ ' stored hash and appends fresh', async () => {
+    const db = await freshDb();
+    await db.identities.put('slot-4b', { kind: 'person' });
+    const first = await handleRequest(db, req(
+        'PUT', '/identities/slot-4b/pii', DEV_TOKEN,
+        humanPii('Erin'),
+    ));
+    assert.equal(first.status, 200);
+    const firstId = first.headers.get('Response-ID');
+    const second = await handleRequest(db, req(
+        'PUT', '/identities/slot-4b/pii', DEV_TOKEN,
+        humanPii('Erin Marie'),
+    ));
+    assert.equal(second.status, 200);
+    assert.notEqual(second.headers.get('Response-ID'), firstId);
+    // The FIRST body's stored request row was physically removed
+    // when the second PUT replaced the slot — storedResponseFor
+    // finds no matching hash, so this is a FRESH write, never a
+    // replay (Step 0(a): WHOLE-pair absence is tolerated).
+    const resend = await handleRequest(db, req(
+        'PUT', '/identities/slot-4b/pii', DEV_TOKEN,
+        humanPii('Erin'),
+    ));
+    assert.equal(resend.status, 200);
+    assert.equal(resend.headers.get('Supersedes'), null);
+    assert.notEqual(resend.headers.get('Response-ID'), firstId);
+    const requests = await db.requests.getAll();
+    const atAddress = requests.filter(
+        r => r.uri_prefix === '/identities/slot-4b/pii/',
+    );
+    assert.equal(atAddress.length, 1);
+});
+
+// ── 5. THE ERASURE-COMPLETENESS PIN (gate 5's theorem) ──
+
+const ERASED_NAME = 'Erasable Person';
+const ERASED_EMAIL = 'erasable@example.com';
+const ERASED_PHONE = '555-0100';
+const ERASED_BIO = 'the erasure-completeness pin body text';
+const EDITED_NAME = 'Erasable Renamed';
+const EDITED_EMAIL = 'erasable-renamed@example.com';
+const EDITED_PHONE = '555-0199';
+const EDITED_BIO = 'the edited erasure-completeness pin text';
+
+test('grant -> accept -> human-member create -> edit -> erase'
++ ' leaves ZERO stored-server-plane trace of the erased PII'
++ ' (gate 5, the erasure-completeness theorem)', async () => {
+    const db = await freshDb();
+    const id = 'erasee-1';
+    const create = await handleRequest(db, req(
+        'POST', '/human-members', DEV_TOKEN,
+        humanCreateBody(id, 'ev-erasee-1'),
+    ));
+    assert.equal(create.status, 204);
+    const intake = await handleRequest(db, req(
+        'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
+        {
+            name: ERASED_NAME, email: ERASED_EMAIL,
+            phone: ERASED_PHONE, bio: ERASED_BIO,
+        },
+    ));
+    assert.equal(intake.status, 200);
+    const grantRes = await handleRequest(db, req(
+        'POST', '/invitations', await organizationToken(),
+        {
+            email: ERASED_EMAIL, invitationId: 'inv-erasee-1',
+            grantEventId: 'ev-grant-erasee-1', grantAt: AT,
+        },
+    ));
+    assert.equal(grantRes.status, 200);
+    const invitationId =
+        ((await grantRes.json()) as { id: string }).id;
+    const acceptRes = await handleRequest(db, req(
+        'POST', '/invitations/' + invitationId + '/acceptance',
+        await organizationToken(id, '1'),
+        {
+            membershipId: 'ms-erasee-1',
+            acceptEventId: 'ev-accept-erasee-1', acceptAt: AT,
+        },
+    ));
+    assert.equal(acceptRes.status, 204);
+    const edit = await handleRequest(db, req(
+        'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
+        {
+            name: EDITED_NAME, email: EDITED_EMAIL,
+            phone: EDITED_PHONE, bio: EDITED_BIO,
+        },
+    ));
+    assert.equal(edit.status, 200);
+    const erase = await handleRequest(db, req(
+        'DELETE', '/identities/' + id + '/pii', DEV_TOKEN,
+    ));
+    assert.equal(erase.status, 204);
+    await assert.rejects(() => db.identityPii.getById(id));
+
+    const erasedValues = [
+        ERASED_NAME, ERASED_EMAIL, ERASED_PHONE, ERASED_BIO,
+        EDITED_NAME, EDITED_EMAIL, EDITED_PHONE, EDITED_BIO,
+    ];
+    const messages = await allMessages(db);
+    for (const value of erasedValues) {
+        assert.ok(
+            !messages.some(m => m.includes(value)),
+            'found an erased value in the ledger: ' + value,
+        );
+    }
+    // Scoped to the STORED SERVER PLANE (gate 5): pre-phase
+    // historical pairs, exported snapshots, the browser's
+    // localStorage session-credentials JWT name claim, and
+    // replay resurrection of a RETAINED pre-erasure PUT request
+    // are named residuals OUTSIDE this theorem — see API.md.
+    assert.deepEqual(await db.identityPii.getAll(), []);
+});
+
+// ── 6. The zone's confinement: a non-/pii DELETE still APPENDS ──
+
+test("the zone's confinement: a non-/pii DELETE (a memberships"
++ ' tombstone) still APPENDS — the zone never leaks', async () => {
+    const db = await freshDb();
+    const put = await handleRequest(db, req(
+        'PUT', '/memberships/ms-confine-1',
+        await organizationToken(),
+        { organization_id: '1', identity_id: 'current', at: AT },
+    ));
+    assert.equal(put.status, 200);
+    const putId = put.headers.get('Response-ID');
+    const del = await handleRequest(db, req(
+        'DELETE', '/memberships/ms-confine-1',
+        await organizationToken(),
+    ));
+    assert.equal(del.status, 204);
+    // Unlike /pii, a memberships DELETE still SUPERSEDES — the
+    // hard-delete zone is confined to identities/:id/pii alone.
+    assert.equal(del.headers.get('Supersedes'), putId);
+    const requests = await db.requests.getAll();
+    const atAddress = requests.filter(
+        r => r.uri_prefix === '/organizations/1/memberships/'
+            && r.uri_id === 'ms-confine-1',
+    );
+    assert.equal(atAddress.length, 2);
+});

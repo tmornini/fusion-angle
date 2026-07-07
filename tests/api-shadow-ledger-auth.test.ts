@@ -128,6 +128,27 @@ test('no live secret survives into the ledger', async () => {
     }
 });
 
+// The PII strip arm's (gate 2) sibling pin: the live secret
+// pin above proves no HIGH-ENTROPY value survives; this proves
+// the LOW-entropy identifying value (the password-flow
+// username, an email) is likewise absent from every stored
+// auth message — removed outright, not fingerprinted, since a
+// fingerprint over a low-entropy value is reversible.
+test('no live username/email survives into the ledger',
+async () => {
+    const db = await dbWithPasswordUser();
+    await seedRootAdmin(db);
+    await fullLoginFlow(db);
+    const requests = await db.requests.getAll();
+    const responses = await db.responses.getAll();
+    for (const row of [...requests, ...responses]) {
+        assert.ok(
+            !row.message.includes('demo@example.com'),
+            'ledger row ' + row.id + ' leaked the live email',
+        );
+    }
+});
+
 test('the password fingerprint is PBKDF2, not sha256',
 async () => {
     const db = await dbWithPasswordUser();

@@ -37,6 +37,9 @@ import {
     currentDefaultOrganizationFor,
 } from './authorization.ts';
 import {
+    deriveDefaultOrganization,
+} from './derive-default-organization.ts';
+import {
     latestByKey,
     findFirstByKey,
 } from '../shared/ledger-reduction.ts';
@@ -124,13 +127,19 @@ export async function subjectOrganizations(
 // The org a flat (un-exchanged) token resolves to, server-side:
 // the identity's SET default, else its PRIMARY membership, else
 // null. The gate denies a null — there is no global default left
-// to fall back on.
+// to fall back on. Task 8 (Phase 11): the row source is the
+// derived /identities/:id/default-org/ message-pair ledger
+// (api/derive-default-organization.ts), never the
+// identity_default_organizations table directly — the reducer
+// below is UNCHANGED, and the primary-membership fallback stays
+// verbatim.
 export async function identityDefaultOrganization(
     adapter: DbAdapter,
     identityId: Id,
 ): Promise<Id | null> {
-    const events = await adapter.identityDefaultOrganizations
-        .getAllWhere('identity_id', identityId);
+    const events = await deriveDefaultOrganization(
+        adapter, identityId,
+    );
     const chosen = currentDefaultOrganizationFor(events, identityId);
     if (chosen !== null) return chosen;
     return await primaryMembershipOrganization(adapter, identityId);

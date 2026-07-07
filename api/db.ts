@@ -468,10 +468,12 @@ export interface GuardedDbAdapter
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
     // Raw single-row read bypassing the EntityStore deleted
-    // filter. Used ONLY by the ownership probe for deleted
-    // graph entities (flow_nodes / flow_edges) — EntityStore's
-    // isDeleted check hides deleted rows, but the ownership
-    // resolver must find the flow_id even after deletion.
+    // filter — the shared primitive of the cross-tenant
+    // OWNERSHIP FENCE probes: graphEntityProbe (flow_nodes /
+    // flow_edges), rawOrganizationOwnedProbes (the org-owned
+    // stores), and the field-values parent-event resolution.
+    // A deleted entity must still resolve to its TRUE owner,
+    // never surface as an ownerless orphan.
     rawReadRow<T extends { id: string }>(
         table: string,
         id: string,

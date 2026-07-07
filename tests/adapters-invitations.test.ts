@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
+import { handleRequest } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { NotificationEvent } from '../api/notifications.ts';
 import {
@@ -13,6 +14,7 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { organizationRow } from './test-fixtures.ts';
+import { seedIdentityPii } from './identity-fixtures.ts';
 import {
     postInvitationGrant,
     postInvitationAcceptance,
@@ -72,6 +74,14 @@ async function seedWithNotify(
     return db;
 }
 
+// identities stays a raw put — no GET /identities (or
+// /identities/:id) reads it anywhere in this file. identityPii
+// DOES feed a flip: getInvitations/getSentInvitations enrich
+// invited_by_name/invitee_email by reading the identity_pii
+// plane (api/invitations-domain.ts), which Task 8 Step 3
+// re-points onto deriveIdentityPiiRows — so this facet forms
+// its pair below-facade (finding 18's fixture budget) via the
+// SAME exported op the live PUT identities/:id/pii route uses.
 async function seedPerson(
     db: DbAdapter,
     id: string,
@@ -80,7 +90,7 @@ async function seedPerson(
 ): Promise<void> {
     await db.members.put(id, { type: 'human' });
     await db.identities.put(id, { kind: 'person' });
-    await db.identityPii.put(id, {
+    await seedIdentityPii(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -98,6 +108,34 @@ async function ctxOn(db: DbAdapter, sub: string, organization: string) {
     return createRequestContext(
         db, await organizationToken(sub, organization),
     );
+}
+
+// Erase a pii slot through the LIVE facade (Phase 10 Task 8
+// Session B), not a raw db.identityPii.delete: the enrichment
+// joins below now read deriveIdentityPiiRows (the message
+// ledger), so a raw row delete leaves the slot's message pair
+// intact and the "erased" identity would still show up in the
+// derived read. The live DELETE also replaces the pair
+// (replacePiiSlot, the hard-delete zone), matching what an
+// actual erasure does. `actor` is the caller (self or admin);
+// `organization` only needs to resolve a valid fenced token —
+// authorizeIdentityPii's self-or-admin check does not itself
+// consult org membership.
+async function eraseIdentityPii(
+    db: DbAdapter,
+    actor: string,
+    organization: string,
+    target: string,
+): Promise<void> {
+    const token = await organizationToken(actor, organization);
+    const response = await handleRequest(db, new Request(
+        `http://localhost/identities/${target}/pii`,
+        {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token },
+        },
+    ));
+    assert.equal(response.status, 204);
 }
 
 test('validateInvitationEntity accepts a full body', () => {
@@ -203,7 +241,7 @@ async () => {
     const { db } = await ctxFor('current', '2');
     const tony = await ctxOn(db, 'current', '2');
     await postInvitationGrant(tony, 'sarah@x.com');
-    await db.identityPii.delete('current');
+    await eraseIdentityPii(db, 'current', '2', 'current');
     const sarah = await ctxOn(db, 'sarah', '1');
     const mine = await getInvitations(sarah);
     assert.equal(mine.length, 1);
@@ -358,7 +396,7 @@ async () => {
     const { db } = await ctxFor('current', '2');
     const tony = await ctxOn(db, 'current', '2');
     await postInvitationGrant(tony, 'sarah@x.com');
-    await db.identityPii.delete('sarah');
+    await eraseIdentityPii(db, 'current', '2', 'sarah');
     const sent = await getSentInvitations(tony);
     assert.equal(sent.length, 1);
     assert.ok(!('inviteeEmail' in sent[0]!));

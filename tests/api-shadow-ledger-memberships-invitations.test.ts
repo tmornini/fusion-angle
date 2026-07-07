@@ -130,6 +130,76 @@ async () => {
     assert.equal(requests[0]!.uri_id, 'inv-1');
 });
 
+test('a grant strips the live email from every stored'
++ ' request message (the PII strip arm, gate 2)', async () => {
+    const db = await freshDb();
+    const res = await grant(db, 'inv-1e', 'sarah@x.com');
+    assert.equal(res.status, 200);
+    const requests = await db.requests.getAll();
+    // Operation pair + the invitation document pair (Phase 8
+    // Task 6), both at this SAME address.
+    assert.equal(requests.length, 2);
+    for (const row of requests) {
+        assert.ok(!row.message.includes('sarah@x.com'));
+    }
+    // The resolved identity_id substitution (invitations-
+    // domain.ts) makes the strip observable directly: the
+    // operation pair's stored request carries identity_id in
+    // place of email, not merely the absence of the live value.
+    const operationRow = requests.find(
+        r => r.message.includes('"grantEventId"'),
+    );
+    assert.ok(operationRow);
+    assert.ok(operationRow!.message.includes('"identity_id"'));
+    assert.ok(!operationRow!.message.includes('"email"'));
+});
+
+test('a grant sharing invitationId/grantEventId/grantAt with a'
++ ' DIFFERENT email is a genuinely separate grant, never'
++ ' folded onto the first (the resolved-identity substitution'
++ ' restores hash distinctness)', async () => {
+    const db = await freshDb();
+    await person(db, 'bob', 'Bob', 'bob@x.com');
+    const first = await grant(db, 'inv-collide', 'sarah@x.com');
+    assert.equal(first.status, 200);
+    const firstBody = await first.json() as {
+        identity_id: string;
+    };
+    assert.equal(firstBody.identity_id, 'sarah');
+    const second = await grant(db, 'inv-collide', 'bob@x.com');
+    assert.equal(second.status, 200);
+    const secondBody = await second.json() as {
+        identity_id: string;
+    };
+    assert.equal(secondBody.identity_id, 'bob');
+    // Last-writer-wins on the invitations row — base parity for
+    // two grants reusing the same client-minted invitationId.
+    const invitationRow =
+        await db.invitations.getById('inv-collide');
+    assert.equal(invitationRow.identity_id, 'bob');
+    // Both grants are FRESH outcomes: each appends its OWN
+    // operation + document pair — 4 request rows, 4 response
+    // rows total, no fold anywhere.
+    const requests = await db.requests.getAll();
+    const responses = await db.responses.getAll();
+    assert.equal(requests.length, 4);
+    assert.equal(responses.length, 4);
+    // The two OPERATION pairs (same invitationId/grantEventId/
+    // grantAt) are distinguished from the two document pairs by
+    // the grantEventId key, present only on the operation body.
+    // Substituting identity_id for email restores hash
+    // distinctness by construction: a different invitee is a
+    // different stored body, hence a different hash.
+    const operationRequests = requests.filter(
+        r => r.message.includes('"grantEventId"'),
+    );
+    assert.equal(operationRequests.length, 2);
+    const operationHashes = new Set(
+        operationRequests.map(r => r.message_hash),
+    );
+    assert.equal(operationHashes.size, 2);
+});
+
 test('a member-conflict grant (409) appends nothing',
 async () => {
     const db = await freshDb();

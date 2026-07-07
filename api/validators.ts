@@ -828,6 +828,49 @@ export function validateIdentityEntity(
     return { kind };
 }
 
+const IDENTITY_DOCUMENT_BODY_KEYS: readonly string[] = ['kind'];
+
+export interface IdentityDocumentBody {
+    readonly entity: Omit<IdentityEntity, 'id'>;
+}
+
+// The HTTP-body gate for PUT /identities/:id: the twelfth
+// registered family, and the FOURTH member of MEMBERS_WIRING's
+// shared-log-with-genesis 'stateless' bucket (see MEMBERS_WIRING
+// in routes.ts for the full rationale-contrast) — the shared id
+// (member.id === identity.id, always) already receives a genesis
+// states event at create and archive/reactivate via PUT
+// states/:id, so a document-address trio here would FREEZE that
+// lifecycle at genesis forever. THE LABEL MANDATE (the Phase 7
+// Objective precedent, a NAMED byte-parity-over-convention
+// choice): the assertOnlyKeys label is 'IdentityEntity', matching
+// TODAY'S store validator (validateIdentityEntity) byte-for-byte,
+// NOT the 'IdentityDocumentBody' naming convention every other
+// *DocumentBody validator uses — the label appears in the wire
+// 400 body ("unexpected key ... for IdentityEntity"), and the
+// convention's label would change those bytes. `kind`'s own rule
+// (validateEnumField over the SAME two-member enum) is IDENTICAL
+// to validateIdentityEntity's, so the missing/stray-key 400s stay
+// byte-identical on both paths too. Global plane (family-
+// registry.ts: organizationNested:false) — no organization_id
+// exists on this entity, so nothing is tolerated beyond `kind`.
+export function validateIdentityDocumentBody(
+    body: Record<string, unknown>,
+): IdentityDocumentBody {
+    assertOnlyKeys(
+        body, IDENTITY_DOCUMENT_BODY_KEYS, 'IdentityEntity',
+    );
+    const kind = validateEnumField(
+        body, 'kind', ['person', 'service'],
+        'identity kind', 'IdentityEntity',
+    );
+    return {
+        entity: {
+            kind,
+        },
+    };
+}
+
 const IDENTITY_PII_BODY_KEYS: readonly string[] = [
     'name', 'email', 'phone', 'bio',
 ];
@@ -1551,11 +1594,14 @@ export interface FlowDocumentBody {
     // validateStoredGraphJson but stored as the SAME encoded
     // string — the op never re-serializes it.
     readonly graph: JsonObjectField;
-    // TRANSITIONAL decomposition sidecars — the ONLY consumer
-    // is the old-plane relation writer (writeFlowGraphDelta);
-    // no derivation reads either one. Retiring at Phase Final,
-    // once the relation tables alone are the graph's source of
-    // truth for every reader, not only the reassembly GET.
+    // TRANSITIONAL decomposition sidecars — consumed by the
+    // old-plane relation writer (writeFlowGraphDelta) AND by
+    // deriveFlowGraphStates (api/derive-states.ts), the sole
+    // ledger source of flow-node/edge deleted/restored history.
+    // Retiring at Phase Final is now GATED on that lifecycle
+    // source being re-anchored elsewhere first — dropping these
+    // sidecars before then would silently stop recording every
+    // future node/edge delete/restore.
     readonly graphDelta: FlowGraphDelta;
     readonly revivals: readonly GraphRevival[];
 }
@@ -3355,7 +3401,6 @@ export function validateFlowUndoBody(
 
 export interface HumanMemberCreateBody {
     readonly id: string;
-    readonly pii: Record<string, unknown>;
     readonly detail: Record<string, unknown>;
     readonly initialState: MemberState;
     readonly initialStateEventId: string;
@@ -3363,23 +3408,24 @@ export interface HumanMemberCreateBody {
 }
 
 const HUMAN_MEMBER_CREATE_KEYS: readonly string[] = [
-    'id', 'pii', 'detail',
+    'id', 'detail',
     'initialState', 'initialStateEventId',
     'initialStateAt',
 ];
 
-// The HTTP-body gate for POST /human-members: the four member
-// facets (the parent member row, the identity, the PII row, the
-// detail row) plus the initial state event, written atomically.
-// The facet fields are NOT fully validated here — each facet
-// store re-validates its own body (validateMemberEntity,
-// validateIdentityEntity, validateIdentityPiiEntity,
+// The HTTP-body gate for POST /human-members: the three member
+// facets (the parent member row, the identity, the detail row)
+// plus the initial state event, written atomically. PII no
+// longer rides this body (Phase 10 Task 2's intake
+// decomposition) — it enters later via the separate PUT
+// identities/:id/pii. The facet fields are NOT fully validated
+// here — each facet store re-validates its own body
+// (validateMemberEntity, validateIdentityEntity,
 // validateHumanMemberEntity) when the composing POST puts it.
 // The member parent (type) and the identity (kind) are
 // server-supplied facts the handler pins, so the body carries
-// only the PII and detail sub-objects. Authorship of the initial
-// event is stamped from the verified caller in the route, never
-// the body.
+// only the detail sub-object. Authorship of the initial event is
+// stamped from the verified caller in the route, never the body.
 export function validateHumanMemberCreateBody(
     body: Record<string, unknown>,
 ): HumanMemberCreateBody {
@@ -3392,9 +3438,6 @@ export function validateHumanMemberCreateBody(
             'HumanMemberCreateBody.id must be non-empty',
         );
     }
-    const pii = asObject(
-        body['pii'], 'HumanMemberCreateBody.pii',
-    );
     const detail = asObject(
         body['detail'], 'HumanMemberCreateBody.detail',
     );
@@ -3415,20 +3458,20 @@ export function validateHumanMemberCreateBody(
         body, 'initialStateAt', 'HumanMemberCreateBody',
     );
     return {
-        id, pii, detail, initialState,
+        id, detail, initialState,
         initialStateEventId, initialStateAt,
     };
 }
 
 // Identity creation, discriminated by kind. A person carries
-// its PII sub-object; a service carries its credential sub-
-// object (a deterministic-id'd client_secret row whose secret
-// is hashed client-side before it crosses the gate). The route
-// pins the identity kind and composes the two writes.
+// only {id, kind} — its PII enters later via the separate PUT
+// identities/:id/pii (Phase 10 Task 2's intake decomposition);
+// a service carries its credential sub-object (a deterministic-
+// id'd client_secret row whose secret is hashed client-side
+// before it crosses the gate). The route pins the identity kind.
 export interface IdentityCreatePersonBody {
     readonly id: string;
     readonly kind: 'person';
-    readonly pii: Record<string, unknown>;
 }
 
 export interface IdentityCreateServiceBody {
@@ -3442,22 +3485,22 @@ export type IdentityCreateBody =
     | IdentityCreateServiceBody;
 
 const IDENTITY_CREATE_PERSON_KEYS: readonly string[] = [
-    'id', 'kind', 'pii',
+    'id', 'kind',
 ];
 
 const IDENTITY_CREATE_SERVICE_KEYS: readonly string[] = [
     'id', 'kind', 'credential',
 ];
 
-// The HTTP-body gate for POST /identities: a person identity +
-// its PII row, OR a service identity + its client_secret
-// credential row, written atomically. The sub-object fields are
-// NOT fully validated here — the parent-scoped identity_pii and
-// identity_credentials stores re-validate their own bodies
-// (validateIdentityPiiEntity, validateIdentityCredentialEntity)
-// when the composing put lands, and the identities store pins
-// the kind through validateIdentityEntity. The credential's
-// secret is hashed client-side; the route never touches crypto.
+// The HTTP-body gate for POST /identities: a bare person
+// identity (its PII lands later via PUT identities/:id/pii), OR
+// a service identity + its client_secret credential row, written
+// atomically. The credential sub-object is NOT fully validated
+// here — the parent-scoped identity_credentials store re-
+// validates its own body (validateIdentityCredentialEntity) when
+// the composing put lands, and the identities store pins the
+// kind through validateIdentityEntity. The credential's secret
+// is hashed client-side; the route never touches crypto.
 // Identity creation writes NO state event — identities carry no
 // lifecycle event at creation — so the handler needs no actor.
 export function validateIdentityCreateBody(
@@ -3479,13 +3522,7 @@ export function validateIdentityCreateBody(
             IDENTITY_CREATE_PERSON_KEYS,
             'IdentityCreatePersonBody',
         );
-        return {
-            id,
-            kind,
-            pii: asObject(
-                body['pii'], 'IdentityCreatePersonBody.pii',
-            ),
-        };
+        return { id, kind };
     }
     assertOnlyKeys(
         body,
@@ -3872,33 +3909,34 @@ export function validateAIMemberEditBody(
 }
 
 export interface HumanMemberEditBody {
-    readonly pii: Record<string, unknown>;
     readonly detail: Record<string, unknown>;
 }
 
 const HUMAN_MEMBER_EDIT_KEYS: readonly string[] = [
-    'pii', 'detail',
+    'detail',
 ];
 
-// The HTTP-body gate for POST /human-members/:id: the four
-// member facets re-put, NO state event (an edit does not move
-// the member's lifecycle), so the handler needs no actor. As
-// with create, each facet store re-validates its own body when
-// the composing POST puts it; the id is the route param, the
-// member type and identity kind are server-supplied facts.
+// The HTTP-body gate for POST /human-members/:id: the member and
+// identity facets re-pin, the detail facet re-puts, NO state
+// event (an edit does not move the member's lifecycle), so the
+// handler needs no actor. PII no longer rides this body (Phase
+// 10 Task 2's intake decomposition) — it changes ONLY via the
+// separate PUT identities/:id/pii, fired by the client IFF the
+// caller's dirty check finds it changed. As with create, the
+// detail facet is NOT fully validated here — human_members
+// re-validates its own body when the composing POST puts it;
+// the id is the route param, the member type and identity kind
+// are server-supplied facts.
 export function validateHumanMemberEditBody(
     body: Record<string, unknown>,
 ): HumanMemberEditBody {
     assertOnlyKeys(
         body, HUMAN_MEMBER_EDIT_KEYS, 'HumanMemberEditBody',
     );
-    const pii = asObject(
-        body['pii'], 'HumanMemberEditBody.pii',
-    );
     const detail = asObject(
         body['detail'], 'HumanMemberEditBody.detail',
     );
-    return { pii, detail };
+    return { detail };
 }
 
 // ── Flow graph delta ─────────────────

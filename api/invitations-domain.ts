@@ -48,6 +48,10 @@ import {
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentPairFor } from './routes.ts';
 import { deriveInvitations } from './derive-invitations.ts';
+import {
+    deriveIdentityPiiRows,
+} from './derive-identity-spine.ts';
+import { deriveInvitationStates } from './derive-states.ts';
 
 // The active org of the caller: the verified token claim, else
 // the identity's resolved default. Null when the identity can
@@ -151,14 +155,37 @@ export async function invitationsRequest(
 // row deriveInvitations returns already carries a resolved
 // state, defaulting to 'pending', so the old "no state event
 // yet" skip is now unreachable — no live write path ever grants
-// without its genesis pending event). The enrichment joins
-// (organization_name, identityPii for invited_by_name) stay
-// old-plane reads — NAMED transitive rides. The states read
-// below is NOT the current-state source anymore; it survives
-// ONLY to find each invitation's grant ('pending') event so its
-// author (the inviter) can be named — a lookup deriveInvitations
-// cannot answer, since it derives a resolved current state, not
-// per-event authorship.
+// without its genesis pending event). The organization_name join
+// stays an old-plane read — a NAMED transitive ride (gate 9,
+// organizations is unregistered). The invited_by_name join is
+// ALSO FLIPPED (Phase 10 Task 8 Session B, gate 13): derived via
+// deriveIdentityPiiRows(ctx.base) — wire-identical to the
+// hand-written ctx.base.identityPii.getAll() dispatch it
+// replaces, since ctx.base is the UNFENCED base adapter already
+// (invitations are global-spine — an invitee reads an invite to
+// an org it is not yet in, which an org fence would hide — see
+// db-organization-scoped.ts), so no fence needs reproducing here,
+// unlike routes.ts's gate-15 identity-pii/credentials reads. The
+// ABSENT-key omission on an erased identity is preserved
+// byte-identically (tests/drift-identities.test.ts case 6 proves
+// the two row sets equal, transitively proving this join too).
+// The states read below is NOT the current-state source anymore;
+// it survives ONLY to find each invitation's grant ('pending')
+// event so its author (the inviter) can be named — a lookup
+// deriveInvitations cannot answer, since it derives a resolved
+// current state, not per-event authorship.
+//
+// GET is FLIPPED (Task 7): re-points onto deriveInvitationStates
+// (api/derive-states.ts's source f) — wire-identical to the
+// hand-written ctx.base.states.getAll() dispatch it replaces.
+// deriveInvitationStates emits ONLY invitation-lifecycle rows
+// (the grant plus its three answering ops), so it is a STRICT
+// SUBSET of the old bulk read, never a wider one — the grant
+// ('pending') event this function looks for is present on both
+// planes, byte-identical (its own header: the grant's stamped
+// requester_identity_id IS the inviter for that pair). The
+// ABSENT-key omission on a missing grant is preserved on both
+// planes for the same reason.
 async function invitationsForInvitee(
     ctx: AuthenticatedContext,
 ): Promise<Response> {
@@ -170,12 +197,12 @@ async function invitationsForInvitee(
         (await ctx.base.organizations.getAll())
             .map(o => [o.id, o.name]));
     const personName = new Map(
-        (await ctx.base.identityPii.getAll())
+        (await deriveIdentityPiiRows(ctx.base))
             .map(p => [p.id, p.name]));
-    // One states read serves every row — a per-invitation
+    // One derived read serves every row — a per-invitation
     // getAllFor opened one transaction per invitation for the
     // same log.
-    const events = await ctx.base.states.getAll();
+    const events = await deriveInvitationStates(ctx.base);
     const eventsFor = Map.groupBy(events, ev => ev.entity_id);
     const out = [];
     for (const inv of mine) {
@@ -219,8 +246,11 @@ async function invitationsForInvitee(
 // state, so the old "no state event yet" skip is unreachable,
 // the same reason invitationsForInvitee's own comment gives).
 // The pending-only + active-org + admin filters are preserved
-// exactly. The invitee-email enrichment join (identityPii)
-// stays an old-plane read — a NAMED transitive ride.
+// exactly. The invitee-email enrichment join is ALSO FLIPPED
+// (Phase 10 Task 8 Session B, gate 13) — the SAME
+// deriveIdentityPiiRows(ctx.base) re-point
+// invitationsForInvitee's own comment above explains (ctx.base
+// is already unfenced, so no fence needs reproducing here).
 async function sentInvitations(
     ctx: AuthenticatedContext,
 ): Promise<Response> {
@@ -240,7 +270,7 @@ async function sentInvitations(
             && inv.state === 'pending');
     if (organizationInvites.length === 0) return Response.json([]);
     const email = new Map(
-        (await ctx.base.identityPii.getAll())
+        (await deriveIdentityPiiRows(ctx.base))
             .map(p => [p.id, p.email]));
     const out = [];
     for (const inv of organizationInvites) {
@@ -350,6 +380,30 @@ async function grantInvitation(
             'no identity with that email', HTTP_NOT_FOUND);
     }
     const identityId = match.id;
+    // The stored request body substitutes the resolved
+    // identity_id for the raw email — a non-PII join reference
+    // the invitation row and document already store openly. The
+    // requestHash (below, via formWritePair) derives from this
+    // STORED body, and the whole stored plane keys request
+    // identity on it: the pre-tx fold (storedResponseFor), the
+    // in-tx dedup (appendMessagePair), and the final
+    // storedPairResponse read all key off it. A bare strip of
+    // `email` (message-redaction.ts's PII strip arm) would
+    // collapse two different invitees' grants — same minted
+    // invitationId/grantEventId/grantAt, different email — onto
+    // ONE hash, and the fold/dedup/final-read chain would then
+    // hand the SECOND caller the FIRST caller's stored response.
+    // Substituting identity_id restores hash distinctness by
+    // construction: a different invitee is a different stored
+    // body, hence a different hash; the SAME email still
+    // resolves to the SAME identity_id, so a genuine byte-
+    // identical retry still folds everywhere. The WIRE body is
+    // untouched (storage-only) — the same sanctioned stored !=
+    // wire class the auth pairs already ship (their stored
+    // bodies carry PBKDF2 fingerprints the wire never carried).
+    const storedBody: Record<string, unknown> = { ...body };
+    delete storedBody.email;
+    storedBody.identity_id = identityId;
     const preOutcome = await grantOutcomeFor(
         ctx.base, organization, identityId);
     if (preOutcome.kind === 'member') {
@@ -373,8 +427,8 @@ async function grantInvitation(
     const address = messageAddress(routeSegments, pathSegments);
     const canonicalPrefix =
         canonicalUriPrefix(undefined, address.uriPrefix);
-    const uriId =
-        createdEntityUriId('invitations', body) ?? address.uriId;
+    const uriId = createdEntityUriId('invitations', storedBody)
+        ?? address.uriId;
     const headPairId = await headPairIdAt(
         ctx.base, canonicalPrefix, uriId);
     const pair = await formWritePair({
@@ -382,7 +436,7 @@ async function grantInvitation(
         routePattern: 'invitations',
         routeSegments, pathSegments,
         headerFields: hoistedHeaderFields(request),
-        body, requesterIdentityId: ctx.principal.id,
+        body: storedBody, requesterIdentityId: ctx.principal.id,
         requestAt: ctx.requestAt, organization: undefined,
         responseStatus: 200, responseBody,
         headPairId,

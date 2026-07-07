@@ -206,6 +206,25 @@ async function pause(ms: number): Promise<void> {
     );
 }
 
+// A states-log event, posted through the SAME wire-reachable
+// PUT the live route serves (states/:id) — required for the
+// flipped GET /states and GET /entity-states/:id/history routes
+// (Task 7), which getWorkOrderActiveClaim/
+// getActiveClaimsByWorkOrder/getWorkOrderCurrentNodeId read, to
+// derive them. A raw db.states.put left no message pair here.
+async function seedStateEvent(
+    ctx: RequestContext,
+    entityId: string,
+    state: string,
+    at: string,
+): Promise<void> {
+    await ctx.PUT(`states/${generateCryptoSafeBase62()}`, {
+        entity_id: entityId,
+        state,
+        at,
+    });
+}
+
 // ── postWorkOrderCreation ─────────
 
 test(
@@ -478,14 +497,8 @@ test(
         // Record an explicit release so no live
         // claim remains, simulating an unclaimed
         // work order.
-        await db.states.put(
-            generateCryptoSafeBase62(),
-            {
-                entity_id: woId,
-                state: 'claim_released',
-                member_id: 'current',
-                at: nowUtc(),
-            },
+        await seedStateEvent(
+            ctx, woId, 'claim_released', nowUtc(),
         );
 
         await postWorkOrderTransition(ctx, {
@@ -543,14 +556,8 @@ test(
         // Release the creation-time claim so this
         // test exercises pure claim-creation
         // without the expiration-notice branch.
-        await db.states.put(
-            generateCryptoSafeBase62(),
-            {
-                entity_id: woId,
-                state: 'claim_released',
-                member_id: 'current',
-                at: nowUtc(),
-            },
+        await seedStateEvent(
+            ctx, woId, 'claim_released', nowUtc(),
         );
         await pause(2);
         await postWorkOrderClaim(ctx, woId);
@@ -575,14 +582,8 @@ test(
         // Release the creation-time claim so the
         // two explicit claim calls below are the
         // only contributors to the count.
-        await db.states.put(
-            generateCryptoSafeBase62(),
-            {
-                entity_id: woId,
-                state: 'claim_released',
-                member_id: 'current',
-                at: nowUtc(),
-            },
+        await seedStateEvent(
+            ctx, woId, 'claim_released', nowUtc(),
         );
         await pause(2);
         await postWorkOrderClaim(ctx, woId);
@@ -670,15 +671,7 @@ test(
             Date.now() - 10_000,
         ).toISOString()
         .replace('Z', '000Z');
-        await db.states.put(
-            generateCryptoSafeBase62(),
-            {
-                entity_id: woId,
-                state: 'claimed',
-                member_id: 'current',
-                at: longAgo,
-            },
-        );
+        await seedStateEvent(ctx, woId, 'claimed', longAgo);
         const claim = await getWorkOrderActiveClaim(
             ctx, woId, 1,
         );
@@ -697,15 +690,7 @@ test(
         );
         const ctx = createRequestContext(db, await devToken());
         const woId = generateCryptoSafeBase62();
-        await db.states.put(
-            generateCryptoSafeBase62(),
-            {
-                entity_id: woId,
-                state: 'claimed',
-                member_id: 'current',
-                at: nowUtc(),
-            },
-        );
+        await seedStateEvent(ctx, woId, 'claimed', nowUtc());
         const claim = await getWorkOrderActiveClaim(
             ctx, woId, DEFAULT_LOCK_TIMEOUT,
         );
@@ -738,25 +723,12 @@ test(
         ).toISOString()
         .replace('Z', '000Z');
         const claimed = (entityId: string, at: string) =>
-            db.states.put(generateCryptoSafeBase62(), {
-                entity_id: entityId,
-                state: 'claimed',
-                member_id: 'current',
-                at,
-            });
+            seedStateEvent(ctx, entityId, 'claimed', at);
         await claimed(fresh1, now);
         await claimed(fresh2, now);
         await claimed(stale, longAgo);
         await claimed(orphan, now);
-        await db.states.put(
-            generateCryptoSafeBase62(),
-            {
-                entity_id: released,
-                state: 'claim_released',
-                member_id: 'current',
-                at: now,
-            },
-        );
+        await seedStateEvent(ctx, released, 'claim_released', now);
         const timeouts = new Map<string, number>([
             [fresh1, DEFAULT_LOCK_TIMEOUT],
             [fresh2, DEFAULT_LOCK_TIMEOUT],

@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -64,6 +65,25 @@ function recordBody(
 // alphabets overlap, so each get*States must discriminate
 // by entity identity, not by state value.
 
+// A states-log event, posted through the SAME wire-reachable
+// PUT the live route serves (states/:id) — required for the
+// flipped GET /states route (Task 7), which every get*States
+// reader below consults. A raw db.states.put/postEvent left no
+// message pair here.
+async function seedStateEvent(
+    ctx: RequestContext,
+    id: string,
+    entityId: string,
+    state: string,
+    at: string,
+): Promise<void> {
+    await ctx.PUT(`states/${id}`, {
+        entity_id: entityId,
+        state,
+        at,
+    });
+}
+
 test('getProjectStates excludes a same-valued idea',
     async () => {
         const db = new MemoryDbAdapter();
@@ -83,8 +103,8 @@ test('getProjectStates excludes a same-valued idea',
             state_event_id: 'ev-p1',
         });
         await db.ideas.put('i1', ideaBody('I'));
-        await db.states.postEvent(
-            'ev-i1', 'i1', 'approved', 'system',
+        await seedStateEvent(
+            ctx, 'ev-i1', 'i1', 'approved',
             '2026-01-01T00:00:01.000000Z',
         );
         const states = await getProjectStates(ctx);
@@ -114,8 +134,8 @@ test('getIdeaStates excludes a same-valued project',
             state_event_id: 'ev-i1',
         });
         await db.projects.put('p1', projectBody('P'));
-        await db.states.postEvent(
-            'ev-p1', 'p1', 'approved', 'system',
+        await seedStateEvent(
+            ctx, 'ev-p1', 'p1', 'approved',
             '2026-01-01T00:00:01.000000Z',
         );
         const states = await getIdeaStates(ctx);
@@ -145,8 +165,8 @@ test('getRecordStateDetails excludes a same-valued idea',
             state_event_id: 'ev-r1',
         });
         await db.ideas.put('i1', ideaBody('I'));
-        await db.states.postEvent(
-            'ev-i1', 'i1', 'archived', 'system',
+        await seedStateEvent(
+            ctx, 'ev-i1', 'i1', 'archived',
             '2026-01-01T00:00:01.000000Z',
         );
         const states = await getRecordStateDetails(ctx);
@@ -164,11 +184,11 @@ test('getMemberStates spans kinds and excludes an idea',
         await seedHumanMember(db, 'wh', 'Human');
         await seedAIMember(db, 'wa', 'Ai');
         await db.ideas.put('i1', ideaBody('I'));
-        await db.states.postEvent(
-            'ev-i1', 'i1', 'active', 'system',
+        const ctx = createRequestContext(db, await devToken());
+        await seedStateEvent(
+            ctx, 'ev-i1', 'i1', 'active',
             '2026-01-01T00:00:00.000000Z',
         );
-        const ctx = createRequestContext(db, await devToken());
         const states = await getMemberStates(ctx);
         assert.equal(states.get('wh'), 'active');
         assert.equal(states.get('wa'), 'active');
@@ -199,18 +219,8 @@ test('getProjectStates keeps the later event on a tie',
             state_event_id: 'ev-genesis',
         });
         const at = '2026-01-01T00:00:00.000000Z';
-        await db.states.put('ev-1', {
-            entity_id: 'p1',
-            state: 'under_review',
-            member_id: 'system',
-            at,
-        });
-        await db.states.put('ev-2', {
-            entity_id: 'p1',
-            state: 'approved',
-            member_id: 'system',
-            at,
-        });
+        await seedStateEvent(ctx, 'ev-1', 'p1', 'under_review', at);
+        await seedStateEvent(ctx, 'ev-2', 'p1', 'approved', at);
         const states = await getProjectStates(ctx);
         assert.equal(states.get('p1'), 'approved');
     });

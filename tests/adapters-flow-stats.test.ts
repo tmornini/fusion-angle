@@ -102,6 +102,28 @@ function daysAgo(d: number): string {
         .replace('Z', '000Z');
 }
 
+// A work-order transition, posted through the SAME
+// wire-reachable POST the live route serves
+// (postWorkOrderTransitionOp) — required for the flipped
+// GET /states route (Task 7), which
+// getTransitionEventsByWorkOrder reads, to derive it. A raw
+// db.states.put left no message pair at this address.
+async function transitionWorkOrder(
+    ctx: RequestContext,
+    workOrderId: string,
+    eventId: string,
+    targetState: string,
+    at: string,
+): Promise<void> {
+    await ctx.POST(`work-orders/${workOrderId}/transition`, {
+        transitionEventId: eventId,
+        targetState,
+        fieldValues: [],
+        release: null,
+        transitionAt: at,
+    });
+}
+
 // c→a→z graph: c isCreate, z isArchive, a regular
 function buildTestGraph(): StoredGraph {
     return {
@@ -181,33 +203,13 @@ test(
         // wo1: '' → c (daysAgo(40)), c → a
         // (daysAgo(40)), a → z (daysAgo(5))
         // ~35 days in node 'a', well within 90-day window
-        await db.states.put('t1a', {
-            entity_id: 'wo1',
-            state: 'c',
-            member_id: 'p1',
-            at: daysAgo(40),
-        });
-        await db.states.put('t1b', {
-            entity_id: 'wo1',
-            state: 'a',
-            member_id: 'p1',
-            at: daysAgo(40),
-        });
-        await db.states.put('t1c', {
-            entity_id: 'wo1',
-            state: 'z',
-            member_id: 'p1',
-            at: daysAgo(5),
-        });
+        await transitionWorkOrder(ctx, 'wo1', 't1a', 'c', daysAgo(40));
+        await transitionWorkOrder(ctx, 'wo1', 't1b', 'a', daysAgo(40));
+        await transitionWorkOrder(ctx, 'wo1', 't1c', 'z', daysAgo(5));
 
         // wo2 (OTHER flow): '' → c (daysAgo(40))
         // Must not affect f1 stats
-        await db.states.put('t2a', {
-            entity_id: 'wo2',
-            state: 'c',
-            member_id: 'p1',
-            at: daysAgo(40),
-        });
+        await transitionWorkOrder(ctx, 'wo2', 't2a', 'c', daysAgo(40));
 
         const { model, graph } =
             await getFlowStats(ctx, 'f1', Date.now());
@@ -269,12 +271,7 @@ test(
             work_order_id: 'wo1',
             at: daysAgo(10),
         });
-        await db.states.put('t1', {
-            entity_id: 'wo1',
-            state: 'c',
-            member_id: 'p1',
-            at: daysAgo(10),
-        });
+        await transitionWorkOrder(ctx, 'wo1', 't1', 'c', daysAgo(10));
         const { model, graph } =
             await getFlowStats(ctx, 'f1', Date.now());
         const graphPos = new Set(

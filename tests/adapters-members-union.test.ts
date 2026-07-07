@@ -157,12 +157,16 @@ test(
                 'members/:id', 'system', systemBody, undefined,
             ),
         );
-        await db.states.postEvent(
-            'st-system', 'system',
-            'active', 'system',
-            '2026-01-01T00:00:00.000000Z',
-        );
         const ctx = createRequestContext(db, await devToken());
+        // Re-pointed onto the wire-reachable PUT states/:id
+        // (finding 15's fixture budget): getMembers/getMemberMap
+        // read ctx.GET('states'), which is now ledger-derived,
+        // so a raw db.states.postEvent here would never surface.
+        await ctx.PUT('states/st-system', {
+            entity_id: 'system',
+            state: 'active',
+            at: '2026-01-01T00:00:00.000000Z',
+        });
         const roster = await getMembers(ctx);
         assert.ok(
             !roster.some(
@@ -319,12 +323,14 @@ test(
                 membershipBody, '1',
             ),
         );
-        await db.states.postEvent(
-            'st-member_without_pii', 'member_without_pii',
-            'active', 'system',
-            '2026-01-01T00:00:00.000000Z',
-        );
         const ctx = createRequestContext(db, await devToken());
+        // Re-pointed onto the wire-reachable PUT states/:id —
+        // same reason as the system-member seed above.
+        await ctx.PUT('states/st-member_without_pii', {
+            entity_id: 'member_without_pii',
+            state: 'active',
+            at: '2026-01-01T00:00:00.000000Z',
+        });
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'member_without_pii'),

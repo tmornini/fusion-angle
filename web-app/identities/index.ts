@@ -22,6 +22,7 @@ import {
     postIdentityCreation,
     subscribeIdentityChanges,
     generateCryptoSafeBase62,
+    IdentityPiiIntakeFailedError,
     type IdentityRosterRow,
     type RequestContext,
 } from '../app/adapters/index.ts';
@@ -32,6 +33,20 @@ import {
 const { signal } = createPageAbort();
 
 let identityListEl: HTMLElement | null = null;
+
+// Mint-once discipline (Phase 10 Task 2): the Add Identity
+// dialog mints its entity id ONCE per dialog session and reuses
+// it across retries — a retry after a partial (second-hop PII
+// PUT) failure re-submits against the SAME identity rather than
+// minting a fresh one and orphaning the first. Reset whenever
+// the dialog opens (bindAddIdentityDialog), so a later session
+// never reuses a stale id from an abandoned earlier one.
+let pendingIdentityId: string | null = null;
+
+function currentIdentityId(): string {
+    pendingIdentityId ??= generateCryptoSafeBase62();
+    return pendingIdentityId;
+}
 
 export async function init(): Promise<void> {
     const list = $required(
@@ -132,6 +147,15 @@ function bindAddIdentityDialog(): void {
             'keydown', onDialogKeydown,
             { signal },
         );
+    // A fresh dialog session gets a fresh id (mint-once
+    // discipline above) — mirrors bindInviteMemberDialog's own
+    // reset-on-open pattern for its field error.
+    $required('#add-identity-btn', document)
+        .addEventListener(
+            'click',
+            () => { pendingIdentityId = null; },
+            { signal },
+        );
 }
 
 function onKindRadioChange(e: Event): void {
@@ -195,7 +219,7 @@ async function submitPersonForm(): Promise<void> {
     }
     const phone = $input('#id-phone', document)!.value;
     const bio = $textarea('#id-bio', document)!.value;
-    const id = generateCryptoSafeBase62();
+    const id = currentIdentityId();
     const ctx = sessionContext();
     try {
         await postIdentityCreation(
@@ -209,9 +233,18 @@ async function submitPersonForm(): Promise<void> {
             },
         );
     } catch (err) {
-        reportFault(
-            ctx, 'Failed to add identity', err,
-        );
+        if (err instanceof IdentityPiiIntakeFailedError) {
+            reportFault(
+                ctx,
+                'Identity created, but its contact'
+                + ' details failed to save',
+                err,
+            );
+        } else {
+            reportFault(
+                ctx, 'Failed to add identity', err,
+            );
+        }
         return;
     }
     showToast('Identity added', 'success');
@@ -229,7 +262,7 @@ async function submitServiceForm(): Promise<void> {
         );
         return;
     }
-    const id = generateCryptoSafeBase62();
+    const id = currentIdentityId();
     const ctx = sessionContext();
     try {
         await postIdentityCreation(

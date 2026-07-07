@@ -257,10 +257,22 @@ test(
         // GET ideas is flipped (Phase 2 Task 5): it derives from
         // the message ledger, never db.ideas, so the fault must
         // be forced from the store the derivation actually reads.
+        // Task 8 (Phase 11): the fence's own default-org fallback
+        // ALSO derives from db.requests now
+        // (identityDefaultOrganization / deriveDefaultOrganization)
+        // — so the fault is targeted at the ideas prefix alone,
+        // letting the fence's own read through to the real
+        // implementation unaffected.
+        const original = db.requests.getAllWhere.bind(db.requests);
         (db.requests as unknown as {
-            getAllWhere: () => Promise<never>;
-        }).getAllWhere = async () => {
-            throw new Error('secret fault detail');
+            getAllWhere: (
+                column: string, key: string,
+            ) => ReturnType<typeof original>;
+        }).getAllWhere = async (column, key) => {
+            if (key === '/organizations/1/ideas/') {
+                throw new Error('secret fault detail');
+            }
+            return original(column, key);
         };
         const response = await handleRequest(
             db,

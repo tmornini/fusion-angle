@@ -92,7 +92,11 @@ function buildFlowGraph(
 // work-orders/:id through the flipped GET (this commit), so
 // the fixture must land through the SAME wire-reachable PUT
 // the live route serves — a raw db.workOrders.put leaves no
-// message pair at this address.
+// message pair at this address. The genesis transition ALSO
+// re-pins here (finding 15's fixture budget): getWorkOrder
+// TransitionEvents reads entity-states/:id/history, which is
+// flipped too — a raw db.states.put left no pair at that
+// address either.
 async function seedWorkOrder(
     db: MemoryDbAdapter,
     id: string,
@@ -105,10 +109,9 @@ async function seedWorkOrder(
         flowGraph,
         position: 0,
     });
-    await db.states.put('t-create-' + id, {
+    await ctx.PUT('states/t-create-' + id, {
         entity_id: id,
         state: currentNodeId,
-        member_id: SYSTEM_MEMBER_ID,
         at: AT_CREATED,
     });
 }
@@ -304,12 +307,15 @@ test(
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-step',
         );
-        // Add a transition with a stored value at
-        // n-step.
-        await db.states.put('t-step', {
+        const ctx = createRequestContext(db, await devToken());
+        // Add a transition with a stored value at n-step,
+        // posted through the SAME wire-reachable PUT states/:id
+        // the live route serves (finding 15's fixture budget):
+        // getWorkOrderTransitionEvents reads entity-states/:id/
+        // history, which is flipped too.
+        await ctx.PUT('states/t-step', {
             entity_id: 'wo-1',
             state: 'n-step',
-            member_id: SYSTEM_MEMBER_ID,
             at: AT_FIRST,
         });
         await db.stateFieldValues.put('fv-1', {
@@ -322,7 +328,6 @@ test(
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
-        const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', 'n-target', new Map(),
         );

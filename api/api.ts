@@ -43,7 +43,7 @@ import {
 } from './notifications.ts';
 import {
     ownerOrganizationOfEntity,
-    organizationOwnedProbes,
+    rawOrganizationOwnedProbes,
     graphEntityProbe,
 } from './store-parent-scoped.ts';
 import {
@@ -337,7 +337,7 @@ export async function handleRequest(
             // two-hop for node/edge deletion events.
             // rawReadRow bypasses EntityStore's deleted filter.
             const owner = await ownerOrganizationOfEntity(
-                organizationOwnedProbes(adapter),
+                rawOrganizationOwnedProbes(adapter),
                 adapter.memberships, fenced.organization,
                 param(params, 0),
                 graphEntityProbe(adapter, adapter.flows),
@@ -375,6 +375,65 @@ export async function handleRequest(
             );
         }
         body = parse.body;
+    }
+
+    // THE STATE OWNERSHIP WRITE FENCE (Phase 11 Task 1):
+    // MEMBER_VERBS permits member-tier PUT here, and the body
+    // names entity_id itself — with no upstream ownership
+    // check, a member of one org could PUT a state event
+    // naming ANOTHER org's entity and forge or tombstone its
+    // lifecycle. PutHandler carries no organization argument
+    // (routes.ts) and the route's `db` is already the SCOPED
+    // adapter (which 404s a foreign row as merely absent), so
+    // the fence cannot live in the route closure — it runs
+    // HERE, pre-dispatch, mirroring the entity-states GET
+    // guard below. The RAW probes resolve a foreign entity's
+    // true owner even after it is soft-deleted — the filtered
+    // organizationOwnedProbes would let a self-deleted foreign
+    // row masquerade as an orphan.
+    if (method === 'PUT' && routePattern === 'states/:id') {
+        const entityId = body?.entity_id;
+        if (typeof entityId === 'string') {
+            const owner = await ownerOrganizationOfEntity(
+                rawOrganizationOwnedProbes(adapter),
+                adapter.memberships, organization!,
+                entityId,
+                graphEntityProbe(adapter, adapter.flows),
+            );
+            if (owner !== null && owner !== organization) {
+                return Response.json(
+                    { error: 'Not found: ' + pathname },
+                    { status: HTTP_NOT_FOUND },
+                );
+            }
+        }
+    }
+    // The field-values sibling: the leaf carries no entity_id
+    // of its own — it is owned by whatever owns its PARENT
+    // state event (states/:id/field-values/:fvid — param 0 is
+    // the parent event, param 1 the leaf). Read raw so an
+    // event whose entity was since deleted still resolves.
+    if (
+        (method === 'PUT' || method === 'DELETE')
+        && routePattern === 'states/:id/field-values/:fvid'
+    ) {
+        const parentEvent = await adapter.rawReadRow<
+            { id: string; entity_id: Id }
+        >('states', param(params, 0));
+        if (parentEvent !== null) {
+            const owner = await ownerOrganizationOfEntity(
+                rawOrganizationOwnedProbes(adapter),
+                adapter.memberships, organization!,
+                parentEvent.entity_id,
+                graphEntityProbe(adapter, adapter.flows),
+            );
+            if (owner !== null && owner !== organization) {
+                return Response.json(
+                    { error: 'Not found: ' + pathname },
+                    { status: HTTP_NOT_FOUND },
+                );
+            }
+        }
     }
 
     const isWrite = method === 'PUT' || method === 'POST'

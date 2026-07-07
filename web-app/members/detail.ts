@@ -45,6 +45,8 @@ import {
     HumanMember,
     AIMember,
     type MemberState,
+    type MemberPii,
+    type IdentityPiiEntity,
 } from '../app/adapters/index.ts';
 
 const { signal } = createPageAbort();
@@ -433,6 +435,34 @@ async function handleSave(): Promise<void> {
     }
 }
 
+// The detail save's dirty check for the PII second hop (Phase
+// 10 Task 2, delta 4): compares the draft's four contact fields
+// — already normalized by the SAME trimStrings the save applies
+// — against the member's FETCHED pii. An erased original has no
+// stored fields to compare, so it baselines against blank
+// strings — the SAME fallback humanMemberDraftFromMember uses to
+// seed the draft in the first place, so an untouched erased
+// member never fires a spurious PUT. Returns the pii patch to
+// send, or undefined when nothing differs — the detail-only
+// save stays ONE hop.
+export function humanMemberPiiPatchIfDirty(
+    patch: {
+        name: string; email: string;
+        phone: string; bio: string;
+    },
+    original: MemberPii,
+): Omit<IdentityPiiEntity, 'id'> | undefined {
+    const baseline = original.erased
+        ? { name: '', email: '', phone: '', bio: '' }
+        : original;
+    const dirty =
+        patch.name !== baseline.name
+        || patch.email !== baseline.email
+        || patch.phone !== baseline.phone
+        || patch.bio !== baseline.bio;
+    return dirty ? { ...patch } : undefined;
+}
+
 async function saveHumanMember(
     s: Extract<
         HumanState,
@@ -456,12 +486,18 @@ async function saveHumanMember(
         humanMemberPatchFromDraft(s.draft),
     );
     const { id: _id, ...rest } = row;
-    const next = { ...rest, ...patch };
+    const {
+        name, email, phone, bio, ...detailPatch
+    } = patch;
+    const nextDetail = { ...rest, ...detailPatch };
+    const piiPatch = humanMemberPiiPatchIfDirty(
+        { name, email, phone, bio }, s.member.pii(),
+    );
     const stateChanged =
         s.draft.state !== s.member.stateValue();
     try {
         await putHumanMember(
-            ctx, memberId, next,
+            ctx, memberId, nextDetail, piiPatch,
         );
         if (stateChanged) {
             await postHumanMemberStateChange(

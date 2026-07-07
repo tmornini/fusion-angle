@@ -323,18 +323,17 @@ function aiMemberDocumentBody(
     };
 }
 
+// PII no longer rides the create body (Phase 10 Task 2's intake
+// decomposition) — `name` stays a parameter so callers keep one
+// literal call shape even though this builder no longer uses it.
 function humanMemberCreateBody(
     id: string,
-    name: string,
+    _name: string,
     stateEventId: string,
     stateAt: string,
 ): Record<string, unknown> {
     return {
         id,
-        pii: {
-            name, email: id + '@example.com',
-            phone: '', bio: '',
-        },
         detail: {
             title: 't', department: 'd',
             strengths: jsonArrayField([]),
@@ -346,14 +345,11 @@ function humanMemberCreateBody(
     };
 }
 
-function humanMemberEditBody(
-    name: string,
-): Record<string, unknown> {
+// PII no longer rides the edit body (Phase 10 Task 2's intake
+// decomposition) — it changes ONLY via a separate PUT
+// identities/:id/pii, which this drift chain does not exercise.
+function humanMemberEditBody(): Record<string, unknown> {
     return {
-        pii: {
-            name, email: name + '@example.com',
-            phone: '', bio: '',
-        },
         detail: {
             title: 't2', department: 'd2',
             strengths: jsonArrayField([]),
@@ -743,7 +739,11 @@ test('live-write chain: create an AI member (bundle balance 3),'
     );
     assert.equal(derivedAiDetail3.name, 'Chain AI Facet');
 
-    // Step 4: create a human member.
+    // Step 4: create a human member — bundle balance 4 (Phase 10
+    // Task 5 widens it from 3: operation + member-document +
+    // detail-document + the synthesized identities/:id document,
+    // a human member's own identity row an AI member never has —
+    // finding 10).
     const humanId = 'human-drift-chain-1';
     const beforeHumanCreate = (await db.requests.getAll()).length;
     const humanCreated = await handleRequest(db, req(
@@ -756,7 +756,7 @@ test('live-write chain: create an AI member (bundle balance 3),'
     assert.equal(humanCreated.status, 204);
     assert.equal(
         (await db.requests.getAll()).length,
-        beforeHumanCreate + 3,
+        beforeHumanCreate + 4,
     );
     await assertMemberParity(humanId);
     const derivedHumanDetail1 = await derivedHumanMember(
@@ -771,7 +771,7 @@ test('live-write chain: create an AI member (bundle balance 3),'
     // Step 5: composed edit (POST /human-members/:id).
     const humanEdited = await handleRequest(db, req(
         'POST', '/human-members/' + humanId, token,
-        humanMemberEditBody('Chain Human Edited'),
+        humanMemberEditBody(),
     ));
     assert.equal(humanEdited.status, 204);
     await assertMemberParity(humanId);
@@ -1227,11 +1227,6 @@ test('THE ORPHANED-MEMBERSHIP CASE: an identity created via'
 
     await postIdentityCreationOp(db, {
         id: orphanId, kind: 'person',
-        pii: {
-            name: 'Orphan Identity',
-            email: 'orphan-drift-1@example.com',
-            phone: '', bio: '',
-        },
     });
     // No members row exists for orphanId — verified on the OLD
     // plane directly (the join-direction precondition this case

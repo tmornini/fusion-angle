@@ -32,7 +32,7 @@ import {
     viaParent,
     viaMembership,
     ownerOrganizationOfEntity,
-    organizationOwnedProbes,
+    rawOrganizationOwnedProbes,
     graphEntityProbe,
     type OwningOrganizationResolver,
 } from './store-parent-scoped.ts';
@@ -88,7 +88,7 @@ export function organizationScopedAdapter(
     // the flow_nodes / flow_edges two-hop for deletion events.
     // rawReadRow bypasses EntityStore's deleted filter so the
     // probe works even after the node/edge is soft-deleted.
-    const organizationOwned = organizationOwnedProbes(base);
+    const organizationOwned = rawOrganizationOwnedProbes(base);
     const graphProbe = graphEntityProbe(base, base.flows);
     const states = new ParentScopedStateStore(
         base.states, organization, 'states',

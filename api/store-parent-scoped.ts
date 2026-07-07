@@ -214,6 +214,35 @@ interface RawReader {
     ): Promise<T | null>;
 }
 
+// The cross-tenant FENCE probe set: mirrors
+// organizationOwnedProbes table-for-table, but each getById
+// resolves via rawReadRow — bypassing the EntityStore deleted
+// filter, the same pattern graphEntityProbe already uses for
+// flow_nodes/flow_edges. A deleted entity resolves to its
+// TRUE owner here, never an orphan, so a foreign tenant
+// cannot defeat the write/read fences by deleting the entity
+// first. organizationOwnedProbes (filtered) stays exported for
+// any non-fence caller; every fence caller uses this one.
+export function rawOrganizationOwnedProbes(
+    adapter: RawReader,
+): readonly OrganizationOwnedProbe[] {
+    return [
+        'ideas', 'projects', 'flows',
+        'records', 'objectives', 'work_orders',
+        'invitations',
+    ].map((table): OrganizationOwnedProbe => ({
+        async getById(id: string) {
+            const row = await adapter.rawReadRow<
+                { id: string; organization_id: Id }
+            >(table, id);
+            if (row === null) {
+                throw new EntityNotFoundError(table, id);
+            }
+            return { organization_id: row.organization_id };
+        },
+    }));
+}
+
 // Build the graph-entity probe shared by both ownerOrganizationOfEntity
 // call sites (db-organization-scoped.ts and api.ts). Tries flow_nodes
 // first (raw — bypasses deleted filter), then flow_edges (raw);

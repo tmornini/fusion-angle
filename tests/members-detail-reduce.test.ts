@@ -24,7 +24,7 @@ const { makeHumanMember, makeAIMember } = await import(
     './member-fixtures.ts'
 );
 
-const { reduceRefresh } = await import(
+const { reduceRefresh, humanMemberPiiPatchIfDirty } = await import(
     '../web-app/members/detail.ts'
 );
 
@@ -129,5 +129,80 @@ test(
         assert.equal(next.kind, 'reading');
         assert.equal(next.variant, 'ai');
         assert.equal(next.member, fresh);
+    },
+);
+
+// ── humanMemberPiiPatchIfDirty (Phase 10 Task 2, delta 4): the
+// detail save's dirty check — a detail-only save must omit the
+// PUT identities/:id/pii second hop.
+
+const ORIGINAL_PII = {
+    erased: false as const,
+    name: 'Sarah Chen',
+    email: 'sarah@example.com',
+    phone: '555-0100',
+    bio: 'Builds things.',
+};
+
+test(
+    'an unchanged draft returns undefined — a detail-only save'
+    + ' omits the PUT identities/:id/pii call',
+    () => {
+        const patch = humanMemberPiiPatchIfDirty(
+            {
+                name: ORIGINAL_PII.name,
+                email: ORIGINAL_PII.email,
+                phone: ORIGINAL_PII.phone,
+                bio: ORIGINAL_PII.bio,
+            },
+            ORIGINAL_PII,
+        );
+        assert.equal(patch, undefined);
+    },
+);
+
+test(
+    'a changed field returns the full four-field patch',
+    () => {
+        const patch = humanMemberPiiPatchIfDirty(
+            {
+                name: 'Sarah C. Chen',
+                email: ORIGINAL_PII.email,
+                phone: ORIGINAL_PII.phone,
+                bio: ORIGINAL_PII.bio,
+            },
+            ORIGINAL_PII,
+        );
+        assert.deepEqual(patch, {
+            name: 'Sarah C. Chen',
+            email: ORIGINAL_PII.email,
+            phone: ORIGINAL_PII.phone,
+            bio: ORIGINAL_PII.bio,
+        });
+    },
+);
+
+test(
+    'an erased original baselines against blank fields — an'
+    + ' untouched erased member never fires a spurious PUT',
+    () => {
+        const patch = humanMemberPiiPatchIfDirty(
+            { name: '', email: '', phone: '', bio: '' },
+            { erased: true },
+        );
+        assert.equal(patch, undefined);
+    },
+);
+
+test(
+    'an erased original with a newly entered name IS dirty',
+    () => {
+        const patch = humanMemberPiiPatchIfDirty(
+            { name: 'New Name', email: '', phone: '', bio: '' },
+            { erased: true },
+        );
+        assert.deepEqual(patch, {
+            name: 'New Name', email: '', phone: '', bio: '',
+        });
     },
 );

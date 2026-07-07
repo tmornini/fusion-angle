@@ -38,6 +38,7 @@ import {
     generateCryptoSafeBase62,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
+    HumanMemberPiiIntakeFailedError,
 } from '../app/adapters/index.ts';
 import {
     ManagedMembersPresenter,
@@ -56,6 +57,20 @@ const { signal } = createPageAbort();
 let membersState:
     ManagedMembersState | null = null;
 let memberListEl: HTMLElement | null = null;
+
+// Mint-once discipline (Phase 10 Task 2): the Add Member
+// dialog mints its entity id ONCE per dialog session and reuses
+// it across retries — a retry after a partial (second-hop PII
+// PUT) failure re-submits against the SAME member rather than
+// minting a fresh one and orphaning the first. Reset whenever
+// the dialog opens (bindAddMemberDialog), so a later session
+// never reuses a stale id from an abandoned earlier one.
+let pendingMemberId: string | null = null;
+
+function currentMemberId(): string {
+    pendingMemberId ??= generateCryptoSafeBase62();
+    return pendingMemberId;
+}
 
 export async function init(): Promise<void> {
     const memberList = $required(
@@ -243,6 +258,15 @@ function bindAddMemberDialog(): void {
             'keydown', onDialogKeydown,
             { signal },
         );
+    // A fresh dialog session gets a fresh id (mint-once
+    // discipline above) — mirrors bindInviteMemberDialog's own
+    // reset-on-open pattern for its field error.
+    $required('#add-member-btn', document)
+        .addEventListener(
+            'click',
+            () => { pendingMemberId = null; },
+            { signal },
+        );
 }
 
 function bindInviteMemberDialog(): void {
@@ -333,6 +357,13 @@ async function handleInviteSubmit(): Promise<void> {
 }
 
 function onKindRadioChange(e: Event): void {
+    // Switching Kind starts a NEW logical operation, so the
+    // mint-once id (above) must not follow it: reusing the id
+    // would let a switched-to submit re-put the OTHER kind's
+    // facet onto an entity already claimed by the first kind's
+    // partial create. Retries WITHIN a kind still reuse the id
+    // via currentMemberId()'s lazy mint.
+    pendingMemberId = null;
     const target = e.target as HTMLInputElement;
     const kind = target.value;
     const humanForm = $(
@@ -408,7 +439,7 @@ async function submitHumanForm(): Promise<void> {
     const bio = $textarea(
         '#hw-bio', document,
     )!.value;
-    const id = generateCryptoSafeBase62();
+    const id = currentMemberId();
     const ctx = sessionContext();
     try {
         await postHumanMemberCreation(
@@ -436,9 +467,18 @@ async function submitHumanForm(): Promise<void> {
             'active',
         );
     } catch (err) {
-        reportFault(
-            ctx, 'Failed to add member', err,
-        );
+        if (err instanceof HumanMemberPiiIntakeFailedError) {
+            reportFault(
+                ctx,
+                'Member added, but its contact details'
+                + ' failed to save',
+                err,
+            );
+        } else {
+            reportFault(
+                ctx, 'Failed to add member', err,
+            );
+        }
         return;
     }
     showToast('Member added', 'success');
@@ -473,7 +513,7 @@ async function submitAIForm(): Promise<void> {
         );
         return;
     }
-    const id = generateCryptoSafeBase62();
+    const id = currentMemberId();
     const ctx = sessionContext();
     try {
         await postAIMemberCreation(

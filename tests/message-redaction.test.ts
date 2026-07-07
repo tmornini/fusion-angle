@@ -9,6 +9,7 @@ import {
     redactHeaderCredentials,
     redactAuthenticationRequest,
     redactAuthenticationResponse,
+    stripPiiRequest,
 } from '../api/message-redaction.ts';
 import { Octets } from '../shared/http-message/octets.ts';
 import {
@@ -322,4 +323,69 @@ async () => {
     const json = canonicalJson(redacted);
     assert.ok(!json.includes('REFRESH-SECRET'));
     assert.ok(json.includes(bigInteger));
+});
+
+// The PII strip arm (gate 2): unlike the high-entropy secrets
+// above, an email or username is low-entropy and identifying —
+// fingerprinting it would leak exactly what it claims to
+// protect (dictionary/rainbow attack against a small address
+// space), so the ONLY safe treatment is removal — absence,
+// never a sentinel.
+test('a grant-shaped body has its email stripped from the'
++ ' stored request; every other field survives', async () => {
+    const model = buildRequestModel({
+        method: 'POST', target: '/invitations', fields: [],
+        body: {
+            email: 'sarah@x.com', invitationId: 'inv-1',
+            grantEventId: 'ev-1',
+            grantAt: '2026-01-01T00:00:00.000000Z',
+        },
+    });
+    const stripped = await stripPiiRequest('invitations', model);
+    const body = bodyOf(stripped);
+    assert.ok(!('email' in body));
+    assert.equal(body.invitationId, 'inv-1');
+    assert.equal(body.grantEventId, 'ev-1');
+    assert.equal(
+        body.grantAt, '2026-01-01T00:00:00.000000Z',
+    );
+});
+
+test('an authorize-shaped body has its username stripped from'
++ ' the stored request; every other field survives',
+async () => {
+    const model = buildRequestModel({
+        method: 'POST', target: '/authentication/authorize',
+        fields: [],
+        body: {
+            method: 'password', username: 'ada@example.com',
+            password: 'hunter2', client_id: 'web',
+        },
+    });
+    const stripped = await stripPiiRequest(
+        'authentication/authorize', model,
+    );
+    const body = bodyOf(stripped);
+    assert.ok(!('username' in body));
+    assert.equal(body.method, 'password');
+    assert.equal(body.password, 'hunter2');
+    assert.equal(body.client_id, 'web');
+});
+
+test('a non-listed route\'s body passes through the PII strip'
++ ' untouched', async () => {
+    const model = buildRequestModel({
+        method: 'POST', target: '/authentication/token',
+        fields: [],
+        body: {
+            grant_type: 'refresh',
+            refresh_token: 'REFRESH-SECRET',
+        },
+    });
+    const stripped = await stripPiiRequest(
+        'authentication/token', model,
+    );
+    assert.equal(
+        canonicalJson(stripped), canonicalJson(model),
+    );
 });

@@ -13,6 +13,7 @@ import {
 import {
     postAiMemberCreationOp,
     postHumanMemberCreationOp,
+    postIdentityPiiDocumentOp,
     postMembershipDocumentOp,
     memberDocumentBodyOf,
     aiMemberDetailBodyOf,
@@ -168,6 +169,41 @@ async function detailDocumentPair(
     });
 }
 
+// The PII facet's own document pair (Phase 10 Task 2's intake
+// decomposition), mirroring detailDocumentPair's shape for the
+// one route whose successBody lives at the top level, not per-
+// verb (identities/:id/pii, like the identities/:id precedent).
+async function identityPiiDocumentPair(
+    id: Id,
+    pii: Record<string, unknown>,
+    requestAt: string,
+): Promise<MessagePair> {
+    const spec = WRITE_RESPONSE_SPECS['identities/:id/pii'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for'
+            + ' identities/:id/pii',
+        );
+    }
+    return formWritePair({
+        method: 'PUT',
+        pathname: `/identities/${id}/pii`,
+        routePattern: 'identities/:id/pii',
+        routeSegments: ['identities', ':id', 'pii'],
+        pathSegments: ['identities', id, 'pii'],
+        headerFields: [],
+        body: pii,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt,
+        organization: undefined,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], pii, SYSTEM_MEMBER_ID, undefined,
+        ),
+        headPairId: undefined,
+    });
+}
+
 async function memberCreateOperationPair(
     routePattern: 'human-members' | 'ai-members',
     body: Record<string, unknown>,
@@ -248,14 +284,14 @@ export async function seedHumanMember(
     state: MemberState = 'active',
 ): Promise<void> {
     const requestAt = nowUtc();
+    const pii = {
+        name,
+        email: `${id}@example.com`.toLowerCase(),
+        phone: '',
+        bio: '',
+    };
     const body = {
         id,
-        pii: {
-            name,
-            email: `${id}@example.com`.toLowerCase(),
-            phone: '',
-            bio: '',
-        },
         detail: humanDetail(),
         initialState: state,
         initialStateEventId: `st-${id}`,
@@ -275,6 +311,14 @@ export async function seedHumanMember(
     };
     await postHumanMemberCreationOp(
         db, body, SYSTEM_MEMBER_ID, pairs,
+    );
+    // Phase 10 Task 2: PII no longer rides the create body — the
+    // production seed's own two-step shape (member facets, then
+    // the PII document), mirrored here with IDENTICAL id/content
+    // so every fixture-seeded human keeps its PII row.
+    await postIdentityPiiDocumentOp(
+        db, id, pii, SYSTEM_MEMBER_ID,
+        await identityPiiDocumentPair(id, pii, requestAt),
     );
     await seedMembership(db, id, requestAt);
 }

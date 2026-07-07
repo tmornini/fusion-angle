@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { GET, POST, handleRequest } from '../api/api.ts';
+import { GET, POST, PUT, handleRequest } from '../api/api.ts';
 import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -61,18 +61,23 @@ function req(
 }
 
 test(
-    'POST identities (person) writes the identity and its'
-    + ' PII row in one operation',
+    'POST identities (person) writes the bare identity; its'
+    + ' PII enters via a separate PUT identities/:id/pii'
+    + ' (Phase 10 Task 2 intake decomposition)',
     async () => {
         const db = await freshDb();
         await POST(db, 'identities', {
             id: 'p1',
             kind: 'person',
-            pii: pii('Alice'),
         }, DEV_TOKEN);
         const identity = await GET<{ kind: string }>(
             db, 'identities/p1', DEV_TOKEN);
         assert.equal(identity.kind, 'person');
+        // No PII row yet — the create body no longer carries pii.
+        await assert.rejects(
+            () => db.identityPii.getById('p1'));
+        await PUT(
+            db, 'identities/p1/pii', pii('Alice'), DEV_TOKEN);
         const piiRow = await db.identityPii.getById('p1');
         assert.equal(piiRow.name, 'Alice');
         // A person carries no credential.
@@ -108,29 +113,55 @@ test(
 );
 
 test(
-    'POST identities (person) rolls back the identity when'
-    + ' its PII sub-object is invalid',
+    'POST identities (person) rejects a legacy pii-bearing'
+    + ' body: PII now enters ONLY via PUT identities/:id/pii'
+    + ' (Phase 10 Task 2 retires the create-time PII facet, and'
+    + ' with it the atomic create+PII rollback this body once'
+    + ' exercised)',
     async () => {
         const db = await freshDb();
         await assert.rejects(
-            // PII missing the required `bio` key — the
-            // identity_pii store rejects it mid-tx, AFTER the
-            // identities put has landed, so both must roll back.
             () => POST(db, 'identities', {
                 id: 'doomed',
                 kind: 'person',
                 pii: {
                     name: 'Doomed',
                     email: 'doomed@example.com',
-                    phone: '',
+                    phone: '', bio: '',
                 },
             }, DEV_TOKEN),
         );
-        // Neither facet survived the aborted transaction.
+        // The unexpected `pii` key 400s before any facet lands.
         await assert.rejects(
             () => GET(db, 'identities/doomed', DEV_TOKEN));
         await assert.rejects(
             () => db.identityPii.getById('doomed'));
+    },
+);
+
+test(
+    'a bad PUT identities/:id/pii after a good create leaves'
+    + ' the identity standing PII-less — the torn-state'
+    + ' acceptance the intake decomposition names',
+    async () => {
+        const db = await freshDb();
+        await POST(db, 'identities', {
+            id: 'torn', kind: 'person',
+        }, DEV_TOKEN);
+        await assert.rejects(
+            // PII missing the required `bio` key.
+            () => PUT(db, 'identities/torn/pii', {
+                name: 'Torn',
+                email: 'torn@example.com',
+                phone: '',
+            }, DEV_TOKEN),
+        );
+        // The identity survives; it simply carries no PII yet.
+        const identity = await GET<{ kind: string }>(
+            db, 'identities/torn', DEV_TOKEN);
+        assert.equal(identity.kind, 'person');
+        await assert.rejects(
+            () => db.identityPii.getById('torn'));
     },
 );
 
@@ -170,7 +201,6 @@ test(
             'POST', '/identities', DEV_TOKEN, {
                 id: 'p1',
                 kind: 'person',
-                pii: pii('Alice'),
             }));
         assert.equal(create.status, 204);
 
@@ -182,7 +212,6 @@ test(
             memberDb, req('POST', '/identities', token, {
                 id: 'p2',
                 kind: 'person',
-                pii: pii('Bob'),
             }));
         assert.equal(denied.status, 403);
         // The denied member wrote nothing.

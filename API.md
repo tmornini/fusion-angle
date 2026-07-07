@@ -145,14 +145,20 @@ Legend for classification:
 
 ### 2.2 Identities & subtree
 
-- `GET /identities` · `GET|PUT /identities/:id` — primitive.
+- `GET /identities` · `GET|PUT /identities/:id` — primitive. `PUT`
+  is a document write (§5.13) — the TWELFTH registered family,
+  joining `MEMBERS_WIRING`'s shared-log-with-genesis bucket.
 - `POST /identities` — operation (§3.5). Admin-only.
 - `GET|PUT|DELETE /identities/:id/pii` — facet. Self-only read;
-  self-or-admin write.
+  self-or-admin write. PUT/DELETE ride the message plane's
+  sanctioned hard-delete zone (§5.12).
 - `GET /identity-pii` — admin PII roster.
 - `GET /identities/:id/credentials` ·
   `GET|PUT /identities/:id/credentials/:cid` — nested; the opaque
-  `secret` is projected out on every read. Admin-only.
+  `secret` is projected out on every read. Admin-only. `PUT`'s
+  closure is extracted to `postIdentityCredentialDocumentOp`
+  (§5.13) but stays hand-dispatched, never family-registered
+  (§5.13's nested-plane rationale).
 
 ### 2.3 Auth spine — tokens, providers, grants
 
@@ -163,6 +169,11 @@ Legend for classification:
 - `GET /identity-providers` · `GET|PUT /identity-providers/:id` —
   primitive.
 - `GET /role-grants` · `GET|PUT /role-grants/:id` — primitive.
+  `PUT`'s closure is extracted to `postRoleGrantDocumentOp`
+  (§5.13) but stays hand-dispatched, never family-registered
+  (§5.13's event-plane rationale); its `WRITE_RESPONSE_SPECS`
+  entry keeps re-stamping `organization_id` from the fence,
+  untouched by the extraction.
 - `POST /authentication/token` — grant dispatch (§3.8). Bearer-exempt.
 - `POST /authentication/authorize` — interactive front door (§3.9).
   Bearer-exempt.
@@ -261,13 +272,61 @@ Legend for classification:
 
 - `GET /states` · `GET /states/:id` — primitive.
 - `PUT /states/:id` — append/stamp a state event; the author is the
-  verified caller, stamped over any client-supplied `member_id`.
+  verified caller, stamped over any client-supplied `member_id`. Gated
+  by the OWNERSHIP FENCE below — a foreign org's entity_id 404s.
 - `GET /entity-states/:id` — the current (latest) state for an entity.
 - `GET /entity-states/:id/history` — the full event history for an
   entity. Both are parent-ownership gated (a foreign org's entity
-  404s).
+  404s) by the SAME fence the write side uses.
 - `GET /states/:id/field-values` ·
-  `PUT|DELETE /states/:id/field-values/:fvid` — nested.
+  `PUT|DELETE /states/:id/field-values/:fvid` — nested; PUT/DELETE
+  gated by the ownership fence too, resolved through the leaf's PARENT
+  state event.
+
+**The state ownership fence** (`api/api.ts`, mirroring the pre-existing
+entity-states GET guard): `MEMBER_VERBS` permits member-tier PUT on
+both `/states/:id` and `/states/:id/field-values/:fvid`
+(`api/authorization.ts`), and each body names its target entity_id
+directly — the field-values leaf via its parent event's entity_id,
+read raw via `adapter.rawReadRow('states', param0)`. Neither
+`PutHandler`/`DeleteHandler` carries an organization argument
+(`routes.ts`), and the route's own `db` is already the ORG-SCOPED
+adapter — which 404s a foreign row as merely absent, making a
+route-level fence a no-op — so both checks run at the GATE, right
+after the body-parse block and before the write dispatches.
+`ownerOrganizationOfEntity` (`api/store-parent-scoped.ts`) resolves
+three outcomes: an OWN-org entity_id passes; a GENUINE orphan (no
+owning row anywhere — an org-less member event, say) passes, since an
+incomplete-but-harmless row is not a foreign tenant's; a foreign
+entity_id — LIVE or already soft-deleted — 404s, byte-identical to the
+existing read guard's `{error: 'Not found: ' + pathname}` (never an
+`EntityNotFoundError`, which keys on the wrong id).
+
+The resolver walks `rawOrganizationOwnedProbes(adapter)` — the SAME
+seven org-owned tables (`ideas`, `projects`, `flows`, `records`,
+`objectives`, `work_orders`, `invitations`) as the filtered
+`organizationOwnedProbes`, but read via `rawReadRow`, bypassing
+`EntityStore`'s deleted filter (the pattern `graphEntityProbe` already
+used for `flow_nodes`/`flow_edges`). This closes a read leak: the
+filtered probes resolve a DELETED entity to "not found" at every
+probed table, falling through to a visible orphan — so an org's OWN
+legitimate deletion of its own entity used to unhide that entity's
+whole lifecycle to every OTHER org's `/states` and
+`/entity-states/:id[/history]` reads. The raw probes resolve the
+entity's TRUE owner whether it is live or deleted, closing both the
+write escalation and the read leak with one probe set. The filtered
+`organizationOwnedProbes` stays exported for any future non-fence
+caller; every fence today — write and read alike — uses the raw one.
+
+Named residual: within ONE org, a member-tier PUT `/states/:id` can
+still post a `'deleted'` event naming a fellow member/membership/
+ai-member/human-member id (MEMBER_VERBS allows it, and those roster
+kinds are not in the organization-owned probe list, so they resolve
+via the membership ledger, not a table). This intra-org reachability
+is unchanged by this fence — the user elected the ORG boundary, not a
+kind/alphabet gate — and is tracked as a named acceptance (see
+`tests/drift-roster.test.ts`'s "states/:id escape hatch"), not a bug
+this task closes.
 
 ### 2.11 Organizations & memberships
 
@@ -355,35 +414,43 @@ closure this same task, the FIRST composed-EDIT synthesis (below).
 
 ### 3.3 `POST /human-members` — create human member
 
-`postHumanMemberCreationOp` (`api/routes.ts`).
+`postHumanMemberCreationOp` (`api/routes.ts`). PII no longer
+lands here (Phase 10 Task 2's intake decomposition, prose
+below) — it enters via a second, separate hop.
 
-- tx: `[members, identities, identity_pii, human_members, states,
-  requests, responses]`
+- tx: `[members, identities, human_members, states, requests,
+  responses]`
 - actual:
   1. `members.put(id, {type:'human'})`
   2. `identities.put(id, {kind:'person'})`
-  3. `identityPii.put(id, pii)`
-  4. `humanMembers.put(id, detail)`
-  5. `states.postEvent(initialStateEventId, id, initialState, actor)`
-  6. three `appendMessagePair` calls — operation, member document,
-     detail document (the bundle, below)
-- doctrinal: four `put_*` primitives + `post_state_event` as
+  3. `humanMembers.put(id, detail)`
+  4. `states.postEvent(initialStateEventId, id, initialState, actor)`
+  5. FOUR `appendMessagePair` calls — operation, member document,
+     detail document, identities document (the bundle, below;
+     Phase 10 Task 5 widens the triple to a quadruple, human-only)
+- doctrinal: three `put_*` primitives + `post_state_event` as
   `post_create_human_member`.
-- props: atomic; admin-only; `validateHumanMemberCreateBody`.
+- props: atomic; admin-only; `validateHumanMemberCreateBody`
+  (`['id', 'detail', 'initialState', 'initialStateEventId',
+  'initialStateAt']` — `pii` retired from this key set).
 
 ### 3.4 `POST /human-members/:id` — edit human member
 
 `postHumanMemberEditOp` (`api/routes.ts`) — the postAiMemberEditOp
-precedent above, for the sibling facet.
+precedent above, for the sibling facet. PII no longer lands here
+either — it changes ONLY via the separate hop, fired IFF the
+client's dirty check finds it changed.
 
-- tx: `[members, identities, identity_pii, human_members, requests,
-  responses]`
-- actual: the four facet `put`s (member, identity, pii, detail), then
-  three `appendMessagePair` calls — operation, member document,
-  detail document (the bundle, below).
-- doctrinal: four `put_*` primitives as `post_edit_human_member`.
+- tx: `[members, identities, human_members, requests, responses]`
+- actual: the three facet `put`s (member, identity, detail), then
+  FOUR `appendMessagePair` calls — operation, member document,
+  detail document, identities document (the bundle, below) — the
+  LAST of which FOLDS (§5.14): its `{kind:'person'}` body is
+  byte-identical to the create's own, at the SAME address.
+- doctrinal: three `put_*` primitives as `post_edit_human_member`.
 - props: atomic; **no state event**; admin-only;
-  `validateHumanMemberEditBody`.
+  `validateHumanMemberEditBody` (`['detail']` alone — `pii`
+  retired from this key set).
 
 **The member write-pair bundle (Phase 8 Task 4), the
 records/objectives-bundle sibling (§3.20/§3.21) — and the
@@ -425,33 +492,125 @@ like every prior bundle.**
   `PerVerbWriteResponseSpec` this task for exactly that reason —
   its `put` slot serves this synthesized bundle and the seed alone,
   never a real client PUT.
+- **The identities document pair (Phase 10 Task 5) — human-only,
+  a fourth member appended LAST.** PUT-shaped, at the identity's
+  own `identities/:id` address (its OWN address, distinct from
+  `members/:id` and the family's own detail address), body
+  `identityDocumentBodyOf('person')` → `{kind:'person'}` alone —
+  the exact live `PUT /identities/:id` wire body — validated
+  through `validateIdentityDocumentBody`. An AI member carries
+  none: it has no identity row of its own (finding 10), so
+  `postAiMemberCreationOp`/`postAiMemberEditOp` never receive one
+  and their bundle stays the ORIGINAL three (§5.14 has the full
+  writeup — the discriminated-union rationale, the fold, and the
+  seed's own extension).
 
 The shared BODY builders (`memberDocumentBodyOf`,
-`aiMemberDetailBodyOf`, `humanMemberDetailBodyOf`) feed
-`formDocumentPairFor` (`api/routes.ts`), the shared pair-FORMER
-the four routes above now call directly (Phase 9 Task 2 retired
-their own route-inline formation). The seed's own invocation
-construction (`api/mock-data/seed-message-pairs.ts`) still forms
-its pairs independently — a different pipeline by design, with no
+`aiMemberDetailBodyOf`, `humanMemberDetailBodyOf`,
+`identityDocumentBodyOf`) feed `formDocumentPairFor`
+(`api/routes.ts`), the shared pair-FORMER the four routes above
+now call directly (Phase 9 Task 2 retired their own route-inline
+formation). The seed's own invocation construction
+(`api/mock-data/seed-message-pairs.ts`) still forms its pairs
+independently — a different pipeline by design, with no
 dispatched route to resolve a fence organization or response spec
 from.
 
-All three pairs share ONE `requestAt` yet strictly-later response
-`at` stamps, so each address's LAST-appended pair becomes its
-head: the member document is `members/:id`'s first-ever pair on a
-member's first write and its new (superseding) head on every
+Every pair in the bundle shares ONE `requestAt` yet strictly-later
+response `at` stamps, so each address's LAST-appended pair becomes
+its head: the member document is `members/:id`'s first-ever pair
+on a member's first write and its new (superseding) head on every
 later write; the detail document shares the operation pair's own
-address and becomes THAT address's new head, appended after it. A
-mid-write failure (an invalid AI model id or a malformed human
-`strengths` JSON string, caught by the pre-tx document-body check
-or by the op's own re-validating store put) leaves zero of the
-three, exactly like every other atomic write in this catalog.
+address and becomes THAT address's new head, appended after it;
+the identities document (human-only) sits at its OWN address and
+becomes THAT address's new head, appended last. A mid-write
+failure (an invalid AI model id or a malformed human `strengths`
+JSON string, caught by the pre-tx document-body check or by the
+op's own re-validating store put) leaves zero of the bundle,
+exactly like every other atomic write in this catalog.
 
 **The PII facet is NEVER synthesized.** `identity_pii` stays
 old-plane on BOTH the human create and edit — its own document
-address awaits the identity spine (a forward-pointer commented at
-both `postHumanMemberCreationOp` and `postHumanMemberEditOp`,
-`api/routes.ts`).
+address (`identities/:id/pii`, §2.2) already exists and carries
+its own message pair independently, never folded into the
+bundle above.
+
+**The PII intake decomposition (Phase 10 Task 2) — the phase's
+NAMED browser-visible change.** The three `pii{}` carriers close
+prospectively: the person branch of `POST /identities` (§3.5)
+narrows to `{id, kind}`; `POST /human-members` (§3.3) narrows to
+`{id, detail, initialState, initialStateEventId,
+initialStateAt}`; `POST /human-members/:id` (§3.4) narrows to
+`{detail}` alone. PII enters ONLY through `PUT
+identities/:id/pii` (§2.2, §5.1) — the client adapters
+(`web-app/app/adapters/identities.ts`'s `postIdentityCreation`,
+`web-app/app/adapters/members.ts`'s `postHumanMemberCreation` and
+`putHumanMember`) gain a SECOND, sequential hop after the
+create/edit succeeds and BEFORE the change notification fires:
+
+- `postIdentityCreation` (person branch): `POST /identities`
+  (bare), then `PUT identities/:id/pii`, then `notify()`.
+- `postHumanMemberCreation`: `POST /human-members` (pii-free),
+  then `PUT identities/:id/pii`, then `notify()` — this hop is
+  UNCONDITIONAL, since a freshly created member always supplies
+  its initial contact facet.
+- `putHumanMember`: `POST /human-members/:id` (detail alone),
+  then `PUT identities/:id/pii` IFF the caller supplies a `pii`
+  argument — the ONLY conditional hop of the three, decided by
+  the dirty check below.
+
+**The dirty check (`web-app/members/detail.ts`'s
+`humanMemberPiiPatchIfDirty`, a pure function).** The detail
+page's save compares the draft's four contact fields — after the
+SAME `trimStrings` normalization the save already applies —
+against the member's FETCHED `pii()` (read at page load, before
+any edit). An erased original has no stored fields to diff
+against, so it baselines against blank strings, the SAME fallback
+`humanMemberDraftFromMember` uses to seed the draft in the first
+place — an untouched erased member's save never fires a spurious
+PUT. `saveHumanMember` passes the resulting patch (or `undefined`)
+straight to `putHumanMember`'s optional `pii` argument, so a
+detail-only save stays exactly ONE hop.
+
+**THE TORN-STATE ACCEPTANCE (gate 3).** The PII facet leaves the
+creates' atomicity: a second-hop failure leaves a PII-less
+member/identity, rendered first-class rather than rolled back.
+- For a human member, this is SELF-HEALING: the next detail-page
+  save re-supplies contact fields, the dirty check finds them
+  differing from the still-erased original, and the PUT fires —
+  one hop closes the gap.
+- For a standalone identity (the Add Identity dialog's person
+  branch), the residual is PERMANENT — there is no PII-edit UI
+  for a bare identity outside the member surfaces.
+- **The mint-once discipline caps the blast radius at ONE orphan
+  per abandoned dialog.** Both Add dialogs
+  (`web-app/identities/index.ts`, `web-app/members/index.ts`)
+  used to mint a fresh entity id on every submit attempt — a
+  retry after a second-hop failure minted a SECOND identity,
+  orphaning the first forever. Both dialogs now mint the id ONCE
+  when the dialog opens (reset on the next open, so a later,
+  unrelated session never reuses a stale id) and REUSE it across
+  retries, so a retry re-targets the SAME partially created
+  entity instead of minting a new one. A second-hop failure
+  surfaces its OWN fault message (`IdentityPiiIntakeFailedError`,
+  `HumanMemberPiiIntakeFailedError`) naming the partial state,
+  never the blanket create-failure toast.
+- The seed inherits the SAME two-step dev-tier shape (§5.3):
+  `api/mock-data.ts` calls `postIdentityPiiDocumentOp` once per
+  seeded human, nested inside the SAME outer `TABLE_NAMES`
+  transaction the member-facet writes already share — ordered
+  BEFORE `seedHumanCredentials` runs (its pii-presence filter
+  reads `identityPii.getAll()` to pick login-capable persons; a
+  pii-empty read after this transaction commits would collapse
+  the credential set to the system row alone).
+
+**Wire-level accounting.** Every response stays byte-identical;
+every OTHER request stays byte-identical; only the three request
+bodies above narrow, and each of the three flows gains its own
++1 hop at its own `identities/:id/pii` address. Old-plane rows
+stay byte-identical too — the op path writes the SAME
+`identity_pii` ids/content, just through a second request instead
+of folded into the first.
 
 **The member-document fold (the E6 note, made concrete).** A
 member's `type` is a server-pinned fact that never changes across
@@ -461,35 +620,58 @@ member from its genesis onward. `appendMessagePair`'s global
 by-hash fold therefore skips the member-document pair on every
 edit following the first write to that member — a genuinely
 PERMANENT fold, not a fixture accident: the address needs no
-second write since its one field never varies. The detail
+second write since its one field never varies. The identities
+document (Phase 10 Task 5) folds the SAME way, for the SAME
+reason: a human member's identity `kind` is ALSO a server-pinned
+fact ('person', always), so `identityDocumentBodyOf('person')`'s
+body is byte-identical across create and every edit — a second,
+independent PERMANENT fold at a DIFFERENT address. The detail
 document and the operation pair carry the write's actual changes,
 so they fold only when a caller resends byte-identical field
 values (the general E6 hazard every bundle shares).
 
 `tests/api-shadow-ledger-members-identities.test.ts`'s create and
-composed-edit cases (balance re-pinned 1 → 3 per write, address
-and key-set assertions for both synthesized documents, and a
-failed-create/failed-edit-appends-nothing pair for both families)
-are the bundle's proof; `tests/mock-data-pairs.test.ts`'s
-`EXPECTED_PAIR_COUNT` (§5.3) and its member-document/
-detail-document address spot-checks extend the SAME proof to the
-seed.
+composed-edit cases (balance re-pinned 1 → 3 per write at Phase 8
+Task 4; human create re-pinned again, 3 → 4, at Phase 10 Task 5 —
+AI stays 3, finding 10; the human edit gains the identities
+document but folds it; address and key-set assertions for every
+synthesized document, including the identities document's
+`{kind}` alone; a failed-create/failed-edit-appends-nothing pair
+for both families) are the bundle's proof.
+`tests/mock-data-pairs.test.ts`'s `EXPECTED_PAIR_COUNT` (§5.3) and
+its member-document/detail-document/identities-document address
+spot-checks extend the SAME proof to the seed. §5.14 has the
+identity-create bundle's own proof (person 1 → 2, service
+1 → 3) and the bundle-or-nothing case.
 
 ### 3.5 `POST /identities` — create identity
 
+The person branch narrows to a bare `{id, kind}` (Phase 10 Task
+2's intake decomposition, prose above §3.5) — its PII enters via
+a second, separate `PUT identities/:id/pii` hop, so a bad PII
+sub-object can no longer roll a person identity back; the
+service branch is untouched (its credential facet was never
+PII, so it stays one atomic write).
+
 - tx (branches by kind):
-  - person → `[identities, identity_pii, requests, responses]`
+  - person → `[identities, requests, responses]`
   - service → `[identities, identity_credentials, requests,
     responses]`
-- actual: `identities.put(id, {kind})`; then person →
-  `identityPii.put(id, pii)`; service →
-  `identityCredentials.put(credId, fields)`; then
-  `appendMessagePair(pair)`.
-- doctrinal: `put_identity` + (`put_identity_pii` |
-  `put_identity_credential`) as `post_create_identity`.
+- actual: `identities.put(id, {kind})`; then, service only,
+  `identityCredentials.put(credId, fields)`; then the bundle
+  (Phase 10 Task 5, §5.14): `appendMessagePair(operation)`, then
+  `appendMessagePair(identityDocument)`, then — service only —
+  `appendMessagePair(credentialDocument)`.
+- doctrinal: `put_identity` (+ `put_identity_credential` for
+  service) as `post_create_identity`.
 - props: atomic; **no state event** (an identity has no creation
   lifecycle event); admin-only; secret hashed client-side (the route
-  touches no crypto); `validateIdentityCreateBody`.
+  touches no crypto); `validateIdentityCreateBody`
+  (`['id', 'kind']` for person — `pii` retired from this key set;
+  `['id', 'kind', 'credential']` for service, unchanged); the
+  bundle is pairs-or-nothing IFF the gate supplied a pair and a
+  fence organization — a below-facade caller (`api/mock-data.ts`,
+  Task 6's own scope) skips it, exactly like every prior bundle.
 
 ### 3.6 `POST /identity-tokens/:jti/rotation` — rotate refresh jti
 
@@ -746,12 +928,15 @@ every save (Decision 7): the body is the entity's own fields
 plus the lifecycle trio (`state`, `state_at`, `state_event_id`),
 the client-authored post-save `graph` (byte-identical to the GET
 wire form, no transform), and two TRANSITIONAL decomposition
-sidecars (`graphDelta`, `revivals` — consumed only by the
-old-plane relation writer below; no derivation reads either,
-and both retire at Phase Final). UNLIKE `PUT /ideas/:id` /
-`PUT /projects/:id`, this op mints NO `member_id` ternary —
-every attempt (including a client retry) mints a fresh trio, so
-nothing here ever resends a STORED trio verbatim.
+sidecars (`graphDelta`, `revivals` — consumed by the old-plane
+relation writer below AND by `deriveFlowGraphStates`
+(`api/derive-states.ts`), the sole ledger source of flow-node/
+edge deleted/restored history; retirement at Phase Final is now
+GATED on that lifecycle source being re-anchored elsewhere
+first). UNLIKE `PUT /ideas/:id` / `PUT /projects/:id`, this op
+mints NO `member_id` ternary — every attempt (including a
+client retry) mints a fresh trio, so nothing here ever resends
+a STORED trio verbatim.
 
 **flows is the FIRST locked-class route** (§5.4, Task 3): a
 save on an existing flow must carry `If-Response-ID`, echoing
@@ -1225,13 +1410,13 @@ membership write.
 and — as a `BOOTSTRAP_ROUTES` member — below the shadow ledger
 entirely: this call forms and appends no pair for ITSELF (none of
 §5.1's headers appear on its own response). What it seeds, though,
-includes 581 of its OWN pre-formed message pairs, one per pair-capable
+includes 603 of its OWN pre-formed message pairs, one per pair-capable
 seed write — see §5.3.
 
 - **Three sequential steps, not one atomic op:**
   1. `ensureTables(TABLE_NAMES)`
   2. `transaction(TABLE_NAMES, postMockDataLoadIn)` — builds the whole
-     dataset, including the 581 seed pairs, in one tx (a mid-seed
+     dataset, including the 603 seed pairs, in one tx (a mid-seed
      failure leaves no half-populated schema).
   3. `seedHumanCredentials(adapter)` — its **own** tx
      `[identity_credentials]`; the PBKDF2 hashing runs outside the tx
@@ -1540,20 +1725,36 @@ one case) never a throw:
 `POST /snapshots/mock-data` and `POST /snapshots/bootstrap` are
 `BOOTSTRAP_ROUTES` — bearer-exempt and below the ledger for their OWN
 request (§3.26–§3.28). What they seed, though, is itself the output of
-TWELVE pair-capable write families, in dependency order: `human-members`,
-`ideas`, `idea-submissions`, `projects`, `flows`, `work-orders`,
-`flow-work-orders`, `ai-members`, `records`, `objectives`, `memberships`,
-and `members` (`buildMockDataInvocations`,
-`api/mock-data/seed-message-pairs.ts`), so the seed forms each family's pair
-the SAME way a live request would, then writes it alongside the seeded row:
+FIFTEEN pair-capable write families, in dependency order:
+`human-members`, `ideas`, `idea-submissions`, `projects`, `flows`,
+`work-orders`, `flow-work-orders`, `ai-members`, `records`,
+`objectives`, `memberships`, `members`, `identities`,
+`identity-credentials`, and `role-grants` (the last three, Phase 10
+Task 6, §5.15), PLUS the historical-trace carve-out's own bare
+`states` / `state_field_values` writes (Phase 11 Task 3, §5.16 — no
+dedicated op wraps them, so they stand outside the FIFTEEN)
+(`buildMockDataInvocations`, `api/mock-data/seed-message-pairs.ts`),
+so the seed forms each family's pair the SAME way a live request
+would, then writes it alongside the seeded row:
 
-- The mock-data seed pre-forms **581** message pairs — one pair per seeded
+- The mock-data seed pre-forms **1500** message pairs — one pair per seeded
   row for most families, but each seeded human/AI member folds in an
   operation/member-document/detail-document triple (11 human-members +
   4 ai-members, each × 3 = 45 member-family pairs: 15 ops + 15 member
   documents + 15 detail documents, Phase 8 Task 4's bundle synthesis,
   the objectives-family 1+1+1 precedent generalized to the roster —
-  see §3.1–§3.4), each seeded membership row folds in its OWN document
+  see §3.1–§3.4), PLUS each seeded human ALSO folds in its OWN
+  `identities/:id/pii` document pair (11 more — Phase 10 Task 2's
+  intake decomposition, prose at §3.4: `postIdentityPiiDocumentOp`
+  nested in the SAME transaction as the member-facet writes, ordered
+  BEFORE `seedHumanCredentials` runs so its pii-presence filter still
+  finds every login-capable person), PLUS each seeded human ALSO folds
+  in its OWN `identities/:id` document pair (11 more — Phase 10 Task 5,
+  §5.14: the human-member create-time bundle widens from a triple to a
+  quadruple, human-only — an AI member forms no identities row,
+  finding 10, so its own triple is unchanged), each seeded membership
+  row folds
+  in its OWN document
   pair (16 — 11 human-member-organization rows, `current` counted
   twice for its two-organization membership, + 4 ai-member rows,
   closed through `postMembershipDocumentOp`), the system member's own
@@ -1570,25 +1771,53 @@ the SAME way a live request would, then writes it alongside the seeded row:
   operation/document/revision triple (5 creates × 3 = 15, §3.21, the
   flows'/work-orders' fixed 1+1+1 precedent verbatim), each seeded
   flow_records binding forms its own join pair (3 flow-record joins,
-  closed through `postFlowRecordDocumentOp`), and each seeded baseline/
+  closed through `postFlowRecordDocumentOp`), each seeded baseline/
   actual score row forms its own document pair (49 baseline + 92 actual
   = 141, closed through `postBaselineScoreDocumentOp` /
-  `postActualScoreDocumentOp`) — in a first pass, BEFORE the
+  `postActualScoreDocumentOp`), PLUS the 4 AI members + the system
+  member each fold in their OWN `identities/:id` document pair (5
+  more — Phase 10 Task 6, §5.15: a standalone invocation, not a
+  bundle-widening, since neither create-time bundle ever carried
+  one), PLUS every seeded human/system credential row folds in its
+  OWN `identities/:id/credentials/:cid` document pair (12 more —
+  11 human passwords + the system client secret, formed by
+  `seedHumanCredentials`' OWN local pass-1/pass-2 split since a
+  credential's hashed secret is unknown until PBKDF2 resolves),
+  PLUS every seeded role grant folds in its OWN `role-grants/:id`
+  document pair (12 more — the 2 admin grants for `current` plus
+  one member grant per non-admin human), PLUS every work-order
+  historical trace event forms its OWN `states/:id` pair (860 —
+  211 hand-authored + 649 generated, Phase 11 Task 3, §5.16: no
+  dedicated op wraps it, a bare `adapter.states.put` untouched
+  beside its own new pair), PLUS every seeded `state_field_value`
+  forms its OWN nested `states/:id/field-values/:fvid` pair (7
+  more, same §5.16), PLUS the system member's OWN genesis event
+  forms its OWN pair (1 more, same §5.16 — bootstrap's own mirror
+  event is counted in the bootstrap count below, never here) —
+  in a first pass, BEFORE the
   seed's own big transaction opens (`formWritePair`'s hashing is async
   crypto, which would auto-commit an IndexedDB transaction early if awaited
   inside one); a second pass then writes the seeded rows and appends each
   pre-formed pair in the SAME transaction the row lands in. The bootstrap
-  seed forms exactly five such pairs (the SAME member-family triple, plus
-  its OWN membership and system-member document pairs), for its lone
-  `current` human-member create.
+  seed forms exactly twelve such pairs (the SAME member-family bundle —
+  now a quadruple, Phase 10 Task 5 — its
+  OWN membership and system-member document pairs, its own
+  `identities/:id/pii` document pair, PLUS Phase 10 Task 6's OWN
+  system-identity document pair, role-grant pair, and the two
+  credential pairs — current's password + the system client
+  secret, PLUS Phase 11 Task 3's OWN system-member genesis-event
+  pair, §5.16), for its lone `current` human-member create.
 - Memberships closed the LAST whole-slice seed deferral (Phase 8 Task
   5): every seeded membership row and the system member's own
   `members/:id` document now form a message pair too, closed through
   `postMembershipDocumentOp` / `postMemberDocumentOp`. NO whole-slice
   seed deferral remains; the work-order historical traces (states
-  events + state_field_values) stay the one NAMED direct-write
+  events + state_field_values) stayed the one NAMED direct-write
   carve-out, bound to the states-consumers flip, not "the work-orders
-  phase" (§5.6).
+  phase" (§5.6) — until Phase 11 Task 3 (§5.16) closed it: every
+  trace event and field value now ALSO forms its own message pair,
+  Path A (the states / state_field_values ROWS themselves stay the
+  SAME direct writes mock-data.ts already made).
 - The scores deferral now closes WHOLE — baselines AND actuals, the
   SAME `buildSeedScoreRows` output (`api/mock-data/scores.ts`) driving
   both the pair formation above and the seeded row writes.
@@ -1602,6 +1831,10 @@ the SAME way a live request would, then writes it alongside the seeded row:
   human-members and AI members).
 - `requestAt` is minted ONCE per seed run and shared by every pair
   that run forms, so seeded pairs read as arriving together.
+- `identity_default_organizations` (both seed paths' `seed-default-
+  org-*` / `bootstrap-default-org-current` rows) STAYS RAW — a
+  later gate defers this family WHOLE; it forms no message pair,
+  unlike every write around it (Phase 10 Task 6, §5.15).
 
 ### 5.4 The two PUT classes
 
@@ -2173,3 +2406,528 @@ outcome) and the ADDITIVE `tests/api-invitations-fence.test.ts`
 KEEP-ATOMIC pin (a removed member's re-accept stays a no-op,
 proven pass-first against the PRE-task code, Author gate 6e)
 are the proof.
+
+### 5.12 The /pii hard-delete zone: single-slot erasure
+
+Phase 10 Task 3 gives `identities/:id/pii` (§2.2) the message
+plane's ONE sanctioned exception to the append-only covenant
+every other family honors. `replacePiiSlot`
+(`api/pii-hard-delete.ts`) is THE ONLY code path that deletes
+rows from `requests` or `responses` — grep-provable. Its two
+callers (`postIdentityPiiDocumentOp`'s PUT,
+the `identities/:id/pii` DELETE closure — both `api/routes.ts`)
+already ran inside `['identity_pii', 'requests', 'responses']`
+before this task; the zone rides that SAME transaction, never a
+second one (Commandment X — wrap the indivisible in the
+platform's existing primitive).
+
+**The single-slot register.** Every write at the address —
+PUT or DELETE — enumerates whatever pair(s) currently occupy it
+by ONE scan (`requests.getAllWhere('uri_prefix', ...)`), deletes
+THAT id-set from BOTH tables, then appends its own pair. A PUT
+leaves a PUT pair (the PII document); a DELETE leaves a DELETE
+pair (a bodyless erasure tombstone — evidence of erasure without
+erased content). Supersession and erasure are the SAME
+mechanism: PUT-PUT leaves exactly one (the latest) PUT pair;
+PUT-DELETE leaves exactly one tombstone; DELETE-PUT re-sets the
+slot to exactly one fresh PUT pair.
+
+**THE SINGLE-AUTHORITATIVE-ID-SET RULE.** `responses` is NEVER
+re-scanned independently and trusted to agree with `requests` —
+two independent scans could disagree (a pre-existing torn pair,
+a mid-flight anomaly), and reconciling them defensively would be
+Internal Defense over a covenant this one function alone must
+keep. Deriving both deletions from ONE id-set structurally
+preserves the orphan-pair balance (`requests.length ===
+responses.length`, asserted throughout the shadow-ledger suite)
+and guarantees the zone never MANUFACTURES a torn pair — a
+pre-existing one still surfaces on its own terms, via
+`storedResponseFor`'s `responses.getById` throwing
+`EntityNotFoundError` (message-pair.ts) rather than silently
+reading as a missing replay.
+
+**Chainless (gate 4) — sanctioned wire delta 5.**
+`identities/:id/pii` is retired from `DOCUMENT_CLASS_ROUTE_
+PATTERNS` (message-pair.ts), so the gate's pre-tx head-read
+never runs for it: every /pii pair forms with NEITHER Supersedes
+nor Follows. A stored provenance pointer at a physically removed
+pair would be a stored lie, so the absence is asserted
+EXPLICITLY (`Supersedes === null`) at both re-pinned chain
+cases, never merely the old assertion deleted. This is the ONLY
+wire delta this task ships — GET behavior is unchanged (reads
+stay old-plane until Task 8) and every PUT/DELETE status and
+body is unchanged.
+
+**The zone's confinement.** Every OTHER document-class address
+still chains exactly as before — a memberships DELETE still
+appends a tombstone that supersedes its PUT
+(`tests/api-pii-hard-delete.test.ts`'s confinement case). The
+retirement above touches ONE Set entry; it is not a blanket
+append-only exemption.
+
+**THE ERASURE-COMPLETENESS PIN (gate 5) — a theorem of gates
+1-4, scoped to the STORED SERVER PLANE.** Because gate 1 confines
+every PII byte to the /pii address alone, and gates 2-4 keep
+that ONE address chainless and single-slot, erasing it (DELETE)
+leaves zero PII bytes anywhere `requests`/`responses` or
+`identity_pii` can be scanned — proven end to end by a real
+grant → accept → human-member create → edit → erase chain
+(`tests/api-pii-hard-delete.test.ts`), scanning every stored
+message for the erased name/email/phone/bio values after the
+fact. Four residuals sit OUTSIDE this theorem, named rather than
+hidden:
+
+1. **Pre-phase historical pairs.** A database that predates this
+   task may already hold a multi-pair chain at some /pii
+   address. No scrub pass ships (gate 2's historical-residual
+   disposition, honestly stated): that chain persists until the
+   NEXT write or erase at the SAME address — `replacePiiSlot`'s
+   own next invocation is what cleans it up, lazily, as a side
+   effect of ordinary use, never a background sweep. An address
+   nobody ever revisits again keeps its full historical chain
+   forever.
+2. **Exported snapshots.** A snapshot taken before an erasure
+   carries the pre-erasure PII rows verbatim (§ Snapshots,
+   §3.26-§3.28); the theorem covers live storage, not files
+   already written to disk.
+3. **The browser's own session credential.** The `fusion.
+   session-credentials` localStorage entry carries the caller's
+   own JWT, whose `name` claim is base64-decodable client-side
+   for the token's lifetime (up to the 30-day refresh TTL). The
+   pin does not scan localStorage — an erased member's OWN prior
+   session token, if retained, still decodes to the pre-erasure
+   name until it expires or is revoked.
+4. **Replay resurrection.** A client that retained a pre-erasure
+   PUT request (the exact bytes, not merely the values) can
+   resend it: hash-keyed idempotency composed with hard-delete
+   means a byte-identical resend after the slot has moved on
+   finds no stored hash (§ The E6 branches, above) and is
+   processed as a FRESH write — which re-installs the old PII as
+   a new, live slot. The theorem proves the LEDGER holds no
+   trace between erasure and such a resend; it cannot prove no
+   such resend will ever arrive.
+
+`tests/api-pii-hard-delete.test.ts` (new) is the proof: PUT-PUT
+single slot; PUT-DELETE tombstone; DELETE-PUT re-set; the E6
+branches (a byte-identical resend against the live slot replays
+and appends nothing; the same resend after supersession finds
+no stored hash and appends fresh); the erasure-completeness
+chain; the zone's confinement; the tombstone-Supersedes absence
+asserted explicitly on both verbs. The re-pinned
+`tests/api-shadow-ledger-members-identities.test.ts` moves its
+two pii chain cases (PUT-PUT, PUT-DELETE) from asserting a
+Supersedes chain to asserting the single-slot replacement —
+the ONLY re-pins this task authorizes.
+
+### 5.13 The twelfth family: identities
+
+Phase 10 Task 4 registers `identities` as the TWELFTH
+`DocumentFamilyWiring` row (`IDENTITIES_WIRING` in
+`api/routes.ts`) and the family-registry row it consults
+(`api/family-registry.ts`): `organizationNested: false`
+("global-plane"), `concurrency: 'simple'`, `createBodyIdField:
+'id'`. It joins `MEMBERS_WIRING`'s shared-log-with-genesis
+`'stateless'` bucket as the FOURTH member (§5.10): the shared id
+(`member.id === identity.id`, always) already receives a genesis
+`states` event at create and archive/reactivate via `PUT
+states/:id`, so the identities document plane carries NO
+lifecycle of its own — a trio here would FREEZE that lifecycle
+at genesis forever. The stateless arm's ONLY tombstone signal is
+a DELETE-method head, already 404-absent via `deriveDocumentsAt`
+with no further walk needed (`document-family.ts`'s
+`derivedDocumentEntity`) — the SAME deleted-filter escape hatch
+every `'stateless'` family before it accepted.
+
+**The slot is LIVE, not inert.** Unlike the projects/members-
+family inert-`createBodyIdField` precedent, `POST /identities` IS
+a live bare collection-POST create route whose pattern is
+literally `'identities'` — the registry consult in
+`createdEntityUriId` (`message-pair.ts`) now fires for real, the
+FOURTH live-firing registered family after flows, work-orders,
+and records. `'identities'` retires from `CREATE_BODY_ID_FIELDS`
+(the same literal table) — the registered family answers ONLY
+from its own registration now. `'invitations'` is the ONE entry
+that literal table keeps PERMANENTLY: the invitations side
+channel has no organization-nesting tier, no concurrency class,
+and no document address of its own to register, so it is never a
+family-registry waypoint, only a standing exception.
+
+**The three extractions (own commit each, behavior-identical).**
+`postIdentityDocumentOp`, `postIdentityCredentialDocumentOp`,
+and `postRoleGrantDocumentOp` are lifted byte-for-byte out of
+their hand-written PUT closures (`identities/:id`,
+`identities/:id/credentials/:cid`, `role-grants/:id`), mirroring
+the `postIdentityPiiDocumentOp` precedent (§5.12). All three are
+EXPORTED — Task 6 seeds through them, and Task 7's drift-mirror
+wiring imports them to compile — alongside
+`validateIdentityDocumentBody`, also exported for the same
+reason. Only `postIdentityDocumentOp` joins a
+`DocumentFamilyWiring` row; the other two stay directly
+dispatched from their own route closures, per the non-
+registration rationale below.
+
+**Why credentials and role-grants do NOT get their own
+family-registry row.** `family-registry.ts` answers exactly
+three axes a document-class, per-id family needs: organization-
+nesting tier, PUT concurrency class, and create-address body
+field. Neither plane is such a family:
+
+- `identities/:id/credentials/:cid` is a NESTED facet of the
+  identity subtree (the identity id is param 0; the credential id
+  is param 1) — it has no address of its own independent of the
+  identity it hangs off, so it never needs an organization-
+  nesting or create-address answer separate from `identities`'
+  own.
+- `role-grants/:id` is an EVENT-APPEND ledger row
+  (`HistoryEntityStore`, latest-wins per `(organization_id,
+  identity_id, role)`) — a grant/revoke history, not a document
+  address with a genesis-then-edit lifecycle a family-registry
+  row exists to describe.
+
+Both extractions leave their own `WRITE_RESPONSE_SPECS` entries
+untouched: `'identities/:id/credentials/:cid'` still reconstructs
+the full entity (including `secret`, a deliberate zero-change
+carry-over); `'role-grants/:id'` still re-stamps
+`organization_id` from the fence — the ONE org-stamped spine
+spec, since `role_grants` rides the ORG-SCOPED store (unlike its
+global-plane siblings) and the wire body omits the field the
+scoped store auto-stamps.
+
+**PUT /identities/:id** now dispatches through
+`documentPutHandler(IDENTITIES_WIRING)`, and
+`WRITE_RESPONSE_SPECS['identities/:id']` is
+`documentWriteResponseSpec(IDENTITIES_WIRING)` — the
+registration-first consult (§5.10's blocking fix) omits the
+`organization_id` stamp for this `organizationNested:false`
+family, so the emitted bytes stay UNCHANGED from the hand-written
+`{id, kind}` body this replaces (validated: Step 0 of this task
+re-confirmed key-set/value equality before the swap landed). GET
+stays hand-written, old-plane, until Task 8 (§5.10's same
+deferral).
+
+**The verb-gap pins (finding 20), COUNT AT EXECUTION: 41
+combos across three regimes**
+(`tests/api-identity-spine-verb-gaps.test.ts`, own commit BEFORE
+the wiring landed):
+
+1. The route-table regime — 36 combos across the FIFTEEN
+   identity-spine `route()` patterns (`identities` through
+   `identity-providers/:id`): a matched pattern with no handler
+   for the request's verb 405s via `handleRequest`'s own
+   per-method branch.
+2. The `identities/:id/default-org` side channel regime — 2
+   combos: this side channel never calls `matchRoute` — a POST or
+   DELETE falls through its own if-chain to ITS OWN inline 405
+   terminal (`organization-requests.ts`).
+3. The identity-tokens authz-tier regime — 3 combos: `GET
+   /identity-tokens` is admin-only (absent from `MEMBER_VERBS`),
+   so a member-tier token 403s at the authz layer BEFORE
+   `matchRoute` runs; `POST /identity-tokens/:jti/rotation` and
+   `.../revocation`, by contrast, DO match `MEMBER_VERBS`'
+   `'/identity-tokens'` entry (POST), so a member-tier token
+   clears authz and reaches the route handler's own domain terms
+   (409 reuse; 204 idempotent no-op) instead of 403.
+
+`tests/family-registry.test.ts` gains the twelfth case
+(`identities`, global-plane like `members`) and swaps its
+unregistered-family control exemplar from `'identities'` (now
+registered) to `'organizations'` — a NAMED re-pin: organizations
+stays unregistered by design (family-registry.ts answers
+document-class per-id families, and `organizations/:id` rides its
+own hand-written PUT with no genesis-address concept the registry
+needs to describe).
+
+`tests/api-identity-document.test.ts` (new) is the wiring's
+proof, mirroring `tests/api-member-documents.test.ts` (§5.10) for
+the identities family alone: `validateIdentityDocumentBody`'s
+accept/reject bytes (the label mandate — `'IdentityEntity'`,
+matching `validateIdentityEntity` byte-for-byte); the below-gate
+op pin; the E6 byte-identical-resend pin; the PUT-chain-derives-
+the-head / DELETE-derives-absent cases against the REAL
+registered wiring row; and a direct assertion that the wire
+response carries `{id, kind}` only, no `organization_id`.
+
+### 5.14 The composed-write bundle widenings: identities
+documents + the service credential document (Phase 10 Task 5)
+
+Every widened site consumes `formDocumentPairFor` (gate 10) — NO
+new formation machinery. Message-side only: old-plane write sets
+(the actual `.put` calls) are untouched, fingerprints and the
+states-911 pin hold, and the wire is byte-unchanged — the bundles
+are storage-only.
+
+**`IdentityWritePairs`, a discriminated union on `kind` (a
+verification finding).** `POST /identities` (§3.5) forms one of
+two shapes: a person carries `{kind: 'person', operation,
+identityDocument}`; a service carries `{kind: 'service',
+operation, identityDocument, credentialDocument}` — the SAME
+`operation`/`identityDocument` pair every kind forms, plus the
+service-only `credentialDocument`. The union mirrors
+`IdentityCreatePersonBody`/
+`IdentityCreateServiceBody` one layer down (`validators.ts`)
+rather than an optional `credentialDocument` field — the
+doctrine lens: prefer the union over an optional field wherever
+the codebase's OWN body-validation axis already draws the same
+line, so a person bundle can never carry a stray credential pair
+by construction (the type system, not a runtime check, closes
+the gap).
+
+**The identity-create bundle (person 1 → 2, service 1 → 3).**
+`postIdentityCreationOp` appends the operation pair, the
+synthesized `identityDocument` pair (+ `credentialDocument` for
+service) LAST, bundle-or-nothing — forming ALL pairs pre-tx
+before the transaction opens means a mid-formation failure (an
+invalid credential `kind`, say) leaves the transaction never
+even called, so zero rows land. The `identities` route forms the
+bundle inline pre-tx:
+
+- `identityDocumentBodyOf(kind)` → `{kind}` — byte-indistinguish-
+  able from a live `PUT /identities/:id` body — at the identity's
+  own `identities/:id` address. `createBodyIdField` collapses
+  `POST /identities` and `PUT /identities/:id` onto the SAME
+  address (§5.13), so `identityDocument` shares the operation
+  pair's own address and becomes its new head, appended after it
+  — the ai-members/detail-document create-address-collapse
+  precedent (§3.1–§3.4).
+- The credential document body (service only) is the create
+  body's credential sub-object MINUS its `id` — mirroring the
+  live `PUT /identities/:id/credentials/:cid` wire body
+  (hash-bearing per the covenant: the secret arrives ALREADY
+  client-hashed, so no crypto runs here) — at the credential's
+  OWN `identities/:id/credentials/:cid` address.
+
+**`MemberWritePairs` gains `identityDocument?: MessagePair`
+(human create/edit 3 → 4; AI stays 3, finding 10).** The human
+create/edit routes (§3.3/§3.4) form + append it LAST, after
+`detailDocument`; the AI routes (§3.1/§3.2) never do —
+`postAiMemberCreationOp` writes no `identities` row (an AI member
+has no identity of its own), so `postAiMemberCreationOp`/
+`postAiMemberEditOp` always receive it `undefined`. The field
+stays on this ONE shared type rather than forking a person-only
+sibling — every consuming op already honors it uniformly via the
+SAME `!== undefined` guard `memberDocument`/`detailDocument` use,
+so the AI ops' own bundle-forming code is untouched by this task.
+
+**The fold (the E6 fold, the member-document fold's own
+precedent — §3.3/§3.4's prose).** A human member's identity
+`kind` is a server-pinned fact, always `'person'`, so
+`identityDocumentBodyOf('person')`'s body is byte-identical
+across a create and every later edit of the SAME member.
+`appendMessagePair`'s global by-hash fold therefore skips the
+identities-document pair on every edit following the member's
+first write — a genuinely PERMANENT fold, at a DIFFERENT address
+than the member-document fold, for the SAME structural reason.
+
+**The seed (`api/mock-data/seed-message-pairs.ts` +
+`api/mock-data.ts`, the SAME commit as the member-op widening —
+two callers of one covenant).** The 11 seeded human-member create
+bundles each gain their `identities/:id` document invocation
+(`seedPairKey('identities/:id', id)`, body `{kind:'person'}`);
+bootstrap's lone `current` bundle widens 3 → 4 the SAME way.
+`EXPECTED_PAIR_COUNT` (§5.3) moves 592 → 603 (+11); the bootstrap
+seed's own count moves 6 → 7. The 4 AI + 1 system identities and
+the credentials/role-grants seed slices are Task 6's — this task
+seeds NEITHER.
+
+**The re-pins.** In
+`tests/api-shadow-ledger-members-identities.test.ts`: identity
+person-create 1 → 2, service-create 1 → 3 (+ a bundle-or-nothing
+case: a service create with an invalid credential body appends
+nothing, since `postIdentityCreationOp` is never even called);
+human create 3 → 4; the human edit gains the identities document
+but it FOLDS, so its OWN balance stays the running total, not +1;
+key-set pins for the identities document (`{kind}`) and the
+credential document (the SAME five keys
+`validateIdentityCredentialEntity` admits). In
+`tests/mock-data-pairs.test.ts`: `EXPECTED_PAIR_COUNT` 592 → 603,
+the breakdown prose (§5.3), an identities-document spot-check
+(the PII spot-check's own precedent), and bootstrap 6 → 7. In
+`tests/drift-roster.test.ts`: the live-write chain re-pins its
+human-member create balance 3 → 4 alongside — the SAME fact
+named above, exercised a second time through the live route
+rather than the shadow-ledger suite.
+
+**Contract.** The synthesized identities document is
+byte-indistinguishable from a live `PUT /identities/:id` pair's
+shape at the same address; old-plane rows/states are untouched
+(fingerprints + the states-911 pin hold); the wire is unchanged
+— the bundles are storage-only.
+
+### 5.15 Gate-seeding the remaining spine slices: AI/system
+identities, credentials, role grants (Phase 10 Task 6)
+
+Path A throughout: the THREE ops §5.13 extracted and exported
+(`postIdentityDocumentOp`, `postIdentityCredentialDocumentOp`,
+`postRoleGrantDocumentOp`) + per-row invocations through the
+UNTOUCHED `formSeedPair` pipeline — no logic change to
+`formSeedPair` itself, only new callers. `formSeedPair` carries
+no `chain` argument at all, so `headPairId` is undefined for
+EVERY seed pair by construction (always-genesis); the live-path
+`chain: 'none'` vocabulary (`formDocumentPairFor`, api/routes.ts)
+does not apply here. Row ids/ats/content stay byte-identical —
+only `EXPECTED_PAIR_COUNT` (§5.3, 603 → 632) and the bootstrap
+count (7 → 11) move.
+
+**The three slices (+29).** The 4 AI + 1 system identities' raw
+`identities.put` sites re-point onto `postIdentityDocumentOp`
+(+5 — a standalone invocation each, since neither the ai-members
+nor the system-member write ever carried an `identityDocument`
+slot the way the human-member bundle does, §5.14). The 12
+credential writes in `seedHumanCredentials` re-point onto
+`postIdentityCredentialDocumentOp` (+12 — 11 human passwords +
+the system client secret). The 12 role-grant raw `roleGrants.put`
+sites re-point onto `postRoleGrantDocumentOp` (+12 — the 2 admin
+grants for `current` plus one member grant per non-admin human).
+Bootstrap mirrors its own system identity, 2 credentials, and 1
+role grant (+4, 7 → 11). `identity_default_organizations` STAYS
+RAW — see §5.3's own boundary note; a later gate defers that
+family whole.
+
+**The tx-widening trap (a verification finding).**
+`seedHumanCredentials` opened its OWN
+`adapter.transaction(['identity_credentials'], ...)` — calling
+`postIdentityCredentialDocumentOp` inside it would throw the
+nested-subset guard (`api/db-backed.ts`'s `#assertSubset`:
+`identities/:id/credentials/:cid`'s wiring transacts
+`['identity_credentials', 'requests', 'responses']`, and
+`'requests'`/`'responses'` are not in the outer declared set).
+The fix widens `seedHumanCredentials`' own transaction to that
+SAME three-table set — one fix covers both the mock-data and
+bootstrap call sites, since both share this one function. Each
+credential pair is PRE-FORMED from the post-hash secret BEFORE
+the widened transaction opens (`formSeedCredentialPairs`,
+`api/mock-data/seed-message-pairs.ts`) — a credential's body is
+unknown until PBKDF2 resolves, and crypto never runs in-tx
+(CLAUDE.md § the IndexedDB auto-commit constraint), so this
+credential batch runs its OWN local pass-1/pass-2 split rather
+than joining `formMockDataMessagePairs` / `formBootstrapMessagePair`
+(both already ran, before `seedHumanCredentials` is even called).
+`tests/credential-surfacing.test.ts` is the Task 2 ordering
+canary — it re-ran green (12 credentials still surface).
+
+**The org-stamp trap (a verification finding).**
+`role-grants/:id`'s `successBody` re-stamps `organization_id`
+from the invocation's `organization` argument (§5.3's
+`documentSeedResponse`, `api/mock-data/seed-message-pairs.ts`,
+threads `inv.organization` straight into it) — so each of the 12
+role-grant seed invocations MUST carry its OWN grant's
+`organization_id` (`STARK_ORGANIZATION`/`ORGANIZATION_TWO` per
+the write body, `assignOrganization(index)` for members), never
+undefined. A wrong/undefined value silently corrupts the STORED
+RESPONSE body with no fingerprint pin catching it —
+`requests`/`responses` are excluded tables (`tests/mock-data-
+fingerprint.test.ts`). Only the spot-check below catches it.
+
+**The re-pins (`tests/mock-data-pairs.test.ts`).**
+`EXPECTED_PAIR_COUNT` 603 → 632 + the breakdown prose; ONE
+credentials-document spot-check, KEY-SET ONLY (`{at, id,
+identity_id, kind, secret, status}`) — a credential's `secret`
+is nondeterministic per reseed, so content can never be pinned;
+ONE role-grant spot-check that reads BOTH the stored response
+body and the actually-written row for the `current`/
+`ORGANIZATION_TWO` admin grant and asserts they agree — the only
+place the org-stamp bug surfaces, not a mere key-set check; the
+bootstrap count 7 → 11. One PRE-EXISTING assertion also needed a
+disambiguating fix, not a re-pin: the ai-member create-pair
+lookup matched by `uri_id` alone, which the new identities-
+document pair (sharing that SAME `uri_id`) now makes ambiguous —
+fixed by filtering on the operation pair's OWN 204 response, the
+SAME technique the ai-member detail-document test already uses
+(the H7/arrival-order hazard class) — the assertion itself is
+unchanged.
+
+**Contract.** Every fingerprint pin holds — `identities` 16/
+`0c164977`, `identity_credentials` 12/`4990628d`, `role_grants`
+12/`4b2311dd`, the full table (`tests/mock-data-fingerprint.
+test.ts`) — because the three ops write the SAME row content the
+raw puts did; only the message plane (excluded from that
+fingerprint) grew. Reseed marginal cost measured ~2 ms for the
++29 pairs (order-of-magnitude consistent with the ~0.144 ms/pair
+baseline; within this harness's run-to-run noise floor).
+
+### 5.16 Gate-seeding the historical-trace carve-out (Phase 11
+Task 3)
+
+Path A throughout, the migration's most FINGERPRINT-CRITICAL
+task: the 860 work-order historical trace events (211 hand-
+authored + 649 generated), the 7 `state_field_values` rows, and
+the system member's OWN genesis event (2 — one per seed path)
+ALSO form their own message pair, beside rows that stay the SAME
+direct writes mock-data.ts already made. Unlike every other
+family §5.3 names, none of these three slices rides a dedicated
+op — `adapter.states.put` / `adapter.stateFieldValues.put` /
+`adapter.states.postEvent` stay bare, and the new pair is appended
+alongside via `appendMessagePair` directly, in the SAME
+transaction the row lands in. `states` 911/`679a7541`,
+`state_field_values` 7/`95d00f3a`, `work_orders` 145/`b57d1e25`,
+`members` 16/`0c164977` — every fingerprint pin the row-write
+side of this task touches — HOLD unchanged (`tests/mock-data-
+fingerprint.test.ts`, re-run, UNCHANGED file).
+
+**The three slices (+869).** Every work-order trace event
+(`buildWorkOrderStateEvents()` + `leadToCloseWorkload.stateEvents`,
+860) forms its OWN `states/:id` pair — idParams `[event.id]`,
+byte-identical to the id the row already carries, so the derived
+plane's future ids can never drift. `requesterIdentityId` is the
+EVENT'S OWN `member_id` — never `workOrderFirstEventMemberId`, the
+sibling map ~30 lines away that answers a DIFFERENT question (a
+work order DOCUMENT's own authorship, not one of its many trace
+events). Every seeded work order is Stark (§3.17's own finding),
+so every trace event nests under `STARK_ORGANIZATION`. The 7
+`state_field_values` rows (`mockStateFieldValues`) each form their
+OWN pair at `states/:id/field-values/:fvid` — idParams
+`[stateEventId, fvId]`, matching `WRITE_RESPONSE_SPECS`'s own
+`param(params, 1)` leaf-id read — authored by the PARENT event's
+OWN `member_id`, looked up off the SAME trace-event map, never a
+second, independently-picked author. The system member's OWN
+genesis event forms its OWN pair too (2 — `memberStateEvents` in
+the mock-data seed, `bootstrapSystemStateEventId` in
+`formBootstrapMessagePair`'s own SEPARATE mirror for bootstrap),
+organization `undefined` — the system member is the org-less
+global actor, the SAME choice its `members/:id` and
+`identities/:id` pairs already make.
+
+**The body shape (a sharp edge the task brief named).** Every
+trace/genesis pair's body is `{entity_id, state, at}` —
+DESTRUCTURED off the stored `StateEntity`, never spread, so a
+leaked `id`/`member_id` can never ride along (`assertOnlyKeys`
+throws on either). Every field-value pair's body is
+`{state_event_id, attribute_id, value}`, the SAME destructuring
+discipline. `stateEventSeedBody` accepts the narrower
+`Pick<StateEntity, 'entity_id' | 'state' | 'at'>`, not the full
+entity, so bootstrap's own system-event — which mints its `at`
+fresh, never from a stored row — shares this ONE construction
+without fabricating a dummy `id`/`member_id`.
+
+**The member_id content spot-check (the role-grant precedent, in
+THIS task).** Fingerprints hash row ids only and exclude
+`requests`/`responses`, so a wrong-but-real `member_id` in a
+gate-seeded pair would be fingerprint-INVISIBLE — the SAME class
+of gap §5.15's role-grant org-stamp spot-check closed. A NEW
+assertion (`tests/mock-data-pairs.test.ts`) reads BOTH a seeded
+trace pair's stored request `requester_identity_id` and the
+ACTUALLY-WRITTEN `states` row's `member_id` for the SAME event id
+and asserts they agree.
+
+**The re-pins (`tests/mock-data-pairs.test.ts`).**
+`EXPECTED_PAIR_COUNT` 632 → 1500 (+860 trace +7 field-value +1
+mock-data-seed system-genesis — NOTE: NOT +2; bootstrap's OWN
+system-genesis pair is counted in the bootstrap total below, a
+SEPARATE seed path with its OWN test) + the breakdown prose; the
+bootstrap count 11 → 12; THREE new address/body-shape spot-checks
+(a trace event, a field value, the mock-data seed's OWN
+system-genesis pair at the GLOBAL, non-org-nested `/states/`
+address) + the member_id content spot-check above.
+`tests/mock-data-fingerprint.test.ts` is UNCHANGED — re-ran green.
+
+**Contract.** `states` 911/`679a7541`, `work_orders` 145/
+`b57d1e25`, `state_field_values` 7/`95d00f3a`, `members` 16/
+`0c164977` HOLD (`tests/mock-data-fingerprint.test.ts`, file
+byte-unchanged) — Path A: `appendMessagePair` writes ONLY
+`requests`/`responses`, proven disjoint from every row-write side
+this task touches. Reseed marginal cost measured ~125 ms for the
++868 `postMockDataLoad`-side pairs (baseline ~351 ms → ~478 ms,
+5 runs each; ≈0.144 ms/pair, consistent with §5.15's own baseline)
+— the largest single-task increment of the migration, ~60× the
+prior (§5.15's +29 at ~2 ms), tracking the pair COUNT rather than
+any new per-pair cost.

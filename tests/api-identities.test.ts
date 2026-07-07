@@ -10,6 +10,7 @@ import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 
 test('validateIdentityEntity accepts person/service', () => {
     assert.deepEqual(
@@ -103,8 +104,7 @@ async function dbWithMember() {
         organization_id: '1', identity_id: 'sarah',
         at: '2026-06-08T00:00:00.000000Z',
     });
-    await db.identities.put('sarah', { kind: 'person' });
-    await db.identityPii.put('sarah', PII);
+    await seedPersonIdentity(db, 'sarah', PII);
     return db;
 }
 

@@ -1,3 +1,4 @@
+import { EntityNotFoundError } from './db.ts';
 import type {
     DbAdapter,
 } from './db.ts';
@@ -17,6 +18,7 @@ import type {
     FlowRecordEntity,
     HumanMemberEntity,
     IdentityEntity,
+    IdentityKind,
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityTokenRevocationEntity,
@@ -58,7 +60,7 @@ import {
     validateIdeaDocumentBody,
     validateIdeaSubmissionEntity,
     validateIdentityCreateBody,
-    validateIdentityEntity,
+    validateIdentityDocumentBody,
     validateIdentityPiiEntity,
     validateIdentityCredentialEntity,
     validateIdentityProviderEntity,
@@ -97,6 +99,7 @@ import {
     pairResponseBody,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
+import { replacePiiSlot } from './pii-hard-delete.ts';
 import { messageAddress } from './message-address.ts';
 import {
     generateCryptoSafeBase62,
@@ -152,6 +155,21 @@ import {
     deriveMembers,
     deriveMemberParent,
 } from './derive-members.ts';
+import {
+    deriveIdentityPiiRows,
+    deriveIdentityPii,
+    deriveCredentialsFor,
+    deriveCredential,
+    deriveRoleGrants,
+    deriveRoleGrant,
+    deriveIdentityProviders,
+    deriveIdentityProvider,
+    deriveTokenRevocation,
+} from './derive-identity-spine.ts';
+import {
+    deriveStates,
+    deriveStatesFor,
+} from './derive-states.ts';
 import {
     param,
     requireOrganization,
@@ -599,6 +617,44 @@ const HUMAN_MEMBERS_WIRING: DocumentFamilyWiring = {
     documentOp: postHumanMemberDocumentOp,
     entityOf: humanMemberDocumentEntityOf,
 };
+// The bare identities row spreads safely (no organization_id, no
+// trio — the SAME reason memberDocumentEntityOf's own comment
+// gives). `_organization` stays unused: identities is GLOBAL
+// plane too (family-registry.ts: organizationNested:false).
+function identityDocumentEntityOf(
+    document: DerivedDocument,
+    _organization: Id,
+): unknown {
+    return {
+        id: document.uriId,
+        ...document.body,
+    };
+}
+// The identities wiring row — the TWELFTH registered family, and
+// the FOURTH member of MEMBERS_WIRING's shared-log-with-genesis
+// 'stateless' bucket (see its own comment above for the full
+// rationale-contrast): the shared id (member.id === identity.id,
+// always) already receives a genesis states event at create and
+// archive/reactivate via PUT states/:id, so the identities
+// document plane carries NO lifecycle of its own — its REAL
+// states events ride the untouched states plane instead. A
+// 'stateless' family's ONLY tombstone signal is a DELETE-method
+// head, already 404-absent via deriveDocumentsAt with no further
+// walk needed (document-family.ts's derivedDocumentEntity) — the
+// SAME deleted-filter escape hatch every 'stateless' family
+// before it accepted. notFoundTable is 'identities' — its
+// storage table name matches its family name, like ideas/
+// projects/flows/records/objectives/memberships/members (work-
+// orders/record-attributes/ai-members/human-members are the
+// families whose names diverge).
+const IDENTITIES_WIRING: DocumentFamilyWiring = {
+    family: 'identities',
+    lifecycle: 'stateless',
+    notFoundTable: 'identities',
+    validateDocument: validateIdentityDocumentBody,
+    documentOp: postIdentityDocumentOp,
+    entityOf: identityDocumentEntityOf,
+};
 registerDocumentFamilyWiring(IDEAS_WIRING);
 registerDocumentFamilyWiring(PROJECTS_WIRING);
 registerDocumentFamilyWiring(FLOWS_WIRING);
@@ -610,6 +666,7 @@ registerDocumentFamilyWiring(MEMBERSHIPS_WIRING);
 registerDocumentFamilyWiring(MEMBERS_WIRING);
 registerDocumentFamilyWiring(AI_MEMBERS_WIRING);
 registerDocumentFamilyWiring(HUMAN_MEMBERS_WIRING);
+registerDocumentFamilyWiring(IDENTITIES_WIRING);
 
 // Every handler receives the verified caller's id (actor) as
 // its final argument — the one place authorship is sourced.
@@ -707,6 +764,65 @@ function withoutSecret(
 ): Omit<IdentityCredentialEntity, 'secret'> {
     const { secret: _secret, ...rest } = cred;
     return rest;
+}
+
+// GATE 15 — THE PRODUCTION MEMBERSHIP PAIR PLANE (Phase 10 Task
+// 8 Session B): identity_pii and identity_credentials carry NO
+// organization_id of their own, so their read fence (viaMembership,
+// api/store-parent-scoped.ts) derives visibility from the
+// membership ledger instead. A GET handler here receives ONLY the
+// caller's already-org-SCOPED adapter (api.ts hands it `effective`)
+// — that adapter's OWN .memberships facet is filtered to the
+// caller's org already, so it cannot see a foreign-org row and
+// would misreport it as an orphan (visible), silently WIDENING the
+// fence rather than reproducing it. The scoped adapter's
+// .requests/.responses DO pass through globally (db-organization-
+// scoped.ts: "the message plane... passes through unwrapped"), so
+// this reads the SAME membership ledger every org's derivation
+// would, via the SAME documentCollectionGetHandler(MEMBERSHIPS_
+// WIRING) reduction GET /memberships itself rides — mirroring
+// tests/drift-identities.test.ts's own gate-15 proof
+// (pairPlaneMembershipsAcrossKnownOrganizations), generalized from
+// that test's hardcoded two-org set to db.organizations.getAll()
+// (itself a global passthrough, like requests/responses above) so
+// this holds for however many organizations actually exist, not
+// only the ones a test happened to seed.
+async function membershipsAcrossAllOrganizations(
+    db: DbAdapter, actor: Id,
+): Promise<MembershipEntity[]> {
+    const organizations = await db.organizations.getAll();
+    const perOrganization = await Promise.all(
+        organizations.map((organization) =>
+            documentCollectionGetHandler(MEMBERSHIPS_WIRING)(
+                db, [], actor, organization.id,
+            ) as Promise<MembershipEntity[]>,
+        ),
+    );
+    return perOrganization.flat();
+}
+
+// viaMembership's OWN three-way algorithm (api/store-parent-
+// scoped.ts), re-derived here over the PAIR-PLANE union above
+// rather than the row-plane's identity_id index — the SAME
+// reduction tests/drift-identities.test.ts's
+// pairPlaneOwnerOrganization proves equal to the row-plane fence
+// on all three legs (co-member, FOREIGN-org, orphan): null
+// (orphan, visible), the bound org (co-member, visible), or a
+// DIFFERENT org (foreign, hidden).
+function ownerOrganizationViaMembershipPairPlane(
+    memberships: readonly MembershipEntity[],
+    identityId: Id,
+    boundOrganization: Id,
+): Id | null {
+    const mine = memberships.filter(
+        (m) => m.identity_id === identityId,
+    );
+    if (mine.length === 0) return null;
+    return mine.some(
+        (m) => m.organization_id === boundOrganization,
+    )
+        ? boundOrganization
+        : mine[0]!.organization_id;
 }
 
 // The bundle a live POST /records forms (Phase 6 Task 4, the
@@ -1620,10 +1736,27 @@ export async function postObjectiveDocumentOp(
 // the SAME (uriPrefix, uriId) as a live PUT there would) — so it
 // becomes THAT address's new head, appended after the operation
 // pair.
+//
+// identityDocument (Task 5) widens this SAME bundle for the
+// human create/edit routes alone: the synthesized identities/:id
+// document pair, byte-indistinguishable from a live PUT there
+// ({kind:'person'}), appended LAST — after detailDocument. The AI
+// routes never populate it (finding 10: postAiMemberCreationOp
+// writes no identities row — an AI member has no identity of its
+// own), so postAiMemberCreationOp/postAiMemberEditOp always
+// receive it undefined; the field stays on this ONE shared type
+// rather than forking a person-only sibling, since every
+// consuming op already honors it uniformly via the SAME
+// `!== undefined` guard the other two fields use. On a human
+// EDIT the body is byte-identical to the create's own, so it
+// FOLDS by message_hash (appendMessagePair's dedup skip) rather
+// than appending a second row — the SAME fold memberDocument's
+// own `type` field already exercises on every edit.
 export interface MemberWritePairs {
     readonly operation: MessagePair;
     readonly memberDocument: MessagePair;
     readonly detailDocument: MessagePair;
+    readonly identityDocument?: MessagePair;
 }
 
 // The shared BODY builders — the ONE-voice seam both the live
@@ -1642,6 +1775,20 @@ export function memberDocumentBodyOf(
     type: MemberKind,
 ): Record<string, unknown> {
     return { type };
+}
+
+// The wire body a live PUT identities/:id would carry for this
+// SAME write: `kind` alone — validateIdentityDocumentBody's only
+// field. Same rationale as memberDocumentBodyOf: the identity
+// kind is a server-supplied fact the caller pins, never read off
+// a request body — the ONE builder both the identity-create
+// route and the human create/edit routes share (the latter
+// always pass 'person', the sole kind a member's own identity
+// ever takes).
+export function identityDocumentBodyOf(
+    kind: IdentityKind,
+): Record<string, unknown> {
+    return { kind };
 }
 
 // The wire body a live PUT ai-members/:id would carry for this
@@ -1735,16 +1882,19 @@ export async function postAiMemberCreationOp(
 }
 
 // Human-member creation: the parent member row, the
-// identity, the PII row, the detail row, and the initial
-// state event commit as ONE transaction — a mid-write
-// failure rolls the whole thing back rather than
-// orphaning a half-built member. Each facet store
-// re-validates its own body as the composing puts land.
-// The parent member type and the identity kind are
-// server-supplied facts the handler pins; PII/identity
-// are GLOBAL passthrough stores, identity_pii is parent-
-// scoped, so the facet puts go straight to their stores.
-// The initial event is authored by the verified caller
+// identity, the detail row, and the initial state event
+// commit as ONE transaction — a mid-write failure rolls
+// the whole thing back rather than orphaning a half-built
+// member. PII no longer lands here (Phase 10 Task 2's
+// intake decomposition): it enters later via the separate
+// PUT identities/:id/pii, so a create can never roll back
+// on a bad PII sub-object — the torn-state acceptance the
+// phase names. Each facet store re-validates its own body
+// as the composing puts land. The parent member type and
+// the identity kind are server-supplied facts the handler
+// pins; members/identities are GLOBAL passthrough stores,
+// so the facet puts go straight to their stores. The
+// initial event is authored by the verified caller
 // (actor), never the body. Exported so the seed can drive
 // human-member creation through the same gate the route
 // uses (Decision 6's below-facade carve-out) — this is
@@ -1756,9 +1906,16 @@ export async function postAiMemberCreationOp(
 // Task 4: create appends THREE pairs — the operation pair
 // (the gate's own), the synthesized member document pair,
 // and the synthesized detail document pair — in that
-// order, LAST, pairs-or-nothing. The identity_pii row
-// stays old-plane: the PII facet is NEVER synthesized here
-// — its own document address awaits the identity spine.
+// order, LAST, pairs-or-nothing. The PII facet's own
+// document pair (identities/:id/pii) is formed and
+// appended by its OWN, separate write (the client's second
+// hop; the seed's own companion postIdentityPiiDocumentOp
+// call) — never synthesized here. Task 5: a FOURTH pair —
+// the synthesized identities/:id document — appends LAST,
+// after detailDocument, IFF the route supplied one (a human
+// member's own identity row, unlike an AI member — finding
+// 10 — which never carries one, so postAiMemberCreationOp's
+// OWN bundle stays exactly three).
 export async function postHumanMemberCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
@@ -1768,7 +1925,7 @@ export async function postHumanMemberCreationOp(
     const b = validateHumanMemberCreateBody(body);
     return db.transaction(
         [
-            'members', 'identities', 'identity_pii',
+            'members', 'identities',
             'human_members', 'states',
             'requests', 'responses',
         ],
@@ -1778,11 +1935,6 @@ export async function postHumanMemberCreationOp(
             );
             await view.identities.put(
                 b.id, { kind: 'person' },
-            );
-            await view.identityPii.put(
-                b.id,
-                b.pii as unknown as
-                    Omit<IdentityPiiEntity, 'id'>,
             );
             await view.humanMembers.put(
                 b.id,
@@ -1804,6 +1956,11 @@ export async function postHumanMemberCreationOp(
                 await appendMessagePair(
                     view, pairs.detailDocument,
                 );
+                if (pairs.identityDocument !== undefined) {
+                    await appendMessagePair(
+                        view, pairs.identityDocument,
+                    );
+                }
             }
         },
     );
@@ -1855,12 +2012,18 @@ export async function postAiMemberEditOp(
 
 // Human-member edit: extracted byte-for-byte from the anonymous
 // POST human-members/:id closure (Task 4) — the postAiMemberEditOp
-// precedent, for the sibling facet: the four member facets re-put
-// as ONE transaction; no states interaction (an edit does not
-// move the member's lifecycle). The identity_pii row stays
-// old-plane here too — the PII facet is NEVER synthesized, the
-// SAME forward-pointer postHumanMemberCreationOp's own comment
-// names.
+// precedent, for the sibling facet: the member facets re-put as
+// ONE transaction; no states interaction (an edit does not move
+// the member's lifecycle). PII no longer lands here (Phase 10
+// Task 2's intake decomposition): it changes ONLY via the
+// separate PUT identities/:id/pii, fired by the client IFF its
+// dirty check finds it changed — this op never sees it either
+// way, so a detail-only edit stays exactly this one write. Task
+// 5: a FOURTH pair — the synthesized identities/:id document —
+// appends LAST, IFF the route supplied one; its body
+// ({kind:'person'}) is byte-identical to the create's own, so it
+// FOLDS by message_hash (appendMessagePair's dedup skip) rather
+// than appending a second row.
 export async function postHumanMemberEditOp(
     db: DbAdapter,
     id: Id,
@@ -1870,7 +2033,7 @@ export async function postHumanMemberEditOp(
     const b = validateHumanMemberEditBody(body);
     return db.transaction(
         [
-            'members', 'identities', 'identity_pii',
+            'members', 'identities',
             'human_members',
             'requests', 'responses',
         ],
@@ -1880,11 +2043,6 @@ export async function postHumanMemberEditOp(
             );
             await view.identities.put(
                 id, { kind: 'person' },
-            );
-            await view.identityPii.put(
-                id,
-                b.pii as unknown as
-                    Omit<IdentityPiiEntity, 'id'>,
             );
             await view.humanMembers.put(
                 id,
@@ -1899,40 +2057,79 @@ export async function postHumanMemberEditOp(
                 await appendMessagePair(
                     view, pairs.detailDocument,
                 );
+                if (pairs.identityDocument !== undefined) {
+                    await appendMessagePair(
+                        view, pairs.identityDocument,
+                    );
+                }
             }
         },
     );
 }
 
-// Identity creation: the identity row and EITHER its PII
-// row (person) OR its client_secret credential row
-// (service) commit as ONE transaction — a mid-write
-// failure rolls the whole thing back rather than orphaning
-// a kindless identity. The identity kind is the server-
-// supplied fact the handler pins; identities/identity_pii/
-// identity_credentials are GLOBAL/parent-scoped stores (no
-// org stamp), so the facet puts go straight to their
-// stores, each re-validating its own body as the composing
-// put lands. The credential's secret is hashed client-side
-// — the route touches no crypto. NO state event (an
+// Identity creation: the identity row alone (person), OR the
+// identity row and its client_secret credential row (service)
+// as ONE transaction — a mid-write failure rolls the service
+// pair back rather than orphaning a kindless identity. A
+// person's PII no longer lands here (Phase 10 Task 2's intake
+// decomposition): it enters later via the separate PUT
+// identities/:id/pii, so a person create can never roll back on
+// a bad PII sub-object — the torn-state acceptance the phase
+// names. The identity kind is the server-supplied fact the
+// handler pins; identities/identity_credentials are GLOBAL/
+// parent-scoped stores (no org stamp), so the facet puts go
+// straight to their stores, each re-validating its own body as
+// the composing put lands. The credential's secret is hashed
+// client-side — the route touches no crypto. NO state event (an
 // identity carries no lifecycle event at creation), so the
-// handler needs no actor. The tx table set branches per
-// mode so each names exactly the tables it writes.
+// handler needs no actor. The tx table set branches per mode so
+// each names exactly the tables it writes.
+// The pairs a live POST /identities create forms (Task 5): the
+// gate's own operation pair (the 204 at the identities/:id
+// address — createBodyIdField collapses POST identities and PUT
+// identities/:id onto the SAME address, the ai-members/detail-
+// document create-address-collapse precedent), and the
+// synthesized identities/:id document pair — byte-
+// indistinguishable from a live PUT there ({kind} alone) —
+// sharing that SAME address, appended after the operation pair.
+// A service ALSO forms the credential-document pair
+// (identities/:id/credentials/:cid — its OWN address; the secret
+// already arrives client-hashed), appended last. The
+// discriminated union mirrors IdentityCreatePersonBody/
+// IdentityCreateServiceBody one layer down (validators.ts) rather
+// than an optional credentialDocument field, so a person bundle
+// can never carry a stray credential pair by construction.
+export type IdentityWritePairs =
+    | {
+        readonly kind: 'person';
+        readonly operation: MessagePair;
+        readonly identityDocument: MessagePair;
+    }
+    | {
+        readonly kind: 'service';
+        readonly operation: MessagePair;
+        readonly identityDocument: MessagePair;
+        readonly credentialDocument: MessagePair;
+    };
+
 // Exported so the seed can drive identity creation through
 // the same gate the route uses (Decision 6's below-facade
 // carve-out) — this is also Phase 1's dual-write insertion
-// seam. `pair` is optional so the seed's below-facade calls
-// (api/mock-data.ts, no gate, no pair) keep compiling
-// unchanged; the route always supplies one, since
-// 'identities' is pair-wired and never bearer-exempt.
+// seam. `pairs` is optional so the seed's below-facade calls
+// (api/mock-data.ts, no gate, no pairs) keep compiling
+// unchanged; the route always supplies the bundle, since
+// 'identities' is pair-wired and never bearer-exempt. Task 5:
+// create appends the operation pair, the synthesized identities
+// document pair (+ the credential document pair for service) —
+// in that order, LAST, bundle-or-nothing.
 export async function postIdentityCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
-    pair?: MessagePair,
+    pairs?: IdentityWritePairs,
 ): Promise<void> {
     const b = validateIdentityCreateBody(body);
     const tables = b.kind === 'person'
-        ? ['identities', 'identity_pii', 'requests', 'responses']
+        ? ['identities', 'requests', 'responses']
         : [
             'identities', 'identity_credentials',
             'requests', 'responses',
@@ -1943,13 +2140,7 @@ export async function postIdentityCreationOp(
             await view.identities.put(
                 b.id, { kind: b.kind },
             );
-            if (b.kind === 'person') {
-                await view.identityPii.put(
-                    b.id,
-                    b.pii as unknown as
-                        Omit<IdentityPiiEntity, 'id'>,
-                );
-            } else {
+            if (b.kind === 'service') {
                 const { id: credId, ...fields } =
                     b.credential as {
                         id: string;
@@ -1962,8 +2153,16 @@ export async function postIdentityCreationOp(
                         >,
                 );
             }
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (pairs !== undefined) {
+                await appendMessagePair(view, pairs.operation);
+                await appendMessagePair(
+                    view, pairs.identityDocument,
+                );
+                if (pairs.kind === 'service') {
+                    await appendMessagePair(
+                        view, pairs.credentialDocument,
+                    );
+                }
             }
         },
     );
@@ -2573,6 +2772,186 @@ export async function postHumanMemberDocumentOp(
     );
 }
 
+// Identity PII document write — extracted byte-for-byte from the
+// hand-written identities/:id/pii PUT closure (the
+// postMembershipDocumentOp precedent above): an identity_pii row
+// and its pair commit as ONE transaction; no states interaction
+// (a PII write does not move the identity's own lifecycle).
+// `pair` is optional so a below-facade caller with no pair keeps
+// compiling; the live route always supplies one. `_actor` is
+// unused for the same reason postMembershipDocumentOp's is:
+// there is no state event here to author. The pair rides
+// `replacePiiSlot` (Phase 10 Task 3), not the generic
+// `appendMessagePair` — /pii is the message plane's sanctioned
+// hard-delete zone (api/pii-hard-delete.ts).
+export async function postIdentityPiiDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<IdentityPiiEntity, 'id'>> {
+    return db.transaction(
+        ['identity_pii', 'requests', 'responses'],
+        async (view) => {
+            const written = await view.identityPii.put(
+                id,
+                withoutId(body) as unknown as
+                    Omit<IdentityPiiEntity, 'id'>,
+            );
+            if (pair !== undefined) {
+                await replacePiiSlot(view, pair.uriPrefix, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Identity document write — extracted byte-for-byte from the
+// hand-written identities/:id PUT closure (the
+// postIdentityPiiDocumentOp precedent above): an identities row
+// and its pair commit as ONE transaction; no states interaction
+// — an edit does not move the identity's own lifecycle, since
+// the shared id's REAL states events ride the untouched states
+// plane instead (the members-family precedent: MEMBERS_WIRING's
+// shared-log-with-genesis bucket below). `pair` is optional so
+// a below-facade caller with no pair keeps compiling; the live
+// route always supplies one. `_actor` is unused for the same
+// reason postIdentityPiiDocumentOp's is: there is no state
+// event here to author.
+export async function postIdentityDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<IdentityEntity, 'id'>> {
+    return db.transaction(
+        ['identities', 'requests', 'responses'],
+        async (view) => {
+            const written = await view.identities.put(
+                id,
+                withoutId(body) as unknown as
+                    Omit<IdentityEntity, 'id'>,
+            );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Identity credential document write — extracted byte-for-byte
+// from the hand-written identities/:id/credentials/:cid PUT
+// closure (the postIdentityDocumentOp precedent above): an
+// identity_credentials row and its pair commit as ONE
+// transaction; no states interaction (a credential write does
+// not move the identity's own lifecycle). `pair` is optional so
+// a below-facade caller with no pair keeps compiling; the live
+// route always supplies one. `_actor` is unused for the same
+// reason postIdentityDocumentOp's is: there is no state event
+// here to author.
+export async function postIdentityCredentialDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<IdentityCredentialEntity, 'id'>> {
+    return db.transaction(
+        ['identity_credentials', 'requests', 'responses'],
+        async (view) => {
+            const written = await view
+                .identityCredentials.put(
+                    id,
+                    withoutId(body) as unknown as
+                        Omit<IdentityCredentialEntity, 'id'>,
+                );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Role grant document write — extracted byte-for-byte from the
+// hand-written role-grants/:id PUT closure (the
+// postIdentityCredentialDocumentOp precedent above): a
+// role_grants row and its pair commit as ONE transaction; no
+// states interaction (a role grant is its own ledger, not a
+// states event). The written row's organization_id is stamped
+// by the ORG-SCOPED store this transaction's `view` binds to
+// (the role-grants/:id WRITE_RESPONSE_SPECS entry re-derives the
+// SAME stamp from the fence for the wire body, untouched by this
+// extraction — see its own comment in WRITE_RESPONSE_SPECS).
+// `pair` is optional so a below-facade caller with no pair keeps
+// compiling; the live route always supplies one. `_actor` is
+// unused for the same reason postIdentityCredentialDocumentOp's
+// is: there is no state event here to author.
+export async function postRoleGrantDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<RoleGrantEntity, 'id'>> {
+    return db.transaction(
+        ['role_grants', 'requests', 'responses'],
+        async (view) => {
+            const written = await view.roleGrants.put(
+                id,
+                withoutId(body) as unknown as
+                    Omit<RoleGrantEntity, 'id'>,
+            );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
+// Identity provider document write — extracted byte-for-byte
+// from the hand-written identity-providers/:id PUT closure (the
+// postRoleGrantDocumentOp precedent above): an identity_providers
+// row and its pair commit as ONE transaction; no states
+// interaction (a provider link/unlink is its own ledger, not a
+// states event). `pair` is optional so a below-facade caller
+// with no pair keeps compiling; the live route always supplies
+// one. `_actor` is unused for the same reason
+// postRoleGrantDocumentOp's is: there is no state event here to
+// author. Extracted for Phase 10 Task 8 Session B, the
+// controller-sanctioned deviation mirroring Task 4's own
+// extraction: a below-facade fixture (tests/identity-fixtures.ts)
+// needs an exported op to form a pair for a raw-put row that
+// would otherwise go derivation-invisible once GET
+// identity-providers flips.
+export async function postIdentityProviderDocumentOp(
+    db: DbAdapter,
+    id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<IdentityProviderEntity, 'id'>> {
+    return db.transaction(
+        ['identity_providers', 'requests', 'responses'],
+        async (view) => {
+            const written = await view
+                .identityProviders.put(
+                    id,
+                    withoutId(body) as unknown as
+                        Omit<IdentityProviderEntity, 'id'>,
+                );
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return written;
+        },
+    );
+}
+
 // The pre-tx response body for each pair-wired write —
 // computed through the SAME validator/stamp its own handler
 // applies, so the gate's precomputed body is byte-identical to
@@ -2792,13 +3171,19 @@ export const WRITE_RESPONSE_SPECS:
         post: { status: 204 },
     },
     'identities': { status: 204 },
-    'identities/:id': {
-        status: 200,
-        successBody: (params, body) => ({
-            id: param(params, 0),
-            ...validateIdentityEntity(withoutId(body ?? {})),
-        }),
-    },
+    // The generic document-form builder (api/document-family.ts)
+    // absorbs the hand-written successBody — see the members/:id
+    // entry above for the shared rationale. identities is ALSO
+    // organizationNested:false, so documentWriteResponseSpec's
+    // registration-first consult omits the organization_id stamp
+    // here too — the emitted bytes stay UNCHANGED from the
+    // hand-written body above ({id, kind}):
+    // validateIdentityDocumentBody's entity carries no
+    // organization_id to spread in the first place, and the
+    // consult never adds one from the fence either — key-set and
+    // value equality re-confirmed at Step 0(a) of the task that
+    // wired this row.
+    'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
     'identities/:id/pii': {
         status: 200,
         successBody: (params, body) => ({
@@ -3185,7 +3570,10 @@ export const routes: Route[] = [
         // entry, so it falls to the root admin tier in
         // ROUTE_POLICY. Task 4: forms the member-document and
         // detail-document pairs INLINE PRE-TX, the ai-members
-        // precedent above, at the human-facet addresses. See
+        // precedent above, at the human-facet addresses. Task 5:
+        // ALSO forms the identities/:id document pair — a human
+        // member's own identity row, which an AI member never has
+        // (finding 10) — appended LAST. See
         // postHumanMemberCreationOp for the transaction shape.
         post: async (
             db, _p, body, actor, pair, organization,
@@ -3219,10 +3607,21 @@ export const routes: Route[] = [
                         organization,
                     },
                 );
+                const identityDocument = await formDocumentPairFor(
+                    db, {
+                        routePattern: 'identities/:id',
+                        params: [b.id],
+                        body: identityDocumentBodyOf('person'),
+                        requesterIdentityId: actor,
+                        requestAt: pair.requestAt,
+                        organization,
+                    },
+                );
                 pairs = {
                     operation: pair,
                     memberDocument,
                     detailDocument,
+                    identityDocument,
                 };
             }
             return postHumanMemberCreationOp(
@@ -3247,9 +3646,14 @@ export const routes: Route[] = [
         // Human-member edit (Task 4, the SAME composed-EDIT
         // synthesis as ai-members/:id above): forms the member-
         // document/detail-document bundle beside the gate's own
-        // operation pair. Admin-only, exactly as create — no
-        // member-tier POST entry exists. See postHumanMemberEditOp
-        // for the transaction shape.
+        // operation pair. Task 5: ALSO forms the identities/:id
+        // document pair, the SAME {kind:'person'} body the create
+        // route forms — byte-identical, so it FOLDS by
+        // message_hash rather than appending a second row (the
+        // memberDocument fold precedent, cross-family). Admin-
+        // only, exactly as create — no member-tier POST entry
+        // exists. See postHumanMemberEditOp for the transaction
+        // shape.
         post: async (db, p, body, actor, pair, organization) => {
             const id = param(p, 0);
             let pairs: MemberWritePairs | undefined;
@@ -3287,77 +3691,131 @@ export const routes: Route[] = [
                         organization,
                     },
                 );
+                const identityDocument = await formDocumentPairFor(
+                    db, {
+                        routePattern: 'identities/:id',
+                        params: [id],
+                        body: identityDocumentBodyOf('person'),
+                        requesterIdentityId: actor,
+                        requestAt: pair.requestAt,
+                        organization,
+                    },
+                );
                 pairs = {
                     operation: pair,
                     memberDocument,
                     detailDocument,
+                    identityDocument,
                 };
             }
             return postHumanMemberEditOp(db, id, body, pairs);
         },
     }),
     route('identities', {
-        get: (db) => db.identities.getAll(),
+        // GET is FLIPPED (Phase 10 Task 8): derived via
+        // documentCollectionGetHandler — wire-identical to the
+        // hand-written db.identities.getAll() dispatch it
+        // replaces (identities is organizationNested:false, so
+        // the derivation ignores whatever organization value the
+        // caller passes, exactly as the GLOBAL-plane scoped
+        // adapter's own db.identities alias already did).
+        get: documentCollectionGetHandler(IDENTITIES_WIRING),
         // Admin-only — POST /identities has no member-tier
         // entry, so it falls to the root admin tier in
-        // ROUTE_POLICY. See postIdentityCreationOp for the
-        // transaction shape.
-        post: (db, _p, body, _actor, pair) =>
-            postIdentityCreationOp(db, body, pair),
-    }),
-    // Hand-written in place of makeIdRoute<IdentityEntity> so
-    // PUT can append its message pair in the same transaction
-    // as the write — the factory's fixed closures have no
-    // per-family pair selector (see message-pair.ts). GET
-    // reproduces the factory closure byte-equivalently; verbs
-    // stay {get, put}.
-    route('identities/:id', {
-        get: (db, p) => db.identities.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['identities', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.identities.put(
-                        id,
-                        withoutId(body) as unknown as
-                            Omit<IdentityEntity, 'id'>,
-                    );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
+        // ROUTE_POLICY. Task 5: forms the identities/:id
+        // document pair (+ the credential-document pair for a
+        // service) INLINE PRE-TX, beside the gate's own operation
+        // pair — the human-members precedent above. See
+        // postIdentityCreationOp for the transaction shape.
+        post: async (
+            db, _p, body, actor, pair, organization,
+        ) => {
+            let pairs: IdentityWritePairs | undefined;
+            if (
+                pair !== undefined && organization !== undefined
+            ) {
+                const b = validateIdentityCreateBody(body);
+                const identityDocument = await formDocumentPairFor(
+                    db, {
+                        routePattern: 'identities/:id',
+                        params: [b.id],
+                        body: identityDocumentBodyOf(b.kind),
+                        requesterIdentityId: actor,
+                        requestAt: pair.requestAt,
+                        organization,
+                    },
+                );
+                if (b.kind === 'service') {
+                    const { id: credId, ...fields } =
+                        b.credential as {
+                            id: string;
+                        } & Record<string, unknown>;
+                    const credentialDocument =
+                        await formDocumentPairFor(db, {
+                            routePattern:
+                                'identities/:id/credentials/:cid',
+                            params: [b.id, credId],
+                            body: fields,
+                            requesterIdentityId: actor,
+                            requestAt: pair.requestAt,
+                            organization,
+                        });
+                    pairs = {
+                        kind: 'service',
+                        operation: pair,
+                        identityDocument,
+                        credentialDocument,
+                    };
+                } else {
+                    pairs = {
+                        kind: 'person',
+                        operation: pair,
+                        identityDocument,
+                    };
+                }
+            }
+            return postIdentityCreationOp(db, body, pairs);
         },
+    }),
+    // GET is FLIPPED (Phase 10 Task 8): absorbed into the generic
+    // documentGetHandler(IDENTITIES_WIRING) — the SAME wiring row
+    // PUT already rides — wire-identical to the hand-written
+    // db.identities.getById dispatch it replaces. PUT rides the
+    // generic documentPutHandler(IDENTITIES_WIRING) — wire-
+    // identical to postIdentityDocumentOp's own direct dispatch
+    // it replaces. Verbs stay {get, put}.
+    route('identities/:id', {
+        get: documentGetHandler(IDENTITIES_WIRING),
+        put: documentPutHandler(IDENTITIES_WIRING),
     }),
     // PII is a facet of the identity's own subtree: GET is
     // self-only, PUT/DELETE self-or-admin (enforced in the
     // request gate, mirroring /identities/:id/default-org). The
     // identity-pii COLLECTION below (admin roster) is separate.
-    // PUT/DELETE each append their message pair in the same
-    // transaction as the write — the pattern's last segment
-    // ('pii') is not a :param, so messageAddress yields uriId
-    // '' (a singleton document at a collection-style address).
+    // PUT/DELETE each REPLACE the slot's message pair
+    // (replacePiiSlot, api/pii-hard-delete.ts) in the same
+    // transaction as the write — the message plane's sanctioned
+    // hard-delete zone: CHAINLESS (retired from DOCUMENT_CLASS_
+    // ROUTE_PATTERNS, message-pair.ts — no Supersedes, no
+    // Follows) and the ONLY address whose prior pair is
+    // physically deleted rather than superseded. The pattern's
+    // last segment ('pii') is not a :param, so messageAddress
+    // yields uriId '' (a singleton document at a collection-
+    // style address). GET is FLIPPED (Phase 10 Task 8): derived
+    // via deriveIdentityPii — wire-identical to the hand-written
+    // db.identityPii.getById dispatch it replaces. No fence is
+    // reproduced HERE: authorizeIdentityPii (the gate dispatch,
+    // api.ts/request-auth.ts, UNTOUCHED by this task) already
+    // restricts a GET to the caller reading its OWN pii, and a
+    // fenced request's own membership always includes its active
+    // org, so the row is always visible to itself regardless of
+    // any org fence.
     route('identities/:id/pii', {
-        get: (db, p) => db.identityPii.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['identity_pii', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.identityPii.put(
-                        id,
-                        withoutId(body) as unknown as
-                            Omit<IdentityPiiEntity, 'id'>,
-                    );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
-        },
+        get: (db, p) => deriveIdentityPii(db, param(p, 0)),
+        put: (db, p, body, actor, pair) =>
+            postIdentityPiiDocumentOp(
+                db, param(p, 0), body, actor, pair,
+            ),
         delete: (db, p, _actor, pair) => {
             const id = param(p, 0);
             return db.transaction(
@@ -3365,14 +3823,37 @@ export const routes: Route[] = [
                 async (view) => {
                     await view.identityPii.delete(id);
                     if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                        await replacePiiSlot(
+                            view, pair.uriPrefix, pair,
+                        );
                     }
                 },
             );
         },
     }),
+    // GET is FLIPPED (Phase 10 Task 8): derived via
+    // deriveIdentityPiiRows, THEN fenced by gate 15's production
+    // membership pair plane (above) — reproducing, byte-
+    // identically, the SAME three-way viaMembership decision the
+    // hand-written db.identityPii.getAll() dispatch (the org-
+    // scoped adapter's own parentScope+viaMembership) made.
     route('identity-pii', {
-        get: (db) => db.identityPii.getAll(),
+        get: async (db, _p, actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const rows = await deriveIdentityPiiRows(db);
+            const memberships =
+                await membershipsAcrossAllOrganizations(
+                    db, actor,
+                );
+            return rows.filter((row) => {
+                const owner = ownerOrganizationViaMembershipPairPlane(
+                    memberships, row.id, organizationId,
+                );
+                return owner === null || owner === organizationId;
+            });
+        },
     }),
     // Credentials nest under their parent identity: the identity
     // id is param 0, so the SERVER filters the collection to that
@@ -3388,57 +3869,118 @@ export const routes: Route[] = [
     // change carry-over from the un-wired behavior (see
     // WRITE_RESPONSE_SPECS's 'identities/:id/credentials/:cid'
     // entry, which reconstructs the FULL entity, unlike the GETs'
-    // withoutSecret projection).
+    // withoutSecret projection). GET is FLIPPED (Phase 10 Task 8):
+    // derived via deriveCredentialsFor, fenced the SAME way
+    // identity-pii's collection above is (gate 15, keyed on the
+    // PARENT identity id rather than each row's own id) — a
+    // hidden identity's credentials read as an EMPTY array, byte-
+    // identical to parentScope.getAllWhere silently dropping every
+    // matched-but-invisible row (never a 404 — getAllWhere never
+    // throws).
+    // FENCE-INPUT FIX (post-session review): the path :id only
+    // ADDRESSES the ledger scan (deriveCredentialsFor reads the
+    // /identities/{path id}/credentials/ prefix — that is where
+    // the pairs live); the pre-flip fence read each ROW's OWN
+    // identity_id field (parentScope's getAllWhere('identity_id',
+    // path id) filters the OLD-plane store by that field BEFORE
+    // fencing, then viaMembership fences on that SAME field). A
+    // below-facade write whose body.identity_id disagrees with
+    // its own address (producible below-facade, or via a hand-
+    // crafted admin PUT — no validator ties body.identity_id to
+    // the path :id, so an admin-crafted request CAN produce it;
+    // only a web-app-generated request cannot) would otherwise
+    // fence on the wrong identity. Reproduced here by filtering the
+    // derived rows to identity_id === the path id FIRST — exactly
+    // the OLD plane's WHERE — so a mismatched row never survives
+    // to the fence step, on either plane.
     route('identities/:id/credentials', {
-        get: async (db, p) =>
-            (await db.identityCredentials.getAllWhere(
-                'identity_id', param(p, 0),
-            )).map(withoutSecret),
-    }),
-    route('identities/:id/credentials/:cid', {
-        get: async (db, p) =>
-            withoutSecret(
-                await db.identityCredentials.getById(
-                    param(p, 1),
-                ),
-            ),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 1);
-            return db.transaction(
-                [
-                    'identity_credentials',
-                    'requests', 'responses',
-                ],
-                async (view) => {
-                    const written = await view
-                        .identityCredentials.put(
-                            id,
-                            withoutId(body) as unknown as
-                                Omit<
-                                    IdentityCredentialEntity, 'id'
-                                >,
-                        );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
+        get: async (db, p, actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
             );
+            const identityId = param(p, 0);
+            const rows = (
+                await deriveCredentialsFor(db, identityId)
+            ).filter(
+                (credential) => credential.identity_id === identityId,
+            );
+            if (rows.length === 0) return [];
+            const memberships =
+                await membershipsAcrossAllOrganizations(
+                    db, actor,
+                );
+            const owner = ownerOrganizationViaMembershipPairPlane(
+                memberships, identityId, organizationId,
+            );
+            if (owner !== null && owner !== organizationId) {
+                return [];
+            }
+            return rows.map(withoutSecret);
         },
+    }),
+    // GET is FLIPPED (Phase 10 Task 8): derived via
+    // deriveCredential, fenced the SAME way (gate 15) — a hidden
+    // identity's credential 404s BYTE-IDENTICALLY to a genuinely
+    // absent one (EntityNotFoundError('identity_credentials', cid),
+    // the SAME table/id parentScope.getById throws — no existence
+    // is confirmed either way). FENCE-INPUT FIX (post-session
+    // review): the path :id only ADDRESSES the scan
+    // (deriveCredential reads the row at /identities/{path id}/
+    // credentials/{cid} — that is where the pair lives); the
+    // pre-flip fence read the ROW's OWN identity_id field — the
+    // hand-written route this flip replaced ignored the path
+    // entirely, fetching by cid alone via parentScope.getById,
+    // which then fenced via viaMembership on the ROW's stored
+    // identity_id. So the fence input below is
+    // `credential.identity_id`, never the path — a below-facade
+    // write whose body.identity_id disagrees with its own address
+    // now fences EXACTLY as the row plane did.
+    route('identities/:id/credentials/:cid', {
+        get: async (db, p, actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const identityId = param(p, 0);
+            const cid = param(p, 1);
+            const credential = await deriveCredential(
+                db, identityId, cid,
+            );
+            const memberships =
+                await membershipsAcrossAllOrganizations(
+                    db, actor,
+                );
+            const owner = ownerOrganizationViaMembershipPairPlane(
+                memberships, credential.identity_id, organizationId,
+            );
+            if (owner !== null && owner !== organizationId) {
+                throw new EntityNotFoundError(
+                    'identity_credentials', cid,
+                );
+            }
+            return withoutSecret(credential);
+        },
+        put: (db, p, body, actor, pair) =>
+            postIdentityCredentialDocumentOp(
+                db, param(p, 1), body, actor, pair,
+            ),
     }),
     // Hand-written in place of makeIdRoute<
     // IdentityTokenRevocationEntity> so PUT can append its
     // message pair in the same transaction as the write — the
     // factory's fixed closures have no per-family pair
-    // selector (see message-pair.ts). GET reproduces the
-    // factory closure byte-equivalently; verbs stay {get,
-    // put}. identity_token_revocations is a HistoryEntityStore
-    // ledger row, so this is EVENT-APPEND: no head-read, no
-    // Supersedes (message-pair.ts DOCUMENT_CLASS_ROUTE_
-    // PATTERNS omits it on purpose).
+    // selector (see message-pair.ts). identity_token_revocations
+    // is a HistoryEntityStore ledger row, so this is
+    // EVENT-APPEND: no head-read, no Supersedes (message-pair.ts
+    // DOCUMENT_CLASS_ROUTE_PATTERNS omits it on purpose). Verbs
+    // stay {get, put}. GET is FLIPPED (Phase 10 Task 8): derived
+    // via deriveTokenRevocation — wire-identical to the
+    // hand-written db.identityTokenRevocations.getById dispatch
+    // it replaces. No fence: identity_token_revocations is
+    // GLOBAL-plane (no organization_id field at all), matching
+    // its sibling identity-providers below.
     route('identity-token-revocations/:id', {
         get: (db, p) =>
-            db.identityTokenRevocations.getById(param(p, 0)),
+            deriveTokenRevocation(db, param(p, 0)),
         put: (db, p, body, _actor, pair) => {
             const id = param(p, 0);
             return db.transaction(
@@ -3464,38 +4006,62 @@ export const routes: Route[] = [
             );
         },
     }),
+    // GET is FLIPPED (Phase 10 Task 8): derived via
+    // deriveRoleGrants, THEN fenced to the caller's org by
+    // organization_id — SIMPLER than identity-pii/credentials'
+    // gate 15 membership-pair-plane fence above, because
+    // role_grants carries its OWN organization_id (gate 16:
+    // deriveRoleGrants reads it off the stored RESPONSE, the
+    // fence-stamped value), matching the row plane's
+    // OrganizationScopedEntityStore#getAll (filter ==
+    // organization_id).
     route('role-grants', {
-        get: (db) => db.roleGrants.getAll(),
+        get: async (db, _p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            return (await deriveRoleGrants(db)).filter(
+                (grant) => grant.organization_id === organizationId,
+            );
+        },
     }),
     // Hand-written in place of makeIdRoute<RoleGrantEntity> so
     // PUT can append its message pair in the same transaction
     // as the write — the factory's fixed closures have no
-    // per-family pair selector (see message-pair.ts). GET
-    // reproduces the factory closure byte-equivalently; verbs
-    // stay {get, put}. role_grants is a HistoryEntityStore
-    // ledger row (latest-wins per (organization_id,
-    // identity_id, role)), so this is EVENT-APPEND: no
-    // head-read, no Supersedes.
+    // per-family pair selector (see message-pair.ts). role_grants
+    // is a HistoryEntityStore ledger row (latest-wins per
+    // (organization_id, identity_id, role)), so this is
+    // EVENT-APPEND: no head-read, no Supersedes. Verbs stay
+    // {get, put}. GET is FLIPPED (Phase 10 Task 8): derived via
+    // deriveRoleGrant, then fenced the SAME way the collection
+    // above is — a foreign-org grant 404s BYTE-IDENTICALLY to a
+    // genuinely absent one (EntityNotFoundError('role_grants',
+    // id), the SAME table/id OrganizationScopedEntityStore#getById
+    // throws — Step 0 confirmed this exact byte shape before the
+    // flip).
     route('role-grants/:id', {
-        get: (db, p) => db.roleGrants.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['role_grants', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view.roleGrants.put(
-                        id,
-                        withoutId(body) as unknown as
-                            Omit<RoleGrantEntity, 'id'>,
-                    );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
+        get: async (db, p, _actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
             );
+            const id = param(p, 0);
+            const grant = await deriveRoleGrant(db, id);
+            if (grant.organization_id !== organizationId) {
+                throw new EntityNotFoundError('role_grants', id);
+            }
+            return grant;
         },
+        put: (db, p, body, actor, pair) =>
+            postRoleGrantDocumentOp(
+                db, param(p, 0), body, actor, pair,
+            ),
     }),
+    // NOT FLIPPED (gate 7): identity_tokens carries THREE
+    // pair-less writers (grant/refresh/exchange mint tokens
+    // directly, below any wired PUT route this migration's pair
+    // plane covers) — flipping this read to message-derivation
+    // would render the Tokens page empty for every token minted
+    // that way. Stays a hand-written old-plane read.
     route('identity-tokens', {
         get: (db) => db.identityTokens.getAll(),
     }),
@@ -3503,7 +4069,9 @@ export const routes: Route[] = [
     // so PUT can append its message pair in the same
     // transaction as the write. identity_tokens is a
     // HistoryEntityStore ledger row, so this is EVENT-APPEND:
-    // no head-read, no Supersedes.
+    // no head-read, no Supersedes. NOT FLIPPED (gate 7 — see
+    // GET /identity-tokens above): stays a hand-written
+    // old-plane read.
     route('identity-tokens/:id', {
         get: (db, p) => db.identityTokens.getById(param(p, 0)),
         put: (db, p, body, _actor, pair) => {
@@ -3577,39 +4145,34 @@ export const routes: Route[] = [
             await revokeTokenChain(db, param(p, 0), pair);
         },
     }),
+    // GET is FLIPPED (Phase 10 Task 8): derived via
+    // deriveIdentityProviders — wire-identical to the
+    // hand-written db.identityProviders.getAll() dispatch it
+    // replaces. No fence: GLOBAL-plane (no organization_id field
+    // at all), matching identities' own global-plane collection
+    // above.
     route('identity-providers', {
-        get: (db) => db.identityProviders.getAll(),
+        get: (db) => deriveIdentityProviders(db),
     }),
     // Hand-written in place of makeIdRoute<
     // IdentityProviderEntity> so PUT can append its message
     // pair in the same transaction as the write — the
     // factory's fixed closures have no per-family pair
-    // selector (see message-pair.ts). GET reproduces the
-    // factory closure byte-equivalently; verbs stay {get,
-    // put}. identity_providers is a HistoryEntityStore ledger
-    // row (linked/unlinked events) and a GLOBAL-plane store (no
-    // organization_id field at all), so this is EVENT-APPEND:
-    // no head-read, no Supersedes.
+    // selector (see message-pair.ts). identity_providers is a
+    // HistoryEntityStore ledger row (linked/unlinked events) and
+    // a GLOBAL-plane store (no organization_id field at all), so
+    // this is EVENT-APPEND: no head-read, no Supersedes. Verbs
+    // stay {get, put}. GET is FLIPPED (Phase 10 Task 8): derived
+    // via deriveIdentityProvider — wire-identical to the
+    // hand-written db.identityProviders.getById dispatch it
+    // replaces. PUT rides postIdentityProviderDocumentOp (the
+    // controller-sanctioned extraction, prior commit).
     route('identity-providers/:id', {
-        get: (db, p) => db.identityProviders.getById(param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['identity_providers', 'requests', 'responses'],
-                async (view) => {
-                    const written = await view
-                        .identityProviders.put(
-                            id,
-                            withoutId(body) as unknown as
-                                Omit<IdentityProviderEntity, 'id'>,
-                        );
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return written;
-                },
-            );
-        },
+        get: (db, p) => deriveIdentityProvider(db, param(p, 0)),
+        put: (db, p, body, actor, pair) =>
+            postIdentityProviderDocumentOp(
+                db, param(p, 0), body, actor, pair,
+            ),
     }),
     // The grant closures retire into api.ts's dedicated
     // authentication POST arm (Task 3, C1 discharge): both
@@ -4630,6 +5193,11 @@ export const routes: Route[] = [
         },
     }),
 
+    // NOT FLIPPED (gate 9): organizations stays an UNREGISTERED
+    // family (family-registry.ts, tests/family-registry.test.ts's
+    // own unregistered-family control) — a named spec gap
+    // assigned by spec amendment, out of this migration's scope.
+    // Stays a hand-written old-plane read.
     route('organizations', {
         get: (db) => db.organizations.getAll(),
     }),
@@ -4642,6 +5210,8 @@ export const routes: Route[] = [
     // EntityStore (mutable), so this is DOCUMENT-class: a
     // repeat PUT records Supersedes. GLOBAL plane — no
     // organization_id stamp (this table IS the tenant root).
+    // NOT FLIPPED (gate 9 — see GET /organizations above): stays
+    // a hand-written old-plane read.
     route('organizations/:id', {
         get: (db, p) => db.organizations.getById(param(p, 0)),
         put: (db, p, body, _actor, pair) => {
@@ -4890,9 +5460,18 @@ export const routes: Route[] = [
                 db, param(p, 1), body, actor, pair,
             ),
     }),
+    // GET is FLIPPED (Task 7): the collection derives from the
+    // message ledger via deriveStates (api/derive-states.ts's
+    // six-source union), not the raw states table — the
+    // client's own GET consumer (deriveOrganizationFacts and
+    // every get*States/get*StateDetails reader in
+    // state-events.ts) rides transitively, no web-app change.
     route('states', {
-        get: (db) => db.states.getAll(),
+        get: (db, _p, _actor, organization) =>
+            deriveStates(db, requireOrganization(organization)),
     }),
+    // GET is NOT flipped: a single event by its OWN event id has
+    // zero product callers (deferred to Phase Final).
     route('states/:id', {
         get: (db, p) =>
             db.states.getById(param(p, 0)),
@@ -4921,13 +5500,27 @@ export const routes: Route[] = [
             );
         },
     }),
+    // GET is NOT flipped: an entity's bare CURRENT state has
+    // zero product callers (deferred to Phase Final).
     route('entity-states/:id', {
         get: (db, p) =>
             db.states.getCurrentFor(param(p, 0)),
     }),
+    // GET is FLIPPED (Task 7): derives via deriveStatesFor —
+    // the gate ALREADY fences this route (api/api.ts's
+    // entity-states/:id[/history] guard resolves the entity's
+    // owner via the RAW probes before dispatch), so the handler
+    // does not re-fence; deriveStatesFor's own header documents
+    // that precondition. Every client reader that names this
+    // address (getWorkOrderCurrentNodeId, getWorkOrderActive
+    // Claim, getProjectState/getRecordStateDetail/etc.) rides
+    // transitively, no web-app change.
     route('entity-states/:id/history', {
-        get: (db, p) =>
-            db.states.getAllFor(param(p, 0)),
+        get: (db, p, _actor, organization) =>
+            deriveStatesFor(
+                db, requireOrganization(organization),
+                param(p, 0),
+            ),
     }),
 
     route('snapshots/schema', {

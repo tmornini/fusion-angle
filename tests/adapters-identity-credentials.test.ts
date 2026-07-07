@@ -6,6 +6,7 @@ import {
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { seedIdentityCredential } from './identity-fixtures.ts';
 import {
     postIdentityCredentialRevocation,
     getIdentityCredentialState,
@@ -21,14 +22,14 @@ async function setup() {
 test('ledger retains set, rotate, revoke; latest wins',
 async () => {
     const { db, ctx } = await setup();
-    await db.identityCredentials.put('c1', {
+    await seedIdentityCredential(db, 'p1', 'c1', {
         identity_id: 'p1',
         kind: 'password',
         status: 'set',
         secret: 'phc-v1',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    await db.identityCredentials.put('c2', {
+    await seedIdentityCredential(db, 'p1', 'c2', {
         identity_id: 'p1',
         kind: 'password',
         status: 'rotated',
@@ -49,7 +50,7 @@ async () => {
 test('the secret never leaves the state adapter',
 async () => {
     const { db, ctx } = await setup();
-    await db.identityCredentials.put('c1', {
+    await seedIdentityCredential(db, 'p1', 'c1', {
         identity_id: 'p1',
         kind: 'password',
         status: 'set',
@@ -72,14 +73,14 @@ async () => {
     // Appended in REVERSE chronological order: the later
     // 'set' precedes the earlier 'revoked' in the array,
     // so array-order "last wins" would wrongly revoke.
-    await db.identityCredentials.put('c1', {
+    await seedIdentityCredential(db, 'p1', 'c1', {
         identity_id: 'p1',
         kind: 'password',
         status: 'set',
         secret: '',
         at: '2026-02-01T00:00:00.000000Z',
     });
-    await db.identityCredentials.put('c2', {
+    await seedIdentityCredential(db, 'p1', 'c2', {
         identity_id: 'p1',
         kind: 'password',
         status: 'revoked',

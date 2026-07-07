@@ -4,6 +4,7 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { organizationRow } from './test-fixtures.ts';
+import { seedIdentityPii } from './identity-fixtures.ts';
 import {
     postMemberDocumentOp,
     memberDocumentBodyOf,
@@ -64,9 +65,14 @@ async function seed(): Promise<MemoryDbAdapter> {
 // budget): rosterIds below reads GET /members, which is now
 // ledger-derived, so an identity absent from the message plane
 // would never surface as a member-parent regardless of its
-// membership. identities/identityPii stay raw — they feed only
-// old-plane reads (identity-pii, and Step 3's invitation
-// enrichment joins), neither of which is ledger-derived here.
+// membership. identities stays raw — no GET /identities (or
+// /identities/:id) reads it anywhere in this file. identityPii's
+// OWN stays-raw acceptance EXPIRES here: GET /invitations
+// (exercised below) enriches invited_by_name by reading the
+// identity_pii plane (api/invitations-domain.ts), which Task 8
+// Step 3 re-points onto deriveIdentityPiiRows — so PII forms
+// its pair below-facade via the SAME exported op the live PUT
+// identities/:id/pii route uses.
 async function person(
     db: MemoryDbAdapter,
     id: string,
@@ -101,7 +107,7 @@ async function person(
         db, id, body, SYSTEM_MEMBER_ID, pair,
     );
     await db.identities.put(id, { kind: 'person' });
-    await db.identityPii.put(id, {
+    await seedIdentityPii(db, id, {
         name, email, phone: '', bio: '',
     });
 }

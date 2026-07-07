@@ -46,18 +46,40 @@ function getMembers(token: string) {
     });
 }
 
+// Task 8 (Phase 11): the flat-token fence fallback
+// (identityDefaultOrganization) now derives from the
+// /identities/:id/default-org/ message-pair ledger, never the
+// identity_default_organizations table directly — so seeding a
+// SET default here must ride the real PUT route (the same
+// production write path), not a raw table put.
+function putDefaultOrganization(
+    token: string, identityId: string, organization: string,
+) {
+    return new Request(
+        `${BASE}/identities/${identityId}/default-org`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({
+                organization_id: organization,
+                eventId: 'ev-flat-default-1',
+                at: AT,
+            }),
+        });
+}
+
 test('a flat token resolves its org from the set default',
 async () => {
     const db = await freshDb();
     await join(db, 'current', '2');
     await grantAdmin(db, 'current', '2');
-    await db.identityDefaultOrganizations.put('d1', {
-        identity_id: 'current',
-        organization_id: '2',
-        at: AT,
-    });
-    const res = await handleRequest(
-        db, getMembers(await devToken()));
+    const token = await devToken();
+    const put = await handleRequest(
+        db, putDefaultOrganization(token, 'current', '2'));
+    assert.equal(put.status, 204);
+    const res = await handleRequest(db, getMembers(token));
     assert.equal(res.status, 200);
 });
 

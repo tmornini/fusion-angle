@@ -13,6 +13,29 @@ function req(path: string, token: string): Request {
     });
 }
 
+// Task 8 (Phase 11): identityDefaultOrganization now derives from
+// the /identities/:id/default-org/ message-pair ledger, never the
+// identity_default_organizations table directly — so pinning a
+// SET default here must ride the real PUT route (the same
+// production write path), not a raw table put.
+function putDefaultOrganization(
+    token: string, identityId: string, organization: string, at: string,
+): Request {
+    return new Request(
+        `${BASE}/identities/${identityId}/default-org`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+            },
+            body: JSON.stringify({
+                organization_id: organization,
+                eventId: 'ev-liveness-pin-1',
+                at,
+            }),
+        });
+}
+
 async function adminDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
@@ -51,12 +74,14 @@ async () => {
     const db = await adminDb();
     // Pin the default org in the ledger, then revoke the
     // membership: the SET default now dangles, and the
-    // fence — not the default-org resolution — must deny.
-    await db.identityDefaultOrganizations.put('do-current', {
-        identity_id: 'current',
-        organization_id: '1',
-        at: '2020-01-02T00:00:00.000000Z',
-    });
+    // fence — not the default-org resolution — must deny. The
+    // route requires live membership at write time, so the pin
+    // must run BEFORE the membership is revoked below.
+    const pin = await handleRequest(db, putDefaultOrganization(
+        await devToken(), 'current', '1',
+        '2020-01-02T00:00:00.000000Z',
+    ));
+    assert.equal(pin.status, 204);
     await db.memberships.delete('test-membership-current');
     const res = await handleRequest(
         db, req('/members', await devToken()));
