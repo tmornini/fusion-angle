@@ -171,6 +171,10 @@ import {
     deriveStatesFor,
 } from './derive-states.ts';
 import {
+    deriveOrganization,
+    deriveOrganizations,
+} from './derive-organizations.ts';
+import {
     param,
     requireOrganization,
     withoutId,
@@ -783,14 +787,16 @@ function withoutSecret(
 // WIRING) reduction GET /memberships itself rides — mirroring
 // tests/drift-identities.test.ts's own gate-15 proof
 // (pairPlaneMembershipsAcrossKnownOrganizations), generalized from
-// that test's hardcoded two-org set to db.organizations.getAll()
-// (itself a global passthrough, like requests/responses above) so
-// this holds for however many organizations actually exist, not
-// only the ones a test happened to seed.
+// that test's hardcoded two-org set to deriveOrganizations(db)
+// (Phase 12 Task 5: the pair-plane derivation, api/derive-
+// organizations.ts — itself reading only requests/responses, the
+// SAME global passthrough the prior db.organizations.getAll()
+// read rode) so this holds for however many organizations
+// actually exist, not only the ones a test happened to seed.
 async function membershipsAcrossAllOrganizations(
     db: DbAdapter, actor: Id,
 ): Promise<MembershipEntity[]> {
-    const organizations = await db.organizations.getAll();
+    const organizations = await deriveOrganizations(db);
     const perOrganization = await Promise.all(
         organizations.map((organization) =>
             documentCollectionGetHandler(MEMBERSHIPS_WIRING)(
@@ -5193,14 +5199,6 @@ export const routes: Route[] = [
         },
     }),
 
-    // NOT FLIPPED (gate 9): organizations stays an UNREGISTERED
-    // family (family-registry.ts, tests/family-registry.test.ts's
-    // own unregistered-family control) — a named spec gap
-    // assigned by spec amendment, out of this migration's scope.
-    // Stays a hand-written old-plane read.
-    route('organizations', {
-        get: (db) => db.organizations.getAll(),
-    }),
     // Hand-written in place of makeIdRoute<OrganizationEntity>
     // so PUT can append its message pair in the same
     // transaction as the write — the factory's fixed closures
@@ -5210,10 +5208,22 @@ export const routes: Route[] = [
     // EntityStore (mutable), so this is DOCUMENT-class: a
     // repeat PUT records Supersedes. GLOBAL plane — no
     // organization_id stamp (this table IS the tenant root).
-    // NOT FLIPPED (gate 9 — see GET /organizations above): stays
-    // a hand-written old-plane read.
+    // GET is FLIPPED (Phase 12 Task 5): dispatches to
+    // deriveOrganization (api/derive-organizations.ts) — wire-
+    // identical to the hand-written db.organizations.getById
+    // read it replaces (tests/drift-organizations.test.ts legs
+    // 2/2b/3a/4/6 pin the parity, including the id-LAST key
+    // order the seven-sibling entityOf convention departs from
+    // on purpose). A bespoke call, not the generic
+    // documentGetHandler(wiring) every other flipped family
+    // rides: that machinery requires a wiring row's documentOp,
+    // and organizations has none — PUT stays hand-written and
+    // unflipped below, so a documentOp built only to satisfy the
+    // type would never be called. PUT: the row write and its
+    // message-pair append still happen in the SAME transaction
+    // as always — only this read moved.
     route('organizations/:id', {
-        get: (db, p) => db.organizations.getById(param(p, 0)),
+        get: (db, p) => deriveOrganization(db, param(p, 0)),
         put: (db, p, body, _actor, pair) => {
             const id = param(p, 0);
             return db.transaction(

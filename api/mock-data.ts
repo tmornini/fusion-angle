@@ -91,6 +91,7 @@ import {
     humanMemberSeedBody,
     ideaSeedBody,
     ideaSubmissionSeedBody,
+    organizationSeedBody,
     projectSeedBody,
     projectOrg2,
     projectOrganizationFor,
@@ -121,10 +122,6 @@ import {
     identityCredentialSeedBody,
 } from './mock-data/seed-message-pairs.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
-
-const TIER_SEATS_LIMIT = 200;
-const TIER_PROJECTS_LIMIT = 50;
-const TIER_IDEAS_LIMIT = 1000;
 
 // A missing pair here is a pass-1/pass-2 wiring bug (a dropped
 // or mis-keyed invocation), never an expected condition — crash
@@ -538,22 +535,40 @@ async function postMockDataLoadIn(
                 ),
             );
         }),
-        adapter.organizations.put(STARK_ORGANIZATION, {
-            name: 'Stark Industries',
-            domain: 'acmecorp.com',
-            next_billing: daysFromNow(300, 0, 0),
-            seats: TIER_SEATS_LIMIT,
-            projects_limit: TIER_PROJECTS_LIMIT,
-            ideas_limit: TIER_IDEAS_LIMIT,
-        }),
-        adapter.organizations.put(ORGANIZATION_TWO, {
-            name: 'Wayne Enterprises',
-            domain: 'wayne.example.com',
-            next_billing: daysFromNow(200, 0, 0),
-            seats: TIER_SEATS_LIMIT,
-            projects_limit: TIER_PROJECTS_LIMIT,
-            ideas_limit: TIER_IDEAS_LIMIT,
-        }),
+        // Task 3 (Phase 12): the row itself STAYS RAW (Path A) —
+        // the SAME direct adapter.organizations.put as before,
+        // via organizationSeedBody's shared construction (the
+        // SAME one seed-message-pairs.ts used to form each row's
+        // pair, so the two can never drift) — but now forms its
+        // OWN message pair beside it.
+        adapter.organizations.put(
+            STARK_ORGANIZATION,
+            organizationSeedBody(
+                'Stark Industries', 'acmecorp.com',
+                daysFromNow(300, 0, 0),
+            ),
+        ),
+        appendMessagePair(
+            adapter,
+            requirePair(
+                pairs,
+                seedPairKey('organizations/:id', STARK_ORGANIZATION),
+            ),
+        ),
+        adapter.organizations.put(
+            ORGANIZATION_TWO,
+            organizationSeedBody(
+                'Wayne Enterprises', 'wayne.example.com',
+                daysFromNow(200, 0, 0),
+            ),
+        ),
+        appendMessagePair(
+            adapter,
+            requirePair(
+                pairs,
+                seedPairKey('organizations/:id', ORGANIZATION_TWO),
+            ),
+        ),
     ]);
 
     const projects = buildProjects();
@@ -1145,6 +1160,7 @@ export async function postBootstrap(
         systemStateEventPair,
         systemStateEventAt,
         defaultOrganizationPair,
+        organizationPair,
     } = await formBootstrapMessagePair(nowUtc());
     // Pass 2: seed the pristine bootstrap data in one
     // transaction. Credentials seed after it commits — PBKDF2
@@ -1159,7 +1175,7 @@ export async function postBootstrap(
             membershipPair, systemMemberPair, piiPair,
             systemIdentityPair, roleGrantPair,
             systemStateEventPair, systemStateEventAt,
-            defaultOrganizationPair,
+            defaultOrganizationPair, organizationPair,
         ),
     );
     const creds = await seedHumanCredentials(adapter);
@@ -1179,6 +1195,7 @@ async function postBootstrapIn(
     systemStateEventPair: MessagePair,
     systemStateEventAt: string,
     defaultOrganizationPair: MessagePair,
+    organizationPair: MessagePair,
 ): Promise<void> {
     // The pristine seed plants only what the app needs
     // to render its shell: the system actor that authors
@@ -1264,14 +1281,19 @@ async function postBootstrapIn(
             systemStateEventAt,
         ),
         appendMessagePair(adapter, systemStateEventPair),
-        adapter.organizations.put(STARK_ORGANIZATION, {
-            name: 'Stark Industries',
-            domain: 'acmecorp.com',
-            next_billing: daysFromNow(300, 0, 0),
-            seats: TIER_SEATS_LIMIT,
-            projects_limit: TIER_PROJECTS_LIMIT,
-            ideas_limit: TIER_IDEAS_LIMIT,
-        }),
+        // Task 3 (Phase 12): the row itself STAYS RAW (Path A) —
+        // the SAME direct adapter.organizations.put as before,
+        // via organizationSeedBody's shared construction — but
+        // now forms its OWN message pair beside it, mirroring
+        // postMockDataLoadIn's own organizations sites.
+        adapter.organizations.put(
+            STARK_ORGANIZATION,
+            organizationSeedBody(
+                'Stark Industries', 'acmecorp.com',
+                daysFromNow(300, 0, 0),
+            ),
+        ),
+        appendMessagePair(adapter, organizationPair),
         // Task 6: bootstrap's own admin role grant — driven
         // through postRoleGrantDocumentOp, the SAME op
         // postMockDataLoadIn's own admin role-grant sites now

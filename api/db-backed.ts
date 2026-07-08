@@ -1,5 +1,7 @@
 import {
     TABLE_NAMES,
+    SNAPSHOT_SCHEMA_VERSION,
+    SNAPSHOT_SCHEMA_VERSION_KEY,
     backendRunner,
     ambientRunner,
 } from './db.ts';
@@ -106,7 +108,7 @@ import {
     validateResponseEntity,
 } from './validators.ts';
 
-// One adapter over any StorageBackend. The 36-store wiring,
+// One adapter over any StorageBackend. The 39-store wiring,
 // the transaction view, and the tx-based snapshot ops live
 // here once (Commandment IX — the third backend, IndexedDB,
 // triggers the abstraction). The per-tier variation rides in
@@ -237,13 +239,23 @@ export class BackedDbAdapter
         const obj = await this.#backend.transaction(
             TABLE_NAMES, 'readonly',
             async (tx) => {
-                const out: Record<string, unknown[]> = {};
+                // Widened to admit the ONE reserved scalar
+                // marker beside the TABLE_NAMES-keyed arrays —
+                // see SNAPSHOT_SCHEMA_VERSION_KEY (api/db.ts)
+                // for why a wrapper shape was rejected.
+                const out:
+                    Record<string, unknown[] | number> = {};
                 for (const table of TABLE_NAMES) {
                     out[table] = await tx.getAll(table);
                 }
                 return out;
             },
         );
+        // Stamped OUTSIDE the tx (a synchronous assignment
+        // needs no row op): every export carries the marker
+        // an import will re-check at the gate.
+        obj[SNAPSHOT_SCHEMA_VERSION_KEY] =
+            SNAPSHOT_SCHEMA_VERSION;
         return JSON.stringify(obj, null, 2);
     }
 
@@ -297,7 +309,7 @@ export class BackedDbAdapter
         );
     }
 
-    // An adapter whose 36 stores are bound to the open tx
+    // An adapter whose 39 stores are bound to the open tx
     // (ambientRunner joins it), so every op runs in one
     // transaction. Lifecycle methods delegate to the parent;
     // a nested transaction RE-ENTERS this same tx — it runs
@@ -355,7 +367,7 @@ export class BackedDbAdapter
         }
     }
 
-    // The 36-store wiring lives here once. The constructor
+    // The 39-store wiring lives here once. The constructor
     // binds it to the backend; the transaction view rebinds
     // the same wiring to an open tx via ambientRunner.
     #buildStores(run: TxRunner): GuardedDbStores {

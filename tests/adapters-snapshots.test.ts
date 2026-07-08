@@ -14,7 +14,11 @@ import {
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
-import { MissingTableError } from '../api/db.ts';
+import {
+    MissingTableError,
+    SNAPSHOT_SCHEMA_VERSION,
+    SNAPSHOT_SCHEMA_VERSION_KEY,
+} from '../api/db.ts';
 import {
     mintAccessToken,
     TOKEN_AUDIENCE,
@@ -62,6 +66,18 @@ async function setup(): Promise<{
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
+// Every putSnapshot fixture below needs the reserved schema-
+// version marker — parseAndValidateSnapshot rejects its
+// absence before any table is read (Phase 12 Task 6).
+function withVersion(
+    tables: Record<string, unknown>,
+): Record<string, unknown> {
+    return {
+        [SNAPSHOT_SCHEMA_VERSION_KEY]: SNAPSHOT_SCHEMA_VERSION,
+        ...tables,
+    };
+}
+
 // Import REPLACES every table — a snapshot that omits the
 // importer's own membership and admin grant locks the session
 // out of the authenticated surfaces. Tests that keep using
@@ -69,8 +85,8 @@ async function setup(): Promise<{
 // a real exported snapshot would.
 function withAdminRows(
     tables: Record<string, unknown[]>,
-): Record<string, unknown[]> {
-    return {
+): Record<string, unknown> {
+    return withVersion({
         memberships: [{
             id: 'test-membership-current',
             organization_id: '1',
@@ -87,7 +103,7 @@ function withAdminRows(
             at: '2020-01-01T00:00:00.000000Z',
         }],
         ...tables,
-    };
+    });
 }
 
 test('getSnapshot returns a JSON object of tables', async () => {
@@ -128,11 +144,11 @@ test(
     + ' into the database',
     async () => {
         const { db, ctx } = await setup();
-        await putSnapshot(ctx, JSON.stringify({
+        await putSnapshot(ctx, JSON.stringify(withVersion({
             human_members: [
                 buildHumanDetail('u1'),
             ],
-        }));
+        })));
         const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u1');
@@ -167,11 +183,11 @@ test(
                 buildHumanDetail('u1'),
             ],
         })));
-        await putSnapshot(ctx, JSON.stringify({
+        await putSnapshot(ctx, JSON.stringify(withVersion({
             human_members: [
                 buildHumanDetail('u2'),
             ],
-        }));
+        })));
         const rows = await db.humanMembers.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
@@ -187,11 +203,11 @@ test(
     async () => {
         const { db, ctx } = await setup();
         const file = new File(
-            [JSON.stringify({
+            [JSON.stringify(withVersion({
                 human_members: [
                     buildHumanDetail('u1'),
                 ],
-            })],
+            }))],
             'snapshot.json',
             { type: 'application/json' },
         );
@@ -293,6 +309,27 @@ test(
     },
 );
 
+// The client-side pre-flight CONVENIENCE (scanForRetiredKeys):
+// a missing/mismatched marker never reaches the network — the
+// SERVER-side gate in api/snapshot-validator.ts is the real
+// guarantee, pinned in tests/snapshot-import-validation.test.ts.
+test(
+    'putSnapshot rejects a snapshot missing the schema'
+    + ' version marker before any network round trip',
+    async () => {
+        const { ctx } = await setup();
+        const json = JSON.stringify({ members: [] });
+        await assert.rejects(
+            () => putSnapshot(ctx, json),
+            (err: Error) =>
+                err instanceof SnapshotIncompatibleError
+                && err.retired.includes(
+                    SNAPSHOT_SCHEMA_VERSION_KEY,
+                ),
+        );
+    },
+);
+
 test(
     'putSnapshot rejects retired projects fields',
     async () => {
@@ -351,7 +388,9 @@ test(
     'putSnapshot accepts current-shape snapshot',
     async () => {
         const { db, ctx } = await setup();
-        const json = JSON.stringify({ members: [] });
+        const json = JSON.stringify(
+            withVersion({ members: [] }),
+        );
         await putSnapshot(ctx, json);
         // import REPLACES: the seeded admin rows are
         // gone, proving the snapshot actually landed
@@ -501,6 +540,88 @@ test(
         const ctx = createRequestContext(db, await anonToken());
         assert.equal(
             await getHasAnyHumanMembers(ctx), true);
+    },
+);
+
+// A hand-built schema, served the same way the partial-schema
+// stub above serves one — lets these tests pin the DERIVATION
+// (pairs vs. the raw members table slice) directly, without
+// driving a full member-creation op through the gate.
+function stubSnapshotCtx(
+    schema: Record<string, unknown>,
+): RequestContext {
+    return {
+        GET: async (resource: string) => {
+            if (resource === 'snapshots/schema') {
+                return JSON.stringify(schema);
+            }
+            return null;
+        },
+    } as unknown as RequestContext;
+}
+
+// Phase 12 Task 6: re-anchored from the raw `members` table
+// slice onto the requests/responses message ledger — the SAME
+// family address api/derive-members.ts already reads
+// (MEMBERS_PREFIX, '/members/'). A raw table row with no
+// backing pair is exactly the staleness class this closes: the
+// live app's own reads already derive from pairs, so a row that
+// exists only in the raw slice would show here but derive EMPTY
+// everywhere else.
+test(
+    'getHasAnyHumanMembers ignores a raw members-table row'
+    + ' with no backing message pair',
+    async () => {
+        const ctx = stubSnapshotCtx({
+            members: [{ id: 'stale', type: 'human' }],
+            requests: [], responses: [],
+        });
+        assert.equal(
+            await getHasAnyHumanMembers(ctx), false);
+    },
+);
+
+test(
+    'getHasAnyHumanMembers is true from a members-family pair'
+    + ' even when the raw members table is empty',
+    async () => {
+        const ctx = stubSnapshotCtx({
+            members: [],
+            requests: [{
+                id: 'r1', uri_prefix: '/members/',
+                uri_id: 'm1',
+                at: '2026-01-01T00:00:00.000000Z',
+                requester_identity_id: 'system',
+                message_hash: 'h', message: '{}',
+            }],
+            responses: [],
+        });
+        assert.equal(
+            await getHasAnyHumanMembers(ctx), true);
+    },
+);
+
+// NOT human-members: that family's own address would under-
+// report AI/system seeds, whose one parent document always
+// rides /members/, never /human-members/. A pair at the detail
+// address alone (no /members/ parent pair) must NOT count.
+test(
+    'getHasAnyHumanMembers ignores a human-members detail'
+    + ' pair with no matching /members/ parent pair',
+    async () => {
+        const ctx = stubSnapshotCtx({
+            members: [],
+            requests: [{
+                id: 'r1', uri_prefix: '/human-members/',
+                uri_id: 'u1',
+                at: '2026-01-01T00:00:00.000000Z',
+                requester_identity_id: 'system',
+                message_hash: 'h', message: '{}',
+            }],
+            responses: [],
+        });
+        assert.equal(
+            await getHasAnyHumanMembers(ctx), false);
     },
 );
 

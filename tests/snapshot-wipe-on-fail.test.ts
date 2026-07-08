@@ -4,6 +4,10 @@ import {
     LocalStorageDbAdapter,
 } from '../api/db-localstorage.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    SNAPSHOT_SCHEMA_VERSION,
+    SNAPSHOT_SCHEMA_VERSION_KEY,
+} from '../api/db.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
@@ -49,6 +53,8 @@ test(
         const adapter = new LocalStorageDbAdapter();
         await adapter.initialize();
         const snapshot = JSON.stringify({
+            [SNAPSHOT_SCHEMA_VERSION_KEY]:
+                SNAPSHOT_SCHEMA_VERSION,
             members: [],
             ideas: [],
             projects: [],
@@ -64,6 +70,8 @@ test(
     async () => {
         const adapter = new MemoryDbAdapter();
         await adapter.putSnapshot(JSON.stringify({
+            [SNAPSHOT_SCHEMA_VERSION_KEY]:
+                SNAPSHOT_SCHEMA_VERSION,
             members: [{ id: 'm1', type: 'human' }],
         }));
         // An invalid row rejects at the validation gate,
@@ -71,6 +79,8 @@ test(
         // survives whole.
         await assert.rejects(
             () => adapter.putSnapshot(JSON.stringify({
+                [SNAPSHOT_SCHEMA_VERSION_KEY]:
+                    SNAPSHOT_SCHEMA_VERSION,
                 members: [{ id: 'm2', type: 'nope' }],
             })),
         );

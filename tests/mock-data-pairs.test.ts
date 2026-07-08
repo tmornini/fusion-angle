@@ -53,6 +53,11 @@ import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 // document, closed through postMembershipDocumentOp /
 // postMemberDocumentOp, the LAST whole-slice seed deferral) +
 // 11 ideas +
+// 2 organizations documents (Phase 12 Task 3: the tenant root's
+// own family onboards — Stark Industries + Wayne Enterprises,
+// each forming its OWN organizations/:id document pair, Path A:
+// the row itself stays the SAME direct adapter.organizations.put,
+// untouched) +
 // 11 idea-submissions (Phase 2 Task 4b: one per seeded idea,
 // closing the prior seed-only gap) + 17 projects (16 Stark +
 // seed-project-org2, Phase 3 Task 3) + 13 flow-family pairs
@@ -120,8 +125,8 @@ import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 // identity-keyed /identities/:id/default-org/ address; Path A —
 // the row itself stays the SAME direct
 // adapter.identityDefaultOrganizations.put, untouched) =
-// 1511. A dropped or reordered invocation changes this count.
-const EXPECTED_PAIR_COUNT = 1511;
+// 1513. A dropped or reordered invocation changes this count.
+const EXPECTED_PAIR_COUNT = 1513;
 
 test('a mock-data seed populates balanced pairs',
 async () => {
@@ -169,6 +174,36 @@ async () => {
     );
     assert.ok(row, 'no request row for the seeded idea');
     assert.equal(row!.uri_prefix, '/organizations/1/ideas/');
+});
+
+test('a seeded organizations pair sits at the global'
++ ' (non-org-nested) address, its actor is the system member,'
++ ' and its stored body\'s fields equal the seeded row\'s'
++ ' fields exactly (Phase 12 Task 3 content spot-check — a'
++ ' wrong-but-real body value is otherwise fingerprint-'
++ ' invisible, since the fingerprint hashes ids only)',
+async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const requests = await db.requests.getAll();
+    const row = requests.find(
+        r => r.uri_prefix === '/organizations/'
+            && r.uri_id === STARK_ORGANIZATION,
+    );
+    assert.ok(row, 'no request row for the seeded organization');
+    assert.equal(row!.requester_identity_id, SYSTEM_MEMBER_ID);
+    const stored = await db.organizations.getById(STARK_ORGANIZATION);
+    const embedded = JSON.parse(row!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.deepEqual(embedded.body, {
+        name: stored.name,
+        domain: stored.domain,
+        next_billing: stored.next_billing,
+        seats: stored.seats,
+        projects_limit: stored.projects_limit,
+        ideas_limit: stored.ideas_limit,
+    });
 });
 
 test('a seeded human-member create pair sits at the global'
@@ -885,7 +920,7 @@ test('seed pairs verify against their hashes', async () => {
     }
 });
 
-test('a bootstrap seed populates exactly twelve balanced,'
+test('a bootstrap seed populates exactly fourteen balanced,'
 + ' hash-verified pairs for the current member and the system'
 + ' member', async () => {
     const db = new MemoryDbAdapter();
@@ -917,9 +952,12 @@ test('a bootstrap seed populates exactly twelve balanced,'
     // 11 + 1 = 12. Phase 11 Task 8 mirrors the mock-data seed's
     // own last "STAYS RAW" deferral: bootstrap's OWN default-org
     // event ('bootstrap-default-org-current') forms its OWN pair
-    // too — 12 + 1 = 13.
-    assert.equal(requests.length, 13);
-    assert.equal(responses.length, 13);
+    // too — 12 + 1 = 13. Phase 12 Task 3 mirrors the mock-data
+    // seed's own new organizations family: bootstrap's OWN lone
+    // organizations row (STARK_ORGANIZATION — bootstrap seeds no
+    // second org) forms its OWN pair too — 13 + 1 = 14.
+    assert.equal(requests.length, 14);
+    assert.equal(responses.length, 14);
     const atSystemStateEvent = requests.filter(
         r => r.uri_prefix === '/states/'
             && r.uri_id === 'bootstrap-system-active',
@@ -959,6 +997,11 @@ test('a bootstrap seed populates exactly twelve balanced,'
             && r.uri_id === 'bootstrap-default-org-current',
     );
     assert.equal(atDefaultOrganization.length, 1);
+    const atOrganization = requests.filter(
+        r => r.uri_prefix === '/organizations/'
+            && r.uri_id === STARK_ORGANIZATION,
+    );
+    assert.equal(atOrganization.length, 1);
     for (const row of requests) {
         assert.equal(
             await sha256Hex(row.message), row.message_hash,

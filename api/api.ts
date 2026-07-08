@@ -203,6 +203,34 @@ function writeResponseSpecFor(
     return method === 'PUT' ? entry.put : entry.post;
 }
 
+// The one catch shared by both pre-dispatch ownership-fence
+// regions (handleRequest, below) so their redaction discipline
+// cannot diverge. A fence read is storage-corruption territory,
+// not a domain outcome — it gets the SAME fixed 500 body the
+// domain-boundary catch (below, ~:938) already gives every other
+// unmapped fault, console-logged with the request identity for
+// correlation. MissingTableError is the one designed exception:
+// it re-raises FIRST, exactly as the domain-boundary catch
+// re-raises it, so web-app/core.ts's redirectIfMissingTable
+// recovery still fires.
+function redactedFenceFailure(
+    ctx: IncomingContext,
+    error: unknown,
+): Response {
+    if (error instanceof MissingTableError) {
+        throw error;
+    }
+    console.error('fence read failed', {
+        requestId: ctx.requestId,
+        method: ctx.method,
+        pathname: ctx.pathname,
+    }, error);
+    return Response.json(
+        { error: 'internal error' },
+        { status: HTTP_INTERNAL_ERROR },
+    );
+}
+
 export async function handleRequest(
     adapter: GuardedDbAdapter,
     request: Request,
@@ -291,68 +319,82 @@ export async function handleRequest(
                 { status: HTTP_UNAUTHORIZED },
             );
         }
-        const fence = await fenceRequest(authed);
-        if (!fence.ok) {
-            return Response.json(
-                { error: fence.error },
-                { status: fence.status },
-            );
-        }
-        const fenced = fence.ctx;
-        const authzFailure =
-            routePattern === 'identities/:id/pii'
-                ? authorizeIdentityPii(
-                    fenced, param(params, 0))
-                : authorizeRequest(fenced);
-        if (authzFailure !== null) {
-            return Response.json(
-                { error: authzFailure },
-                { status: HTTP_FORBIDDEN },
-            );
-        }
-        // organizations/:id is global passthrough; fence READS
-        // to the caller's memberships so a non-member id 404s
-        // like any foreign row. PUT is not gated here — a new
-        // org is created before its first membership exists.
-        if (method === 'GET'
-            && routePattern === 'organizations/:id'
-            && !fenced.memberOrganizations.has(param(params, 0))) {
-            return Response.json(
-                { error: 'Not found: ' + pathname },
-                { status: HTTP_NOT_FOUND },
-            );
-        }
-        // entity-states/:id[/history] read StateStore methods
-        // the store fence cannot cover; gate on PARENT
-        // ownership — a DIFFERENT org's entity 404s, an orphan
-        // or own entity passes. The history-leak bug gated on
-        // entity_id alone.
-        if (method === 'GET'
-            && (routePattern === 'entity-states/:id'
-                || routePattern
-                    === 'entity-states/:id/history')) {
-            // The owner resolves through the memberships
-            // identity_id index, never a whole-ledger scan.
-            // The graphProbe closes the flow_nodes / flow_edges
-            // two-hop for node/edge deletion events.
-            // rawReadRow bypasses EntityStore's deleted filter.
-            const owner = await ownerOrganizationOfEntity(
-                rawOrganizationOwnedProbes(adapter),
-                adapter.memberships, fenced.organization,
-                param(params, 0),
-                graphEntityProbe(adapter, adapter.flows),
-            );
-            if (owner !== null
-                && owner !== fenced.organization) {
+        // Region A of the pre-dispatch ownership fence (Phase 12
+        // Task 1): every read below — fenceRequest's own
+        // memberships/roleGrants/requests/responses reads, and
+        // the entity-states guard's rawReadRow probes — is
+        // storage-corruption territory should it throw. Redact
+        // through the shared helper rather than letting the
+        // fault reach the wire; MissingTableError still escapes.
+        try {
+            const fence = await fenceRequest(authed);
+            if (!fence.ok) {
+                return Response.json(
+                    { error: fence.error },
+                    { status: fence.status },
+                );
+            }
+            const fenced = fence.ctx;
+            const authzFailure =
+                routePattern === 'identities/:id/pii'
+                    ? authorizeIdentityPii(
+                        fenced, param(params, 0))
+                    : authorizeRequest(fenced);
+            if (authzFailure !== null) {
+                return Response.json(
+                    { error: authzFailure },
+                    { status: HTTP_FORBIDDEN },
+                );
+            }
+            // organizations/:id is global passthrough; fence
+            // READS to the caller's memberships so a non-member
+            // id 404s like any foreign row. PUT is not gated
+            // here — a new org is created before its first
+            // membership exists.
+            if (method === 'GET'
+                && routePattern === 'organizations/:id'
+                && !fenced.memberOrganizations
+                    .has(param(params, 0))) {
                 return Response.json(
                     { error: 'Not found: ' + pathname },
                     { status: HTTP_NOT_FOUND },
                 );
             }
+            // entity-states/:id[/history] read StateStore
+            // methods the store fence cannot cover; gate on
+            // PARENT ownership — a DIFFERENT org's entity 404s,
+            // an orphan or own entity passes. The history-leak
+            // bug gated on entity_id alone.
+            if (method === 'GET'
+                && (routePattern === 'entity-states/:id'
+                    || routePattern
+                        === 'entity-states/:id/history')) {
+                // The owner resolves through the memberships
+                // identity_id index, never a whole-ledger scan.
+                // The graphProbe closes the flow_nodes /
+                // flow_edges two-hop for node/edge deletion
+                // events. rawReadRow bypasses EntityStore's
+                // deleted filter.
+                const owner = await ownerOrganizationOfEntity(
+                    rawOrganizationOwnedProbes(adapter),
+                    adapter.memberships, fenced.organization,
+                    param(params, 0),
+                    graphEntityProbe(adapter, adapter.flows),
+                );
+                if (owner !== null
+                    && owner !== fenced.organization) {
+                    return Response.json(
+                        { error: 'Not found: ' + pathname },
+                        { status: HTTP_NOT_FOUND },
+                    );
+                }
+            }
+            effective = fenced.scoped;
+            actor = fenced.principal.id;
+            organization = fenced.organization;
+        } catch (error) {
+            return redactedFenceFailure(ctx, error);
         }
-        effective = fenced.scoped;
-        actor = fenced.principal.id;
-        organization = fenced.organization;
     }
 
     // Parse the request body when the method
@@ -377,63 +419,76 @@ export async function handleRequest(
         body = parse.body;
     }
 
-    // THE STATE OWNERSHIP WRITE FENCE (Phase 11 Task 1):
-    // MEMBER_VERBS permits member-tier PUT here, and the body
-    // names entity_id itself — with no upstream ownership
-    // check, a member of one org could PUT a state event
-    // naming ANOTHER org's entity and forge or tombstone its
-    // lifecycle. PutHandler carries no organization argument
-    // (routes.ts) and the route's `db` is already the SCOPED
-    // adapter (which 404s a foreign row as merely absent), so
-    // the fence cannot live in the route closure — it runs
-    // HERE, pre-dispatch, mirroring the entity-states GET
-    // guard below. The RAW probes resolve a foreign entity's
-    // true owner even after it is soft-deleted — the filtered
-    // organizationOwnedProbes would let a self-deleted foreign
-    // row masquerade as an orphan.
-    if (method === 'PUT' && routePattern === 'states/:id') {
-        const entityId = body?.entity_id;
-        if (typeof entityId === 'string') {
-            const owner = await ownerOrganizationOfEntity(
-                rawOrganizationOwnedProbes(adapter),
-                adapter.memberships, organization!,
-                entityId,
-                graphEntityProbe(adapter, adapter.flows),
-            );
-            if (owner !== null && owner !== organization) {
-                return Response.json(
-                    { error: 'Not found: ' + pathname },
-                    { status: HTTP_NOT_FOUND },
+    // Region B of the pre-dispatch ownership fence (Phase 12
+    // Task 1): the two UNCONDITIONAL write guards below run
+    // after body-parse regardless of bearerExempt, mirroring
+    // Region A above. routePattern makes the two `if` bodies
+    // mutually exclusive per request, so one try over both
+    // spans the same fence-read fault class Region A redacts —
+    // never both guards' reads for the same request.
+    try {
+        // THE STATE OWNERSHIP WRITE FENCE (Phase 11 Task 1):
+        // MEMBER_VERBS permits member-tier PUT here, and the
+        // body names entity_id itself — with no upstream
+        // ownership check, a member of one org could PUT a
+        // state event naming ANOTHER org's entity and forge or
+        // tombstone its lifecycle. PutHandler carries no
+        // organization argument (routes.ts) and the route's
+        // `db` is already the SCOPED adapter (which 404s a
+        // foreign row as merely absent), so the fence cannot
+        // live in the route closure — it runs HERE, pre-
+        // dispatch, mirroring the entity-states GET guard
+        // above. The RAW probes resolve a foreign entity's true
+        // owner even after it is soft-deleted — the filtered
+        // organizationOwnedProbes would let a self-deleted
+        // foreign row masquerade as an orphan.
+        if (method === 'PUT' && routePattern === 'states/:id') {
+            const entityId = body?.entity_id;
+            if (typeof entityId === 'string') {
+                const owner = await ownerOrganizationOfEntity(
+                    rawOrganizationOwnedProbes(adapter),
+                    adapter.memberships, organization!,
+                    entityId,
+                    graphEntityProbe(adapter, adapter.flows),
                 );
+                if (owner !== null && owner !== organization) {
+                    return Response.json(
+                        { error: 'Not found: ' + pathname },
+                        { status: HTTP_NOT_FOUND },
+                    );
+                }
             }
         }
-    }
-    // The field-values sibling: the leaf carries no entity_id
-    // of its own — it is owned by whatever owns its PARENT
-    // state event (states/:id/field-values/:fvid — param 0 is
-    // the parent event, param 1 the leaf). Read raw so an
-    // event whose entity was since deleted still resolves.
-    if (
-        (method === 'PUT' || method === 'DELETE')
-        && routePattern === 'states/:id/field-values/:fvid'
-    ) {
-        const parentEvent = await adapter.rawReadRow<
-            { id: string; entity_id: Id }
-        >('states', param(params, 0));
-        if (parentEvent !== null) {
-            const owner = await ownerOrganizationOfEntity(
-                rawOrganizationOwnedProbes(adapter),
-                adapter.memberships, organization!,
-                parentEvent.entity_id,
-                graphEntityProbe(adapter, adapter.flows),
-            );
-            if (owner !== null && owner !== organization) {
-                return Response.json(
-                    { error: 'Not found: ' + pathname },
-                    { status: HTTP_NOT_FOUND },
+        // The field-values sibling: the leaf carries no
+        // entity_id of its own — it is owned by whatever owns
+        // its PARENT state event (states/:id/field-values/:fvid
+        // — param 0 is the parent event, param 1 the leaf).
+        // Read raw so an event whose entity was since deleted
+        // still resolves.
+        if (
+            (method === 'PUT' || method === 'DELETE')
+            && routePattern === 'states/:id/field-values/:fvid'
+        ) {
+            const parentEvent = await adapter.rawReadRow<
+                { id: string; entity_id: Id }
+            >('states', param(params, 0));
+            if (parentEvent !== null) {
+                const owner = await ownerOrganizationOfEntity(
+                    rawOrganizationOwnedProbes(adapter),
+                    adapter.memberships, organization!,
+                    parentEvent.entity_id,
+                    graphEntityProbe(adapter, adapter.flows),
                 );
+                if (owner !== null && owner !== organization) {
+                    return Response.json(
+                        { error: 'Not found: ' + pathname },
+                        { status: HTTP_NOT_FOUND },
+                    );
+                }
             }
         }
+    } catch (error) {
+        return redactedFenceFailure(ctx, error);
     }
 
     const isWrite = method === 'PUT' || method === 'POST'

@@ -6,6 +6,9 @@ import { devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { postMockDataLoad } from '../api/mock-data.ts';
+import { buildMembers } from '../api/mock-data/members.ts';
+import type { OrganizationEntity } from '../api/types.ts';
 
 // Pin the collection routes that handleRequest
 // must serve. A new top-level resource is added
@@ -56,3 +59,26 @@ for (const route of COLLECTION_ROUTES) {
         },
     );
 }
+
+// GET /organizations routes through the pre-matchRoute guard in
+// handleRequest (api.ts), never the route('organizations', {get})
+// table entry — that entry is dead code, unreachable by
+// construction (see api/routes.ts's own comment at the removed
+// site). Proof: a SINGLE-organization caller sees ONLY their own
+// membership org here, never every seeded org — the surviving
+// path (organizationsEnumerationRequest) self-fences to the
+// caller's memberships; the removed table entry's own handler
+// (db.organizations.getAll(), unfenced) would have returned BOTH
+// seeded orgs had it ever been reached.
+test('GET /organizations self-fences to the caller\'s own'
++ ' memberships — the membership-filtered path, never the'
++ ' removed unfenced route table entry', async () => {
+    const db = new MemoryDbAdapter();
+    await postMockDataLoad(db);
+    const singleOrganizationIdentityId = buildMembers()[0]!.id;
+    const rows = await GET<OrganizationEntity[]>(
+        db, 'organizations',
+        await devToken(singleOrganizationIdentityId),
+    );
+    assert.equal(rows.length, 1);
+});

@@ -17,6 +17,7 @@ import { deriveIdeaStateHistory } from './derive-ideas.ts';
 import { deriveProjectStateHistory } from './derive-projects.ts';
 import { deriveRecordStateHistory } from './derive-records.ts';
 import { deriveFlowStateHistory } from './derive-flows.ts';
+import { deriveOrganizations } from './derive-organizations.ts';
 import { latestClaimEvent } from './work-order-claims.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseJson } from '../shared/http-message/json-codec.ts';
@@ -199,10 +200,17 @@ const ORGANIZATION_NESTED_FAMILY_ADDRESS_PATTERN = new RegExp(
 const INVITATIONS_PREFIX =
     canonicalUriPrefix(undefined, '/invitations/');
 
+// ALL-orgs, server-side ownership resolution — distinct from
+// api/organization-requests.ts's enumerateMyOrganizations, which
+// filters to the caller's own memberships. This walk NEVER
+// filters by caller: it resolves which org OWNS an entity,
+// independent of who is asking (Phase 12 Task 5: the row source
+// flips to the pair-plane derivation; the ALL-orgs, uncaller-
+// filtered shape is untouched).
 async function organizationIds(
     db: DbAdapter,
 ): Promise<readonly Id[]> {
-    const organizations = await db.organizations.getAll();
+    const organizations = await deriveOrganizations(db);
     return organizations.map((organization) => organization.id);
 }
 

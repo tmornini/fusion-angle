@@ -63,8 +63,6 @@ async function seedStateEvent(
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('A', organizationRow('Acme'));
-    await db.organizations.put('B', organizationRow('Beta'));
     await db.roleGrants.put('rg-current-a', {
         organization_id: 'A', identity_id: 'current',
         role: 'admin', action: 'granted',
@@ -74,6 +72,19 @@ async function seed(): Promise<MemoryDbAdapter> {
         organization_id: 'A', identity_id: 'current',
         at: AT,
     });
+    // A's message pair, not a raw row: organizationIds (Phase 12
+    // Task 5, api/derive-states.ts) is the ALL-orgs scan
+    // resolveFlowGraphOwner walks to find node-a/edge-a's true
+    // owner — it now derives from the ledger. B stays a raw row:
+    // resolveFlowGraphOwner always checks the BOUND org first
+    // regardless of organizationIds' contents, so a B-bound read
+    // below never needs B itself to be derivable, only A.
+    await handleRequest(db, req(
+        'PUT', '/organizations/A',
+        await organizationToken('current', 'A'),
+        organizationRow('Acme'),
+    ));
+    await db.organizations.put('B', organizationRow('Beta'));
     // Seeded through the wire (NAMED re-pin: the READ-side
     // pair-plane fence, api/derive-states.ts's
     // resolveFlowGraphOwner, resolves a flow-node/edge's owner

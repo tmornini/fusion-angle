@@ -31,17 +31,23 @@ import {
     hoistedHeaderFields,
     storedPairResponse,
 } from './message-pair.ts';
+import { deriveOrganizations } from './derive-organizations.ts';
 
 // GET /organizations — the caller's reachable orgs, derived
 // fresh from the membership ledger (never the token claim, so
 // it cannot be stale). The authoritative source the embedded
-// `orgs` claim is a snapshot of.
+// `orgs` claim is a snapshot of. The row list itself is now the
+// PAIR-PLANE derivation (Phase 12 Task 5) — tests/drift-
+// organizations.test.ts leg 1 pins this function's own output
+// byte-identical to the row-plane read it replaces; the
+// membership filter below is UNTOUCHED — this flip is the row
+// SOURCE only, never the fence.
 async function enumerateMyOrganizations(
     ctx: AuthenticatedContext,
 ): Promise<Response> {
     const mine =
         await callerOrganizationIds(ctx.base, ctx.principal);
-    const organizations = await ctx.base.organizations.getAll();
+    const organizations = await deriveOrganizations(ctx.base);
     return Response.json(
         organizations.filter(o => mine.has(o.id)),
     );

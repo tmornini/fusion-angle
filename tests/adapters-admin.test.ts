@@ -272,7 +272,13 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.organizations.put('1', organizationRow('Acme'));
+        const ctx = createRequestContext(
+            db, await organizationToken(),
+        );
+        // The flipped GET organizations/:id (Phase 12 Task 5)
+        // derives from the ledger, so the row needs a message
+        // pair — a raw db.organizations.put would be invisible.
+        await ctx.PUT('organizations/1', organizationRow('Acme'));
         // two rows for one identity + one other:
         // DISTINCT identities = 2, not 3
         await seedMembership(
@@ -283,9 +289,6 @@ test(
         );
         await seedMembership(
             db, 'm3', 'other', '2026-03-01T00:00:00.000000Z',
-        );
-        const ctx = createRequestContext(
-            db, await organizationToken(),
         );
         const organization = await getOrganization(ctx);
         assert.equal(organization.usedSeats(), 2);
@@ -298,7 +301,13 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await db.organizations.put('1', organizationRow('Acme'));
+        const ctx = createRequestContext(
+            db, await organizationToken(),
+        );
+        // The flipped GET organizations/:id (Phase 12 Task 5)
+        // derives from the ledger, so the row needs a message
+        // pair — a raw db.organizations.put would be invisible.
+        await ctx.PUT('organizations/1', organizationRow('Acme'));
         // Stays raw: this test never asserts usedSeats(), only
         // lastActivityText() (derived from states, not
         // memberships) — an invisible-to-the-ledger membership
@@ -308,9 +317,6 @@ test(
             identity_id: 'current',
             at: '2026-01-01T00:00:00.000000Z',
         });
-        const ctx = createRequestContext(
-            db, await organizationToken(),
-        );
         const before = await getOrganization(ctx);
         assert.equal(before.lastActivityText(), '—');
 

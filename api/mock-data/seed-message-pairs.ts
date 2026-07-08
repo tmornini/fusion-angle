@@ -103,6 +103,18 @@
 // requests/responses gain the beside-it pair. No carve-out
 // remains: every seed row this file's pass 1 can see now forms
 // one.
+//
+// Phase 12 Task 3 onboards a NEW family — organizations, the
+// THIRTEENTH and last unflipped in-scope one
+// (api/derive-organizations.ts), registered ahead of this task
+// (family-registry.ts, Task 2). Its two seeded rows (Stark
+// Industries, Wayne Enterprises) form their OWN organizations/:id
+// document pair, the SAME per-family onboarding playbook every
+// prior family already rode: Path A — the row itself STAYS
+// RAW (the SAME direct adapter.organizations.put mock-data.ts
+// already made), only requests/responses gain the beside-it
+// pair. Bootstrap's own lone STARK_ORGANIZATION row mirrors this
+// SAME pair via formBootstrapMessagePair below.
 
 import type {
     Id,
@@ -119,6 +131,7 @@ import type {
     FlowWorkOrderEntity,
     FlowRecordEntity,
     IdentityCredentialKind,
+    OrganizationEntity,
 } from '../types.ts';
 import {
     jsonArrayField,
@@ -154,6 +167,9 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
     assignOrganization,
+    TIER_SEATS_LIMIT,
+    TIER_PROJECTS_LIMIT,
+    TIER_IDEAS_LIMIT,
 } from './seed-constants.ts';
 import {
     daysFromNow,
@@ -616,6 +632,33 @@ export const mockFlowRecords: FlowRecordEntity[] = [
 // Each returns the EXACT object its family's postXxxOp receives
 // as its body/payload argument — the same construction feeds
 // both formWritePair (here) and the actual write (mock-data.ts).
+
+// The wire body a live PUT organizations/:id would carry for a
+// seeded organization row (Phase 12 Task 3): the six
+// OrganizationEntity fields, no id (a route param, not a body
+// field) — the SAME shape validateOrganizationEntity accepts
+// (api/derive-organizations.ts's own organizationEntityOf
+// reconstructs a row from this SAME shape). organizations is
+// GLOBAL plane (the tenant root itself — never organization-
+// nested, family-registry.ts), so the invocation's own
+// `organization` slot stays undefined, mirroring the
+// members-family invocations below rather than memberships'
+// org-nested one. seats/projects_limit/ideas_limit ride the SAME
+// TIER_* constants (seed-constants.ts) the row write uses, so a
+// seeded pair can never drift from what mock-data.ts actually
+// stores.
+export function organizationSeedBody(
+    name: string, domain: string, nextBilling: string,
+): Omit<OrganizationEntity, 'id'> {
+    return {
+        name,
+        domain,
+        next_billing: nextBilling,
+        seats: TIER_SEATS_LIMIT,
+        projects_limit: TIER_PROJECTS_LIMIT,
+        ideas_limit: TIER_IDEAS_LIMIT,
+    };
+}
 
 export function humanMemberSeedBody(
     member: SeedHumanMember,
@@ -1223,12 +1266,13 @@ interface MockDataInvocation {
 }
 
 // Dependency-ordered (matches postMockDataLoadIn's write order):
-// memberships + human-members, ideas, idea-submissions,
-// projects, flows, work-orders, flow-work-orders, the work-order
-// historical traces + state_field_values + the system member's
-// own genesis event (Phase 11 Task 3), memberships + ai-members,
-// the system member's own document, records, flow-records,
-// objectives. A dropped or reordered invocation here is caught by
+// memberships + human-members, ideas, organizations (Phase 12
+// Task 3), idea-submissions, projects, flows, work-orders,
+// flow-work-orders, the work-order historical traces +
+// state_field_values + the system member's own genesis event
+// (Phase 11 Task 3), memberships + ai-members, the system
+// member's own document, records, flow-records, objectives. A
+// dropped or reordered invocation here is caught by
 // tests/mock-data-pairs.test.ts's pinned invocation count.
 export function buildMockDataInvocations():
     readonly MockDataInvocation[] {
@@ -1452,6 +1496,35 @@ export function buildMockDataInvocations():
             requesterIdentityId: event.member_id,
             body: ideaSeedBody(idea, event, i),
         });
+    });
+    // Task 3 (Phase 12): the two seeded organization rows — Stark
+    // Industries and Wayne Enterprises — each form their OWN
+    // organizations/:id document pair too, mirroring the write
+    // order postMockDataLoadIn actually uses (organizations.put
+    // rides the SAME Promise.all as the ideas loop above, right
+    // after it). Path A: the row itself STAYS RAW — the SAME
+    // direct adapter.organizations.put as before.
+    invocations.push({
+        key: seedPairKey('organizations/:id', STARK_ORGANIZATION),
+        routePattern: 'organizations/:id',
+        idParams: [STARK_ORGANIZATION],
+        organization: undefined,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        body: organizationSeedBody(
+            'Stark Industries', 'acmecorp.com',
+            daysFromNow(300, 0, 0),
+        ),
+    });
+    invocations.push({
+        key: seedPairKey('organizations/:id', ORGANIZATION_TWO),
+        routePattern: 'organizations/:id',
+        idParams: [ORGANIZATION_TWO],
+        organization: undefined,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        body: organizationSeedBody(
+            'Wayne Enterprises', 'wayne.example.com',
+            daysFromNow(200, 0, 0),
+        ),
     });
     for (const submission of buildIdeaSubmissions()) {
         const ideaIndex = ideaIndexById.get(submission.idea_id)!;
@@ -2186,6 +2259,7 @@ export async function formBootstrapMessagePair(
     readonly systemStateEventPair: MessagePair;
     readonly systemStateEventAt: string;
     readonly defaultOrganizationPair: MessagePair;
+    readonly organizationPair: MessagePair;
 }> {
     const body = bootstrapCurrentMemberBody(nowUtc());
     const operation = await formSeedPair(
@@ -2330,6 +2404,27 @@ export async function formBootstrapMessagePair(
         'current', bootstrapDefaultOrganizationEventId,
         STARK_ORGANIZATION, requestAt,
     );
+    // Task 3 (Phase 12): bootstrap's own lone organizations row
+    // (STARK_ORGANIZATION — bootstrap seeds no second org) forms
+    // its OWN pair too — the mock-data seed's own organizations
+    // precedent above, mirrored here for bootstrap's separate
+    // seed path. Path A: the row itself STAYS RAW (the SAME
+    // direct adapter.organizations.put mock-data.ts already
+    // made).
+    const organizationPair = await formSeedPair(
+        {
+            key: seedPairKey('organizations/:id', STARK_ORGANIZATION),
+            routePattern: 'organizations/:id',
+            idParams: [STARK_ORGANIZATION],
+            organization: undefined,
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            body: organizationSeedBody(
+                'Stark Industries', 'acmecorp.com',
+                daysFromNow(300, 0, 0),
+            ),
+        },
+        requestAt,
+    );
     return {
         body,
         pairs: {
@@ -2344,5 +2439,6 @@ export async function formBootstrapMessagePair(
         systemStateEventPair,
         systemStateEventAt,
         defaultOrganizationPair,
+        organizationPair,
     };
 }

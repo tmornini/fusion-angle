@@ -115,6 +115,22 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
             // create route (unlike the projects/members-family
             // inert-slot precedent above).
     },
+    {
+        family: 'organizations',
+        organizationNested: false, // the tenant ROOT itself:
+            // an organization can never be nested under
+            // another organization — global plane, like
+            // members/ai-members/human-members/identities.
+        concurrency: 'simple', // routes.ts's own PUT
+            // organizations/:id comment: "a repeat PUT
+            // records Supersedes" — the simple-class chain
+            // (spec §The two PUT classes), never
+            // If-Response-ID/Follows.
+        createBodyIdField: 'id', // INERT — no collection POST
+            // exists for organizations either (route(
+            // 'organizations', {get}) is GET-only); the same
+            // inert slot as memberships/members above.
+    },
 ];
 
 export function familyRegistration(

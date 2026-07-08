@@ -189,6 +189,23 @@ the localStorage tier could not close is gone (CLAUDE.md §
 Gotchas — "Cross-tab writes are safe"). Re-read tolerantly
 (`≥ N`) for timing rather than asserting exact event counts.
 
+Post-states-flip (Phase 11): the appends above still land in
+the `states` table, but the `GET /states` and
+`GET /entity-states/:id/history` READS now DERIVE from the
+message ledger (`deriveStates`/`deriveStatesFor`,
+`api/derive-states.ts`), so every states-backed surface
+(workbox inbox, flow-stats, dashboard, the members roster,
+idea/project/record/objective state badges + history views)
+reads a six-source union, not the log — the log stays a
+storage-only truth until Phase Final. `tests/drift-states.test.ts`
+pins full parity between the two planes over the seeded dataset
+plus live writes (the Agent-G roster-flip precedent). The
+ownership fence (Phase 11 Task 1) makes a foreign org's
+`entity_id` 404 on both the write (`PUT /states/:id`) and the
+read (`GET /entity-states/:id/history`, `GET /states`) planes —
+UI-invisible, since no legitimate browser flow names a foreign
+entity's opaque id.
+
 #### Parallel session & connection isolation
 
 Write-table partitioning (above) keeps *data* writes

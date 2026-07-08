@@ -48,6 +48,7 @@ import {
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentPairFor } from './routes.ts';
 import { deriveInvitations } from './derive-invitations.ts';
+import { deriveOrganizations } from './derive-organizations.ts';
 import {
     deriveIdentityPiiRows,
 } from './derive-identity-spine.ts';
@@ -156,9 +157,12 @@ export async function invitationsRequest(
 // state, defaulting to 'pending', so the old "no state event
 // yet" skip is now unreachable — no live write path ever grants
 // without its genesis pending event). The organization_name join
-// stays an old-plane read — a NAMED transitive ride (gate 9,
-// organizations is unregistered). The invited_by_name join is
-// ALSO FLIPPED (Phase 10 Task 8 Session B, gate 13): derived via
+// is ALSO FLIPPED (Phase 12 Task 5): derived via
+// deriveOrganizations(ctx.base) — wire-identical to the
+// hand-written ctx.base.organizations.getAll() dispatch it
+// replaces (tests/drift-organizations.test.ts leg 2). The
+// invited_by_name join is ALSO FLIPPED (Phase 10 Task 8 Session
+// B, gate 13): derived via
 // deriveIdentityPiiRows(ctx.base) — wire-identical to the
 // hand-written ctx.base.identityPii.getAll() dispatch it
 // replaces, since ctx.base is the UNFENCED base adapter already
@@ -193,8 +197,17 @@ async function invitationsForInvitee(
         .filter(inv =>
             inv.identity_id === ctx.principal.id);
     if (mine.length === 0) return Response.json([]);
+    // The organization_name join stays a Map built once over
+    // EVERY organization (Efficiency: one derivation, not one
+    // deriveOrganization call per invitation) — only its row
+    // source flips (Phase 12 Task 5): deriveOrganizations
+    // (api/derive-organizations.ts), wire-identical to the
+    // row-plane ctx.base.organizations.getAll() it replaces
+    // (tests/drift-organizations.test.ts leg 2). The ABSENT-key
+    // omission on a vanished org is unchanged: Map.get still
+    // returns undefined for an id with no row on either plane.
     const organizationName = new Map(
-        (await ctx.base.organizations.getAll())
+        (await deriveOrganizations(ctx.base))
             .map(o => [o.id, o.name]));
     const personName = new Map(
         (await deriveIdentityPiiRows(ctx.base))

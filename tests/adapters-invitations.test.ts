@@ -13,7 +13,7 @@ import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { organizationRow } from './test-fixtures.ts';
+import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 import {
     postInvitationGrant,
@@ -31,8 +31,17 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // identity with no membership anywhere (a fresh invitee).
 async function seedRows(db: DbAdapter): Promise<void> {
     await db.postSchemaCreation();
-    await db.organizations.put('1', organizationRow('Stark'));
-    await db.organizations.put('2', organizationRow('Wayne'));
+    // Message pairs, not raw rows: getInvitations' own
+    // organization_name join (Phase 12 Task 5,
+    // api/invitations-domain.ts) derives from the ledger, so a
+    // raw db.organizations.put would leave both orgs invisible
+    // to it — seedOrganizationDocument's own comment (test-
+    // fixtures.ts) on why this rides below the facade rather
+    // than a live PUT (this fixture also feeds seedWithNotify's
+    // counting spy, which a live PUT's own notification would
+    // pollute).
+    await seedOrganizationDocument(db, '1', 'Stark');
+    await seedOrganizationDocument(db, '2', 'Wayne');
     for (const organization of ['1', '2']) {
         await db.roleGrants.put('rg-current-' + organization, {
             organization_id: organization, identity_id: 'current',
@@ -250,13 +259,26 @@ async () => {
 
 test('the view omits the org name when the org is gone',
 async () => {
+    // Org '3': current is admin/member, but it carries no
+    // organizations document at all — a states 'deleted' event
+    // against an EXISTING org (the pre-flip version of this test)
+    // no longer omits the name, since the flipped join (Phase 12
+    // Task 5) derives from the ledger, which never consults
+    // states (a NAMED watch-point, api/derive-organizations.ts's
+    // own header — organizations carry no real delete lifecycle,
+    // so a genuinely-undocumented org is the honest "gone" case
+    // on BOTH planes).
     const { db } = await ctxFor('current', '2');
-    const tony = await ctxOn(db, 'current', '2');
+    await db.roleGrants.put('rg-current-3', {
+        organization_id: '3', identity_id: 'current',
+        role: 'admin', action: 'granted',
+        by_member_id: 'system', at: AT,
+    });
+    await db.memberships.put('m-current-3', {
+        organization_id: '3', identity_id: 'current', at: AT,
+    });
+    const tony = await ctxOn(db, 'current', '3');
     await postInvitationGrant(tony, 'sarah@x.com');
-    await db.states.postEvent(
-        'ev-org-gone', '2', 'deleted', 'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
     const sarah = await ctxOn(db, 'sarah', '1');
     const mine = await getInvitations(sarah);
     assert.equal(mine.length, 1);
@@ -376,6 +398,34 @@ test('granting the same email twice is idempotent', async () => {
     await postInvitationGrant(tony, 'sarah@x.com');
     await postInvitationGrant(tony, 'sarah@x.com');
     assert.equal((await db.invitations.getAll()).length, 1);
+});
+
+// The dedup treats only a PENDING invitation as outstanding — a
+// DECLINED one is spent. Contrast the idempotent-duplicate case
+// above (still pending): here the invitee has answered, so the
+// re-grant must mint a FRESH invitation, never echo the declined
+// row's id.
+test('re-inviting a declined invitee mints a fresh invitation',
+async () => {
+    const { db } = await ctxFor('current', '2');
+    const tony = await ctxOn(db, 'current', '2');
+    await postInvitationGrant(tony, 'sarah@x.com');
+    const first = (await db.invitations.getAll())[0]!;
+    const sarah = await ctxOn(db, 'sarah', '1');
+    await postInvitationDecline(sarah, first.id);
+
+    assert.equal(
+        await postInvitationGrant(tony, 'sarah@x.com'), 'sent');
+
+    const invs = await db.invitations.getAll();
+    assert.equal(invs.length, 2);
+    const fresh = invs.find(inv => inv.id !== first.id);
+    assert.ok(fresh !== undefined);
+
+    const mine = await getInvitations(sarah);
+    const stateById = new Map(mine.map(v => [v.id, v.state]));
+    assert.equal(stateById.get(first.id), 'declined');
+    assert.equal(stateById.get(fresh!.id), 'pending');
 });
 
 test('sent invitations list the active org pending only',

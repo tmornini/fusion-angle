@@ -1,4 +1,8 @@
-import { TABLE_NAMES } from './db.ts';
+import {
+    TABLE_NAMES,
+    SNAPSHOT_SCHEMA_VERSION,
+    SNAPSHOT_SCHEMA_VERSION_KEY,
+} from './db.ts';
 import { extractErrorMessage } from '../shared/error-helpers.ts';
 import {
     validateMemberEntity,
@@ -188,6 +192,34 @@ function validateSnapshotRow(
     }
 }
 
+// The UNIVERSAL version gate's own typed rejection — thrown
+// by parseAndValidateSnapshot, so every DbAdapter.putSnapshot
+// caller crosses it (route dispatch, a direct adapter call, a
+// test). `found` is the raw value read at
+// SNAPSHOT_SCHEMA_VERSION_KEY, or undefined when the key was
+// absent — never coerced, never defaulted (Abomination: Default
+// Values). Mirrors SnapshotIncompatibleError's own shape (a
+// named Error subclass with a diagnostic field) — the client-
+// side twin web-app/app/adapters/snapshots.ts's
+// scanForRetiredKeys pre-flight checks for BEFORE this ever
+// runs, as a convenience only; this is the guarantee.
+export class SnapshotVersionMismatchError extends Error {
+    readonly found: unknown;
+    constructor(found: unknown) {
+        super(
+            'Snapshot schema version '
+            + (found === undefined
+                ? 'is missing'
+                : 'is ' + JSON.stringify(found))
+            + '; required version is '
+            + SNAPSHOT_SCHEMA_VERSION
+            + '. Re-snapshot from current state.',
+        );
+        this.name = 'SnapshotVersionMismatchError';
+        this.found = found;
+    }
+}
+
 // Parses + validates the snapshot JSON, returning
 // per-table parsed rows. Throws with a precise
 // message identifying which table or row failed.
@@ -213,6 +245,20 @@ export function parseAndValidateSnapshot(
         );
     }
     const record = parsed as Record<string, unknown>;
+    // The version gate: BETWEEN the object-shape check above
+    // and the TABLE_NAMES loop below, so no table is ever read
+    // from a stale or unmarked export. Strict equality — an
+    // absent key reads as undefined, which never equals the
+    // numeric SNAPSHOT_SCHEMA_VERSION, so absence rejects
+    // exactly like a mismatch. No fallback, no coercion.
+    if (
+        record[SNAPSHOT_SCHEMA_VERSION_KEY]
+            !== SNAPSHOT_SCHEMA_VERSION
+    ) {
+        throw new SnapshotVersionMismatchError(
+            record[SNAPSHOT_SCHEMA_VERSION_KEY],
+        );
+    }
     const result = new Map<string, { id: string }[]>();
     for (const table of TABLE_NAMES) {
         const rows = record[table];

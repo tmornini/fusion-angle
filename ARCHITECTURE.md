@@ -352,7 +352,16 @@ re-verified by the automated suite:
   (RS256/ES256, WebCrypto) plus RFC 7523 claim checks.
 - **500 fallback body** (`handleRequest`, `api/api.ts`): a
   fixed opaque `internal error` body; fault detail goes to
-  the console, never the wire.
+  the console, never the wire. Through Phase 11 this covered
+  only the domain-boundary catch; a thrown pre-dispatch
+  ownership-fence read (`fenceRequest` itself, or the
+  `states/:id` PUT / field-values ownership guards) still
+  propagated unredacted. Phase 12 Task 1 closed that gap: the
+  two fence regions now share one redaction catch with the
+  same fixed body, so the claim holds everywhere a request can
+  fault. `MissingTableError` still re-raises past all three
+  catches, recovered by `redirectIfMissingTable`
+  (`web-app/app/core.ts`).
 - **Route policy tiers** (`ROUTE_POLICY`,
   `api/authorization.ts`): `admin` everywhere plus a real
   `member` tier on the content surfaces; identity, credential,
@@ -422,9 +431,17 @@ session token. Tests pass `createRequestContext` a
 `api/routes.ts` defines four state-route patterns covering
 five HTTP operations — `GET/PUT states/:id`, `GET states`,
 `GET entity-states/:id` (current), and
-`GET entity-states/:id/history` (ordered) — each dispatching
-to a store method (`getAll`/`getById`/`put`,
-`getCurrentFor`, `getAllFor`).
+`GET entity-states/:id/history` (ordered). The two CONSUMED
+reads derive from the message ledger (Phase 11 Task 7):
+`GET states` → `deriveStates(db, organization)` and
+`GET entity-states/:id/history` →
+`deriveStatesFor(db, organization, entityId)`
+(`api/derive-states.ts`, a six-source union fenced from the
+pair plane). The two zero-caller reads (`GET states/:id` by
+event id, `GET entity-states/:id` current) still dispatch to
+the store methods (`getById`, `getCurrentFor`) and flip at
+Phase Final; `PUT states/:id` still appends through `put`,
+gated by the ownership fence.
 When no schema exists, non-entry pages redirect to snapshots.
 
 ## Storage tiers

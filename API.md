@@ -270,14 +270,24 @@ Legend for classification:
 
 ### 2.10 States — the append-only event log
 
-- `GET /states` · `GET /states/:id` — primitive.
+- `GET /states` — primitive, DERIVED (Phase 11 Task 7): the
+  collection reads `deriveStates(db, organization)`
+  (`api/derive-states.ts`), a six-source union over the message
+  ledger reduced by `(at, id)`, returned `byIdAscending`. The old
+  `states` table is untouched (Phase Final deletes it); this route no
+  longer reads it. `GET /states/:id` (a single event by its own event
+  id) stays a store primitive — zero product callers, flipped at Phase
+  Final.
 - `PUT /states/:id` — append/stamp a state event; the author is the
   verified caller, stamped over any client-supplied `member_id`. Gated
   by the OWNERSHIP FENCE below — a foreign org's entity_id 404s.
-- `GET /entity-states/:id` — the current (latest) state for an entity.
+- `GET /entity-states/:id` — the current (latest) state for an entity;
+  a store primitive — zero product callers, flipped at Phase Final.
 - `GET /entity-states/:id/history` — the full event history for an
-  entity. Both are parent-ownership gated (a foreign org's entity
-  404s) by the SAME fence the write side uses.
+  entity, DERIVED (Phase 11 Task 7): reads `deriveStatesFor(db,
+  organization, entityId)` in `(at, id)` order. The GATE still fences
+  it on parent ownership (a foreign org's entity 404s) via the raw
+  probes; the derived handler does NOT re-fence.
 - `GET /states/:id/field-values` ·
   `PUT|DELETE /states/:id/field-values/:fvid` — nested; PUT/DELETE
   gated by the ownership fence too, resolved through the leaf's PARENT
@@ -342,7 +352,13 @@ this task closes.
   rationale. `GET` and `DELETE` stay hand-written, old-plane,
   until Task 8.
 - `GET|PUT /identities/:id/default-org` — the read/write face of the
-  default-org ledger. Self-only.
+  default-org ledger. Self-only. `GET` (and every other caller of
+  `identityDefaultOrganization`, api/authentication.ts) reads via
+  `deriveDefaultOrganization` (api/derive-default-organization.ts,
+  Phase 11 Task 8): a TARGETED `requests`/`responses` read at the
+  identity-keyed `/identities/:id/default-org/` prefix, never the
+  `identity_default_organizations` table directly. `PUT` still
+  writes that table (Path A — unchanged) beside its own pair.
 
 ### 2.12 Invitations (sub-router)
 
@@ -1731,13 +1747,15 @@ FIFTEEN pair-capable write families, in dependency order:
 `objectives`, `memberships`, `members`, `identities`,
 `identity-credentials`, and `role-grants` (the last three, Phase 10
 Task 6, §5.15), PLUS the historical-trace carve-out's own bare
-`states` / `state_field_values` writes (Phase 11 Task 3, §5.16 — no
-dedicated op wraps them, so they stand outside the FIFTEEN)
+`states` / `state_field_values` writes (Phase 11 Task 3, §5.16) AND
+the `identity_default_organizations` family's own bare writes
+(Phase 11 Task 8, §5.17) — no dedicated op wraps either of these
+two, so they stand outside the FIFTEEN
 (`buildMockDataInvocations`, `api/mock-data/seed-message-pairs.ts`),
 so the seed forms each family's pair the SAME way a live request
 would, then writes it alongside the seeded row:
 
-- The mock-data seed pre-forms **1500** message pairs — one pair per seeded
+- The mock-data seed pre-forms **1511** message pairs — one pair per seeded
   row for most families, but each seeded human/AI member folds in an
   operation/member-document/detail-document triple (11 human-members +
   4 ai-members, each × 3 = 45 member-family pairs: 15 ops + 15 member
@@ -1793,20 +1811,26 @@ would, then writes it alongside the seeded row:
   forms its OWN nested `states/:id/field-values/:fvid` pair (7
   more, same §5.16), PLUS the system member's OWN genesis event
   forms its OWN pair (1 more, same §5.16 — bootstrap's own mirror
-  event is counted in the bootstrap count below, never here) —
+  event is counted in the bootstrap count below, never here), PLUS
+  every seeded human member's OWN default-org event forms its OWN
+  identity-keyed `identities/:id/default-org/` pair (11 more, Phase
+  11 Task 8, §5.17: no dedicated op wraps it either, a bare
+  `adapter.identityDefaultOrganizations.put` untouched beside its
+  own new pair) —
   in a first pass, BEFORE the
   seed's own big transaction opens (`formWritePair`'s hashing is async
   crypto, which would auto-commit an IndexedDB transaction early if awaited
   inside one); a second pass then writes the seeded rows and appends each
   pre-formed pair in the SAME transaction the row lands in. The bootstrap
-  seed forms exactly twelve such pairs (the SAME member-family bundle —
+  seed forms exactly thirteen such pairs (the SAME member-family bundle —
   now a quadruple, Phase 10 Task 5 — its
   OWN membership and system-member document pairs, its own
   `identities/:id/pii` document pair, PLUS Phase 10 Task 6's OWN
   system-identity document pair, role-grant pair, and the two
   credential pairs — current's password + the system client
   secret, PLUS Phase 11 Task 3's OWN system-member genesis-event
-  pair, §5.16), for its lone `current` human-member create.
+  pair (§5.16), PLUS Phase 11 Task 8's OWN default-org event pair
+  (§5.17)), for its lone `current` human-member create.
 - Memberships closed the LAST whole-slice seed deferral (Phase 8 Task
   5): every seeded membership row and the system member's own
   `members/:id` document now form a message pair too, closed through
@@ -1832,9 +1856,10 @@ would, then writes it alongside the seeded row:
 - `requestAt` is minted ONCE per seed run and shared by every pair
   that run forms, so seeded pairs read as arriving together.
 - `identity_default_organizations` (both seed paths' `seed-default-
-  org-*` / `bootstrap-default-org-current` rows) STAYS RAW — a
-  later gate defers this family WHOLE; it forms no message pair,
-  unlike every write around it (Phase 10 Task 6, §5.15).
+  org-*` / `bootstrap-default-org-current` rows) STAYS RAW — the
+  ROW write is unchanged — but each ALSO forms its own message pair
+  now (Phase 11 Task 8, §5.17), closing the LAST family this seed
+  deferred WHOLE (Phase 10 Task 6, §5.15).
 
 ### 5.4 The two PUT classes
 
@@ -2931,3 +2956,108 @@ this task touches. Reseed marginal cost measured ~125 ms for the
 — the largest single-task increment of the migration, ~60× the
 prior (§5.15's +29 at ~2 ms), tracking the pair COUNT rather than
 any new per-pair cost.
+
+### 5.17 Flipping default organization reads to the ledger
+(Phase 11 Task 8)
+
+The gate 7 USER ELECTION: `identityDefaultOrganization`
+(`api/authentication.ts`) — the I/O composition every flip-relevant
+caller rides transitively (`fenceRequest`'s flat-token fallback,
+`identityDefaultOrganizationRequest`'s own GET arm, and
+`callerActiveOrganization` in `api/invitations-domain.ts`) — swaps
+its ROW SOURCE from `identity_default_organizations.getAllWhere`
+to `deriveDefaultOrganization` (a new sibling module,
+`api/derive-default-organization.ts`), still handing the mapped
+rows to the SAME UNCHANGED pure reducer,
+`currentDefaultOrganizationFor` (`api/authorization.ts`, pinned by
+`tests/default-organization-resolve.test.ts`), and keeping the
+`primaryMembershipOrganization` fallback verbatim. The FOURTH
+caller — `organization-requests.ts`'s PUT idempotency no-op check,
+which calls the pure reducer directly over a live `getAll()` — is
+UNTOUCHED; it never rode `identityDefaultOrganization` at all. Zero
+caller edits: all three flip-relevant callers, and the reducer
+itself, are absent from this task's diff.
+
+**The derivation.** `deriveDefaultOrganization(db, identityId)`
+reads the SAME identity-keyed address
+`identityDefaultOrganizationRequest` already writes to
+(`api/organization-requests.ts`) —
+`/identities/:id/default-org/`, the eventId riding a FABRICATED
+trailing `:eventId` path segment no real URL carries (the live
+PUT's `eventId` is a BODY key) — via a TARGETED
+`requests`/`responses.getAllWhere('uri_prefix', prefix)` pair, never
+a full-ledger scan, and maps each 2xx pair
+(`documentPairsAt`, `api/derive-documents.ts`) to an
+`IdentityDefaultOrganizationEntity`-shaped row: `id` is the pair's
+own `uriId` (the eventId), `organization_id`/`at` are read off the
+stored request body. A no-op PUT resend still forms its own pair
+(`identityDefaultOrganizationRequest`'s pair append is
+unconditional; only the `identity_default_organizations` ROW write
+is conditional on `changes`) — but it always carries the SAME
+`organization_id` the identity already held, so including it
+changes nothing the reducer would resolve.
+
+**Why the fence fallback is safe to flip categorically.** It runs
+PRE-DISPATCH in `fenceRequest` — never inside a transaction, so no
+IndexedDB auto-commit hazard — and is LATENT-hot: ordinary traffic
+carries an org-scoped token (`ctx.principal.organization` already
+set), so the fallback read fires only for a flat, un-exchanged
+token, once per boot.
+
+**The gate-seed (+11).** The `identity_default_organizations`
+family's own row writes STAY RAW (Path A — both seed paths' bare
+`adapter.identityDefaultOrganizations.put` calls are untouched),
+closing the LAST family Phase 10 Task 6 (§5.15) deferred WHOLE:
+each ALSO forms its own message pair now, through a dedicated
+former (`formDefaultOrganizationSeedPair`,
+`api/mock-data/seed-message-pairs.ts`) that mirrors the live PUT's
+`formWritePair` call byte-for-byte rather than riding the generic
+`formSeedPair`/`WRITE_RESPONSE_SPECS` pipeline every other family
+uses — the fabricated trailing `:eventId` segment cannot be
+expressed by that pipeline's `routePattern.split('/')` convention,
+the SAME reason the invitations side channel forms its own pairs
+directly. 11 mock-data pairs (one per seeded human member, actor =
+the member's OWN id — the route's self-authorship rule, never
+`SYSTEM_MEMBER_ID`) + bootstrap's OWN mirror pair (actor =
+`'current'`) — `EXPECTED_PAIR_COUNT` 1500 → 1511; the bootstrap
+count 12 → 13.
+
+**The re-pins (`tests/mock-data-pairs.test.ts`).**
+`EXPECTED_PAIR_COUNT` 1500 → 1511 (+11) + the breakdown prose; the
+bootstrap count 12 → 13 + a new assertion for its default-org pair
+address; ONE new address/body-shape spot-check (a seeded default-
+org pair's identity-keyed address, its body carrying the three
+`{organization_id, eventId, at}` keys).
+`tests/mock-data-fingerprint.test.ts` is UNCHANGED — re-ran green;
+`identity_default_organizations` 11/`ab3efde4` HOLDS, along with
+every other pin.
+
+**The adapter/fence suites (plumbing only).** Three suites seeded
+a SET default via a raw `identityDefaultOrganizations.put` and then
+exercised the now-flipped read
+(`identityDefaultOrganization`/`fenceRequest`) — a raw row no
+longer influences that read, so each converts to a paired write,
+assertions byte-identical: `tests/default-organization-precedence.
+test.ts` (a local `formWritePair` + `appendMessagePair` helper, the
+lowest-level plumbing this file's own style already uses),
+`tests/api-flat-token-organization.test.ts` and
+`tests/api-membership-liveness.test.ts` (both ride the REAL PUT
+route via `handleRequest`, already available in-file). `tests/
+default-organization-resolve.test.ts` (the pure reducer's pin) is
+UNTOUCHED, as is every suite exercising the LIVE PUT/GET route
+through `handleRequest` (`tests/api-identity-default-organization.
+test.ts`, `tests/api-shadow-ledger-default-organization.test.ts`) —
+those already form genuine pairs alongside their raw rows and
+needed no change. `tests/api.test.ts`'s 500-fallback fault-injection
+test narrows its blanket `db.requests.getAllWhere` override to the
+`/ideas` domain-read prefix alone, since the fence's own fallback
+now ALSO reads `db.requests` — an unrelated widened dependency
+surface, not a weakened assertion.
+
+**Contract.** `identity_default_organizations` 11/`ab3efde4` HOLDS
+(`tests/mock-data-fingerprint.test.ts`, file byte-unchanged) — Path
+A: the new pair writes ONLY `requests`/`responses`, disjoint from
+the row-write side this task touches. Reseed marginal cost measured
+~4 ms for the +11 pairs (baseline ~479 ms → ~483 ms, 10 runs each)
+— consistent with §5.16's own ~0.14 ms/pair rate at this small a
+delta, within the run-to-run noise floor at this scale.

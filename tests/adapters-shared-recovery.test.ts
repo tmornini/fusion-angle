@@ -107,6 +107,28 @@ async function seedOrganizationAdmin(
     });
 }
 
+// The pair-plane counterpart of seedOrganizationAdmin's row-
+// only grant/membership: a real PUT through the route so the
+// org exists on BOTH planes. The flipped GET /organizations
+// (Phase 12 Task 5) derives from the ledger, so the re-scope
+// read below needs this, not a raw db.organizations.put — the
+// admin role seedOrganizationAdmin already grants `current` in
+// `organization` authorizes the write.
+async function seedOrganizationDocument(
+    db: MemoryDbAdapter, organization: string,
+): Promise<void> {
+    await handleRequest(db, new Request(
+        `${BASE}/organizations/${organization}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization':
+                    'Bearer ' + await devToken('current'),
+            },
+            body: JSON.stringify(organizationRow(organization)),
+        }));
+}
+
 // A dead access token already scoped to `org` — the vessel an
 // org-bound request carries when its session expires mid-flight.
 async function expiredOrganizationToken(
@@ -252,10 +274,11 @@ test('recovery re-scopes to the vessel org claim, not the'
     const db = await freshDb();
     await seedOrganizationAdmin(db, 'A');
     await seedOrganizationAdmin(db, 'B');
-    // the enumerate joins org rows to memberships, so both
-    // orgs must exist as rows to land in the reachable set
-    await db.organizations.put('A', organizationRow('Acme'));
-    await db.organizations.put('B', organizationRow('Beta'));
+    // the enumerate joins derived org documents to memberships,
+    // so both orgs must exist on the pair plane to land in the
+    // reachable set (seedOrganizationDocument's own comment)
+    await seedOrganizationDocument(db, 'A');
+    await seedOrganizationDocument(db, 'B');
     const pair = await issuePair(db);
     // the dying request was scoped to org A: its access token
     // has expired but the refresh is still live
@@ -284,8 +307,8 @@ test('recovery leaves the cross-tab active-org preference'
     const db = await freshDb();
     await seedOrganizationAdmin(db, 'A');
     await seedOrganizationAdmin(db, 'B');
-    await db.organizations.put('A', organizationRow('Acme'));
-    await db.organizations.put('B', organizationRow('Beta'));
+    await seedOrganizationDocument(db, 'A');
+    await seedOrganizationDocument(db, 'B');
     const pair = await issuePair(db);
     const deadA = await expiredOrganizationToken('A');
     putSessionCredentials({

@@ -6,6 +6,10 @@ import {
 import {
     jsonObjectField,
 } from '../api/types.ts';
+import {
+    SNAPSHOT_SCHEMA_VERSION,
+    SNAPSHOT_SCHEMA_VERSION_KEY,
+} from '../api/db.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
@@ -219,6 +223,8 @@ test(
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
         const snapshot = JSON.stringify({
+            [SNAPSHOT_SCHEMA_VERSION_KEY]:
+                SNAPSHOT_SCHEMA_VERSION,
             flow_versions: [
                 { id: 'fv-imp', ...baseVersion },
             ],

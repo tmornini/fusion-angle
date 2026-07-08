@@ -124,9 +124,19 @@ test('identities is the twelfth registered family,'
     });
 });
 
-test('an unregistered family returns undefined'
-+ ' (organizations stays unregistered by design)', () => {
-    assert.equal(familyRegistration('organizations'), undefined);
+test('organizations is the thirteenth registered family,'
++ ' the tenant root itself — global-plane like identities',
+() => {
+    assert.deepEqual(familyRegistration('organizations'), {
+        family: 'organizations',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('an unregistered family returns undefined', () => {
+    assert.equal(familyRegistration('not-a-family'), undefined);
 });
 
 test('every registered family names a concurrency class',

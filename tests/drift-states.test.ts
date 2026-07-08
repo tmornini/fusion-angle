@@ -60,6 +60,13 @@ import { firstProviderModel } from './member-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
+// Strictly later than AT: at an EQUAL `at`, latestByKey's
+// (at, id) tiebreak falls to the larger event id, and
+// 'drift-states-fence-foreign-idea-genesis' sorts after
+// 'drift-states-fence-foreign-del-ev' — an equal-`at` delete
+// would lose the tiebreak and the foreign idea would never
+// genuinely read as deleted (case 3's deleted-entity leg).
+const LATER = '2026-06-01T00:00:00.000000Z';
 
 function req(
     method: string,
@@ -353,7 +360,7 @@ test('case 3: the fence\'s legs — own-org visible, foreign hidden'
     const foreignDeleted = await handleRequest(db, req(
         'PUT', '/states/drift-states-fence-foreign-del-ev',
         tokenOrg2,
-        { entity_id: foreignIdeaId, state: 'deleted', at: AT },
+        { entity_id: foreignIdeaId, state: 'deleted', at: LATER },
     ));
     assert.equal(foreignDeleted.status, 200);
 

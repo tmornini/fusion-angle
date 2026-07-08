@@ -22,6 +22,12 @@ import {
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
+// Strictly later than AT: at an EQUAL `at`, latestByKey's
+// (at, id) tiebreak falls to the larger event id, and
+// 'idea-b-genesis' sorts after 'ev-b-delete' — an equal-`at`
+// delete would lose the tiebreak and idea-b would never
+// genuinely read as deleted.
+const LATER = '2026-06-01T00:00:00.000000Z';
 
 function req(
     method: string,
@@ -46,8 +52,6 @@ function req(
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('A', organizationRow('Acme'));
-    await db.organizations.put('B', organizationRow('Beta'));
     await db.roleGrants.put('rg-a', {
         organization_id: 'A', identity_id: 'adminA',
         role: 'admin', action: 'granted',
@@ -64,6 +68,21 @@ async function seed(): Promise<MemoryDbAdapter> {
     await db.memberships.put('m-b', {
         organization_id: 'B', identity_id: 'adminB', at: AT,
     });
+    // Message pairs, not raw rows: organizationIds (Phase 12
+    // Task 5, api/derive-states.ts) is the ALL-orgs scan
+    // resolveOwningOrganization/resolveFlowGraphOwner both walk
+    // — it now derives from the ledger, so a raw
+    // db.organizations.put would leave A/B invisible to it.
+    await handleRequest(db, req(
+        'PUT', '/organizations/A',
+        await organizationToken('adminA', 'A'),
+        organizationRow('Acme'),
+    ));
+    await handleRequest(db, req(
+        'PUT', '/organizations/B',
+        await organizationToken('adminB', 'B'),
+        organizationRow('Beta'),
+    ));
     return db;
 }
 
@@ -222,7 +241,7 @@ async () => {
     // tests/api-states-ownership-fence.test.ts).
     const del = await handleRequest(db, req(
         'PUT', '/states/ev-b-delete', tokenB,
-        { entity_id: 'idea-b', state: 'deleted', at: AT },
+        { entity_id: 'idea-b', state: 'deleted', at: LATER },
     ));
     assert.equal(del.status, 200);
 

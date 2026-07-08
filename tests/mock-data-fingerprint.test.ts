@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
+import { SNAPSHOT_SCHEMA_VERSION_KEY } from '../api/db.ts';
 
 // Characterization pin for the mock-data decomposition (F-030):
 // every verbatim-move commit that splits api/mock-data.ts into
@@ -81,8 +82,12 @@ const EXPECTED: Record<string, TableFingerprint> = {
 // OLD plane (every table above) is what invisibility pins; the
 // two message tables' DETERMINISTIC coverage (pair count,
 // balance, per-family address, hash-verify) moved to
-// tests/mock-data-pairs.test.ts.
-const EXCLUDED_TABLES = new Set(['requests', 'responses']);
+// tests/mock-data-pairs.test.ts. The reserved schema-version
+// marker (Phase 12 Task 6) is excluded too — it is a scalar,
+// not a row array, so `rows.map` below would throw on it.
+const EXCLUDED_TABLES = new Set([
+    'requests', 'responses', SNAPSHOT_SCHEMA_VERSION_KEY,
+]);
 
 async function seededFingerprint(): Promise<
     Record<string, TableFingerprint>

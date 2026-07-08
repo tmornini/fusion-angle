@@ -20,3 +20,12 @@ export const ORGANIZATION_TWO = '2';
 export function assignOrganization(index: number): string {
     return index % 2 === 0 ? STARK_ORGANIZATION : ORGANIZATION_TWO;
 }
+
+// The tier limits every seeded organization row carries.
+// Shared so the organization row write (mock-data.ts) and its
+// own organizations/:id message pair (seed-message-pairs.ts's
+// organizationSeedBody) can never diverge on these values —
+// Phase 12 Task 3.
+export const TIER_SEATS_LIMIT = 200;
+export const TIER_PROJECTS_LIMIT = 50;
+export const TIER_IDEAS_LIMIT = 1000;
