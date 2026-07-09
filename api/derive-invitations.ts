@@ -46,6 +46,10 @@ const OP_STATES: Readonly<Record<string, InvitationState>> = {
 const OP_ADDRESS_PATTERN =
     /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
 
+const INVITATION_OP_KINDS = [
+    'acceptance', 'decline', 'revocation',
+] as const;
+
 export interface DerivedInvitationRow {
     readonly id: Id;
     readonly organization_id: Id;
@@ -71,6 +75,37 @@ async function invitationOpStates(
         states.set(match[1]!, state);
     }
     return states;
+}
+
+// ENTITY-SCOPED sibling of invitationOpStates above (Phase 14
+// Task 1): the SAME OP_STATES mutual-exclusivity covenant,
+// restricted to ONE known invitation id via three INDEXED
+// getAllWhere('uri_prefix', ...) reads (one per op kind) rather
+// than the whole-ledger db.requests.getAll() invitationOpStates
+// needs to DISCOVER every invitation's own op prefix out of an
+// unknown set of ids. dbOrView-shaped and opens no nested
+// transaction — callable from WITHIN an already-open write-gate
+// transaction (currentInvitationState's own accept/decline/
+// revoke in-tx reads, api/invitations-domain.ts — a LATER task
+// wires the call site; this task lands the core alone).
+// undefined means no terminal op has landed yet — the invitation
+// is still 'pending' (or the id names no invitation at all), a
+// distinction only a caller that already knows the id is genuine
+// can resolve.
+export async function invitationOpStateFor(
+    dbOrView: DbAdapter,
+    id: Id,
+): Promise<InvitationState | undefined> {
+    for (const op of INVITATION_OP_KINDS) {
+        const prefix = canonicalUriPrefix(
+            undefined, '/invitations/' + id + '/' + op + '/',
+        );
+        const rows = await dbOrView.requests.getAllWhere(
+            'uri_prefix', prefix,
+        );
+        if (rows.length > 0) return OP_STATES[op];
+    }
+    return undefined;
 }
 
 // Reads db.requests/db.responses ONLY. invitationsForInvitee and

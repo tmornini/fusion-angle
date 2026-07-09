@@ -480,6 +480,24 @@ export async function handleRequest(
             (method === 'PUT' || method === 'DELETE')
             && routePattern === 'states/:id/field-values/:fvid'
         ) {
+            // NAMED DEVIATION (Phase 14 Task 7, controller-
+            // adjudicated): Author gate 6 intended this
+            // lookup re-anchored onto the pair plane.
+            // INFEASIBLE — op-born parent events (work-order
+            // transition/claim, document-trio embedded
+            // events) carry NO states/:id pair; the id lives
+            // only inside an op pair's BODY, addressed by the
+            // OWNING ENTITY, never the event id — exactly why
+            // deriveStates/deriveStatesFor (derive-states.ts)
+            // union SIX sources rather than read states/:id
+            // pairs alone. A pair-plane lookup here would need
+            // an unbounded cross-organization scan on this hot
+            // pre-dispatch path, or silently misread an
+            // op-born foreign parent as absent — a cross-
+            // tenant regression. Stays states-table-based,
+            // joining the Final-gated residual family (entity-
+            // table probes, EntityStore tombstones); retires
+            // at Phase Final alongside state_field_values.
             const parentEvent = await adapter.rawReadRow<
                 { id: string; entity_id: Id }
             >('states', param(params, 0));

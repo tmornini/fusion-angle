@@ -296,6 +296,16 @@ test(
 
 // ── 4. UNDO round-trip: GET returns the target graph ──────
 
+// NAMED REWRITE (Phase 14 Task 8, undo-as-replay): no
+// flow_versions row is published or consumed any more — undo
+// resolves its own restore target from the flows/:id
+// document-pair history, and computes graphDelta/revivals
+// SERVER-SIDE (api/flow-graph-diff.ts) from the CURRENT vs
+// TARGET graphs it reads off that history, never from a
+// client-supplied delta. The setup (create → save targetGraph →
+// save advancedGraph) is UNCHANGED — it already shapes exactly
+// the "one step back" undo needs — only the undo call itself
+// shrinks to the state trio's two free fields.
 test(
     'after undo GET /flows/:id returns the'
     + ' target (undone) graph from relations',
@@ -311,8 +321,8 @@ test(
             name: 'Undo Test Flow',
         });
 
-        // Step 2: save the target graph, then capture a
-        // version to undo back to.
+        // Step 2: save the target graph — undo's own pair-plane
+        // walk will resolve back to THIS state.
         const targetGraph = buildNonTrivialGraph();
         await putFlow(ctx, flowId, {
             name: 'Undo Test Flow',
@@ -323,8 +333,6 @@ test(
             nodes: targetGraph.nodes,
             edges: targetGraph.edges,
         });
-        const verId = 'ver-undo-target';
-        await postFlowVersion(ctx, verId, flowId);
 
         // Step 3: advance to a different (smaller) graph.
         const advancedGraph: StoredGraph = {
@@ -344,103 +352,14 @@ test(
             edges: advancedGraph.edges,
         });
 
-        // Step 4: issue an undo that reverts to the target
-        // graph and consumes the version row. The delta
-        // re-introduces the nodes/edges the target carries
-        // that the advanced graph dropped.
-        // Use nowUtc() so the undo timestamps are always
-        // after the advance's deletion events.
-        const now = nowUtc();
+        // Step 4: issue the undo — the server resolves the
+        // target (targetGraph, above) and computes its own
+        // graphDelta/revivals from CURRENT (advancedGraph) vs
+        // TARGET, re-introducing what the advance dropped and
+        // deleting what it added.
         await ctx.POST('flows/' + flowId + '/undo', {
-            flow: buildFlowBody({
-                name: 'Undo Test Flow',
-                isLocked: false,
-                isAutoLayout: false,
-                isAutoFit: false,
-                lockTimeout: DEFAULT_LOCK_TIMEOUT,
-                nodes: targetGraph.nodes,
-                edges: targetGraph.edges,
-            }),
             eventId: 'undo-ev-1',
-            at: now,
-            // Task 5: the post-undo reduced graph — REQUIRED
-            // plumbing, consumed only by the undo route's own
-            // synthesized document pair.
-            graph: storedGraphField(targetGraph),
-            consumedVersionId: verId,
-            graphDelta: {
-                nodes: targetGraph.nodes.map(n => ({
-                    id: n.id,
-                    flow_id: flowId,
-                    name: n.name,
-                    position_x: n.positionX,
-                    position_y: n.positionY,
-                    is_create: n.isCreate,
-                    is_archive: n.isArchive,
-                    task_instructions: n.taskInstructions,
-                    at: now,
-                })),
-                edges: targetGraph.edges.map(e => ({
-                    id: e.id,
-                    flow_id: flowId,
-                    name: e.name,
-                    from_node_id: e.fromNodeId,
-                    to_node_id: e.toNodeId,
-                    at: now,
-                })),
-                memberEvents: targetGraph.nodes
-                    .filter(n => n.memberIds.length > 0)
-                    .flatMap(n =>
-                        n.memberIds.map(mid => ({
-                            id: generateCryptoSafeBase62(),
-                            flow_node_id: n.id,
-                            member_id: mid,
-                            action: 'added' as const,
-                            at: now,
-                        })),
-                    ),
-                attributeEvents: targetGraph.nodes
-                    .filter(n => n.attributes.length > 0)
-                    .flatMap(n =>
-                        n.attributes.map(a => ({
-                            id: generateCryptoSafeBase62(),
-                            flow_node_id: n.id,
-                            attribute_id: a.attributeId,
-                            mode: a.mode,
-                            is_required: a.isRequired,
-                            action: 'added' as const,
-                            at: now,
-                        })),
-                    ),
-                // ex1 was introduced by the advance but is
-                // absent in the target — the undo deletes it.
-                deletions: [
-                    {
-                        eventId: generateCryptoSafeBase62(),
-                        entityId: 'ex1',
-                        at: now,
-                    },
-                ],
-            },
-            revivals: [
-                // mid was in the target but not the advanced;
-                // it was soft-deleted by the advance. Restore.
-                {
-                    eventId: generateCryptoSafeBase62(),
-                    entityId: 'mid',
-                    at: now,
-                },
-                {
-                    eventId: generateCryptoSafeBase62(),
-                    entityId: 'e1',
-                    at: now,
-                },
-                {
-                    eventId: generateCryptoSafeBase62(),
-                    entityId: 'e2',
-                    at: now,
-                },
-            ],
+            at: nowUtc(),
         });
 
         // Step 5: GET must return the target (undone) graph.

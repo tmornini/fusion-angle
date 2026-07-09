@@ -30,6 +30,12 @@ export interface FlowGraph {
     lockTimeout: number;
     nodes: GraphNode[];
     edges: GraphEdge[];
+    // Phase 14 Task 8 (undo-as-replay): a cheap, approximate
+    // "has this flow ever been edited past genesis" signal,
+    // carried verbatim from FlowWithGraph.hasUndoHistory — see
+    // that field's own doc comment (api/types.ts) for the
+    // approximation and its degrade-gracefully failure mode.
+    hasUndoHistory: boolean;
 }
 
 function parseGraph(
@@ -194,5 +200,6 @@ export async function getFlowGraph(
         lockTimeout: flow.lock_timeout,
         nodes: g.nodes,
         edges: g.edges,
+        hasUndoHistory: flow.hasUndoHistory,
     });
 }

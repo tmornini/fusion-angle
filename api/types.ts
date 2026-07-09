@@ -1057,13 +1057,22 @@ export interface FlowEntity {
     lock_timeout: number;
 }
 
-// The GET-response shape for a flow: the stored row PLUS the
-// `graph` field the GET handlers derive by reassembling the
-// four relation tables (single GET /flows/:id and the list GET
-// /flows). The stored row no longer carries the blob; readers
-// that need the graph annotate their GET as FlowWithGraph.
+// The GET-response shape for a flow: the stored row plus the
+// `graph` field (the head document pair's OWN `graph` field,
+// carried verbatim — api/derive-flows.ts's flowEntityOf; single
+// GET /flows/:id and the list GET /flows both serve this
+// shape). `hasUndoHistory` (Phase 14 Task 8) is a CHEAP,
+// approximate signal — this flow's own flows/:id document-pair
+// count exceeds 1 (i.e. it has been edited past genesis) —
+// reusing whatever GET already fetched the flow (page load,
+// the post-undo refresh) rather than a new wire read; a rare
+// false positive (undo has already reached genesis, but a
+// save/undo cycle since kept the pair count above 1) degrades
+// to a silent server-side no-op on the next undo, never a
+// crash or wrong restore.
 export type FlowWithGraph = FlowEntity & {
     graph: JsonObjectField;
+    hasUndoHistory: boolean;
 };
 
 export interface FlowVersionEntity {
@@ -1268,6 +1277,20 @@ export interface FlowRecordEntity {
     flow_id: Id;
     record_id: RecordId;
     at: string;
+}
+
+// A flow tag: the codebase's FIRST pair-plane-ONLY document
+// family (Phase 14 Task 9) — no backing table, derived entirely
+// from message pairs at /flows/:id/tags/:name. `id` is the tag's
+// own NAME — user-authored address text (validateFlowTagName,
+// api/validators.ts), never a generated id, unlike every sibling
+// entity's `id` above. The body carries ONLY the pinned response
+// id of the flow document pair this tag names — never a copy of
+// the flow's own content (Entangled Nouns).
+export interface FlowTagEntity {
+    id: string;
+    flow_id: Id;
+    flow_response_id: Id;
 }
 
 // Per-field values written when a state event

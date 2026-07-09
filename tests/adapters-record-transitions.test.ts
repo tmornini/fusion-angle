@@ -318,7 +318,13 @@ test(
             state: 'n-step',
             at: AT_FIRST,
         });
-        await db.stateFieldValues.put('fv-1', {
+        // NAMED re-pin (Phase 14 Task 6): GET states/:id/field-
+        // values is flipped by default now — a raw
+        // db.stateFieldValues.put leaves no pair at the leaf
+        // address (states/:id/field-values/:fvid), so the row
+        // must land through the SAME wire-reachable PUT the
+        // live route serves.
+        await ctx.PUT('states/t-step/field-values/fv-1', {
             state_event_id: 't-step',
             attribute_id: 'a-1',
             value: 'me@example.com',

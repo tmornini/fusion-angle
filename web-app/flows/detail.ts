@@ -17,7 +17,6 @@ import {
     getFlowGraph,
     getFlowMermaid,
     getFlowZip,
-    getFlowVersions,
     getHumanMembers,
     getAIMembers,
     getRecordEntities,
@@ -288,6 +287,23 @@ async function reportOpFailure(
     });
 }
 
+// Fix wave (Phase 14 Task 8, post-Task-11-browser-regression):
+// undo/redo no longer follow their own commit with a SAVE-
+// TRIGGERING commitAndFit(...withLayoutReconciled()) — op.freshSnap
+// already carries server-reconciled positions (performUndo/
+// performRedo build it from getFlowGraph, whose
+// withRenderableLayout ALWAYS recomputes fresh positions for an
+// auto-layout flow, purely client-side, no write). A further
+// reconcile-and-save was therefore redundant for display AND
+// actively harmful for undo-as-replay: it landed its OWN
+// document pair immediately after every undo/redo, which the
+// cursor (api/derive-flows.ts's resolveFlowUndoTarget) treats as
+// a full, indistinguishable history step — so the NEXT undo
+// click reverted that reconcile-only noise instead of reaching
+// the user's actual prior edit (the Task 11 browser report's
+// "Undo flips the toolbar but the canvas never visibly
+// changes"). reconcileFitFromDom() alone still adjusts the
+// VIEWPORT (zoom/pan) — a read-only, non-saving operation.
 async function handleUndo(): Promise<void> {
     const snap = pageState.presenter().snapshot();
     const op = await performUndo(
@@ -299,9 +315,7 @@ async function handleUndo(): Promise<void> {
     }
     pageState.setHistory(op.newHistory);
     commit(op.freshSnap);
-    commitAndFit(
-        pageState.presenter().withLayoutReconciled(),
-    );
+    reconcileFitFromDom();
 }
 
 async function handleRedo(): Promise<void> {
@@ -315,9 +329,7 @@ async function handleRedo(): Promise<void> {
     }
     pageState.setHistory(op.newHistory);
     commit(op.freshSnap);
-    commitAndFit(
-        pageState.presenter().withLayoutReconciled(),
-    );
+    reconcileFitFromDom();
 }
 
 async function handleDeleteSelected(): Promise<void> {
@@ -1418,17 +1430,23 @@ export async function init(
     });
 }
 
+// Undo-as-replay (Phase 14 Task 8): no longer fetches
+// getFlowVersions to seed hasUndoHistory — flow_versions stops
+// being written on the live path entirely (Step 0), so that
+// list would always be empty. getFlowGraph's own response now
+// carries hasUndoHistory verbatim (FlowGraph.hasUndoHistory,
+// api/derive-flows.ts's cheap document-pair-count
+// approximation) — one fewer round-trip at load, not one more.
 async function loadFlowDesignerBundle(
     flowId: string,
 ) {
     const ctx = sessionContext();
     const [
-        graph, versions,
+        graph,
         humanMembers, aiMembers,
         records, boundRecordId,
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
-        getFlowVersions(ctx, flowId),
         getHumanMembers(ctx),
         getAIMembers(ctx),
         getRecordEntities(ctx),
@@ -1441,7 +1459,7 @@ async function loadFlowDesignerBundle(
             )
             : [];
     return {
-        graph, versions,
+        graph,
         humanMembers, aiMembers,
         records, boundRecordId,
         recordAttributes,
@@ -1459,7 +1477,7 @@ function onFlowLoaded(
     pageState.setNeedsFit(true);
     pageState.setHistory(
         buildFlowHistorySnapshot(
-            loaded.versions.length > 0,
+            loaded.graph.hasUndoHistory,
         ),
     );
 
@@ -1472,12 +1490,17 @@ function onFlowLoaded(
             loaded.aiMembers,
             loaded.recordAttributes,
         );
+    // migrateToCenter=true ONLY here — this is the one
+    // per-load construction, never the commit()-driven
+    // per-render path (flow-designer.ts's constructor comment
+    // has the full fix-wave-2 root cause).
     const presenter =
         new FlowDesignerPresenter(
             initialSnap,
             FALLBACK_W,
             FALLBACK_H,
             pageState.history(),
+            true,
         );
     pageState.setPresenter(presenter);
     const panelStateRef: PanelStateRef =

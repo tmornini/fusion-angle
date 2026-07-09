@@ -7,7 +7,6 @@ import { showToast } from '../toast.ts';
 import {
     sessionContext,
     putFlow,
-    postFlowVersion,
     HumanMember,
     AIMember,
 } from '../adapters/index.ts';
@@ -25,7 +24,6 @@ import type {
     MemberId,
 } from '../../../api/types.ts';
 import {
-    generateCryptoSafeBase62,
     type RecordAttribute,
 } from '../adapters/index.ts';
 import {
@@ -153,18 +151,42 @@ export class FlowDesignerPresenter {
     #needsFit: boolean;
     #history: FlowHistorySnapshot;
 
+    // Fix wave (Phase 14 Task 8, post-Task-11-browser-
+    // regression, round 2): migrateToCenter defaults FALSE
+    // because `commit()` (detail.ts) builds a BRAND NEW
+    // presenter on EVERY commit — including undo/redo's own
+    // `commit(op.freshSnap)` — so an unconditional migrate
+    // check here fired the legacy-recenter #queueSave on every
+    // single re-render, not just page load. Auto-layout's own
+    // output is already centered (applyAutoLayout / runFlowLayout
+    // sum to zero), so the ONLY legitimate target for this
+    // migration is a freshly LOADED, possibly-legacy graph —
+    // onFlowLoaded (detail.ts) is the one call site that opts
+    // in. Every other construction (commit(), including undo/
+    // redo's) now leaves an off-center snapshot exactly as
+    // given: no silent recenter, no silent save. That silent
+    // save was landing as a "genuine" (non-undo-correlated)
+    // document pair 3-7s after undo/redo — exactly the kind of
+    // pair resolveFlowUndoTarget's stack+pointer walk treats as
+    // a real edit, corrupting the target for the NEXT undo
+    // click (it kept re-resolving to "one step back from the
+    // recenter noise" instead of the user's actual prior edit —
+    // the same class of symptom the two prior fix-wave commits
+    // targeted, from a third source neither touched).
     constructor(
         snap: FlowSnapshot,
         canvasW: number,
         canvasH: number,
         history: FlowHistorySnapshot,
+        migrateToCenter: boolean = false,
     ) {
         this.#canvasW = canvasW;
         this.#canvasH = canvasH;
         this.#needsFit = true;
         this.#history = history;
-        this.#snapshot =
-            this.#computeMigrateToCenter(snap);
+        this.#snapshot = migrateToCenter
+            ? this.#computeMigrateToCenter(snap)
+            : snap;
     }
 
     history(): FlowHistorySnapshot {
@@ -189,24 +211,56 @@ export class FlowDesignerPresenter {
         };
     }
 
-    #saveChain: Promise<void> = Promise.resolve();
+    // Saves ORIGINATING FROM THIS PRESENTER'S OWN methods
+    // are SERIALIZED on one promise chain PER FLOW, so the
+    // presenter's concurrent gestures can never reorder
+    // against each other; a failed save surfaces through
+    // reportFault and the chain survives for the saves
+    // queued behind it. NOT covered: flow-operations.ts's
+    // commitFlowMutation writes (graph edits, redo) call
+    // putFlow directly — those rely on putFlow's own
+    // optimistic-concurrency retry, so contention there
+    // degrades to a visible fault, never silent loss;
+    // routing them through this queue is a named
+    // fast-follow (Phase 14 final review). Fix
+    // wave (Phase 14 Task 8, post-Task-11-browser-regression):
+    // this chain lives at MODULE scope, keyed by flowId — NOT
+    // as an instance field — because `commit()` (detail.ts)
+    // constructs a BRAND NEW FlowDesignerPresenter on EVERY
+    // commit; an instance field resets to a fresh
+    // Promise.resolve() each time, so the "serialized" claim
+    // was pure fiction the moment TWO DIFFERENT commits each
+    // queued a save (the load-time auto-layout reconcile
+    // racing the FIRST user edit is exactly this: two
+    // presenter instances, two unlinked chains, two
+    // concurrent putFlow calls targeting the SAME baseline —
+    // the `responses.follows` collision the Task 11 browser
+    // report caught). Keyed by flowId so saves for DIFFERENT
+    // flows never serialize against each other; persists for
+    // the life of the page's module (module-level Maps in a
+    // single-flow-per-tab app never grow unboundedly in
+    // practice — a demo-tier concession, not correctness-
+    // load-bearing).
+    static readonly #saveChains = new Map<string, Promise<void>>();
 
-    // Saves are SERIALIZED on one promise chain, so
-    // concurrent gestures can never reorder against
-    // each other; a failed save surfaces through
-    // reportFault and the chain survives for the
-    // saves queued behind it.
-    #queueSave(
-        versioned: boolean,
-        snap: FlowSnapshot,
-    ): void {
-        this.#saveChain = this.#saveChain.then(
+    // Undo-as-replay (Phase 14 Task 8) drops the versioned/
+    // non-versioned split: every save used to OPTIONALLY
+    // archive the pre-edit state through postFlowVersion
+    // first (feeding the OLD undo mechanism's flow_versions
+    // consume) — undo now resolves its target from the
+    // flows/:id document-pair history instead, so that
+    // archive write served no purpose once its one reader
+    // (the undo route's own consume) was retired, whichever
+    // call site queued it.
+    #queueSave(snap: FlowSnapshot): void {
+        const chains = FlowDesignerPresenter.#saveChains;
+        const previous =
+            chains.get(snap.flowId) ?? Promise.resolve();
+        const next = previous.then(
             async () => {
                 const ctx = sessionContext();
                 try {
-                    await this.#persistFlow(
-                        ctx, versioned, snap,
-                    );
+                    await this.#persistFlow(ctx, snap);
                 } catch (err) {
                     reportFault(
                         ctx,
@@ -216,20 +270,13 @@ export class FlowDesignerPresenter {
                 }
             },
         );
+        chains.set(snap.flowId, next);
     }
 
     async #persistFlow(
         ctx: RequestContext,
-        versioned: boolean,
         snap: FlowSnapshot,
     ): Promise<void> {
-        if (versioned) {
-            await postFlowVersion(
-                ctx,
-                generateCryptoSafeBase62(),
-                snap.flowId,
-            );
-        }
         await putFlow(
             ctx, snap.flowId, this.#buildSaveShape(snap),
         );
@@ -261,7 +308,7 @@ export class FlowDesignerPresenter {
             isLocked: result.isLocked,
             isEditingName: result.isEditingName,
         };
-        this.#queueSave(false, next);
+        this.#queueSave(next);
         return next;
     }
 
@@ -276,7 +323,7 @@ export class FlowDesignerPresenter {
             ...this.#snapshot,
             isAutoLayout: toggled,
         };
-        this.#queueSave(false, next);
+        this.#queueSave(next);
         if (toggled) {
             next = this.#applyLayoutReconcile(next);
         }
@@ -303,7 +350,7 @@ export class FlowDesignerPresenter {
             ...this.#snapshot,
             isAutoFit: toggled,
         };
-        this.#queueSave(false, next);
+        this.#queueSave(next);
         if (toggled) {
             this.#applyZoomToFit(next);
         }
@@ -341,7 +388,7 @@ export class FlowDesignerPresenter {
             flowName: result.flowName,
             isEditingName: result.isEditingName,
         };
-        this.#queueSave(true, next);
+        this.#queueSave(next);
         this.#noteMutation();
         return next;
     }
@@ -379,7 +426,7 @@ export class FlowDesignerPresenter {
                 positionY: n.positionY - centerY,
             })),
         };
-        this.#queueSave(false, next);
+        this.#queueSave(next);
         return next;
     }
 
@@ -704,7 +751,7 @@ Auto Fit</label>
                 this.#snapshot.nodes, updates,
             ),
         };
-        this.#queueSave(true, moved);
+        this.#queueSave(moved);
         this.#noteMutation();
         return this.#applyLayoutReconcile(moved);
     }
@@ -760,7 +807,7 @@ Auto Fit</label>
             nodes: result.nodes,
             edgeWaypoints: result.edgeWaypoints,
         };
-        this.#queueSave(false, next);
+        this.#queueSave(next);
         return next;
     }
 
@@ -781,7 +828,7 @@ Auto Fit</label>
                 { name: name.trim() },
             ),
         };
-        this.#queueSave(true, next);
+        this.#queueSave(next);
         this.#noteMutation();
         return next;
     }
@@ -803,7 +850,7 @@ Auto Fit</label>
                 { taskInstructions: text },
             ),
         };
-        this.#queueSave(true, next);
+        this.#queueSave(next);
         this.#noteMutation();
         return next;
     }
@@ -825,7 +872,7 @@ Auto Fit</label>
                 { memberIds },
             ),
         };
-        this.#queueSave(true, next);
+        this.#queueSave(next);
         this.#noteMutation();
         return next;
     }
@@ -850,7 +897,7 @@ Auto Fit</label>
                 { name: name.trim() },
             ),
         };
-        this.#queueSave(true, next);
+        this.#queueSave(next);
         this.#noteMutation();
         return next;
     }

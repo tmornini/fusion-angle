@@ -130,6 +130,7 @@ const MEMBER_VERBS: Readonly<
     '/flows/:id/versions': ['GET', 'PUT', 'POST', 'DELETE'],
     '/flows/:id/work-orders': ['GET', 'PUT'],
     '/flows/:id/records': ['GET', 'PUT', 'DELETE'],
+    '/flows/:id/tags': ['GET', 'PUT', 'DELETE'],
     '/records': ['GET', 'PUT', 'DELETE', 'POST'],
     '/record-attributes': ['GET', 'PUT', 'DELETE'],
     '/states/:id/field-values': ['GET', 'PUT', 'DELETE'],

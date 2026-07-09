@@ -588,6 +588,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'flows/:id/undo',
     'flows/:id/versions',
     'flows/:id/versions/:vid',
+    'flows/:id/tags/:name',
     'work-orders',
     'work-orders/:id',
     'work-orders/:id/claim',
@@ -670,6 +671,14 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'flows',
         'flows/:id',
         'flows/:id/versions/:vid',
+        // SIMPLE class (Phase 14 Task 9, gate 8): the locked
+        // class 'flows' itself rides is structurally MOOT here —
+        // api.ts's isLockedWrite exact-matches routePattern ===
+        // family + '/:id', and this 4-segment pattern never
+        // equals 'flows/:id' — so registering it here safely
+        // opts this address into the ordinary head-read/
+        // Supersedes chain, never the locked four-outcome table.
+        'flows/:id/tags/:name',
         'work-orders',
         'work-orders/:id',
         'flows/:id/work-orders/:woid',

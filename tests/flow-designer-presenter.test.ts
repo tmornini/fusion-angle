@@ -353,3 +353,45 @@ test(
         );
     },
 );
+
+// Fix wave 2 (Task 11 browser regression, round 2): pins the
+// mechanism narrated in flow-designer.ts's constructor
+// comment. commit() (detail.ts) — including undo/redo's own
+// commit(op.freshSnap) — builds a presenter via the plain
+// 4-arg constructor on EVERY render. Before this fix, the
+// constructor ALWAYS ran the legacy migrate-to-center check
+// and silently queued a save whenever the snapshot's node
+// centroid drifted off origin — corrupting undo-as-replay's
+// document-pair history on every such render, not just page
+// load. This test cannot reach #queueSave at all (Node has no
+// IndexedDB — see this file's other tests' centered-input
+// convention) so it asserts the STRUCTURAL guarantee that
+// implies no save was queued: an off-center snapshot survives
+// the plain constructor byte-for-byte. Only the 5-arg,
+// migrateToCenter=true form (onFlowLoaded's own one call
+// site) may recenter.
+test(
+    'the plain (commit()-style) constructor leaves an'
+    + ' off-center snapshot untouched — no silent'
+    + ' migrate-to-center save on every re-render',
+    () => {
+        const graph = {
+            ...emptyGraph,
+            nodes: [
+                node('n1', 500, 500),
+                node('n2', 500, 500),
+            ],
+        };
+        const snap = buildInitialFlowSnapshot(
+            graph, 800, 600, [], [], [],
+        );
+        const presenter = new FlowDesignerPresenter(
+            snap, 800, 600,
+            buildFlowHistorySnapshot(false),
+        );
+        const n1 = presenter.snapshot().nodes
+            .find(n => n.id === 'n1')!;
+        assert.equal(n1.positionX, 500);
+        assert.equal(n1.positionY, 500);
+    },
+);

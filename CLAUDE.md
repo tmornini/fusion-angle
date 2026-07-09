@@ -100,29 +100,41 @@ is HTTP-only.
 - **Auth.** Real OAuth 2.1 spine. `/authentication/token`
   (grant dispatch) + `/authentication/authorize` (password
   loop) mint/verify HMAC-SHA256 JWTs (`api/access-token.ts`);
-  a Bearer gate in `handleRequest` enforces them, backed by
-  token-lifecycle + revocation ledgers and PBKDF2 password
-  hashing. The HMAC key is client-shipped, so isolation is
+  a Bearer gate in `handleRequest` enforces them. Token
+  lifecycle (issue/rotate/revoke) lives only as message-pair
+  events now — `identity_tokens` and `authorization_codes`
+  are RETIRED tables (Phase 13 Task 9); the
+  `identity_token_revocations` ledger and PBKDF2 password
+  hashing back the gate too. Every per-request check —
+  revocation, the tenancy fence, roles — derives fresh from
+  the pair plane, never a snapshot the token claim itself
+  carries. The HMAC key is client-shipped, so isolation is
   demo-grade until the server tier. The snapshot plane
   (`BOOTSTRAP_ROUTES`) is intentionally auth-free dev-tier —
   removed or re-gated when the Postgres server tier lands; see
   [ARCHITECTURE.md](ARCHITECTURE.md) § Server-tier deploy
   blockers.
 - **Tenancy.** Every authenticated request runs org-scoped:
-  `handleRequest` wraps the adapter in `orgScopedAdapter`
-  bound to the org from the VERIFIED token claim (never the
-  path). A flat (un-exchanged) token resolves its org via
-  `identityDefaultOrganization`: the identity's SET default org
+  `handleRequest` wraps the adapter in
+  `organizationScopedAdapter` bound to the org from the
+  VERIFIED token claim (never the path). A flat (un-exchanged)
+  token resolves its org via `identityDefaultOrganization`:
+  the identity's SET default org
   (`identity_default_organizations` ledger, latest wins), else its
   PRIMARY membership org, else a 403 — there is no global default.
-  `organizations` is the tenant root; `memberships`
-  joins identity↔org; the members roster is derived from that
-  ledger. A `memberships` row is created when an invitee
-  ACCEPTS an `invitations` grant (the only live membership
-  write; `web-app/app/adapters/invitations.ts` + the
-  `invitations` facade in `api/api.ts`) — accept stamps the
-  INVITATION's org, not the caller's active org. Per-org roles
-  via `currentRolesForInOrganization`. See [SCHEMA.md](SCHEMA.md) /
+  The membership fence itself derives fresh every request too
+  (`callerOrganizationIds` → `deriveMembershipsForIdentity`,
+  Phase 13), so a revoked membership loses access on the very
+  next request, never waiting on token expiry. `organizations`
+  is the tenant root; `memberships` joins identity↔org; the
+  members roster is derived from that ledger. A `memberships`
+  row is created when an invitee ACCEPTS an `invitations`
+  grant (the only live membership write;
+  `web-app/app/adapters/invitations.ts` + the `invitations`
+  facade in `api/api.ts`) — accept stamps the INVITATION's
+  org, not the caller's active org. Per-org roles (also
+  derived, `deriveRoleGrants`) via
+  `currentRolesForInOrganization`. See [SCHEMA.md](SCHEMA.md) /
   [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over IndexedDB. Adapters
   in `web-app/app/adapters/` shape rows for pages. The live
@@ -130,7 +142,13 @@ is HTTP-only.
   `flow_edges`, `flow_node_members`, `flow_node_attributes`)
   and reassembled at the GET route into `FlowWithGraph`;
   `flows.graph` is retired live but kept frozen
-  (`flow_versions.graph`, `work_orders.flow_graph`).
+  (`flow_versions.graph`, `work_orders.flow_graph`). Flow
+  undo now resolves its restore target from the flow's own
+  document-pair history (Phase 14 Task 8) — `flow_versions`
+  no longer receives writes on the live path (table/routes
+  remain, Phase Final retires). Flow tags
+  (`flows/:id/tags/:name`) are the first document family with
+  no backing table, derived entirely from message pairs.
 - **Presentation.** Presenters in `web-app/app/presenters/` emit
   `SafeHtml`.
 - **Database.** IndexedDB (`api/backend-indexeddb.ts`): one
@@ -237,8 +255,9 @@ in-browser): REST routing, DB adapter interface, mock data,
 validators, plus the auth/authz/tenancy spine:
 `authentication.ts` (OAuth grants), `access-token.ts` (JWT
 mint/verify), `authorization.ts` (per-org roles),
-`db-org-scoped.ts` / `store-org-scoped.ts` (the org fence),
-and the identity/organizations/memberships stores.
+`db-organization-scoped.ts` / `store-organization-scoped.ts`
+(the org fence), and the identity/organizations/memberships
+stores.
 `shared/` — code that crosses the client/server chasm, imported
 by both `api/` and `web-app/`: the HTTP wire schema
 (`http-message/`, with its own `types.ts`) plus pure cross-chasm
@@ -309,7 +328,15 @@ formatter), and the invitation lifecycle
 (`adapters-invitations.test.ts` for grant/accept/decline/
 revoke + derive-from-states, `api-invitations-fence.test.ts`
 for the org fence + authz, `presenter-invitation-list.test.ts`
-for the SafeHtml) — see `tests/` for the current set.
+for the SafeHtml); Phase 14 added the view-accepting
+write-path cores' drift/parity suite
+(`drift-phase14-cores-parity.test.ts`), the SFV two-source-
+union derive (`drift-state-field-values.test.ts`), the
+invitation write-path parity pin
+(`pin-invitation-write-path-parity.test.ts`), the undo-as-
+replay cursor algorithm (`flow-undo-cursor.test.ts`), and the
+first pair-plane-only document family
+(`api-flow-tags.test.ts`) — see `tests/` for the current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so
 adapter and api-layer tests run without `localStorage`.
 

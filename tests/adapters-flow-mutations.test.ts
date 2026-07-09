@@ -412,47 +412,33 @@ test(
     },
 );
 
+// NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the old body
+// carried a client-computed `flow`/`graph`/`graphDelta`/
+// `revivals` and a `consumedVersionId` to delete — all retired.
+// Undo now resolves its own restore target from the flows/:id
+// document-pair history (api/derive-flows.ts's
+// resolveFlowUndoTarget), so the setup needs a genuine PRIOR
+// SAVE to restore to (a flow_versions row is no longer read at
+// all) and the POST body shrinks to the state trio's two free
+// fields.
 test(
     'POST flows/:id/undo posts the updated event'
     + ' at the caller time',
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
-        // Seed a version row to consume — version-publish rides
-        // its own POST (Decision 3), so no PUT is needed here.
-        await ctx.POST('flows/flow-1/versions', {
-            id: 'ver-1',
-            version: {
-                flow_id: 'flow-1',
-                name: 'v1',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: JSON.stringify({ nodes: [], edges: [] }),
-                at: '2026-01-01T00:00:00.000000Z',
-            },
-            trimIds: [],
+        await putFlow(ctx, 'flow-1', {
+            name: 'edited',
+            isLocked: false,
+            isAutoLayout: false,
+            isAutoFit: false,
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+            nodes: [],
+            edges: [],
         });
         await ctx.POST('flows/flow-1/undo', {
-            flow: buildFlowBody({
-                name: 'undone',
-                isLocked: false,
-                isAutoLayout: false,
-                isAutoFit: false,
-                lockTimeout: DEFAULT_LOCK_TIMEOUT,
-                nodes: [],
-                edges: [],
-            }),
             eventId: 'undo-ev',
             at: '2099-01-02T00:00:00.000000Z',
-            consumedVersionId: 'ver-1',
-            // Task 5: the post-undo reduced graph — REQUIRED
-            // plumbing, consumed only by the undo route's own
-            // synthesized document pair.
-            graph: JSON.stringify({ nodes: [], edges: [] }),
-            graphDelta: EMPTY_GRAPH_DELTA,
-            revivals: [],
         });
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/flow-1/history',

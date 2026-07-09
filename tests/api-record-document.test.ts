@@ -150,17 +150,35 @@ async () => {
 // 'member-b' as author would 409 against the already-stored
 // (current-authored) row — this proves the op replays the
 // STORED head's member_id rather than the editing actor's.
+// Phase 14 Task 5: the head read is now pair-plane-anchored
+// (documentStateHeadFor), so the FIRST (genesis) call must form
+// a real document pair for the second call's head-read to find
+// it — the below-gate convention this file otherwise follows
+// (its own header comment) omits pairs entirely, which the row-
+// plane read tolerated but the pair-plane one cannot; the
+// pair is formed via formWritePair, the SAME helper
+// document-family.test.ts's below-facade convention test uses.
 test('postRecordDocumentOp with an echoed trio writes the row'
 + ' and NO new event, replaying the stored head\'s member_id',
 async () => {
     const db = await freshDb();
+    const firstBody = {
+        ...recordDocument('First', 'active', AT, 'ev-2'),
+        organization_id: '1',
+    };
+    const firstPair = await formWritePair({
+        method: 'PUT', pathname: '/records/rec-2',
+        routePattern: 'records/:id',
+        routeSegments: ['records', ':id'],
+        pathSegments: ['records', 'rec-2'],
+        headerFields: [], body: firstBody,
+        requesterIdentityId: 'current',
+        requestAt: AT, organization: '1',
+        responseStatus: 200, responseBody: undefined,
+        headPairId: undefined,
+    });
     await postRecordDocumentOp(
-        db, 'rec-2',
-        {
-            ...recordDocument('First', 'active', AT, 'ev-2'),
-            organization_id: '1',
-        },
-        'current',
+        db, 'rec-2', firstBody, 'current', firstPair,
     );
     await postRecordDocumentOp(
         db, 'rec-2',

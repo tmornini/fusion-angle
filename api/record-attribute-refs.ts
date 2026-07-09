@@ -11,6 +11,9 @@ import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
     relationFailClosed,
 } from './flow-graph-relations.ts';
+import {
+    deriveStateFieldValueReferrers,
+} from './derive-state-field-values.ts';
 
 // Destroying a record attribute must not orphan its
 // covenants: state_field_values rows name the attribute in
@@ -29,20 +32,26 @@ export interface AttributeReferrers {
     readonly workOrderIds: readonly string[];
 }
 
-// Every table the referrer scan touches. The fenced
-// state_field_values read resolves each MATCHED row's owning
-// org through its parent state event and the org-owned probe
-// ring; the flow-node-attribute scan reads
-// flow_node_attributes + flow_nodes (+ states, already in
-// the ring, for the tombstone check). An in-tx caller must
+// Every table the referrer scan touches. The state-field-value
+// leg is pair-plane derived (Phase 14 Task 6,
+// deriveStateFieldValueReferrers in api/derive-state-field-
+// values.ts): requests + responses feed the derive, and each
+// candidate row's visibility is settled by view.states.getById
+// on its parent state event — the row-plane fence db-
+// organization-scoped.ts already carries, reused rather than
+// rebuilt. 'states' was already required regardless — every
+// EntityStore read here consults it for the soft-delete filter
+// (getDeletedIdsIn). The flow-node-attribute scan reads
+// flow_node_attributes + flow_nodes. An in-tx caller must
 // declare the whole ring — IndexedDB throws on any store a
 // transaction did not name.
 export const ATTRIBUTE_RESTRICT_TABLES:
     readonly string[] = [
-    'state_field_values', 'flows', 'work_orders',
+    'flows', 'work_orders',
     'states', 'ideas', 'projects', 'records',
     'objectives', 'invitations', 'memberships',
     'flow_node_attributes', 'flow_nodes',
+    'requests', 'responses',
 ];
 
 interface BoundGraph {
@@ -70,8 +79,10 @@ function graphBindsAttribute(
 // flow_node_id — a 'removed' row means no current binding).
 // Frozen work-order referrers still parse the
 // work_orders.flow_graph blob (the frozen plane keeps its
-// inlined graph). Field-value referrers are a keyed read on
-// state_field_values.
+// inlined graph). Field-value referrers are pair-plane derived
+// (Phase 14 Task 6) — ONE deriveStateFieldValueReferrers pass
+// ahead of the loop, keyed by attribute_id, rather than a
+// per-id table read (the pair plane has no such index).
 export async function collectAttributeReferrers(
     view: DbAdapter,
     attributeIds: readonly string[],
@@ -83,10 +94,12 @@ export async function collectAttributeReferrers(
             wo.flow_graph, 'work_orders.flow_graph',
         ),
     }));
+    const fieldValuesByAttribute =
+        await deriveStateFieldValueReferrers(view, attributeIds);
     const referrers = new Map<string, AttributeReferrers>();
     for (const attributeId of attributeIds) {
-        const values = await view.stateFieldValues
-            .getAllWhere('attribute_id', attributeId);
+        const values =
+            fieldValuesByAttribute.get(attributeId) ?? [];
         const attrRows =
             await view.flowNodeAttributes
                 .getAllWhere('attribute_id', attributeId);

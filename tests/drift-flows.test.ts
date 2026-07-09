@@ -314,10 +314,19 @@ function normalizedGraph(graph: string): unknown {
     };
 }
 
+// hasUndoHistory (Phase 14 Task 8) is excluded on BOTH sides:
+// it is a PAIR-PLANE-ONLY signal (this flow's own document-pair
+// count), with no old-table-plane equivalent to drift-check
+// against — assembleOldFlow (below) never sets it at all, so
+// comparing it here would fail on a field the old plane was
+// never asked to derive, not on genuine drift.
 function assertFlowsEqual(
     derived: FlowWithGraph, old: FlowWithGraph,
 ): void {
-    const { graph: derivedGraph, ...derivedRest } = derived;
+    const {
+        graph: derivedGraph, hasUndoHistory: _derivedHistory,
+        ...derivedRest
+    } = derived;
     const { graph: oldGraph, ...oldRest } = old;
     assert.deepEqual(derivedRest, oldRest);
     assert.deepEqual(
@@ -623,27 +632,19 @@ test('live-write chain: create, save, versioned save, node '
         1,
     );
 
-    // Undo: reverts to the published version, reviving n2/e1 —
-    // visible on BOTH planes.
+    // Undo (Phase 14 Task 8, undo-as-replay — NAMED REWRITE):
+    // no flow_versions row is read or consumed any more; undo
+    // resolves its own target from the flows/:id document-pair
+    // history — one step back from the current ("Trimmed") head
+    // is the "Chain Flow Versioned" pair (fullGraph, 2
+    // nodes/1 edge), so this reverts to THAT, reviving n2/e1 by
+    // the server's own current-vs-target diff — visible on
+    // BOTH planes.
     const undoAt = '2026-03-05T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
         'POST', '/flows/' + flowId + '/undo', token, {
-            flow: flowFields('Chain Flow Versioned'),
             eventId: flowId + '-undo-ev',
             at: undoAt,
-            consumedVersionId: flowId + '-v1',
-            graph: fullGraph,
-            graphDelta: emptyDelta(),
-            revivals: [
-                {
-                    eventId: flowId + '-revive-n2',
-                    entityId: n2, at: undoAt,
-                },
-                {
-                    eventId: flowId + '-revive-e1',
-                    entityId: e1, at: undoAt,
-                },
-            ],
         },
     ));
     assert.equal(undone.status, 204);

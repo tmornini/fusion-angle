@@ -25,15 +25,15 @@ That mechanism will replace the existing ledger's and common states system by mo
   |      └─|─ /pii                             • full physical removal from the DB required, i.e. physical delete, all others: Delete-At: header
   |      └─|─ /role-grants                     • all of them, single document
   |      └─|─ /third-party-identity-providers  • all of them, single document
-  |      └─|─ /token-revocations               • if the answer to the question directly above is "PUT/GET"
+  |      └─|─ /token-revocations               • RECONCILED: shipped FLAT, not nested here — GET|PUT /identity-token-revocations/:id (GLOBAL-plane, no organization_id), the answer WAS "PUT/GET"; GET stays admin-only, PUT widened to member-tier SELF-target only at WP8 (Phase 13 Task 8) — a member may revoke its own chain, naming another identity still requires admin — see the Auth RECONCILED 2026-07-06 block, go-to-church-peaceful-castle.md §Phases 3…N
   |      └─|─ /memberships/                    • /memberships/ with forced and/or filtered identity
   |      └─|─ /organizations/                  • /organizations/ with forced and/or filtered identity
   |      └─|─ /work-orders/                    • /work-orders/ with forced and/or filtered identity
-  |      └─|─ /tokens/
+  |      └─|─ /tokens/                         • RECONCILED: shipped FLAT, not nested here — GET /identity-tokens, GET|PUT /identity-tokens/:id, POST /identity-tokens/:jti/rotation, POST /identity-tokens/:jti/revocation; both GETs derive from the pair plane (Phase 13 Task 6), PUT is pair-only and rotation/revocation append event pairs only (Task 5) — Phase 13 Task 9 retired the identity_tokens row store outright (SNAPSHOT_SCHEMA_VERSION 1→2, alongside authorization_codes) — see the Auth RECONCILED 2026-07-06 block, go-to-church-peaceful-castle.md §Phases 3…N
   |        |  └── :id
-  |        |      ├── /rotation                • is this a POST?
-  |        |      └── /revocation              • is this a POST?
-  |        |      └── /revocation              • is this a POST, if not, a PUT/GET pair?
+  |        |      ├── /rotation                • is this a POST? — YES, see the /tokens/ RECONCILED note above
+  |        |      └── /revocation              • is this a POST? — YES, see the /tokens/ RECONCILED note above
+  |        |      └── /revocation              • is this a POST, if not, a PUT/GET pair? — POST, see above
   |        \
   |         \- identity authz realm 
 └─|─ /organizations/
@@ -42,7 +42,9 @@ That mechanism will replace the existing ledger's and common states system by mo
   |    |  └── /objectives                     • RECONCILED: shipped as per-objective documents at objectives/:id (the seventh registered family, 'simple' + lifecycle 'stateless'), collection served by the generic document handler over per-entity heads, revision history as per-objective message history at objectives/:id/revisions/, NOT a single org document — see the objectives FLIPPED 2026-07-05 block, go-to-church-peaceful-castle.md §Phased sequence (Author gates 1/3)
   |    |  └── /flows/
   |    |      └── :id
-  |    |          └── /undo
+  |    |          └── /undo                    • RECONCILED: undo-as-replay (Phase 14 Task 8) — body shrinks to {eventId, at}, both still client-minted; the restore target resolves SERVER-SIDE pre-tx by replaying this flow's OWN flows/:id document-pair history against its OWN undo operation-pair history (stack+pointer, cursor keyed by the undo pairs' stored REQUEST at, never the response at); graphDelta/revivals are now SERVER-computed (SIDECAR-KEEP: the wire SHAPE persists, the client is never told the target to diff against); flow_versions no longer receives a write on this path — routes/table REMAIN (DELETE NOTHING), Phase Final retires — see .superpowers/sdd/progress.md, Phase 14 Task 8
+  |    |          └── /tags/                   • RECONCILED: flow tags (Phase 14 Task 9) — GET|PUT|DELETE flows/:id/tags/:name, SIMPLE class (the locked four-outcome table is structurally MOOT here — isLockedWrite exact-matches flows/:id, never this 4-segment address); the codebase's FIRST document family with NO backing table at all, derived entirely from the pair plane — flow_response_id (one flow document pair's own pinned response id) is the tag's only body field; DELETE is a marked tombstone, no row to splice; API-only this phase, no designer UI — see .superpowers/sdd/progress.md, Phase 14 Task 9
+  |    |              └── :name
   |    |  └── /ideas/
   |    |      └── :id
   |    |  └── /memberships/                   • canonical storage (tenancy covenant)

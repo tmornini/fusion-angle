@@ -224,6 +224,23 @@ export interface StateStore {
     getAllForIn(tx: Tx, entityId: Id): Promise<StateEntity[]>;
     getDeletedIdsIn(tx: Tx): Promise<Set<Id>>;
     isDeletedIn(tx: Tx, id: Id): Promise<boolean>;
+    // FENCE MECHANICS (Phase 14 Task 6 fix wave): does a row
+    // with `id` exist AT ALL, ignoring any organization fence a
+    // wrapper applies on top — RAW presence, the same
+    // unfenced-escape shape as rawReadRow/rawOrganizationOwned
+    // Probes (store-parent-scoped.ts), scoped to this ONE store.
+    // A wrapper's getById cannot answer this alone: "no such
+    // row" and "a row owned by a different organization" both
+    // throw EntityNotFoundError identically, yet
+    // state_field_values' own parent-event visibility rule
+    // treats them oppositely (the former is a visible orphan,
+    // the latter is hidden — db-organization-scoped.ts's
+    // stateFieldValues resolver). Retires alongside the
+    // row-plane state_field_values plane at Phase Final.
+    // Phase 14 Task 7 adjudicated a pair-plane re-point of
+    // this same probe infeasible, for the same reason — see
+    // api/api.ts's Region B NAMED DEVIATION comment.
+    rawHasRow(id: Id): Promise<boolean>;
 }
 
 export type TxMode = 'readonly' | 'readwrite';

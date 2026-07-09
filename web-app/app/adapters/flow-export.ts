@@ -333,6 +333,7 @@ export async function getFlowZip(
         lockTimeout: flow.lock_timeout,
         nodes: graph.nodes,
         edges: graph.edges,
+        hasUndoHistory: flow.hasUndoHistory,
     };
 
     const enc = new TextEncoder();

@@ -316,17 +316,21 @@ export function buildSaveEvents(
     };
 }
 
-// Compute the revival set for an undo/redo-style op: every
-// node/edge id present in the TARGET graph but absent from the
-// CURRENT graph is a tombstoned id the target re-introduces. In
-// undo/redo, such an id is always previously-deleted, so revive
-// it unconditionally — a 'restored' event on an already-live
-// entity is harmless. `at` is the one moment of the computation.
-// Exported: buildFlowPutBody (below) recomputes this fresh
-// against EACH retry attempt's own baseline — the one caller
-// that needs it inside a retry loop; performUndo
-// (flow-operations.ts) is the other caller, computing its own
-// once, ahead of its single-shot (non-retrying) POST /undo.
+// Compute the revival set for a redo-style save: every node/edge
+// id present in the TARGET graph but absent from the CURRENT
+// graph is a tombstoned id the target re-introduces. In redo,
+// such an id is always previously-deleted, so revive it
+// unconditionally — a 'restored' event on an already-live entity
+// is harmless. `at` is the one moment of the computation.
+// Exported: buildFlowPutBody (below) is the ONLY caller,
+// recomputing this fresh against EACH retry attempt's own
+// baseline — the one caller performRedo's revivalTarget flows
+// through. Undo-as-replay (Phase 14 Task 8) computes ITS OWN
+// revivals server-side (api/flow-graph-diff.ts's
+// buildFlowGraphRevivals, the same diff semantics ported to
+// api/routes.ts's undo route) — performUndo/postFlowUndo
+// (flow-operations.ts) never call this function at all; the
+// client no longer knows the restore target well enough to.
 export function buildRevivals(
     current: StoredGraph,
     target: StoredGraph,

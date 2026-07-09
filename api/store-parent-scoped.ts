@@ -423,4 +423,15 @@ export class ParentScopedStateStore implements StateStore {
     isDeletedIn(tx: Tx, id: Id): Promise<boolean> {
         return this.#inner.isDeletedIn(tx, id);
     }
+
+    // FENCE MECHANICS — see StateStore's own interface header
+    // (api/db.ts). Delegates to the WRAPPED #inner store's raw
+    // presence check, deliberately UNFENCED — the org filter
+    // this class exists to apply is exactly what a caller needs
+    // to bypass here, to tell "no such row" apart from "a row
+    // owned by a different organization" (isVisibleStateEvent,
+    // api/derive-state-field-values.ts).
+    rawHasRow(id: Id): Promise<boolean> {
+        return this.#inner.rawHasRow(id);
+    }
 }

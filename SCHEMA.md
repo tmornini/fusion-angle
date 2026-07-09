@@ -969,3 +969,19 @@ Secondary indexes: `uri_prefix`, `uri_id` (`api/db.ts`
 `TABLE_INDEXES`) — the unique `follows` index arrives in
 Task 5 with the machinery that can express a partial unique
 index.
+
+### Flow tags (pair-plane only, no table)
+
+`flows/:id/tags/:name` (Phase 14 Task 9) is the FIRST
+document family with no backing table at all: PUT, GET, and
+DELETE all touch only `requests`/`responses`, addressed at
+`flows/<flow-id>/tags/<name>/`. A tag body carries exactly
+one field, `flow_response_id` — the pinned `id` of one of the
+flow's own `flows/:id` document-pair responses — so the tag
+survives every later save of the flow it names (GET replays
+the tag's own stored body, never re-derives against the
+flow's current head). DELETE is a marked tombstone: a
+DELETE-shaped response pair excluded from the head by
+`deriveDocumentsAt`, exactly like every other document
+family's DELETE — there is no row to splice, since there was
+never a row to begin with.

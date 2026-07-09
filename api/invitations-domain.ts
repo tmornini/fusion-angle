@@ -47,13 +47,19 @@ import {
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentPairFor } from './routes.ts';
-import { deriveInvitations } from './derive-invitations.ts';
+import {
+    deriveInvitations,
+    invitationOpStateFor,
+} from './derive-invitations.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
     deriveIdentityPiiRows,
     deriveRoleGrants,
 } from './derive-identity-spine.ts';
-import { deriveInvitationStates } from './derive-states.ts';
+import {
+    deriveInvitationStates,
+    invitationLifecycleStatesFor,
+} from './derive-states.ts';
 import { membershipExistsFor } from './derive-memberships.ts';
 
 // The active org of the caller: the verified token claim, else
@@ -78,16 +84,34 @@ async function callerIsOrganizationAdmin(
     ).includes('admin');
 }
 
-// An invitation's current state: the latest event on its id —
-// states.getCurrentFor, the same (at, id) derivation every
-// entity's lifecycle uses. Null when no event has been
-// recorded.
-async function currentInvitationState(
+// An invitation's current state: the latest lifecycle event on
+// its id, derived from the pair plane.
+//
+// FLIPPED (Phase 14 Task 2): re-points onto
+// invitationLifecycleStatesFor (api/derive-states.ts, Task 1) —
+// wire-identical to the old adapter.states.getCurrentFor(id)
+// dispatch it replaces (tests/drift-states.test.ts case 5b's
+// revoke leg proves old-plane parity for the one terminal state
+// that had none before this task). latestByKey applies the SAME
+// (at, id) total order getCurrentForIn itself delegates to
+// (shared/ledger-reduction.ts) — mutual exclusivity of the three
+// terminal ops (derive-invitations.ts's own covenant) means at
+// most a 'pending' row and ONE terminal row can ever compete, but
+// the shared reduction is reused rather than hand-rolled so no
+// ordering assumption is duplicated. Null when no lifecycle event
+// has been recorded at all — a genuinely absent invitation, or
+// the rare pre-tx race grantInvitation's own header describes.
+// Exported for tests/pin-invitation-write-path-parity.test.ts's
+// pre-tx-vs-in-tx pin (Task 2 commit 3) — accept/decline/revoke
+// each call this ONLY in-tx today; the export lets the pin also
+// call it pre-tx, over the SAME plain adapter, for comparison.
+export async function currentInvitationState(
     adapter: DbAdapter,
     id: Id,
 ): Promise<InvitationState | null> {
-    const latest = await adapter.states.getCurrentFor(id);
-    return latest === null
+    const rows = await invitationLifecycleStatesFor(adapter, id);
+    const latest = latestByKey(rows, ev => ev.entity_id).get(id);
+    return latest === undefined
         ? null
         : assertInvitationState(latest.state, 'invitation ' + id);
 }
@@ -581,7 +605,27 @@ async function grantOutcomeFor(
 
 // The org's outstanding pending invitation for an identity, or
 // null. The grant idempotency check.
-async function pendingInvitationFor(
+//
+// FLIPPED (Phase 14 Task 2): the per-candidate STATE lookup
+// re-points onto invitationOpStateFor (api/derive-invitations.ts,
+// Task 1) — wire-identical to the states.getAll()+latestByKey
+// dispatch it replaces (tests/drift-invitation-pending-dedup.
+// test.ts's Step 0 equivalence proof). Candidate DISCOVERY stays
+// on the invitations ROW plane (adapter.invitations.getAll()) —
+// dual-write keeps that table current, and no (organization,
+// identity) index exists on the pair plane to discover candidates
+// without it. `undefined` means "no terminal op yet" — the same
+// 'pending' conclusion the old current.state check reached, since
+// every genuine invitations row already carries its own genesis
+// 'pending' pair (the dual-write invariant grantInvitation's own
+// transaction keeps). Exported for
+// tests/pin-invitation-write-path-parity.test.ts's pre-tx-vs-in-tx
+// pin (Task 2 commit 3) — called BOTH pre-tx (to decide the
+// response) and in-tx (the `agrees` re-check) inside
+// grantInvitation's own transaction, so both calls already run
+// this SAME body; the pin makes that a proven property, not a
+// coincidence.
+export async function pendingInvitationFor(
     adapter: DbAdapter,
     organization: Id,
     identityId: Id,
@@ -589,17 +633,9 @@ async function pendingInvitationFor(
     const candidates = (await adapter.invitations.getAll())
         .filter(inv => inv.organization_id === organization
             && inv.identity_id === identityId);
-    if (candidates.length === 0) return null;
-    // One states read answers every candidate; on the grant
-    // path this joins the already-open transaction.
-    const latest = latestByKey(
-        await adapter.states.getAll(), ev => ev.entity_id);
     for (const inv of candidates) {
-        const current = latest.get(inv.id);
-        if (current === undefined) continue;
-        const state = assertInvitationState(
-            current.state, 'invitation ' + inv.id);
-        if (state === 'pending') {
+        const state = await invitationOpStateFor(adapter, inv.id);
+        if (state === undefined) {
             return { id: inv.id, at: inv.at };
         }
     }
@@ -740,11 +776,23 @@ async function acceptInvitation(
                 return;
             }
             if (state !== 'pending') { conflict = true; return; }
-            const already = (await view.memberships.getAll())
-                .some(m =>
-                    m.identity_id === ctx.principal.id
-                    && m.organization_id
-                        === inv.organization_id);
+            // The membership-presence check is FLIPPED (Phase 14
+            // Task 3): re-points onto membershipExistsFor (api/
+            // derive-memberships.ts) — the SAME view.memberships.
+            // getAll().some(...) dispatch it replaces, byte-
+            // identical for member/non-member (tests/drift-
+            // memberships-identity.test.ts leg 5 already proves the
+            // derive via grantOutcomeFor; pin-invitation-write-path-
+            // parity.test.ts adds the accept-tx-table parity leg).
+            // membershipExistsFor is ADAPTER-SHAPED (dbOrView:
+            // DbAdapter) so this in-tx `view` — which already
+            // carries 'requests'/'responses' in its own table list
+            // — calls it directly; no nested transaction. The
+            // 'accepted' no-op short-circuit above still runs FIRST
+            // (KEEP-ATOMIC): a removed member's re-accept never
+            // reaches this check at all.
+            const already = await membershipExistsFor(
+                view, inv.organization_id, ctx.principal.id);
             if (!already) {
                 await view.memberships.put(membershipId, {
                     organization_id: inv.organization_id,

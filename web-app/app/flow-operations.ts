@@ -7,30 +7,22 @@ import type {
     GraphNode,
     NodeAttribute,
     RecordAttributeId,
-    StoredGraph,
 } from '../../api/types.ts';
 import {
     DEFAULT_NEW_STATE_NAME,
     DEFAULT_TRANSITION_NAME,
-    storedGraphField,
 } from '../../api/types.ts';
 import { RequestError } from '../../api/api.ts';
 import {
-    postFlowVersion,
     putFlow,
-    buildFlowBody,
-    buildSaveEvents,
-    buildRevivals,
     notifyFlowChange,
     getFlowGraph,
-    getFlowVersions,
     generateCryptoSafeBase62,
     nowUtc,
 } from './adapters/index.ts';
 import type {
     FlowSaveShape,
 } from './adapters/flow-mutations.ts';
-import type { FlowVersion } from './adapters/flow-versions.ts';
 import { jitteredBackoff } from './adapters/shared.ts';
 import {
     NODE_WIDTH,
@@ -89,17 +81,18 @@ function snapToSave(
     };
 }
 
+// Undo-as-replay (Phase 14 Task 8): no longer archives the
+// PRE-edit state through postFlowVersion first — that archive
+// existed solely to give the OLD undo mechanism a flow_versions
+// row to consume. putFlow's own document pair (written on every
+// call, always) is now what a LATER undo's pair-plane walk finds
+// as "the state before this edit," so the archive write is dead.
 async function commitFlowMutation(
     ctx: RequestContext,
     snap: FlowSnapshot,
     nodes: GraphNode[],
     edges: GraphEdge[],
 ): Promise<void> {
-    await postFlowVersion(
-        ctx,
-        generateCryptoSafeBase62(),
-        snap.flowId,
-    );
     await putFlow(
         ctx,
         snap.flowId,
@@ -667,71 +660,36 @@ function applyServerGraph(
 // bound putFlow's own PUT retry uses (adapters/flow-mutations.ts).
 const MAX_UNDO_ATTEMPTS = 3;
 
-// Drive POST /flows/:id/undo with its own jittered 412-absorb
-// (Task 5, corrected): the undo op's synthesized document pair
-// takes the LOCKED family's follows slot, so a save racing this
-// undo for the SAME head 412s the whole transaction (the
-// responses.follows unique index — message-pair.ts). Attempt 1
-// computes graphDelta/revivals from the CALLER's in-memory
-// liveGraph — the designer's live working snapshot IS the
-// baseline on the happy path, exactly as the pre-Task-5 code
-// did, so the happy path never fetches getFlowGraph at all (it
-// stays at getFlowVersions + POST + a TRAILING getFlowGraph +
-// getFlowVersions — 4 hops, performUndo below). Only a 412 retry
-// (attempt 2+) re-fetches a FRESH getFlowGraph baseline before
-// recomputing — retrying against the ORIGINAL (now-stale)
-// baseline would under-revive any node a concurrent save deleted
-// in between (the same hazard class Task 4 closed for redo's
-// revivals; re-reading getFlowVersions alone would not catch
-// it — the TARGET version stays fixed across attempts, only the
-// CURRENT baseline is re-read on retry). Not exported: performUndo
-// is the only caller.
+// Drive POST /flows/:id/undo with its own jittered 412-absorb:
+// the undo op's synthesized document pair takes the LOCKED
+// family's follows slot, so a save racing this undo for the SAME
+// head 412s the whole transaction (the responses.follows unique
+// index — message-pair.ts). Undo-as-replay (Phase 14 Task 8)
+// resolves the restore target SERVER-SIDE from the pair plane
+// (api/derive-flows.ts's resolveFlowUndoTarget), so this loop
+// carries no baseline of its own — a 412 just means the head
+// moved; the server re-resolves fresh against the NEW head on
+// the very next attempt, landing correctly on "one step back
+// from whatever raced this undo in" with nothing for the client
+// to recompute or refetch. Each attempt mints a FRESH
+// eventId/at (the E6 split putFlow's own retry uses) — a resent
+// attempt must be a byte-DIFFERENT request, or it would collide
+// on the gate's idempotency fast path (FlowUndoBody's own doc
+// comment, api/validators.ts, names why the body keeps these two
+// fields at all). Not exported: performUndo is the only caller.
 async function postFlowUndo(
     ctx: RequestContext,
     flowId: string,
-    version: FlowVersion,
-    liveGraph: StoredGraph,
 ): Promise<void> {
-    const target = {
-        nodes: version.nodes,
-        edges: version.edges,
-    };
-    let baseline: StoredGraph = liveGraph;
     for (
         let attempt = 1;
         attempt <= MAX_UNDO_ATTEMPTS;
         attempt++
     ) {
-        const now = nowUtc();
-        const graphDelta = buildSaveEvents(
-            baseline,
-            target,
-            flowId,
-            generateCryptoSafeBase62,
-            now,
-        );
-        const revivals = buildRevivals(
-            baseline,
-            target,
-            now,
-        );
         try {
             await ctx.POST(`flows/${flowId}/undo`, {
-                flow: buildFlowBody({
-                    name: version.name,
-                    isLocked: version.isLocked,
-                    isAutoLayout: version.isAutoLayout,
-                    isAutoFit: version.isAutoFit,
-                    lockTimeout: version.lockTimeout,
-                    nodes: version.nodes,
-                    edges: version.edges,
-                }),
                 eventId: generateCryptoSafeBase62(),
-                at: now,
-                consumedVersionId: version.id,
-                graph: storedGraphField(target),
-                graphDelta,
-                revivals,
+                at: nowUtc(),
             });
             return;
         } catch (err) {
@@ -741,7 +699,6 @@ async function postFlowUndo(
                 && attempt < MAX_UNDO_ATTEMPTS
             ) {
                 await jitteredBackoff(attempt);
-                baseline = await getFlowGraph(ctx, flowId);
                 continue;
             }
             throw err;
@@ -756,17 +713,20 @@ export async function performUndo(
 ): Promise<OpResult<HistoryOpOk>> {
     const locked = requireFlowNotLocked(snap);
     if (locked) return locked;
-    const versions = await getFlowVersions(
-        ctx, snap.flowId,
-    );
-    const version = versions[0];
-    if (!version) {
+    // Undo-as-replay (Phase 14 Task 8): exhaustion is a CLIENT-
+    // side short-circuit against the session/wire hasUndoHistory
+    // flag — no flow_versions fetch, no server round-trip at
+    // all, mirroring today's UX shape with the source swapped
+    // (see the PINNED Step 0 block,
+    // .superpowers/sdd/phase14-task-8-report.md). A direct-API
+    // caller that bypasses this gate still gets a graceful
+    // server-side no-op — the route performs zero domain writes
+    // when its own pair-plane walk finds no target.
+    if (!history.hasUndoHistory) {
         return {
             kind: 'ok',
             freshSnap: snap,
-            newHistory: recordUndoHistoryMark(
-                history, false,
-            ),
+            newHistory: history,
         };
     }
     const stagedHistory = appendToRedoStack(
@@ -784,17 +744,12 @@ export async function performUndo(
             createdAt: nowUtc(),
         },
     );
-    // Restore + consume as ONE atomic transaction through the
-    // named POST /flows/:id/undo — the flow can never land
-    // reverted while the version row survives unconsumed. The
-    // 3-attempt jittered 412-absorb lives in postFlowUndo, above;
-    // its attempt-1 baseline is THIS snap — the designer's live
-    // working state — never a fetch.
+    // The restore write rides ONE named POST /flows/:id/undo
+    // transaction — the flow can never land partially reverted.
+    // The 3-attempt jittered 412-absorb lives in postFlowUndo,
+    // above.
     try {
-        await postFlowUndo(
-            ctx, snap.flowId, version,
-            { nodes: snap.nodes, edges: snap.edges },
-        );
+        await postFlowUndo(ctx, snap.flowId);
     } catch (err) {
         log.error(
             'performUndo failed',
@@ -806,12 +761,9 @@ export async function performUndo(
     const graph = await getFlowGraph(
         ctx, snap.flowId,
     );
-    const remaining = await getFlowVersions(
-        ctx, snap.flowId,
-    );
     const newHistory = recordUndoHistoryMark(
         stagedHistory,
-        remaining.length > 0,
+        graph.hasUndoHistory,
     );
     return {
         kind: 'ok',
@@ -837,33 +789,26 @@ export async function performRedo(
     }
     const v = popped.version;
     // Redo folds into the locked save (R1/E5): the retired
-    // POST /flows/:id/redo's ONE atomic transaction splits into
-    // two independent writes — the SAME non-atomic shape every
-    // OTHER perform* mutation (commitFlowMutation) already
-    // carries. First, archive the CURRENT state as a version
-    // snapshot through postFlowVersion ALONE — that POST
-    // computes the publish internally (the exact `version`
-    // field the retired route carried), so this never also
-    // calls buildFlowVersionSnapshot (double-compute). Then save
-    // the redo target's graph through putFlow, passing the
-    // TARGET graph itself as the revival intent — putFlow's own
-    // C6 retry loop derives the actual revivals fresh from EACH
-    // attempt's own baseline, never a list this function
-    // precomputes: a concurrent save landing between attempts can
-    // tombstone a node the target carries, and only a recompute
-    // against the FRESH baseline catches that (see putFlow /
-    // buildRevivals in adapters/flow-mutations.ts). One catch
-    // spans both writes below: any failure in the redo
-    // sequence — postFlowVersion, or putFlow's own exhausted
-    // retry / non-412 error — degrades to the same visible
-    // failOp, mirroring performUndo's single covenant for its
-    // own (one-call) write.
+    // POST /flows/:id/redo's ONE write is now just putFlow,
+    // passing the TARGET graph itself as the revival intent —
+    // putFlow's own C6 retry loop derives the actual revivals
+    // fresh from EACH attempt's own baseline, never a list this
+    // function precomputes: a concurrent save landing between
+    // attempts can tombstone a node the target carries, and only
+    // a recompute against the FRESH baseline catches that (see
+    // putFlow / buildRevivals in adapters/flow-mutations.ts).
+    // Undo-as-replay (Phase 14 Task 8) retires the OTHER write
+    // this used to make (postFlowVersion, archiving the
+    // pre-redo state so a LATER undo could consume it): undo no
+    // longer consumes flow_versions at all — it resolves its
+    // target from the flows/:id document-pair history, and THIS
+    // putFlow's own document pair (every redo already wrote one)
+    // is exactly what a later undo's pair-plane walk finds as
+    // "the state before the redo," with no archive needed. A
+    // failure here — putFlow's own exhausted retry or a non-412
+    // error — degrades to the same visible failOp, mirroring
+    // performUndo's single covenant for its own one-call write.
     try {
-        await postFlowVersion(
-            ctx,
-            generateCryptoSafeBase62(),
-            snap.flowId,
-        );
         await putFlow(
             ctx,
             snap.flowId,
@@ -890,7 +835,7 @@ export async function performRedo(
         ctx, snap.flowId,
     );
     const newHistory = recordUndoHistoryMark(
-        popped.snapshot, true,
+        popped.snapshot, graph.hasUndoHistory,
     );
     return {
         kind: 'ok',

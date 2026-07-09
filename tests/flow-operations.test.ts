@@ -217,9 +217,10 @@ async function setupFlow(): Promise<{
     return { db, ctx };
 }
 
-// A db with NO flow row: commitFlowMutation's
-// postFlowVersion does ctx.GET('flows/flow-1')
-// which 404s, driving the catch → failOp(...).
+// A db with NO flow row: commitFlowMutation's / putFlow's own
+// baseline read (buildFlowPutBody's ctx.GETWithResponseId)
+// does ctx.GET('flows/flow-1') which 404s, driving the catch
+// → failOp(...).
 async function setupNoFlow(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
@@ -246,8 +247,10 @@ async function flowVersionCount(
 
 // Save a graph through the real route (putFlow) so the four
 // relation tables hold exactly this state — the read source
-// GET /flows/:id reassembles from. Undo/redo diff their
-// in-memory snap against a version; that diff only applies
+// GET /flows/:id reassembles from, and (Phase 14 Task 8) the
+// SAME document pair undo-as-replay's own server-side diff
+// reads as either the current head or a resolved target. Undo/
+// redo diff current vs target graphs; that diff only applies
 // correctly when the relations already carry the snap's graph.
 async function seedCurrentGraph(
     ctx: RequestContext,
@@ -297,8 +300,14 @@ test(
         assert.equal(op.advanceHistory, true);
         const g = await persistedGraph(db);
         assert.equal(g.edges.length, 1);
+        // Undo-as-replay (Phase 14 Task 8): commitFlowMutation
+        // no longer archives the pre-edit state through
+        // postFlowVersion — undo resolves its target from the
+        // flows/:id document-pair history instead, so this
+        // save's own putFlow document pair is now sufficient;
+        // flow_versions stays untouched.
         assert.equal(
-            await flowVersionCount(db), 1,
+            await flowVersionCount(db), 0,
         );
     },
 );
@@ -1162,8 +1171,14 @@ test(
 
 // -- performUndo ------------------------------
 
+// NAMED REWRITE (Phase 14 Task 8, undo-as-replay): exhaustion
+// is now a CLIENT-side short-circuit on hasUndoHistory (no
+// flow_versions fetch, no server round-trip at all) — the
+// source swaps from "versions is empty" to "hasUndoHistory is
+// false", but the observable shape (freshSnap is the SAME
+// object, by reference) is unchanged.
 test(
-    'performUndo: with no versions is a no-op'
+    'performUndo: with no history is a no-op'
     + ' that returns the same snapshot',
     async () => {
         const { db } = await setupFlow();
@@ -1172,7 +1187,7 @@ test(
         ]));
         const op = await performUndo(
             createRequestContext(db, DEV_TOKEN), snap,
-            buildFlowHistorySnapshot(true),
+            buildFlowHistorySnapshot(false),
         );
         assert.equal(op.kind, 'ok');
         if (op.kind !== 'ok') return;
@@ -1198,33 +1213,24 @@ test(
     },
 );
 
+// NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the target
+// is no longer a flow_versions row the client seeds and the
+// route consumes — it is the flows/:id document-pair
+// immediately BEFORE the current head, resolved server-side.
+// The setup swaps the raw versions PUT for a genuine
+// seedCurrentGraph save (the 2-node baseline, undo's own
+// target), followed by the 3-node "current" save.
 test(
-    'performUndo: restores the latest version,'
-    + ' consumes it, and stages a redo entry',
+    'performUndo: restores the previous save (one'
+    + ' step back), and stages a redo entry',
     async () => {
         const { db, ctx } = await setupFlow();
-        // Snapshot the 2-node baseline as v1.
-        await ctx.PUT('flows/' + FLOW_ID + '/versions/v1', {
-            flow_id: FLOW_ID,
-            name: 'Test Flow',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: JSON.stringify({
-                nodes: [
-                    buildNode('a'),
-                    buildNode('b'),
-                ],
-                edges: [],
-            }),
-            at: '2026-01-01T00:00:00.000000Z',
-        });
-        // Current state has a third node. Seed the relations
-        // with that same graph so GET /flows/:id (the read
-        // source) reflects what the snap claims is current —
-        // the undo diff (current → version) then applies
-        // against real rows, not an empty graph.
+        // The 2-node baseline — undo's own target.
+        await seedCurrentGraph(ctx, [
+            buildNode('a'),
+            buildNode('b'),
+        ]);
+        // Current state has a third node.
         const currentNodes = [
             buildNode('a'),
             buildNode('b'),
@@ -1241,8 +1247,11 @@ test(
         assert.equal(
             op.freshSnap.nodes.length, 2,
         );
+        // Genesis is a THIRD document pair still further back —
+        // there is more to undo, unlike the old flow_versions
+        // count (which hit zero after consuming its one row).
         assert.equal(
-            op.newHistory.hasUndoHistory, false,
+            op.newHistory.hasUndoHistory, true,
         );
         assert.equal(
             op.newHistory.redoStack.length, 1,
@@ -1252,6 +1261,10 @@ test(
                 .nodes.length,
             3,
         );
+        // flow_versions is never written OR read by the live
+        // undo path any more (Step 0: publish/consume both
+        // stop) — this stays a meaningful regression guard,
+        // not a tautology.
         assert.equal(
             await flowVersionCount(db), 0,
         );
@@ -1333,32 +1346,33 @@ test(
         assert.equal(
             op.newHistory.redoStack.length, 0,
         );
+        // Undo-as-replay (Phase 14 Task 8): redo no longer
+        // archives the pre-redo state through postFlowVersion —
+        // its own putFlow write is what a LATER undo's
+        // pair-plane walk would find instead. flow_versions
+        // stays untouched by the live redo path.
         assert.equal(
-            await flowVersionCount(db), 1,
+            await flowVersionCount(db), 0,
         );
         const g = await persistedGraph(db);
         assert.equal(g.nodes.length, 2);
     },
 );
 
-// Fix wave 1 (Task 4 review): redo's write sequence now rides
-// ONE covenant catch (postFlowVersion, then putFlow — see the
-// tests below), matching every OTHER perform* mutation's
-// commitFlowMutation precedent, where a missing flow ALREADY
-// degrades to a graceful failOp ('a commit failure yields a
-// fail result', throughout this file). Base's original split —
-// buildFlowVersionSnapshot's read OUTSIDE any catch, only the
-// POST /flows/:id/redo write guarded — no longer exists once the
-// read and the archive-write share ONE opaque call
-// (postFlowVersion); keeping redo the lone sibling that crashes
-// on a missing flow would leave it inconsistent with the family
-// the fold set out to match. So the read now shares the same
-// covenant as every other mutation's read-then-write.
+// Comment refreshed (Phase 14 Task 8, undo-as-replay): redo is
+// now a SINGLE putFlow write (the postFlowVersion archive this
+// comment originally described is retired — undo no longer
+// consumes it, so archiving before redo served no purpose).
+// putFlow's own baseline read (buildFlowPutBody's
+// ctx.GETWithResponseId) 404s on a missing flow exactly as
+// postFlowVersion's read used to, so the SAME graceful failOp
+// this test pins still holds, matching every sibling perform*
+// mutation's read-then-write covenant.
 test(
     'performRedo: a missing flow fails gracefully —'
-    + ' postFlowVersion\'s own read shares the redo'
-    + ' sequence\'s one covenant catch, matching every'
-    + ' sibling perform* mutation',
+    + ' putFlow\'s own baseline read shares the SAME'
+    + ' covenant catch every sibling perform* mutation'
+    + ' uses',
     async () => {
         const db = await setupNoFlow();
         const snap = snapFrom(buildGraph([
@@ -1454,28 +1468,18 @@ function faultingPutCtx(
     return { ctx: wrapped, puts: () => count };
 }
 
+// NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the fault
+// fires at the client's own ctx.POST call site, before any
+// network activity — the server-side resolution (does a target
+// even exist) never enters into it, so the flow_versions seed
+// this test used to need is dropped entirely; the assertion it
+// fed becomes "flow_versions stays untouched", not "the
+// consumed row survives".
 test(
-    'performUndo: restore + consume ride ONE'
-    + ' transaction; a faulted POST /flows/:id/undo'
+    'performUndo: a faulted POST /flows/:id/undo'
     + ' applies nothing',
     async () => {
         const { db, ctx } = await setupFlow();
-        await ctx.PUT('flows/' + FLOW_ID + '/versions/v1', {
-            flow_id: FLOW_ID,
-            name: 'Test Flow',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: JSON.stringify({
-                nodes: [
-                    buildNode('a'),
-                    buildNode('b'),
-                ],
-                edges: [],
-            }),
-            at: '2026-01-01T00:00:00.000000Z',
-        });
         const snap = snapFrom(buildGraph([
             buildNode('a'),
             buildNode('b'),
@@ -1494,67 +1498,11 @@ test(
         if (op.kind !== 'fail') return;
         assert.match(op.toast, /undo failed/i);
         assert.equal(faulting.posts(), 1);
-        // nothing applied: the consumed version row
-        // survives AND the persisted graph keeps the
-        // seeded start + complete pair (the revert
-        // never landed; the 3-node snap was only ever
-        // the client's view, never persisted)
-        assert.equal(
-            await flowVersionCount(db), 1,
-        );
-        const g = await persistedGraph(db);
-        assert.equal(g.nodes.length, 2);
-    },
-);
-
-// Task 4 (R1/E5): redo's retired POST /flows/:id/redo carried
-// its own one-transaction covenant; the fold splits it into
-// postFlowVersion (a POST) then putFlow (a PUT), two
-// INDEPENDENT writes — the same non-atomic shape every OTHER
-// perform* mutation (commitFlowMutation) already carries. The
-// two tests below fault each write in turn. performRedo wraps
-// BOTH writes in one catch (mirroring performUndo's single
-// covenant for its own one-call write) — a faulted write
-// degrades to the SAME visible failOp('Redo failed', ...),
-// exactly like the missing-flow case above, never an unhandled
-// rejection (Swallowed Failures guard honored: the failure
-// surfaces via the toast channel every other perform* mutation
-// already uses). putFlow's OWN internal loop separately absorbs
-// a 412 (up to 3 attempts) before ever reaching this catch.
-
-test(
-    'performRedo: a faulted version-POST fails'
-    + ' gracefully; nothing lands (postFlowVersion'
-    + ' runs FIRST, before putFlow)',
-    async () => {
-        const { db, ctx } = await setupFlow();
-        const snap = snapFrom(buildGraph([
-            buildNode('a'),
-        ]));
-        const history = appendToRedoStack(
-            buildFlowHistorySnapshot(false),
-            buildFlowVersion({
-                nodes: [
-                    buildNode('a'),
-                    buildNode('b'),
-                ],
-            }),
-        );
-        const faulting = faultingPostCtx(
-            ctx, 'flows/' + FLOW_ID + '/versions',
-        );
-        const op = await silenceConsoleError(
-            () => performRedo(
-                faulting.ctx, snap, history,
-            ),
-        );
-        assert.equal(op.kind, 'fail');
-        if (op.kind !== 'fail') return;
-        assert.match(op.toast, /redo failed/i);
-        assert.equal(faulting.posts(), 1);
-        // nothing applied: no new version row, and
-        // the persisted graph stays the seeded
-        // start + complete pair (putFlow never ran)
+        // nothing applied: flow_versions is never touched by
+        // the live undo path, and the persisted graph keeps
+        // the seeded start + complete pair (the revert never
+        // landed; the 3-node snap was only ever the client's
+        // view, never persisted).
         assert.equal(
             await flowVersionCount(db), 0,
         );
@@ -1563,12 +1511,28 @@ test(
     },
 );
 
+// RETIRED (Phase 14 Task 8, undo-as-replay): "performRedo: a
+// faulted version-POST fails gracefully; nothing lands
+// (postFlowVersion runs FIRST, before putFlow)" no longer has a
+// premise to test — redo dropped its postFlowVersion archive
+// entirely (undo no longer consumes it), so there is no version-
+// POST left to fault. The surviving test below (faulting the
+// document-PUT) still covers the class this one proved: a fault
+// in redo's write path degrades gracefully to failOp, never an
+// unhandled rejection.
+//
+// Redo is now a SINGLE putFlow write — the R1/E5 two-write fold
+// this comment used to describe collapsed once its OTHER write
+// (postFlowVersion) retired, so performRedo's failure shape now
+// matches every OTHER perform* mutation (commitFlowMutation)
+// exactly: one write, one covenant catch, one failOp on fault
+// (Swallowed Failures guard honored: the failure surfaces via
+// the toast channel every other perform* mutation already
+// uses). putFlow's OWN internal loop separately absorbs a 412
+// (up to 3 attempts) before ever reaching this catch.
 test(
     'performRedo: a faulted document-PUT fails'
-    + ' gracefully AFTER the version already'
-    + ' landed — the fold\'s two writes are no'
-    + ' longer one transaction (named R1/E5'
-    + ' trade-off)',
+    + ' gracefully',
     async () => {
         const { db, ctx } = await setupFlow();
         const snap = snapFrom(buildGraph([
@@ -1595,15 +1559,13 @@ test(
         if (op.kind !== 'fail') return;
         assert.match(op.toast, /redo failed/i);
         assert.equal(faulting.puts(), 1);
-        // the version-POST already landed — it runs
-        // FIRST and is not itself faulted, so the two
-        // now-independent writes leave the version
-        // archived even though the document save fails.
+        // nothing applied: flow_versions is never touched by
+        // the live redo path, and the document PUT never
+        // landed — the graph stays the seeded start + complete
+        // pair.
         assert.equal(
-            await flowVersionCount(db), 1,
+            await flowVersionCount(db), 0,
         );
-        // the document PUT never applied: the graph
-        // stays the seeded start + complete pair.
         const g = await persistedGraph(db);
         assert.equal(g.nodes.length, 2);
     },

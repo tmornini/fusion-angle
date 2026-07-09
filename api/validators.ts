@@ -46,6 +46,7 @@ import type {
     RecordId,
     RecordState,
     FlowRecordEntity,
+    FlowTagEntity,
     ObjectiveEntity,
     ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScoreEntity,
@@ -2778,6 +2779,52 @@ export function validateFlowRecordEntity(
     };
 }
 
+// A flow tag's own NAME is the FIRST user-authored address
+// segment this codebase validates (every prior :id path segment
+// is either server-generated or a client-picked-but-opaque
+// identifier never rendered) — pinned at least as strict as
+// GRAPH_ID_ALPHABET above, plus a length cap, since an address
+// segment has no natural bound the way a body field's own
+// pickString does.
+const FLOW_TAG_NAME_MAX_LENGTH = 64;
+const FLOW_TAG_NAME_ALPHABET = /^[A-Za-z0-9_-]+$/;
+
+export function validateFlowTagName(value: string): string {
+    if (
+        value.length > FLOW_TAG_NAME_MAX_LENGTH
+        || !FLOW_TAG_NAME_ALPHABET.test(value)
+    ) {
+        throw new ValidationError(
+            'flow tag name must contain only [A-Za-z0-9_-],'
+            + ' 1-' + FLOW_TAG_NAME_MAX_LENGTH
+            + ' characters, got ' + value,
+        );
+    }
+    return value;
+}
+
+// The tag's own body (design decision — Step 0, Phase 14 Task
+// 9): MINIMAL — the pinned response id of the flow document pair
+// this tag names, and nothing else. `flow_id` is never a client
+// key here (the address's own :id segment already names it; the
+// route stamps it onto the wire response) — Omit<FlowTagEntity,
+// 'id' | 'flow_id'> mirrors validateFlowRecordEntity's own
+// Omit<_, 'id'> shape, one field narrower.
+const FLOW_TAG_BODY_KEYS: readonly string[] = ['flow_response_id'];
+
+export function validateFlowTagEntity(
+    body: Record<string, unknown>,
+): Omit<FlowTagEntity, 'id' | 'flow_id'> {
+    assertOnlyKeys(body, FLOW_TAG_BODY_KEYS, 'FlowTagEntity');
+    const flowResponseId = pickString(body, 'flow_response_id');
+    if (flowResponseId === '') {
+        throw new ValidationError(
+            'FlowTagEntity.flow_response_id must be non-empty',
+        );
+    }
+    return { flow_response_id: flowResponseId };
+}
+
 export interface RecordWriteCreateBody {
     readonly kind: 'create';
     readonly id: RecordId;
@@ -3286,33 +3333,34 @@ export function validateFlowVersionPublishBody(
     return { id, version, trimIds };
 }
 
+// Undo-as-replay (Phase 14 Task 8): the body shrinks to the
+// state trio's two free fields — every OTHER field the old
+// 6-field body carried (`flow`, `consumedVersionId`, `graph`,
+// `graphDelta`, `revivals`) is now resolved/computed
+// SERVER-SIDE (api/derive-flows.ts's resolveFlowUndoTarget,
+// api/flow-graph-diff.ts) from the pair-plane, never the wire.
+// Both remaining fields stay (not dropped to an empty body):
+// an empty body would make every undo POST for the same flow
+// canonically byte-identical (same method/path/headers),
+// colliding on the gate's pre-tx idempotency fast path
+// (storedResponseFor) and silently replaying the FIRST call's
+// cached 204 for every later undo. `eventId`/`at` are the SAME
+// state-trio convention every other document write already
+// uses to keep each attempt's stored request unique — S1 (body
+// timestamps belong to the message's creator), never
+// pair.requestAt.
 export interface FlowUndoBody {
-    readonly flow: Record<string, unknown>;
     readonly eventId: string;
-    readonly consumedVersionId: string;
     readonly at: string;
-    // Task 5: the post-undo reduced graph — performUndo already
-    // computes the target working copy, so the client carries it
-    // verbatim (the SAME wire covenant validateFlowDocumentBody's
-    // `graph` field already holds). REQUIRED — an old-shape undo
-    // body (missing this field) 400s; there is no silent
-    // fallback. The ONLY consumer is the undo route's synthesized
-    // document pair (message-pair.ts); this op's own row writes
-    // never touch it.
-    readonly graph: JsonObjectField;
-    readonly graphDelta: FlowGraphDelta;
-    readonly revivals: GraphRevival[];
 }
 
-const FLOW_UNDO_KEYS: readonly string[] = [
-    'flow', 'eventId', 'consumedVersionId', 'at',
-    'graph', 'graphDelta', 'revivals',
-];
+const FLOW_UNDO_KEYS: readonly string[] = ['eventId', 'at'];
 
-// The revivals array gate, shared by the undo and redo
-// bodies: each element is the deletion/revival triple, so the
-// route can post a 'restored' event that supersedes a prior
-// tombstone. `label` names the enclosing body.
+// The revivals array gate, shared by the flows/:id document
+// body and (through Phase 13) the retired undo body: each
+// element is the deletion/revival triple, so the route can
+// post a 'restored' event that supersedes a prior tombstone.
+// `label` names the enclosing body.
 function validateRevivals(
     value: unknown,
     label: string,
@@ -3322,53 +3370,26 @@ function validateRevivals(
     );
 }
 
-// The HTTP-body gate for POST /flows/:id/undo: the flow row, the
-// 'updated' state event, the DELETE of the consumed version, the
-// graphDelta to the four relation tables, and the revivals —
-// written atomically. The flow can never land reverted while the
-// version row survives unconsumed. The flow fields are
-// re-validated by the org-scoped flows store after the org
-// stamp (body OMITS organization_id). The state is fixed to
-// 'updated' server-side and authored by the verified caller
-// (actor), never the body. graphDelta lands the target graph in
-// relations (validated via validateFlowGraphDelta); revivals
-// post 'restored' events that supersede the tombstones of the
-// nodes/edges the target re-introduces (so isDeletedIn flips
-// back to false and they reappear in reads).
+// The HTTP-body gate for POST /flows/:id/undo: just the
+// 'updated' state event's own trio fields — eventId non-empty,
+// at a valid timestamp. The restore target, the flow row's
+// scalar fields, the graph, and the graphDelta/revivals
+// sidecars are ALL resolved/computed by the route itself
+// (api/routes.ts) from the pair plane, never from this body.
 export function validateFlowUndoBody(
     body: Record<string, unknown>,
 ): FlowUndoBody {
     assertOnlyKeys(body, FLOW_UNDO_KEYS, 'FlowUndoBody');
-    const flow = asObject(body['flow'], 'FlowUndoBody.flow');
     const eventId = pickString(body, 'eventId');
     if (eventId === '') {
         throw new ValidationError(
             'FlowUndoBody.eventId must be non-empty',
         );
     }
-    const consumedVersionId = pickString(
-        body, 'consumedVersionId',
-    );
-    if (consumedVersionId === '') {
-        throw new ValidationError(
-            'FlowUndoBody.consumedVersionId must be non-empty',
-        );
-    }
     const at = validateTimestampField(
         body, 'at', 'FlowUndoBody',
     );
-    const graph = pickJsonObjectField(body, 'graph');
-    validateStoredGraphJson(graph, 'FlowUndoBody.graph');
-    const graphDelta = validateFlowGraphDelta(
-        asObject(body['graphDelta'], 'FlowUndoBody.graphDelta'),
-    );
-    const revivals = validateRevivals(
-        body['revivals'], 'FlowUndoBody.revivals',
-    );
-    return {
-        flow, eventId, consumedVersionId, at,
-        graph, graphDelta, revivals,
-    };
+    return { eventId, at };
 }
 
 export interface HumanMemberCreateBody {

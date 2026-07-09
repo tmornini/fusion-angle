@@ -375,9 +375,17 @@ async function seedChain(
         await organizationToken(identity, organization),
         { entity_id: 'i' + s, state: 'active', at: T8_AT },
     ));
-    await db.stateFieldValues.put('sfv' + s, {
-        state_event_id: 'se' + s, attribute_id: 'x', value: 'v',
-    });
+    // NAMED re-pin (Phase 14 Task 6): the flipped GET states/:id/
+    // field-values route derives from the message ledger too,
+    // the SAME reason as the /states re-pin just above — a raw
+    // db.stateFieldValues.put leaves no pair at the leaf address
+    // (states/:id/field-values/:fvid), so the row must land
+    // through the SAME wire-reachable PUT the live route serves.
+    await handleRequest(db, req(
+        'PUT', '/states/se' + s + '/field-values/sfv' + s,
+        await organizationToken(identity, organization),
+        { state_event_id: 'se' + s, attribute_id: 'x', value: 'v' },
+    ));
 }
 
 // Two full chains (A, B) plus the identity spine; `current` is
@@ -689,6 +697,32 @@ for (const c of NESTED_FLOW_CASES) {
         });
     }
 }
+
+// flows/:id/tags/:name (Phase 14 Task 9): PAIR-PLANE ONLY, so it
+// cannot join NESTED_FLOW_CASES above (no backing table for
+// `store` to probe). A DIRECT fence, not the facade re-entry:
+// fB belongs to org B (seeded via seedChain(db, 'B', 'B', 'pb')
+// in deepDb()), so a tag written there through 'pb's org-B token
+// lands at the '/organizations/B/flows/fB/tags/' address; a read
+// of the SAME path with 'current's org-A-scoped token resolves
+// an entirely different '/organizations/A/...' prefix — the
+// same structural fence every org-nested address rides, with no
+// tag-specific code of its own.
+test('nested flows/:id/tags 404s a foreign-org flow', async () => {
+    const db = await deepDb();
+    const tagged = await handleRequest(db, req(
+        'PUT', '/flows/fB/tags/v1',
+        await organizationToken('pb', 'B'),
+        { flow_response_id: 'r-b-1' },
+    ));
+    assert.equal(tagged.status, 200);
+
+    const res = await handleRequest(db, req(
+        'GET', '/flows/fB/tags/v1',
+        await organizationToken('current', 'A'),
+    ));
+    assert.equal(res.status, 404);
+});
 
 // The three project-subordinate resources nest under
 // projects/:id. The collection is fetched at projects/pA/<seg> —

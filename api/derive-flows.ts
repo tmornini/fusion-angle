@@ -73,10 +73,21 @@ function flowsUriPrefix(organization: Id): string {
 // shared normalizer — derivation reads ONLY the document's own
 // fields, never the graphDelta/revivals sidecars (Internal
 // Defense: tests/drift-flows.test.ts's sidecar-insensitivity
-// case proves this, not just asserts it).
+// case proves this, not just asserts it). `pairCount` is this
+// flow's OWN document-pair count (Phase 14 Task 8) — the cheap
+// hasUndoHistory approximation; deriveFlow/deriveFlows (below)
+// supply it, since both already group pairs per flow for their
+// own lifecycle walk (no second pass here). OPTIONAL only so
+// this function keeps satisfying DocumentFamilyWiring's fixed
+// 2-arg `entityOf` contract in FLOWS_WIRING (api/routes.ts) —
+// dead in practice, since both live flows GET routes are
+// hand-written and call deriveFlow/deriveFlows directly (never
+// the generic document-family GET path flows used before this
+// task), never omitting the count.
 export function flowEntityOf(
     document: DerivedDocument,
     organization: Id,
+    pairCount?: number,
 ): FlowWithGraph {
     const body = document.body;
     return {
@@ -90,6 +101,7 @@ export function flowEntityOf(
         graph: normalizedStoredGraphField(
             pickJsonObjectField(body, 'graph'),
         ),
+        hasUndoHistory: (pairCount ?? 0) > 1,
     };
 }
 
@@ -142,7 +154,10 @@ export async function deriveFlows(
         if (currentDocumentState(history) === DELETED_STATE) {
             continue;
         }
-        flows.push(flowEntityOf(document, organization));
+        flows.push(flowEntityOf(
+            document, organization,
+            pairsByFlowId.get(flowId)?.length ?? 0,
+        ));
     }
     return flows.sort(byIdAscending);
 }
@@ -158,16 +173,93 @@ export async function deriveFlow(
     if (document === undefined) {
         throw new EntityNotFoundError(FLOWS_TABLE, flowId);
     }
+    const ownPairs = pairs.filter(
+        (pair) => pair.uriId === flowId,
+    );
     const history = stateHistoryFrom(
-        documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === flowId),
-        ),
+        documentLifecycleEvents(ownPairs),
         flowId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
         throw new EntityNotFoundError(FLOWS_TABLE, flowId);
     }
-    return flowEntityOf(document, organization);
+    return flowEntityOf(document, organization, ownPairs.length);
+}
+
+// Undo-as-replay's own resolution (Phase 14 Task 8): given this
+// flow's OWN undo-operation-pair address prefix (the route's
+// own `pair.uriPrefix` — already flow-specific, since `undo` is
+// a literal final route segment, so messageAddress folds the
+// real id into the PREFIX rather than a separate uriId), walks
+// this flow's flows/:id document-pair history and replays it as
+// a stack with a pointer: a GENUINE pair (no correlated undo
+// call) truncates any abandoned branch to `[0..pointer]` then
+// pushes; an UNDO-correlated pair only moves the pointer back —
+// it never adds a new logical state (the fix that makes
+// undo-save-undo target the SAVE's own baseline, never a
+// discarded future — see the PINNED Step 0 trace,
+// .superpowers/sdd/phase14-task-8-report.md). Correlation is by
+// the STORED REQUEST `at` (never the response `at` —
+// appendMessagePair mints each pair's own response `at`
+// independently via nowUtc(), so two pairs written in the SAME
+// transaction do not share it; the request `at` DOES, since
+// both the operation pair and its synthesized document pair
+// carry the identical `pair.requestAt`). `target: undefined`
+// means exhaustion (no pair exists before the current head); an
+// undefined RETURN means the flow has no document pairs at all
+// at this address (should never happen for a routed request
+// against a real flow id — this derivation trusts nothing
+// beyond what it reads, same posture as deriveFlow's own
+// EntityNotFoundError guard).
+export interface FlowUndoResolution {
+    readonly current: DocumentPair;
+    readonly target: DocumentPair | undefined;
+}
+
+export async function resolveFlowUndoTarget(
+    db: DbAdapter,
+    organization: Id,
+    flowId: Id,
+    undoUriPrefix: string,
+): Promise<FlowUndoResolution | undefined> {
+    const prefix = flowsUriPrefix(organization);
+    const [requests, responses, undoRequests] =
+        await Promise.all([
+            db.requests.getAllWhere('uri_prefix', prefix),
+            db.responses.getAllWhere('uri_prefix', prefix),
+            db.requests.getAllWhere(
+                'uri_prefix', undoUriPrefix,
+            ),
+        ]);
+    const pairs = documentPairsAt(requests, responses, prefix)
+        .filter((pair) => pair.uriId === flowId);
+    const current = pairs.at(-1);
+    if (current === undefined) return undefined;
+    const requestAtById = new Map(
+        requests.map((request) => [request.id, request.at]),
+    );
+    const undoRequestAts = new Set(
+        undoRequests.map((request) => request.at),
+    );
+    const stack: DocumentPair[] = [];
+    let pointer = -1;
+    for (const pair of pairs) {
+        const requestAt = requestAtById.get(pair.id);
+        if (
+            requestAt !== undefined
+            && undoRequestAts.has(requestAt)
+        ) {
+            pointer -= 1;
+        } else {
+            stack.length = Math.max(pointer + 1, 0);
+            stack.push(pair);
+            pointer = stack.length - 1;
+        }
+    }
+    const targetPointer = pointer - 1;
+    const target = targetPointer >= 0
+        ? stack[targetPointer] : undefined;
+    return { current, target };
 }
 
 // One row per pair whose state_event_id is NEW — the document

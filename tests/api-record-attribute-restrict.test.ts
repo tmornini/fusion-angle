@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import {
     DELETE,
     POST,
+    PUT,
     RequestError,
 } from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
@@ -111,10 +112,20 @@ test(
             entity_id: 'r1', state: 'active',
             member_id: 'current', at: AT,
         });
-        await db.stateFieldValues.put('sfv1', {
-            state_event_id: 'ev1', attribute_id: 'attr1',
-            value: 'High',
-        });
+        // NAMED re-pin (Phase 14 Task 6): RESTRICT's field-
+        // value leg is pair-plane derived now — a raw
+        // db.stateFieldValues.put leaves no pair at the leaf
+        // address (states/:id/field-values/:fvid), so the row
+        // must land through the SAME wire-reachable PUT the
+        // live route serves.
+        await PUT(
+            db, 'states/ev1/field-values/sfv1',
+            {
+                state_event_id: 'ev1', attribute_id: 'attr1',
+                value: 'High',
+            },
+            DEV_TOKEN,
+        );
         await assert.rejects(
             () => DELETE(
                 db, 'record-attributes/attr1',
@@ -259,10 +270,20 @@ test(
             entity_id: 'r1', state: 'active',
             member_id: 'current', at: AT,
         });
-        await db.stateFieldValues.put('sfv1', {
-            state_event_id: 'ev1', attribute_id: 'attr1',
-            value: 'High',
-        });
+        // NAMED re-pin (Phase 14 Task 6): RESTRICT's field-
+        // value leg is pair-plane derived now — a raw
+        // db.stateFieldValues.put leaves no pair at the leaf
+        // address (states/:id/field-values/:fvid), so the row
+        // must land through the SAME wire-reachable PUT the
+        // live route serves.
+        await PUT(
+            db, 'states/ev1/field-values/sfv1',
+            {
+                state_event_id: 'ev1', attribute_id: 'attr1',
+                value: 'High',
+            },
+            DEV_TOKEN,
+        );
         const requestsBefore = await db.requests.getAll();
         const responsesBefore = await db.responses.getAll();
         await assert.rejects(

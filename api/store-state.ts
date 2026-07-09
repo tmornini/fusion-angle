@@ -225,6 +225,20 @@ export class StateStore
         return latest !== undefined
             && latest.state === 'deleted';
     }
+
+    // FENCE MECHANICS — see StateStore's own interface header
+    // (api/db.ts). This IS the raw base tier already (no
+    // wrapper here), so "raw presence" is simply presence: a
+    // primary-key get, same as getById minus the throw.
+    async rawHasRow(id: Id): Promise<boolean> {
+        return this.#run(
+            [this.#table], 'readonly',
+            async (tx) =>
+                (await tx.get<StateEntity>(
+                    this.#table, id,
+                )) !== null,
+        );
+    }
 }
 
 function sameEvent(

@@ -23,9 +23,6 @@ import {
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import {
-    postFlowVersion,
-} from '../web-app/app/adapters/flow-versions.ts';
-import {
     buildInitialFlowSnapshot,
     type FlowSnapshot,
 } from
@@ -33,9 +30,6 @@ import {
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
-import {
-    generateCryptoSafeBase62,
-} from '../shared/crypto-safe-base62.ts';
 import {
     performUndo,
     performRedo,
@@ -155,19 +149,19 @@ function snapOf(
     );
 }
 
-// Persist `graph` as the CURRENT flow state AND snapshot it
-// as a version — so a later undo reverts to exactly this
-// graph. Mirrors commitFlowMutation's version-then-write
-// order at the persistence seam.
-async function commitVersionedGraph(
+// Persist `graph` as the CURRENT flow state — a genuine save,
+// so it lands its OWN document pair at flows/:id. Undo-as-replay
+// (Phase 14 Task 8) resolves its restore target by walking that
+// SAME document-pair history — a plain putFlow call is now the
+// full setup a later undo needs to revert to exactly this graph;
+// no flow_versions archive rides alongside it any more (that
+// archive fed the OLD undo mechanism's own consume, now retired).
+async function saveGraph(
     ctx: RequestContext,
     nodes: GraphNode[],
     edges: GraphEdge[],
 ): Promise<void> {
     await putFlow(ctx, FLOW_ID, save(nodes, edges));
-    await postFlowVersion(
-        ctx, generateCryptoSafeBase62(), FLOW_ID,
-    );
 }
 
 // Read the live (tombstone-filtered) relation rows and
@@ -198,7 +192,13 @@ async function latestStateFor(
     return events.at(-1)!.state;
 }
 
-const NO_REDO = buildFlowHistorySnapshot(false);
+// performUndo (Phase 14 Task 8) gates on hasUndoHistory
+// client-side BEFORE ever calling the server — every test below
+// has already made a genuine saveGraph edit, so this fixture
+// must say so (true), or performUndo short-circuits to a no-op
+// without exercising the route at all. The empty redoStack is
+// the part actually named "no redo" below.
+const HAS_UNDO_HISTORY = buildFlowHistorySnapshot(true);
 
 test(
     'DELETE-THEN-UNDO revives the deleted node and its'
@@ -210,8 +210,8 @@ test(
         const x = buildNode('x');
         const xEdge = buildEdge('xe', 'a', 'x');
 
-        // Version the graph that HAS X + its edge.
-        await commitVersionedGraph(
+        // Save the graph that HAS X + its edge — undo's target.
+        await saveGraph(
             ctx, [a, x], [xEdge],
         );
         // Then save the graph WITHOUT X (X + its edge are
@@ -233,7 +233,7 @@ test(
         // UNDO from the current (X-less) graph back to the
         // version that still had X.
         const undo = await performUndo(
-            ctx, snapOf([a], []), NO_REDO,
+            ctx, snapOf([a], []), HAS_UNDO_HISTORY,
         );
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
@@ -270,8 +270,8 @@ test(
         const a = buildNode('a', { isCreate: true });
         const x = buildNode('x');
 
-        // Version the graph WITHOUT X.
-        await commitVersionedGraph(ctx, [a], []);
+        // Save the graph WITHOUT X — undo's target.
+        await saveGraph(ctx, [a], []);
         // Then save the graph WITH X (X added).
         await putFlow(ctx, FLOW_ID, save([a, x], []));
 
@@ -281,7 +281,7 @@ test(
         // Undo the add -> X is in current-not-target, so it
         // is deleted by the undo delta.
         const undo = await performUndo(
-            ctx, snapOf([a, x], []), NO_REDO,
+            ctx, snapOf([a, x], []), HAS_UNDO_HISTORY,
         );
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
@@ -307,8 +307,8 @@ test(
             memberIds: ['m1'],
         });
 
-        // Version the graph whose node a has NO member.
-        await commitVersionedGraph(ctx, [aBare], []);
+        // Save the graph whose node a has NO member — undo's target.
+        await saveGraph(ctx, [aBare], []);
         // Then save the graph where a gains member m1.
         await putFlow(ctx, FLOW_ID, save([aWithMember], []));
 
@@ -320,7 +320,7 @@ test(
 
         // Undo -> revert to the no-member version.
         const undo = await performUndo(
-            ctx, snapOf([aWithMember], []), NO_REDO,
+            ctx, snapOf([aWithMember], []), HAS_UNDO_HISTORY,
         );
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
@@ -343,14 +343,14 @@ test(
         const x = buildNode('x');
         const xEdge = buildEdge('xe', 'a', 'x');
 
-        // Version the graph that HAS X.
-        await commitVersionedGraph(ctx, [a, x], [xEdge]);
+        // Save the graph that HAS X — undo's target.
+        await saveGraph(ctx, [a, x], [xEdge]);
         // Save the graph WITHOUT X (delete).
         await putFlow(ctx, FLOW_ID, save([a], []));
 
         // Undo -> X revived.
         const undo = await performUndo(
-            ctx, snapOf([a], []), NO_REDO,
+            ctx, snapOf([a], []), HAS_UNDO_HISTORY,
         );
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;

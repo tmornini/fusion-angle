@@ -228,15 +228,18 @@ test('undo/versions-publish are operation-addressed:'
     assert.ok(publishRow);
     assert.equal(publishRow!.uri_id, '');
 
+    // Phase 14 Task 8 (undo-as-replay): the body shrinks to the
+    // state trio's two free fields; no target save precedes
+    // this call (an exhausted resolution — nothing before
+    // genesis), so the route performs a genuine no-op — but its
+    // OWN operation pair still lands (api.ts's "wired write
+    // stored no pair" guard, true for every pair-wired route
+    // regardless of domain effect), which is exactly the
+    // address/chaining behavior this test pins.
     const undone = await handleRequest(db, req(
         'POST', '/flows/flow-4/undo', token, {
-            flow: flowFields('Fresh Flow'),
             eventId: 'flow-4-undo-ev',
             at: AT,
-            consumedVersionId: 'v-1',
-            graph: '{"nodes":[],"edges":[]}',
-            graphDelta: emptyDelta(),
-            revivals: [],
         },
     ));
     assert.equal(undone.status, 204);

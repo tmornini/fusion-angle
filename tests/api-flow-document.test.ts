@@ -655,38 +655,26 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
     assert.equal(secondDocumentResponse.follows, undefined);
 });
 
+// NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the old body
+// carried a client-computed target (`flow`/`graph`/`graphDelta`/
+// `revivals`) plus `consumedVersionId`. The restore target is
+// now resolved SERVER-SIDE from the flows/:id document-pair
+// history, so the setup needs a genuine PRIOR SAVE (the
+// one-node graph) followed by a SECOND save that moves the head
+// away from it — undo must revert exactly that second save,
+// landing back on the first save's own graph, never a
+// client-supplied one.
 test('e2e: POST flows/:id/undo forms a document pair carrying'
 + ' Follows to the pre-undo head, with graph matching the'
 + ' post-undo reassembly', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'flow-undo-pairs-1');
-    const preUndoHead = await headResponseId(
+    const genesisHead = await headResponseId(
         db, token, 'flow-undo-pairs-1',
     );
 
-    const published = await handleRequest(db, req(
-        'POST', '/flows/flow-undo-pairs-1/versions', token, {
-            id: 'v-undo-pairs-1',
-            version: {
-                flow_id: 'flow-undo-pairs-1',
-                name: 'v1',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: emptyGraph(),
-                at: AT,
-            },
-            trimIds: [],
-        },
-    ));
-    assert.equal(published.status, 204);
-
-    const requestsBeforeUndo = await db.requests.getAll();
-    const responsesBeforeUndo = await db.responses.getAll();
-
-    // A non-trivial undo graph (one node) — so the graph
+    // A non-trivial undo TARGET (one node) — so the graph
     // comparison below actually exercises the mechanism rather
     // than trivially equating two empty graphs.
     const undoneGraph = {
@@ -699,12 +687,9 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
         }],
         edges: [],
     };
-    const undone = await handleRequest(db, req(
-        'POST', '/flows/flow-undo-pairs-1/undo', token, {
-            flow: flowFields('Fresh Flow'),
-            eventId: 'flow-undo-pairs-1-undo-ev',
-            at: AT,
-            consumedVersionId: 'v-undo-pairs-1',
+    const firstSave = await handleRequest(db, req(
+        'PUT', '/flows/flow-undo-pairs-1', token,
+        documentBody('One Node', 'flow-undo-pairs-1-ev-1', {
             graph: JSON.stringify(undoneGraph),
             graphDelta: {
                 nodes: [{
@@ -718,7 +703,34 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
                 edges: [], deletions: [],
                 memberEvents: [], attributeEvents: [],
             },
-            revivals: [],
+        }),
+        { 'if-response-id': genesisHead },
+    ));
+    assert.equal(firstSave.status, 200);
+    const headAfterFirstSave = await headResponseId(
+        db, token, 'flow-undo-pairs-1',
+    );
+
+    // A SECOND save moves the head away from the one-node
+    // graph — undo must revert THIS, landing back on the
+    // first save's own one-node graph.
+    const secondSave = await handleRequest(db, req(
+        'PUT', '/flows/flow-undo-pairs-1', token,
+        documentBody('Back To Empty', 'flow-undo-pairs-1-ev-2'),
+        { 'if-response-id': headAfterFirstSave },
+    ));
+    assert.equal(secondSave.status, 200);
+    const preUndoHead = await headResponseId(
+        db, token, 'flow-undo-pairs-1',
+    );
+
+    const requestsBeforeUndo = await db.requests.getAll();
+    const responsesBeforeUndo = await db.responses.getAll();
+
+    const undone = await handleRequest(db, req(
+        'POST', '/flows/flow-undo-pairs-1/undo', token, {
+            eventId: 'flow-undo-pairs-1-undo-ev',
+            at: AT,
         },
     ));
     assert.equal(undone.status, 204);
@@ -757,6 +769,13 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
     const decoded =
         decodeRequestMessage(undoDocumentRequest!.message);
     assert.equal(decoded.method, 'PUT');
+    assert.deepEqual(
+        JSON.parse(decoded.body['graph'] as string),
+        undoneGraph,
+        'the restore write carries the ORIGINAL one-node'
+        + ' graph, resolved from the pair plane — never a'
+        + ' client-supplied one',
+    );
 
     const after = await handleRequest(
         db, req('GET', '/flows/flow-undo-pairs-1', token),
@@ -768,6 +787,13 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
     );
 });
 
+// NAMED REWRITE (Phase 14 Task 8, undo-as-replay): no
+// flow_versions row is published or consumed at all any more —
+// undo resolves its target from the flows/:id document-pair
+// history, so the setup needs a genuine PRIOR SAVE (giving undo
+// a target: genesis) before the race, and the post-race
+// assertions drop every flow_versions check (there is no
+// consumed-or-survives row to inspect).
 test('e2e: an undo racing a save collides on the SAME follows'
 + ' target — the loser 412s, storage shows exactly one'
 + ' follower, and the whole loser transaction lands nothing',
@@ -775,36 +801,22 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'flow-race-1');
-    const head = await headResponseId(db, token, 'flow-race-1');
-
-    const published = await handleRequest(db, req(
-        'POST', '/flows/flow-race-1/versions', token, {
-            id: 'v-race-1',
-            version: {
-                flow_id: 'flow-race-1',
-                name: 'v1',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: emptyGraph(),
-                at: AT,
-            },
-            trimIds: [],
-        },
+    const genesisHead = await headResponseId(
+        db, token, 'flow-race-1',
+    );
+    const before = await handleRequest(db, req(
+        'PUT', '/flows/flow-race-1', token,
+        documentBody('Before Race', 'flow-race-1-ev-1'),
+        { 'if-response-id': genesisHead },
     ));
-    assert.equal(published.status, 204);
+    assert.equal(before.status, 200);
+    const head = await headResponseId(db, token, 'flow-race-1');
 
     const [undo, save] = await Promise.all([
         handleRequest(db, req(
             'POST', '/flows/flow-race-1/undo', token, {
-                flow: flowFields('Undone'),
                 eventId: 'flow-race-1-undo-ev',
                 at: AT,
-                consumedVersionId: 'v-race-1',
-                graph: emptyGraph(),
-                graphDelta: emptyDelta(),
-                revivals: [],
             },
         )),
         handleRequest(db, req(
@@ -827,23 +839,18 @@ async () => {
     );
 
     const flow = await db.flows.getById('flow-race-1');
-    if (flow.name === 'Undone') {
-        // Undo won the race; the save's write never landed.
+    if (flow.name === 'Fresh Flow') {
+        // Undo won the race, reverting all the way back to
+        // genesis (the only pair before "Before Race"); the
+        // save's write never landed.
         assert.equal(undo.status, 204);
         assert.equal(save.status, 412);
-        await assert.rejects(
-            () => db.flowVersions.getById('v-race-1'),
-        );
     } else {
         // The save won the race; the undo's write never landed
-        // — the version row survives unconsumed and the undo's
-        // own event never posted.
+        // — its own event never posted.
         assert.equal(flow.name, 'Saved');
         assert.equal(save.status, 200);
         assert.equal(undo.status, 412);
-        const version =
-            await db.flowVersions.getById('v-race-1');
-        assert.ok(version);
         const events = await db.states.getAllFor('flow-race-1');
         assert.ok(
             !events.some(

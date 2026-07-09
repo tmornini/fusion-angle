@@ -6,6 +6,7 @@ import { sha256Hex } from '../shared/digest.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { jsonArrayField } from '../api/types.ts';
 
 const BASE = 'http://localhost';
@@ -218,6 +219,45 @@ test('an edit POST shares the SAME address as create and'
         editOperationPair, 'no stored operation-pair response',
     );
     assert.equal(editOperationPair!.supersedes, trueHead!.id);
+});
+
+// Phase 14 Task 5, site 4 — the ONE missing two-actor echo
+// regression (research finding 4): 'current' creates a record;
+// 'member-b' then edits it via the composed POST /records edit
+// arm, echoing the SAME trio verbatim (editRecordBody's own
+// contract). sameEvent (store-state.ts) compares member_id too,
+// so replaying 'member-b' as author would 409 against the
+// already-stored (current-authored) event — mirroring the
+// api-record-document op-tier echo test's shape (tests/api-
+// record-document.test.ts) at the route tier. Lands PASS-FIRST,
+// green on the OLD (row-plane view.states.getCurrentFor) path,
+// before the composed-write flip commit re-anchors
+// postRecordWriteOp's edit arm onto documentStateHeadFor.
+test('two actors, same trio: a composed POST /records edit'
++ ' echoes the stored head\'s author — exactly one state event,'
++ ' member_id unchanged', async () => {
+    const db = await freshDb();
+    await seedOrganizationMember(db, 'member-b');
+    const tokenA = await organizationToken();
+    const tokenB = await organizationToken('member-b');
+
+    const created = await handleRequest(db, req(
+        'POST', '/records', tokenA,
+        createRecordBody('rec-echo', 'ev-echo'),
+    ));
+    assert.equal(created.status, 204);
+
+    const edited = await handleRequest(db, req(
+        'POST', '/records', tokenB,
+        editRecordBody('rec-echo', 'ev-echo'),
+    ));
+    assert.equal(edited.status, 204);
+
+    const events = await db.states.getAllFor('rec-echo');
+    assert.equal(events.length, 1);
+    assert.equal(events[0]!.member_id, 'current');
+    const row = await db.records.getById('rec-echo');
+    assert.equal(row.name, 'Edited Record');
 });
 
 test('a record create with attributes appends the'
@@ -437,11 +477,31 @@ test('a RESTRICTed DELETE record-attributes/:id 409s and'
         'PUT', '/record-attributes/attr-3', token,
         recordAttributeFields('rec-7', 'Bound'),
     ));
-    await db.stateFieldValues.put('sfv-1', {
-        state_event_id: 'ev-x',
-        attribute_id: 'attr-3',
-        value: 'v',
-    });
+    // NAMED re-pin (Phase 14 Task 6): RESTRICT's field-value
+    // leg is pair-plane derived now — a raw
+    // db.stateFieldValues.put leaves no pair at the leaf
+    // address (states/:id/field-values/:fvid), so the row must
+    // land through the SAME wire-reachable PUT the live route
+    // serves. 'ev-x' itself is DELIBERATELY never created —
+    // the ORIGINAL dangling-parent fixture, restored (fix wave,
+    // Critical 1): no states row exists for it at all, so it
+    // resolves as a visible orphan (isVisibleStateEvent's
+    // rawHasRow branch, api/derive-state-field-values.ts),
+    // exactly as the retired parentScope resolver treated it
+    // (db-organization-scoped.ts's own try/catch on
+    // base.states.getById). This is the three-way visibility
+    // rule's FIRST branch — it never reaches the entity-
+    // ownership probe, so it does not depend on the flow_edges/
+    // ATTRIBUTE_RESTRICT_TABLES pre-existing gap either (see
+    // this file's Concerns note in the Task 6 report).
+    await handleRequest(db, req(
+        'PUT', '/states/ev-x/field-values/sfv-1', token,
+        {
+            state_event_id: 'ev-x',
+            attribute_id: 'attr-3',
+            value: 'v',
+        },
+    ));
     const countBefore = (await db.requests.getAll()).length;
     const del = await handleRequest(db, req(
         'DELETE', '/record-attributes/attr-3', token,
