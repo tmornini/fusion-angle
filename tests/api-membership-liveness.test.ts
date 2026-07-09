@@ -13,6 +13,26 @@ function req(path: string, token: string): Request {
     });
 }
 
+// De-membership rides the real wire DELETE (an admin-tier route,
+// authorized here by 'current's own seedRootAdmin admin grant) —
+// Phase 13 Task 3's flip onto deriveMembershipsForIdentity reads
+// ONLY the message-pair ledger, so a raw db.memberships.delete
+// (the row-plane splice alone) would leave the derivation seeing
+// a still-live membership: a DELETE-shaped pair must actually
+// land for the fence to observe the revocation.
+async function deleteMembership(
+    db: MemoryDbAdapter, id: string,
+): Promise<void> {
+    const res = await handleRequest(
+        db, new Request(`${BASE}/memberships/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': 'Bearer ' + await organizationToken(),
+            },
+        }));
+    assert.equal(res.status, 204);
+}
+
 // Task 8 (Phase 11): identityDefaultOrganization now derives from
 // the /identities/:id/default-org/ message-pair ledger, never the
 // identity_default_organizations table directly — so pinning a
@@ -58,10 +78,9 @@ async () => {
     const before = await handleRequest(
         db, req('/members', token));
     assert.equal(before.status, 200);
-    // De-membership: splice the relationship row. The token
-    // is still cryptographically valid for its full TTL —
-    // the fence must not wait for it to expire.
-    await db.memberships.delete('test-membership-current');
+    // De-membership: the token is still cryptographically valid
+    // for its full TTL — the fence must not wait for it to expire.
+    await deleteMembership(db, 'test-membership-current');
     const after = await handleRequest(
         db, req('/members', token));
     assert.equal(after.status, 403);
@@ -82,7 +101,7 @@ async () => {
         '2020-01-02T00:00:00.000000Z',
     ));
     assert.equal(pin.status, 204);
-    await db.memberships.delete('test-membership-current');
+    await deleteMembership(db, 'test-membership-current');
     const res = await handleRequest(
         db, req('/members', await devToken()));
     assert.equal(res.status, 403);

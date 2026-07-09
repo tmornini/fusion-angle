@@ -229,11 +229,11 @@ Append-only set-default-org ledger
 identity chose its default organization — the org a
 flat (un-exchanged) token lands in. The current
 default is the LATEST `at` per `identity_id`
-(`currentDefaultOrgFor` in `api/authorization.ts` is
-its single home); `identityDefaultOrg` falls through
-to the PRIMARY membership org when the ledger is
-empty, else a 403. A re-choice is a NEW row — never a
-mutated column. `at` is validated as a well-formed
+(`currentDefaultOrganizationFor` in `api/authorization.ts` is
+its single home); `identityDefaultOrganization` falls
+through to the PRIMARY membership org when the ledger
+is empty, else a 403. A re-choice is a NEW row — never
+a mutated column. `at` is validated as a well-formed
 RFC-3339 Zulu timestamp at the storage gate.
 
 | Column | Type |
@@ -269,32 +269,6 @@ the request org's grants.
 | role | TEXT |
 | action | TEXT (`granted` \| `revoked`) |
 | by_member_id | TEXT (FK → members) |
-| at | TEXT |
-
-### identity_tokens
-
-Append-only token-lifecycle ledger
-(`HistoryEntityStore`). One row per jti event; a
-token's current validity = the latest action for its
-`jti`. `chain_id` groups a refresh-rotation lineage:
-each rotation appends `rotated` for the old jti and
-`issued` for the new at one shared `at`, both carrying
-the `chain_id`. A token's predecessor is DERIVED for
-display, not stored — the jti `rotated` at its `issued`
-instant; a root has none. Presenting a rotated-away or
-`revoked` jti is replay → the whole chain is revoked.
-Distinct from `identity_token_revocations` (coarse
-per-identity log-out-everywhere); this is per-jti and
-per-chain, checked at the gate. `at` is the RFC-3339
-zulu moment, validated at the storage gate.
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| jti | TEXT |
-| identity_id | TEXT (FK → identities) |
-| action | TEXT (`issued` \| `rotated` \| `revoked`) |
-| chain_id | TEXT |
 | at | TEXT |
 
 ### clients
@@ -342,27 +316,6 @@ storage gate.
 | provider | TEXT |
 | provider_subject | TEXT |
 | action | TEXT (`linked` \| `unlinked`) |
-| at | TEXT |
-
-### authorization_codes
-
-Append-only ledger of authorization-code lifecycle
-(`HistoryEntityStore`). One row per issue/consume; a
-code's current status = the latest event for its
-`code`. The row `id` is a generated event id; `code` is
-the opaque single-use value bound to (identity, client).
-A consume is a NEW `consumed` row; re-presenting a code
-whose latest status is `consumed` (or unknown) is
-replay. `at` is the RFC-3339 zulu moment, validated at
-the storage gate.
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| code | TEXT |
-| identity_id | TEXT (FK → identities) |
-| client_id | TEXT (FK → clients) |
-| status | TEXT (`issued` \| `consumed`) |
 | at | TEXT |
 
 ### ideas

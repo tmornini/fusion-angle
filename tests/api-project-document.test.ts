@@ -125,8 +125,8 @@ test('a byte-identical resend converges: one event,'
     );
     const events = await db.states.getAllFor('doc-3');
     assert.equal(events.length, 1);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('the pair body carries state/state_at while the'
@@ -145,8 +145,8 @@ test('the pair body carries state/state_at while the'
     assert.ok(!('state' in row));
     assert.ok(!('state_at' in row));
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    const parsed = JSON.parse(requests[0]!.message) as {
+    assert.equal(requests.length, 4);
+    const parsed = JSON.parse(requests[3]!.message) as {
         body: { state: string; state_at: string };
     };
     assert.equal(parsed.body.state, 'under_review');

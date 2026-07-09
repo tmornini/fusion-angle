@@ -11,6 +11,13 @@ import {
 } from '../api/document-family.ts';
 import { sha256Hex } from '../shared/digest.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
+import {
+    postMembershipDocumentOp,
+    postRoleGrantDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 // Phase 8 Task 6: the invitation document plane — the grant's
 // PUT-shaped invitation document (the entity minus id, NO email
@@ -53,16 +60,90 @@ async function person(
     });
 }
 
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// the invitation grant/accept authz below derives from the pair
+// plane once role_grants/memberships flip, so a raw row here
+// would go derivation-invisible. Every id/field value stays
+// IDENTICAL to the raw puts these replace — only the write
+// mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function seedRoleGrantPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for role-grants/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/role-grants/' + id,
+        routePattern: 'role-grants/:id',
+        routeSegments: ['role-grants', ':id'],
+        pathSegments: ['role-grants', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postRoleGrantDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await db.organizations.put('1', organizationRow('Stark'));
-    await db.roleGrants.put('rg-current-1', {
+    await seedRoleGrantPair(db, 'rg-current-1', {
         organization_id: '1', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.memberships.put('m-current-1', {
+    await seedMembershipPair(db, 'm-current-1', {
         organization_id: '1', identity_id: 'current', at: AT,
     });
     await person(db, 'current', 'Tony', 'demo@example.com');
@@ -96,7 +177,9 @@ async () => {
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    assert.equal(requests.length, 2);
+    // 4: the fixture's own role-grant + membership pair (Phase
+    // 13 Task 1) precede the grant's own 2 pairs.
+    assert.equal(requests.length, 4);
     const atAddress = requests.filter(
         r => r.uri_prefix === '/invitations/'
             && r.uri_id === 'inv-doc-1',
@@ -145,13 +228,16 @@ async () => {
 test('a failed (member-conflict) grant appends nothing',
 async () => {
     const db = await freshDb();
-    await db.memberships.put('m-sarah-conflict', {
+    await seedMembershipPair(db, 'm-sarah-conflict', {
         organization_id: '1', identity_id: 'sarah', at: AT,
     });
     const res = await grant(db, 'inv-doc-fail');
     assert.equal(res.status, 409);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    // 3: the fixture's own role-grant + membership pair, plus
+    // sarah's own conflicting membership pair (Phase 13 Task 1)
+    // — the failed grant appends nothing further.
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 // ── accept: the memberships document pair (the B2 closure) ──
@@ -226,8 +312,11 @@ async () => {
     const documents = (await db.requests.getAll()).filter(
         r => r.uri_prefix === '/organizations/1/memberships/',
     );
-    assert.equal(documents.length, 1);
-    assert.equal(documents[0]!.uri_id, 'ms-doc-4');
+    // 2: the fixture's own membership pair (Phase 13 Task 1)
+    // shares this SAME org-nested address, so it matches the
+    // filter too — at index 0, since it precedes the accept.
+    assert.equal(documents.length, 2);
+    assert.equal(documents[1]!.uri_id, 'ms-doc-4');
 });
 
 // ── deriveInvitations: the message-plane reduction ──
@@ -343,9 +432,11 @@ test('every stored invitation-family message verifies against'
     const responses = await db.responses.getAll();
     // 3 grants x 2 (operation + invitation document) + 1 accept
     // x 2 (operation + memberships document) + 1 decline x 1
-    // (operation only — decline synthesizes no document) = 9.
-    assert.equal(requests.length, 9);
-    assert.equal(responses.length, 9);
+    // (operation only — decline synthesizes no document) = 9,
+    // plus the fixture's own role-grant + membership pair
+    // (Phase 13 Task 1) = 11.
+    assert.equal(requests.length, 11);
+    assert.equal(responses.length, 11);
     for (const row of requests) {
         assert.equal(
             await sha256Hex(row.message), row.message_hash,

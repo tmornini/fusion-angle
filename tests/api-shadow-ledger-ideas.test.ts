@@ -79,14 +79,14 @@ async () => {
     const res = await createIdea(db, token, 'idea-1');
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 4);
     assert.equal(
-        requests[0]!.uri_prefix,
+        requests[3]!.uri_prefix,
         '/organizations/1/ideas/',
     );
-    assert.equal(requests[0]!.uri_id, 'idea-1');
+    assert.equal(requests[3]!.uri_id, 'idea-1');
     const responses = await db.responses.getAll();
-    assert.equal(responses[0]!.id, requests[0]!.id);
+    assert.equal(responses[3]!.id, requests[3]!.id);
 });
 
 test('a failed create appends nothing', async () => {
@@ -112,8 +112,8 @@ test('a failed create appends nothing', async () => {
         },
     ));
     assert.equal(res.status, 409);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('a second PUT to the same idea records supersedes',
@@ -182,8 +182,8 @@ test('a byte-identical resend returns the stored response '
         db, req('PUT', '/ideas/idea-5', token, body),
     );
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('stored messages verify against their hashes',
@@ -256,7 +256,7 @@ test('a DELETE to a pair-wired PUT-only route still 405s '
         db, req('DELETE', '/ideas/idea-9', token),
     );
     assert.equal(res.status, 405);
-    assert.equal((await db.requests.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
 });
 
 test('request and response counts stay equal',

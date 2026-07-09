@@ -8,19 +8,147 @@ import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
+import {
+    postMembershipDocumentOp,
+    postRoleGrantDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import {
+    appendMessagePair, formAuthPair, formWritePair,
+} from '../api/message-pair.ts';
+import type { AuthPairSeed } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { seedOrganizationDocument } from './test-fixtures.ts';
+import {
+    authorizationCodeSpent, deriveAuthorizationCodeId,
+} from '../api/authentication.ts';
+import {
+    deriveIdentityTokens,
+} from '../api/derive-identity-tokens.ts';
 
 const BASE = 'http://localhost';
 
-const issuedCode = {
-    code: 'the-code', identity_id: 'current',
-    client_id: 'web', status: 'issued',
-    at: '2026-06-03T00:00:00.000000Z',
-};
+const INVALID_CODE_ERROR = 'invalid or used authorization code';
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     return db;
+}
+
+// Below-facade pair formation, mirroring authorizePassword's OWN
+// storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
+// 's pre-tx lookup scans the '/authentication/authorize/' response
+// family for a stored pair whose (redacted) `code` field
+// fingerprints to the presented code, so a bare pair — the SAME
+// shape a real login forms (Phase 13 Task 9: the authorization_
+// codes row half retired) — is all a seed needs. Every id/field
+// value stays IDENTICAL to the raw puts this replaces — only the
+// write mechanism changes.
+async function seedAuthorizationCodePair(
+    db: MemoryDbAdapter,
+    code: string,
+    identityId: string,
+    clientId: string,
+): Promise<void> {
+    const seed: AuthPairSeed = {
+        requestAt: nowUtc(),
+        headerFields: [],
+        method: 'POST',
+        pathname: '/authentication/authorize',
+        routePattern: 'authentication/authorize',
+        routeSegments: ['authentication', 'authorize'],
+        pathSegments: ['authentication', 'authorize'],
+    };
+    const requestBody = {
+        method: 'password', username: 'seed@example.com',
+        password: 'seed-password', client_id: clientId,
+    };
+    const pair = await formAuthPair(
+        seed, requestBody, identityId, 200, { code },
+    );
+    await appendMessagePair(db, pair);
+}
+
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// the token-exchange org-scoping tests below authorize through
+// memberships/role_grants once they derive from the pair plane,
+// so a raw row here would go derivation-invisible. Every
+// id/field value stays IDENTICAL to the raw puts these replace —
+// only the write mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    // A real organizations/:id document (Phase 13 Task 3's
+    // fixture prerequisite; seedOrganizationDocument is idempotent
+    // — a no-op on a repeat organization id) — a membership pair
+    // with no document for its own org stays derivation-invisible
+    // to deriveMembershipsForIdentity's own enumerate-then-probe
+    // (via deriveOrganizations).
+    await seedOrganizationDocument(db, organization, organization);
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function seedRoleGrantPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for role-grants/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/role-grants/' + id,
+        routePattern: 'role-grants/:id',
+        routeSegments: ['role-grants', ':id'],
+        pathSegments: ['role-grants', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postRoleGrantDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
 }
 
 function tokenRequest(body: Record<string, unknown>): Request {
@@ -47,16 +175,15 @@ async () => {
         db, tokenRequest({ grant_type: 'wat' }));
     assert.equal(res.status, 400);
     assert.equal(
-        (await db.identityTokens.getAll()).length, 0);
-    assert.equal(
-        (await db.authorizationCodes.getAll()).length, 0);
+        (await deriveIdentityTokens(db)).length, 0);
 });
 
 test('authorization_code grant issues a gate-valid token pair',
 async () => {
     const db = await freshDb();
     await seedRootAdmin(db);   // 'current' is admin
-    await db.authorizationCodes.put('ev1', issuedCode);
+    await seedAuthorizationCodePair(
+        db, 'the-code', 'current', 'web');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
     }));
@@ -75,19 +202,20 @@ async () => {
 
 test('replaying a consumed code is a 401 no-op', async () => {
     const db = await freshDb();
-    await db.authorizationCodes.put('ev1', issuedCode);
+    await seedAuthorizationCodePair(
+        db, 'the-code', 'current', 'web');
     const first = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
     }));
     assert.equal(first.status, 200);
-    const before = (await db.identityTokens.getAll()).length;
+    const before = (await deriveIdentityTokens(db)).length;
     const replay = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
     }));
     assert.equal(replay.status, 401);
     // no new token chain minted on the replay
     assert.equal(
-        (await db.identityTokens.getAll()).length, before);
+        (await deriveIdentityTokens(db)).length, before);
 });
 
 test(
@@ -96,7 +224,8 @@ test(
     async () => {
         const db = await freshDb();
         await seedRootAdmin(db);
-        await db.authorizationCodes.put('ev1', issuedCode);
+        await seedAuthorizationCodePair(
+            db, 'the-code', 'current', 'web');
         const [a, b] = await Promise.all([
             handleRequest(db, tokenRequest({
                 grant_type: 'authorization_code',
@@ -111,7 +240,7 @@ test(
             [a.status, b.status].sort(), [200, 401],
         );
         assert.equal(
-            (await db.identityTokens.getAll()).length, 1,
+            (await deriveIdentityTokens(db)).length, 1,
             'exactly one token chain minted',
         );
     },
@@ -125,10 +254,71 @@ test('an unknown code is a 401', async () => {
     assert.equal(res.status, 401);
 });
 
+// GATE 3 (Phase 13 Task 7): the code-spend guard's three 401
+// classes — unknown (never issued), spent (replayed), raced
+// (lost a concurrent exchange) — all carry the SAME byte-exact
+// body. The pair-plane guard (authorizeCodeIssuer /
+// authorizationCodeSpent, api/authentication.ts) makes no
+// distinction between them at the wire, exactly as the retired
+// codeState-driven guard never did either.
+test('GATE 3: unknown / spent / raced code all 401 with the'
++ ' SAME byte-exact body', async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+
+    const unknown = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code', code: 'ghost',
+    }));
+    assert.equal(unknown.status, 401);
+    assert.deepEqual(
+        await unknown.json(), { error: INVALID_CODE_ERROR });
+
+    await seedAuthorizationCodePair(
+        db, 'the-code-spent', 'current', 'web');
+    const first = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code',
+        code: 'the-code-spent',
+    }));
+    assert.equal(first.status, 200);
+    const spent = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code',
+        code: 'the-code-spent',
+    }));
+    assert.equal(spent.status, 401);
+    assert.deepEqual(
+        await spent.json(), { error: INVALID_CODE_ERROR });
+
+    await seedAuthorizationCodePair(
+        db, 'the-code-raced', 'current', 'web');
+    const [a, b] = await Promise.all([
+        handleRequest(db, tokenRequest({
+            grant_type: 'authorization_code',
+            code: 'the-code-raced',
+        })),
+        handleRequest(db, tokenRequest({
+            grant_type: 'authorization_code',
+            code: 'the-code-raced',
+        })),
+    ]);
+    assert.deepEqual([a.status, b.status].sort(), [200, 401]);
+    const raced = a.status === 401 ? a : b;
+    assert.deepEqual(
+        await raced.json(), { error: INVALID_CODE_ERROR });
+
+    // The derived id itself: a live-minted spend is visible on
+    // the pair plane by exactly that id, the SAME value the
+    // guard above already checked internally.
+    const derivedId =
+        await deriveAuthorizationCodeId('the-code-spent');
+    assert.equal(
+        await authorizationCodeSpent(db, derivedId), true);
+});
+
 async function initialPair(
     db: MemoryDbAdapter,
 ): Promise<{ access_token: string; refresh_token: string }> {
-    await db.authorizationCodes.put('ev1', issuedCode);
+    await seedAuthorizationCodePair(
+        db, 'the-code', 'current', 'web');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
     }));
@@ -183,7 +373,7 @@ test('an invalid refresh token is a 401 no-op', async () => {
     }));
     assert.equal(res.status, 401);
     assert.equal(
-        (await db.identityTokens.getAll()).length, 0);
+        (await deriveIdentityTokens(db)).length, 0);
 });
 
 test('token-exchange shapes sub=subject and act=actor',
@@ -210,7 +400,7 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const before =
-        (await db.identityTokens.getAll()).length;
+        (await deriveIdentityTokens(db)).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
         subject_token: await devToken('current'),
@@ -221,7 +411,7 @@ async () => {
     assert.match(body.error, /self-delegation/);
     // grant-first: a denied exchange mints nothing
     assert.equal(
-        (await db.identityTokens.getAll()).length, before);
+        (await deriveIdentityTokens(db)).length, before);
 });
 
 test('token-exchange rejects unverifiable tokens with 401',
@@ -241,7 +431,7 @@ async () => {
 test('token-exchange into a member org carries org + orgs',
 async () => {
     const db = await freshDb();
-    await db.memberships.put('m-current', {
+    await seedMembershipPair(db, 'm-current', {
         organization_id: '1',
         identity_id: 'current',
         at: '2026-06-04T00:00:00.000000Z',
@@ -263,13 +453,13 @@ test('token-exchange into a non-member org is 403',
 async () => {
     const db = await freshDb();
     // current is a member of '1' but not org '7'
-    await db.memberships.put('m-current', {
+    await seedMembershipPair(db, 'm-current', {
         organization_id: '1',
         identity_id: 'current',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const before =
-        (await db.identityTokens.getAll()).length;
+        (await deriveIdentityTokens(db)).length;
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'token-exchange',
         subject_token: await devToken('current'),
@@ -279,13 +469,13 @@ async () => {
     assert.equal(res.status, 403);
     // grant-first: a denied exchange mints nothing
     assert.equal(
-        (await db.identityTokens.getAll()).length, before);
+        (await deriveIdentityTokens(db)).length, before);
 });
 
 test('a flat exchange carries orgs but no active org',
 async () => {
     const db = await freshDb();
-    await db.memberships.put('m-current', {
+    await seedMembershipPair(db, 'm-current', {
         organization_id: '1',
         identity_id: 'current',
         at: '2026-06-04T00:00:00.000000Z',
@@ -327,13 +517,13 @@ async function signedClientSetup() {
 test('client_credentials issues a gate-valid token', async () => {
     const db = await freshDb();
     // the service principal (client id) holds an admin role
-    await db.roleGrants.put('rg-svc', {
+    await seedRoleGrantPair(db, 'rg-svc', {
         organization_id: '1',
         identity_id: 'svc-client', role: 'admin',
         action: 'granted', by_member_id: 'system',
         at: '2020-01-01T00:00:00.000000Z',
     });
-    await db.memberships.put('m-svc', {
+    await seedMembershipPair(db, 'm-svc', {
         organization_id: '1',
         identity_id: 'svc-client',
         at: '2020-01-01T00:00:00.000000Z',

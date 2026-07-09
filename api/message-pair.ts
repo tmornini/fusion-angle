@@ -1,5 +1,7 @@
 import type { DbAdapter } from './db.ts';
-import type { Id, ResponseEntity } from './types.ts';
+import type {
+    Id, IdentityTokenEntity, ResponseEntity,
+} from './types.ts';
 import { nowUtc } from './types.ts';
 import {
     generateCryptoSafeBase62,
@@ -19,6 +21,7 @@ import {
     redactAuthenticationResponse,
     stripPiiRequest,
 } from './message-redaction.ts';
+import { validateIdentityTokenEntity } from './validators.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseJson } from '../shared/http-message/json-codec.ts';
@@ -244,6 +247,67 @@ export async function formAuthPair(
         organization: undefined,
         responseStatus,
         responseBody,
+        headPairId: undefined,
+    });
+}
+
+// The literal 'identity-tokens/:id' route pattern: the wired
+// PUT's own address family and response spec (routes.ts,
+// WRITE_RESPONSE_SPECS['identity-tokens/:id']), reused
+// byte-for-byte by every synthesized identity_tokens row-write
+// pair (Phase 13 Task 5, Gate 7) — one derivation later serves
+// fixture pairs, real PUT pairs, and these synthesized
+// grant/rotation/revocation pairs uniformly. Kept as a literal
+// here rather than imported from routes.ts: routes.ts imports
+// FROM message-pair.ts (formWritePair, headPairIdAt), never the
+// reverse — the import graph stays acyclic (see
+// formDocumentPairFor's own comment, routes.ts).
+const TOKEN_EVENT_ROUTE_PATTERN = 'identity-tokens/:id';
+const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
+    TOKEN_EVENT_ROUTE_PATTERN.split('/');
+
+// Synthesizes ONE identity_tokens row's event pair — the SAME
+// address, method, and response shape a real PUT
+// identity-tokens/:id would store for that exact row
+// ({id, jti, identity_id, action, chain_id, at}, per
+// validateIdentityTokenEntity), formed PRE-TX like every other
+// pair (formWritePair's own crypto never runs inside an open
+// transaction — the auto-commit constraint). EVENT-APPEND, like
+// every identity_tokens row: identity-tokens/:id carries no
+// DOCUMENT_CLASS_ROUTE_PATTERNS entry, so headPairId is always
+// undefined here too — no head-read, no Supersedes.
+// requesterIdentityId is the event's OWN identity_id (the
+// affected identity) — the NAMED convention for a write with no
+// authenticated actor in view at this depth (an internal grant,
+// a rotation, a chain revocation). NO new redaction arm: jti is
+// an identifier, not a bearer secret — the row plane already
+// stores it plaintext, and this route pattern is absent from
+// AUTHENTICATION_ROUTE_PATTERNS, so
+// redactAuthenticationRequest/Response (message-redaction.ts)
+// leave it untouched, exactly as the live wired PUT's own pairs
+// already do.
+export async function formTokenEventPair(
+    id: Id,
+    event: Omit<IdentityTokenEntity, 'id'>,
+): Promise<MessagePair> {
+    const pathSegments = [TOKEN_EVENT_ROUTE_SEGMENTS[0]!, id];
+    const body = event as unknown as Record<string, unknown>;
+    return formWritePair({
+        method: 'PUT',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: TOKEN_EVENT_ROUTE_PATTERN,
+        routeSegments: TOKEN_EVENT_ROUTE_SEGMENTS,
+        pathSegments,
+        headerFields: [],
+        body,
+        requesterIdentityId: event.identity_id,
+        requestAt: event.at,
+        organization: undefined,
+        responseStatus: 200,
+        responseBody: {
+            id,
+            ...validateIdentityTokenEntity(body),
+        },
         headPairId: undefined,
     });
 }

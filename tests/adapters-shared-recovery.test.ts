@@ -42,6 +42,7 @@ import {
 } from '../web-app/app/adapters/session-credentials.ts';
 import {
     ideaBody, organizationRow, seedAdminSchema,
+    seedOrganizationDocument as seedOrganizationDocumentPair,
 } from './test-fixtures.ts';
 import {
     devToken, expiredToken, organizationToken,
@@ -58,14 +59,21 @@ import {
 import {
     getSessionToken,
 } from '../web-app/app/adapters/init.ts';
+import {
+    postMembershipDocumentOp,
+    postRoleGrantDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import {
+    appendMessagePair, formAuthPair, formWritePair,
+} from '../api/message-pair.ts';
+import type { AuthPairSeed } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import {
+    deriveIdentityTokens,
+} from '../api/derive-identity-tokens.ts';
 
 const BASE = 'http://localhost';
-
-const issuedCode = {
-    code: 'the-code', identity_id: 'current',
-    client_id: 'web', status: 'issued',
-    at: '2026-06-03T00:00:00.000000Z',
-};
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
@@ -73,10 +81,40 @@ async function freshDb() {
     return db;
 }
 
+// Below-facade pair formation, mirroring authorizePassword's OWN
+// storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
+// 's pre-tx lookup scans the '/authentication/authorize/' response
+// family for a stored pair whose (redacted) `code` field
+// fingerprints to the presented code, so a bare pair — the SAME
+// shape a real login forms (Phase 13 Task 9: the authorization_
+// codes row half retired) — is all a seed needs.
+async function seedAuthorizationCodePair(
+    db: MemoryDbAdapter,
+    code: string,
+): Promise<void> {
+    const seed: AuthPairSeed = {
+        requestAt: nowUtc(),
+        headerFields: [],
+        method: 'POST',
+        pathname: '/authentication/authorize',
+        routePattern: 'authentication/authorize',
+        routeSegments: ['authentication', 'authorize'],
+        pathSegments: ['authentication', 'authorize'],
+    };
+    const requestBody = {
+        method: 'password', username: 'seed@example.com',
+        password: 'seed-password', client_id: 'web',
+    };
+    const pair = await formAuthPair(
+        seed, requestBody, 'current', 200, { code },
+    );
+    await appendMessagePair(db, pair);
+}
+
 async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
 }> {
-    await db.authorizationCodes.put('ev1', issuedCode);
+    await seedAuthorizationCodePair(db, 'the-code');
     const res = await handleRequest(db, new Request(
         `${BASE}/authentication/token`, {
             method: 'POST',
@@ -89,19 +127,103 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
     return res.json();
 }
 
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// the recovery/re-scope paths below authorize through
+// role_grants/memberships once they derive from the pair plane,
+// so a raw row here would go derivation-invisible. Every
+// id/field value stays IDENTICAL to the raw puts these replace —
+// only the write mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function seedRoleGrantPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for role-grants/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/role-grants/' + id,
+        routePattern: 'role-grants/:id',
+        routeSegments: ['role-grants', ':id'],
+        pathSegments: ['role-grants', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postRoleGrantDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
 // Authorize `current` as admin of `org` and stamp the
 // membership the gate fences on — the per-org grant the
 // facade reads (mirrors api-org-isolation's twoOrganizations).
 async function seedOrganizationAdmin(
     db: MemoryDbAdapter, organization: string,
 ): Promise<void> {
-    await db.roleGrants.put('role-current-' + organization, {
+    // A real organizations/:id document (Phase 13 Task 3's
+    // fixture prerequisite; idempotent — a no-op on a repeat
+    // organization id, so this file's own separate
+    // seedOrganizationDocument calls below stay harmless) —
+    // deriveMembershipsForIdentity's own enumerate-then-probe (via
+    // deriveOrganizations) needs `organization` to already be
+    // derivable before the role-grant/membership pairs below can
+    // resolve.
+    await seedOrganizationDocumentPair(
+        db, organization, organization);
+    await seedRoleGrantPair(db, 'role-current-' + organization, {
         organization_id: organization, identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system',
         at: '2020-01-01T00:00:00.000000Z',
     });
-    await db.memberships.put('m-current-' + organization, {
+    await seedMembershipPair(db, 'm-current-' + organization, {
         organization_id: organization, identity_id: 'current',
         at: '2026-06-04T00:00:00.000000Z',
     });
@@ -183,7 +305,7 @@ async () => {
     assert.ok(Array.isArray(members));
     assert.ok(Array.isArray(organizations));
     // exactly ONE rotation event: the refresh jti was spent once
-    const rotations = (await db.identityTokens.getAll())
+    const rotations = (await deriveIdentityTokens(db))
         .filter(row => row.action === 'rotated');
     assert.equal(rotations.length, 1);
     // the session survived (nothing was branded reuse)

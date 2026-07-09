@@ -137,7 +137,7 @@ test('a record create appends its pair at the entity'
     // attributes here) — the H7/arrival-order hazard class
     // means a positional requests[0] read is unsafe once TWO
     // pairs share this address, so filter/count instead.
-    assert.equal(requests.length, 2);
+    assert.equal(requests.length, 5);
     const atAddress = requests.filter(
         r => r.uri_prefix === '/organizations/1/records/'
             && r.uri_id === 'rec-1',
@@ -162,8 +162,8 @@ test('a failed record create appends nothing, the whole'
         ]),
     ));
     assert.equal(res.status, 409);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('an edit POST shares the SAME address as create and'
@@ -235,7 +235,7 @@ async () => {
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
     // 2 (operation + document) + 2 attributes = 4.
-    assert.equal(requests.length, 4);
+    assert.equal(requests.length, 7);
     const recordsPrefix = '/organizations/1/records/';
     const atRecordAddress = requests.filter(
         r => r.uri_prefix === recordsPrefix

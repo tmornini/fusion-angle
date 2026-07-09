@@ -51,8 +51,10 @@ import { deriveInvitations } from './derive-invitations.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
     deriveIdentityPiiRows,
+    deriveRoleGrants,
 } from './derive-identity-spine.ts';
 import { deriveInvitationStates } from './derive-states.ts';
+import { membershipExistsFor } from './derive-memberships.ts';
 
 // The active org of the caller: the verified token claim, else
 // the identity's resolved default. Null when the identity can
@@ -70,8 +72,7 @@ async function callerIsOrganizationAdmin(
     ctx: AuthenticatedContext,
     organization: Id,
 ): Promise<boolean> {
-    const rows = await ctx.base.roleGrants
-        .getAllWhere('identity_id', ctx.principal.id);
+    const rows = await deriveRoleGrants(ctx.base);
     return currentRolesForInOrganization(
         rows, ctx.principal.id, organization,
     ).includes('admin');
@@ -568,9 +569,8 @@ async function grantOutcomeFor(
     organization: Id,
     identityId: Id,
 ): Promise<GrantOutcome> {
-    const member = (await adapter.memberships.getAll())
-        .some(m => m.identity_id === identityId
-            && m.organization_id === organization);
+    const member = await membershipExistsFor(
+        adapter, organization, identityId);
     if (member) return { kind: 'member' };
     const existing = await pendingInvitationFor(
         adapter, organization, identityId);

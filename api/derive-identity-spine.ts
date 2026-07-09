@@ -418,9 +418,14 @@ export async function deriveIdentityProvider(
 }
 
 // ---- identity_token_revocations — same event-plane shape, ------
-// ---- REQUEST body; no live collection route exists for this ----
-// ---- family (unlike role-grants/identity-providers), so only ---
-// ---- the by-id derivation is named here -------------------------
+// ---- REQUEST body; the family is flat (no live collection ------
+// ---- route lists it, unlike role-grants/identity-providers), ---
+// ---- so the by-identity read below scans the family then -------
+// ---- filters the body's identity_id, rather than addressing ----
+// ---- one identity's slot directly (the /credentials shape). ----
+// ---- Phase 13 Task 4: deriveTokenRevocationsFor is the coarse --
+// ---- 'sign out everywhere' gate's (tokenRevocationReason's -----
+// ---- FIRST read) one production reader --------------------------
 
 const IDENTITY_TOKEN_REVOCATIONS_PREFIX = canonicalUriPrefix(
     undefined, '/identity-token-revocations/',
@@ -434,6 +439,35 @@ function tokenRevocationEntityOf(
         identity_id: pickString(document.body, 'identity_id'),
         at: pickString(document.body, 'at'),
     };
+}
+
+// Every LIVE revocation for one identity, id-lex ordered — the
+// SAME family scan deriveTokenRevocation reads by id, filtered
+// by the body's identity_id AFTER the scan (the family is flat,
+// unlike /credentials, which nests one prefix per identity).
+export async function deriveTokenRevocationsFor(
+    db: DbAdapter,
+    identityId: Id,
+): Promise<IdentityTokenRevocationEntity[]> {
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere(
+            'uri_prefix', IDENTITY_TOKEN_REVOCATIONS_PREFIX,
+        ),
+        db.responses.getAllWhere(
+            'uri_prefix', IDENTITY_TOKEN_REVOCATIONS_PREFIX,
+        ),
+    ]);
+    const documents = deriveDocumentsAt(
+        requests, responses, IDENTITY_TOKEN_REVOCATIONS_PREFIX,
+    );
+    const rows: IdentityTokenRevocationEntity[] = [];
+    for (const document of documents.values()) {
+        const entity = tokenRevocationEntityOf(document);
+        if (entity.identity_id === identityId) {
+            rows.push(entity);
+        }
+    }
+    return rows.sort(byIdAscending);
 }
 
 export async function deriveTokenRevocation(

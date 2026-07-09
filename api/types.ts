@@ -481,8 +481,8 @@ export type IdentityCredentialStatus =
 // so it never crosses the API boundary — never rendered.
 // Revocation is a NEW 'revoked' event, never a splice
 // (contrast identity_pii). The client-assertion crypto is
-// REAL (RFC 7523 JWS, RS256/ES256) and the OAuth stores
-// (clients, identity_tokens, identity_providers) are live;
+// REAL (RFC 7523 JWS, RS256/ES256) and the OAuth spine
+// (clients, identity-tokens, identity_providers) is live;
 // the remaining SP-5 items are the ones access-token.ts
 // names: per-client multi-audience, DPoP cnf binding, jti
 // reuse-detection.
@@ -597,23 +597,6 @@ export interface IdentityProviderEntity {
     provider: string;
     provider_subject: string;
     action: IdentityProviderAction;
-    at: string;
-}
-
-export type AuthorizationCodeStatus = 'issued' | 'consumed';
-
-// Append-only ledger of authorization-code lifecycle. One row
-// per issue/consume; a code's current status = the latest event
-// for its `code`. The row `id` is a generated event id; `code`
-// is the opaque single-use value bound to (identity, client). A
-// consume is a NEW 'consumed' row — re-presenting a code whose
-// latest status is already 'consumed' (or unknown) is replay.
-export interface AuthorizationCodeEntity {
-    id: Id;
-    code: string;
-    identity_id: Id;
-    client_id: Id;
-    status: AuthorizationCodeStatus;
     at: string;
 }
 

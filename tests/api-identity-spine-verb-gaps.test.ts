@@ -26,10 +26,11 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 // per-method branch ("Method X not allowed on <path>"). Every
 // one of these patterns is admin-only for any verb this suite
 // exercises (none of their prefixes appear in authorization.ts's
-// MEMBER_VERBS, aside from '/identity-tokens' POST — narrower
-// than the collection GET this regime probes), so an admin
-// token is required to reach the 405 branch rather than an
-// earlier 403.
+// MEMBER_VERBS, aside from '/identity-tokens' POST and — since
+// WP8, Phase 13 Task 8 — '/identity-token-revocations' PUT,
+// neither of which this regime's POST/DELETE combos exercise),
+// so an admin token is required to reach the 405 branch rather
+// than an earlier 403.
 //
 // (2) the default-org side channel regime — 2 combos on
 // /identities/:id/default-org (api/organization-requests.ts's
@@ -56,9 +57,23 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 // 403. This is the GET-admin/POST-member asymmetry finding 20
 // names.
 //
-// 36 + 2 + 3 = 41 combos (the brief's own estimate was ~19 per
-// route-table-style regime; this is the actual, execution-time
-// enumeration, verified by a temporary observed-value probe
+// (4) the identity-token-revocations authz-tier regime (WP8,
+// Phase 13 Task 8) — 1 combo: GET identity-token-revocations/:id
+// stays admin-only — UNTOUCHED, not re-pinned here (regime 1's
+// own comment above already names the fact; this regime adds no
+// new GET assertion). PUT, by contrast, now DOES match
+// MEMBER_VERBS' new '/identity-token-revocations': PUT entry, so
+// a member-tier token clears authz and reaches the route
+// handler — which then answers on api/api.ts's Region B
+// self-only ownership-fence terms (2xx for a self-target; a
+// foreign target's byte-pinned 403 lives in
+// tests/api-identity-token-revocations-self.test.ts, not here —
+// this file pins the authz-TIER asymmetry only, the regime 3
+// precedent). The ONE sanctioned combo-pin addition this phase.
+//
+// 36 + 2 + 3 + 1 = 42 combos (the brief's own estimate was ~19
+// per route-table-style regime; this is the actual, execution-
+// time enumeration, verified by a temporary observed-value probe
 // before every assertion below was pinned, per Step 0/Step 1 of
 // the task brief).
 
@@ -539,4 +554,29 @@ test('POST identity-tokens/:jti/revocation clears authz for a'
         ),
     );
     assert.equal(res.status, 204);
+});
+
+// ── regime 4: the identity-token-revocations PUT-member/
+// GET-admin authz asymmetry (WP8, Phase 13 Task 8; 1 combo) ──
+
+test('PUT identity-token-revocations/:id clears authz for a'
++ ' member-tier token naming itself (MEMBER_VERBS widens'
++ " '/identity-token-revocations' PUT) and succeeds 2xx —"
++ ' the row-level self/foreign fence lives in'
++ ' tests/api-identity-token-revocations-self.test.ts, not'
++ ' here', async () => {
+    const db = await freshDb();
+    await seedOrganizationMember(db, 'member1');
+    const token = await organizationToken('member1');
+    const res = await handleRequest(
+        db, req(
+            'PUT', '/identity-token-revocations/regime4-1',
+            token,
+            {
+                identity_id: 'member1',
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+        ),
+    );
+    assert.equal(res.status, 200);
 });

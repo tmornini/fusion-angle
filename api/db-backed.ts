@@ -24,10 +24,8 @@ import type {
     IdentityTokenRevocationEntity,
     IdentityDefaultOrganizationEntity,
     RoleGrantEntity,
-    IdentityTokenEntity,
     ClientEntity,
     IdentityProviderEntity,
-    AuthorizationCodeEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -78,10 +76,8 @@ import {
     validateIdentityTokenRevocationEntity,
     validateIdentityDefaultOrganizationEntity,
     validateRoleGrantEntity,
-    validateIdentityTokenEntity,
     validateClientEntity,
     validateIdentityProviderEntity,
-    validateAuthorizationCodeEntity,
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
@@ -139,13 +135,9 @@ export class BackedDbAdapter
     readonly identityDefaultOrganizations!:
         GuardedEntityStore<IdentityDefaultOrganizationEntity>;
     readonly roleGrants!: GuardedEntityStore<RoleGrantEntity>;
-    readonly identityTokens!:
-        GuardedEntityStore<IdentityTokenEntity>;
     readonly clients!: GuardedEntityStore<ClientEntity>;
     readonly identityProviders!:
         GuardedEntityStore<IdentityProviderEntity>;
-    readonly authorizationCodes!:
-        GuardedEntityStore<AuthorizationCodeEntity>;
     readonly ideas!: GuardedEntityStore<IdeaEntity>;
     readonly projects!: GuardedEntityStore<ProjectEntity>;
     readonly flows!: GuardedEntityStore<FlowEntity>;
@@ -423,10 +415,6 @@ export class BackedDbAdapter
                 'role_grants', run,
                 validateRoleGrantEntity,
             ),
-            identityTokens: new HistoryEntityStore(
-                'identity_tokens', run,
-                validateIdentityTokenEntity,
-            ),
             clients: new EntityStore(
                 'clients', run, stateStore,
                 validateClientEntity,
@@ -434,10 +422,6 @@ export class BackedDbAdapter
             identityProviders: new HistoryEntityStore(
                 'identity_providers', run,
                 validateIdentityProviderEntity,
-            ),
-            authorizationCodes: new HistoryEntityStore(
-                'authorization_codes', run,
-                validateAuthorizationCodeEntity,
             ),
             ideas: new EntityStore(
                 'ideas', run, stateStore,

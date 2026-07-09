@@ -156,8 +156,8 @@ test('a byte-identical PUT resend to objectives/:id converges'
         db, 'objectives/obj-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 // -- 4. below-route via the generic handlers, against the REAL

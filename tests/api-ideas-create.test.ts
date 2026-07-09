@@ -174,8 +174,8 @@ test(
         );
         const events = await db.states.getAllFor('idea-retry');
         assert.equal(events.length, 1);
-        assert.equal((await db.requests.getAll()).length, 1);
-        assert.equal((await db.responses.getAll()).length, 1);
+        assert.equal((await db.requests.getAll()).length, 4);
+        assert.equal((await db.responses.getAll()).length, 4);
     },
 );
 
@@ -192,6 +192,6 @@ test(
             ),
         ));
         assert.equal(res.status, 405);
-        assert.equal((await db.requests.getAll()).length, 0);
+        assert.equal((await db.requests.getAll()).length, 3);
     },
 );

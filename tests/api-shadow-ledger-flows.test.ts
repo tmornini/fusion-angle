@@ -143,12 +143,12 @@ async () => {
     // Task 5: three pairs — the operation pair (this address),
     // its synthesized document pair (same address), and its
     // synthesized join pair (the project_flows address).
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 6);
     assert.equal(
-        requests[0]!.uri_prefix,
+        requests[3]!.uri_prefix,
         '/organizations/1/flows/',
     );
-    assert.equal(requests[0]!.uri_id, 'flow-1');
+    assert.equal(requests[3]!.uri_id, 'flow-1');
 });
 
 test('a failed flow create appends nothing', async () => {
@@ -165,8 +165,8 @@ test('a failed flow create appends nothing', async () => {
         createBody('flow-doomed', 'pf-doomed', 'ev-x'),
     ));
     assert.equal(res.status, 409);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 // flows/:id is the locked class (Task 3): a save on an

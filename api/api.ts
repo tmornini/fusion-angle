@@ -304,6 +304,15 @@ export async function handleRequest(
     // target — undefined for a bearer-exempt route (no fence
     // ran) or the global identity/auth spine.
     let organization: Id | undefined;
+    // Whether the caller holds the admin role in the fenced
+    // organization — threaded out of Region A (below) alongside
+    // effective/actor/organization for WP8's self-only revocation
+    // guard (Region B, below): MEMBER_VERBS widens PUT
+    // /identity-token-revocations to the member tier, but an
+    // admin may still name any identity. False for a bearer-
+    // exempt route (no fence ran, so no role to hold) — the
+    // guard below only ever runs on an authenticated route.
+    let callerIsAdmin = false;
     // BOOTSTRAP_ROUTES: the accepted dev-tier auth-free
     // snapshot plane (removed at the Postgres server tier) —
     // see api/request-auth.ts.
@@ -392,6 +401,7 @@ export async function handleRequest(
             effective = fenced.scoped;
             actor = fenced.principal.id;
             organization = fenced.organization;
+            callerIsAdmin = fenced.roles.includes('admin');
         } catch (error) {
             return redactedFenceFailure(ctx, error);
         }
@@ -420,12 +430,13 @@ export async function handleRequest(
     }
 
     // Region B of the pre-dispatch ownership fence (Phase 12
-    // Task 1): the two UNCONDITIONAL write guards below run
-    // after body-parse regardless of bearerExempt, mirroring
-    // Region A above. routePattern makes the two `if` bodies
-    // mutually exclusive per request, so one try over both
-    // spans the same fence-read fault class Region A redacts —
-    // never both guards' reads for the same request.
+    // Task 1, joined by WP8's self-only revocation guard below):
+    // the three UNCONDITIONAL write guards below run after body-
+    // parse regardless of bearerExempt, mirroring Region A above.
+    // routePattern makes the `if` bodies mutually exclusive per
+    // request, so one try over all three spans the same fence-
+    // read fault class Region A redacts — never more than one
+    // guard's reads for the same request.
     try {
         // THE STATE OWNERSHIP WRITE FENCE (Phase 11 Task 1):
         // MEMBER_VERBS permits member-tier PUT here, and the
@@ -485,6 +496,41 @@ export async function handleRequest(
                         { status: HTTP_NOT_FOUND },
                     );
                 }
+            }
+        }
+        // WP8 (Phase 13 Task 8): the self-only revocation guard.
+        // MEMBER_VERBS widens PUT /identity-token-revocations to
+        // the member tier (Region A's route-policy check already
+        // cleared it), but the revocation's TARGET identity_id
+        // rides the BODY, parsed above — the URL :id is the
+        // revocation ROW's own id, never the target — so no
+        // upstream check has fenced ownership yet. A member may
+        // revoke only its OWN chain; an admin may name any
+        // identity. The 403 body reuses authorizeRequest's OWN
+        // wording (request-auth.ts) — byte-identical to what
+        // EVERY member request against this route returned before
+        // this task, self or foreign alike — so a foreign-target
+        // member sees no wire change at all; only the self-target
+        // case flips 403 to the admin path's exact success shape.
+        if (
+            method === 'PUT'
+            && routePattern === 'identity-token-revocations/:id'
+        ) {
+            const targetIdentityId = body?.identity_id;
+            if (
+                typeof targetIdentityId === 'string'
+                && targetIdentityId !== actor
+                && !callerIsAdmin
+            ) {
+                return Response.json(
+                    {
+                        error: 'forbidden: ' + method + ' '
+                            + pathname
+                            + ' requires a role this principal'
+                            + ' lacks',
+                    },
+                    { status: HTTP_FORBIDDEN },
+                );
             }
         }
     } catch (error) {

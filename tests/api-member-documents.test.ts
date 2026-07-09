@@ -372,8 +372,8 @@ test('a byte-identical PUT resend to members/:id converges to'
         db, 'members/mem-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('a byte-identical PUT resend to ai-members/:id converges'
@@ -388,8 +388,8 @@ test('a byte-identical PUT resend to ai-members/:id converges'
         db, 'ai-members/ai-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file

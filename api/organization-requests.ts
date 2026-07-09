@@ -32,6 +32,9 @@ import {
     storedPairResponse,
 } from './message-pair.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
+import {
+    deriveDefaultOrganization,
+} from './derive-default-organization.ts';
 
 // GET /organizations — the caller's reachable orgs, derived
 // fresh from the membership ledger (never the token claim, so
@@ -174,8 +177,16 @@ export async function identityDefaultOrganizationRequest(
         if (replay !== undefined) {
             return responseFromStored(replay);
         }
-        const rows =
-            await ctx.base.identityDefaultOrganizations.getAll();
+        // FLIPPED (Phase 13 Task 8): deriveDefaultOrganization
+        // (Phase 11) reads this identity's own /default-org
+        // prefix — a targeted, identity-keyed read, never a
+        // full-ledger scan — replacing the SOLE remaining
+        // production read of the identity_default_organizations
+        // table. currentDefaultOrganizationFor (the reducer) and
+        // its fallback wiring below are BYTE-UNCHANGED — only the
+        // row source moves.
+        const rows = await deriveDefaultOrganization(
+            ctx.base, identityId);
         const changes = currentDefaultOrganizationFor(
             rows, identityId) !== organization;
         if (changes) {

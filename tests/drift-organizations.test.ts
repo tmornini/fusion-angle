@@ -27,10 +27,9 @@ import { organizationRow } from './test-fixtures.ts';
 // fence in api.ts) to the message-derived output
 // (api/derive-organizations.ts) — the SAME OLD-vs-DERIVED
 // comparison method tests/drift-states.test.ts established.
-// NOTHING reads api/derive-organizations.ts in production yet
-// (gate 9: organizations stays a hand-written, UNFLIPPED
-// family) — this file alone gates that flip (Task 5) and stays
-// a regression guard through Phase Final, like every sibling
+// The flip LANDED (Task 5): all six production consumers now
+// read api/derive-organizations.ts, and this file stays a
+// regression guard through Phase Final, like every sibling
 // drift suite (tests/drift-*.test.ts).
 //
 // organizations is GLOBAL plane, like identities/members: it IS

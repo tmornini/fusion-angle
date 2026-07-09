@@ -11,15 +11,75 @@ import {
     shouldShowOrganizationSwitcher,
     resolveActiveOrganization,
 } from '../web-app/app/adapters/organization-session.ts';
+import {
+    postMembershipDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { seedOrganizationDocument } from './test-fixtures.ts';
+
+const AT = '2026-06-04T00:00:00.000000Z';
+
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// postOrganizationSessionExchange's membership-fence check derives
+// from the pair plane once memberships flips, so a raw row here
+// would go derivation-invisible. Every id/field value stays
+// IDENTICAL to the raw put this replaces — only the write
+// mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    organization: string,
+    identityId: string,
+): Promise<void> {
+    // A real organizations/:id document (Phase 13 Task 3's
+    // fixture prerequisite; seedOrganizationDocument is idempotent
+    // — a no-op on a repeat organization id) — a membership pair
+    // with no document for its own org stays derivation-invisible
+    // to deriveMembershipsForIdentity's own enumerate-then-probe
+    // (via deriveOrganizations).
+    await seedOrganizationDocument(db, organization, organization);
+    const body = {
+        organization_id: organization,
+        identity_id: identityId,
+        at: AT,
+    };
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
 
 async function memberOf(organizations: string[]) {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     for (const [i, organization] of organizations.entries()) {
-        await db.memberships.put('m-' + i, {
-            organization_id: organization, identity_id: 'current',
-            at: '2026-06-04T00:00:00.000000Z',
-        });
+        await seedMembershipPair(
+            db, 'm-' + i, organization, 'current',
+        );
     }
     return db;
 }

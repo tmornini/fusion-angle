@@ -170,10 +170,8 @@ export function organizationScopedAdapter(
         identityTokenRevocations:
             base.identityTokenRevocations,
         identityDefaultOrganizations: base.identityDefaultOrganizations,
-        identityTokens: base.identityTokens,
         clients: base.clients,
         identityProviders: base.identityProviders,
-        authorizationCodes: base.authorizationCodes,
 
         // The organizations directory is global; the
         // organizations/:id and GET /organizations route guards

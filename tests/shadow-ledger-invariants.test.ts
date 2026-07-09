@@ -304,11 +304,19 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     assert.equal(workOrderPut.status, 200);
 
     // Operation POST (identity-tokens — global, not org-
-    // nested): revoke a pre-seeded chain.
-    await db.identityTokens.put('inv-tok-root', {
-        jti: 'inv-jti-root', identity_id: 'current',
-        action: 'issued', chain_id: 'inv-chain-1', at: AT,
-    });
+    // nested): revoke a pre-seeded chain. The seed itself rides
+    // the PUT route (not a raw store write): Phase 13 Task 6
+    // flips revokeTokenChain's PRE-TX chain lookup onto the
+    // message ledger, so a pair-less row is invisible to it —
+    // the PUT route forms both the row AND its pair, the SAME
+    // mechanism a live write uses.
+    const tokenRootPut = await handleRequest(db, req(
+        'PUT', '/identity-tokens/inv-tok-root', org1Token, {
+            jti: 'inv-jti-root', identity_id: 'current',
+            action: 'issued', chain_id: 'inv-chain-1', at: AT,
+        },
+    ));
+    assert.equal(tokenRootPut.status, 200);
     const revoked = await handleRequest(db, req(
         'POST', '/identity-tokens/inv-jti-root/revocation',
         org1Token, {},

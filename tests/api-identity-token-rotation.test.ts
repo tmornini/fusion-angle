@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
     POST,
+    PUT,
     RequestError,
 } from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
@@ -10,6 +11,9 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     latestActionForJti,
 } from '../api/identity-tokens.ts';
+import {
+    deriveIdentityTokens,
+} from '../api/derive-identity-tokens.ts';
 
 // POST identity-tokens/:jti/rotation decides and appends in
 // ONE transaction: a live jti returns its successor; a
@@ -24,11 +28,16 @@ const ROOT_JTI = 'jti-1';
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
-    await db.identityTokens.put('t-root', {
+    // Seeded via the PUT route (not a raw store write): both
+    // PRE-TX and IN-TX chain lookups read the message ledger
+    // (Phase 13 Task 6/9a), so a pair-less event is invisible to
+    // them — the PUT route forms the SAME event pair a live write
+    // uses (Phase 13 Task 9: pair-only, no row).
+    await PUT(db, 'identity-tokens/t-root', {
         jti: ROOT_JTI, identity_id: 'current',
         action: 'issued', chain_id: 'chain-1',
         at: '2026-06-01T00:00:00.000000Z',
-    });
+    }, DEV_TOKEN);
     return db;
 }
 
@@ -49,7 +58,7 @@ test(
         const { jti: next } = await rotate(db, ROOT_JTI);
         assert.notEqual(next, ROOT_JTI);
         // issued(root) + rotated(root) + issued(next) = 3
-        const rows = await db.identityTokens.getAll();
+        const rows = await deriveIdentityTokens(db);
         assert.equal(rows.length, 3);
         assert.equal(
             latestActionForJti(rows, ROOT_JTI), 'rotated');
@@ -70,7 +79,7 @@ test(
                 err instanceof RequestError
                 && err.status === 409,
         );
-        const rows = await db.identityTokens.getAll();
+        const rows = await deriveIdentityTokens(db);
         assert.equal(
             latestActionForJti(rows, ROOT_JTI), 'revoked');
         assert.equal(
@@ -88,7 +97,7 @@ test(
                 err instanceof RequestError
                 && err.status === 409,
         );
-        const rows = await db.identityTokens.getAll();
+        const rows = await deriveIdentityTokens(db);
         assert.equal(rows.length, 1);
     },
 );
@@ -102,7 +111,7 @@ test(
             db, `identity-tokens/${next}/revocation`, {},
             DEV_TOKEN,
         );
-        const rows = await db.identityTokens.getAll();
+        const rows = await deriveIdentityTokens(db);
         assert.equal(
             latestActionForJti(rows, ROOT_JTI), 'revoked');
         assert.equal(
@@ -118,7 +127,7 @@ test(
             db, 'identity-tokens/ghost/revocation', {},
             DEV_TOKEN,
         );
-        const rows = await db.identityTokens.getAll();
+        const rows = await deriveIdentityTokens(db);
         assert.equal(rows.length, 1);
     },
 );

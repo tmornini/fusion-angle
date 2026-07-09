@@ -24,6 +24,9 @@ import {
     tokenRevocationReason,
     identityDefaultOrganization,
 } from './authentication.ts';
+import { deriveMembershipsForIdentity } from
+    './derive-memberships.ts';
+import { deriveRoleGrants } from './derive-identity-spine.ts';
 
 // Authenticate in-tree requests at the one chokepoint. The
 // gate runs AFTER matchRoute (which already 404'd anything
@@ -101,8 +104,7 @@ async function callerRolesInOrganization(
     principal: Principal,
     organization: Id,
 ): Promise<string[]> {
-    const rows = await adapter.roleGrants
-        .getAllWhere('identity_id', principal.id);
+    const rows = await deriveRoleGrants(adapter);
     return currentRolesForInOrganization(rows, principal.id, organization);
 }
 
@@ -201,8 +203,8 @@ export async function callerOrganizationIds(
     adapter: DbAdapter,
     principal: Principal,
 ): Promise<Set<Id>> {
-    const memberships = await adapter.memberships
-        .getAllWhere('identity_id', principal.id);
+    const memberships = await deriveMembershipsForIdentity(
+        adapter, principal.id);
     return new Set(
         memberships.map(m => m.organization_id),
     );

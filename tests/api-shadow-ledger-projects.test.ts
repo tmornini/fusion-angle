@@ -78,14 +78,14 @@ test('a PUT to a fresh project appends its pair at the'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 4);
     assert.equal(
-        requests[0]!.uri_prefix,
+        requests[3]!.uri_prefix,
         '/organizations/1/projects/',
     );
-    assert.equal(requests[0]!.uri_id, 'proj-1');
+    assert.equal(requests[3]!.uri_id, 'proj-1');
     const responses = await db.responses.getAll();
-    assert.equal(responses[0]!.id, requests[0]!.id);
+    assert.equal(responses[3]!.id, requests[3]!.id);
 });
 
 test('a second PUT to the same project records supersedes',
@@ -119,12 +119,12 @@ test('PUT project-flows appends its pair at the join'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 4);
     assert.equal(
-        requests[0]!.uri_prefix,
+        requests[3]!.uri_prefix,
         '/organizations/1/projects/proj-3/flows/',
     );
-    assert.equal(requests[0]!.uri_id, 'pf-1');
+    assert.equal(requests[3]!.uri_id, 'pf-1');
 });
 
 test('DELETE project-flows appends its tombstone pair,'
@@ -147,8 +147,8 @@ test('DELETE project-flows appends its tombstone pair,'
     assert.equal(del.headers.get('Supersedes'), putId);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    assert.equal(requests.length, 2);
-    assert.equal(responses.length, 2);
+    assert.equal(requests.length, 5);
+    assert.equal(responses.length, 5);
     await assert.rejects(
         () => db.projectFlows.getById('pf-2'),
     );
@@ -187,8 +187,8 @@ test('a failed PUT appends nothing', async () => {
         },
     ));
     assert.equal(res.status, 400);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('a byte-identical resend returns the stored response '
@@ -204,8 +204,8 @@ test('a byte-identical resend returns the stored response '
         'PUT', '/projects/proj-7', token, body,
     ));
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('stored messages verify against their hashes',

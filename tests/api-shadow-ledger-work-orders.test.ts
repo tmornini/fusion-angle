@@ -186,8 +186,8 @@ test('a work-order create appends three pairs: the operation'
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    assert.equal(requests.length, 3);
-    assert.equal(responses.length, 3);
+    assert.equal(requests.length, 6);
+    assert.equal(responses.length, 6);
 
     const atEntityAddress = requests.filter(
         r => r.uri_prefix === '/organizations/1/work-orders/'
@@ -255,8 +255,8 @@ test('a failed work-order create appends none of the three'
         createBody('wo-doomed', 'fwo-doomed'),
     ));
     assert.equal(res.status, 409);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('a claim appends its pair at an operation address:'
@@ -424,14 +424,14 @@ test('a PUT to a fresh work order appends its pair at the'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 4);
     assert.equal(
-        requests[0]!.uri_prefix,
+        requests[3]!.uri_prefix,
         '/organizations/1/work-orders/',
     );
-    assert.equal(requests[0]!.uri_id, 'wo-8');
+    assert.equal(requests[3]!.uri_id, 'wo-8');
     const responses = await db.responses.getAll();
-    assert.equal(responses[0]!.id, requests[0]!.id);
+    assert.equal(responses[3]!.id, requests[3]!.id);
 });
 
 test('a second PUT to the same work order records'
@@ -481,8 +481,8 @@ test('a byte-identical PUT resend to work-orders/:id returns'
         'PUT', '/work-orders/wo-11', token, body,
     ));
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('request and response counts stay balanced across a'

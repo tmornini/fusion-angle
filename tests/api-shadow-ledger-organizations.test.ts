@@ -43,9 +43,9 @@ async () => {
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0]!.uri_prefix, '/organizations/');
-    assert.equal(requests[0]!.uri_id, 'org-1');
+    assert.equal(requests.length, 4);
+    assert.equal(requests[3]!.uri_prefix, '/organizations/');
+    assert.equal(requests[3]!.uri_id, 'org-1');
     const domainRow = await db.organizations.getById('org-1');
     assert.deepEqual(await res.json(), domainRow);
 });
@@ -81,8 +81,8 @@ test('a byte-identical PUT resend returns the stored response'
         'PUT', '/organizations/org-3', DEV_TOKEN, body,
     ));
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('a failed PUT (missing required field) appends nothing',
@@ -95,8 +95,8 @@ async () => {
         incomplete,
     ));
     assert.equal(res.status, 400);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('stored messages verify against their hashes',

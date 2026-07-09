@@ -62,9 +62,9 @@ test('PUT role-grants/:id appends its pair at the entity'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0]!.uri_prefix, '/role-grants/');
-    assert.equal(requests[0]!.uri_id, 'rg-1');
+    assert.equal(requests.length, 4);
+    assert.equal(requests[3]!.uri_prefix, '/role-grants/');
+    assert.equal(requests[3]!.uri_id, 'rg-1');
     const domainRow = await db.roleGrants.getById('rg-1');
     assert.deepEqual(await res.json(), domainRow);
     // The wire body never carried organization_id, yet the
@@ -120,8 +120,8 @@ async () => {
         { ...grantFields('walt'), action: 'sideways' },
     ));
     assert.equal(res.status, 400);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('stored messages verify against their hashes',

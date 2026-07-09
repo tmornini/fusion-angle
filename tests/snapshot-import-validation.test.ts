@@ -11,6 +11,9 @@ import {
 import {
     jsonObjectField,
 } from '../api/types.ts';
+import {
+    SnapshotVersionMismatchError,
+} from '../api/snapshot-validator.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
@@ -162,6 +165,34 @@ test(
         await assert.rejects(
             () => adapter.putSnapshot(json),
             /schema version/i,
+        );
+    },
+);
+
+// Phase 13 Task 9's version bump (1→2, identity_tokens +
+// authorization_codes retire): a genuine PRE-BUMP export — the
+// literal historical version this build no longer accepts — is
+// exactly what SNAPSHOT_SCHEMA_VERSION's ASYMMETRIC guarantee
+// exists to reject (api/db.ts). Pinned as a concrete regression
+// guard naming the real value, distinct from the generic
+// mismatch legs above.
+test(
+    'rejects a genuine pre-Task-9 (v1) export with'
+    + ' SnapshotVersionMismatchError',
+    async () => {
+        installShim();
+        const adapter = new LocalStorageDbAdapter();
+        const json = JSON.stringify({
+            [SNAPSHOT_SCHEMA_VERSION_KEY]: 1,
+            members: [],
+            identity_tokens: [],
+            authorization_codes: [],
+        });
+        await assert.rejects(
+            () => adapter.putSnapshot(json),
+            (err: unknown) =>
+                err instanceof SnapshotVersionMismatchError
+                && err.found === 1,
         );
     },
 );

@@ -53,7 +53,6 @@ export class SnapshotTooLargeError extends Error {
 // user back to re-snapshot from current state.
 export const RETIRED_KEYS_PER_TABLE:
     Record<string, readonly string[]> = {
-    identity_tokens: ['parent_jti'],
     members: ['first_name', 'last_name'],
     ai_members: ['created_at', 'auth_token', 'provider'],
     flows: ['created_at', 'updated_at', 'graph'],
@@ -88,6 +87,8 @@ export const RETIRED_TABLES: readonly string[] = [
     'activity_actors',
     'identity_default_orgs',
     'organization',
+    'identity_tokens',
+    'authorization_codes',
 ];
 
 // State-event values the alphabet has retired. Old

@@ -2,8 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
+import { canonicalUriPrefix } from '../api/message-pair.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
+import {
+    seedIdentityCredential,
+    seedIdentityPii,
+} from './identity-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -20,14 +25,30 @@ const authorize = (b: unknown) =>
 const token = (b: unknown) =>
     jsonPost('authentication/token', b);
 
+// The surviving-plane counterpart of the retired authorization_
+// codes row check (Phase 13 Task 9): a failed login appends NO
+// stored '/authentication/authorize/' response — authorizePassword
+// forms and stores its pair ONLY on the success branch (grant-
+// first), so a miss here is the SAME covenant the row-plane count
+// used to pin.
+async function noStoredAuthorizeResponse(
+    db: MemoryDbAdapter,
+): Promise<boolean> {
+    const responses = await db.responses.getAllWhere(
+        'uri_prefix',
+        canonicalUriPrefix(undefined, '/authentication/authorize/'),
+    );
+    return responses.length === 0;
+}
+
 async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.identityPii.put('current', {
+    await seedIdentityPii(db, 'current', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
-    await db.identityCredentials.put('c1', {
+    await seedIdentityCredential(db, 'current', 'c1', {
         identity_id: 'current', kind: 'password',
         status: 'set', secret: await hashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
@@ -63,8 +84,7 @@ async () => {
         password: 'WRONG', client_id: 'web',
     }));
     assert.equal(res.status, 401);
-    assert.equal(
-        (await db.authorizationCodes.getAll()).length, 0);
+    assert.ok(await noStoredAuthorizeResponse(db));
 });
 
 test('an unknown username is the same 401 (no enumeration)',
@@ -87,11 +107,11 @@ test('a revoked password credential is the same 401',
 async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.identityPii.put('current', {
+    await seedIdentityPii(db, 'current', {
         name: 'Demo', email: 'demo@example.com',
         phone: '555-0100', bio: 'demo user',
     });
-    await db.identityCredentials.put('c1', {
+    await seedIdentityCredential(db, 'current', 'c1', {
         identity_id: 'current', kind: 'password',
         status: 'revoked',
         secret: await hashPassword('s3cret'),
@@ -102,8 +122,7 @@ async () => {
         password: 's3cret', client_id: 'web',
     }));
     assert.equal(res.status, 401);
-    assert.equal(
-        (await db.authorizationCodes.getAll()).length, 0);
+    assert.ok(await noStoredAuthorizeResponse(db));
 });
 
 test('passkey, provider, and oidc are 501 seams', async () => {

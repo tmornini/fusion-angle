@@ -78,10 +78,6 @@ const VALID_ROWS: Record<
         identity_id: 'i1', role: 'admin',
         action: 'granted', by_member_id: 'm1', at: AT,
     },
-    identity_tokens: {
-        id: 't1', jti: 'jti-1', identity_id: 'i1',
-        action: 'issued', chain_id: 'ch1', at: AT,
-    },
     clients: {
         id: 'cl1', grant_types: 'authorization_code',
         redirect_uris: 'https://example.com/cb',
@@ -91,10 +87,6 @@ const VALID_ROWS: Record<
         id: 'p1', identity_id: 'i1',
         provider: 'google', provider_subject: 'sub-1',
         action: 'linked', at: AT,
-    },
-    authorization_codes: {
-        id: 'ac1', code: 'code-1', identity_id: 'i1',
-        client_id: 'cl1', status: 'issued', at: AT,
     },
 };
 
@@ -110,10 +102,8 @@ const BAD_OVERRIDE: Record<
     identity_token_revocations: { at: 'not-a-date' },
     identity_default_organizations: { at: 'not-a-date' },
     role_grants: { action: 'maybe' },
-    identity_tokens: { action: 'minted' },
     clients: { status: 'paused' },
     identity_providers: { action: 'connected' },
-    authorization_codes: { status: 'expired' },
 };
 
 for (const [table, valid] of Object.entries(VALID_ROWS)) {

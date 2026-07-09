@@ -62,9 +62,10 @@ for (const route of COLLECTION_ROUTES) {
 
 // GET /organizations routes through the pre-matchRoute guard in
 // handleRequest (api.ts), never the route('organizations', {get})
-// table entry — that entry is dead code, unreachable by
-// construction (see api/routes.ts's own comment at the removed
-// site). Proof: a SINGLE-organization caller sees ONLY their own
+// table entry — that entry was dead code, unreachable by
+// construction, and is now REMOVED (API.md §5.18 carries the
+// control-flow argument). Proof: a SINGLE-organization caller
+// sees ONLY their own
 // membership org here, never every seeded org — the surviving
 // path (organizationsEnumerationRequest) self-fences to the
 // caller's memberships; the removed table entry's own handler

@@ -395,9 +395,9 @@ alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
 (`DbAdapter` interface + `TABLE_NAMES` array listing every
 storage table — the entity tables plus the identity/auth
 spine (`identities`, `identity_pii`, `identity_credentials`,
-`identity_tokens`, `clients`, `identity_providers`,
-`authorization_codes`, `role_grants`, …) and the tenancy
-stores (`organizations`, `memberships`); [SCHEMA.md](SCHEMA.md)
+`clients`, `identity_providers`, `role_grants`, …) and the
+tenancy stores (`organizations`, `memberships`);
+[SCHEMA.md](SCHEMA.md)
 is the authoritative list and per-column reference),
 `api/store-state.ts` (the `StateStore` class — `postEvent`,
 `getCurrentFor`, `getAllFor`, `getDeletedIds`, `isDeleted`),

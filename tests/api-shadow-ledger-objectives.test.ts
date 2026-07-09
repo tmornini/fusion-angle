@@ -95,7 +95,7 @@ test('an objective create appends its pair at the entity'
     // the H7/arrival-order hazard class means a positional
     // requests[0] read is unsafe once an address holds two
     // pairs, so filter/count instead.
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 6);
     const atAddress = requests.filter(
         r => r.uri_prefix === '/organizations/1/objectives/'
             && r.uri_id === 'obj-1',
@@ -217,8 +217,8 @@ test('a failed objective create appends nothing', async () => {
         createBody('obj-doomed', 'rev-doomed', ''),
     ));
     assert.equal(res.status, 400);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('a PUT to a fresh objective appends its pair at the'
@@ -261,8 +261,8 @@ test('a byte-identical PUT resend to an objective returns'
         'PUT', '/objectives/obj-9', token, body,
     ));
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('a PUT to an objective verifies against its hash and'
@@ -383,8 +383,8 @@ test('a byte-identical PUT resend to a revision returns the'
         'PUT', '/objectives/obj-5/revisions/rev-5', token, body,
     ));
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('stored messages verify against their hashes',

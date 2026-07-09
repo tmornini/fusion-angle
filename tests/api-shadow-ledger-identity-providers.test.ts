@@ -54,11 +54,11 @@ test('PUT identity-providers/:id appends its pair at the'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 4);
     assert.equal(
-        requests[0]!.uri_prefix, '/identity-providers/',
+        requests[3]!.uri_prefix, '/identity-providers/',
     );
-    assert.equal(requests[0]!.uri_id, 'idp-1');
+    assert.equal(requests[3]!.uri_id, 'idp-1');
     const domainRow = await db.identityProviders.getById('idp-1');
     assert.deepEqual(await res.json(), domainRow);
 });
@@ -111,8 +111,8 @@ async () => {
         { ...providerFields('sarah'), action: 'sideways' },
     ));
     assert.equal(res.status, 400);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('stored messages verify against their hashes',

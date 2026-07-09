@@ -11,6 +11,12 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
+import {
+    postMembershipDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 test('validateIdentityEntity accepts person/service', () => {
     assert.deepEqual(
@@ -97,13 +103,58 @@ const PII = {
     name: 'Sarah', email: 's@x.io', phone: 'p', bio: 'b',
 };
 
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// the pii-subtree authz below reads through the membership
+// pair plane once memberships flips, so a raw row here would go
+// derivation-invisible. Every id/field value stays IDENTICAL to
+// the raw put this replaces — only the write mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    organization: string,
+    identityId: string,
+    at: string,
+): Promise<void> {
+    const body = {
+        organization_id: organization,
+        identity_id: identityId,
+        at,
+    };
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
 async function dbWithMember() {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);   // 'current' admin in org '1'
-    await db.memberships.put('m-sarah', {
-        organization_id: '1', identity_id: 'sarah',
-        at: '2026-06-08T00:00:00.000000Z',
-    });
+    await seedMembershipPair(
+        db, 'm-sarah', '1', 'sarah',
+        '2026-06-08T00:00:00.000000Z',
+    );
     await seedPersonIdentity(db, 'sarah', PII);
     return db;
 }

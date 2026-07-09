@@ -130,8 +130,8 @@ test('a byte-identical PUT resend to a member returns the'
         'PUT', '/members/mem-2', DEV_TOKEN, body,
     ));
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('a PUT to members/:id verifies against its hash and'
@@ -173,7 +173,7 @@ test('an ai-member create appends its bundle: operation +'
     // positional requests[0] read is unsafe once an address
     // holds two pairs, so filter/count instead (the
     // objectives-family precedent).
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 6);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/ai-members/'
             && r.uri_id === 'ai-1',
@@ -222,8 +222,8 @@ test('a failed ai-member create appends nothing', async () => {
         aiCreateBody('ai-doomed', 'ev-x', 'Doomed'),
     ));
     assert.equal(res.status, 409);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('PUT ai-members/:id appends its pair, and the wire body'
@@ -234,9 +234,9 @@ test('PUT ai-members/:id appends its pair, and the wire body'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
-    assert.equal(requests[0]!.uri_prefix, '/ai-members/');
-    assert.equal(requests[0]!.uri_id, 'ai-2');
+    assert.equal(requests.length, 4);
+    assert.equal(requests[3]!.uri_prefix, '/ai-members/');
+    assert.equal(requests[3]!.uri_id, 'ai-2');
     const domainRow = await db.aiMembers.getById('ai-2');
     assert.deepEqual(await res.json(), domainRow);
 });
@@ -261,7 +261,7 @@ async () => {
     // operation + detail document (both at the shared
     // ai-members address) + member document (its own address)
     // = 4.
-    assert.equal(requests.length, 4);
+    assert.equal(requests.length, 7);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/ai-members/'
             && r.uri_id === 'ai-3',
@@ -324,7 +324,7 @@ async () => {
     // precedent's cross-family code-identity, confirmed at
     // Phase 8).
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 5);
+    assert.equal(requests.length, 8);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/ai-members/'
             && r.uri_id === 'ai-4',
@@ -377,7 +377,7 @@ test('a human-member create appends its bundle: operation +'
     // the PII intake's own pair at its own address (Phase 10 Task
     // 2's intake decomposition — pii no longer rides the create's
     // own request) = 5.
-    assert.equal(requests.length, 5);
+    assert.equal(requests.length, 8);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/human-members/'
             && r.uri_id === 'hm-1',
@@ -465,7 +465,7 @@ async () => {
     // {kind:'person'} is byte-identical to the create's own, so it
     // never appends a second row either.
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 6);
+    assert.equal(requests.length, 9);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/human-members/'
             && r.uri_id === 'hm-2',
@@ -522,7 +522,7 @@ test('an identity (person) create appends its bundle: operation'
     // precedent) — = 2, + the PII intake's own pair at its own
     // address (Phase 10 Task 2's intake decomposition — pii no
     // longer rides the create's own request) = 3.
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 6);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/identities/'
             && r.uri_id === 'idp-1',
@@ -567,7 +567,7 @@ test('an identity (service) create appends its bundle:'
     // operation + identities document (both at the entity
     // address, Task 5's create-address-collapse) + credential
     // document (its own address) = 3.
-    assert.equal(requests.length, 3);
+    assert.equal(requests.length, 6);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/identities/'
             && r.uri_id === 'ids-1',
@@ -608,8 +608,8 @@ test('a service identity create with an invalid credential body'
         },
     ));
     assert.equal(res.status, 400);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('PUT identities/:id appends its pair, and a second PUT'

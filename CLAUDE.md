@@ -112,10 +112,10 @@ is HTTP-only.
   `handleRequest` wraps the adapter in `orgScopedAdapter`
   bound to the org from the VERIFIED token claim (never the
   path). A flat (un-exchanged) token resolves its org via
-  `identityDefaultOrg`: the identity's SET default org
+  `identityDefaultOrganization`: the identity's SET default org
   (`identity_default_organizations` ledger, latest wins), else its
-  PRIMARY membership org, else a 403 — there is no global
-  default. `organizations` is the tenant root; `memberships`
+  PRIMARY membership org, else a 403 — there is no global default.
+  `organizations` is the tenant root; `memberships`
   joins identity↔org; the members roster is derived from that
   ledger. A `memberships` row is created when an invitee
   ACCEPTS an `invitations` grant (the only live membership
@@ -386,6 +386,17 @@ apply to it (RED is the audit's first finding).
   localStorage tier rolls back logic errors the same way, but
   its multi-key flush is still not OS-atomic on a mid-write
   quota error — the one gap IndexedDB closes.
+- **Snapshot version gate.** Every export is stamped with
+  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`) at the reserved key
+  `__schema_version__`. Every import REJECTS an absent or
+  mismatched version SERVER-side
+  (`parseAndValidateSnapshot`, `SnapshotVersionMismatchError`)
+  — before the atomicity above ever runs. ASYMMETRIC: it only
+  closes "a new build imports an old export"; an old build's
+  importer ignores the unknown key and imports anyway. The
+  constant bumps whenever `TABLE_NAMES` shrinks — Phase 13
+  Task 9 (identity_tokens + authorization_codes retire) is
+  the first bump, 1→2.
 - **`file:///` protocol.** Page URLs use relative paths.
   Code supports `file:///` locally but testing is HTTP-only.
 - **View Transition aborts.** rapid programmatic navigation

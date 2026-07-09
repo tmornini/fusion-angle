@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { organizationRow } from './test-fixtures.ts';
+import { seedOrganizationDocument } from './test-fixtures.ts';
 import type { StateEntity } from '../api/types.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
@@ -11,6 +11,13 @@ import {
     resolveOwningOrganization,
     fenceStatesByOwner,
 } from '../api/derive-states.ts';
+import {
+    postMembershipDocumentOp,
+    postRoleGrantDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 // Phase 11 Task 2: the event-pair reader (deriveEventPairStates)
 // plus the PAIR-PLANE org fence (resolveOwningOrganization /
@@ -45,6 +52,80 @@ function req(
     });
 }
 
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// every write below authorizes through organizationToken, whose
+// gate check derives from the role_grants/memberships pair plane
+// once they flip, so a raw row here would go derivation-
+// invisible. Every id/field value stays IDENTICAL to the raw
+// puts these replace — only the write mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function seedRoleGrantPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for role-grants/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/role-grants/' + id,
+        routePattern: 'role-grants/:id',
+        routeSegments: ['role-grants', ':id'],
+        pathSegments: ['role-grants', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postRoleGrantDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
 // Two orgs (A, B), one admin identity each — admin (not member)
 // because PUT /memberships/:id is admin-only (authorization.ts),
 // and this suite's fixtures need ideas, memberships, invitations,
@@ -52,37 +133,34 @@ function req(
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.roleGrants.put('rg-a', {
+    // A's and B's own organizations/:id documents, FIRST and
+    // below-facade (Phase 13 Task 3's fixture prerequisite):
+    // organizationIds (Phase 12 Task 5, api/derive-states.ts) is
+    // the ALL-orgs scan resolveOwningOrganization/
+    // resolveFlowGraphOwner both walk, and
+    // deriveMembershipsForIdentity's own enumerate-then-probe (via
+    // deriveOrganizations) needs A/B to already be derivable
+    // before adminA's/adminB's role-grant/membership pairs below
+    // can resolve — a live PUT authenticated with a token ALREADY
+    // scoped to the org it is creating cannot bootstrap that org.
+    await seedOrganizationDocument(db, 'A', 'Acme');
+    await seedOrganizationDocument(db, 'B', 'Beta');
+    await seedRoleGrantPair(db, 'rg-a', {
         organization_id: 'A', identity_id: 'adminA',
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.roleGrants.put('rg-b', {
+    await seedRoleGrantPair(db, 'rg-b', {
         organization_id: 'B', identity_id: 'adminB',
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.memberships.put('m-a', {
+    await seedMembershipPair(db, 'm-a', {
         organization_id: 'A', identity_id: 'adminA', at: AT,
     });
-    await db.memberships.put('m-b', {
+    await seedMembershipPair(db, 'm-b', {
         organization_id: 'B', identity_id: 'adminB', at: AT,
     });
-    // Message pairs, not raw rows: organizationIds (Phase 12
-    // Task 5, api/derive-states.ts) is the ALL-orgs scan
-    // resolveOwningOrganization/resolveFlowGraphOwner both walk
-    // — it now derives from the ledger, so a raw
-    // db.organizations.put would leave A/B invisible to it.
-    await handleRequest(db, req(
-        'PUT', '/organizations/A',
-        await organizationToken('adminA', 'A'),
-        organizationRow('Acme'),
-    ));
-    await handleRequest(db, req(
-        'PUT', '/organizations/B',
-        await organizationToken('adminB', 'B'),
-        organizationRow('Beta'),
-    ));
     return db;
 }
 

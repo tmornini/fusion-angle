@@ -17,7 +17,6 @@ import type {
     IdentityTokenEntity,
     ClientEntity,
     IdentityProviderEntity,
-    AuthorizationCodeEntity,
     RoleGrantEntity,
     MemberEntity,
     HumanMemberEntity,
@@ -1071,33 +1070,6 @@ export function validateIdentityProviderEntity(
         provider_subject:
             pickString(body, 'provider_subject'),
         action,
-        at,
-    };
-}
-
-const AUTHORIZATION_CODE_BODY_KEYS: readonly string[] = [
-    'code', 'identity_id', 'client_id', 'status', 'at',
-];
-
-export function validateAuthorizationCodeEntity(
-    body: Record<string, unknown>,
-): Omit<AuthorizationCodeEntity, 'id'> {
-    assertOnlyKeys(
-        body, AUTHORIZATION_CODE_BODY_KEYS,
-        'AuthorizationCodeEntity',
-    );
-    const status = validateEnumField(
-        body, 'status', ['issued', 'consumed'],
-        'code status', 'AuthorizationCodeEntity',
-    );
-    const at = validateTimestampField(
-        body, 'at', 'AuthorizationCodeEntity',
-    );
-    return {
-        code: pickString(body, 'code'),
-        identity_id: pickString(body, 'identity_id'),
-        client_id: pickString(body, 'client_id'),
-        status,
         at,
     };
 }

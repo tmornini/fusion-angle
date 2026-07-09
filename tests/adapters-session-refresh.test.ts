@@ -12,14 +12,13 @@ import {
 } from '../web-app/app/adapters/session-refresh.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
+import {
+    appendMessagePair, formAuthPair,
+} from '../api/message-pair.ts';
+import type { AuthPairSeed } from '../api/message-pair.ts';
+import { nowUtc } from '../api/types.ts';
 
 const BASE = 'http://localhost';
-
-const issuedCode = {
-    code: 'the-code', identity_id: 'current',
-    client_id: 'web', status: 'issued',
-    at: '2026-06-03T00:00:00.000000Z',
-};
 
 async function freshDb() {
     const db = new MemoryDbAdapter();
@@ -27,12 +26,42 @@ async function freshDb() {
     return db;
 }
 
+// Below-facade pair formation, mirroring authorizePassword's OWN
+// storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
+// 's pre-tx lookup scans the '/authentication/authorize/' response
+// family for a stored pair whose (redacted) `code` field
+// fingerprints to the presented code, so a bare pair — the SAME
+// shape a real login forms (Phase 13 Task 9: the authorization_
+// codes row half retired) — is all a seed needs.
+async function seedAuthorizationCodePair(
+    db: MemoryDbAdapter,
+    code: string,
+): Promise<void> {
+    const seed: AuthPairSeed = {
+        requestAt: nowUtc(),
+        headerFields: [],
+        method: 'POST',
+        pathname: '/authentication/authorize',
+        routePattern: 'authentication/authorize',
+        routeSegments: ['authentication', 'authorize'],
+        pathSegments: ['authentication', 'authorize'],
+    };
+    const requestBody = {
+        method: 'password', username: 'seed@example.com',
+        password: 'seed-password', client_id: 'web',
+    };
+    const pair = await formAuthPair(
+        seed, requestBody, 'current', 200, { code },
+    );
+    await appendMessagePair(db, pair);
+}
+
 // Drive the real authorization_code grant to mint a genuine
 // token chain — there is no shortcut fixture for refresh tokens.
 async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
 }> {
-    await db.authorizationCodes.put('ev1', issuedCode);
+    await seedAuthorizationCodePair(db, 'the-code');
     const res = await handleRequest(db, new Request(
         `${BASE}/authentication/token`, {
             method: 'POST',

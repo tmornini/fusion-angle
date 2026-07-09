@@ -341,9 +341,15 @@ this task closes.
 ### 2.11 Organizations & memberships
 
 - `GET /organizations` — the caller's reachable orgs (identity-scoped;
-  runs above the admin gate so a roleless member can boot).
+  runs above the admin gate so a roleless member can boot). The row
+  list is now the pair-plane derivation (Phase 12 Task 5):
+  `deriveOrganizations` (`api/derive-organizations.ts`, §5.18) — the
+  membership filter itself stays old-plane.
 - `GET|PUT /organizations/:id` — primitive (global passthrough; reads
-  fence to the caller's memberships).
+  fence to the caller's memberships). `GET` is FLIPPED too (Phase 12
+  Task 5): a bespoke `deriveOrganization` call in the route closure
+  (§5.18), not the generic `documentGetHandler` every other flipped
+  family rides. `PUT` stays hand-written old-plane.
 - `GET /memberships` · `GET|PUT|DELETE /memberships/:id` —
   primitive. `PUT` is a document write (§5.9) — the eighth
   family, and the FOURTH `'stateless'` one (§5.9): a pure join
@@ -377,12 +383,31 @@ runs on the base adapter with explicit guards:
 ### 2.13 Snapshots (bootstrap plane, bearer-exempt)
 
 - `GET /snapshots/schema` — schema existence + full export, else null.
+  The export (`getSnapshot`, `api/db-backed.ts`) stamps one reserved
+  top-level key, `__schema_version__` (`SNAPSHOT_SCHEMA_VERSION`,
+  `api/db.ts`, Phase 12 Task 6), beside the `TABLE_NAMES` arrays.
 - `DELETE /snapshots/schema` — drop the schema and reopen clean.
 - `POST /snapshots/mock-data` — seed the full demo dataset (§3.26).
 - `POST /snapshots/bootstrap` — seed the pristine minimal state
   (§3.27).
 - `PUT /snapshots/import` — validate then atomically restore a snapshot
-  (§3.28).
+  (§3.28). `parseAndValidateSnapshot` (`api/snapshot-validator.ts`)
+  REJECTS an absent or mismatched `__schema_version__` with
+  `SnapshotVersionMismatchError`, before any table is read — the
+  universal gate, covering every `DbAdapter.putSnapshot` caller.
+  ASYMMETRIC by design: it closes "a new build imports an old
+  export" only — an old build's importer has no way to know the
+  marker exists, so it silently ignores the key and imports
+  anyway. The client-side `scanForRetiredKeys` pre-flight
+  (`web-app/app/adapters/snapshots.ts`) checks the same key
+  before upload, as a convenience only; the server gate is the
+  guarantee.
+
+`getHasAnyHumanMembers` (`web-app/app/adapters/snapshots.ts`) — the
+first-run check gating the pristine-vs-seeded boot choice —
+re-anchored (Task 6) from a raw `members` table slice onto a scan
+of the SAME export's `requests` rows at the `/members/` address,
+matching what the now-derived `GET /members` (§2.1) actually sees.
 
 ---
 
@@ -3061,3 +3086,93 @@ the row-write side this task touches. Reseed marginal cost measured
 ~4 ms for the +11 pairs (baseline ~479 ms → ~483 ms, 10 runs each)
 — consistent with §5.16's own ~0.14 ms/pair rate at this small a
 delta, within the run-to-run noise floor at this scale.
+
+### 5.18 Flipping organizations reads to the ledger
+(Phase 12 Tasks 2–5)
+
+organizations is the tenant root — the THIRTEENTH and LAST
+in-scope family — flipped through the same arc every prior
+family rode: a derive module (Task 2), seed pairs (Task 3), a
+drift-parity suite (Task 4), then the consumer flip (Task 5).
+
+**The derivation.** `deriveOrganizations(db)` /
+`deriveOrganization(db, id)` (`api/derive-organizations.ts`)
+head-pair-reduce the `/organizations/:id` address family,
+reusing `derive-documents.ts`'s helpers like every sibling.
+`organizationEntityOf` departs from the seven-sibling id-first
+`entityOf` convention ON PURPOSE: it re-runs the head pair's own
+REQUEST body through `validateOrganizationEntity` (an echoed
+`id` stripped via `withoutId` first) rather than re-listing
+field names, so the derived shape is byte-identical to the
+STORED ROW — id-LAST, never id-first
+(`tests/drift-organizations.test.ts` leg 6 pins the key order on
+both planes). Registration (Task 2's sibling) makes organizations
+the THIRTEENTH `FAMILY_REGISTRY` row: `organizationNested: false`
+(the tenant root — global plane, like members/ai-members/
+human-members/identities), `concurrency: 'simple'`,
+`createBodyIdField: 'id'` (INERT — no collection POST exists).
+Registration alone is byte-inert for the canonical address; it
+does not flip a read by itself.
+
+**The seed pairs (Task 3).** Both seeded organizations (Stark
+Industries, Wayne Enterprises) form their OWN `organizations/:id`
+document pair beside the SAME direct
+`adapter.organizations.put` row write — Path A, the row itself
+untouched. `EXPECTED_PAIR_COUNT` 1511 → 1513 (+2); the bootstrap
+count 13 → 14 (+1, its own lone Stark row).
+`tests/mock-data-fingerprint.test.ts`'s `organizations` pin —
+2/`e13d8f06` — HOLDS byte-identical: Path A, the pair write
+touches only `requests`/`responses`, disjoint from the row-write
+side.
+
+**The drift suite (Task 4, `tests/drift-organizations.test.ts`,
+8 legs).** OLD-vs-DERIVED parity: the caller-filtered collection
+for a multi-org and a single-org caller (leg 1); the unfiltered
+collection plus both seeded `:id` reads (leg 2); the bootstrap
+singleton (leg 2b); both 404 shapes — the store's
+`EntityNotFoundError` and the pre-dispatch membership-fence 404
+(legs 3a/3b); a live PUT re-compared after the write (leg 4); the
+SEED-STATE precondition — no `states` event exists for either
+seeded organization, so no tombstone can diverge the two planes
+(leg 5); and the id-LAST key-order pin (leg 6). Stays until Phase
+Final, like every sibling drift suite.
+
+**The flip (Task 5) — six consumers, five re-pointed, one
+removed:**
+
+- `enumerateMyOrganizations` (`api/organization-requests.ts`) —
+  row source only: `deriveOrganizations` replaces
+  `ctx.base.organizations.getAll()`. The `callerOrganizationIds`
+  membership filter STAYS old-plane — Phase 13's own scope.
+- `GET /organizations/:id` (`api/routes.ts`) — a BESPOKE
+  `deriveOrganization` call in the route closure, not the
+  generic `documentGetHandler(wiring)` every other flipped
+  family rides: that machinery needs a wiring row's
+  `documentOp`, and organizations has none — `PUT` stays
+  hand-written old-plane, so a `documentOp` built only to
+  satisfy the type would never be called.
+- The gate-15 fence enumeration —
+  `membershipsAcrossAllOrganizations` (`api/routes.ts`) — now
+  walks `deriveOrganizations(db)` instead of
+  `db.organizations.getAll()`.
+- `derive-states.ts`'s own `organizationIds` — the ALL-orgs,
+  uncaller-filtered ownership resolution, distinct from
+  `enumerateMyOrganizations`'s caller-filtered read — now sources
+  from `deriveOrganizations` too. Stays ALL-orgs; never
+  caller-filtered.
+- `invitations-domain.ts`'s `organizationName` join — a Map
+  built ONCE over every organization (Efficiency: one
+  derivation, not one `deriveOrganization` call per invitation)
+  — sources from `deriveOrganizations` in place of
+  `ctx.base.organizations.getAll()`.
+- The DEAD `route('organizations', {get: ...})` table entry is
+  REMOVED: unreachable since `GET /organizations` is intercepted
+  PRE-`matchRoute` in `api/api.ts` (the `pathSegments.length ===
+  1 && GET` guard, §1.1) — the route-table row never dispatched.
+
+**What stayed old-plane.** The `organizations` row store is
+fully intact — every write above is STILL Path A, dual-writing
+the row beside its pair. `PUT /organizations/:id` is untouched,
+hand-written. `callerOrganizationIds`'s membership filter and
+`derive-states.ts`'s ALL-orgs shape are both UNCHANGED — this
+task flips the row SOURCE only, never a fence or a filter.

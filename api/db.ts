@@ -9,10 +9,8 @@ import type {
     IdentityTokenRevocationEntity,
     IdentityDefaultOrganizationEntity,
     RoleGrantEntity,
-    IdentityTokenEntity,
     ClientEntity,
     IdentityProviderEntity,
-    AuthorizationCodeEntity,
     IdeaEntity,
     ProjectEntity,
     FlowEntity,
@@ -311,7 +309,7 @@ export const backendRunner = (
 export const ambientRunner = (tx: Tx): TxRunner =>
     (_tables, _mode, fn) => fn(tx);
 
-// The 39 stores an adapter exposes, factored out of
+// The 37 stores an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
 // place (`#buildStores`) and a transaction can rebuild it
 // bound to an open tx (A9).
@@ -334,14 +332,10 @@ export interface DbStores {
         EntityStore<IdentityDefaultOrganizationEntity>;
     roleGrants:
         EntityStore<RoleGrantEntity>;
-    identityTokens:
-        EntityStore<IdentityTokenEntity>;
     clients:
         EntityStore<ClientEntity>;
     identityProviders:
         EntityStore<IdentityProviderEntity>;
-    authorizationCodes:
-        EntityStore<AuthorizationCodeEntity>;
     ideas:
         EntityStore<IdeaEntity>;
     projects:
@@ -480,6 +474,15 @@ export interface GuardedDbAdapter
     ): Promise<T | null>;
 }
 
+// Phase 13 Task 9 shrank this list by two (identity_tokens,
+// authorization_codes retired). IndexedDB's own open is
+// UNVERSIONED (backend-indexeddb.ts's #openConnection calls
+// indexedDB.open(DB_NAME) with no version argument), so
+// onupgradeneeded — the only place object stores are created —
+// never re-fires for an origin that already has a database: an
+// EXISTING origin keeps the two dropped stores as harmless,
+// unread orphans. deleteSchema (a full database delete) is the
+// only cleanup; nothing else needs to reconcile them.
 export const TABLE_NAMES = [
     'members',
     'human_members',
@@ -490,10 +493,8 @@ export const TABLE_NAMES = [
     'identity_token_revocations',
     'identity_default_organizations',
     'role_grants',
-    'identity_tokens',
     'clients',
     'identity_providers',
-    'authorization_codes',
     'ideas',
     'projects',
     'flows',
@@ -537,8 +538,9 @@ export const TABLE_NAMES = [
 // mismatched marker rejects the import outright — never a
 // default, never a best-effort import. Bump it whenever
 // TABLE_NAMES (or a family's derivation shape) changes in a
-// way that would strand an older export; Phase Final's planned
-// TABLE_NAMES shrink is the first known future bump.
+// way that would strand an older export; Phase 13's TABLE_NAMES
+// shrink (identity_tokens + authorization_codes retire) is the
+// first such bump.
 //
 // THE ASYMMETRY: this closes only "a new build imports an old
 // export." A new build's OWN marked export is silently accepted
@@ -547,7 +549,7 @@ export const TABLE_NAMES = [
 // here (an old build's validator loop never looks at this key
 // at all). Intended and dev-tier-acceptable: the old build has
 // no way to know a marker scheme was ever invented.
-export const SNAPSHOT_SCHEMA_VERSION = 1;
+export const SNAPSHOT_SCHEMA_VERSION = 2;
 export const SNAPSHOT_SCHEMA_VERSION_KEY = '__schema_version__';
 
 // A secondary index is either a plain column name (the
@@ -592,8 +594,6 @@ export const TABLE_INDEXES:
     identity_token_revocations: ['identity_id'],
     identity_default_organizations: ['identity_id'],
     role_grants: ['organization_id', 'identity_id'],
-    identity_tokens: ['jti', 'chain_id'],
-    authorization_codes: ['code'],
     ideas: ['organization_id'],
     idea_submissions: ['idea_id'],
     projects: ['organization_id'],

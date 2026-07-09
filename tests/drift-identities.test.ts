@@ -40,6 +40,7 @@ import {
     deriveIdentityProviders,
     deriveIdentityProvider,
     deriveTokenRevocation,
+    deriveTokenRevocationsFor,
 } from '../api/derive-identity-spine.ts';
 import {
     STARK_ORGANIZATION,
@@ -47,6 +48,9 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedIdentityCredential } from './identity-fixtures.ts';
+import { currentRolesForInOrganization } from
+    '../api/authorization.ts';
+import { identityByEmail } from '../api/authentication.ts';
 
 // The E10 drift check (Phase 10 Task 7): message-derived reads
 // over the identity spine's remaining facets (pii, credentials,
@@ -472,6 +476,37 @@ test('identity-pii collection parity (11 seeded slots) fenced'
     );
 });
 
+// -- 2b. the by-email login-shape leg (Phase 13 Task 8, concern -
+// -- 2): authorizePassword's identity lookup now feeds -----------
+// -- identityByEmail from deriveIdentityPiiRows rather than the --
+// -- row-plane identityPii.getAllWhere('email', ...) scan — this -
+// -- proves the reducer resolves the SAME identity id from BOTH --
+// -- planes, for every seeded email AND an unknown one (both -----
+// -- null, the no-enumeration shape) -------------------------------
+
+test('by-email login-shape parity: identityByEmail resolves the'
++ ' same identity id from derived pii rows as from the row'
++ ' plane, for every seeded email + an unknown email (both'
++ ' null)', async () => {
+    const db = await seededDb();
+    const derivedRows = await deriveIdentityPiiRows(db);
+    const oldRows = await db.identityPii.getAll();
+    for (const row of oldRows) {
+        const fromDerived = identityByEmail(
+            derivedRows, row.email,
+        );
+        const fromOld = identityByEmail(oldRows, row.email);
+        assert.equal(fromDerived, fromOld);
+        assert.equal(fromDerived, row.id);
+    }
+    const unknownEmail = 'nobody@example.com';
+    assert.equal(
+        identityByEmail(derivedRows, unknownEmail),
+        identityByEmail(oldRows, unknownEmail),
+    );
+    assert.equal(identityByEmail(derivedRows, unknownEmail), null);
+});
+
 // -- 3. credentials parity per identity + per cid + the ---------
 // -- withoutSecret projection pin + 404 bytes --------------------
 
@@ -832,6 +867,97 @@ test('role-grants parity (org fence legs both orgs) + getById +'
             err instanceof EntityNotFoundError
             && err.message === expectedRevocationMessage,
     );
+
+    // -- the by-identity fold (Phase 13 Task 4): the coarse
+    // 'sign out everywhere' gate reads THIS shape. Parity with
+    // the row plane is necessary but not sufficient (II
+    // Security) — a derivation MISS here would ADMIT a
+    // signed-out session, so the leg also drives adminToken
+    // (minted with an iat that predates the revocation's `at`
+    // above) through the LIVE Bearer gate and proves it now
+    // 401s, showing the revocation is SEEN, not merely mirrored
+    // on the row plane. --
+    const derivedForCurrent = sortById(
+        await deriveTokenRevocationsFor(db, 'current'),
+    );
+    const oldForCurrent = sortById(
+        await db.identityTokenRevocations.getAllWhere(
+            'identity_id', 'current',
+        ),
+    );
+    assert.deepEqual(derivedForCurrent, oldForCurrent);
+    assert.equal(derivedForCurrent.length, 1);
+    assert.deepEqual(
+        await deriveTokenRevocationsFor(db, 'no-such-identity'),
+        [],
+    );
+    const revoked = await handleRequest(
+        db, req('GET', '/members', adminToken),
+    );
+    assert.equal(revoked.status, 401);
+});
+
+// -- 4b. the hot-path FILTERED shape: currentRolesForInOrganization
+// -- over derived vs row-plane role-grant rows, for a seeded -----
+// -- admin and a seeded member, per organization — case 4's own --
+// -- collection parity proves the UNFILTERED row sets equal; it --
+// -- does NOT exercise the per-identity, per-org FILTER the two --
+// -- flipped readers (callerRolesInOrganization,
+// -- callerIsOrganizationAdmin) actually apply --------------------
+
+test("role-grants hot-path filtered shape: currentRolesFor"
++ "InOrganization over derived vs row-plane rows agrees for a"
++ " seeded admin ('current') and a seeded member, per"
++ ' organization', async () => {
+    const db = await seededDb();
+    // sarahId: STARK-only seeded member. mikeId: ORGANIZATION_TWO-
+    // only seeded member (both from the mock-data member pool;
+    // 'current' is seeded admin in BOTH orgs).
+    const sarahId = 'LhfaUUf4IumVsCSGB4xjdK';
+    const mikeId = 'bLP3X1hb1mSz8gY9neogU3';
+    const memberIdFor = new Map([
+        [STARK_ORGANIZATION, sarahId],
+        [ORGANIZATION_TWO, mikeId],
+    ]);
+
+    for (const organization of [
+        STARK_ORGANIZATION, ORGANIZATION_TWO,
+    ]) {
+        // The admin leg: 'current' — derived-all vs the OLD
+        // reader's own identity_id-indexed row read.
+        const derivedAdminRows = await deriveRoleGrants(db);
+        const oldAdminRows = await db.roleGrants
+            .getAllWhere('identity_id', 'current');
+        const derivedAdminRoles = currentRolesForInOrganization(
+            derivedAdminRows, 'current', organization,
+        );
+        const oldAdminRoles = currentRolesForInOrganization(
+            oldAdminRows, 'current', organization,
+        );
+        assert.deepEqual(
+            [...derivedAdminRoles].sort(),
+            [...oldAdminRoles].sort(),
+        );
+        assert.ok(derivedAdminRoles.includes('admin'));
+
+        // The member leg: the org's own seeded, roleless-of-admin
+        // member.
+        const memberId = memberIdFor.get(organization)!;
+        const derivedMemberRows = await deriveRoleGrants(db);
+        const oldMemberRows = await db.roleGrants
+            .getAllWhere('identity_id', memberId);
+        const derivedMemberRoles = currentRolesForInOrganization(
+            derivedMemberRows, memberId, organization,
+        );
+        const oldMemberRoles = currentRolesForInOrganization(
+            oldMemberRows, memberId, organization,
+        );
+        assert.deepEqual(
+            [...derivedMemberRoles].sort(),
+            [...oldMemberRoles].sort(),
+        );
+        assert.ok(!derivedMemberRoles.includes('admin'));
+    }
 });
 
 // -- 5. live-write chain, re-compared on BOTH planes at every ---

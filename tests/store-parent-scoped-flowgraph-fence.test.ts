@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { organizationRow } from './test-fixtures.ts';
+import {
+    organizationRow,
+    seedOrganizationDocument,
+} from './test-fixtures.ts';
+import {
+    postMembershipDocumentOp,
+    postRoleGrantDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
 // Flow-graph entity deletion events must be fenced by the
 // flow's owning org. A 'deleted' states event whose entity_id
@@ -56,6 +66,79 @@ async function seedStateEvent(
     assert.equal(res.status, 200);
 }
 
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// the org-A/org-B admin checks below derive from the pair plane
+// once role_grants/memberships flip, so a raw row here would go
+// derivation-invisible. Every id/field value stays IDENTICAL to
+// the raw puts these replace — only the write mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function seedRoleGrantPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for role-grants/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/role-grants/' + id,
+        routePattern: 'role-grants/:id',
+        routeSegments: ['role-grants', ':id'],
+        pathSegments: ['role-grants', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postRoleGrantDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
 // Two orgs: A (admin = current) and B. A flow + node + edge
 // seeded in org A. Deletion events posted for the node and
 // edge (the 'deleted' state). `current` is admin+member of A;
@@ -63,27 +146,28 @@ async function seedStateEvent(
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.roleGrants.put('rg-current-a', {
+    // A's own organizations/:id document, FIRST and below-facade
+    // (Phase 13 Task 3's fixture prerequisite): organizationIds
+    // (Phase 12 Task 5, api/derive-states.ts) is the ALL-orgs scan
+    // resolveFlowGraphOwner walks to find node-a/edge-a's true
+    // owner, and deriveMembershipsForIdentity's own enumerate-
+    // then-probe (via deriveOrganizations) needs A to already be
+    // derivable before 'current's role-grant/membership pairs
+    // below can resolve — a live PUT authenticated with a token
+    // ALREADY scoped to A cannot bootstrap A itself. B stays a raw
+    // row: resolveFlowGraphOwner always checks the BOUND org first
+    // regardless of organizationIds' contents, so a B-bound read
+    // below never needs B itself to be derivable, only A.
+    await seedOrganizationDocument(db, 'A', 'Acme');
+    await seedRoleGrantPair(db, 'rg-current-a', {
         organization_id: 'A', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.memberships.put('m-current-a', {
+    await seedMembershipPair(db, 'm-current-a', {
         organization_id: 'A', identity_id: 'current',
         at: AT,
     });
-    // A's message pair, not a raw row: organizationIds (Phase 12
-    // Task 5, api/derive-states.ts) is the ALL-orgs scan
-    // resolveFlowGraphOwner walks to find node-a/edge-a's true
-    // owner — it now derives from the ledger. B stays a raw row:
-    // resolveFlowGraphOwner always checks the BOUND org first
-    // regardless of organizationIds' contents, so a B-bound read
-    // below never needs B itself to be derivable, only A.
-    await handleRequest(db, req(
-        'PUT', '/organizations/A',
-        await organizationToken('current', 'A'),
-        organizationRow('Acme'),
-    ));
     await db.organizations.put('B', organizationRow('Beta'));
     // Seeded through the wire (NAMED re-pin: the READ-side
     // pair-plane fence, api/derive-states.ts's
@@ -188,12 +272,20 @@ test('node deletion event is hidden from org B', async () => {
         'se-node-del',
     );
     // Grant current admin access to B so the facade opens.
-    await db.roleGrants.put('rg-current-b', {
+    // B's own organizations/:id document (Phase 13 Task 3's
+    // fixture prerequisite; idempotent — a no-op if already
+    // seeded): 'current' becomes a genuine member of B in THIS
+    // case, so the tenancy fence (deriveMembershipsForIdentity's
+    // enumerate-then-probe, via deriveOrganizations) needs B to be
+    // derivable, unlike seed()'s own B-stays-raw precedent above
+    // (which never grants 'current' membership in B).
+    await seedOrganizationDocument(db, 'B', 'Beta');
+    await seedRoleGrantPair(db, 'rg-current-b', {
         organization_id: 'B', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.memberships.put('m-current-b', {
+    await seedMembershipPair(db, 'm-current-b', {
         organization_id: 'B', identity_id: 'current',
         at: AT,
     });
@@ -219,12 +311,20 @@ test('edge deletion event is hidden from org B', async () => {
         (await db.states.getById('se-edge-del')).id,
         'se-edge-del',
     );
-    await db.roleGrants.put('rg-current-b', {
+    // B's own organizations/:id document (Phase 13 Task 3's
+    // fixture prerequisite; idempotent — a no-op if already
+    // seeded): 'current' becomes a genuine member of B in THIS
+    // case, so the tenancy fence (deriveMembershipsForIdentity's
+    // enumerate-then-probe, via deriveOrganizations) needs B to be
+    // derivable, unlike seed()'s own B-stays-raw precedent above
+    // (which never grants 'current' membership in B).
+    await seedOrganizationDocument(db, 'B', 'Beta');
+    await seedRoleGrantPair(db, 'rg-current-b', {
         organization_id: 'B', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.memberships.put('m-current-b', {
+    await seedMembershipPair(db, 'm-current-b', {
         organization_id: 'B', identity_id: 'current',
         at: AT,
     });
@@ -245,12 +345,20 @@ test('entity-states for a node id is 200 in org A', async () => {
 
 test('entity-states for a node id is 404 in org B', async () => {
     const db = await seed();
-    await db.roleGrants.put('rg-current-b', {
+    // B's own organizations/:id document (Phase 13 Task 3's
+    // fixture prerequisite; idempotent — a no-op if already
+    // seeded): 'current' becomes a genuine member of B in THIS
+    // case, so the tenancy fence (deriveMembershipsForIdentity's
+    // enumerate-then-probe, via deriveOrganizations) needs B to be
+    // derivable, unlike seed()'s own B-stays-raw precedent above
+    // (which never grants 'current' membership in B).
+    await seedOrganizationDocument(db, 'B', 'Beta');
+    await seedRoleGrantPair(db, 'rg-current-b', {
         organization_id: 'B', identity_id: 'current',
         role: 'admin', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.memberships.put('m-current-b', {
+    await seedMembershipPair(db, 'm-current-b', {
         organization_id: 'B', identity_id: 'current',
         at: AT,
     });

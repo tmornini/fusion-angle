@@ -167,6 +167,27 @@ export type RotationPlan =
     }
     | { readonly kind: 'unknown' };
 
+// Whether two jtis sets are identical, order- and
+// duplicate-insensitive — the token-write retry loop's
+// divergence check (authentication.ts, Phase 13 Task 5): the
+// FULL set of jtis a plan's appends touch, never `kind` alone.
+// A concurrent sibling rotation can grow a replay's revocation
+// set between the pre-tx and in-tx reads while `kind` stays
+// 'replay' on both sides — comparing kinds alone would miss
+// that growth and leave the new jti unrevoked.
+export function jtiSetsEqual(
+    a: readonly string[],
+    b: readonly string[],
+): boolean {
+    const setA = new Set(a);
+    const setB = new Set(b);
+    if (setA.size !== setB.size) return false;
+    for (const jti of setA) {
+        if (!setB.has(jti)) return false;
+    }
+    return true;
+}
+
 export function planRotation(
     rows: readonly IdentityTokenEntity[],
     presentedJti: string,

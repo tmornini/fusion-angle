@@ -4,8 +4,15 @@ import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { organizationRow } from './test-fixtures.ts';
-import { jsonObjectField } from '../api/types.ts';
+import { seedOrganizationDocument } from './test-fixtures.ts';
+import { jsonObjectField, nowUtc, SYSTEM_MEMBER_ID } from
+    '../api/types.ts';
+import {
+    postMembershipDocumentOp,
+    postRoleGrantDocumentOp,
+    WRITE_RESPONSE_SPECS,
+} from '../api/routes.ts';
+import { formWritePair } from '../api/message-pair.ts';
 
 // The state ownership WRITE fence (Phase 11 Task 1).
 // MEMBER_VERBS permits member-tier PUT /states/:id
@@ -49,6 +56,80 @@ function tokenFor(
     return organizationToken(sub, organization);
 }
 
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// the MEMBER_VERBS gate below authorizes through role_grants/
+// memberships once they derive from the pair plane, so a raw
+// row here would go derivation-invisible. Every id/field value
+// stays IDENTICAL to the raw puts these replace — only the write
+// mechanism changes.
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for memberships/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/memberships/' + id,
+        routePattern: 'memberships/:id',
+        routeSegments: ['memberships', ':id'],
+        pathSegments: ['memberships', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postMembershipDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function seedRoleGrantPair(
+    db: MemoryDbAdapter,
+    id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const organization = body.organization_id as string;
+    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for role-grants/:id',
+        );
+    }
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/role-grants/' + id,
+        routePattern: 'role-grants/:id',
+        routeSegments: ['role-grants', ':id'],
+        pathSegments: ['role-grants', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], body, SYSTEM_MEMBER_ID, organization,
+        ),
+        headPairId: undefined,
+    });
+    await postRoleGrantDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
 // Two orgs (A, B), one member each (the tier MEMBER_VERBS
 // actually grants PUT /states to), an idea owned by each org,
 // plus a work order and an objective owned by A — the other
@@ -58,20 +139,25 @@ function tokenFor(
 async function seed(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('A', organizationRow('Acme'));
-    await db.organizations.put('B', organizationRow('Beta'));
-    await db.memberships.put('m-a', {
+    // Real organizations/:id documents (Phase 13 Task 3's fixture
+    // prerequisite) — a raw db.organizations.put leaves the org
+    // derivation-invisible, so deriveMembershipsForIdentity's own
+    // enumerate-then-probe (via deriveOrganizations) never reaches
+    // memberA's/memberB's membership prefix below.
+    await seedOrganizationDocument(db, 'A', 'Acme');
+    await seedOrganizationDocument(db, 'B', 'Beta');
+    await seedMembershipPair(db, 'm-a', {
         organization_id: 'A', identity_id: 'memberA', at: AT,
     });
-    await db.memberships.put('m-b', {
+    await seedMembershipPair(db, 'm-b', {
         organization_id: 'B', identity_id: 'memberB', at: AT,
     });
-    await db.roleGrants.put('rg-a', {
+    await seedRoleGrantPair(db, 'rg-a', {
         organization_id: 'A', identity_id: 'memberA',
         role: 'member', action: 'granted',
         by_member_id: 'system', at: AT,
     });
-    await db.roleGrants.put('rg-b', {
+    await seedRoleGrantPair(db, 'rg-b', {
         organization_id: 'B', identity_id: 'memberB',
         role: 'member', action: 'granted',
         by_member_id: 'system', at: AT,

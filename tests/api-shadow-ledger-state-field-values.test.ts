@@ -65,12 +65,12 @@ test('PUT states/:id/field-values/:fvid appends its pair at'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 1);
+    assert.equal(requests.length, 4);
     assert.equal(
-        requests[0]!.uri_prefix,
+        requests[3]!.uri_prefix,
         `/organizations/1/states/${EVENT_ID}/field-values/`,
     );
-    assert.equal(requests[0]!.uri_id, 'fv-1');
+    assert.equal(requests[3]!.uri_id, 'fv-1');
     const domainRow = await db.stateFieldValues.getById('fv-1');
     assert.deepEqual(await res.json(), domainRow);
 });
@@ -110,8 +110,8 @@ test('a byte-identical PUT resend returns the stored response'
         body,
     ));
     assert.equal(second.headers.get('Response-ID'), firstId);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('DELETE states/:id/field-values/:fvid appends its'
@@ -141,8 +141,8 @@ test('a failed write (missing required field) appends'
         token, { state_event_id: EVENT_ID },
     ));
     assert.equal(res.status, 400);
-    assert.equal((await db.requests.getAll()).length, 0);
-    assert.equal((await db.responses.getAll()).length, 0);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('stored messages verify against their hashes',

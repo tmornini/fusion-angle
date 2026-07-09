@@ -164,17 +164,30 @@ test('a token whose jti is revoked in the ledger is denied',
 async () => {
     const db = await freshDb();
     // the access token (devToken jti = dev-current) is issued
-    // then its chain is revoked in the identity_tokens ledger
-    await db.identityTokens.put('e1', {
-        jti: 'dev-current', identity_id: 'current',
-        action: 'issued', chain_id: 'c1',
-        at: '2026-01-01T00:00:00.000000Z',
-    });
-    await db.identityTokens.put('e2', {
-        jti: 'dev-current', identity_id: 'current',
-        action: 'revoked', chain_id: 'c1',
-        at: '2026-02-01T00:00:00.000000Z',
-    });
+    // then its chain is revoked in the identity_tokens ledger.
+    // Seeded via the PUT route (not a raw store write): the
+    // gate's by-jti fold now derives from the message ledger
+    // (Phase 13 Task 6), so a pair-less row would be invisible
+    // to it — the PUT route forms both the row AND its pair, the
+    // SAME mechanism a live write uses.
+    await PUT(
+        db, 'identity-tokens/e1',
+        {
+            jti: 'dev-current', identity_id: 'current',
+            action: 'issued', chain_id: 'c1',
+            at: '2026-01-01T00:00:00.000000Z',
+        },
+        await devToken(),
+    );
+    await PUT(
+        db, 'identity-tokens/e2',
+        {
+            jti: 'dev-current', identity_id: 'current',
+            action: 'revoked', chain_id: 'c1',
+            at: '2026-02-01T00:00:00.000000Z',
+        },
+        await devToken(),
+    );
     await assert.rejects(
         async () => GET(db, 'members', await devToken()),
         /chain revoked/);
