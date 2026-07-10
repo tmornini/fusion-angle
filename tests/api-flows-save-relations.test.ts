@@ -14,7 +14,7 @@ import {
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import type {
-    FlowEntity,
+    FlowWithGraph,
     GraphNode,
     GraphEdge,
     StateEntity,
@@ -24,9 +24,6 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import {
-    reassembleStoredGraph,
-} from '../api/flow-graph-relations.ts';
-import {
     asStoredGraph,
 } from '../api/validators.ts';
 import {
@@ -35,6 +32,13 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import {
+    documentPairsAt,
+} from '../api/derive-documents.ts';
+
+// Phase Final Task 2: graph relation ROW halves stripped.
+// Save oracles re-home to pair-plane graph (GET) and to
+// document-pair graphDelta member/attribute event ledgers.
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -103,31 +107,106 @@ function save(
     };
 }
 
-async function relations(
+async function pairPlaneGraph(
+    ctx: RequestContext,
+    flowId: string,
+): Promise<StoredGraph> {
+    const flow = await ctx.GET<FlowWithGraph>(
+        'flows/' + flowId,
+    );
+    return asStoredGraph(
+        JSON.parse(flow.graph), 'flow.graph',
+    );
+}
+
+function norm(g: StoredGraph): StoredGraph {
+    return {
+        nodes: [...g.nodes]
+            .sort((p, q) => p.id.localeCompare(q.id))
+            .map(n => ({
+                ...n,
+                memberIds: [...n.memberIds].sort(),
+                attributes: [...n.attributes].sort(
+                    (p, q) => p.attributeId
+                        .localeCompare(q.attributeId),
+                ),
+            })),
+        edges: [...g.edges]
+            .sort((p, q) => p.id.localeCompare(q.id)),
+    };
+}
+
+// graphDelta member/attribute events across every document
+// pair at this flow (SIDECAR-KEEP append-only ledger).
+async function pairGraphDeltaEvents(
     db: MemoryDbAdapter,
     flowId: string,
 ): Promise<{
-    nodeRows: Awaited<
-        ReturnType<typeof db.flowNodes.getAllWhere>
-    >;
-    edgeRows: Awaited<
-        ReturnType<typeof db.flowEdges.getAllWhere>
-    >;
-    memberRows: Awaited<
-        ReturnType<typeof db.flowNodeMembers.getAll>
-    >;
-    attrRows: Awaited<
-        ReturnType<typeof db.flowNodeAttributes.getAll>
-    >;
+    memberEvents: {
+        flow_node_id: string;
+        member_id: string;
+        action: string;
+    }[];
+    attributeEvents: {
+        flow_node_id: string;
+        attribute_id: string;
+        mode: string;
+        action: string;
+    }[];
 }> {
-    return {
-        nodeRows: await db.flowNodes
-            .getAllWhere('flow_id', flowId),
-        edgeRows: await db.flowEdges
-            .getAllWhere('flow_id', flowId),
-        memberRows: await db.flowNodeMembers.getAll(),
-        attrRows: await db.flowNodeAttributes.getAll(),
-    };
+    const requests = await db.requests.getAll();
+    const responses = await db.responses.getAll();
+    const pairs = documentPairsAt(
+        requests, responses, '/organizations/1/flows/',
+    ).filter((p) => p.uriId === flowId);
+    const memberEvents: {
+        flow_node_id: string;
+        member_id: string;
+        action: string;
+    }[] = [];
+    const attributeEvents: {
+        flow_node_id: string;
+        attribute_id: string;
+        mode: string;
+        action: string;
+    }[] = [];
+    for (const pair of pairs) {
+        const delta = pair.body['graphDelta'];
+        if (typeof delta !== 'object' || delta === null) {
+            continue;
+        }
+        const d = delta as Record<string, unknown>;
+        const members = d['memberEvents'];
+        if (Array.isArray(members)) {
+            for (const raw of members) {
+                if (typeof raw !== 'object' || raw === null) {
+                    continue;
+                }
+                const m = raw as Record<string, unknown>;
+                memberEvents.push({
+                    flow_node_id: String(m['flow_node_id']),
+                    member_id: String(m['member_id']),
+                    action: String(m['action']),
+                });
+            }
+        }
+        const attrs = d['attributeEvents'];
+        if (Array.isArray(attrs)) {
+            for (const raw of attrs) {
+                if (typeof raw !== 'object' || raw === null) {
+                    continue;
+                }
+                const a = raw as Record<string, unknown>;
+                attributeEvents.push({
+                    flow_node_id: String(a['flow_node_id']),
+                    attribute_id: String(a['attribute_id']),
+                    mode: String(a['mode']),
+                    action: String(a['action']),
+                });
+            }
+        }
+    }
+    return { memberEvents, attributeEvents };
 }
 
 // The known baseline graph save #1 establishes: two nodes
@@ -215,10 +294,10 @@ async function seedKnownBaseline(
 }
 
 test(
-    'PUT /flows/:id ROUND-TRIP: reassembled relations'
-    + ' equal the intended saved graph',
+    'PUT /flows/:id ROUND-TRIP: pair-plane graph'
+    + ' equals the intended saved graph',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = 'flow-save-rt';
         await seedKnownBaseline(ctx, flowId);
 
@@ -227,19 +306,16 @@ test(
             working.nodes, working.edges,
         ));
 
-        const r = await relations(db, flowId);
-        const reassembled = reassembleStoredGraph(
-            r.nodeRows, r.edgeRows, r.memberRows, r.attrRows,
-        );
+        const graph = await pairPlaneGraph(ctx, flowId);
 
         // node c deleted, edge e2 deleted
-        const nodeIds = reassembled.nodes
+        const nodeIds = graph.nodes
             .map(n => n.id).sort();
         assert.deepEqual(nodeIds, ['a', 'b']);
-        const edgeIds = reassembled.edges.map(e => e.id);
+        const edgeIds = graph.edges.map(e => e.id);
         assert.deepEqual(edgeIds, ['e1']);
 
-        const a = reassembled.nodes
+        const a = graph.nodes
             .find(n => n.id === 'a')!;
         // node a moved
         assert.equal(a.positionX, 999);
@@ -266,7 +342,7 @@ test(
             ],
         );
 
-        const b = reassembled.nodes
+        const b = graph.nodes
             .find(n => n.id === 'b')!;
         // member m2 added to b
         assert.deepEqual(b.memberIds.sort(), ['m2']);
@@ -275,7 +351,7 @@ test(
 
 test(
     'PUT /flows/:id APPEND-ONLY: removed/re-added/'
-    + 'changed leave new ledger rows, never splice',
+    + 'changed leave new graphDelta events, never splice',
     async () => {
         const { db, ctx } = await setupMemDb();
         const flowId = 'flow-save-ledger';
@@ -286,39 +362,37 @@ test(
             working.nodes, working.edges,
         ));
 
-        const memberRows = await db.flowNodeMembers
-            .getAll();
+        const { memberEvents, attributeEvents } =
+            await pairGraphDeltaEvents(db, flowId);
         // m2 on node a: an 'added' (baseline) then a
         // 'removed' (save #2). The 'added' is never spliced.
-        const aM2 = memberRows.filter(
+        const aM2 = memberEvents.filter(
             row => row.flow_node_id === 'a'
                 && row.member_id === 'm2',
         );
         const aM2Actions = aM2.map(r => r.action).sort();
         assert.deepEqual(
             aM2Actions, ['added', 'removed'],
-            'removed member leaves a removed row beside'
-            + ' the original added row',
+            'removed member leaves a removed event beside'
+            + ' the original added event',
         );
-        // m2 re-added on node b: a NEW 'added' row
-        const bM2 = memberRows.filter(
+        // m2 re-added on node b: a NEW 'added' event
+        const bM2 = memberEvents.filter(
             row => row.flow_node_id === 'b'
                 && row.member_id === 'm2',
         );
         assert.equal(bM2.length, 1);
         assert.equal(bM2[0]!.action, 'added');
 
-        const attrRows = await db.flowNodeAttributes
-            .getAll();
         // x on a: baseline 'added' (editable) then a NEW
-        // 'added' (readonly) — prior row UNMUTATED.
-        const aX = attrRows.filter(
+        // 'added' (readonly) — prior event UNMUTATED.
+        const aX = attributeEvents.filter(
             row => row.flow_node_id === 'a'
                 && row.attribute_id === 'x',
         );
         assert.equal(
             aX.length, 2,
-            'mode change appends a new added row',
+            'mode change appends a new added event',
         );
         const editableRow = aX.find(
             r => r.mode === 'editable',
@@ -328,11 +402,11 @@ test(
         );
         assert.ok(
             editableRow,
-            'the original editable row is untouched',
+            'the original editable event is untouched',
         );
         assert.ok(readonlyRow);
         // y on a removed: an 'added' then a 'removed'
-        const aY = attrRows.filter(
+        const aY = attributeEvents.filter(
             row => row.flow_node_id === 'a'
                 && row.attribute_id === 'y',
         );
@@ -345,21 +419,15 @@ test(
 
 test(
     'PUT /flows/:id IDEMPOTENCY: replaying one delta'
-    + ' body twice lands byte-identical storage',
+    + ' body twice leaves pair graph unchanged',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = 'flow-save-idem';
         await seedKnownBaseline(ctx, flowId);
 
         const working = buildWorkingGraph();
         // Capture ONE PUT body (with one graphDelta) AND its
-        // If-Response-ID echo, and replay both. putFlow rebuilds
-        // the delta (and mints a fresh echo) per call, so capture
-        // the wire request directly. flows/:id is locked-class
-        // (Task 3): the echo header rides the request's canonical
-        // hash, so a replay omitting it would hash differently —
-        // no longer the SAME message, and thus not a byte-
-        // identical resend at all.
+        // If-Response-ID echo, and replay both.
         let captured: Record<string, unknown> | null = null;
         let capturedHeaders:
             readonly (readonly [string, string])[]
@@ -387,56 +455,28 @@ test(
         ));
         assert.ok(captured, 'a PUT body was captured');
 
-        const afterFirst = await relations(db, flowId);
-        const firstGraph = reassembleStoredGraph(
-            afterFirst.nodeRows, afterFirst.edgeRows,
-            afterFirst.memberRows, afterFirst.attrRows,
+        const firstGraph = norm(
+            await pairPlaneGraph(ctx, flowId),
         );
-        const memberCountBefore =
-            afterFirst.memberRows.length;
-        const attrCountBefore = afterFirst.attrRows.length;
-        const nodeCountBefore = afterFirst.nodeRows.length;
-        const edgeCountBefore = afterFirst.edgeRows.length;
 
         // Replay the EXACT captured body (and its echo header).
         await origPut(
             'flows/' + flowId, captured, capturedHeaders,
         );
 
-        const afterReplay = await relations(db, flowId);
-        // No duplicate rows on any relation table.
-        assert.equal(
-            afterReplay.memberRows.length,
-            memberCountBefore,
-            'no duplicate member rows on replay',
-        );
-        assert.equal(
-            afterReplay.attrRows.length,
-            attrCountBefore,
-            'no duplicate attribute rows on replay',
-        );
-        assert.equal(
-            afterReplay.nodeRows.length,
-            nodeCountBefore,
-        );
-        assert.equal(
-            afterReplay.edgeRows.length,
-            edgeCountBefore,
-        );
-        // Derived state identical.
-        const replayGraph = reassembleStoredGraph(
-            afterReplay.nodeRows, afterReplay.edgeRows,
-            afterReplay.memberRows, afterReplay.attrRows,
+        // Derived state identical (byte-identical resend).
+        const replayGraph = norm(
+            await pairPlaneGraph(ctx, flowId),
         );
         assert.deepEqual(replayGraph, firstGraph);
     },
 );
 
 test(
-    'PUT /flows/:id DUAL-WRITE: stored flows.graph blob'
-    + ' equals the reassembled relations',
+    'PUT /flows/:id pair-plane graph equals the'
+    + ' intended working graph after save',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = 'flow-save-dual';
         await seedKnownBaseline(ctx, flowId);
 
@@ -445,34 +485,17 @@ test(
             working.nodes, working.edges,
         ));
 
-        const flow = await ctx.GET<FlowEntity>(
+        const flow = await ctx.GET<FlowWithGraph>(
             'flows/' + flowId,
         );
         const blob = asStoredGraph(
             JSON.parse(flow.graph), 'flow.graph',
         );
-
-        const r = await relations(db, flowId);
-        const reassembled = reassembleStoredGraph(
-            r.nodeRows, r.edgeRows, r.memberRows, r.attrRows,
-        );
-
-        // Both describe the same nodes/edges/members/attrs.
-        const norm = (g: StoredGraph): StoredGraph => ({
-            nodes: [...g.nodes]
-                .sort((p, q) => p.id.localeCompare(q.id))
-                .map(n => ({
-                    ...n,
-                    memberIds: [...n.memberIds].sort(),
-                    attributes: [...n.attributes].sort(
-                        (p, q) => p.attributeId
-                            .localeCompare(q.attributeId),
-                    ),
-                })),
-            edges: [...g.edges]
-                .sort((p, q) => p.id.localeCompare(q.id)),
-        });
-        assert.deepEqual(norm(blob), norm(reassembled));
+        const intended: StoredGraph = {
+            nodes: working.nodes,
+            edges: working.edges,
+        };
+        assert.deepEqual(norm(blob), norm(intended));
     },
 );
 

@@ -15,6 +15,7 @@ import {
 } from '../web-app/app/adapters/flow-stats.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { now } from '../api/mock-data/seed-kit.ts';
+import { deriveFlows } from '../api/derive-flows.ts';
 
 const FLOW_NAME = 'Lead-to-Close';
 const EXPECTED_NODE_COUNT = 7;
@@ -29,7 +30,9 @@ async function seededLeadToClose() {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     await postMockDataLoad(db);
-    const flows = await db.flows.getAll();
+    // Phase Final Task 2: flows row half stripped — resolve
+    // the seed flow from the pair plane.
+    const flows = await deriveFlows(db, '1');
     const flow = flows.find(
         f => f.name === FLOW_NAME,
     );

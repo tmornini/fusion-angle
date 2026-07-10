@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -7,16 +9,14 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 
 // Phase 3 Task 2 (Decision 7 state-in-entity): PUT
-// /projects/:id now takes the FULL document — the entity's
-// fields plus the state trio (state, state_at,
-// state_event_id). The op decomposes it: the old-plane
-// projects row stays byte-identical (no state column), and
-// the trio lands on the states log via ONE states.postEvent
-// call in the same transaction. These cases exercise the
-// MEMBER_ID CAVEAT split (a state-unchanged edit must replay
-// the STORED head event's member_id, never the editing actor)
-// and the wire-parity rule (the pair's stored request carries
-// the trio; the old-plane row does not).
+// /projects/:id takes the FULL document — entity fields plus
+// the state trio. Phase Final Task 2: projects ROW half
+// stripped; the trio still lands on the states log via
+// states.postEvent (until the states-trace strip). Cases
+// exercise the MEMBER_ID CAVEAT (state-unchanged edit replays
+// the STORED head event's member_id) and wire-parity (pair
+// request carries the trio; GET/WRITE_RESPONSE_SPECS form
+// the entity without state).
 
 const BASE = 'http://localhost';
 
@@ -63,8 +63,8 @@ function projectDocument(
     };
 }
 
-test('a document PUT with a new state writes the row and'
-+ ' exactly one event, authored by the actor', async () => {
+test('a document PUT with a new state writes wire entity'
++ ' and exactly one event, authored by the actor', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -75,10 +75,15 @@ test('a document PUT with a new state writes the row and'
         ),
     ));
     assert.equal(res.status, 200);
-    const row = await db.projects.getById('doc-1');
-    assert.equal(row.title, 'Fresh');
-    assert.ok(!('state' in row));
-    const events = await db.states.getAllFor('doc-1');
+    const wire = await res.json() as Record<string, unknown>;
+    assert.equal(wire.title, 'Fresh');
+    assert.ok(!('state' in wire));
+    const getRes = await handleRequest(
+        db, req('GET', '/projects/doc-1', token),
+    );
+    assert.equal(getRes.status, 200);
+    assert.deepEqual(await getRes.json(), wire);
+    const events = await deriveStatesFor(db, '1', 'doc-1');
     assert.equal(events.length, 1);
     assert.equal(events[0]!.state, 'submitted');
     assert.equal(events[0]!.member_id, 'current');
@@ -103,10 +108,13 @@ async () => {
         ),
     ));
     assert.equal(edit.status, 200);
-    const events = await db.states.getAllFor('doc-2');
+    const events = await deriveStatesFor(db, '1', 'doc-2');
     assert.equal(events.length, 1);
-    const row = await db.projects.getById('doc-2');
-    assert.equal(row.title, 'Second');
+    const getRes = await handleRequest(
+        db, req('GET', '/projects/doc-2', token),
+    );
+    const wire = await getRes.json() as { title: string };
+    assert.equal(wire.title, 'Second');
 });
 
 test('a byte-identical resend converges: one event,'
@@ -123,14 +131,14 @@ test('a byte-identical resend converges: one event,'
     await handleRequest(
         db, req('PUT', '/projects/doc-3', token, body),
     );
-    const events = await db.states.getAllFor('doc-3');
+    const events = await deriveStatesFor(db, '1', 'doc-3');
     assert.equal(events.length, 1);
     assert.equal((await db.requests.getAll()).length, 4);
     assert.equal((await db.responses.getAll()).length, 4);
 });
 
 test('the pair body carries state/state_at while the'
-+ ' old-plane row carries neither', async () => {
++ ' GET wire entity carries neither', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await handleRequest(db, req(
@@ -140,10 +148,13 @@ test('the pair body carries state/state_at while the'
             '2026-01-01T00:00:00.000000Z', 'ev-doc-4',
         ),
     ));
-    const row = await db.projects.getById('doc-4') as
+    const getRes = await handleRequest(
+        db, req('GET', '/projects/doc-4', token),
+    );
+    const wire = await getRes.json() as
         Record<string, unknown>;
-    assert.ok(!('state' in row));
-    assert.ok(!('state_at' in row));
+    assert.ok(!('state' in wire));
+    assert.ok(!('state_at' in wire));
     const requests = await db.requests.getAll();
     assert.equal(requests.length, 4);
     const parsed = JSON.parse(requests[3]!.message) as {
@@ -196,10 +207,13 @@ test('a same-state edit by a DIFFERENT member never'
     ));
     assert.equal(edited.status, 200);
 
-    const events = await db.states.getAllFor('doc-5');
+    const events = await deriveStatesFor(db, '1', 'doc-5');
     assert.equal(events.length, 1);
     assert.equal(events[0]!.member_id, 'current');
 
-    const row = await db.projects.getById('doc-5');
-    assert.equal(row.title, 'Second');
+    const getRes = await handleRequest(
+        db, req('GET', '/projects/doc-5', tokenA),
+    );
+    const wire = await getRes.json() as { title: string };
+    assert.equal(wire.title, 'Second');
 });

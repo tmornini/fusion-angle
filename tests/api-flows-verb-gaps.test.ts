@@ -50,15 +50,8 @@ async () => {
     assert.equal(res.status, 405);
 });
 
-test('POST flows/:id/versions/:vid 405s (no post handler'
-+ ' wired)', async () => {
-    const db = await freshDb();
-    const token = await organizationToken();
-    const res = await handleRequest(db, req(
-        'POST', '/flows/f1/versions/v1', token, {},
-    ));
-    assert.equal(res.status, 405);
-});
+// POST flows/:id/versions/:vid verb-gap RETIRED with the
+// versions routes (Phase 15 Task 7) — router 404, not 405.
 
 test('GET projects/:id/flows/:pfid 405s (no get handler'
 + ' wired)', async () => {
@@ -97,7 +90,7 @@ async () => {
 // segment. Additive pin: today (pre-fold) this same request
 // still 204s.
 test('POST flows/:id/redo 404s (route retired; redo now'
-+ ' rides versions-POST + document-PUT)', async () => {
++ ' rides client document-PUT only)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(

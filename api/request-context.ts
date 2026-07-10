@@ -1,4 +1,4 @@
-import type { DbAdapter, GuardedDbAdapter } from './db.ts';
+import type { GuardedDbAdapter } from './db.ts';
 import { nowUtc, type Id } from './types.ts';
 import type { Principal } from './access-token.ts';
 import {
@@ -14,7 +14,7 @@ import {
 // bearer token; authentication reads the header from the raw
 // Request and the secret stays there. Route handlers keep
 // their (adapter, params, body) contract: the route table is
-// the chosen boundary where the vessel hands the fenced
+// the chosen boundary where the vessel hands the base
 // adapter to the handler.
 
 // The request id travels the whole hop chain: the facade
@@ -27,9 +27,10 @@ export interface IncomingContext {
     readonly requestId: string;
     readonly method: string;
     readonly pathname: string;
-    // The unfenced tier, carried with its full honest face so
-    // the fence step can consume the guarded write capability
-    // without re-acquiring it by assertion.
+    // The unfenced tier. Phase Final Task 5 retired the
+    // org-scoped decorator shell; handlers receive this base
+    // adapter. Pair-plane tenancy rides uri_prefix, not a
+    // store fence.
     readonly base: GuardedDbAdapter;
     // The ARRIVAL stamp: minted here, gate entry, as early as
     // the request is observable — the message plane's requests
@@ -45,8 +46,9 @@ export interface AuthenticatedContext extends IncomingContext {
 }
 
 // Completed by the fence step (request-auth.ts) — the one
-// place the org, the live memberships, the roles, and the
-// org-scoped adapter are resolved.
+// place the organization, the live memberships, and the
+// roles are resolved. No scoped adapter: surviving stores
+// are global (clients + message plane).
 export interface RequestContext extends AuthenticatedContext {
     readonly organization: Id;
     // The caller's live membership orgs, derived from the
@@ -54,7 +56,6 @@ export interface RequestContext extends AuthenticatedContext {
     // and the organizations/:id read fence both consume.
     readonly memberOrganizations: ReadonlySet<Id>;
     readonly roles: readonly string[];
-    readonly scoped: DbAdapter;
 }
 
 export function incomingContext(

@@ -6,6 +6,11 @@ import {
     postBootstrap,
 } from '../api/mock-data.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
+import { deriveDefaultOrganization } from
+    '../api/derive-default-organization.ts';
+import { deriveMembershipsForIdentity } from
+    '../api/derive-memberships.ts';
+import { buildMembers } from '../api/mock-data/members.ts';
 
 async function mockSeeded() {
     const db = new MemoryDbAdapter();
@@ -14,22 +19,22 @@ async function mockSeeded() {
     return db;
 }
 
+// Phase Final Task 2: identity + membership + default-org
+// ROW halves stripped — pair-plane oracles only.
+
 test('every membership-bearing person has a default-org event',
 async () => {
     const db = await mockSeeded();
-    const persons = (await db.identities.getAll())
-        .filter(i => i.kind === 'person')
-        .map(i => i.id);
-    const memberships = await db.memberships.getAll();
-    const haveDefault = new Set(
-        (await db.identityDefaultOrganizations.getAll())
-            .map(d => d.identity_id));
+    const persons = buildMembers().map(m => m.id);
     for (const id of persons) {
-        if (!memberships.some(m => m.identity_id === id)) {
-            continue;
-        }
+        const memberships =
+            await deriveMembershipsForIdentity(db, id);
+        if (memberships.length === 0) continue;
+        const defaults = await deriveDefaultOrganization(
+            db, id,
+        );
         assert.ok(
-            haveDefault.has(id),
+            defaults.length > 0,
             'person ' + id + ' lacks a default-org event');
     }
 });
@@ -46,10 +51,11 @@ async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
-    const defaults = await db.identityDefaultOrganizations.getAll();
+    const defaults = await deriveDefaultOrganization(
+        db, 'current',
+    );
     assert.ok(
-        defaults.some(
-            d => d.identity_id === 'current'
-                && d.organization_id === '1'),
+        defaults.some(d => d.organization_id === '1'),
         "current has no default-org event for org 1");
+    // Phase Final Stage B: identity spine tables retired.
 });

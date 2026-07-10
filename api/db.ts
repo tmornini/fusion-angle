@@ -1,42 +1,7 @@
 import type {
-    Id,
-    MemberEntity,
-    HumanMemberEntity,
-    AIMemberEntity,
-    IdentityEntity,
-    IdentityPiiEntity,
-    IdentityCredentialEntity,
-    IdentityTokenRevocationEntity,
-    IdentityDefaultOrganizationEntity,
-    RoleGrantEntity,
     ClientEntity,
-    IdentityProviderEntity,
-    IdeaEntity,
-    ProjectEntity,
-    FlowEntity,
-    FlowVersionEntity,
-    FlowNodeEntity,
-    FlowEdgeEntity,
-    FlowNodeMemberEntity,
-    FlowNodeAttributeEntity,
-    OrganizationEntity,
-    MembershipEntity,
-    InvitationEntity,
-    IdeaSubmissionEntity,
-    ProjectFlowEntity,
-    WorkOrderEntity,
-    FlowWorkOrderEntity,
-    StateFieldValueEntity,
-    RecordEntity,
-    RecordAttributeEntity,
-    FlowRecordEntity,
-    ObjectiveEntity,
-    ObjectiveRevisionEntity,
-    ProjectObjectiveBaselineScoreEntity,
-    ProjectObjectiveActualScoreEntity,
     RequestEntity,
     ResponseEntity,
-    StateEntity,
 } from './types.ts';
 import type { NotificationPost } from './notifications.ts';
 
@@ -117,11 +82,9 @@ export interface EntityStore<
 > {
     getAll(): Promise<T[]>;
     // The keyed sub-collection read: the rows whose indexed
-    // `column` equals `key`, tombstones already removed. The
-    // concrete stores serve it over `Tx.getWhere`; the fences
-    // serve it by matching through the inner index and then
-    // filtering to their slice. Every store face honors the
-    // same read, so no caller re-acquires it by assertion.
+    // `column` equals `key`. Concrete stores serve it over
+    // `Tx.getWhere`. Every store face honors the same read,
+    // so no caller re-acquires it by assertion.
     getAllWhere(
         column: string,
         key: string,
@@ -138,50 +101,6 @@ export interface EntityStore<
     delete(id: string): Promise<void>;
 }
 
-// The write-side fence capability: peek + decide + write in
-// ONE transaction, so no concurrent writer can slip between
-// the check and the row op. The peek hands each guard the
-// RAW row (or null when absent) — tombstone-blind, because a
-// fence must decide on the row that EXISTS, not the row
-// lifecycle presents. putGuarded's guard throws to reject
-// (the tx aborts, nothing written); deleteGuarded's guard
-// returns whether to splice — false is a silent no-op, so a
-// replayed or foreign DELETE is indistinguishable from
-// deleting an absent row (Commandment VII). putManyGuarded
-// applies both guards inside the batch's one transaction.
-export interface GuardedEntityWriter<
-    T extends { id: string },
-> {
-    putGuarded(
-        id: string,
-        fields: Omit<T, 'id'>,
-        guard: (
-            existing: T | null,
-            id: string,
-        ) => void,
-    ): Promise<T>;
-    putManyGuarded(
-        entries: readonly EntityPut<T>[],
-        deleteIds: readonly string[],
-        putGuard: (
-            existing: T | null,
-            id: string,
-        ) => void,
-        deleteGuard: (existing: T | null) => boolean,
-    ): Promise<void>;
-    deleteGuarded(
-        id: string,
-        guard: (existing: T | null) => boolean,
-    ): Promise<void>;
-}
-
-// The full face of an unfenced leaf store: the plain
-// contract plus the guarded write capability the org fence
-// consumes. Kept off EntityStore by Interface Segregation —
-// the fence needs it inward but never re-exposes it.
-export type GuardedEntityStore<T extends { id: string }> =
-    EntityStore<T> & GuardedEntityWriter<T>;
-
 // The storage-edge validator. Stores accept one at
 // construction and re-verify every `put` body through
 // it — the same telling-shape function used by the
@@ -193,55 +112,6 @@ export type EntityValidator<
 > = (
     body: Record<string, unknown>,
 ) => Omit<T, 'id'>;
-
-export interface StateStore {
-    getAll(): Promise<StateEntity[]>;
-    getById(id: Id): Promise<StateEntity>;
-    put(
-        id: Id,
-        fields: Omit<StateEntity, 'id'>,
-    ): Promise<StateEntity>;
-    postEvent(
-        id: Id,
-        entityId: Id,
-        state: string,
-        memberId: Id,
-        at: string,
-    ): Promise<void>;
-    getCurrentFor(
-        entityId: Id,
-    ): Promise<StateEntity | null>;
-    getAllFor(entityId: Id): Promise<StateEntity[]>;
-    getDeletedIds(): Promise<Set<Id>>;
-    isDeleted(id: Id): Promise<boolean>;
-    // The *In twins read the log within an already-open tx,
-    // so a joined reader scans states in the same
-    // transaction that reads the entity row.
-    getCurrentForIn(
-        tx: Tx,
-        entityId: Id,
-    ): Promise<StateEntity | null>;
-    getAllForIn(tx: Tx, entityId: Id): Promise<StateEntity[]>;
-    getDeletedIdsIn(tx: Tx): Promise<Set<Id>>;
-    isDeletedIn(tx: Tx, id: Id): Promise<boolean>;
-    // FENCE MECHANICS (Phase 14 Task 6 fix wave): does a row
-    // with `id` exist AT ALL, ignoring any organization fence a
-    // wrapper applies on top — RAW presence, the same
-    // unfenced-escape shape as rawReadRow/rawOrganizationOwned
-    // Probes (store-parent-scoped.ts), scoped to this ONE store.
-    // A wrapper's getById cannot answer this alone: "no such
-    // row" and "a row owned by a different organization" both
-    // throw EntityNotFoundError identically, yet
-    // state_field_values' own parent-event visibility rule
-    // treats them oppositely (the former is a visible orphan,
-    // the latter is hidden — db-organization-scoped.ts's
-    // stateFieldValues resolver). Retires alongside the
-    // row-plane state_field_values plane at Phase Final.
-    // Phase 14 Task 7 adjudicated a pair-plane re-point of
-    // this same probe infeasible, for the same reason — see
-    // api/api.ts's Region B NAMED DEVIATION comment.
-    rawHasRow(id: Id): Promise<boolean>;
-}
 
 export type TxMode = 'readonly' | 'readwrite';
 
@@ -326,98 +196,18 @@ export const backendRunner = (
 export const ambientRunner = (tx: Tx): TxRunner =>
     (_tables, _mode, fn) => fn(tx);
 
-// The 37 stores an adapter exposes, factored out of
+// The 3 stores an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
 // place (`#buildStores`) and a transaction can rebuild it
-// bound to an open tx (A9).
+// bound to an open tx (A9). Phase Final Stage B: states
+// table retired; clients rides HistoryEntityStore.
 export interface DbStores {
-    members:
-        EntityStore<MemberEntity>;
-    humanMembers:
-        EntityStore<HumanMemberEntity>;
-    aiMembers:
-        EntityStore<AIMemberEntity>;
-    identities:
-        EntityStore<IdentityEntity>;
-    identityPii:
-        EntityStore<IdentityPiiEntity>;
-    identityCredentials:
-        EntityStore<IdentityCredentialEntity>;
-    identityTokenRevocations:
-        EntityStore<IdentityTokenRevocationEntity>;
-    identityDefaultOrganizations:
-        EntityStore<IdentityDefaultOrganizationEntity>;
-    roleGrants:
-        EntityStore<RoleGrantEntity>;
     clients:
         EntityStore<ClientEntity>;
-    identityProviders:
-        EntityStore<IdentityProviderEntity>;
-    ideas:
-        EntityStore<IdeaEntity>;
-    projects:
-        EntityStore<ProjectEntity>;
-    flows:
-        EntityStore<FlowEntity>;
-    flowVersions:
-        EntityStore<FlowVersionEntity>;
-    flowNodes:
-        EntityStore<FlowNodeEntity>;
-    flowEdges:
-        EntityStore<FlowEdgeEntity>;
-    flowNodeMembers:
-        EntityStore<FlowNodeMemberEntity>;
-    flowNodeAttributes:
-        EntityStore<FlowNodeAttributeEntity>;
-    projectFlows:
-        EntityStore<
-            ProjectFlowEntity
-        >;
-    workOrders:
-        EntityStore<
-            WorkOrderEntity
-        >;
-    flowWorkOrders:
-        EntityStore<
-            FlowWorkOrderEntity
-        >;
-    stateFieldValues:
-        EntityStore<
-            StateFieldValueEntity
-        >;
-    records:
-        EntityStore<RecordEntity>;
-    recordAttributes:
-        EntityStore<RecordAttributeEntity>;
-    flowRecords:
-        EntityStore<FlowRecordEntity>;
-    organizations:
-        EntityStore<OrganizationEntity>;
-    memberships:
-        EntityStore<MembershipEntity>;
-    invitations:
-        EntityStore<InvitationEntity>;
-    ideaSubmissions:
-        EntityStore<
-            IdeaSubmissionEntity
-        >;
-    objectives:
-        EntityStore<ObjectiveEntity>;
-    objectiveRevisions:
-        EntityStore<ObjectiveRevisionEntity>;
-    projectObjectiveBaselineScores:
-        EntityStore<
-            ProjectObjectiveBaselineScoreEntity
-        >;
-    projectObjectiveActualScores:
-        EntityStore<
-            ProjectObjectiveActualScoreEntity
-        >;
     requests:
         EntityStore<RequestEntity>;
     responses:
         EntityStore<ResponseEntity>;
-    states: StateStore;
 }
 
 // Schema/connection lifecycle plus the snapshot plane — the
@@ -439,8 +229,8 @@ export interface DbLifecycle {
     // so cross-tab (and future cross-process) subscribers are
     // informed of state changes — never polled. Carried on the
     // COMMON ancestor of DbAdapter and GuardedDbAdapter so
-    // both the fenced view (organizationScopedAdapter) and the
-    // open-tx view (#viewForTx) type-check.
+    // both the open-tx view (#viewForTx) and plain adapters
+    // type-check.
     postNotification: NotificationPost;
 }
 
@@ -456,88 +246,42 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     ): Promise<R>;
 }
 
-// The unfenced tier's stores: every entity store carries the
-// guarded write capability the concrete leaf stores
-// implement; the states log keeps its own contract.
-export type GuardedDbStores = {
-    [K in keyof DbStores]: DbStores[K] extends
-        EntityStore<infer T>
-        ? GuardedEntityStore<T>
-        : DbStores[K];
-};
-
-// The unfenced tier's honest contract. The org fence consumes
-// THIS face, so the guarded write capability is carried by
-// the type from construction to use — never re-acquired by
-// assertion. The fenced face it returns is a plain DbAdapter:
-// the fence spends the guard; it does not re-expose it.
+// The unfenced tier: same stores as DbAdapter, plus a raw
+// primary-key probe. Phase Final Task 5 retired the guarded
+// write capability (putGuarded family) with the store
+// decorator shell — surviving tables never soft-delete.
 export interface GuardedDbAdapter
-    extends DbLifecycle, GuardedDbStores
+    extends DbLifecycle, DbStores
 {
     transaction<R>(
         tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
-    // Raw single-row read bypassing the EntityStore deleted
-    // filter — the shared primitive of the cross-tenant
-    // OWNERSHIP FENCE probes: graphEntityProbe (flow_nodes /
-    // flow_edges), rawOrganizationOwnedProbes (the org-owned
-    // stores), and the field-values parent-event resolution.
-    // A deleted entity must still resolve to its TRUE owner,
-    // never surface as an ownerless orphan.
+    // Raw single-row read by primary key — no store-layer
+    // semantics. Surviving tables never soft-delete, so this
+    // is byte-identical to EntityStore.getById for present
+    // rows and returns null for absence (getById throws).
+    // Kept for the client-lookup path and residual probes.
     rawReadRow<T extends { id: string }>(
         table: string,
         id: string,
     ): Promise<T | null>;
 }
 
-// Phase 13 Task 9 shrank this list by two (identity_tokens,
-// authorization_codes retired). IndexedDB's own open is
+// Phase Final Stage B shrank this list (ideas +
+// idea_submissions first; remaining doomed families follow
+// in later Task 4 commits). IndexedDB's own open is
 // UNVERSIONED (backend-indexeddb.ts's #openConnection calls
 // indexedDB.open(DB_NAME) with no version argument), so
 // onupgradeneeded — the only place object stores are created —
 // never re-fires for an origin that already has a database: an
-// EXISTING origin keeps the two dropped stores as harmless,
-// unread orphans. deleteSchema (a full database delete) is the
-// only cleanup; nothing else needs to reconcile them.
+// EXISTING origin keeps dropped stores as harmless, unread
+// orphans. deleteSchema (a full database delete) is the only
+// cleanup; nothing else needs to reconcile them.
 export const TABLE_NAMES = [
-    'members',
-    'human_members',
-    'ai_members',
-    'identities',
-    'identity_pii',
-    'identity_credentials',
-    'identity_token_revocations',
-    'identity_default_organizations',
-    'role_grants',
     'clients',
-    'identity_providers',
-    'ideas',
-    'projects',
-    'flows',
-    'flow_versions',
-    'flow_nodes',
-    'flow_edges',
-    'flow_node_members',
-    'flow_node_attributes',
-    'project_flows',
-    'work_orders',
-    'flow_work_orders',
-    'state_field_values',
-    'records',
-    'record_attributes',
-    'flow_records',
-    'organizations',
-    'memberships',
-    'invitations',
-    'idea_submissions',
-    'objectives',
-    'objective_revisions',
-    'project_objective_baseline_scores',
-    'project_objective_actual_scores',
     'requests',
     'responses',
-    'states',
 ];
 
 // The snapshot export's ONE reserved top-level key, stamped
@@ -555,9 +299,9 @@ export const TABLE_NAMES = [
 // mismatched marker rejects the import outright — never a
 // default, never a best-effort import. Bump it whenever
 // TABLE_NAMES (or a family's derivation shape) changes in a
-// way that would strand an older export; Phase 13's TABLE_NAMES
-// shrink (identity_tokens + authorization_codes retire) is the
-// first such bump.
+// way that would strand an older export. Phase 13's TABLE_NAMES
+// shrink (identity_tokens + authorization_codes) bumped 1→2;
+// Phase Final Stage B's doomed-table deletions bump 2→3.
 //
 // THE ASYMMETRY: this closes only "a new build imports an old
 // export." A new build's OWN marked export is silently accepted
@@ -566,7 +310,15 @@ export const TABLE_NAMES = [
 // here (an old build's validator loop never looks at this key
 // at all). Intended and dev-tier-acceptable: the old build has
 // no way to know a marker scheme was ever invented.
-export const SNAPSHOT_SCHEMA_VERSION = 2;
+//
+// MID-SEQUENCE WINDOW (Phase Final Task 4): several commits
+// stamp v3 while TABLE_NAMES shrinks further. parseAndValidate
+// ignores unknown keys, so a mid-sequence v3 export can import
+// into a later v3 build by silently dropping later-deleted
+// tables' keys. Intra-phase exports are NOT a supported
+// contract — do not export/import across deletion commits
+// except in tests that control both ends.
+export const SNAPSHOT_SCHEMA_VERSION = 3;
 export const SNAPSHOT_SCHEMA_VERSION_KEY = '__schema_version__';
 
 // A secondary index is either a plain column name (the
@@ -606,37 +358,10 @@ export function uniqueColumns(
 // collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
-    identity_pii: ['email'],
-    identity_credentials: ['identity_id'],
-    identity_token_revocations: ['identity_id'],
-    identity_default_organizations: ['identity_id'],
-    role_grants: ['organization_id', 'identity_id'],
-    ideas: ['organization_id'],
-    idea_submissions: ['idea_id'],
-    projects: ['organization_id'],
-    project_flows: ['project_id'],
-    project_objective_baseline_scores: ['project_id'],
-    project_objective_actual_scores: ['project_id'],
-    flows: ['organization_id'],
-    flow_versions: ['flow_id'],
-    flow_nodes: ['flow_id'],
-    flow_edges: ['flow_id'],
-    flow_node_members: ['flow_node_id'],
-    flow_node_attributes: ['flow_node_id', 'attribute_id'],
-    flow_work_orders: ['flow_id'],
-    flow_records: ['flow_id'],
-    work_orders: ['organization_id'],
-    state_field_values: ['attribute_id', 'state_event_id'],
-    records: ['organization_id'],
-    record_attributes: ['organization_id'],
-    objectives: ['organization_id'],
-    objective_revisions: ['objective_id'],
-    memberships: ['organization_id', 'identity_id'],
     requests: ['uri_prefix', 'uri_id', 'message_hash'],
     responses: [
         'uri_prefix',
         'uri_id',
         { column: 'follows', unique: true },
     ],
-    states: ['entity_id'],
 };

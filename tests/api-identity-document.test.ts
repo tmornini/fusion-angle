@@ -119,8 +119,9 @@ test('validateIdentityDocumentBody rejects an unknown kind,'
 
 // -- 2. the op (below-gate, MemoryDbAdapter) -------------------
 
-test('postIdentityDocumentOp writes exactly the identities row'
-+ ' and the pair', async () => {
+test('postIdentityDocumentOp writes exactly the pair'
++ ' (Phase Final Task 2: identities ROW half stripped)',
+async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     const body = identityFields();
@@ -137,11 +138,11 @@ test('postIdentityDocumentOp writes exactly the identities row'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postIdentityDocumentOp(
+    const written = await postIdentityDocumentOp(
         db, 'id-doc-op-1', body, 'current', pair,
     );
-    const row = await db.identities.getById('id-doc-op-1');
-    assert.deepEqual(row, { id: 'id-doc-op-1', ...body });
+    assert.deepEqual(written, body);
+    // Phase Final Stage B: identity spine tables retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });

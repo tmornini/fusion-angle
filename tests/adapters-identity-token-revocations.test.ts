@@ -13,6 +13,8 @@ import {
     postIdentityLogoutEverywhere,
 } from
     '../web-app/app/adapters/identity-token-revocations.ts';
+import { deriveTokenRevocationsFor } from
+    '../api/derive-identity-spine.ts';
 
 test('validates a revocation body', () => {
     assert.deepEqual(
@@ -47,6 +49,9 @@ async function setup() {
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
+// Phase Final Task 2: identity_token_revocations ROW half
+// stripped — append count lives on the pair plane.
+
 test('logout-everywhere appends, never splices',
 async () => {
     // Revoke a subject OTHER than the writer's ('current',
@@ -58,9 +63,11 @@ async () => {
     const { db, ctx } = await setup();
     await postIdentityLogoutEverywhere(ctx, 'target');
     await postIdentityLogoutEverywhere(ctx, 'target');
-    const rows =
-        await db.identityTokenRevocations.getAll();
+    const rows = await deriveTokenRevocationsFor(
+        db, 'target',
+    );
     assert.equal(rows.length, 2);            // retained
     assert.ok(rows.every(
         r => r.identity_id === 'target'));
+    // Phase Final Stage B: identity spine tables retired.
 });

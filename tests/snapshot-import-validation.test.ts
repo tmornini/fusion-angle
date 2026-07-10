@@ -9,9 +9,6 @@ import {
     SNAPSHOT_SCHEMA_VERSION_KEY,
 } from '../api/db.ts';
 import {
-    jsonObjectField,
-} from '../api/types.ts';
-import {
     SnapshotVersionMismatchError,
 } from '../api/snapshot-validator.ts';
 
@@ -197,6 +194,48 @@ test(
     },
 );
 
+// Phase Final Stage B Task 4's version bump (2→3): a genuine
+// PRE-FINAL export — version 2 with REAL pre-Final table
+// content (ideas + idea_submissions rows, not a bare version
+// mismatch) — is rejected by SnapshotVersionMismatchError
+// before any table key is read. Intra-phase mid-sequence v3
+// exports are NOT a supported contract (api/db.ts).
+test(
+    'rejects a genuine pre-Final (v2) export with'
+    + ' SnapshotVersionMismatchError',
+    async () => {
+        installShim();
+        const adapter = new LocalStorageDbAdapter();
+        const json = JSON.stringify({
+            [SNAPSHOT_SCHEMA_VERSION_KEY]: 2,
+            members: [],
+            ideas: [{
+                id: 'i1',
+                organization_id: '1',
+                title: 'pre-Final idea',
+                position: 1,
+                problem_statement: 'p',
+                target_users: 't',
+                proposed_solution: 's',
+                expected_outcome: 'o',
+                success_metrics: 'm',
+            }],
+            idea_submissions: [{
+                id: 'is1',
+                idea_id: 'i1',
+                member_id: 'system',
+                at: '2020-01-01T00:00:00.000000Z',
+            }],
+        });
+        await assert.rejects(
+            () => adapter.putSnapshot(json),
+            (err: unknown) =>
+                err instanceof SnapshotVersionMismatchError
+                && err.found === 2,
+        );
+    },
+);
+
 test(
     'accepts a snapshot carrying the current schema version',
     async () => {
@@ -204,11 +243,12 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            members: [],
+            clients: [],
         }));
         await adapter.putSnapshot(json);
-        const members = await adapter.members.getAll();
-        assert.deepStrictEqual(members, []);
+        const clients =
+            await adapter.clients.getAll();
+        assert.deepStrictEqual(clients, []);
     },
 );
 
@@ -219,11 +259,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            members: { not: 'an array' },
+            clients: { not: 'an array' },
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /table "members" is not an array/,
+            /table "clients" is not an array/,
         );
     },
 );
@@ -235,11 +275,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            members: ['not an object'],
+            clients: ['not an object'],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /row 0 in table "members" is not an object/,
+            /row 0 in table "clients" is not an object/,
         );
     },
 );
@@ -251,11 +291,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            members: [null],
+            clients: [null],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /row 0 in table "members" is not an object/,
+            /row 0 in table "clients" is not an object/,
         );
     },
 );
@@ -267,11 +307,11 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            members: [['not', 'an', 'object']],
+            clients: [['not', 'an', 'object']],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /row 0 in table "members" is not an object/,
+            /row 0 in table "clients" is not an object/,
         );
     },
 );
@@ -283,59 +323,71 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            members: [
+            clients: [
                 {
                     id: 'u1',
-                    type: 'human',
+                    grant_types: 'authorization_code',
+                    redirect_uris:
+                        'https://example.com/cb',
+                    jwks: '{}',
+                    aud: 'aud',
+                    status: 'active',
                     rogue_field: 'invalid',
                 },
             ],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /snapshot\.members\[0\]/,
+            /snapshot\.clients\[0\]/,
         );
     },
 );
 
 test(
-    'rejects objective row with unknown key',
+    'rejects client row with unknown key',
     async () => {
         installShim();
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            objectives: [{
+            clients: [{
                 id: 'o1',
-                organization_id: '1',
-                position: 1,
+                grant_types: 'authorization_code',
+                redirect_uris: 'https://example.com/cb',
+                jwks: '{}',
+                aud: 'aud',
+                status: 'active',
                 rogue_field: 'invalid',
             }],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /snapshot\.objectives\[0\]/,
+            /snapshot\.clients\[0\]/,
         );
     },
 );
 
 test(
-    'accepts valid objective row through the'
+    'accepts valid client row through the'
     + ' snapshot-validation gate',
     async () => {
         const map = installShim();
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            objectives: [{
-                id: 'o1', organization_id: '1',
-                position: 1,
+            clients: [{
+                id: 'o1',
+                grant_types: 'authorization_code',
+                redirect_uris: 'https://example.com/cb',
+                jwks: '{}',
+                aud: 'aud',
+                status: 'active',
             }],
         }));
         await adapter.putSnapshot(json);
         assert.ok(
-            map.get(KEY_PREFIX + 'objectives'),
-            'objective row should persist',
+            map.get(KEY_PREFIX + 'clients'),
+            'client row should persist',
         );
     },
 );
@@ -347,21 +399,22 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            human_members: [
+            clients: [
                 {
                     id: 'u1',
-                    title: 'product_manager',
-                    strengths: '[]',
-                    team_dimensions: '{}',
-                    department: 'Product',
+                    grant_types: 'authorization_code',
+                    redirect_uris: 'https://example.com/cb',
+                    jwks: '{}',
+                    aud: 'aud',
+                    status: 'active',
                 },
             ],
         }));
         await adapter.putSnapshot(json);
         const stored = map.get(
-            KEY_PREFIX + 'human_members',
+            KEY_PREFIX + 'clients',
         );
-        assert.ok(stored, 'humans should persist');
+        assert.ok(stored, 'clients should persist');
     },
 );
 
@@ -417,17 +470,22 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.members.put('u1', {
-            type: 'human',
+        await adapter.clients.put('u1', {
+            grant_types: 'authorization_code',
+            redirect_uris: 'https://example.com/cb',
+            jwks: '{}',
+            aud: 'aud',
+            status: 'active',
         });
         await adapter.postSchemaCreation();
-        const members = await adapter.members.getAll();
+        const clients =
+            await adapter.clients.getAll();
         assert.equal(
-            members.length, 1,
+            clients.length, 1,
             'second postSchemaCreation preserves data',
         );
         assert.ok(
-            map.get(KEY_PREFIX + 'members'),
+            map.get(KEY_PREFIX + 'clients'),
         );
     },
 );
@@ -439,21 +497,19 @@ test(
         const adapter =
             new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.flowVersions.put('fv1', {
-            flow_id: 'flow-aaaa',
-            name: 'Flow',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: 60,
-            graph: jsonObjectField({
-                nodes: [], edges: [],
-            }),
-            at: '2026-01-01T00:00:00.000000Z',
+        // Phase Final Stage B: roster retired — pin export
+        // surface on clients.
+        await adapter.clients.put('m1', {
+            grant_types: 'authorization_code',
+            redirect_uris: 'https://example.com/cb',
+            jwks: '{}',
+            aud: 'aud',
+            status: 'active',
         });
         const json =
             await adapter.getSnapshot();
         const parsed = JSON.parse(json);
+        assert.equal(parsed.clients.length, 1);
         for (const table of TABLE_NAMES) {
             assert.ok(
                 Array.isArray(parsed[table]),

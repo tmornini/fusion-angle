@@ -64,20 +64,21 @@ test(
     async () => {
         const db = await freshDb();
         // The states/:id PUT ownership fence resolves the named
-        // entity's owner via rawOrganizationOwnedProbes, which
-        // reads adapter.rawReadRow('ideas', ...) first. Fault
+        // entity's owner via resolveOwningOrganization (pair
+        // plane), which reads responses by uri_id first. Fault
         // THAT read alone, keyed to the entity id this PUT
         // names.
-        const original = db.rawReadRow.bind(db);
-        (db as unknown as {
-            rawReadRow: (
-                table: string, id: string,
+        const original =
+            db.responses.getAllWhere.bind(db.responses);
+        (db.responses as unknown as {
+            getAllWhere: (
+                column: string, key: string,
             ) => ReturnType<typeof original>;
-        }).rawReadRow = async (table, id) => {
-            if (table === 'ideas' && id === 'fault-entity') {
+        }).getAllWhere = async (column, key) => {
+            if (column === 'uri_id' && key === 'fault-entity') {
                 throw new Error('secret fence fault detail');
             }
-            return original(table, id);
+            return original(column, key);
         };
         const response = await handleRequest(
             db,

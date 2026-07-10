@@ -3,74 +3,66 @@ import { strict as assert } from 'node:assert';
 import { TABLE_NAMES } from '../api/db.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 
-test('TABLE_NAMES includes the objective tables', () => {
-    const expected = [
-        'objectives',
-        'objective_revisions',
-        'project_objective_baseline_scores',
-        'project_objective_actual_scores',
-    ];
-    for (const name of expected) {
+// Phase Final Stage B Task 4: TABLE_NAMES shrinks as doomed
+// tables delete. Pin permanent survivors and tables this
+// commit just dropped.
+test('TABLE_NAMES keeps the permanent survivors', () => {
+    for (const name of [
+        'requests', 'responses', 'clients',
+    ] as const) {
         assert.ok(
             TABLE_NAMES.includes(name),
-            `TABLE_NAMES missing ${name}`,
+            `TABLE_NAMES missing survivor ${name}`,
         );
     }
 });
 
-test('MemoryDbAdapter exposes objective stores',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await db.postSchemaCreation();
-        await db.objectives.put('o1', {
-            organization_id: '1', position: 0,
-        });
-        const all = await db.objectives.getAll();
-        assert.equal(all.length, 1);
-        assert.equal(all[0]!.id, 'o1');
-
-        await db.objectiveRevisions.put('o1:t1', {
-            objective_id: 'o1',
-            name: 'Revenue',
-            description: 'd',
-            member_id: 'w1',
-            at: '2026-05-14T00:00:00.000000Z',
-        });
-        const revs =
-            await db.objectiveRevisions.getAll();
-        assert.equal(revs.length, 1);
-
-        await db.projectObjectiveBaselineScores.put(
-            'p1:o1:t1', {
-                project_id: 'p1',
-                objective_id: 'o1',
-                score: 42,
-                member_id: 'w1',
-                at: '2026-05-14T00:00:00.000000Z',
-            },
-        );
-        const bs = await
-            db.projectObjectiveBaselineScores.getAll();
-        assert.equal(bs.length, 1);
-
-        await db.projectObjectiveActualScores.put(
-            'p1:o1:t2', {
-                project_id: 'p1',
-                objective_id: 'o1',
-                score: -10,
-                member_id: 'w1',
-                at: '2026-05-15T00:00:00.000000Z',
-            },
-        );
-        const ac = await
-            db.projectObjectiveActualScores.getAll();
-        assert.equal(ac.length, 1);
-    });
-
-test('TABLE_NAMES includes the message tables', () => {
-    assert.ok(TABLE_NAMES.includes('requests'));
-    assert.ok(TABLE_NAMES.includes('responses'));
-});
+test(
+    'TABLE_NAMES drops ideas..objectives and roster',
+    () => {
+        for (const name of [
+            'ideas',
+            'idea_submissions',
+            'projects',
+            'project_flows',
+            'project_objective_baseline_scores',
+            'project_objective_actual_scores',
+            'flows',
+            'flow_versions',
+            'flow_nodes',
+            'flow_edges',
+            'flow_node_members',
+            'flow_node_attributes',
+            'work_orders',
+            'flow_work_orders',
+            'state_field_values',
+            'records',
+            'record_attributes',
+            'flow_records',
+            'objectives',
+            'objective_revisions',
+            'members',
+            'human_members',
+            'ai_members',
+            'memberships',
+            'invitations',
+            'identities',
+            'identity_pii',
+            'identity_credentials',
+            'identity_token_revocations',
+            'identity_default_organizations',
+            'role_grants',
+            'identity_providers',
+            'organizations',
+            'states',
+        ] as const) {
+            assert.ok(
+                !TABLE_NAMES.includes(name),
+                `${name} still in TABLE_NAMES`,
+            );
+        }
+    },
+);
 
 test('MemoryDbAdapter exposes message stores', async () => {
     const db = new MemoryDbAdapter();

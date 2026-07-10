@@ -1,4 +1,9 @@
 import { test } from 'node:test';
+import {
+    invitationLifecycleStatesFor,
+} from '../api/derive-states.ts';
+import { currentInvitationState } from
+    '../api/invitations-domain.ts';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -14,6 +19,48 @@ import {
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { deriveInvitations } from
+    '../api/derive-invitations.ts';
+import { deriveOrganizations } from
+    '../api/derive-organizations.ts';
+import { canonicalUriPrefix } from '../api/message-pair.ts';
+import { deriveDocumentsAt } from
+    '../api/derive-documents.ts';
+import {
+    validateMembershipEntity,
+} from '../api/validators.ts';
+import { withoutId } from '../api/document-family.ts';
+
+// Phase Final Task 2: memberships on the pair plane.
+async function allMemberships(db: MemoryDbAdapter) {
+    const organizations = await deriveOrganizations(db);
+    const rows: Array<{
+        id: string;
+        organization_id: string;
+        identity_id: string;
+        at: string;
+    }> = [];
+    for (const organization of organizations) {
+        const prefix = canonicalUriPrefix(
+            organization.id, '/memberships/',
+        );
+        const [requests, responses] = await Promise.all([
+            db.requests.getAllWhere('uri_prefix', prefix),
+            db.responses.getAllWhere('uri_prefix', prefix),
+        ]);
+        for (const document of deriveDocumentsAt(
+            requests, responses, prefix,
+        ).values()) {
+            rows.push({
+                ...validateMembershipEntity(
+                    withoutId(document.body),
+                ),
+                id: document.uriId,
+            });
+        }
+    }
+    return rows;
+}
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -186,7 +233,6 @@ async function person(
     await postMemberDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
     );
-    await db.identities.put(id, { kind: 'person' });
     await seedIdentityPii(db, id, {
         name, email, phone: '', bio: '',
     });
@@ -207,7 +253,7 @@ async function grantSarahToWayne(
             grantAt: AT,
         }));
     assert.equal(res.status, 200);
-    return (await db.invitations.getAll())[0]!.id;
+    return (await deriveInvitations(db))[0]!.id;
 }
 
 test('a role-less invitee may read their invitations',
@@ -241,7 +287,7 @@ test('a pending invite writes no membership', async () => {
     // invite must not add one, so the org stays unreachable.
     const db = await seed();
     await grantSarahToWayne(db);
-    const sarahOrganizations = (await db.memberships.getAll())
+    const sarahOrganizations = (await allMemberships(db))
         .filter(m => m.identity_id === 'sarah')
         .map(m => m.organization_id).sort();
     assert.deepEqual(sarahOrganizations, ['1']);
@@ -253,7 +299,7 @@ test('a pending invitee is absent from the roster', async () => {
     const before = await rosterIds(db);
     assert.ok(!before.has('sarah'));
     // Sarah accepts; now the Wayne roster includes her.
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const acc = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
         await organizationToken('sarah', '1'),
@@ -287,7 +333,7 @@ test('accept makes the invitation org reachable', async () => {
             acceptEventId: 'ev-acc-2',
             acceptAt: AT,
         }));
-    const sarahOrganizations = (await db.memberships.getAll())
+    const sarahOrganizations = (await allMemberships(db))
         .filter(m => m.identity_id === 'sarah')
         .map(m => m.organization_id).sort();
     assert.deepEqual(sarahOrganizations, ['1', '2']);
@@ -342,14 +388,22 @@ async () => {
     const r2 = await handleRequest(
         db, req('POST', '/invitations', tok, body));
     assert.equal(r2.status, 200);
-    assert.equal((await db.invitations.getAll()).length, 1);
+    assert.equal((await deriveInvitations(db)).length, 1);
     assert.equal(
-        (await db.states.getAllFor('inv-idem')).length, 1,
+        (await invitationLifecycleStatesFor(db, 'inv-idem')).length, 1,
     );
     // Event carries the caller-supplied at.
-    const ev = await db.states.getCurrentFor('inv-idem');
-    assert.equal(ev?.at, GRANT_AT);
-    assert.equal(ev?.id, 'ev-g-idem');
+    const life = await invitationLifecycleStatesFor(
+        db, 'inv-idem',
+    );
+    const ev = [...life].sort((a, b) =>
+        a.at < b.at ? -1
+            : a.at > b.at ? 1
+            : a.id < b.id ? -1
+            : a.id > b.id ? 1 : 0,
+    ).at(-1)!;
+    assert.equal(ev.at, GRANT_AT);
+    assert.equal(ev.id, 'ev-g-idem');
 });
 
 test('accept: replay of fixed body is a no-op (two events total)',
@@ -379,14 +433,21 @@ async () => {
         sTok, accBody));
     assert.equal(a2.status, 204);
     assert.equal(
-        (await db.states.getAllFor('inv-ai')).length, 2,
+        (await invitationLifecycleStatesFor(db, 'inv-ai')).length, 2,
     );
     // Event carries the caller-supplied at.
-    const ev = await db.states.getCurrentFor('inv-ai');
-    assert.equal(ev?.at, ACCEPT_AT);
-    assert.equal(ev?.id, 'ev-a-idem');
-    // Author is server-derived (the invitee's identity id).
-    assert.equal(ev?.member_id, 'sarah');
+    const life = await invitationLifecycleStatesFor(
+        db, 'inv-ai',
+    );
+    const ev = [...life].sort((a, b) =>
+        a.at < b.at ? -1
+            : a.at > b.at ? 1
+            : a.id < b.id ? -1
+            : a.id > b.id ? 1 : 0,
+    ).at(-1)!;
+    assert.equal(ev.at, ACCEPT_AT);
+    assert.equal(ev.id, 'ev-a-idem');
+    assert.equal(ev.member_id, 'sarah');
 });
 
 test('decline: replay of fixed body is a no-op (two events total)',
@@ -415,12 +476,20 @@ async () => {
         sTok, decBody));
     assert.equal(d2.status, 204);
     assert.equal(
-        (await db.states.getAllFor('inv-di')).length, 2,
+        (await invitationLifecycleStatesFor(db, 'inv-di')).length, 2,
     );
     // Event carries the caller-supplied at.
-    const ev = await db.states.getCurrentFor('inv-di');
-    assert.equal(ev?.at, DECLINE_AT);
-    assert.equal(ev?.id, 'ev-d-idem');
+    const life = await invitationLifecycleStatesFor(
+        db, 'inv-di',
+    );
+    const ev = [...life].sort((a, b) =>
+        a.at < b.at ? -1
+            : a.at > b.at ? 1
+            : a.id < b.id ? -1
+            : a.id > b.id ? 1 : 0,
+    ).at(-1)!;
+    assert.equal(ev.at, DECLINE_AT);
+    assert.equal(ev.id, 'ev-d-idem');
 });
 
 test('revoke: replay of fixed body is a no-op (two events total)',
@@ -448,14 +517,21 @@ async () => {
         tok, revBody));
     assert.equal(r2.status, 204);
     assert.equal(
-        (await db.states.getAllFor('inv-ri')).length, 2,
+        (await invitationLifecycleStatesFor(db, 'inv-ri')).length, 2,
     );
     // Event carries the caller-supplied at.
-    const ev = await db.states.getCurrentFor('inv-ri');
-    assert.equal(ev?.at, REVOKE_AT);
-    assert.equal(ev?.id, 'ev-r-idem');
-    // Author is server-derived (the admin's identity id).
-    assert.equal(ev?.member_id, 'current');
+    const life = await invitationLifecycleStatesFor(
+        db, 'inv-ri',
+    );
+    const ev = [...life].sort((a, b) =>
+        a.at < b.at ? -1
+            : a.at > b.at ? 1
+            : a.id < b.id ? -1
+            : a.id > b.id ? 1 : 0,
+    ).at(-1)!;
+    assert.equal(ev.at, REVOKE_AT);
+    assert.equal(ev.id, 'ev-r-idem');
+    assert.equal(ev.member_id, 'current');
 });
 
 // Gap-1 gate: empty ids are rejected at the gate (400).
@@ -491,7 +567,7 @@ test('grant: empty grantEventId is rejected (400)', async () => {
 test('accept: empty membershipId is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
         await organizationToken('sarah', '1'),
@@ -507,7 +583,7 @@ test('decline: empty declineEventId is rejected (400)',
 async () => {
     const db = await seed();
     await grantSarahToWayne(db);
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/decline',
         await organizationToken('sarah', '1'),
@@ -521,7 +597,7 @@ async () => {
 test('revoke: empty revokeEventId is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/revocation',
         await organizationToken('current', '2'),
@@ -569,7 +645,7 @@ test('accept: missing acceptEventId is rejected (400)',
 async () => {
     const db = await seed();
     await grantSarahToWayne(db);
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
         await organizationToken('sarah', '1'),
@@ -585,7 +661,7 @@ test('accept: non-string acceptAt is rejected (400)',
 async () => {
     const db = await seed();
     await grantSarahToWayne(db);
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
         await organizationToken('sarah', '1'),
@@ -600,7 +676,7 @@ async () => {
 test('decline: missing declineAt is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/decline',
         await organizationToken('sarah', '1'),
@@ -640,7 +716,7 @@ test('a removed member who re-accepts gets a no-op — not a'
         'DELETE', '/memberships/ms-sarah-removed',
         await organizationToken('current', '2')));
     assert.equal(del.status, 204);
-    const statesBefore = (await db.states.getAllFor(id)).length;
+    const statesBefore = (await invitationLifecycleStatesFor(db, id)).length;
     const reaccept = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/acceptance',
         await organizationToken('sarah', '1'),
@@ -650,19 +726,19 @@ test('a removed member who re-accepts gets a no-op — not a'
             acceptAt: '2026-01-01T00:00:02.000000Z',
         }));
     assert.equal(reaccept.status, 204);
-    const sarahInWayne = (await db.memberships.getAll())
+    const sarahInWayne = (await allMemberships(db))
         .filter(m => m.identity_id === 'sarah'
             && m.organization_id === '2');
     assert.deepEqual(sarahInWayne, []);
     assert.equal(
-        (await db.states.getAllFor(id)).length, statesBefore,
+        (await invitationLifecycleStatesFor(db, id)).length, statesBefore,
     );
 });
 
 test('revoke: missing revokeAt is rejected (400)', async () => {
     const db = await seed();
     await grantSarahToWayne(db);
-    const id = (await db.invitations.getAll())[0]!.id;
+    const id = (await deriveInvitations(db))[0]!.id;
     const res = await handleRequest(db, req(
         'POST', '/invitations/' + id + '/revocation',
         await organizationToken('current', '2'),

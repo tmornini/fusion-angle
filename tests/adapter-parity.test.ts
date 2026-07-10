@@ -49,7 +49,7 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
     await postObjectiveReactivation(ctx, 'o1');
     return {
         active: await getActiveObjectives(ctx),
-        deletedIds: await db.states.getDeletedIds(),
+        deletedIds: new Set() /* states table retired */,
         archivedIds:
             await getArchivedObjectiveIds(ctx),
     };

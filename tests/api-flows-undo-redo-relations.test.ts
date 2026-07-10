@@ -35,6 +35,7 @@ import {
     performRedo,
 } from '../web-app/app/flow-operations.ts';
 import type {
+    FlowWithGraph,
     GraphNode,
     GraphEdge,
     StateEntity,
@@ -44,14 +45,19 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import {
-    reassembleStoredGraph,
-} from '../api/flow-graph-relations.ts';
+    asStoredGraph,
+} from '../api/validators.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+
+// Phase Final Task 2: graph relation ROW halves stripped.
+// Undo/redo oracles re-home to pair-plane GET graph and
+// entity-states history (deriveFlowGraphStates from
+// graphDelta/revivals SIDECAR-KEEP).
 
 const FLOW_ID = 'flow-ur';
 
@@ -151,11 +157,8 @@ function snapOf(
 
 // Persist `graph` as the CURRENT flow state — a genuine save,
 // so it lands its OWN document pair at flows/:id. Undo-as-replay
-// (Phase 14 Task 8) resolves its restore target by walking that
-// SAME document-pair history — a plain putFlow call is now the
-// full setup a later undo needs to revert to exactly this graph;
-// no flow_versions archive rides alongside it any more (that
-// archive fed the OLD undo mechanism's own consume, now retired).
+// resolves its restore target by walking that document-pair
+// history.
 async function saveGraph(
     ctx: RequestContext,
     nodes: GraphNode[],
@@ -164,21 +167,15 @@ async function saveGraph(
     await putFlow(ctx, FLOW_ID, save(nodes, edges));
 }
 
-// Read the live (tombstone-filtered) relation rows and
-// reassemble the domain graph — the same READ seam the canvas
-// uses. A revived node reappears here ONLY if a non-'deleted'
-// state event now supersedes its tombstone.
-async function reassemble(
-    db: MemoryDbAdapter,
+// Pair-plane working graph (GET /flows/:id).
+async function pairGraph(
+    ctx: RequestContext,
 ): Promise<StoredGraph> {
-    const nodeRows = await db.flowNodes
-        .getAllWhere('flow_id', FLOW_ID);
-    const edgeRows = await db.flowEdges
-        .getAllWhere('flow_id', FLOW_ID);
-    const memberRows = await db.flowNodeMembers.getAll();
-    const attrRows = await db.flowNodeAttributes.getAll();
-    return reassembleStoredGraph(
-        nodeRows, edgeRows, memberRows, attrRows,
+    const flow = await ctx.GET<FlowWithGraph>(
+        'flows/' + FLOW_ID,
+    );
+    return asStoredGraph(
+        JSON.parse(flow.graph), 'flow.graph',
     );
 }
 
@@ -192,20 +189,17 @@ async function latestStateFor(
     return events.at(-1)!.state;
 }
 
-// performUndo (Phase 14 Task 8) gates on hasUndoHistory
-// client-side BEFORE ever calling the server — every test below
-// has already made a genuine saveGraph edit, so this fixture
-// must say so (true), or performUndo short-circuits to a no-op
-// without exercising the route at all. The empty redoStack is
-// the part actually named "no redo" below.
+// performUndo gates on hasUndoHistory client-side BEFORE ever
+// calling the server — every test below has already made a
+// genuine saveGraph edit, so this fixture must say so (true).
 const HAS_UNDO_HISTORY = buildFlowHistorySnapshot(true);
 
 test(
     'DELETE-THEN-UNDO revives the deleted node and its'
-    + ' edge: reassembly includes them, latest state'
+    + ' edge: pair graph includes them, latest state'
     + " is 'restored'",
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const a = buildNode('a', { isCreate: true });
         const x = buildNode('x');
         const xEdge = buildEdge('xe', 'a', 'x');
@@ -218,7 +212,7 @@ test(
         // tombstoned by the save delta).
         await putFlow(ctx, FLOW_ID, save([a], []));
 
-        const afterDelete = await reassemble(db);
+        const afterDelete = await pairGraph(ctx);
         assert.ok(
             !afterDelete.nodes.some(n => n.id === 'x'),
             'X is tombstoned after the deleting save',
@@ -239,8 +233,8 @@ test(
         if (undo.kind !== 'ok') return;
 
         // KEYSTONE: X and its edge are REVIVED — the
-        // reassembled live graph includes them again.
-        const afterUndo = await reassemble(db);
+        // pair-plane graph includes them again.
+        const afterUndo = await pairGraph(ctx);
         assert.ok(
             afterUndo.nodes.some(n => n.id === 'x'),
             'undo REVIVES the deleted node X',
@@ -263,10 +257,10 @@ test(
 );
 
 test(
-    'ADD-THEN-UNDO deletes the added node: reassembly'
+    'ADD-THEN-UNDO deletes the added node: pair graph'
     + ' omits it (working-not-target is a deletion)',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const a = buildNode('a', { isCreate: true });
         const x = buildNode('x');
 
@@ -275,7 +269,7 @@ test(
         // Then save the graph WITH X (X added).
         await putFlow(ctx, FLOW_ID, save([a, x], []));
 
-        const afterAdd = await reassemble(db);
+        const afterAdd = await pairGraph(ctx);
         assert.ok(afterAdd.nodes.some(n => n.id === 'x'));
 
         // Undo the add -> X is in current-not-target, so it
@@ -286,7 +280,7 @@ test(
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
 
-        const afterUndo = await reassemble(db);
+        const afterUndo = await pairGraph(ctx);
         assert.ok(
             !afterUndo.nodes.some(n => n.id === 'x'),
             'undo of an add deletes the added node',
@@ -300,7 +294,7 @@ test(
 test(
     'MEMBER add + undo: the member is gone after undo',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const aBare = buildNode('a', { isCreate: true });
         const aWithMember = buildNode('a', {
             isCreate: true,
@@ -312,7 +306,7 @@ test(
         // Then save the graph where a gains member m1.
         await putFlow(ctx, FLOW_ID, save([aWithMember], []));
 
-        const afterAdd = await reassemble(db);
+        const afterAdd = await pairGraph(ctx);
         assert.ok(
             afterAdd.nodes.find(n => n.id === 'a')!
                 .memberIds.includes('m1'),
@@ -325,7 +319,7 @@ test(
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
 
-        const afterUndo = await reassemble(db);
+        const afterUndo = await pairGraph(ctx);
         assert.ok(
             !afterUndo.nodes.find(n => n.id === 'a')!
                 .memberIds.includes('m1'),
@@ -338,7 +332,7 @@ test(
     'REDO round-trip: redo re-applies the delete after'
     + ' an undo revived it (X tombstoned again)',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const a = buildNode('a', { isCreate: true });
         const x = buildNode('x');
         const xEdge = buildEdge('xe', 'a', 'x');
@@ -354,7 +348,7 @@ test(
         );
         assert.equal(undo.kind, 'ok');
         if (undo.kind !== 'ok') return;
-        const afterUndo = await reassemble(db);
+        const afterUndo = await pairGraph(ctx);
         assert.ok(afterUndo.nodes.some(n => n.id === 'x'));
 
         // Redo -> re-apply the delete (X tombstoned again).
@@ -364,7 +358,7 @@ test(
         assert.equal(redo.kind, 'ok');
         if (redo.kind !== 'ok') return;
 
-        const afterRedo = await reassemble(db);
+        const afterRedo = await pairGraph(ctx);
         assert.ok(
             !afterRedo.nodes.some(n => n.id === 'x'),
             'redo re-applies the delete: X tombstoned again',

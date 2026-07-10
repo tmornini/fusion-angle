@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import {
     MemoryDbAdapter,
@@ -174,21 +176,14 @@ test(
 test(
     'getProjects excludes tombstoned rows',
     async () => {
-        const { db, ctx } = await adminContext();
+        const { ctx } = await adminContext();
         await seedProject(ctx, 'keep', 'Keep');
         await seedProject(ctx, 'gone', 'Gone');
-        // NAMED re-pin (Phase 3 Task 6, Step 2b): physical row
-        // removal has no ledger analogue — the flipped GET
-        // derives visibility from the lifecycle trio, not a raw
-        // db.projects.delete row removal — so the tombstone must
-        // land as a state-'deleted' document PUT like any other
-        // transition (mirrors drift-projects.test.ts's lifecycle
-        // case). The wire-level covenant (deleted projects
-        // excluded from lists) is preserved on both planes: the
-        // old-plane store tombstone-filters state-'deleted' too.
+        // Tombstone lands as a state-'deleted' document PUT
+        // (Phase Final Task 2: no projects row plane).
         const {
             id: _id, organization_id: _org, ...fields
-        } = await db.projects.getById('gone');
+        } = await getProjectEntity(ctx, 'gone');
         await postProjectStateChange(
             ctx, 'gone', fields, 'deleted',
         );
@@ -209,29 +204,27 @@ const TRIO = {
 };
 
 test('putProject persists a new project', async () => {
-    const { db, ctx } = await adminContext();
+    const { ctx } = await adminContext();
+    const { organization_id: _o, ...entity } =
+        buildProject('p1', 'Created');
     await putProject(
         ctx, 'p1',
-        { ...buildProject('p1', 'Created'), ...TRIO },
+        { ...entity, ...TRIO },
     );
-    const stored = await db.projects.getById('p1');
+    const stored = await getProjectEntity(ctx, 'p1');
     assert.equal(stored.title, 'Created');
 });
 
 test('putProject updates an existing project', async () => {
-    const { db, ctx } = await adminContext();
-    await db.projects.put(
-        'p1', buildProject('p1', 'Before'),
-    );
+    const { ctx } = await adminContext();
+    await seedProject(ctx, 'p1', 'Before');
+    const { organization_id: _o, ...entity } =
+        buildProject('p1', 'After', { progress: 100 });
     await putProject(ctx, 'p1', {
-        ...buildProject(
-            'p1', 'After', {
-                progress: 100,
-            },
-        ),
+        ...entity,
         ...TRIO,
     });
-    const stored = await db.projects.getById('p1');
+    const stored = await getProjectEntity(ctx, 'p1');
     assert.equal(stored.title, 'After');
     assert.equal(stored.progress, 100);
 });
@@ -240,8 +233,10 @@ test(
     'putProject changes are visible to a fresh ctx',
     async () => {
         const { db, ctx } = await adminContext();
+        const { organization_id: _o, ...entity } =
+            buildProject('p1', 'Persisted');
         await putProject(ctx, 'p1', {
-            ...buildProject('p1', 'Persisted'),
+            ...entity,
             ...TRIO,
         });
         const fresh = createRequestContext(db, await devToken());
@@ -254,7 +249,7 @@ test(
     'putProjectFields merges the camel patch onto'
     + ' the stored row, keeping untouched columns',
     async () => {
-        const { db, ctx } = await adminContext();
+        const { ctx } = await adminContext();
         await seedProject(
             ctx, 'p1', 'Before', undefined, {
                 position: 7,
@@ -268,8 +263,7 @@ test(
             targetEndDate: '2026-11-30',
             estimatedCost: 75000,
         }, TRIO);
-        const stored =
-            await db.projects.getById('p1');
+        const stored = await getProjectEntity(ctx, 'p1');
         assert.equal(stored.title, 'After');
         assert.equal(
             stored.description, 'new desc',
@@ -291,15 +285,14 @@ test(
 test(
     'putProjectPosition writes only the position',
     async () => {
-        const { db, ctx } = await adminContext();
+        const { ctx } = await adminContext();
         await seedProject(
             ctx, 'p1', 'Stay', undefined, {
                 position: 1,
             },
         );
         await putProjectPosition(ctx, 'p1', 9.5, TRIO);
-        const stored =
-            await db.projects.getById('p1');
+        const stored = await getProjectEntity(ctx, 'p1');
         assert.equal(stored.position, 9.5);
         assert.equal(stored.title, 'Stay');
     },
@@ -340,15 +333,14 @@ test(
 
 test(
     'postProjectStateChange records a state event'
-    + ' without touching the project row',
+    + ' without changing entity fields on GET',
     async () => {
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
         await seedProject(
             ctx, 'p1', 'Original', 'approved',
         );
-        const before =
-            await db.projects.getById('p1');
+        const before = await getProjectEntity(ctx, 'p1');
         const {
             id: _id,
             organization_id: _org,
@@ -359,10 +351,10 @@ test(
             ctx, 'p1', fields, 'archived',
         );
 
-        const after =
-            await db.projects.getById('p1');
+        const after = await getProjectEntity(ctx, 'p1');
         assert.deepEqual(after, before);
-        const events = await db.states.getAllFor('p1');
+        const events = await deriveStatesFor(db, '1', 'p1');
+        // genesis + transition
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'archived',

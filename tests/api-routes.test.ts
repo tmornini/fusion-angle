@@ -26,7 +26,6 @@ const COLLECTION_ROUTES: readonly string[] = [
     'ideas',
     'projects',
     'flows',
-    'flows/any-flow/versions',
     'projects/any-project/flows',
     'work-orders',
     'flows/any-flow/work-orders',

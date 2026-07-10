@@ -25,6 +25,8 @@ import {
     deriveIdentityToken,
     deriveIdentityTokens,
 } from '../api/derive-identity-tokens.ts';
+import { deriveTokenRevocation } from
+    '../api/derive-identity-spine.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -155,8 +157,10 @@ test('PUT identity-token-revocations/:id appends its pair at'
         requests[3]!.uri_prefix, '/identity-token-revocations/',
     );
     assert.equal(requests[3]!.uri_id, 'rev-1');
+    // Phase Final Task 2: identity_token_revocations ROW half
+    // stripped — oracle is the pair plane.
     const domainRow =
-        await db.identityTokenRevocations.getById('rev-1');
+        await deriveTokenRevocation(db, 'rev-1');
     assert.deepEqual(await res.json(), domainRow);
 });
 

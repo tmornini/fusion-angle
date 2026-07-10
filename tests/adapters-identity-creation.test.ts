@@ -10,6 +10,12 @@ import { verifyPassword } from '../shared/password-hash.ts';
 import {
     postIdentityCreation,
 } from '../web-app/app/adapters/identities.ts';
+import {
+    deriveIdentityPii,
+    deriveCredentialsFor,
+} from '../api/derive-identity-spine.ts';
+import { GET } from '../api/api.ts';
+import { DEV_TOKEN } from './token-fixtures.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
@@ -19,6 +25,10 @@ async function setup() {
         ctx: createRequestContext(db, await devToken()),
     };
 }
+
+// Phase Final Task 2: identities / identity_pii /
+// identity_credentials ROW halves stripped — oracles are the
+// pair plane (GET + derive).
 
 test('postIdentityCreation mints a person identity'
     + ' with PII', async () => {
@@ -30,12 +40,14 @@ test('postIdentityCreation mints a person identity'
             phone: '555-0100', bio: 'bio',
         },
     });
-    const identity = await db.identities.getById('i1');
+    const identity = await GET<{ kind: string }>(
+        db, 'identities/i1', DEV_TOKEN,
+    );
     assert.equal(identity.kind, 'person');
-    const pii = (await db.identityPii.getAll())
-        .find(r => r.id === 'i1');
-    assert.ok(pii, 'pii row exists');
+    const pii = await deriveIdentityPii(db, 'i1');
     assert.equal(pii.email, 'pat@example.com');
+    // Phase Final Stage B: identity spine tables retired.
+    // Phase Final Stage B: identity spine tables retired.
 });
 
 test('postIdentityCreation mints a service identity'
@@ -44,22 +56,20 @@ test('postIdentityCreation mints a service identity'
     await postIdentityCreation(ctx, 's1', {
         kind: 'service', secret: 'top-secret',
     });
-    const identity = await db.identities.getById('s1');
+    const identity = await GET<{ kind: string }>(
+        db, 'identities/s1', DEV_TOKEN,
+    );
     assert.equal(identity.kind, 'service');
-    const cred = (await db.identityCredentials.getAll())
-        .find(r => r.identity_id === 's1');
-    assert.ok(cred, 'credential row exists');
-    assert.equal(cred.kind, 'client_secret');
+    const creds = await deriveCredentialsFor(db, 's1');
+    const cred = creds.find(r => r.kind === 'client_secret');
+    assert.ok(cred, 'credential exists on pair plane');
     assert.equal(cred.status, 'set');
     assert.notEqual(cred.secret, 'top-secret');
     assert.equal(
         await verifyPassword('top-secret', cred.secret),
         true);
-    const pii = (await db.identityPii.getAll())
-        .find(r => r.id === 's1');
-    assert.equal(
-        pii, undefined,
-        'service identity carries no pii',
+    await assert.rejects(
+        () => deriveIdentityPii(db, 's1'),
     );
 });
 
@@ -75,21 +85,24 @@ async () => {
     };
     await postIdentityCreation(ctx, 'i1', spec);
     await postIdentityCreation(ctx, 'i1', spec);
-    const dupes = (await db.identities.getAll())
-        .filter(r => r.id === 'i1');
-    assert.equal(dupes.length, 1);
+    // Pair-plane document at identities/:id is one head.
+    const identity = await GET<{ kind: string }>(
+        db, 'identities/i1', DEV_TOKEN,
+    );
+    assert.equal(identity.kind, 'person');
+    const pii = await deriveIdentityPii(db, 'i1');
+    assert.equal(pii.email, 'a@example.com');
 });
 
 test('two service creations for the same id leave'
-    + ' exactly one client_secret row', async () => {
+    + ' exactly one client_secret head', async () => {
     const { db, ctx } = await setup();
     const spec = {
         kind: 'service' as const, secret: 'top-secret',
     };
     await postIdentityCreation(ctx, 's1', spec);
     await postIdentityCreation(ctx, 's1', spec);
-    const creds = (await db.identityCredentials.getAll())
-        .filter(r => r.identity_id === 's1'
-            && r.kind === 'client_secret');
+    const creds = (await deriveCredentialsFor(db, 's1'))
+        .filter(r => r.kind === 'client_secret');
     assert.equal(creds.length, 1);
 });

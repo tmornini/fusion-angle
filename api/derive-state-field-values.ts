@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
 import type {
     Id, RequestEntity, ResponseEntity, StateFieldValueEntity,
 } from './types.ts';
@@ -9,22 +8,24 @@ import {
     documentPairsAt, byIdAscending, type DocumentPair,
 } from './derive-documents.ts';
 import {
-    operationPairsAt, WORK_ORDER_TRANSITION_PATTERN,
+    operationPairsAt,
+    WORK_ORDER_TRANSITION_PATTERN,
+    stateEventVisibilityFor,
 } from './derive-states.ts';
 
 // Phase 14 Task 6: state_field_values (SFV) truth, derived from
 // the pair plane instead of read off its own table. Author gate
-// 5's own census, re-run at Step 0 and unchanged: the row plane
-// has exactly ONE writer, postWorkOrderTransitionOp (api/
-// routes.ts) — it folds every field-value row for a transition
-// into that SAME transaction's state_field_values.put calls,
-// alongside ONE transition OPERATION pair (work-orders/:id/
-// transition) whose body carries the fold (fieldValues: [{id,
-// fields}]) — no per-value pair of its own. The STANDALONE leaf
-// address (states/:id/field-values/:fvid) is BOTH PAIR_WIRED and
-// DOCUMENT_CLASS (message-pair.ts), so a direct leaf PUT/DELETE —
-// live OR seeded (api/mock-data/seed-message-pairs.ts pair-wires
-// every mock row the same way) — DOES pair-wire itself.
+// 5's own census: the LIVE writer is postWorkOrderTransitionOp
+// (api/routes.ts) — it folds every field-value row for a
+// transition into that SAME transaction's state_field_values
+// .put calls, alongside ONE transition OPERATION pair
+// (work-orders/:id/transition) whose body carries the fold
+// (fieldValues: [{id, fields}]) — no per-value pair of its
+// own. The STANDALONE leaf address
+// (states/:id/field-values/:fvid) RETIRED its live routes
+// (Phase 15 Task 7) but SEED still forms pairs there via
+// formSeedPair + WRITE_RESPONSE_SPECS (finding 7); historical
+// leaf pairs remain in the two-source union.
 //
 // ELECTED (a) TWO-SOURCE UNION (spec B2) over (b) close-the-gap:
 // zero ledger growth. The union is EXACT, not approximate — the
@@ -71,9 +72,10 @@ interface TransitionFieldValue {
 // `id`/`at` are the TRANSITION pair's OWN envelope (every row it
 // folds landed inside that ONE atomic write, so they share one
 // order-key); `uriId` is the field-value row's OWN id — the SAME
-// id a later leaf PUT/DELETE at states/:id/field-values/:fvid
-// would revisit. `method: 'PUT'` — a transition only ever CREATES
-// a row (validateWorkOrderTransitionBody carries no delete arm),
+// id a historical leaf PUT/DELETE pair (or seed pair) at
+// states/:id/field-values/:fvid revisits. `method: 'PUT'` — a
+// transition only ever CREATES a row
+// (validateWorkOrderTransitionBody carries no delete arm),
 // never tombstones one.
 function transitionFieldValueCandidates(
     requests: readonly RequestEntity[],
@@ -107,8 +109,9 @@ function transitionFieldValueCandidates(
 // The leaf address's own document pairs, across every state
 // event's field-values sub-collection — UNFENCED (a caller
 // narrows to its own organization; see isVisibleStateEvent
-// below), matching deriveEventPairStates' own unfenced read at
-// gate 5a (derive-states.ts).
+// → stateEventVisibilityFor below), matching
+// deriveEventPairStates' own unfenced read at gate 5a
+// (derive-states.ts).
 function leafFieldValueCandidates(
     requests: readonly RequestEntity[],
     responses: readonly ResponseEntity[],
@@ -155,79 +158,52 @@ export function stateFieldValuesFrom(
     return rows.sort(byIdAscending);
 }
 
-// The row-plane fence, delegated rather than re-derived: a
-// field-value row is visible iff its PARENT STATE EVENT is.
-// `view.states` is ALREADY org-scoped (db-organization-scoped.ts's
-// ParentScopedStateStore) for any caller-supplied view this
-// module's own exports receive, so this is the SAME resolution
-// the RETIRING state_field_values parentScope resolver performed
-// (base.states.getById(row.state_event_id), then
-// ownerOrganizationOfEntity on a hit) — reused via the store that
-// already carries it, never rebuilt over the pair plane a second
-// time.
-//
-// THE THREE-WAY RULE, restored verbatim (fix wave, Critical 1):
-// the retiring resolver's own three branches are (1) no row for
-// state_event_id AT ALL — a visible orphan (its own try/catch:
-// EntityNotFoundError on the RAW base.states.getById returns
-// null, and isVisible(null, org) is true); (2) a row exists and
-// its entity resolves to this organization, OR to no owner at
-// all (a visible orphan again) — both fold through
-// ParentScopedStateStore's OWN getById succeeding; (3) a row
-// exists and its entity resolves to a DIFFERENT, existing
-// organization — hidden. view.states.getById ALONE cannot tell
-// (1) apart from (3): both throw EntityNotFoundError identically
-// (case 1 from the unfenced inner getById; case 3 from
-// ParentScopedStateStore's own re-throw after a foreign-owner
-// resolution). rawHasRow (api/db.ts's StateStore interface, the
-// fence-mechanics addition this fix wave adds) settles (1) first
-// — a raw presence check delegated to the SAME wrapped inner
-// store the retired resolver closed over, never a second
-// top-level transaction (db-backed.ts's ambientRunner reuses
-// whatever tx `view` is already bound to).
+// Pair-plane fence successor (Phase 15 Task 3): a field-value
+// row is visible iff its PARENT STATE EVENT is. Re-anchored
+// from the row-plane rawHasRow + fenced getById three-way onto
+// stateEventVisibilityFor (api/derive-states.ts, Phase 15
+// Task 1 gate 2) — same disposition, pair-plane sourced:
+//   orphan  → visible (no event anywhere)
+//   visible → own-org (or owner-null entity)
+//   hidden  → foreign organization
+// Boolean fold: visibility !== 'hidden'. Wire shape held
+// exactly (ALWAYS 200 for GET field-values; three-way filtered
+// array). boundOrganization is the verified token claim, never
+// a path segment.
 async function isVisibleStateEvent(
     view: DbAdapter,
+    boundOrganization: Id,
     stateEventId: Id,
 ): Promise<boolean> {
-    if (!(await view.states.rawHasRow(stateEventId))) {
-        // Case (1): no row anywhere — a visible orphan.
-        return true;
-    }
-    try {
-        // Case (2): the row exists and is visible (same org, or
-        // an orphan entity) — ParentScopedStateStore's own
-        // getById already applies exactly this rule.
-        await view.states.getById(stateEventId);
-        return true;
-    } catch (e) {
-        if (e instanceof EntityNotFoundError) {
-            // Case (3): the row exists but resolves to a
-            // different, existing organization — hidden.
-            return false;
-        }
-        throw e;
-    }
+    const visibility = await stateEventVisibilityFor(
+        view, boundOrganization, stateEventId,
+    );
+    return visibility !== 'hidden';
 }
 
 // The RESTRICT-facing reader (api/record-attribute-refs.ts's
 // collectAttributeReferrers): every LIVE field-value row whose
-// attribute_id is among `attributeIds`, visible to `view`'s bound
-// organization, keyed by attribute_id — ONE derive pass serves
-// every id the caller's own loop asks about, rather than
-// rescanning the plane per id (the pair plane has no attribute_id
-// index the way the retired table's getAllWhere did). `view` is
-// the ALREADY-OPEN write-gate transaction (ATTRIBUTE_RESTRICT_
-// TABLES: requests, responses, and states are all in its ring) —
-// no nested transaction opens here, matching workOrderClaim
-// SourcesFor's own in-tx contract (derive-states.ts).
+// attribute_id is among `attributeIds`, visible to
+// `boundOrganization`, keyed by attribute_id — ONE derive pass
+// serves every id the caller's own loop asks about, rather than
+// rescanning the plane per id (the pair plane has no
+// attribute_id index the way the retired table's getAllWhere
+// did). `view` is the ALREADY-OPEN write-gate transaction
+// (ATTRIBUTE_RESTRICT_TABLES: requests, responses, and states
+// are all in its ring) — no nested transaction opens here,
+// matching workOrderClaimSourcesFor's own in-tx contract
+// (derive-states.ts). Visibility reuses stateEventVisibilityFor
+// (pair plane), not the row-plane rawHasRow fence.
 //
-// NAMED DEVIATION — Author gate 1(d) (fix wave, Critical 2): this
-// reads the WHOLE requests/responses plane inside a write-gate
-// transaction, which gate 1(d) disfavors in favor of entity-
-// scoped indexed reads (the workOrderClaimSourcesFor precedent
-// this header cites). TWO family-scoped alternatives were
-// investigated and REJECTED before falling back here, not
-// skipped:
+// NAMED DEVIATION — Author gate 1(d) (fix wave, Critical 2):
+// this SFV RESTRICT leg still reads the WHOLE requests/
+// responses plane inside a write-gate transaction, which gate
+// 1(d) disfavors in favor of entity-scoped indexed reads (the
+// workOrderClaimSourcesFor precedent this header cites). The
+// deviation PERSISTS BY DESIGN at the browser tier — it is not
+// a Phase Final residual for the SFV count. TWO family-scoped
+// alternatives were investigated and REJECTED before falling
+// back here, not skipped:
 //   - Leaf family (states/:id/field-values/): no cheaper
 //     entity-id source exists. A leaf pair's own uri_prefix is
 //     keyed by state_event_id (api/message-address.ts), and
@@ -239,24 +215,21 @@ async function isVisibleStateEvent(
 //     ('uri_prefix', ...) reads (api/db.ts's TABLE_INDEXES: both
 //     tables index uri_prefix — an EXACT-match index, one value
 //     per entity, not a family-wide constant), one per known
-//     work-order id, EXCEPT the only cheap work-order id source
-//     — view.workOrders.getAll() — is an EntityStore read, which
-//     applies its OWN deleted-filter (getDeletedIdsIn,
-//     store-entity.ts) and silently excludes a since-deleted
-//     work order. The OLD table-plane state_field_values read
-//     never filtered by work-order lifecycle at all (a field-
-//     value row survives its work order's own deletion), so
-//     scoping by view.workOrders.getAll() would introduce a
-//     genuine wire delta — dropping a since-deleted work order's
-//     field-value history from the RESTRICT count — not merely
-//     miss an optimization. Rejected for that reason; no
-//     DbAdapter-level primitive enumerates work-order ids
-//     WITHOUT the deleted filter today.
-// Task 11 measures this; closing the transition half would need
-// a raw, undeleted-filtered work-order id enumeration this task
-// does not introduce on its own authority.
+//     work-order id, EXCEPT enumerating those ids WITHOUT the
+//     EntityStore deleted-filter would drop a since-deleted
+//     work order's field-value history from the RESTRICT count
+//     — a genuine wire delta vs the old table-plane read (a
+//     field-value row survives its work order's own deletion).
+//     Rejected for that reason.
+// Contrast: Phase 15 Task 4 re-anchored the three GRAPH legs of
+// collectAttributeReferrers onto organization-scoped pair
+// prefixes (WO document heads) and graphDelta replay
+// (flowGraphBindingsFromPairs) — those legs are no longer a
+// whole-plane scan. This SFV comment's scope is the field-value
+// count alone. Task 11 measures the residual whole-plane cost.
 export async function deriveStateFieldValueReferrers(
     view: DbAdapter,
+    boundOrganization: Id,
     attributeIds: readonly Id[],
 ): Promise<Map<Id, readonly StateFieldValueEntity[]>> {
     const [requests, responses] = await Promise.all([
@@ -270,15 +243,17 @@ export async function deriveStateFieldValueReferrers(
     // IMPORTANT 3 (fix wave): resolve visibility ONCE per
     // DISTINCT parent state event, not once per candidate row —
     // a hot attribute referenced by many rows under the SAME
-    // event previously repeated the same rawHasRow/getById pair
-    // once per row.
+    // event previously repeated the same visibility probe once
+    // per row.
     const distinctEventIds = [...new Set(
         candidates.map((row) => row.state_event_id),
     )];
     const visibilityFlags = await Promise.all(
         distinctEventIds.map(
             (stateEventId) =>
-                isVisibleStateEvent(view, stateEventId),
+                isVisibleStateEvent(
+                    view, boundOrganization, stateEventId,
+                ),
         ),
     );
     const visibility = new Map(
@@ -302,24 +277,30 @@ export async function deriveStateFieldValueReferrers(
 
 // The GET-facing reader (states/:id/field-values, flipped by
 // DEFAULT — Task 6, Author gate 5). The visibility check runs
-// FIRST, against `db` directly (already org-scoped): an absent OR
-// foreign event returns [] without ever deriving anything — byte-
-// identical to the retired table read's own empty-array outcome
-// for both cases (db.stateFieldValues.getAllWhere trivially found
-// no rows for an absent event, and the SFV parentScope resolver
-// fenced a foreign event's rows to invisible — this route never
-// 404s). Once visible, ONE shared readonly tx over requests+
-// responses (the deriveEventPairStates torn-read closure, derive-
-// states.ts) derives the WHOLE plane: the GET path may scan wider
-// than the RESTRICT write gate (Author gate 5's own hard
-// constraint), and the transition fold has no address of its own
-// keyed by state_event_id, so a narrower read is not available
+// FIRST via stateEventVisibilityFor (pair plane): an absent OR
+// foreign event returns [] without ever deriving anything —
+// byte-identical to the retired table read's own empty-array
+// outcome for both cases (db.stateFieldValues.getAllWhere
+// trivially found no rows for an absent event, and the SFV
+// parentScope resolver fenced a foreign event's rows to
+// invisible — this route never 404s). Once visible, ONE shared
+// readonly tx over requests+responses (the
+// deriveEventPairStates torn-read closure, derive-states.ts)
+// derives the WHOLE plane: the GET path may scan wider than the
+// RESTRICT write gate (Author gate 5's own hard constraint),
+// and the transition fold has no address of its own keyed by
+// state_event_id, so a narrower read is not available
 // regardless — see this module's header.
 export async function stateFieldValuesForStateEvent(
     db: DbAdapter,
+    boundOrganization: Id,
     stateEventId: Id,
 ): Promise<StateFieldValueEntity[]> {
-    if (!(await isVisibleStateEvent(db, stateEventId))) return [];
+    if (!(await isVisibleStateEvent(
+        db, boundOrganization, stateEventId,
+    ))) {
+        return [];
+    }
     return db.transaction(
         ['requests', 'responses'],
         async (view) => {

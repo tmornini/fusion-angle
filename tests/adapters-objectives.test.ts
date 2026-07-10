@@ -174,8 +174,8 @@ test('getArchivedObjectiveIds returns a Set', async () => {
 });
 
 test(
-    'postObjectiveCreation writes the objective row and'
-    + ' its first revision through POST /objectives',
+    'postObjectiveCreation writes via GET the objective'
+    + ' and its first revision through POST /objectives',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -185,26 +185,28 @@ test(
             ctx, 'o1', 'Revenue', 'Top line', 1,
         );
 
-        const objectives = await db.objectives.getAll();
+        // Phase Final Task 2: row halves stripped — assert via
+        // adapter GETs (pair plane).
+        const objectives = await getObjectives(ctx);
         assert.equal(objectives.length, 1);
         assert.equal(objectives[0]!.id, 'o1');
         assert.equal(objectives[0]!.position, 1);
-        // The org fence stamped the bound org from the token.
         assert.equal(objectives[0]!.organization_id, '1');
 
-        const revisions = await db.objectiveRevisions.getAll();
-        assert.equal(revisions.length, 1);
-        assert.equal(revisions[0]!.objective_id, 'o1');
-        assert.equal(revisions[0]!.name, 'Revenue');
-        assert.equal(revisions[0]!.description, 'Top line');
-        // member_id is the current member — a row column, not
-        // an authored state event (creation writes no event).
-        assert.equal(revisions[0]!.member_id, 'current');
+        const revisions =
+            await getObjectiveRevisionsByObjective(
+                ctx, ['o1'],
+            );
+        const revs = revisions.get('o1')!;
+        assert.equal(revs.length, 1);
+        assert.equal(revs[0]!.objectiveId, 'o1');
+        assert.equal(revs[0]!.name, 'Revenue');
+        assert.equal(revs[0]!.description, 'Top line');
+        assert.equal(revs[0]!.memberId, 'current');
 
-        // Creation writes NO state event: the objective reads as
-        // active with an empty archived set.
         const archived = await getArchivedObjectiveIds(ctx);
         assert.equal(archived.size, 0);
+        // Phase Final Stage B: objectives table retired.
     },
 );
 
@@ -239,7 +241,8 @@ test(
             ctx, 'o3', newPos,
         );
 
-        const all = await db.objectives.getAll();
+        // Phase Final Task 2: positions from GET (pair plane).
+        const all = await getObjectives(ctx);
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );
@@ -271,7 +274,8 @@ test(
         await putObjectivePosition(ctx, 'o2', 1.5);
         await putObjectivePosition(ctx, 'o3', 1.25);
 
-        const all = await db.objectives.getAll();
+        // Phase Final Task 2: positions from GET (pair plane).
+        const all = await getObjectives(ctx);
         const map = new Map(
             all.map(o => [o.id, o.position]),
         );

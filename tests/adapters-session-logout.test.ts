@@ -33,6 +33,8 @@ import {
 } from '../web-app/app/adapters/session-credentials.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
+import { deriveTokenRevocationsFor } from
+    '../api/derive-identity-spine.ts';
 
 test('logout revokes this identity and clears credentials',
 async () => {
@@ -43,9 +45,14 @@ async () => {
         refreshToken: await organizationToken(),
     });
     await postSessionLogout(ctx);
-    const rows = await db.identityTokenRevocations.getAll();
+    // Phase Final Task 2: identity_token_revocations ROW half
+    // stripped — oracle is the pair plane.
+    const rows = await deriveTokenRevocationsFor(
+        db, 'current',
+    );
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.identity_id, 'current');
+    // Phase Final Stage B: identity spine tables retired.
     assert.equal(getSessionCredentials(), null);
 });
 

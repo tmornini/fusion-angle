@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
@@ -289,7 +291,7 @@ test(
         await postRecordStateChange(
             ctx, rec1, 'archived',
         );
-        const events = await db.states.getAllFor(
+        const events = await deriveStatesFor(db, '1', 
             'rec-1',
         );
         const values = events

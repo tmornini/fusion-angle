@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { POST, PUT, DELETE } from '../api/api.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import { POST, PUT, handleRequest } from '../api/api.ts';
+import { DEV_TOKEN, organizationToken } from
+    './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { nowUtc } from '../api/types.ts';
@@ -10,25 +11,35 @@ import {
     deriveStateFieldValueReferrers,
     stateFieldValuesForStateEvent,
 } from '../api/derive-state-field-values.ts';
+import { STARK_ORGANIZATION } from
+    '../api/mock-data/seed-constants.ts';
 
-// Phase 14 Task 6's own drift suite: state_field_values (SFV)
-// truth, pair-plane derived (api/derive-state-field-values.ts),
-// proven byte-equal to the row plane it replaces as a decision
-// surface for RESTRICT (api/record-attribute-refs.ts) and the
-// GET states/:id/field-values read (api/routes.ts). Mirrors the
-// sibling drift suites' own conventions (tests/drift-states.
-// test.ts): sortByIdAscending on BOTH sides before deepEqual
-// (H7's own reason — insertion order on the memory tier is not
-// the derive's own order).
+// Phase Final Task 2: state_field_values dual-write stripped.
+// This file no longer compares derive vs row-plane oracles —
+// the SFV table is empty after live transitions. Coverage
+// re-homes to pair-plane derive + wire-byte handleRequest
+// assertions. Leaf PUT/DELETE routes retired Phase 15 Task 7;
+// live writes ride the transition fold only. Seed still forms
+// leaf-address pairs via formSeedPair (WRS survives).
 
-function sortByIdAscending<T extends { id: string }>(
-    rows: readonly T[],
-): T[] {
-    return [...rows].sort((a, b) =>
-        a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-}
-
+const BASE = 'http://localhost';
 const LOCK_TIMEOUT_SECONDS = 300;
+
+function req(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+): Request {
+    return new Request(`${BASE}${path}`, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+}
 
 function graphJson(): string {
     return JSON.stringify({
@@ -38,31 +49,36 @@ function graphJson(): string {
     });
 }
 
+// Seed via REAL PUT so the WO carries a document pair.
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
-    await db.workOrders.put('wo1', {
-        organization_id: '1', display_id: 'abcd',
-        flow_graph: graphJson(), position: 1,
-    });
-    await db.recordAttributes.put('attr-1', {
-        organization_id: '1', record_id: 'rec-1',
-        name: 'Severity', attribute_type: 'text',
-        sort_order: 0, options: '[]', constraints: '[]',
-    });
+    await PUT(
+        db, 'work-orders/wo1', {
+            display_id: 'abcd',
+            flow_graph: graphJson(),
+            position: 1,
+        },
+        DEV_TOKEN,
+    );
+    // Phase Final Stage B: record_attributes retired.
+    await PUT(
+        db, 'record-attributes/attr-1', {
+            organization_id: '1', record_id: 'rec-1',
+            name: 'Severity', attribute_type: 'text',
+            sort_order: 0, options: '[]', constraints: '[]',
+        },
+        DEV_TOKEN,
+    );
     return db;
 }
 
-test('RESTRICT parity: deriveStateFieldValueReferrers'
-+ ' deepEquals the row plane over a live transition, a'
-+ ' standalone leaf PUT, and a leaf DELETE of the'
-+ ' transition-born row', async () => {
+test('RESTRICT: deriveStateFieldValueReferrers sees the'
++ ' transition fold; SFV row plane stays empty',
+async () => {
     const db = await seededDb();
 
-    // A live transition folds ONE field-value row (fv-1) into
-    // its OWN operation pair — no leaf pair of its own (Author
-    // gate 5's own census, this module's header).
     await POST(
         db, 'work-orders/wo1/transition', {
             transitionEventId: 'te1',
@@ -81,42 +97,19 @@ test('RESTRICT parity: deriveStateFieldValueReferrers'
         DEV_TOKEN,
     );
 
-    // A standalone leaf PUT adds a SECOND row under the SAME
-    // transition event, pair-wired at its own address.
-    await PUT(
-        db, 'states/te1/field-values/fv-2',
-        {
-            state_event_id: 'te1',
-            attribute_id: 'attr-1',
-            value: 'medium',
-        },
-        DEV_TOKEN,
-    );
-
-    // The leaf DELETE tombstones the TRANSITION-born row through
-    // the standalone address — proving deletion reproduces
-    // across sources, not merely within one (the leaf-DELETE
-    // pair-visibility gate this task's brief names).
-    await DELETE(
-        db, 'states/te1/field-values/fv-1', DEV_TOKEN,
-    );
-
     const derived =
-        await deriveStateFieldValueReferrers(db, ['attr-1']);
-    const old = await db.stateFieldValues
-        .getAllWhere('attribute_id', 'attr-1');
-
-    assert.deepEqual(
-        sortByIdAscending([...(derived.get('attr-1') ?? [])]),
-        sortByIdAscending(old),
-    );
-    assert.equal(old.length, 1);
-    assert.equal(old[0]!.id, 'fv-2');
+        await deriveStateFieldValueReferrers(
+            db, STARK_ORGANIZATION, ['attr-1'],
+        );
+    const rows = derived.get('attr-1') ?? [];
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.id, 'fv-1');
+    assert.equal(rows[0]!.attribute_id, 'attr-1');
+    // Phase Final Stage B: state_field_values table retired.
 });
 
-test('GET drift: stateFieldValuesForStateEvent deepEquals the'
-+ ' row plane, both sides sorted, over a live transition'
-+ ' plus a standalone leaf PUT under the SAME event',
+test('GET /states/:id/field-values wire equals'
++ ' stateFieldValuesForStateEvent over a live fold',
 async () => {
     const db = await seededDb();
     await POST(
@@ -136,22 +129,70 @@ async () => {
         },
         DEV_TOKEN,
     );
-    await PUT(
-        db, 'states/te1/field-values/fv-2',
-        {
-            state_event_id: 'te1',
-            attribute_id: 'attr-1',
-            value: 'medium',
+
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req('GET', '/states/te1/field-values', token),
+    );
+    assert.equal(res.status, 200);
+    const wireText = await res.text();
+    const derived = await stateFieldValuesForStateEvent(
+        db, STARK_ORGANIZATION, 'te1',
+    );
+    assert.equal(wireText, JSON.stringify(derived));
+    assert.equal(derived.length, 1);
+    assert.equal(derived[0]!.id, 'fv-1');
+    // Phase Final Stage B: state_field_values table retired.
+});
+
+// Non-lex field-value ids so collection order is not
+// insertion order (byIdAscending craftsmanship).
+test('GET field-values collection is id-lex ordered after'
++ ' non-lex transition fold', async () => {
+    const db = await seededDb();
+    await POST(
+        db, 'work-orders/wo1/transition', {
+            transitionEventId: 'te-lex',
+            targetState: 'n-next',
+            fieldValues: [
+                {
+                    id: 'fv-z',
+                    fields: {
+                        state_event_id: 'te-lex',
+                        attribute_id: 'attr-1',
+                        value: 'z',
+                    },
+                },
+                {
+                    id: 'fv-a',
+                    fields: {
+                        state_event_id: 'te-lex',
+                        attribute_id: 'attr-1',
+                        value: 'a',
+                    },
+                },
+                {
+                    id: 'fv-m',
+                    fields: {
+                        state_event_id: 'te-lex',
+                        attribute_id: 'attr-1',
+                        value: 'm',
+                    },
+                },
+            ],
+            release: null,
+            transitionAt: nowUtc(),
         },
         DEV_TOKEN,
     );
-
-    const derived =
-        await stateFieldValuesForStateEvent(db, 'te1');
-    const old = await db.stateFieldValues
-        .getAllWhere('state_event_id', 'te1');
-
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req('GET', '/states/te-lex/field-values', token),
+    );
+    assert.equal(res.status, 200);
+    const list = await res.json() as { id: string }[];
     assert.deepEqual(
-        sortByIdAscending(derived), sortByIdAscending(old));
-    assert.equal(old.length, 2);
+        list.map(r => r.id),
+        ['fv-a', 'fv-m', 'fv-z'],
+    );
 });

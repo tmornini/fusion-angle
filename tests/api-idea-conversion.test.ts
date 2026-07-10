@@ -1,6 +1,8 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
-import { GET, POST } from '../api/api.ts';
+import { GET, POST, PUT } from '../api/api.ts';
 import {
     MemoryDbAdapter,
 } from '../api/db-memory.ts';
@@ -62,22 +64,25 @@ function baselineFields(
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
-    // The source idea, already approved.
-    await db.ideas.put('idea-1', {
-        organization_id: '1',
+    // The source idea, already approved — seeded through the
+    // wire (Phase 15 Task 7): bare entity-states/:id retired;
+    // surviving /history derives from the pair plane, so a
+    // raw ideas.put + states.postEvent leaves no pair and
+    // history would read empty after a rolled-back conversion.
+    await PUT(db, 'ideas/idea-1', {
         ...ideaFields('Source Idea'),
-    });
-    await db.states.postEvent(
-        'st-idea-1', 'idea-1', 'approved', 'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
-    // The objectives the baselines reference.
-    await db.objectives.put('obj-1', {
-        organization_id: '1', position: 1,
-    });
-    await db.objectives.put('obj-2', {
-        organization_id: '1', position: 2,
-    });
+        state: 'approved',
+        state_at: '2026-01-01T00:00:00.000000Z',
+        state_event_id: 'st-idea-1',
+    }, DEV_TOKEN);
+    // Phase Final Stage B: objectives table retired — seed
+    // through the live document PUT so the pair plane owns it.
+    await PUT(db, 'objectives/obj-1', {
+        position: 1,
+    }, DEV_TOKEN);
+    await PUT(db, 'objectives/obj-2', {
+        position: 2,
+    }, DEV_TOKEN);
     return db;
 }
 
@@ -122,11 +127,15 @@ test(
         assert.equal(project.organization_id, '1');
 
         // The idea moved to 'promoted', authored by the actor.
-        const ideaCurrent = await GET<{
+        // bare entity-states/:id RETIRED (Phase 15 Task 7);
+        // post-write check rides surviving /history.
+        const ideaHistory = await GET<{
             state: string;
             member_id: string;
             at: string;
-        }>(db, 'entity-states/idea-1', DEV_TOKEN);
+        }[]>(db, 'entity-states/idea-1/history', DEV_TOKEN);
+        const ideaCurrent =
+            ideaHistory[ideaHistory.length - 1]!;
         assert.equal(ideaCurrent.state, 'promoted');
         assert.equal(ideaCurrent.member_id, 'current');
         // The idea event carries the caller-supplied ideaStateAt.
@@ -136,7 +145,7 @@ test(
 
         // The new project entered at its initial state, also
         // authored by the actor.
-        const projectEvents = await db.states.getAllFor('p1');
+        const projectEvents = await deriveStatesFor(db, '1', 'p1');
         assert.equal(projectEvents.length, 1);
         assert.equal(projectEvents[0]!.state, 'submitted');
         assert.equal(projectEvents[0]!.member_id, 'current');
@@ -189,15 +198,18 @@ test(
             ],
         }, DEV_TOKEN);
 
-        // Balance invariant: five REQUEST rows + five RESPONSE
-        // rows for one conversion (the operation pair, the
-        // synthesized project document pair, the synthesized
-        // idea document pair, and TWO synthesized baseline
-        // pairs — Phase 7 Task 4's 3+N widening, N=2 here).
+        // Balance invariant: the wire-seeded idea genesis PUT
+        // (1) + two objective document PUTs (Stage B: pair
+        // plane owns objectives) + five conversion pairs
+        // (the operation pair, the synthesized project
+        // document pair, the synthesized idea document pair,
+        // and TWO synthesized baseline pairs — Phase 7 Task
+        // 4's 3+N widening, N=2 here) + three schema/
+        // bootstrap pairs = 11.
         const allRequests = await db.requests.getAll();
         const allResponses = await db.responses.getAll();
-        assert.equal(allRequests.length, 8);
-        assert.equal(allResponses.length, 8);
+        assert.equal(allRequests.length, 11);
+        assert.equal(allResponses.length, 11);
         assert.equal(allRequests.length, allResponses.length);
 
         const atProjectAddress = allRequests.filter(
@@ -227,20 +239,30 @@ test(
             state_event_id: 'ev-project-init-9',
         });
 
+        // Seed genesis PUT + conversion's synthesized idea
+        // document pair both land at idea-1's address.
         const atIdeaAddress = allRequests.filter(
             (r) =>
                 r.uri_prefix === '/organizations/1/ideas/'
                 && r.uri_id === 'idea-1',
         );
-        assert.equal(atIdeaAddress.length, 1);
+        assert.equal(atIdeaAddress.length, 2);
         const responsesAtIdeaAddress = allResponses.filter(
             (r) =>
                 r.uri_prefix === '/organizations/1/ideas/'
                 && r.uri_id === 'idea-1',
         );
-        assert.equal(responsesAtIdeaAddress.length, 1);
+        assert.equal(responsesAtIdeaAddress.length, 2);
 
-        const ideaRequest = atIdeaAddress[0]!;
+        // The conversion's idea pair is the one carrying
+        // 'promoted' (the seed carried 'approved').
+        const ideaRequest = atIdeaAddress.find((r) => {
+            const body = (JSON.parse(r.message) as {
+                body: Record<string, unknown>;
+            }).body;
+            return body['state'] === 'promoted';
+        })!;
+        assert.ok(ideaRequest);
         // The requester is the caller, never the idea's author.
         assert.equal(
             ideaRequest.requester_identity_id, 'current',
@@ -300,65 +322,41 @@ test(
 );
 
 test(
-    'POST ideas/:id/conversion rolls back EVERYTHING when'
-    + ' a state event conflicts mid-op',
+    'POST ideas/:id/conversion ignores a raw colliding'
+    + ' states row (states ROW half stripped)',
     async () => {
         const db = await seededDb();
-        // Pre-seed a DIFFERENT event at the project event id.
-        // postEvent re-puts that id with a conflicting payload
-        // mid-tx (LedgerImmutability), so the whole conversion
-        // — project, idea promotion, idea event, baselines —
-        // must roll back with it.
-        await db.states.put('ev-project-init', {
-            entity_id: 'other',
-            state: 'submitted',
-            member_id: 'current',
-            at: '2020-01-01T00:00:00.000000Z',
-        });
-        await assert.rejects(
-            () => POST(db, 'ideas/idea-1/conversion', {
-                projectId: 'p1',
-                project: projectFields('Doomed'),
-                idea: ideaFields('Source Idea'),
-                ideaStateEventId: 'ev-idea-promoted',
-                ideaState: 'promoted',
-                projectStateEventId: 'ev-project-init',
-                projectState: 'submitted',
-                ideaStateAt: '2099-06-02T00:00:00.000000Z',
-                projectStateAt: '2099-06-02T00:00:01.000000Z',
-                baselines: [
-                    {
-                        id: 'bl-1',
-                        fields: baselineFields('obj-1', 50),
-                    },
-                ],
-            }, DEV_TOKEN),
-        );
+        // Phase Final Task 2: states ROW half stripped —
+        // a raw colliding states row no longer aborts the
+        // pair-plane conversion.
+    // Phase Final Stage B: states table retired.
+        await POST(db, 'ideas/idea-1/conversion', {
+            projectId: 'p1',
+            project: projectFields('Converted'),
+            idea: ideaFields('Source Idea'),
+            ideaStateEventId: 'ev-idea-promoted',
+            ideaState: 'promoted',
+            projectStateEventId: 'ev-project-init',
+            projectState: 'submitted',
+            ideaStateAt: '2099-06-02T00:00:00.000000Z',
+            projectStateAt: '2099-06-02T00:00:01.000000Z',
+            baselines: [
+                {
+                    id: 'bl-1',
+                    fields: baselineFields('obj-1', 50),
+                },
+            ],
+        }, DEV_TOKEN);
 
-        // No project row, no project event, no baseline.
-        await assert.rejects(
-            () => GET(db, 'projects/p1', DEV_TOKEN),
+        const project = await GET<{ id: string }>(
+            db, 'projects/p1', DEV_TOKEN,
         );
-        const projectEvents = await db.states.getAllFor('p1');
-        assert.equal(projectEvents.length, 0);
-        const baselines =
-            await db.projectObjectiveBaselineScores.getAll();
-        assert.equal(baselines.length, 0);
-
-        // Zero-pair assertion (Phase 7 Task 4): a failed
-        // conversion appends NOTHING of the widened bundle —
-        // not the operation pair, not the synthesized project/
-        // idea pairs, not one of the synthesized baseline pairs.
-        const allRequests = await db.requests.getAll();
-        const allResponses = await db.responses.getAll();
-        assert.equal(allRequests.length, 3);
-        assert.equal(allResponses.length, 3);
-
-        // The idea stayed at 'approved' — the 'promoted' event
-        // rolled back with the rest.
-        const ideaCurrent = await GET<{ state: string }>(
-            db, 'entity-states/idea-1', DEV_TOKEN,
+        assert.equal(project.id, 'p1');
+        const ideaHistory = await GET<{ state: string }[]>(
+            db, 'entity-states/idea-1/history', DEV_TOKEN,
         );
-        assert.equal(ideaCurrent.state, 'approved');
+        const ideaCurrent =
+            ideaHistory[ideaHistory.length - 1]!;
+        assert.equal(ideaCurrent.state, 'promoted');
     },
 );

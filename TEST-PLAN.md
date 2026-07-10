@@ -189,22 +189,43 @@ the localStorage tier could not close is gone (CLAUDE.md §
 Gotchas — "Cross-tab writes are safe"). Re-read tolerantly
 (`≥ N`) for timing rather than asserting exact event counts.
 
-Post-states-flip (Phase 11): the appends above still land in
-the `states` table, but the `GET /states` and
-`GET /entity-states/:id/history` READS now DERIVE from the
-message ledger (`deriveStates`/`deriveStatesFor`,
-`api/derive-states.ts`), so every states-backed surface
-(workbox inbox, flow-stats, dashboard, the members roster,
-idea/project/record/objective state badges + history views)
-reads a six-source union, not the log — the log stays a
-storage-only truth until Phase Final. `tests/drift-states.test.ts`
-pins full parity between the two planes over the seeded dataset
-plus live writes (the Agent-G roster-flip precedent). The
-ownership fence (Phase 11 Task 1) makes a foreign org's
-`entity_id` 404 on both the write (`PUT /states/:id`) and the
-read (`GET /entity-states/:id/history`, `GET /states`) planes —
-UI-invisible, since no legitimate browser flow names a foreign
-entity's opaque id.
+Post-states-flip (Phase 11) + last-readers (Phase 15): the
+appends above still land in the `states` table, but the
+`GET /states` and `GET /entity-states/:id/history` READS
+DERIVE from the message ledger (`deriveStates`/
+`deriveStatesFor`, `api/derive-states.ts`), so every
+states-backed surface (workbox inbox, flow-stats, dashboard,
+the members roster, idea/project/record/objective state
+badges + history views) reads a six-source union, not the
+log — the log stays a storage-only truth until Phase Final.
+`tests/drift-states.test.ts` pins full parity between the
+two planes over the seeded dataset plus live writes. The
+ownership fence re-anchored onto `resolveOwningOrganization`
+(Phase 15 Task 5) makes a foreign org's `entity_id` 404 on
+both the write (`PUT /states/:id`) and the history read
+(`GET /entity-states/:id/history`) — UI-invisible, since no
+legitimate browser flow names a foreign entity's opaque id.
+Also closed: WP1 (organization-as-entity_id forge) and the
+records hard-delete forgery channel.
+
+**Retired routes (Phase 15 Task 7) — no browser cases.**
+These addresses have zero product callers; a manual pass
+need not open them. Automated pins cover the status bytes:
+- bare `GET /states/:id` → **405** (PUT survives on the
+  pattern — honest, not collapsed with the open-tree 404)
+- `GET /entity-states/:id` (current) → router 404
+- `PUT|DELETE /states/:id/field-values/:fvid` → router 404
+  (collection `GET /states/:id/field-values` SURVIVES,
+  derived; live writes ride the transition fold only)
+- `GET|POST|PUT|DELETE /flows/:id/versions[...]` → router 404
+  (table remains until Final; F66 still asserts NO live
+  `flow_versions` writes)
+
+Browser-gate residual for Final (not a phase abort): a
+full interactive chrome sweep for undo/redo visual +
+cross-tab is still recommended (Phase 14 lesson); Phase 15
+Task 9 covered wire contracts via the 127-test security
+suite + HTTP page smoke.
 
 #### Parallel session & connection isolation
 
@@ -1327,12 +1348,11 @@ no-op, and the 412-retry-then-fresh-resolve on a save racing
 an undo are covered by `tests/flow-undo-cursor.test.ts` and
 `tests/flow-operations.test.ts` (`performUndo` /
 `performRedo`). `flow_versions` no longer receives any write
-on this path — its publish/consume machinery remains
-reachable directly (`tests/adapters-flow-versions.test.ts`,
-`tests/api-flow-versions-publish.test.ts`) but is dead code
-on the live flow-designer path. The cases below verify the
-toolbar buttons, the keyboard shortcuts, the disabled states,
-and that the canvas re-renders after each step.)
+on this path — Phase 15 Task 7 RETIRED the versions routes
+(router 404); the table remains until Phase Final. The cases
+below verify the toolbar buttons, the keyboard shortcuts,
+the disabled states, and that the canvas re-renders after
+each step.)
 
 - [ ] **F32** After adding a state, click the Undo
   toolbar button. PASS: the state and its
@@ -1532,7 +1552,8 @@ designer "tag current" action lands.)
 - [ ] **F66** Inspect the `flow_versions` object store
   (IndexedDB) before and after a `memberIds` change. PASS: NO
   new row appears — `flow_versions` is no longer written on
-  the live path (Phase 14 Task 8); member assignment is
+  the live path (Phase 14 Task 8) and its HTTP routes are
+  retired (Phase 15 Task 7, router 404); member assignment is
   captured only in the flow's own document-pair history, in
   `requests`/`responses`. F67 confirms the change is still
   undoable through that history.

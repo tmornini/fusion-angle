@@ -49,17 +49,8 @@ test('rejects an extra key', () => {
         }));
 });
 
-test('identity_providers store retains events', async () => {
-    const db = new MemoryDbAdapter();
-    await db.postSchemaCreation();
-    await db.identityProviders.put('p1', goodRow);
-    await db.identityProviders.put('p2', {
-        ...goodRow, action: 'unlinked',
-        at: '2026-07-01T00:00:00.000000Z',
-    });
-    assert.equal(
-        (await db.identityProviders.getAll()).length, 2);
-});
+// Phase Final Stage B: identity_providers table retired —
+// store append pins live on pair-plane document tests.
 
 test('an anonymous principal cannot read providers',
 async () => {

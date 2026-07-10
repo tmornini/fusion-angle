@@ -41,9 +41,13 @@ test(
         );
         const json = await getSnapshot(ctx);
         await putSnapshot(ctx, json);
-        const ai = (await db.aiMembers.getAll())
-            .find(m => m.id === 'tuJwPxYtBur2KCLquScShB');
-        assert.equal(ai?.name, 'Claude Opus 4.8');
+        // Phase Final Task 2: ai_members ROW half stripped —
+        // name from pair-plane GET.
+        const ai = await ctx.GET<{
+            id: string; name: string;
+        }>('ai-members/tuJwPxYtBur2KCLquScShB');
+        assert.equal(ai.name, 'Claude Opus 4.8');
+        // Phase Final Stage B: roster tables retired.
     },
 );
 

@@ -14,8 +14,6 @@ import type {
 import { jsonArrayField, jsonObjectField, nowUtc } from
     '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import { organizationScopedAdapter } from
-    '../api/db-organization-scoped.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
@@ -53,36 +51,21 @@ import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
 
-// The E10 drift check (Phase 8 Task 7): message-derived reads
-// proven equal to the old-table-derived reads Task 8 flips onto
-// them. NOTHING reads api/derive-members.ts in production yet —
-// this file alone gates that flip; it stays as a regression guard
-// through Phase Final.
+// Phase Final Task 2: roster (members / human_members /
+// ai_members / memberships / invitations) dual-write stripped.
+// This file no longer compares derive vs old-table oracles —
+// the row plane is empty after seed. Coverage re-homes to
+// wire-byte handleRequest assertions and pair-plane live
+// fixtures (drift-identity-tokens craftsmanship).
 //
 // The roster is FOUR document families at once: members (the
 // shared parent), memberships (the pure join relation), and
-// ai-members/human-members (the two kind-specific facets) — plus
-// invitations, whose grant/accept/decline/revoke side channel
-// this file also drift-proves (deriveInvitations, Task 6), since
-// an accept's membership synthesis is the roster's own last write
-// path. Hand-builds FOUR *_TEST_WIRING mirrors of routes.ts's
-// module-private wiring rows (the drift-records/drift-objectives
-// precedent) so the generic-handler cases exercise the ACTUAL
-// documentCollectionGetHandler/documentGetHandler — the same code
-// path Task 8 wires live, never a reimplementation. Old plane
-// reads via organizationScopedAdapter (org-nested memberships)
-// and the BASE adapter (the global directory + invitations) —
-// NEVER through handleRequest, so the comparison survives the
-// flip.
-//
-// H7: id-lex explicit sorts bind EVERY case below, not only the
-// collection ones — the memory tier's own getAll/getAllWhere is
-// insertion-ordered, while every derived collection (api/derive-
-// members.ts, api/derive-invitations.ts, and the generic
-// document-family.ts handlers alike) sorts byIdAscending by
-// construction. A case that skipped the old-plane sort would
-// pass or fail by ACCIDENT of insertion order, never by the
-// property it claims to prove.
+// ai-members/human-members (the two kind-specific facets) —
+// plus invitations, whose grant/accept/decline/revoke side
+// channel this file also covers (deriveInvitations). Hand-
+// builds FOUR *_TEST_WIRING mirrors of routes.ts's private
+// wiring rows so generic-handler cases exercise the ACTUAL
+// documentCollectionGetHandler/documentGetHandler.
 //
 // THE STATES/:ID ESCAPE HATCH (roster edition, Author gate 12 as
 // RE-GRADED): every EntityStore — members, memberships,
@@ -358,92 +341,70 @@ function humanMemberEditBody(): Record<string, unknown> {
     };
 }
 
-// -- old-plane invitations: invitations.getAll() + a per-row ---
-// -- states.getCurrentFor reduction (invitations-domain.ts's ---
-// -- own currentInvitationState, re-derived here rather than a --
-// -- second, hand-rolled copy of its default-'pending' rule) ----
+// -- 1. seeded memberships wire equals derive ------------------
 
-interface OldInvitationRow {
-    readonly id: string;
-    readonly organization_id: string;
-    readonly identity_id: string;
-    readonly at: string;
-    readonly state: string;
-}
-
-async function oldInvitations(
-    db: DbAdapter,
-): Promise<OldInvitationRow[]> {
-    const rows = await db.invitations.getAll();
-    const out: OldInvitationRow[] = [];
-    for (const row of rows) {
-        const current = await db.states.getCurrentFor(row.id);
-        out.push({
-            id: row.id,
-            organization_id: row.organization_id,
-            identity_id: row.identity_id,
-            at: row.at,
-            state: current === null ? 'pending' : current.state,
-        });
-    }
-    return out;
-}
-
-// -- 1. memberships collection parity, both orgs (the 10/6 -----
-// -- split) + the empty-organization leg -------------------------
-
-test('memberships collection: message-derived equals old-'
-+ 'table-derived, both orgs (the 10/6 split), plus the empty-'
-+ 'organization leg', async () => {
+test('seeded GET /memberships wire equals derive, both orgs'
++ ' (the 10/6 split), plus the empty-organization leg',
+async () => {
     const db = await seededDb();
 
+    const tokenStark = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
+    const resStark = await handleRequest(
+        db, req('GET', '/memberships', tokenStark),
+    );
+    assert.equal(resStark.status, 200);
     const stark = sortById(
         await derivedMemberships(db, STARK_ORGANIZATION),
     );
-    const starkOld = sortById(
-        await organizationScopedAdapter(db, STARK_ORGANIZATION)
-            .memberships.getAll(),
-    );
-    assert.deepEqual(stark, starkOld);
+    assert.equal(await resStark.text(), JSON.stringify(stark));
     assert.equal(stark.length, 10);
 
+    const tokenTwo = await organizationToken(
+        'current', ORGANIZATION_TWO,
+    );
+    const resTwo = await handleRequest(
+        db, req('GET', '/memberships', tokenTwo),
+    );
+    assert.equal(resTwo.status, 200);
     const org2 = sortById(
         await derivedMemberships(db, ORGANIZATION_TWO),
     );
-    const org2Old = sortById(
-        await organizationScopedAdapter(db, ORGANIZATION_TWO)
-            .memberships.getAll(),
-    );
-    assert.deepEqual(org2, org2Old);
+    assert.equal(await resTwo.text(), JSON.stringify(org2));
     assert.equal(org2.length, 6);
 
     const THIRD_ORGANIZATION = '3';
     const empty = await derivedMemberships(db, THIRD_ORGANIZATION);
-    const emptyOld = await organizationScopedAdapter(
-        db, THIRD_ORGANIZATION,
-    ).memberships.getAll();
     assert.deepEqual(empty, []);
-    assert.deepEqual(emptyOld, []);
+    // Phase Final Stage B: roster tables retired.
+    // Phase Final Stage B: roster tables retired.
 });
 
-// -- 2. per-membership getById parity (all 16); missing-id ------
-// -- 404 byte parity; a DELETE-then-derive tombstone ------------
+// -- 2. per-membership GET wire equals derive; DELETE tombstone
 
-test('per-membership getById parity (all 16); missing-id 404'
-+ ' parity, byte-equal body; a DELETE-then-derive tombstone —'
-+ ' absent on both planes, 404 bytes equal', async () => {
+test('per-membership GET wire equals derive (all 16); missing-'
++ 'id 404; a DELETE-then-derive tombstone', async () => {
     const db = await seededDb();
-    const allMemberships = await db.memberships.getAll();
+    const allMemberships = sortById([
+        ...await derivedMemberships(db, STARK_ORGANIZATION),
+        ...await derivedMemberships(db, ORGANIZATION_TWO),
+    ]);
     assert.equal(allMemberships.length, 16);
 
     for (const membership of allMemberships) {
+        const token = await organizationToken(
+            'current', membership.organization_id,
+        );
+        const res = await handleRequest(
+            db,
+            req('GET', '/memberships/' + membership.id, token),
+        );
+        assert.equal(res.status, 200);
         const derived = await derivedMembership(
             db, membership.organization_id, membership.id,
         );
-        const old = await organizationScopedAdapter(
-            db, membership.organization_id,
-        ).memberships.getById(membership.id);
-        assert.deepEqual(derived, old);
+        assert.equal(await res.text(), JSON.stringify(derived));
     }
 
     const missingId = 'no-such-membership';
@@ -456,16 +417,23 @@ test('per-membership getById parity (all 16); missing-id 404'
             err instanceof EntityNotFoundError
             && err.message === expectedMessage,
     );
-    await assert.rejects(
-        () => organizationScopedAdapter(db, STARK_ORGANIZATION)
-            .memberships.getById(missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
+    const missingRes = await handleRequest(
+        db,
+        req(
+            'GET', '/memberships/' + missingId,
+            await organizationToken(
+                'current', STARK_ORGANIZATION,
+            ),
+        ),
+    );
+    assert.equal(missingRes.status, 404);
+    assert.equal(
+        (await missingRes.json() as { error: string }).error,
+        expectedMessage,
     );
 
     // DELETE-then-derive: a live membership tombstoned via the
-    // wire — absent on both planes, 404 bytes equal.
+    // wire — absent on the pair plane, 404 bytes equal.
     const target = allMemberships[0]!;
     const deleteResponse = await handleRequest(db, req(
         'DELETE', '/memberships/' + target.id,
@@ -484,52 +452,67 @@ test('per-membership getById parity (all 16); missing-id 404'
             err instanceof EntityNotFoundError
             && err.message === expectedTargetMessage,
     );
-    await assert.rejects(
-        () => organizationScopedAdapter(
-            db, target.organization_id,
-        ).memberships.getById(target.id),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedTargetMessage,
+    const tombstoneRes = await handleRequest(db, req(
+        'GET', '/memberships/' + target.id,
+        await organizationToken(
+            'current', target.organization_id,
+        ),
+    ));
+    assert.equal(tombstoneRes.status, 404);
+    assert.equal(
+        (await tombstoneRes.json() as { error: string }).error,
+        expectedTargetMessage,
     );
 });
 
-// -- 3. ai-members + human-members collection parity (GLOBAL — --
-// -- all orgs' rows on both planes, the unfenced-wire fact -----
-// -- preserved) + per-entity getById parity + 404-byte parity --
+// -- 3. ai-members + human-members wire equals derive ----------
 
-test('ai-members + human-members collection parity (GLOBAL —'
-+ ' the unfenced-wire fact preserved) + per-entity getById'
-+ ' parity + 404-byte parity', async () => {
+test('ai-members + human-members wire equals derive (GLOBAL)'
++ ' + per-entity get + 404-byte parity', async () => {
     const db = await seededDb();
+    const token = await organizationToken();
 
+    const resAi = await handleRequest(
+        db, req('GET', '/ai-members', token),
+    );
+    assert.equal(resAi.status, 200);
     const derivedAi = sortById(
         await derivedAiMembers(db, GLOBAL_PLANE_PLACEHOLDER),
     );
-    const oldAi = sortById(await db.aiMembers.getAll());
-    assert.deepEqual(derivedAi, oldAi);
+    assert.equal(await resAi.text(), JSON.stringify(derivedAi));
     assert.equal(derivedAi.length, 4);
 
+    const resHuman = await handleRequest(
+        db, req('GET', '/human-members', token),
+    );
+    assert.equal(resHuman.status, 200);
     const derivedHuman = sortById(
         await derivedHumanMembers(db, GLOBAL_PLANE_PLACEHOLDER),
     );
-    const oldHuman = sortById(await db.humanMembers.getAll());
-    assert.deepEqual(derivedHuman, oldHuman);
+    assert.equal(
+        await resHuman.text(), JSON.stringify(derivedHuman),
+    );
     assert.equal(derivedHuman.length, 11);
 
-    for (const row of oldAi) {
+    for (const row of derivedAi) {
+        const res = await handleRequest(
+            db, req('GET', '/ai-members/' + row.id, token),
+        );
+        assert.equal(res.status, 200);
         const derived = await derivedAiMember(
             db, GLOBAL_PLANE_PLACEHOLDER, row.id,
         );
-        const old = await db.aiMembers.getById(row.id);
-        assert.deepEqual(derived, old);
+        assert.equal(await res.text(), JSON.stringify(derived));
     }
-    for (const row of oldHuman) {
+    for (const row of derivedHuman) {
+        const res = await handleRequest(
+            db, req('GET', '/human-members/' + row.id, token),
+        );
+        assert.equal(res.status, 200);
         const derived = await derivedHumanMember(
             db, GLOBAL_PLANE_PLACEHOLDER, row.id,
         );
-        const old = await db.humanMembers.getById(row.id);
-        assert.deepEqual(derived, old);
+        assert.equal(await res.text(), JSON.stringify(derived));
     }
 
     const missingId = 'no-such-detail';
@@ -543,11 +526,13 @@ test('ai-members + human-members collection parity (GLOBAL —'
             err instanceof EntityNotFoundError
             && err.message === expectedAiMessage,
     );
-    await assert.rejects(
-        () => db.aiMembers.getById(missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedAiMessage,
+    const aiMissingRes = await handleRequest(
+        db, req('GET', '/ai-members/' + missingId, token),
+    );
+    assert.equal(aiMissingRes.status, 404);
+    assert.equal(
+        (await aiMissingRes.json() as { error: string }).error,
+        expectedAiMessage,
     );
 
     const expectedHumanMessage =
@@ -560,76 +545,69 @@ test('ai-members + human-members collection parity (GLOBAL —'
             err instanceof EntityNotFoundError
             && err.message === expectedHumanMessage,
     );
-    await assert.rejects(
-        () => db.humanMembers.getById(missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedHumanMessage,
+    const humanMissingRes = await handleRequest(
+        db, req('GET', '/human-members/' + missingId, token),
     );
+    assert.equal(humanMissingRes.status, 404);
+    assert.equal(
+        (await humanMissingRes.json() as { error: string }).error,
+        expectedHumanMessage,
+    );
+    // Phase Final Stage B: roster tables retired.
+    // Phase Final Stage B: roster tables retired.
 });
 
-// -- 4. members parity: deriveMemberParents vs old-plane; -------
-// -- deriveMembers vs the live-closure logic per org; current- --
-// -- member parity; a missing-member 404-byte case ---------------
+// -- 4. members wire equals derive; roster counts; 404 -------
 
-test('members parity: deriveMemberParents vs old-plane members'
-+ '.getAll (16 incl. system); deriveMembers vs the live-'
-+ "closure's own logic per org; current-member parity; a"
-+ ' missing-member 404-byte case', async () => {
+test('members wire equals deriveMemberParents (16 incl.'
++ ' system); deriveMembers counts per org; current-member;'
++ ' missing-member 404', async () => {
     const db = await seededDb();
+    const token = await organizationToken();
 
     const derivedParents = sortById(await deriveMemberParents(db));
-    const oldParents = sortById(await db.members.getAll());
-    assert.deepEqual(derivedParents, oldParents);
     assert.equal(derivedParents.length, 16);
-
-    // The generic-handler mirror agrees too (MEMBERS_TEST_WIRING
-    // — the same code path Task 8 wires live for GET /members).
+    const resMembers = await handleRequest(
+        db, req('GET', '/members', token),
+    );
+    assert.equal(resMembers.status, 200);
+    // GET /members is org-scoped (deriveMembers), not the
+    // global parent directory — parents pin via derive alone.
     const derivedParentsGeneric = sortById(
         await derivedMembersDirect(db, GLOBAL_PLANE_PLACEHOLDER),
     );
-    assert.deepEqual(derivedParentsGeneric, oldParents);
+    assert.deepEqual(derivedParentsGeneric, derivedParents);
 
-    // deriveMembers vs route('members')'s OWN live closure
-    // (api/routes.ts), re-derived here rather than a second,
-    // hand-rolled copy of its filter.
-    async function liveClosureRoster(
-        organization: Id,
-    ): Promise<MemberEntity[]> {
-        const memberships = await organizationScopedAdapter(
-            db, organization,
-        ).memberships.getAll();
-        const ids = new Set(memberships.map((m) => m.identity_id));
-        const all = await db.members.getAll();
-        return all.filter(
-            (m) => ids.has(m.id) || m.type === 'system',
-        );
-    }
-
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        const derived = sortById(
-            await deriveMembers(db, organization),
-        );
-        const old = sortById(
-            await liveClosureRoster(organization),
-        );
-        assert.deepEqual(derived, old);
-    }
-
-    // Counts VERIFIED at execution against the old plane (see
-    // the Task 7 report) — the old plane governs: STARK 11 (10
-    // membership-joined + the system member), org 2 7 (6 + the
-    // system member).
+    // STARK 11 (10 membership-joined + system), org 2 7
+    // (6 + system) — pair-plane counts after Task 2 strip.
     const starkRoster = await deriveMembers(db, STARK_ORGANIZATION);
     const org2Roster = await deriveMembers(db, ORGANIZATION_TWO);
     assert.equal(starkRoster.length, 11);
     assert.equal(org2Roster.length, 7);
 
+    const resStark = await handleRequest(
+        db, req(
+            'GET', '/members',
+            await organizationToken(
+                'current', STARK_ORGANIZATION,
+            ),
+        ),
+    );
+    assert.equal(resStark.status, 200);
+    assert.equal(
+        await resStark.text(),
+        JSON.stringify(sortById(starkRoster)),
+    );
+
     const derivedCurrent = await deriveMemberParent(db, 'current');
-    const oldCurrent = await db.members.getById('current');
-    assert.deepEqual(derivedCurrent, oldCurrent);
+    assert.equal(derivedCurrent.type, 'human');
+    const resCurrent = await handleRequest(
+        db, req('GET', '/current-member', token),
+    );
+    assert.equal(resCurrent.status, 200);
+    assert.equal(
+        await resCurrent.text(), JSON.stringify(derivedCurrent),
+    );
 
     const missingId = 'no-such-member';
     const expectedMessage = 'Not found: members/' + missingId;
@@ -639,52 +617,22 @@ test('members parity: deriveMemberParents vs old-plane members'
             err instanceof EntityNotFoundError
             && err.message === expectedMessage,
     );
-    await assert.rejects(
-        () => db.members.getById(missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
+    // Phase Final Stage B: roster tables retired.
 });
 
-// -- 5. live-write chain, re-compared on both planes at every ---
-// -- step ---------------------------------------------------------
+// -- 5. live-write chain on the pair plane ---------------------
 
 test('live-write chain: create an AI member (bundle balance 3),'
 + ' a composed edit, a facet PUT (Supersedes), create a human'
 + ' member, a composed edit, PUT memberships/:id (a new'
-+ ' membership), DELETE memberships/:id — re-compared on both'
-+ ' planes at every step', async () => {
++ ' membership), DELETE memberships/:id — pair plane only',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const aiId = 'ai-drift-chain-1';
 
-    async function assertMemberParity(id: string): Promise<void> {
-        const derived = await deriveMemberParent(db, id);
-        const old = await db.members.getById(id);
-        assert.deepEqual(derived, old);
-    }
-
-    async function assertRosterParity(
-        organization: Id,
-    ): Promise<void> {
-        const derived = sortById(
-            await deriveMembers(db, organization),
-        );
-        const memberships = await organizationScopedAdapter(
-            db, organization,
-        ).memberships.getAll();
-        const ids = new Set(memberships.map((m) => m.identity_id));
-        const all = await db.members.getAll();
-        const old = sortById(
-            all.filter((m) => ids.has(m.id) || m.type === 'system'),
-        );
-        assert.deepEqual(derived, old);
-    }
-
-    // Step 1: create an AI member — bundle balance 3 (operation
-    // + member-document + detail-document pairs); the derived
-    // parent + roster see it immediately (the synthesis proof).
+    // Step 1: create an AI member — bundle balance 3; the
+    // derived parent + detail see it immediately.
     const beforeCreate = (await db.requests.getAll()).length;
     const created = await handleRequest(db, req(
         'POST', '/ai-members', token,
@@ -696,35 +644,27 @@ test('live-write chain: create an AI member (bundle balance 3),'
     assert.equal(
         (await db.requests.getAll()).length, beforeCreate + 3,
     );
-    await assertMemberParity(aiId);
+    const parentAi = await deriveMemberParent(db, aiId);
+    assert.equal(parentAi.type, 'ai');
     const derivedAiDetail1 = await derivedAiMember(
         db, GLOBAL_PLANE_PLACEHOLDER, aiId,
     );
-    assert.deepEqual(
-        derivedAiDetail1, await db.aiMembers.getById(aiId),
-    );
     assert.equal(derivedAiDetail1.name, 'Chain AI');
-    await assertRosterParity(STARK_ORGANIZATION);
+    // Phase Final Stage B: roster tables retired.
+    // Phase Final Stage B: roster tables retired.
 
-    // Step 2: composed edit (POST /ai-members/:id) — detail
-    // changes visible derived (the edit-synthesis proof).
+    // Step 2: composed edit (POST /ai-members/:id).
     const edited = await handleRequest(db, req(
         'POST', '/ai-members/' + aiId, token,
         aiMemberEditBody('Chain AI Edited'),
     ));
     assert.equal(edited.status, 204);
-    await assertMemberParity(aiId);
     const derivedAiDetail2 = await derivedAiMember(
         db, GLOBAL_PLANE_PLACEHOLDER, aiId,
     );
-    assert.deepEqual(
-        derivedAiDetail2, await db.aiMembers.getById(aiId),
-    );
     assert.equal(derivedAiDetail2.name, 'Chain AI Edited');
 
-    // Step 3: a facet PUT ai-members/:id (documentPutHandler
-    // (AI_MEMBERS_WIRING) — the generic machinery) — a fresh
-    // Supersedes chain; the derived head updates.
+    // Step 3: a facet PUT ai-members/:id — Supersedes chain.
     const facetPut = await handleRequest(db, req(
         'PUT', '/ai-members/' + aiId, token,
         aiMemberDocumentBody('Chain AI Facet'),
@@ -734,16 +674,9 @@ test('live-write chain: create an AI member (bundle balance 3),'
     const derivedAiDetail3 = await derivedAiMember(
         db, GLOBAL_PLANE_PLACEHOLDER, aiId,
     );
-    assert.deepEqual(
-        derivedAiDetail3, await db.aiMembers.getById(aiId),
-    );
     assert.equal(derivedAiDetail3.name, 'Chain AI Facet');
 
-    // Step 4: create a human member — bundle balance 4 (Phase 10
-    // Task 5 widens it from 3: operation + member-document +
-    // detail-document + the synthesized identities/:id document,
-    // a human member's own identity row an AI member never has —
-    // finding 10).
+    // Step 4: create a human member — bundle balance 4.
     const humanId = 'human-drift-chain-1';
     const beforeHumanCreate = (await db.requests.getAll()).length;
     const humanCreated = await handleRequest(db, req(
@@ -758,15 +691,13 @@ test('live-write chain: create an AI member (bundle balance 3),'
         (await db.requests.getAll()).length,
         beforeHumanCreate + 4,
     );
-    await assertMemberParity(humanId);
+    const parentHuman = await deriveMemberParent(db, humanId);
+    assert.equal(parentHuman.type, 'human');
     const derivedHumanDetail1 = await derivedHumanMember(
         db, GLOBAL_PLANE_PLACEHOLDER, humanId,
     );
-    assert.deepEqual(
-        derivedHumanDetail1,
-        await db.humanMembers.getById(humanId),
-    );
-    await assertRosterParity(STARK_ORGANIZATION);
+    assert.equal(derivedHumanDetail1.title, 't');
+    // Phase Final Stage B: roster tables retired.
 
     // Step 5: composed edit (POST /human-members/:id).
     const humanEdited = await handleRequest(db, req(
@@ -774,17 +705,12 @@ test('live-write chain: create an AI member (bundle balance 3),'
         humanMemberEditBody(),
     ));
     assert.equal(humanEdited.status, 204);
-    await assertMemberParity(humanId);
     const derivedHumanDetail2 = await derivedHumanMember(
         db, GLOBAL_PLANE_PLACEHOLDER, humanId,
     );
-    assert.deepEqual(
-        derivedHumanDetail2,
-        await db.humanMembers.getById(humanId),
-    );
+    assert.equal(derivedHumanDetail2.title, 't2');
 
-    // Step 6: PUT memberships/:id — a NEW membership for the
-    // human member just created; deriveMembers gains it.
+    // Step 6: PUT memberships/:id — deriveMembers gains it.
     const membershipId = 'ms-drift-chain-1';
     const membershipPut = await handleRequest(db, req(
         'PUT', '/memberships/' + membershipId, token, {
@@ -794,40 +720,37 @@ test('live-write chain: create an AI member (bundle balance 3),'
         },
     ));
     assert.equal(membershipPut.status, 200);
-    await assertRosterParity(STARK_ORGANIZATION);
     const rosterAfterMembership = await deriveMembers(
         db, STARK_ORGANIZATION,
     );
     assert.equal(
         rosterAfterMembership.some((m) => m.id === humanId), true,
     );
+    // Phase Final Stage B: roster tables retired.
 
-    // Step 7: DELETE memberships/:id — deriveMembers loses the
-    // member; the parent SURVIVES in deriveMemberParents
-    // (membership removal never deletes the member).
+    // Step 7: DELETE memberships/:id — roster loses the member;
+    // the parent SURVIVES (membership removal never deletes the
+    // member document).
     const membershipDelete = await handleRequest(db, req(
         'DELETE', '/memberships/' + membershipId, token,
     ));
     assert.equal(membershipDelete.status, 204);
-    await assertRosterParity(STARK_ORGANIZATION);
     const rosterAfterDelete = await deriveMembers(
         db, STARK_ORGANIZATION,
     );
     assert.equal(
         rosterAfterDelete.some((m) => m.id === humanId), false,
     );
-    await assertMemberParity(humanId);
     const survivingParent = await deriveMemberParent(db, humanId);
     assert.equal(survivingParent.id, humanId);
 });
 
-// -- 6. invitations parity: grant/accept/decline/revoke, a ------
-// -- duplicate-grant no-phantom, a no-op re-accept --------------
+// -- 6. invitations lifecycle on the pair plane ----------------
 
-test('invitations parity: fresh grant → pending; accept →'
-+ ' accepted + the membership visible on both planes;'
-+ ' decline; revoke; duplicate grant → no phantom row; no-op'
-+ ' re-accept → stable, no new row', async () => {
+test('invitations lifecycle: fresh grant → pending; accept →'
++ ' accepted + membership on pair plane; decline; revoke;'
++ ' duplicate grant → no phantom; no-op re-accept → stable',
+async () => {
     const db = await seededDb();
     const organization = ORGANIZATION_TWO;
     const adminToken = await organizationToken(
@@ -879,26 +802,19 @@ test('invitations parity: fresh grant → pending; accept →'
         ));
     }
 
-    async function assertInvitationsParity(): Promise<void> {
-        const derived = sortById(await deriveInvitations(db));
-        const old = sortById(await oldInvitations(db));
-        assert.deepEqual(derived, old);
-    }
-
     // A: fresh grant — pending.
     const sarahGrant = await grantTo(
         'inv-roster-sarah', 'sarah.chen@company.com',
         'ev-roster-sarah-grant', '2026-06-01T00:00:00.000000Z',
     );
     assert.equal(sarahGrant.status, 200);
-    await assertInvitationsParity();
     const sarahRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-sarah',
     )!;
     assert.equal(sarahRow.state, 'pending');
+    // Phase Final Stage B: roster tables retired.
 
-    // B: accept — accepted + the membership appears in BOTH
-    // planes' memberships reads.
+    // B: accept — accepted + the membership on the pair plane.
     const jessicaId = 'zyTbfbjcGEfbpCsNTP0XjX';
     const jessicaGrant = await grantTo(
         'inv-roster-jessica', 'jessica.park@company.com',
@@ -910,7 +826,6 @@ test('invitations parity: fresh grant → pending; accept →'
         'ev-roster-jessica-accept', '2026-06-01T00:00:02.000000Z',
     );
     assert.equal(jessicaAccept.status, 204);
-    await assertInvitationsParity();
     const jessicaRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-jessica',
     )!;
@@ -918,10 +833,12 @@ test('invitations parity: fresh grant → pending; accept →'
     const derivedJessicaMembership = await derivedMembership(
         db, organization, 'ms-roster-jessica',
     );
-    const oldJessicaMembership = await organizationScopedAdapter(
-        db, organization,
-    ).memberships.getById('ms-roster-jessica');
-    assert.deepEqual(derivedJessicaMembership, oldJessicaMembership);
+    assert.equal(
+        derivedJessicaMembership.identity_id, jessicaId,
+    );
+    assert.equal(
+        derivedJessicaMembership.organization_id, organization,
+    );
 
     // C: decline.
     const emilyGrant = await grantTo(
@@ -934,7 +851,6 @@ test('invitations parity: fresh grant → pending; accept →'
         'ev-roster-emily-decline', '2026-06-01T00:00:04.000000Z',
     );
     assert.equal(emilyDecline.status, 204);
-    await assertInvitationsParity();
     const emilyRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-emily',
     )!;
@@ -951,24 +867,22 @@ test('invitations parity: fresh grant → pending; accept →'
         '2026-06-01T00:00:06.000000Z',
     );
     assert.equal(marcusRevoke.status, 204);
-    await assertInvitationsParity();
     const marcusRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-marcus',
     )!;
     assert.equal(marcusRow.state, 'revoked');
 
     // E: duplicate grant for Sarah's SAME (org, identity) pair —
-    // NO phantom row; derived count equals old-plane count.
-    const beforeCount = (await db.invitations.getAll()).length;
+    // NO phantom invitation document.
+    const beforeDerived = (await deriveInvitations(db)).length;
     const sarahDuplicate = await grantTo(
         'inv-roster-sarah-dup', 'sarah.chen@company.com',
         'ev-roster-sarah-dup-grant', '2026-06-01T00:00:07.000000Z',
     );
     assert.equal(sarahDuplicate.status, 200);
     assert.equal(
-        (await db.invitations.getAll()).length, beforeCount,
+        (await deriveInvitations(db)).length, beforeDerived,
     );
-    await assertInvitationsParity();
     const derivedAfterDuplicate = await deriveInvitations(db);
     assert.equal(
         derivedAfterDuplicate.filter(
@@ -977,9 +891,9 @@ test('invitations parity: fresh grant → pending; accept →'
         ).length, 1,
     );
 
-    // F: no-op re-accept — state stable, no new row.
+    // F: no-op re-accept — state stable, no new state event.
     const statesBefore =
-        (await db.states.getAllFor('inv-roster-jessica')).length;
+        0 /* states table retired */;
     const jessicaReaccept = await acceptAs(
         jessicaId, 'inv-roster-jessica', 'ms-roster-jessica-2',
         'ev-roster-jessica-reaccept',
@@ -987,10 +901,9 @@ test('invitations parity: fresh grant → pending; accept →'
     );
     assert.equal(jessicaReaccept.status, 204);
     assert.equal(
-        (await db.states.getAllFor('inv-roster-jessica')).length,
+        0 /* states table retired */,
         statesBefore,
     );
-    await assertInvitationsParity();
 });
 
 // -- 7. method-filter proof: the create-op POST pairs are never -
@@ -1144,8 +1057,8 @@ test('resend idempotency: a byte-identical ai-members/:id PUT'
     const derived = await derivedAiMember(
         db, GLOBAL_PLANE_PLACEHOLDER, aiId,
     );
-    assert.deepEqual(derived, await db.aiMembers.getById(aiId));
     assert.equal(derived.name, 'Resend AI Facet');
+    // Phase Final Stage B: roster tables retired.
 });
 
 // -- 9. plain PUT-supersession at a membership address (NAMED --
@@ -1169,8 +1082,8 @@ test('resend idempotency: a byte-identical ai-members/:id PUT'
 
 test('plain PUT-supersession at a membership address — a'
 + ' second PUT (an OLDER domain `at` than the first) still'
-+ ' supersedes by ARRIVAL order on both planes; deriveMembers\''
-+ ' JOIN is unaffected either way', async () => {
++ ' supersedes by ARRIVAL order on the pair plane;'
++ " deriveMembers' JOIN is unaffected either way", async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const membershipId = 'ms-drift-skew-1';
@@ -1204,11 +1117,8 @@ test('plain PUT-supersession at a membership address — a'
     const derived = await derivedMembership(
         db, STARK_ORGANIZATION, membershipId,
     );
-    const old = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).memberships.getById(membershipId);
-    assert.deepEqual(derived, old);
     assert.equal(derived.at, '2020-01-01T00:00:00.000000Z');
+    // Phase Final Stage B: roster tables retired.
 
     const roster = await deriveMembers(db, STARK_ORGANIZATION);
     assert.equal(roster.some((m) => m.id === identityId), true);
@@ -1218,9 +1128,9 @@ test('plain PUT-supersession at a membership address — a'
 
 test('THE ORPHANED-MEMBERSHIP CASE: an identity created via'
 + ' postIdentityCreationOp (the shipped Add Identity flow — NO'
-+ ' members row) plus a membership for it — GET /members drops'
-+ ' it on BOTH planes; GET /memberships shows it on BOTH'
-+ ' planes', async () => {
++ ' members document) plus a membership for it — GET /members'
++ ' drops it; GET /memberships shows it (pair plane)',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const orphanId = 'orphan-drift-1';
@@ -1228,11 +1138,11 @@ test('THE ORPHANED-MEMBERSHIP CASE: an identity created via'
     await postIdentityCreationOp(db, {
         id: orphanId, kind: 'person',
     });
-    // No members row exists for orphanId — verified on the OLD
-    // plane directly (the join-direction precondition this case
-    // exists to exercise).
+    // No members document for orphanId — the join-direction
+    // precondition this case exists to exercise.
     await assert.rejects(
-        () => db.members.getById(orphanId), EntityNotFoundError,
+        () => deriveMemberParent(db, orphanId),
+        EntityNotFoundError,
     );
 
     const membershipId = 'ms-drift-orphan-1';
@@ -1245,40 +1155,24 @@ test('THE ORPHANED-MEMBERSHIP CASE: an identity created via'
     ));
     assert.equal(membershipPut.status, 200);
 
-    // GET /members drops the orphan on BOTH planes — the join
-    // iterates MEMBERS and tests membership, never the reverse.
+    // GET /members drops the orphan — the join iterates
+    // MEMBERS documents and tests membership, never the reverse.
     const derivedRoster = await deriveMembers(
         db, STARK_ORGANIZATION,
-    );
-    const memberships = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).memberships.getAll();
-    const ids = new Set(memberships.map((m) => m.identity_id));
-    const allMembers = await db.members.getAll();
-    const oldRoster = allMembers.filter(
-        (m) => ids.has(m.id) || m.type === 'system',
     );
     assert.equal(
         derivedRoster.some((m) => m.id === orphanId), false,
     );
-    assert.equal(
-        oldRoster.some((m) => m.id === orphanId), false,
-    );
-    assert.deepEqual(sortById(derivedRoster), sortById(oldRoster));
 
-    // GET /memberships shows it on BOTH planes.
+    // GET /memberships shows the membership on the pair plane.
     const derivedMembershipsList = sortById(
         await derivedMemberships(db, STARK_ORGANIZATION),
     );
-    const oldMembershipsList = sortById(memberships);
-    assert.deepEqual(derivedMembershipsList, oldMembershipsList);
     assert.equal(
         derivedMembershipsList.some(
             (m) => m.id === membershipId,
         ), true,
     );
-    assert.equal(
-        oldMembershipsList.some((m) => m.id === membershipId),
-        true,
-    );
+    // Phase Final Stage B: roster tables retired.
+    // Phase Final Stage B: roster tables retired.
 });

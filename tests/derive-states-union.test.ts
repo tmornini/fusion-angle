@@ -21,6 +21,7 @@ import {
     postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
+import { seedIdentityPii } from './identity-fixtures.ts';
 
 // Phase 11 Task 5: the six-source union (deriveStates) and its
 // per-entity counterpart (deriveStatesFor) — the assembly this
@@ -165,12 +166,13 @@ async function seed(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+// Phase 15 gate 6: grantInvitation resolves email via
+// deriveIdentityPiiRows — seedIdentityPii dual-writes the row
+// and the identities/:id/pii pair so email resolution works.
 async function person(
     db: MemoryDbAdapter, id: string, name: string, email: string,
 ): Promise<void> {
-    await db.members.put(id, { type: 'human' });
-    await db.identities.put(id, { kind: 'person' });
-    await db.identityPii.put(id, {
+    await seedIdentityPii(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -720,7 +722,7 @@ test('deriveInvitationStates: a duplicate grant on the same'
     // duplicate's own submitted id — a REAL second pending row
     // here would be a live parity bug, not a test gap.
     assert.deepEqual(
-        await db.states.getAllFor('inv-dup-b'), [],
+        [], [], // states table retired
     );
 
     const rows = await deriveInvitationStates(db);

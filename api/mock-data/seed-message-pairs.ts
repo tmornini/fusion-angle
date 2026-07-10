@@ -107,14 +107,13 @@
 // Phase 12 Task 3 onboards a NEW family — organizations, the
 // THIRTEENTH and last unflipped in-scope one
 // (api/derive-organizations.ts), registered ahead of this task
-// (family-registry.ts, Task 2). Its two seeded rows (Stark
-// Industries, Wayne Enterprises) form their OWN organizations/:id
-// document pair, the SAME per-family onboarding playbook every
-// prior family already rode: Path A — the row itself STAYS
-// RAW (the SAME direct adapter.organizations.put mock-data.ts
-// already made), only requests/responses gain the beside-it
-// pair. Bootstrap's own lone STARK_ORGANIZATION row mirrors this
-// SAME pair via formBootstrapMessagePair below.
+// (family-registry.ts, Task 2). Its two seeded organizations
+// (Stark Industries, Wayne Enterprises) form their OWN
+// organizations/:id document pair, the SAME per-family
+// onboarding playbook every prior family already rode. Phase
+// Final Task 2 strips the organizations ROW half — pairs alone
+// remain. Bootstrap's own lone STARK_ORGANIZATION pair mirrors
+// this via formBootstrapMessagePair below.
 
 import type {
     Id,
@@ -1497,13 +1496,9 @@ export function buildMockDataInvocations():
             body: ideaSeedBody(idea, event, i),
         });
     });
-    // Task 3 (Phase 12): the two seeded organization rows — Stark
-    // Industries and Wayne Enterprises — each form their OWN
-    // organizations/:id document pair too, mirroring the write
-    // order postMockDataLoadIn actually uses (organizations.put
-    // rides the SAME Promise.all as the ideas loop above, right
-    // after it). Path A: the row itself STAYS RAW — the SAME
-    // direct adapter.organizations.put as before.
+    // Phase 12 Task 3 / Phase Final Task 2: the two seeded
+    // organizations form their OWN organizations/:id document
+    // pairs (ROW half stripped — pair-plane only).
     invocations.push({
         key: seedPairKey('organizations/:id', STARK_ORGANIZATION),
         routePattern: 'organizations/:id',
@@ -1681,12 +1676,14 @@ export function buildMockDataInvocations():
     }
     // The 7 state_field_values rows nest under their OWN parent
     // trace event: idParams [stateEventId, fvId] — matches the
-    // live PUT states/:id/field-values/:fvid's params order
-    // (WRITE_RESPONSE_SPECS reads param(params, 1) as the leaf
-    // id). requesterIdentityId is the PARENT event's OWN
-    // member_id (the same person who authored that transition),
-    // looked up off the SAME traceEvents list above — never a
-    // second, independently-picked author.
+    // retired leaf PUT states/:id/field-values/:fvid params
+    // order (WRITE_RESPONSE_SPECS entry SURVIVES for seed
+    // formation, Phase 15 Task 7 / finding 7; reads
+    // param(params, 1) as the leaf id). requesterIdentityId is
+    // the PARENT event's OWN member_id (the same person who
+    // authored that transition), looked up off the SAME
+    // traceEvents list above — never a second, independently-
+    // picked author.
     const traceEventById = new Map(
         traceEvents.map(e => [e.id, e]),
     );
@@ -2407,10 +2404,8 @@ export async function formBootstrapMessagePair(
     // Task 3 (Phase 12): bootstrap's own lone organizations row
     // (STARK_ORGANIZATION — bootstrap seeds no second org) forms
     // its OWN pair too — the mock-data seed's own organizations
-    // precedent above, mirrored here for bootstrap's separate
-    // seed path. Path A: the row itself STAYS RAW (the SAME
-    // direct adapter.organizations.put mock-data.ts already
-    // made).
+    // precedent above, mirrored here. Phase Final Task 2:
+    // organizations ROW half stripped — pair-plane only.
     const organizationPair = await formSeedPair(
         {
             key: seedPairKey('organizations/:id', STARK_ORGANIZATION),

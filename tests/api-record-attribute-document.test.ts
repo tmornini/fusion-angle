@@ -122,17 +122,17 @@ test('postRecordAttributeDocumentOp writes exactly the'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postRecordAttributeDocumentOp(
+    // Phase Final Task 2: record_attributes ROW half stripped
+    // — pair plane + op return are the oracles.
+    const written = await postRecordAttributeDocumentOp(
         db, 'ra-doc-op-1', body, 'current', pair,
     );
-    const row = await db.recordAttributes.getById(
-        'ra-doc-op-1',
-    );
-    assert.deepEqual(row, {
+    assert.deepEqual(written, {
         id: 'ra-doc-op-1',
         organization_id: '1',
         ...documentFields(),
     });
+    // Phase Final Stage B: record_attributes table retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });

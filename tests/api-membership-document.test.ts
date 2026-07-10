@@ -103,8 +103,9 @@ test('validateMembershipDocumentBody rejects each missing key,'
 
 // -- 2. postMembershipDocumentOp (below-gate, MemoryDbAdapter) --
 
-test('postMembershipDocumentOp writes exactly the memberships'
-+ ' row and the pair', async () => {
+test('postMembershipDocumentOp writes exactly the pair and'
++ ' reconstructs the entity return (row half stripped)',
+async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     const body = documentFields();
@@ -121,14 +122,13 @@ test('postMembershipDocumentOp writes exactly the memberships'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postMembershipDocumentOp(
+    // Phase Final Task 2: memberships ROW half stripped —
+    // op returns the reconstructed entity; only pairs land.
+    const written = await postMembershipDocumentOp(
         db, 'ms-doc-op-1', body, 'current', pair,
     );
-    const row = await db.memberships.getById('ms-doc-op-1');
-    assert.deepEqual(row, {
-        id: 'ms-doc-op-1',
-        ...documentFields(),
-    });
+    assert.deepEqual(written, documentFields());
+    // Phase Final Stage B: roster tables retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });

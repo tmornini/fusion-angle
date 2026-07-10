@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import {
     MemoryDbAdapter,
@@ -13,6 +15,7 @@ import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     getIdeas,
     getIdea,
+    getIdeaEntity,
     putIdea,
     postIdeaCreation,
     postIdeaStateChange,
@@ -43,26 +46,13 @@ function buildIdea(
     };
 }
 
-async function seedIdeaState(
-    db: MemoryDbAdapter,
-    ideaId: string,
-    state: string,
-): Promise<void> {
-    await db.states.postEvent(
-        `st-${ideaId}`,
-        ideaId,
-        state,
-        'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
-}
-
 // Seeds an idea through the SAME document PUT the live route
 // uses (postIdeaCreation), so a message pair exists at this
 // idea's address — required for the flipped GET ideas / GET
-// ideas/:id routes (Phase 2 Task 5) to derive it. The direct
-// db.ideas.put + seedIdeaState idiom above stays for tests that
-// read only the raw stores or drive an op directly.
+// ideas/:id routes (Phase 2 Task 5) to derive it. Phase Final
+// Task 2 stripped the ideas row half: every test that needs a
+// readable idea must go through this path (or putIdea), never
+// a raw db.ideas.put.
 async function seedIdea(
     ctx: RequestContext,
     id: string,
@@ -154,18 +144,22 @@ test('getIdea throws on missing submission', async () => {
 });
 
 test('putIdea persists changes', async () => {
-    const { db, ctx } = await adminContext();
-    await db.ideas.put(
-        'i1', buildIdea('i1', 'Original'),
-    );
+    const { ctx } = await adminContext();
+    await seedIdea(ctx, 'i1', 'Original', 'active');
+    const before = await getIdeaEntity(ctx, 'i1');
+    const {
+        id: _id,
+        organization_id: _organizationId,
+        ...fields
+    } = before;
     await putIdea(ctx, 'i1', {
-        ...buildIdea('i1', 'Updated'),
+        ...fields,
+        title: 'Updated',
         state: 'active',
         stateAt: '2026-01-01T00:00:00.000000Z',
         stateEventId: 'ev-i1',
     });
-    const stored =
-        await db.ideas.getById('i1');
+    const stored = await getIdeaEntity(ctx, 'i1');
     assert.equal(stored.title, 'Updated');
 });
 
@@ -190,7 +184,7 @@ test('archived ideas are filtered from getIdeas', async () => {
 });
 
 test(
-    'postIdeaCreation persists the row and'
+    'postIdeaCreation persists via GET and'
     + ' records the initial state event',
     async () => {
         const { db, ctx } = await adminContext();
@@ -198,18 +192,19 @@ test(
             db, 'current', 'Demo User',
         );
 
+        const { organization_id: _o, ...entity } =
+            buildIdea('i1', 'Fresh');
         await postIdeaCreation(
             ctx,
             'i1',
-            buildIdea('i1', 'Fresh'),
+            entity,
             'active',
         );
 
-        const row =
-            await db.ideas.getById('i1');
+        const row = await getIdeaEntity(ctx, 'i1');
         assert.equal(row.title, 'Fresh');
         const events =
-            await db.states.getAllFor('i1');
+            await deriveStatesFor(db, '1', 'i1');
         assert.equal(events.length, 1);
         assert.equal(
             events[0]?.state,
@@ -220,28 +215,24 @@ test(
 
 test(
     'postIdeaStateChange records a state event'
-    + ' without touching the idea row',
+    + ' without changing entity fields on GET',
     async () => {
         const { db, ctx } = await adminContext();
         await seedHumanMember(
             db, 'current', 'Demo User',
         );
-        await db.ideas.put(
-            'i1', buildIdea('i1', 'Original'),
-        );
-        await seedIdeaState(db, 'i1', 'in_review');
-        const before =
-            await db.ideas.getById('i1');
+        await seedIdea(ctx, 'i1', 'Original', 'in_review');
+        const before = await getIdeaEntity(ctx, 'i1');
 
         await postIdeaStateChange(
             ctx, before, 'approved',
         );
 
-        const after =
-            await db.ideas.getById('i1');
+        const after = await getIdeaEntity(ctx, 'i1');
         assert.deepEqual(after, before);
         const events =
-            await db.states.getAllFor('i1');
+            await deriveStatesFor(db, '1', 'i1');
+        // genesis + transition
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'approved',
@@ -258,10 +249,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo User',
         );
-        await db.ideas.put(
-            'i1', buildIdea('i1', 'First'),
-        );
-        await seedIdeaState(db, 'i1', 'approved');
+        await seedIdea(ctx, 'i1', 'First', 'approved');
 
         const projectEntity:
             Omit<ProjectEntity, 'id'> = {
@@ -275,7 +263,7 @@ test(
             actual_cost: 0,
             position: 1,
         };
-        const promotedIdea =
+        const { organization_id: _o, ...promotedIdea } =
             buildIdea('i1', 'First');
 
         await postIdeaConversion(
@@ -292,18 +280,21 @@ test(
             ['obj-1', 'obj-2'],
         );
 
-        const project =
-            await db.projects.getById('p1');
+        // Phase Final Task 2: projects row half stripped —
+        // read via GET /projects/:id.
+        const project = await ctx.GET<{ title: string }>(
+            'projects/p1',
+        );
         assert.equal(project.title, 'P1');
 
         const ideaEvents =
-            await db.states.getAllFor('i1');
+            await deriveStatesFor(db, '1', 'i1');
         assert.equal(
             ideaEvents.at(-1)?.state, 'promoted',
         );
 
         const projectEvents =
-            await db.states.getAllFor('p1');
+            await deriveStatesFor(db, '1', 'p1');
         assert.equal(projectEvents.length, 1);
         assert.equal(
             projectEvents[0]?.state, 'submitted',
@@ -331,14 +322,8 @@ test(
     'postIdeaConversion rejects a conversion'
     + ' missing a score for an active objective',
     async () => {
-        const { db, ctx } = await adminContext();
-        await seedHumanMember(
-            db, 'current', 'Demo User',
-        );
-        await db.ideas.put(
-            'i1', buildIdea('i1', 'First'),
-        );
-        await seedIdeaState(db, 'i1', 'approved');
+        const { ctx } = await adminContext();
+        await seedIdea(ctx, 'i1', 'First', 'approved');
         const projectEntity:
             Omit<ProjectEntity, 'id'> = {
             organization_id: '1',
@@ -351,6 +336,8 @@ test(
             actual_cost: 0,
             position: 1,
         };
+        const { organization_id: _o, ...promotedIdea } =
+            buildIdea('i1', 'First');
         await assert.rejects(
             () => postIdeaConversion(
                 ctx,
@@ -358,7 +345,7 @@ test(
                 'p1',
                 projectEntity,
                 'submitted',
-                buildIdea('i1', 'First'),
+                promotedIdea,
                 [
                     { objectiveId: 'obj-1', score: 5 },
                 ],
@@ -384,11 +371,10 @@ test('deleted ideas are filtered from getIdeas', async () => {
     );
     // A transition to 'deleted' (ideas has no DELETE route) —
     // the flipped GET ideas derives visibility from the
-    // lifecycle trio, not a raw db.ideas.delete row removal, so
-    // the deletion must land as a document PUT like any other
-    // transition (mirrors drift-ideas.test.ts's lifecycle case).
+    // lifecycle trio, so the deletion must land as a document
+    // PUT like any other transition.
     await postIdeaStateChange(
-        ctx, await db.ideas.getById('i2'), 'deleted',
+        ctx, await getIdeaEntity(ctx, 'i2'), 'deleted',
     );
     const result = await getIdeas(ctx);
     assert.equal(result.length, 1);

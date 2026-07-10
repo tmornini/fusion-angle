@@ -1333,17 +1333,18 @@ export interface IdeaDocumentBody {
 // trio folded in. organization_id is deliberately absent from
 // the expected set (like every other org-owned write, the
 // client never supplies it; the org fence stamps it downstream
-// when view.ideas.put re-validates through validateIdeaEntity)
-// yet rides the `optional` allowance rather than `expected` —
-// a caller-forged organization_id is tolerated-but-ignored, not
-// rejected, because the fence's stamp always overrides whatever
-// key it finds (the forged-body isolation test relies on this).
-// The trio holds to the SAME rules the bare states/:id route
-// applies to an event (assertIdeaState, an RFC-3339 `at`, a
-// non-empty event id), so a folded document and a bare event
-// share one shape. Entity fields are picked directly rather
-// than delegated to validateIdeaEntity — that function REQUIRES
-// organization_id, which this body never carries pre-stamp.
+// when the write path stamps organization_id from the bound
+// org) yet rides the `optional` allowance rather than
+// `expected` — a caller-forged organization_id is
+// tolerated-but-ignored, not rejected, because the bound org
+// always overrides (the forged-body isolation test relies on
+// this). The trio holds to the SAME rules the bare states/:id
+// route applies to an event (assertIdeaState, an RFC-3339
+// `at`, a non-empty event id), so a folded document and a bare
+// event share one shape. Entity fields are picked directly
+// rather than delegated to validateIdeaEntity — that function
+// REQUIRES organization_id, which this body never carries
+// pre-stamp.
 export function validateIdeaDocumentBody(
     body: Record<string, unknown>,
 ): IdeaDocumentBody {
@@ -1567,14 +1568,11 @@ export interface FlowDocumentBody {
     // validateStoredGraphJson but stored as the SAME encoded
     // string — the op never re-serializes it.
     readonly graph: JsonObjectField;
-    // TRANSITIONAL decomposition sidecars — consumed by the
-    // old-plane relation writer (writeFlowGraphDelta) AND by
-    // deriveFlowGraphStates (api/derive-states.ts), the sole
-    // ledger source of flow-node/edge deleted/restored history.
-    // Retiring at Phase Final is now GATED on that lifecycle
-    // source being re-anchored elsewhere first — dropping these
-    // sidecars before then would silently stop recording every
-    // future node/edge delete/restore.
+    // SIDECAR-KEEP: graphDelta/revivals stay on the document
+    // pair body permanently — deriveFlowGraphStates is the
+    // sole ledger source of flow-node/edge deleted/restored
+    // history. Phase Final Task 2 retired writeFlowGraphDelta
+    // (the old-plane relation writer half).
     readonly graphDelta: FlowGraphDelta;
     readonly revivals: readonly GraphRevival[];
 }
@@ -2513,21 +2511,16 @@ export interface RecordDocumentBody {
 // full wire document — the entity's own fields plus the
 // lifecycle trio folded in. organization_id is deliberately
 // absent from the expected set (like every other org-owned
-// write, the client never supplies it; the org fence stamps it
-// downstream when view.records.put re-validates through
-// validateRecordEntity) yet rides the `optional` allowance
+// write, the client never supplies it; the org fence stamps
+// it on the response) yet rides the `optional` allowance
 // rather than `expected` — a caller-forged organization_id is
-// tolerated-but-ignored, not rejected, because the fence's
-// stamp always overrides whatever key it finds. The trio holds
-// to the SAME rules the bare states/:id route applies to an
-// event (assertRecordState, an RFC-3339 `at`, a non-empty
-// event id), so a folded document and a bare event share one
-// shape. Entity fields are picked directly rather than
-// delegated to validateRecordEntity — that function REQUIRES
-// organization_id, which this body never carries pre-stamp
-// (name's own non-empty invariant still lands downstream, at
-// view.records.put's own re-validation — this gate gates the
-// WIRE SHAPE, not the entity's own rules).
+// tolerated-but-ignored, not rejected. The trio holds to the
+// SAME rules the bare states/:id route applies to an event
+// (assertRecordState, an RFC-3339 `at`, a non-empty event
+// id). Phase Final Task 2: records ROW half stripped — this
+// gate is the sole entity-shape check for the document PUT
+// (validateRecordEntity REQUIRES organization_id, which this
+// body never carries pre-stamp). Name non-empty re-homes here.
 export function validateRecordDocumentBody(
     body: Record<string, unknown>,
 ): RecordDocumentBody {
@@ -2535,6 +2528,12 @@ export function validateRecordDocumentBody(
         body, RECORD_DOCUMENT_BODY_KEYS,
         'RecordDocumentBody', ['organization_id'],
     );
+    const name = pickString(body, 'name');
+    if (name === '') {
+        throw new ValidationError(
+            'RecordDocumentBody.name must be non-empty',
+        );
+    }
     const state = assertRecordState(
         pickString(body, 'state'),
         'RecordDocumentBody.state',
@@ -2548,7 +2547,7 @@ export function validateRecordDocumentBody(
     }
     return {
         entity: {
-            name: pickString(body, 'name'),
+            name,
             description: pickString(body, 'description'),
             position: pickNumber(body, 'position'),
         },
@@ -2664,12 +2663,12 @@ export interface RecordAttributeDocumentBody {
 // here is a pure entity edit. organization_id is deliberately
 // absent from the expected set (like every other org-owned
 // write, the client never supplies it; the org fence stamps it
-// downstream when view.recordAttributes.put re-validates
-// through validateRecordAttributeEntity) yet rides the
-// `optional` allowance rather than `expected` — a caller-forged
-// organization_id is tolerated-but-ignored, not rejected,
-// because the fence's stamp always overrides whatever key it
-// finds. REASON this validator exists rather than wiring
+// on the response) yet rides the `optional` allowance rather
+// than `expected` — a caller-forged organization_id is
+// tolerated-but-ignored, not rejected. Phase Final Task 2:
+// record_attributes ROW half stripped — this gate is the sole
+// entity-shape check for the document PUT. REASON this
+// validator exists rather than wiring
 // validateRecordAttributeEntity straight into
 // documentWriteResponseSpec: that generic builder calls
 // validateDocument WITHOUT pre-stamping organization_id (the
@@ -2677,11 +2676,9 @@ export interface RecordAttributeDocumentBody {
 // today's hand-written response spec pre-stamps the key BEFORE
 // calling validateRecordAttributeEntity — wiring the shipped
 // entity validator in directly would 500 any body lacking the
-// key, where today it 200s. Every existing fixture happens to
-// carry the key, so ./validate alone would not catch that
-// regression — this validator closes it by construction. Entity
-// fields are picked directly (the same constraints/options
-// rules validateRecordAttributeEntity enforces) rather than
+// key, where today it 200s. Entity fields are picked directly
+// (the same constraints/options rules
+// validateRecordAttributeEntity enforces) rather than
 // delegated to it — that function REQUIRES organization_id,
 // which this body never carries pre-stamp.
 export function validateRecordAttributeDocumentBody(
@@ -3678,19 +3675,17 @@ const TRANSITION_FIELD_VALUE_KEYS: readonly string[] = [
 ];
 
 // The HTTP-body gate for POST /work-orders/:id/transition: the
-// transition state event (target node), zero or more
-// state_field_values rows, and an OPTIONAL claim-release event,
-// written atomically. The web-app computes WHAT to write — the
-// target node, the field rows, and whether a live claim must be
-// released — exactly as POST /work-orders keeps graph derivation
-// client-side. The field-value `fields` are NOT fully validated
-// here: the state_field_values store re-validates each row
-// through validateStateFieldValueEntity AFTER the transition
-// event id is woven in. Authorship of the transition event AND
-// the release event is stamped from the verified caller in the
-// route, never the body — matching the old commit batch, where
-// both events flowed through PUT /states/:id and were stamped
-// with the actor.
+// transition state event (target node), zero or more field-
+// value folds, and an OPTIONAL claim-release event. The web-
+// app computes WHAT to write — the target node, the field
+// rows, and whether a live claim must be released. Phase
+// Final Task 2: state_field_values ROW half stripped; each
+// fields object is fully validated here via
+// validateStateFieldValueEntity (re-homed from the store put)
+// AFTER the MANDATORY state_event_id === transitionEventId
+// pin (Phase 15 Task 3, wire delta (4)). Authorship of the
+// transition event AND the release event is stamped from the
+// verified caller in the route, never the body.
 export function validateWorkOrderTransitionBody(
     body: Record<string, unknown>,
 ): WorkOrderTransitionBody {
@@ -3731,12 +3726,34 @@ export function validateWorkOrderTransitionBody(
                 label + '.id must be non-empty',
             );
         }
-        return {
-            id,
-            fields: asObject(
-                row['fields'], label + '.fields',
-            ),
-        };
+        const fields = asObject(
+            row['fields'], label + '.fields',
+        );
+        // Wire delta (4) — MANDATORY (Phase 15 Task 3): a
+        // transition-fold field value may only name THIS
+        // transaction's own transitionEventId. Dangling,
+        // foreign, or absent state_event_id values are
+        // unmintable prospectively (historical orphans still
+        // render via tier semantics on the read path). Shipped
+        // UI always sends the transaction's own id; only a
+        // forged client observes this 400. Soft-read so
+        // absent folds into the same message as a mismatch
+        // rather than pickString's type-error voice.
+        const rawStateEventId = fields['state_event_id'];
+        const stateEventId =
+            typeof rawStateEventId === 'string'
+                ? rawStateEventId
+                : '';
+        if (stateEventId !== transitionEventId) {
+            throw new ValidationError(
+                label + '.fields.state_event_id must equal'
+                + ' transitionEventId',
+            );
+        }
+        // Phase Final Task 2: re-home store put validation —
+        // field values ride the op pair body only.
+        validateStateFieldValueEntity(fields);
+        return { id, fields };
     });
     const rawRelease = body['release'];
     let release: WorkOrderTransitionRelease | null = null;

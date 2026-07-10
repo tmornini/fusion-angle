@@ -9,8 +9,6 @@ import {
     SNAPSHOT_SCHEMA_VERSION_KEY,
 } from '../api/db.ts';
 
-const KEY_PREFIX = 'fusion-ai:';
-
 function installFailingShim(
     failOnSetCall: number,
 ): Map<string, string> {
@@ -40,6 +38,14 @@ function installFailingShim(
     return map;
 }
 
+const clientRow = {
+    grant_types: 'authorization_code',
+    redirect_uris: 'https://example.com/cb',
+    jwks: '{}',
+    aud: 'aud',
+    status: 'active' as const,
+};
+
 // Wipe-on-fail is retired: the import now runs in one
 // transaction, so a validation error (at the gate) or a
 // logic error (inside the tx) leaves prior data intact via
@@ -55,9 +61,7 @@ test(
         const snapshot = JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,
-            members: [],
-            ideas: [],
-            projects: [],
+            clients: [],
         });
         await assert.rejects(
             () => adapter.putSnapshot(snapshot),
@@ -72,7 +76,9 @@ test(
         await adapter.putSnapshot(JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,
-            members: [{ id: 'm1', type: 'human' }],
+            clients: [
+                { id: 'm1', ...clientRow },
+            ],
         }));
         // An invalid row rejects at the validation gate,
         // before any storage touch — so the prior import
@@ -81,11 +87,17 @@ test(
             () => adapter.putSnapshot(JSON.stringify({
                 [SNAPSHOT_SCHEMA_VERSION_KEY]:
                     SNAPSHOT_SCHEMA_VERSION,
-                members: [{ id: 'm2', type: 'nope' }],
+                clients: [
+                    {
+                        id: 'm2',
+                        status: 'paused',
+                    },
+                ],
             })),
         );
-        const members = await adapter.members.getAll();
-        assert.equal(members.length, 1);
-        assert.equal(members[0]!.id, 'm1');
+        const clients =
+            await adapter.clients.getAll();
+        assert.equal(clients.length, 1);
+        assert.equal(clients[0]!.id, 'm1');
     },
 );

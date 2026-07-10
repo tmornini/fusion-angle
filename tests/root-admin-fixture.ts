@@ -50,32 +50,20 @@ export function organizationRow(
 
 // Below-facade pair formation for an organization document (the
 // identity-fixtures.ts precedent, applied to organizations):
-// every reader flipped onto deriveOrganization(s) (Phase 12 Task
-// 5) — and, from Phase 13 Task 3 on, deriveMembershipsForIdentity
-// (which enumerates via deriveOrganizations before probing each
-// org's own membership prefix) — sees ONLY the message ledger, so
-// a raw db.organizations.put, or a membership/role-grant pair
-// whose organization was never itself given a document, leaves
-// the identity's membership derivation-invisible even though the
-// row-plane sees it (production is never in this state — POST
-// /organizations always forms the pair before any membership can
-// name that org). Writes the SAME row + pair shape the live PUT
-// organizations/:id route forms, without handleRequest's
-// auth/notification overhead — organizations/:id's PUT stays
-// hand-written (no exported documentOp to call directly), so this
-// mirrors its transaction body instead. GLOBAL plane
-// (organizationNested: false) — `organization` stays undefined
-// throughout, the identity-fixtures.ts GLOBAL_PLANE_PLACEHOLDER
-// precedent. IDEMPOTENT on the PAIR PLANE (deriveOrganizations),
-// never the row plane: a handful of multi-org fixtures
-// (store-parent-scoped-flowgraph-fence.test.ts's own B-stays-raw
-// precedent) legitimately write `id`'s row directly, with no pair,
-// for an unrelated reason — checking db.organizations.getById
-// would read that raw row as "already seeded" and skip forming
-// the pair this function exists to guarantee. Checking the pair
-// plane instead means seedRootAdmin/seedOrganizationMember still
-// avoid a duplicate pair when both run against the same db, AND a
-// later call still forms the pair a raw-row-only site never did.
+// every reader of deriveOrganization(s) — and
+// deriveMembershipsForIdentity (which enumerates via
+// deriveOrganizations before probing each org's own membership
+// prefix) — sees ONLY the message ledger, so a raw
+// db.organizations.put, or a membership/role-grant pair whose
+// organization was never itself given a document, leaves the
+// identity's membership derivation-invisible. Phase Final Task
+// 2: organizations ROW half stripped — pure pair-plane write,
+// mirroring the live PUT organizations/:id route body. GLOBAL
+// plane (organizationNested: false) — `organization` stays
+// undefined throughout. IDEMPOTENT on the PAIR PLANE
+// (deriveOrganizations): seedRootAdmin/seedOrganizationMember
+// still avoid a duplicate pair when both run against the same
+// db.
 export async function seedOrganizationDocument(
     db: DbAdapter,
     id: Id,
@@ -110,9 +98,9 @@ export async function seedOrganizationDocument(
         headPairId: undefined,
     });
     await db.transaction(
-        ['organizations', 'requests', 'responses'],
+        // Phase Final Task 2: organizations ROW half stripped.
+        ['requests', 'responses'],
         async (view) => {
-            await view.organizations.put(id, body);
             await appendMessagePair(view, pair);
         },
     );

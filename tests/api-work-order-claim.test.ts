@@ -15,6 +15,10 @@ import { nowUtc } from '../api/types.ts';
 import {
     generateCryptoSafeBase62,
 } from '../shared/crypto-safe-base62.ts';
+import { workOrderClaimHistoryFor } from
+    '../api/derive-states.ts';
+import { STARK_ORGANIZATION } from
+    '../api/mock-data/seed-constants.ts';
 
 const BASE = 'http://localhost';
 
@@ -76,10 +80,17 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+// Phase Final Task 1(b): claim_released via bare PUT
+// /states/:id is pair-plane-only. workOrderClaimHistoryFor
+// is the claim gate's own two-source union (op pairs +
+// states/:id), so it still sees releases after the row
+// half was stripped.
 function claimEventsFor(
     db: MemoryDbAdapter,
 ): Promise<{ state: string; member_id: string }[]> {
-    return db.states.getAllFor('wo1');
+    return workOrderClaimHistoryFor(
+        db, STARK_ORGANIZATION, 'wo1',
+    );
 }
 
 // Fresh caller-minted body for tests that don't assert
@@ -354,6 +365,33 @@ test(
         assert.equal(
             events.filter((ev) => ev.state === 'claimed').length,
             1,
+        );
+    },
+);
+
+// Phase 15 Task 2 Author gate 4 — pass-first pin on the OLD
+// workOrders.getById path: a claim against a work order that
+// does not exist must map to the SAME EntityNotFoundError
+// bytes the store already emits. Held unchanged through the
+// document-head re-anchor (null head → same throw).
+test(
+    'claim on a nonexistent work order is a byte-exact 404',
+    async () => {
+        const db = await seededDb();
+        const missingId = 'no-such-work-order';
+        const response = await handleRequest(db, req(
+            'POST',
+            '/work-orders/' + missingId + '/claim',
+            DEV_TOKEN,
+            freshClaimBody(),
+        ));
+        assert.equal(response.status, 404);
+        assert.deepEqual(
+            await response.json(),
+            {
+                error:
+                    'Not found: work_orders/' + missingId,
+            },
         );
     },
 );

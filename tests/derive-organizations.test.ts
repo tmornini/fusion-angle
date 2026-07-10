@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import { EntityNotFoundError } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -12,16 +13,11 @@ import {
     deriveOrganizations,
 } from '../api/derive-organizations.ts';
 
-// Phase 12 Task 2: the tenant root's own derive module, built
-// AHEAD of both its family-registry.ts registration (this
-// commit's sibling) and its seed pairs (Task 3) —
-// api-shadow-ledger-organizations.test.ts's own freshDb/
-// DEV_TOKEN/organizationRow fixtures, reused rather than
-// re-invented: this file predates Task 3's own seed pairs, so
-// every pair it compares against is built through the SAME
-// live PUT route the shadow-ledger suite already exercises,
-// never the mock-data seed (which now forms its own
-// organizations pairs too).
+// Phase Final Task 2: organizations dual-write stripped. This
+// file no longer compares derive vs row-plane oracles — the
+// row plane is empty after a live PUT. Coverage re-homes to
+// wire-body / derive agreement and pair-plane address proofs.
+// Every pair is still built through the live PUT route.
 
 const BASE = 'http://localhost';
 
@@ -47,13 +43,6 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-function sortById<T extends { id: string }>(
-    rows: readonly T[],
-): T[] {
-    return [...rows].sort((a, b) =>
-        a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-}
-
 function putOrganization(
     db: MemoryDbAdapter,
     id: string,
@@ -65,34 +54,49 @@ function putOrganization(
     ));
 }
 
-// -- mapping parity vs rows ------------------------------------
+// -- mapping parity vs wire ------------------------------------
 
-test('deriveOrganization mirrors the stored row exactly',
+test('deriveOrganization mirrors the PUT wire body exactly',
 async () => {
     const db = await freshDb();
     const res = await putOrganization(db, 'org-a', 'Acme');
     assert.equal(res.status, 200);
-    const row = await db.organizations.getById('org-a');
+    const wire = await res.json();
     const derived = await deriveOrganization(db, 'org-a');
-    assert.deepEqual(derived, row);
+    assert.deepEqual(derived, wire);
+    // Phase Final Stage B: organizations table retired.
 });
 
-test('deriveOrganizations mirrors every stored row, id-lex'
-+ ' ordered', async () => {
+test('deriveOrganizations mirrors every PUT wire body,'
++ ' id-lex ordered', async () => {
     const db = await freshDb();
-    await putOrganization(db, 'org-b', 'Beta');
-    await putOrganization(db, 'org-a', 'Alpha');
-    const rows = sortById(await db.organizations.getAll());
+    // seedAdminSchema plants org '1'; these two PUTs add
+    // more heads — derive is id-lex over the full set.
+    const beta = await putOrganization(db, 'org-b', 'Beta');
+    const alpha = await putOrganization(db, 'org-a', 'Alpha');
+    assert.equal(beta.status, 200);
+    assert.equal(alpha.status, 200);
     const derived = await deriveOrganizations(db);
-    assert.deepEqual(derived, rows);
+    assert.deepEqual(
+        derived.map((o) => o.id),
+        ['1', 'org-a', 'org-b'],
+    );
+    assert.equal(
+        derived.find((o) => o.id === 'org-a')!.name, 'Alpha',
+    );
+    assert.equal(
+        derived.find((o) => o.id === 'org-b')!.name, 'Beta',
+    );
+    // Phase Final Stage B: organizations table retired.
 });
 
-test('deriveOrganization 404s exactly like db.organizations'
-+ '.getById on an absent id', async () => {
+test('deriveOrganization 404s with store-shaped'
++ ' EntityNotFoundError on an absent id', async () => {
     const db = await freshDb();
     await assert.rejects(
         () => deriveOrganization(db, 'org-missing'),
         (error: unknown) => {
+            assert.ok(error instanceof EntityNotFoundError);
             assert.equal(
                 (error as { message: string }).message,
                 'Not found: organizations/org-missing',
@@ -115,13 +119,14 @@ test('a second live PUT supersedes the first; derive sees the'
 
     const derived = await deriveOrganization(db, 'org-c');
     assert.equal(derived.name, 'Second');
-    const row = await db.organizations.getById('org-c');
-    assert.deepEqual(derived, row);
+    const wire = await second.json();
+    assert.deepEqual(derived, wire);
 
     const all = await deriveOrganizations(db);
     assert.equal(
         all.filter((org) => org.id === 'org-c').length, 1,
     );
+    // Phase Final Stage B: organizations table retired.
 });
 
 // -- the un-nested address proof ---------------------------------
@@ -132,6 +137,7 @@ async () => {
     const db = await freshDb();
     await putOrganization(db, 'org-d', 'Flat');
     const requests = await db.requests.getAll();
+    // seedAdminSchema forms 3 pairs; this PUT is the 4th.
     assert.equal(requests.length, 4);
     assert.equal(requests[3]!.uri_prefix, '/organizations/');
     assert.equal(requests[3]!.uri_id, 'org-d');
@@ -142,13 +148,6 @@ async () => {
 
 // -- the id-echo roundtrip ----------------------------------------
 
-// The idiomatic fetch-edit-PUT client pattern: a GET response
-// carries `id` in its body, and a client that spreads that body
-// back into its own PUT payload echoes it right back on the
-// wire. The write path tolerates this (routes.ts's PUT handler
-// strips it via withoutId before validating, mirroring
-// EntityStore.put) — derivation must tolerate it too, since the
-// STORED request body is the raw wire body, echoed id and all.
 test('a PUT whose body echoes id round-trips through'
 + ' derivation, mirroring the write path\'s own'
 + ' withoutId(body) strip', async () => {
@@ -158,13 +157,14 @@ test('a PUT whose body echoes id round-trips through'
         { id: 'org-echo', ...organizationRow('Echo') },
     ));
     assert.equal(res.status, 200);
-    const row = await db.organizations.getById('org-echo');
+    const wire = await res.json();
 
     const derived = await deriveOrganization(db, 'org-echo');
-    assert.deepEqual(derived, row);
+    assert.deepEqual(derived, wire);
 
     const all = await deriveOrganizations(db);
     assert.deepEqual(
-        all.find((org) => org.id === 'org-echo'), row,
+        all.find((org) => org.id === 'org-echo'), wire,
     );
+    // Phase Final Stage B: organizations table retired.
 });

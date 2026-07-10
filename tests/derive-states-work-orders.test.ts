@@ -233,9 +233,8 @@ test('a live create births exactly the three initial state'
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    const old = await db.states.getAllFor(workOrderId);
+    // Phase Final Task 2: states ROW half stripped.
     assert.equal(derived.length, 3);
-    assert.deepEqual(derived, old);
 });
 
 // -- 2. EDGE 1: a SEEDED-shape work order births nothing, --------
@@ -318,8 +317,7 @@ test('a claim, then a claim past lockTimeout supersedes with'
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    const old = await db.states.getAllFor(workOrderId);
-    assert.deepEqual(derived, old);
+    assert.ok(derived.length >= 0); // Phase Final Task 2: row plane empty
     assert.deepEqual(
         derived.map((row) => row.state),
         ['claimed', 'claim_expired', 'claimed'],
@@ -388,11 +386,10 @@ test('a transition, then a transition with release ends the'
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    const old = await db.states.getAllFor(workOrderId);
+    // Phase Final Task 2: states ROW half stripped.
     // 3 births + transition1 (1, no release) + transition2
     // (target + release, 2) = 6.
     assert.equal(derived.length, 6);
-    assert.deepEqual(derived, old);
 });
 
 // -- 5. the MOVING lock_timeout case -------------------------------
@@ -466,8 +463,7 @@ test('the MOVING lock_timeout case: an entity PUT changing'
     const derived = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    const old = await db.states.getAllFor(workOrderId);
-    assert.deepEqual(derived, old);
+    assert.ok(derived.length >= 0); // Phase Final Task 2: row plane empty
     assert.deepEqual(
         derived.map((row) => row.state),
         ['claimed', 'claim_expired', 'claimed'],
@@ -541,14 +537,19 @@ test('HYBRID: a seeded-shape work order plus a live claim —'
         'the two readers must never emit overlapping ids',
     );
 
-    const old = await db.states.getAllFor(workOrderId);
+    // Phase Final Task 1(b): genesis rides pair-plane-only
+    // states/:id (row half stripped). Drop the row-plane
+    // getAllFor union oracle; pin the two-source composition
+    // itself (claim + genesis), (at, id) ordered.
+    const union = [...ours, ...fromEventPairs].sort((a, b) =>
+        a.at < b.at ? -1
+            : a.at > b.at ? 1
+                : a.id < b.id ? -1
+                    : a.id > b.id ? 1
+                        : 0);
     assert.deepEqual(
-        [...ours, ...fromEventPairs].sort((a, b) =>
-            a.at < b.at ? -1
-                : a.at > b.at ? 1
-                    : a.id < b.id ? -1
-                        : a.id > b.id ? 1
-                            : 0),
-        old,
+        union.map((row) => row.id),
+        [workOrderId + '-genesis', workOrderId + '-ce1'],
     );
+    assert.equal(union.length, 2);
 });

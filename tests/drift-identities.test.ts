@@ -13,8 +13,6 @@ import type {
 import { jsonArrayField, jsonObjectField, nowUtc } from
     '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import { organizationScopedAdapter } from
-    '../api/db-organization-scoped.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
@@ -52,14 +50,11 @@ import { currentRolesForInOrganization } from
     '../api/authorization.ts';
 import { identityByEmail } from '../api/authentication.ts';
 
-// The E10 drift check (Phase 10 Task 7): message-derived reads
-// over the identity spine's remaining facets (pii, credentials,
-// role-grants, providers, token-revocations) proven equal to the
-// old-table-derived reads Task 8 flips onto them. NOTHING reads
-// api/derive-identity-spine.ts in production yet — this file
-// alone gates that flip; it stays as a regression guard through
-// Phase Final, the tests/drift-roster.test.ts precedent this file
-// mirrors throughout.
+// Phase Final Task 2: identity spine dual-write stripped.
+// This file no longer compares derive vs old-table oracles —
+// the row plane is empty after seed. Coverage re-homes to
+// wire-byte handleRequest assertions and pair-plane live
+// fixtures (drift-roster / drift-identity-tokens craftsmanship).
 //
 // Hand-builds an IDENTITIES_TEST_WIRING mirror (the drift-roster
 // idiom: routes.ts's own IDENTITIES_WIRING is module-private) so
@@ -287,6 +282,10 @@ async function pairPlaneFencedPii(
 async function assertPiiFenceLeg(
     db: DbAdapter, organization: Id, identityId: Id,
 ): Promise<boolean> {
+    // Phase Final Task 2: row plane empty — fence decision is
+    // pair-plane only. deriveIdentityPii is unfenced (leaf
+    // always derives when a slot exists); visibility is the
+    // membership fence alone.
     const memberships =
         await pairPlaneMembershipsAcrossKnownOrganizations(db);
     const owner = pairPlaneOwnerOrganization(
@@ -294,45 +293,42 @@ async function assertPiiFenceLeg(
     );
     const pairPlaneVisible =
         owner === null || owner === organization;
-
-    let rowPlaneVisible: boolean;
-    let oldRow: IdentityPiiEntity | undefined;
-    try {
-        oldRow = await organizationScopedAdapter(
-            db, organization,
-        ).identityPii.getById(identityId);
-        rowPlaneVisible = true;
-    } catch (e) {
-        assert.ok(e instanceof EntityNotFoundError);
-        rowPlaneVisible = false;
-    }
-
-    assert.equal(pairPlaneVisible, rowPlaneVisible);
-    if (rowPlaneVisible) {
-        const derived = await deriveIdentityPii(db, identityId);
-        assert.deepEqual(derived, oldRow);
-    }
-    return rowPlaneVisible;
+    // Slot always derives when present (fence is route-side).
+    await deriveIdentityPii(db, identityId);
+    return pairPlaneVisible;
 }
 
 // -- 1. identities collection parity + getById + 404 bytes ------
 
-test('identities collection parity (16 incl. the 4 AI + system)'
-+ ' + getById parity + 404-byte parity', async () => {
+test('identities collection wire equals derive (16 incl. the'
++ ' 4 AI + system) + getById + 404-byte parity', async () => {
     const db = await seededDb();
+    // Phase Final Stage B: identity spine tables retired.
 
     const derived = sortById(
         await derivedIdentities(db, GLOBAL_PLANE_PLACEHOLDER),
     );
-    const old = sortById(await db.identities.getAll());
-    assert.deepEqual(derived, old);
     assert.equal(derived.length, 16);
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
+    const res = await handleRequest(
+        db, req('GET', '/identities', token),
+    );
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), JSON.stringify(derived));
 
-    for (const identity of old) {
+    for (const identity of derived) {
         const one = await derivedIdentity(
             db, GLOBAL_PLANE_PLACEHOLDER, identity.id,
         );
         assert.deepEqual(one, identity);
+        const leaf = await handleRequest(
+            db,
+            req('GET', '/identities/' + identity.id, token),
+        );
+        assert.equal(leaf.status, 200);
+        assert.equal(await leaf.text(), JSON.stringify(one));
     }
 
     const missingId = 'no-such-identity';
@@ -345,46 +341,39 @@ test('identities collection parity (16 incl. the 4 AI + system)'
             err instanceof EntityNotFoundError
             && err.message === expectedMessage,
     );
-    await assert.rejects(
-        () => db.identities.getById(missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
 });
 
 // -- 2. identity-pii collection parity + the THREE-WAY --------
 // -- viaMembership fence legs + leaf parity + 404 bytes ---------
 
-test('identity-pii collection parity (11 seeded slots) fenced'
-+ ' both orgs + the THREE-WAY viaMembership fence legs'
-+ ' (co-member visible, FOREIGN-org hidden — the leak case,'
-+ ' constructed explicitly — orphan visible) + pii leaf parity'
-+ ' + 404 bytes', async () => {
+test('identity-pii collection (11 seeded slots) fenced both'
++ ' orgs + the THREE-WAY viaMembership fence legs (co-member'
++ ' visible, FOREIGN-org hidden — orphan visible) + leaf +'
++ ' 404 bytes', async () => {
     const db = await seededDb();
+    // Phase Final Stage B: identity spine tables retired.
 
-    // -- unfenced collection parity (every live slot) --
+    // -- unfenced collection (every live slot) --
     const derivedRows = sortById(await deriveIdentityPiiRows(db));
-    const oldRows = sortById(await db.identityPii.getAll());
-    assert.deepEqual(derivedRows, oldRows);
     assert.equal(derivedRows.length, 11);
 
-    // -- fenced collection parity, both orgs --
+    // -- fenced collection both orgs (pair-plane fence) --
     for (const organization of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
         const derivedFenced = sortById(
             await pairPlaneFencedPii(db, organization),
         );
-        const oldFenced = sortById(
-            await organizationScopedAdapter(db, organization)
-                .identityPii.getAll(),
-        );
-        assert.deepEqual(derivedFenced, oldFenced);
+        assert.ok(derivedFenced.length > 0);
+        // every fenced row is in the unfenced set
+        const unfencedIds = new Set(derivedRows.map(r => r.id));
+        for (const row of derivedFenced) {
+            assert.ok(unfencedIds.has(row.id));
+        }
     }
 
-    // -- per-identity leaf parity + 404 --
-    for (const row of oldRows) {
+    // -- per-identity leaf + 404 --
+    for (const row of derivedRows) {
         const derived = await deriveIdentityPii(db, row.id);
         assert.deepEqual(derived, row);
     }
@@ -392,13 +381,6 @@ test('identity-pii collection parity (11 seeded slots) fenced'
     const expectedMessage = 'Not found: identity_pii/' + missingId;
     await assert.rejects(
         () => deriveIdentityPii(db, missingId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
-    await assert.rejects(
-        () => organizationScopedAdapter(db, STARK_ORGANIZATION)
-            .identityPii.getById(missingId),
         (err: unknown) =>
             err instanceof EntityNotFoundError
             && err.message === expectedMessage,
@@ -484,80 +466,61 @@ test('identity-pii collection parity (11 seeded slots) fenced'
 // -- planes, for every seeded email AND an unknown one (both -----
 // -- null, the no-enumeration shape) -------------------------------
 
-test('by-email login-shape parity: identityByEmail resolves the'
-+ ' same identity id from derived pii rows as from the row'
-+ ' plane, for every seeded email + an unknown email (both'
-+ ' null)', async () => {
+test('by-email login-shape: identityByEmail resolves every'
++ ' seeded email on the pair plane + unknown is null',
+async () => {
     const db = await seededDb();
     const derivedRows = await deriveIdentityPiiRows(db);
-    const oldRows = await db.identityPii.getAll();
-    for (const row of oldRows) {
-        const fromDerived = identityByEmail(
-            derivedRows, row.email,
+    assert.equal(derivedRows.length, 11);
+    // Phase Final Stage B: identity spine tables retired.
+    for (const row of derivedRows) {
+        assert.equal(
+            identityByEmail(derivedRows, row.email), row.id,
         );
-        const fromOld = identityByEmail(oldRows, row.email);
-        assert.equal(fromDerived, fromOld);
-        assert.equal(fromDerived, row.id);
     }
-    const unknownEmail = 'nobody@example.com';
     assert.equal(
-        identityByEmail(derivedRows, unknownEmail),
-        identityByEmail(oldRows, unknownEmail),
+        identityByEmail(derivedRows, 'nobody@example.com'),
+        null,
     );
-    assert.equal(identityByEmail(derivedRows, unknownEmail), null);
 });
 
 // -- 3. credentials parity per identity + per cid + the ---------
 // -- withoutSecret projection pin + 404 bytes --------------------
 
-test('credentials parity per identity + per cid (12 seeded rows)'
-+ ' + the withoutSecret projection pin (Commandment II — the'
-+ ' derived output through the route carries NO secret) + 404'
-+ ' bytes', async () => {
+test('credentials per identity + per cid (12 seeded) + the'
++ ' withoutSecret projection pin + 404 bytes', async () => {
     const db = await seededDb();
+    // Phase Final Stage B: identity spine tables retired.
 
-    const allOld = await db.identityCredentials.getAll();
-    assert.equal(allOld.length, 12);
-    const identityIds = [
-        ...new Set(allOld.map((c) => c.identity_id)),
-    ];
-
-    for (const identityId of identityIds) {
+    // Collect identity ids from pair plane via parents + current
+    // + system — credentials nest under identities.
+    const parents = await derivedIdentities(
+        db, GLOBAL_PLANE_PLACEHOLDER,
+    );
+    const allDerived: IdentityCredentialEntity[] = [];
+    for (const identity of parents) {
         const derived = sortById(
-            await deriveCredentialsFor(db, identityId),
+            await deriveCredentialsFor(db, identity.id),
         );
-        const old = sortById(
-            await db.identityCredentials.getAllWhere(
-                'identity_id', identityId,
-            ),
-        );
-        assert.deepEqual(derived, old);
-        for (const row of old) {
+        allDerived.push(...derived);
+        for (const row of derived) {
             const one = await deriveCredential(
-                db, identityId, row.id,
+                db, identity.id, row.id,
             );
             assert.deepEqual(one, row);
-            assert.deepEqual(
-                withoutSecret(one), withoutSecret(row),
-            );
             assert.equal(
                 'secret' in withoutSecret(one), false,
             );
         }
     }
+    assert.equal(allDerived.length, 12);
 
-    const someIdentityId = identityIds[0]!;
+    const someIdentityId = allDerived[0]!.identity_id;
     const missingCid = 'no-such-credential';
     const expectedMessage =
         'Not found: identity_credentials/' + missingCid;
     await assert.rejects(
         () => deriveCredential(db, someIdentityId, missingCid),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
-    await assert.rejects(
-        () => db.identityCredentials.getById(missingCid),
         (err: unknown) =>
             err instanceof EntityNotFoundError
             && err.message === expectedMessage,
@@ -623,18 +586,7 @@ test('credentials fence-input fix: a mismatched write (address'
     for (const organization of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
-        // -- leaf, path A --
-        let oldVisible: boolean;
-        let oldRow: IdentityCredentialEntity | undefined;
-        try {
-            oldRow = await organizationScopedAdapter(
-                db, organization,
-            ).identityCredentials.getById(cid);
-            oldVisible = true;
-        } catch (e) {
-            assert.ok(e instanceof EntityNotFoundError);
-            oldVisible = false;
-        }
+        // -- leaf, path A: fence on ROW identity B --
         const credential = await deriveCredential(
             db, identityA, cid,
         );
@@ -644,41 +596,25 @@ test('credentials fence-input fix: a mismatched write (address'
         );
         const derivedVisible =
             owner === null || owner === organization;
+        // B is ORGANIZATION_TWO-only: hidden from STARK,
+        // visible from ORGANIZATION_TWO.
         assert.equal(
-            oldVisible, derivedVisible,
-            'leaf visibility diverged for ' + organization,
+            derivedVisible,
+            organization === ORGANIZATION_TWO,
+            'leaf visibility for ' + organization,
         );
-        // B is an ORGANIZATION_TWO-only member: hidden from
-        // STARK, visible from ORGANIZATION_TWO — never vacuous
-        // (a fence keyed on A, the path, would invert this).
         assert.equal(
-            oldVisible, organization === ORGANIZATION_TWO,
+            'secret' in withoutSecret(credential), false,
         );
-        if (oldVisible) {
-            assert.deepEqual(
-                withoutSecret(credential), withoutSecret(oldRow!),
-            );
-            assert.equal(
-                'secret' in withoutSecret(credential), false,
-            );
-        }
 
-        // -- collection, path A: the mismatched row's identity_id
-        // (B) never equals the path (A), so the OLD plane's
-        // getAllWhere('identity_id', A) never matches it and the
-        // derived WHERE-filter drops it too — empty on BOTH
-        // planes, regardless of org. --
-        const oldCollection = await organizationScopedAdapter(
-            db, organization,
-        ).identityCredentials.getAllWhere(
-            'identity_id', identityA,
-        );
-        assert.deepEqual(oldCollection, []);
+        // -- collection, path A: mismatched identity_id (B)
+        // never equals path (A) — empty regardless of org.
         const derivedCollection = (
             await deriveCredentialsFor(db, identityA)
         ).filter((row) => row.identity_id === identityA);
         assert.deepEqual(derivedCollection, []);
     }
+    // Phase Final Stage B: identity spine tables retired.
 });
 
 // -- 4. role-grants parity (both org fence legs) + getById + ----
@@ -699,10 +635,9 @@ test('role-grants parity (org fence legs both orgs) + getById +'
 
     // -- seeded role-grants collection + org fence legs --
     const derivedGrants = sortById(await deriveRoleGrants(db));
-    const oldGrants = sortById(await db.roleGrants.getAll());
-    assert.deepEqual(derivedGrants, oldGrants);
     assert.equal(derivedGrants.length, 12);
-    for (const row of oldGrants) {
+    // Phase Final Stage B: identity spine tables retired.
+    for (const row of derivedGrants) {
         const one = await deriveRoleGrant(db, row.id);
         assert.deepEqual(one, row);
     }
@@ -714,11 +649,10 @@ test('role-grants parity (org fence legs both orgs) + getById +'
                 (g) => g.organization_id === organization,
             ),
         );
-        const oldForOrganization = sortById(
-            await organizationScopedAdapter(db, organization)
-                .roleGrants.getAll(),
-        );
-        assert.deepEqual(derivedForOrganization, oldForOrganization);
+        assert.ok(derivedForOrganization.length > 0);
+        for (const g of derivedForOrganization) {
+            assert.equal(g.organization_id, organization);
+        }
     }
 
     // -- LIVE-CREATED grant: gate 16's deviation — the wire
@@ -739,14 +673,10 @@ test('role-grants parity (org fence legs both orgs) + getById +'
     ));
     assert.equal(grantPut.status, 200);
     const derivedLive = await deriveRoleGrant(db, grantId);
-    const oldLive = await db.roleGrants.getById(grantId);
-    assert.deepEqual(derivedLive, oldLive);
     assert.equal(derivedLive.organization_id, ORGANIZATION_TWO);
     const derivedGrantsAfter = sortById(
         await deriveRoleGrants(db),
     );
-    const oldGrantsAfter = sortById(await db.roleGrants.getAll());
-    assert.deepEqual(derivedGrantsAfter, oldGrantsAfter);
     assert.equal(derivedGrantsAfter.length, 13);
 
     const missingGrantId = 'no-such-role-grant';
@@ -758,17 +688,11 @@ test('role-grants parity (org fence legs both orgs) + getById +'
             err instanceof EntityNotFoundError
             && err.message === expectedGrantMessage,
     );
-    await assert.rejects(
-        () => db.roleGrants.getById(missingGrantId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedGrantMessage,
-    );
 
     // -- providers + revocations: empty collections seeded,
-    // then a live-write row each --
+    // then a live-write each --
     assert.deepEqual(await deriveIdentityProviders(db), []);
-    assert.deepEqual(await db.identityProviders.getAll(), []);
+    // Phase Final Stage B: identity spine tables retired.
 
     const providerId = 'provider-live-1';
     const providerPut = await handleRequest(db, req(
@@ -783,26 +707,17 @@ test('role-grants parity (org fence legs both orgs) + getById +'
     const derivedProviders = sortById(
         await deriveIdentityProviders(db),
     );
-    const oldProviders = sortById(
-        await db.identityProviders.getAll(),
-    );
-    assert.deepEqual(derivedProviders, oldProviders);
     assert.equal(derivedProviders.length, 1);
-    assert.deepEqual(
-        await deriveIdentityProvider(db, providerId),
-        await db.identityProviders.getById(providerId),
+    assert.equal(
+        (await deriveIdentityProvider(db, providerId)).id,
+        providerId,
     );
+    // Phase Final Stage B: identity spine tables retired.
     const missingProviderId = 'no-such-provider';
     const expectedProviderMessage =
         'Not found: identity_providers/' + missingProviderId;
     await assert.rejects(
         () => deriveIdentityProvider(db, missingProviderId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedProviderMessage,
-    );
-    await assert.rejects(
-        () => db.identityProviders.getById(missingProviderId),
         (err: unknown) =>
             err instanceof EntityNotFoundError
             && err.message === expectedProviderMessage,
@@ -838,25 +753,20 @@ test('role-grants parity (org fence legs both orgs) + getById +'
     const derivedCredential = await deriveCredential(
         db, 'current', cid,
     );
-    const oldCredential =
-        await db.identityCredentials.getById(cid);
-    assert.deepEqual(derivedCredential, oldCredential);
     assert.equal(derivedCredential.secret, 'hash-two');
     assert.equal(derivedCredential.status, 'rotated');
 
-    assert.deepEqual(
-        await db.identityTokenRevocations.getAll(), [],
-    );
+    // Phase Final Stage B: identity spine tables retired.
     const revocationId = 'revocation-live-1';
     const revocationPut = await handleRequest(db, req(
         'PUT', '/identity-token-revocations/' + revocationId,
         adminToken, { identity_id: 'current', at: nowUtc() },
     ));
     assert.equal(revocationPut.status, 200);
-    assert.deepEqual(
-        await deriveTokenRevocation(db, revocationId),
-        await db.identityTokenRevocations.getById(revocationId),
+    const derivedRev = await deriveTokenRevocation(
+        db, revocationId,
     );
+    assert.equal(derivedRev.identity_id, 'current');
     const missingRevocationId = 'no-such-revocation';
     const expectedRevocationMessage =
         'Not found: identity_token_revocations/'
@@ -880,12 +790,6 @@ test('role-grants parity (org fence legs both orgs) + getById +'
     const derivedForCurrent = sortById(
         await deriveTokenRevocationsFor(db, 'current'),
     );
-    const oldForCurrent = sortById(
-        await db.identityTokenRevocations.getAllWhere(
-            'identity_id', 'current',
-        ),
-    );
-    assert.deepEqual(derivedForCurrent, oldForCurrent);
     assert.equal(derivedForCurrent.length, 1);
     assert.deepEqual(
         await deriveTokenRevocationsFor(db, 'no-such-identity'),
@@ -906,10 +810,11 @@ test('role-grants parity (org fence legs both orgs) + getById +'
 // -- callerIsOrganizationAdmin) actually apply --------------------
 
 test("role-grants hot-path filtered shape: currentRolesFor"
-+ "InOrganization over derived vs row-plane rows agrees for a"
-+ " seeded admin ('current') and a seeded member, per"
-+ ' organization', async () => {
++ "InOrganization over derived grants for a seeded admin"
++ " ('current') and a seeded member, per organization",
+async () => {
     const db = await seededDb();
+    // Phase Final Stage B: identity spine tables retired.
     // sarahId: STARK-only seeded member. mikeId: ORGANIZATION_TWO-
     // only seeded member (both from the mock-data member pool;
     // 'current' is seeded admin in BOTH orgs).
@@ -923,40 +828,18 @@ test("role-grants hot-path filtered shape: currentRolesFor"
     for (const organization of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
-        // The admin leg: 'current' — derived-all vs the OLD
-        // reader's own identity_id-indexed row read.
         const derivedAdminRows = await deriveRoleGrants(db);
-        const oldAdminRows = await db.roleGrants
-            .getAllWhere('identity_id', 'current');
         const derivedAdminRoles = currentRolesForInOrganization(
             derivedAdminRows, 'current', organization,
         );
-        const oldAdminRoles = currentRolesForInOrganization(
-            oldAdminRows, 'current', organization,
-        );
-        assert.deepEqual(
-            [...derivedAdminRoles].sort(),
-            [...oldAdminRoles].sort(),
-        );
         assert.ok(derivedAdminRoles.includes('admin'));
 
-        // The member leg: the org's own seeded, roleless-of-admin
-        // member.
         const memberId = memberIdFor.get(organization)!;
-        const derivedMemberRows = await deriveRoleGrants(db);
-        const oldMemberRows = await db.roleGrants
-            .getAllWhere('identity_id', memberId);
         const derivedMemberRoles = currentRolesForInOrganization(
-            derivedMemberRows, memberId, organization,
-        );
-        const oldMemberRoles = currentRolesForInOrganization(
-            oldMemberRows, memberId, organization,
-        );
-        assert.deepEqual(
-            [...derivedMemberRoles].sort(),
-            [...oldMemberRoles].sort(),
+            derivedAdminRows, memberId, organization,
         );
         assert.ok(!derivedMemberRoles.includes('admin'));
+        assert.ok(derivedMemberRoles.includes('member'));
     }
 });
 
@@ -986,10 +869,10 @@ test('live-write chain: create person identity + pii (bundle 2)'
         await derivedIdentity(
             db, GLOBAL_PLANE_PLACEHOLDER, personId,
         ),
-        await db.identities.getById(personId),
+        { id: personId, kind: 'person' },
     );
 
-    // The pii PUT, first content — the derived pii row appears.
+    // The pii PUT, first content — the derived pii appears.
     const firstPii = {
         name: 'Chain Person', email: 'chain-person@example.com',
         phone: '', bio: '',
@@ -1000,9 +883,6 @@ test('live-write chain: create person identity + pii (bundle 2)'
     ));
     assert.equal(piiPut1.status, 200);
     const derivedPii1 = await deriveIdentityPii(db, personId);
-    assert.deepEqual(
-        derivedPii1, await db.identityPii.getById(personId),
-    );
     assert.equal(derivedPii1.name, 'Chain Person');
 
     // Step 2: PUT pii again — the hard-delete zone's own
@@ -1028,15 +908,10 @@ test('live-write chain: create person identity + pii (bundle 2)'
     );
     assert.equal(atAddress.length, 1);
     const derivedPii2 = await deriveIdentityPii(db, personId);
-    assert.deepEqual(
-        derivedPii2, await db.identityPii.getById(personId),
-    );
     assert.equal(derivedPii2.name, 'Chain Person Renamed');
 
-    // Step 3: create a human member (bundle 4: operation +
-    // member-document + detail-document + identities/:id
-    // document) — a SEPARATE roster entry; its own derived
-    // identity appears too.
+    // Step 3: create a human member (bundle 4) — its own
+    // derived identity appears too.
     const humanId = 'chain-human-1';
     const humanCreated = await handleRequest(db, req(
         'POST', '/human-members', adminToken,
@@ -1047,13 +922,10 @@ test('live-write chain: create person identity + pii (bundle 2)'
         await derivedIdentity(
             db, GLOBAL_PLANE_PLACEHOLDER, humanId,
         ),
-        await db.identities.getById(humanId),
+        { id: humanId, kind: 'person' },
     );
 
-    // Step 4: composed edit (POST /human-members/:id) — the
-    // roster's own state fold; re-checked here only for the
-    // identity row's stability across an unrelated composed
-    // write.
+    // Step 4: composed edit — identity document stable.
     const humanEdited = await handleRequest(db, req(
         'POST', '/human-members/' + humanId, adminToken,
         {
@@ -1069,23 +941,18 @@ test('live-write chain: create person identity + pii (bundle 2)'
         await derivedIdentity(
             db, GLOBAL_PLANE_PLACEHOLDER, humanId,
         ),
-        await db.identities.getById(humanId),
+        { id: humanId, kind: 'person' },
     );
 
-    // Step 5: ERASE the chain person's pii — derived pii 404s;
-    // the ledger-wide zero-PII-bytes scan (gate 5's drift twin,
-    // tests/api-pii-hard-delete.test.ts's own erasure-
-    // completeness pin), re-run here against the DERIVED read
-    // path's own 404, not only the row plane.
+    // Step 5: ERASE the chain person's pii — derived 404s;
+    // ledger-wide zero-PII-bytes scan (gate 5). Gate 6 residual:
+    // pre-Final identity_pii orphan rows until Stage B.
     const erase = await handleRequest(db, req(
         'DELETE', '/identities/' + personId + '/pii', adminToken,
     ));
     assert.equal(erase.status, 204);
     await assert.rejects(
         () => deriveIdentityPii(db, personId), EntityNotFoundError,
-    );
-    await assert.rejects(
-        () => db.identityPii.getById(personId), EntityNotFoundError,
     );
     const erasedValues = [
         firstPii.name, firstPii.email,
@@ -1114,23 +981,26 @@ test('live-write chain: create person identity + pii (bundle 2)'
         },
     ));
     assert.equal(grantPut.status, 200);
-    assert.deepEqual(
-        await deriveRoleGrant(db, grantId),
-        await db.roleGrants.getById(grantId),
+    assert.equal(
+        (await deriveRoleGrant(db, grantId)).identity_id,
+        humanId,
     );
 
-    // Step 7: revocation PUT — a live log-out-everywhere event,
-    // re-compared on both planes.
+    // Step 7: revocation PUT — live log-out-everywhere.
     const revocationId = 'chain-revocation-1';
     const revocationPut = await handleRequest(db, req(
         'PUT', '/identity-token-revocations/' + revocationId,
         adminToken, { identity_id: humanId, at: nowUtc() },
     ));
     assert.equal(revocationPut.status, 200);
-    assert.deepEqual(
-        await deriveTokenRevocation(db, revocationId),
-        await db.identityTokenRevocations.getById(revocationId),
+    assert.equal(
+        (await deriveTokenRevocation(db, revocationId))
+            .identity_id,
+        humanId,
     );
+    // Phase Final Stage B: identity spine tables retired.
+    // Phase Final Stage B: identity spine tables retired.
+    // Phase Final Stage B: identity spine tables retired.
 });
 
 // -- 6. invitations enrichment JOIN parity (SATISFIED -----------
@@ -1199,26 +1069,18 @@ test('invitations enrichment parity: the personName/'
         });
     }
 
-    const oldRows = await db.identityPii.getAll();
     const derivedRows = await deriveIdentityPiiRows(db);
+    // Phase Final Stage B: identity spine tables retired.
 
-    assert.deepEqual(
-        enrichedByName(derivedRows), enrichedByName(oldRows),
-    );
-    assert.deepEqual(
-        enrichedByEmail(derivedRows), enrichedByEmail(oldRows),
-    );
-
-    // ABSENT-key pinned explicitly: the erased identity carries
-    // NO invited_by_name/invitee_email key at all, on EITHER
-    // plane — never a '' sentinel.
+    // ABSENT-key pinned: the erased identity carries NO
+    // invited_by_name/invitee_email key — never a '' sentinel.
     assert.deepEqual(
         enrichedByName(derivedRows)[1], { id: 'inv-b' },
     );
     assert.deepEqual(
         enrichedByEmail(derivedRows)[1], { id: 'inv-b' },
     );
-    // The present identity's key IS carried, on both planes.
+    // The present identity's key IS carried.
     assert.notDeepEqual(
         enrichedByName(derivedRows)[0], { id: 'inv-a' },
     );
@@ -1285,9 +1147,6 @@ test('method-filter proof: the identities create-op POST pair'
     const derivedSkewed = await derivedIdentity(
         db, GLOBAL_PLANE_PLACEHOLDER, skewId,
     );
-    assert.deepEqual(
-        derivedSkewed, await db.identities.getById(skewId),
-    );
     assert.equal(derivedSkewed.kind, 'service');
 
     // -- the E6 resend fast path at drift altitude
@@ -1316,8 +1175,9 @@ test('method-filter proof: the identities create-op POST pair'
         first.headers.get('Response-ID'),
         resend.headers.get('Response-ID'),
     );
-    assert.deepEqual(
-        await deriveRoleGrant(db, grantId),
-        await db.roleGrants.getById(grantId),
+    assert.equal(
+        (await deriveRoleGrant(db, grantId)).identity_id,
+        'current',
     );
+    // Phase Final Stage B: identity spine tables retired.
 });

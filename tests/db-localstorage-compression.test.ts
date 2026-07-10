@@ -4,9 +4,6 @@ import {
     LocalStorageDbAdapter,
 } from '../api/db-localstorage.ts';
 import {
-    jsonObjectField,
-} from '../api/types.ts';
-import {
     SNAPSHOT_SCHEMA_VERSION,
     SNAPSHOT_SCHEMA_VERSION_KEY,
 } from '../api/db.ts';
@@ -29,46 +26,31 @@ function installShim(): Map<string, string> {
     return map;
 }
 
-const baseVersion = {
-    flow_id: 'flow-aaaaaaaaaaaaaaaaaaaa',
-    name: 'Test Flow',
-    is_locked: false,
-    is_auto_layout: true,
-    is_auto_fit: true,
-    lock_timeout: 60,
-    graph: jsonObjectField({
-        nodes: [
-            {
-                id: 'n1',
-                name: 'Start',
-                isCreate: true,
-                isArchive: false,
-                memberIds: [],
-                attributes: [],
-                positionX: 0,
-                positionY: 0,
-                taskInstructions: '',
-            },
-        ],
-        edges: [],
-    }),
-    at: '2026-01-01T00:00:00.000000Z',
+// Phase Final Stage B: clients retired — pin the
+// localStorage write surface on clients (surviving
+// store with string fields + status enum).
+const baseClient = {
+    grant_types: '["password"]',
+    redirect_uris: '[]',
+    jwks: '{}',
+    aud: 'fusion-ai',
+    status: 'active' as const,
 };
 
 // Writes are plain JSON since the F-080 measurement
 // retired compression; the gz1: decoder survives for
 // READS of legacy payloads only (pinned below).
 test(
-    'flow_versions write stores raw JSON',
+    'clients write stores raw JSON',
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.flowVersions.put(
-            'fv-prefix-test', baseVersion,
+        await adapter.clients.put(
+            'cli-prefix-test', baseClient,
         );
         const stored = map.get(
-            KEY_PREFIX + 'flow_versions',
+            KEY_PREFIX + 'clients',
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
@@ -80,41 +62,39 @@ test(
 );
 
 test(
-    'flow_versions round-trips through put → getById',
+    'clients round-trips through put → getById',
     async () => {
         installShim();
         const adapter = new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.flowVersions.put(
-            'fv-rt', baseVersion,
+        await adapter.clients.put(
+            'cli-rt', baseClient,
         );
-        const got = await adapter.flowVersions.getById(
-            'fv-rt',
+        const got = await adapter.clients.getById(
+            'cli-rt',
         );
-        assert.equal(got.id, 'fv-rt');
-        assert.equal(got.name, 'Test Flow');
-        assert.equal(got.flow_id, baseVersion.flow_id);
+        assert.equal(got.id, 'cli-rt');
+        assert.equal(
+            got.name,
+            baseClient.name,
+        );
     },
 );
 
 test(
-    'booleans round-trip as booleans, not 1|0 numbers',
+    'status enum round-trips as a string',
     async () => {
         installShim();
         const adapter = new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.flowVersions.put(
-            'fv-bool', baseVersion,
+        await adapter.clients.put(
+            'cli-status', baseClient,
         );
-        const got = await adapter.flowVersions.getById(
-            'fv-bool',
+        const got = await adapter.clients.getById(
+            'cli-status',
         );
-        assert.strictEqual(got.is_locked, false);
-        assert.strictEqual(got.is_auto_layout, true);
-        assert.strictEqual(got.is_auto_fit, true);
-        assert.strictEqual(
-            typeof got.is_locked, 'boolean',
-        );
+        assert.strictEqual(got.status, 'active');
+        assert.strictEqual(typeof got.status, 'string');
     },
 );
 
@@ -126,14 +106,14 @@ test(
         await adapter.postSchemaCreation();
         const ids = Array.from(
             { length: 11 },
-            (_, i) => `u-${i}`,
+            (_, i) => `cli-${i}`,
         );
         await Promise.all(
-            ids.map(id => adapter.members.put(id, {
-                type: 'human',
-            })),
+            ids.map(id => adapter.clients.put(
+                id, baseClient,
+            )),
         );
-        const all = await adapter.members.getAll();
+        const all = await adapter.clients.getAll();
         assert.equal(
             all.length, 11,
             'all 11 concurrent puts must persist',
@@ -148,45 +128,22 @@ test(
     },
 );
 
-test(
-    'states write stores raw JSON',
-    async () => {
-        const map = installShim();
-        const adapter = new LocalStorageDbAdapter();
-        await adapter.postSchemaCreation();
-        await adapter.states.put(
-            'evt-prefix-test',
-            {
-                entity_id: 'wo-1',
-                state: 'n-to',
-                member_id: 'u-1',
-                at:
-                    '2026-01-01T00:00:00.000000Z',
-            },
-        );
-        const stored = map.get(
-            KEY_PREFIX + 'states',
-        );
-        assert.ok(stored, 'expected stored value');
-        assert.ok(
-            stored.startsWith('['),
-            'expected raw JSON array, got '
-            + stored.slice(0, 20),
-        );
-    },
-);
 
 test(
-    'members table is not compressed (raw JSON in storage)',
+    'clients table is not compressed (raw JSON in storage)',
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.members.put('u1', {
-            type: 'human',
+        await adapter.clients.put('c1', {
+            grant_types: '["password"]',
+            redirect_uris: '[]',
+            jwks: '{}',
+            aud: 'fusion-ai',
+            status: 'active',
         });
-        const stored = map.get(KEY_PREFIX + 'members');
-        assert.ok(stored, 'expected stored people value');
+        const stored = map.get(KEY_PREFIX + 'clients');
+        assert.ok(stored, 'expected stored clients value');
         assert.ok(
             stored.startsWith('['),
             'expected raw JSON array, got '
@@ -201,37 +158,37 @@ test(
         installShim();
         const adapter = new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.flowVersions.put(
-            'fv-export', baseVersion,
+        await adapter.clients.put(
+            'cli-export', baseClient,
         );
         const json = await adapter.getSnapshot();
         const parsed = JSON.parse(json);
         assert.ok(
-            Array.isArray(parsed.flow_versions),
-            'flow_versions should be an array in snapshot',
+            Array.isArray(parsed.clients),
+            'clients should be an array in snapshot',
         );
-        assert.equal(parsed.flow_versions.length, 1);
+        assert.equal(parsed.clients.length, 1);
         assert.equal(
-            parsed.flow_versions[0].id, 'fv-export',
+            parsed.clients[0].id, 'cli-export',
         );
     },
 );
 
 test(
-    'snapshot import stores flow_versions raw',
+    'snapshot import stores clients raw',
     async () => {
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
         const snapshot = JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,
-            flow_versions: [
-                { id: 'fv-imp', ...baseVersion },
+            clients: [
+                { id: 'cli-imp', ...baseClient },
             ],
         });
         await adapter.putSnapshot(snapshot);
         const stored = map.get(
-            KEY_PREFIX + 'flow_versions',
+            KEY_PREFIX + 'clients',
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
@@ -248,18 +205,11 @@ test(
         const map = installShim();
         const adapter = new LocalStorageDbAdapter();
         await adapter.postSchemaCreation();
-        const flowRow = {
-            id: 'flow-aaaaaaaaaaaaaaaaaaaa',
-            name: 'Test',
-            is_locked: false,
-            is_auto_layout: true,
-            is_auto_fit: true,
-            lock_timeout: 60,
-            graph: jsonObjectField({
-                nodes: [], edges: [],
-            }),
+        const clientRow = {
+            id: 'cli-gz1',
+            ...baseClient,
         };
-        const rawJson = JSON.stringify([flowRow]);
+        const rawJson = JSON.stringify([clientRow]);
         const stream = new Blob([rawJson]).stream()
             .pipeThrough(new CompressionStream('gzip'));
         const buffer = await new Response(stream)
@@ -270,11 +220,11 @@ test(
             binary += String.fromCharCode(b);
         }
         map.set(
-            KEY_PREFIX + 'flows',
+            KEY_PREFIX + 'clients',
             'gz1:' + btoa(binary),
         );
-        const result = await adapter.flows.getAll();
+        const result = await adapter.clients.getAll();
         assert.equal(result.length, 1);
-        assert.equal(result[0]!.name, 'Test');
+        assert.equal(result[0]!.status, 'active');
     },
 );

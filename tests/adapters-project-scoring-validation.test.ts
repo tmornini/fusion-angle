@@ -8,8 +8,13 @@ import { adminContext } from './context-fixtures.ts';
 import {
     postProjectBaselineScoring,
     postProjectActualMeasurement,
+    getBaselineScoresForProject,
 } from
     '../web-app/app/adapters/project-scoring.ts';
+import {
+    validateBaselineScoreEntity,
+    validateActualScoreEntity,
+} from '../api/validators.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
     seedAdminSchema,
@@ -20,80 +25,57 @@ const VALID: ReadonlyArray<number> = [-100, 0, 100];
 const INVALID: ReadonlyArray<number> = [-101, 101, 106];
 const RANGE_MSG = /expected integer in \[-100, \+100\]/;
 
-test('baseline store.put accepts valid boundary scores',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
+// Phase Final Stage B: score tables retired — the store-gate
+// pins re-home to the pure validators; wire + adapter pins
+// stay on the pair plane.
+
+test('baseline validator accepts valid boundary scores',
+    () => {
         for (const score of VALID) {
-            await db.projectObjectiveBaselineScores.put(
-                `p:o:${score}`,
-                {
+            assert.doesNotThrow(() =>
+                validateBaselineScoreEntity({
                     project_id: 'p', objective_id: 'o',
                     score, member_id: 'w1', at: AT,
-                },
+                }),
             );
         }
-        const rows = await db
-            .projectObjectiveBaselineScores.getAll();
-        assert.equal(rows.length, VALID.length);
     });
 
-test('baseline store.put rejects out-of-range scores',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
+test('baseline validator rejects out-of-range scores',
+    () => {
         for (const score of INVALID) {
-            await assert.rejects(
-                () => db.projectObjectiveBaselineScores
-                    .put(
-                        `p:o:${score}`,
-                        {
-                            project_id: 'p',
-                            objective_id: 'o',
-                            score, member_id: 'w1', at: AT,
-                        },
-                    ),
+            assert.throws(
+                () => validateBaselineScoreEntity({
+                    project_id: 'p',
+                    objective_id: 'o',
+                    score, member_id: 'w1', at: AT,
+                }),
                 RANGE_MSG,
             );
         }
-        const rows = await db
-            .projectObjectiveBaselineScores.getAll();
-        assert.equal(rows.length, 0);
     });
 
-test('actual store.put accepts valid boundary scores',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
+test('actual validator accepts valid boundary scores',
+    () => {
         for (const score of VALID) {
-            await db.projectObjectiveActualScores.put(
-                `p:o:${score}`,
-                {
+            assert.doesNotThrow(() =>
+                validateActualScoreEntity({
                     project_id: 'p', objective_id: 'o',
                     score, member_id: 'w1', at: AT,
-                },
+                }),
             );
         }
-        const rows = await db
-            .projectObjectiveActualScores.getAll();
-        assert.equal(rows.length, VALID.length);
     });
 
-test('actual store.put rejects out-of-range scores',
-    async () => {
-        const db = new MemoryDbAdapter();
-        await seedAdminSchema(db);
+test('actual validator rejects out-of-range scores',
+    () => {
         for (const score of INVALID) {
-            await assert.rejects(
-                () => db.projectObjectiveActualScores
-                    .put(
-                        `p:o:${score}`,
-                        {
-                            project_id: 'p',
-                            objective_id: 'o',
-                            score, member_id: 'w1', at: AT,
-                        },
-                    ),
+            assert.throws(
+                () => validateActualScoreEntity({
+                    project_id: 'p',
+                    objective_id: 'o',
+                    score, member_id: 'w1', at: AT,
+                }),
                 RANGE_MSG,
             );
         }
@@ -117,9 +99,9 @@ test('ctx.PUT rejects out-of-range baseline scores',
         }
     });
 
-test('ctx.PUT leaves no baseline row on a bad score',
+test('ctx.PUT leaves no baseline score on a bad score',
     async () => {
-        const { db, ctx } = await adminContext();
+        const { ctx } = await adminContext();
         for (const score of INVALID) {
             await assert.rejects(
                 () => ctx.PUT(
@@ -133,8 +115,9 @@ test('ctx.PUT leaves no baseline row on a bad score',
                 ),
             );
         }
-        const rows = await db
-            .projectObjectiveBaselineScores.getAll();
+        const rows = await getBaselineScoresForProject(
+            ctx, 'p',
+        );
         assert.equal(rows.length, 0);
     });
 
@@ -171,8 +154,9 @@ test('postProjectBaselineScoring rejects bad scores',
                 ),
             );
         }
-        const rows = await db
-            .projectObjectiveBaselineScores.getAll();
+        const rows = await getBaselineScoresForProject(
+            ctx, 'p',
+        );
         assert.equal(rows.length, 0);
     });
 
@@ -191,9 +175,6 @@ test('postProjectActualMeasurement rejects bad scores',
                 ),
             );
         }
-        const rows = await db
-            .projectObjectiveActualScores.getAll();
-        assert.equal(rows.length, 0);
     });
 
 test('postProjectBaselineScoring accepts valid scores',
@@ -207,7 +188,8 @@ test('postProjectBaselineScoring accepts valid scores',
                 objectiveId: `o:${score}`, score,
             })),
         );
-        const rows = await db
-            .projectObjectiveBaselineScores.getAll();
+        const rows = await getBaselineScoresForProject(
+            ctx, 'p',
+        );
         assert.equal(rows.length, VALID.length);
     });

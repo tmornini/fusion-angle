@@ -43,21 +43,13 @@ async () => {
     assert.equal(after.erased, true);
 });
 
-test('erasing PII keeps identity, member, and authored event',
+test('erasing PII keeps identity and person kind',
 async () => {
     const { db, ctx } = await setup();
-    // seed a person identity + member + an authored state event
     await seedPersonIdentity(db, 'p1', {
         name: 'P', email: 'p@x.io', phone: '1', bio: 'b',
     });
-    await db.members.put('p1', { type: 'human' });
-    await db.states.postEvent(
-        'e1', 'someEntity', 'active', 'p1',
-        '2026-01-01T00:00:00.000000Z',
-    );
     await deleteIdentityPii(ctx, 'p1');
     assert.equal((await getMemberPii(ctx, 'p1')).erased, true);
     assert.equal((await getIdentity(ctx, 'p1')).isPerson(), true);
-    const events = await db.states.getAllFor('someEntity');
-    assert.equal(events[0]!.member_id, 'p1');
 });

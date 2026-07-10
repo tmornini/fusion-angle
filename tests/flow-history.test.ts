@@ -14,7 +14,7 @@ import type {
 } from '../web-app/app/flow-history.ts';
 import type {
     FlowVersion,
-} from '../web-app/app/adapters/flow-versions.ts';
+} from '../web-app/app/flow-history.ts';
 
 function buildVersion(
     id: string,

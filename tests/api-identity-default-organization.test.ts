@@ -156,8 +156,16 @@ test('PUT the same org twice appends one event', async () => {
         db, putDefaultOrganization(
             token, 'current', '1', 'ev-dup-1', EVENT_AT,
         ));
-    const rows = await db.identityDefaultOrganizations.getAll();
+    // Phase Final Task 2: identity_default_organizations ROW
+    // half stripped — count via derive.
+    const { deriveDefaultOrganization } = await import(
+        '../api/derive-default-organization.ts'
+    );
+    const rows = await deriveDefaultOrganization(
+        db, 'current',
+    );
     assert.equal(rows.length, 1);
+    // Phase Final Stage B: identity spine tables retired.
 });
 
 test('GET resolves to the primary membership when unset',
@@ -184,8 +192,8 @@ test('GET is null for an org-less identity', async () => {
     assert.equal(body.organization_id, null);
 });
 
-test('PUT persists the caller-supplied eventId as the row id',
-async () => {
+test('PUT persists the caller-supplied eventId as the'
++ ' pair uriId', async () => {
     const db = await freshDb();
     await seedMembership(db, 'current', '1');
     const token = await devToken();
@@ -194,8 +202,13 @@ async () => {
             token, 'current', '1', 'caller-id-1', EVENT_AT,
         ));
     assert.equal(put.status, 204);
-    const rows =
-        await db.identityDefaultOrganizations.getAll();
+    // Phase Final Task 2: row half stripped — pair plane.
+    const { deriveDefaultOrganization } = await import(
+        '../api/derive-default-organization.ts'
+    );
+    const rows = await deriveDefaultOrganization(
+        db, 'current',
+    );
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.id, 'caller-id-1');
     assert.equal(rows[0]!.at, EVENT_AT);
@@ -216,9 +229,13 @@ async () => {
     assert.equal(r1.status, 204);
     const r2 = await handleRequest(db, req2);
     assert.equal(r2.status, 204);
-    const rows =
-        await db.identityDefaultOrganizations.getAll();
-    // org unchanged on second PUT — no new row appended
+    const { deriveDefaultOrganization } = await import(
+        '../api/derive-default-organization.ts'
+    );
+    const rows = await deriveDefaultOrganization(
+        db, 'current',
+    );
+    // org unchanged on second PUT — no new event appended
     assert.equal(rows.length, 1);
 });
 

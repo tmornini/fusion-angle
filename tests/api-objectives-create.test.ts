@@ -35,8 +35,8 @@ function revisionFields(id: string, name: string) {
 }
 
 test(
-    'POST objectives writes the objective row and its'
-    + ' first revision in one operation',
+    'POST objectives writes the objective and its first'
+    + ' revision on the pair plane in one operation',
     async () => {
         const db = await freshDb();
         await POST(db, 'objectives', {
@@ -45,6 +45,8 @@ test(
             revisionId: 'rev-1',
             revision: revisionFields('obj-1', 'Revenue'),
         }, DEV_TOKEN);
+        // Phase Final Task 2: row halves stripped — GET is
+        // pair-derived.
         const objective = await GET<{
             id: string;
             position: number;
@@ -54,8 +56,8 @@ test(
         // The fence stamped the bound org — never the body.
         assert.equal(objective.organization_id, '1');
         // The leaf revision route is PUT-only; read the nested
-        // per-objective collection and find the row the create
-        // wrote (the server filters it to obj-1).
+        // per-objective collection and find the revision the
+        // create synthesized (the server filters to obj-1).
         const revisions = await GET<Array<{
             id: string;
             objective_id: string;
@@ -65,18 +67,19 @@ test(
         assert.ok(revision);
         assert.equal(revision.objective_id, 'obj-1');
         assert.equal(revision.name, 'Revenue');
+        // Phase Final Stage B: objectives tables retired.
     },
 );
 
 test(
-    'POST objectives rolls back the objective row when'
-    + ' its first revision is malformed',
+    'POST objectives appends nothing when its first'
+    + ' revision is malformed',
     async () => {
         const db = await freshDb();
-        // An empty revision name is rejected by the
-        // objective_revisions store validator mid-tx (after the
-        // objective row is put), so the objective write must
-        // roll back with it.
+        // An empty revision name is rejected by
+        // validateObjectiveRevisionEntity at the route
+        // pre-tx (pair formation), so no pairs land and
+        // GET cannot derive the objective.
         await assert.rejects(
             () => POST(db, 'objectives', {
                 id: 'obj-rollback',

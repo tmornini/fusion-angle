@@ -122,9 +122,10 @@ export async function identityDefaultOrganizationRequest(
                 { status: HTTP_BAD_REQUEST },
             );
         }
-        let at: string;
+        // Validate `at` for the wire body (pair-plane payload);
+        // Phase Final Task 2 no longer stamps a row with it.
         try {
-            at = validateTimestampField(body, 'at',
+            validateTimestampField(body, 'at',
                 'identity_default_organizations');
         } catch {
             return Response.json(
@@ -190,18 +191,11 @@ export async function identityDefaultOrganizationRequest(
         const changes = currentDefaultOrganizationFor(
             rows, identityId) !== organization;
         if (changes) {
+            // Phase Final Task 2: identity_default_organizations
+            // ROW half stripped — pure pair-plane write.
             await ctx.base.transaction(
-                [
-                    'identity_default_organizations',
-                    'requests', 'responses',
-                ],
+                ['requests', 'responses'],
                 async (view) => {
-                    await view.identityDefaultOrganizations.put(
-                        eventId, {
-                            identity_id: identityId,
-                            organization_id: organization,
-                            at,
-                        });
                     await appendMessagePair(view, pair);
                 },
             );

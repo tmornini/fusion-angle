@@ -308,15 +308,9 @@ test(
         // derives from the ledger, so the row needs a message
         // pair — a raw db.organizations.put would be invisible.
         await ctx.PUT('organizations/1', organizationRow('Acme'));
-        // Stays raw: this test never asserts usedSeats(), only
-        // lastActivityText() (derived from states, not
-        // memberships) — an invisible-to-the-ledger membership
-        // row here changes nothing this test checks.
-        await db.memberships.put('m1', {
-            organization_id: '1',
-            identity_id: 'current',
-            at: '2026-01-01T00:00:00.000000Z',
-        });
+        // Phase Final Stage B: memberships table retired —
+        // lastActivityText derives from states, not
+        // memberships.
         const before = await getOrganization(ctx);
         assert.equal(before.lastActivityText(), '—');
 

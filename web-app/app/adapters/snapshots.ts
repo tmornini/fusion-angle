@@ -82,6 +82,12 @@ export const RETIRED_KEYS_PER_TABLE:
     ],
 };
 
+// Client-side diagnostics only (scanForRetiredKeys on the
+// file-upload path). The UNIVERSAL server gate is
+// SNAPSHOT_SCHEMA_VERSION equality in parseAndValidateSnapshot
+// — a pre-Final export fails the version check before any
+// table key is read. This list fails fast on known dead keys
+// when a file still carries them alongside a current marker.
 export const RETIRED_TABLES: readonly string[] = [
     'activities',
     'activity_actors',
@@ -89,6 +95,40 @@ export const RETIRED_TABLES: readonly string[] = [
     'organization',
     'identity_tokens',
     'authorization_codes',
+    'ideas',
+    'idea_submissions',
+    'projects',
+    'project_flows',
+    'project_objective_baseline_scores',
+    'project_objective_actual_scores',
+    'flows',
+    'flow_versions',
+    'flow_nodes',
+    'flow_edges',
+    'flow_node_members',
+    'flow_node_attributes',
+    'work_orders',
+    'flow_work_orders',
+    'state_field_values',
+    'records',
+    'record_attributes',
+    'flow_records',
+    'objectives',
+    'objective_revisions',
+    'members',
+    'human_members',
+    'ai_members',
+    'memberships',
+    'invitations',
+    'identities',
+    'identity_pii',
+    'identity_credentials',
+    'identity_token_revocations',
+    'identity_default_organizations',
+    'role_grants',
+    'identity_providers',
+    'organizations',
+    'states',
 ];
 
 // State-event values the alphabet has retired. Old

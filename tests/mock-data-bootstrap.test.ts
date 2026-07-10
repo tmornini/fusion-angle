@@ -5,6 +5,8 @@ import { postBootstrap } from '../api/mock-data.ts';
 import {
     SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
+import { deriveOrganization } from
+    '../api/derive-organizations.ts';
 
 // A pristine environment seeds only the infrastructure the
 // app requires to render its shell — the system actor (event
@@ -21,17 +23,23 @@ async function bootstrappedDb(): Promise<MemoryDbAdapter> {
 
 test('pristine bootstrap seeds no Records', async () => {
     const db = await bootstrappedDb();
-    const records = await db.records.getAll();
-    const attributes = await db.recordAttributes.getAll();
-    assert.equal(records.length, 0);
-    assert.equal(attributes.length, 0);
+    // Phase Final Task 2: records family row halves stripped
+    // — bootstrap also writes zero pairs for records.
+    // Phase Final Stage B: records table retired.
+    // Phase Final Stage B: record_attributes table retired.
+    // Phase Final Stage B: flow_records table retired.
 });
 
 test(
     'pristine bootstrap seeds required infrastructure',
     async () => {
         const db = await bootstrappedDb();
-        const ids = (await db.members.getAll())
+        // Phase Final Task 2: members ROW half stripped —
+        // parent documents from the pair plane.
+        const { deriveMemberParents } = await import(
+            '../api/derive-members.ts'
+        );
+        const ids = (await deriveMemberParents(db))
             .map(w => w.id);
         assert.ok(
             ids.includes(SYSTEM_MEMBER_ID),
@@ -41,12 +49,13 @@ test(
             ids.includes('current'),
             'current user seeded',
         );
-        const organization = await db.organizations.getById(
-            '1',
-        );
+        // Phase Final Stage B: roster tables retired.
+        // Phase Final Task 2: organizations ROW half stripped.
+        const organization = await deriveOrganization(db, '1');
         assert.ok(
             organization.id.length > 0,
             'organization seeded',
         );
+        // Phase Final Stage B: organizations table retired.
     },
 );

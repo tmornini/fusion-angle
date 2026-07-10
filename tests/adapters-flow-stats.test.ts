@@ -162,8 +162,9 @@ test(
         // demands shape, but getFlowStats reads from
         // flow-work-orders and flow transitions,
         // not from work-order.flow_graph
-        await db.workOrders.put('wo1', {
-            organization_id: '1',
+        // Phase Final Stage B: work_orders table retired —
+        // seed through the live document PUT.
+        await ctx.PUT('work-orders/wo1', {
             display_id: 'WO-1',
             flow_graph: jsonObjectField({
                 name: 'Onboarding',
@@ -171,8 +172,7 @@ test(
             }),
             position: 1,
         });
-        await db.workOrders.put('wo2', {
-            organization_id: '1',
+        await ctx.PUT('work-orders/wo2', {
             display_id: 'WO-2',
             flow_graph: jsonObjectField({
                 name: 'Onboarding',
@@ -182,13 +182,8 @@ test(
         });
 
         // wo1 belongs to f1; wo2 belongs to OTHER. NAMED re-pin
-        // (Task 7, the projects/:id/flows precedent): getFlowStats
-        // reads flows/:id/work-orders through the flipped GET —
-        // a raw db.flowWorkOrders.put leaves no message pair at
-        // this address, so each join must land through the SAME
-        // wire-reachable PUT the live route serves. The
-        // workOrders.put entity rows above STAY raw — getFlowStats
-        // never reads a flipped work-orders entity route.
+        // (Task 7): getFlowStats reads flows/:id/work-orders
+        // through the flipped GET.
         await ctx.PUT('flows/f1/work-orders/fwo1', {
             flow_id: 'f1',
             work_order_id: 'wo1',
@@ -256,8 +251,8 @@ test(
         // seeds c→a→z all at (0,0).
         const autoGraph = buildTestGraph();
         await seedFlow(ctx, 'f1', 'AutoLayout', autoGraph);
-        await db.workOrders.put('wo1', {
-            organization_id: '1',
+        // Phase Final Stage B: work_orders table retired.
+        await ctx.PUT('work-orders/wo1', {
             display_id: 'WO-1',
             flow_graph: jsonObjectField({
                 name: 'AutoLayout',

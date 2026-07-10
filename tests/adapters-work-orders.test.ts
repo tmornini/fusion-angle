@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import {
     MemoryDbAdapter,
@@ -172,10 +174,14 @@ async function seedFlow(
         nodes: graph.nodes,
         edges: graph.edges,
     };
-    const existing = await db.flows.getAll();
-    if (existing.some(f => f.id === flowId)) {
+    // Phase Final Stage B: flows table retired — probe
+    // existence via GET; create on miss.
+    try {
+        await ctx.GET('flows/' + flowId);
         await putFlow(ctx, flowId, save);
         return;
+    } catch {
+        // missing — create below
     }
     await postFlowCreation(ctx, {
         flowId,
@@ -241,27 +247,16 @@ test(
                 ctx, 'f1',
             );
 
-        const wos = await db.workOrders
-            .getAll();
-        assert.equal(wos.length, 1);
-        assert.equal(wos[0]!.id, woId);
-        assert.equal(
-            wos[0]!.position, 1,
-        );
-
-        const links =
-            await db.flowWorkOrders
-                .getAll();
-        assert.equal(links.length, 1);
-        assert.equal(
-            links[0]!.flow_id, 'f1',
-        );
-        assert.equal(
-            links[0]!.work_order_id, woId,
-        );
+        // Phase Final Task 2: WO + join on pair plane.
+        const wo = await getWorkOrder(ctx, woId);
+        assert.equal(wo.id, woId);
+        assert.equal(wo.position, 1);
+        // Phase Final Stage B: work_orders +
+        // flow_work_orders tables retired — pair plane
+        // is residual pin.
 
         const events =
-            await db.states.getAllFor(woId);
+            await deriveStatesFor(db, '1', woId);
         // start node, post-start, claimed
         assert.equal(events.length, 3);
         const nonClaim = events.filter(
@@ -308,13 +303,11 @@ test(
             position: 7.5,
         });
 
-        await createWorkOrder(ctx, 'f1');
+        const secondId = await createWorkOrder(ctx, 'f1');
 
-        const all = await db.workOrders.getAll();
-        const second = all.find(
-            w => w.id !== firstId,
-        );
-        assert.equal(second!.position, 8.5);
+        // Phase Final Task 2: position from pair-plane GET.
+        const second = await getWorkOrder(ctx, secondId);
+        assert.equal(second.position, 8.5);
     },
 );
 
@@ -390,13 +383,13 @@ test(
     async () => {
         const { db, ctx } = await setupDb();
         await seedFlow(db, 'f1', buildLinearGraph());
-        await createWorkOrder(ctx, 'f1');
-        await createWorkOrder(ctx, 'f1');
-        const wos = await db.workOrders
-            .getAll();
-        const positions = wos
-            .map(w => w.position)
-            .sort();
+        const a = await createWorkOrder(ctx, 'f1');
+        const b = await createWorkOrder(ctx, 'f1');
+        // Phase Final Task 2: positions from pair-plane GET.
+        const positions = [
+            (await getWorkOrder(ctx, a)).position,
+            (await getWorkOrder(ctx, b)).position,
+        ].sort();
         assert.deepEqual(
             positions, [1, 2],
         );
@@ -410,7 +403,7 @@ test(
     async () => {
         const { db, ctx } = await setupDb();
         await seedFlow(db, 'f1', buildLinearGraph());
-        await createWorkOrder(ctx, 'f1');
+        const woId = await createWorkOrder(ctx, 'f1');
 
         // Mutate source flow AFTER the
         // work order captured its
@@ -421,19 +414,15 @@ test(
         mutated.nodes[1]!.name = 'EDITED';
         await seedFlow(db, 'f1', mutated);
 
-        const wo = (
-            await db.workOrders.getAll()
-        )[0]!;
-        const fg = JSON.parse(
-            wo.flow_graph,
-        );
+        // Phase Final Task 2: frozen graph on pair-plane GET.
+        const wo = await getWorkOrder(ctx, woId);
         assert.equal(
-            fg.nodes[1].name, 'Doing work',
+            wo.flowGraph.nodes[1]!.name, 'Doing work',
         );
         assert.notEqual(
-            fg.nodes[1].name, 'EDITED',
+            wo.flowGraph.nodes[1]!.name, 'EDITED',
         );
-        assert.equal('flowId' in fg, false);
+        assert.equal('flowId' in wo.flowGraph, false);
     },
 );
 
@@ -590,7 +579,7 @@ test(
         await pause(2);
         await postWorkOrderClaim(ctx, woId);
         const events =
-            await db.states.getAllFor(woId);
+            await deriveStatesFor(db, '1', woId);
         const claimed = events.filter(
             (e: StateEntity) =>
                 e.state === 'claimed',
@@ -761,7 +750,12 @@ async () => {
     await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db, await devToken());
     await deleteWorkOrderClaim(ctx, 'wo-release-1');
-    const events = await db.states.getAllFor('wo-release-1');
+    // Phase Final Task 1(b): claim_released is pair-plane-only
+    // (bare PUT /states/:id). Pin via the live derived history
+    // path, never the retired row half.
+    const events = await ctx.GET<StateEntity[]>(
+        'entity-states/wo-release-1/history',
+    );
     assert.equal(events.length, 1);
     assert.equal(events[0]!.state, 'claim_released');
 });
@@ -797,7 +791,7 @@ test(
         });
 
         const allEvents =
-            await db.states.getAllFor(woId);
+            await deriveStatesFor(db, '1', woId);
         const transitionEvt = allEvents.find(
             (e: StateEntity) =>
                 e.state === 'n-finish',

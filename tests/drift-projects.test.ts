@@ -3,10 +3,7 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
-import type { ProjectEntity } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import { organizationScopedAdapter } from
-    '../api/db-organization-scoped.ts';
 import { buildProjects } from '../api/mock-data/projects.ts';
 import {
     secondOrganizationProjectId,
@@ -23,11 +20,12 @@ import {
     deriveProjectStateHistory,
 } from '../api/derive-projects.ts';
 
-// The E10 drift check (Phase 3 Task 5): message-derived reads
-// proven equal to the old-table-derived reads they will replace
-// at the route (Task 6). NOTHING reads the pairs in production
-// yet — this file alone gates that flip; it stays as a
-// regression guard through Phase Final.
+// Phase Final Task 2: projects(+project_flows+scores)
+// dual-write stripped. This file no longer compares derive
+// vs old-table oracles — the row plane is empty after seed.
+// Coverage re-homes to wire-byte handleRequest assertions
+// and non-lexical live fixtures (byIdAscending must diverge
+// from insertion order; never function-vs-function only).
 
 const BASE = 'http://localhost';
 
@@ -47,21 +45,50 @@ function req(
     });
 }
 
-function sortById<T extends { id: string }>(
-    rows: readonly T[],
-): T[] {
-    return [...rows].sort((a, b) =>
-        a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+function projectDocument(
+    title: string,
+    state: string,
+    stateAt: string,
+    stateEventId: string,
+    position = 1,
+) {
+    return {
+        title,
+        description: 'd',
+        progress: 0,
+        start_date: '2026-04-01',
+        target_end_date: '2026-07-01',
+        estimated_cost: 100,
+        actual_cost: 0,
+        position,
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
+    };
 }
 
-// Reads through the SAME org-scoped store the live route reads
-// today (organizationScopedAdapter binds the fence the route's
-// verified-token org resolves to).
-function oldPlaneProjects(
-    db: MemoryDbAdapter, organization: string,
-): Promise<ProjectEntity[]> {
-    return organizationScopedAdapter(db, organization)
-        .projects.getAll();
+// Wire entity shape WRITE_RESPONSE_SPECS + projectEntityOf
+// form (id first, organization_id, then entity fields).
+function wireProject(
+    id: string,
+    title: string,
+    position = 1,
+    organization = '1',
+    overrides: Record<string, unknown> = {},
+) {
+    return {
+        id,
+        organization_id: organization,
+        title,
+        description: 'd',
+        progress: 0,
+        start_date: '2026-04-01',
+        target_end_date: '2026-07-01',
+        estimated_cost: 100,
+        actual_cost: 0,
+        position,
+        ...overrides,
+    };
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
@@ -72,88 +99,150 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 // Every seeded project's own id, paired with the org the seed
 // actually stamped it into: buildProjects() (16 rows) all land
-// on STARK_ORGANIZATION; the 17th is the org-2 override sharing
-// secondOrganizationProjectId (seed-message-pairs.ts) — reused
-// rather than a second literal.
+// on STARK_ORGANIZATION; the 17th is the org-2 override.
 const SEEDED_PROJECTS = [
     ...buildProjects().map((project) => ({
         id: project.id,
         organization: STARK_ORGANIZATION,
+        title: project.title,
+        position: project.position,
     })),
     {
         id: secondOrganizationProjectId,
         organization: ORGANIZATION_TWO,
+        title: undefined as string | undefined,
+        position: undefined as number | undefined,
     },
 ];
 
-test('projects: message-derived equals old-table-derived',
-async () => {
+test('seeded GET /projects wire equals deriveProjects'
++ ' per org', async () => {
     const db = await seededDb();
     for (const organization of ['1', '2']) {
-        const old = sortById(
-            await oldPlaneProjects(db, organization),
+        const token = await organizationToken(
+            'current', organization,
         );
+        const res = await handleRequest(
+            db, req('GET', '/projects', token),
+        );
+        assert.equal(res.status, 200);
+        const wireText = await res.text();
         const derived = await deriveProjects(db, organization);
-        assert.deepEqual(derived, old);
+        assert.equal(wireText, JSON.stringify(derived));
+        assert.ok(derived.length > 0);
     }
 });
 
-test('per-project getById parity across every seeded project',
-async () => {
+test('per-project GET wire equals deriveProject for'
++ ' every seed', async () => {
     const db = await seededDb();
-    for (const { id, organization } of SEEDED_PROJECTS) {
-        const derived = await deriveProject(
-            db, organization, id,
+    for (const seed of SEEDED_PROJECTS) {
+        const token = await organizationToken(
+            'current', seed.organization,
         );
-        const old = await organizationScopedAdapter(
-            db, organization,
-        ).projects.getById(id);
-        assert.deepEqual(derived, old);
+        const res = await handleRequest(
+            db, req('GET', '/projects/' + seed.id, token),
+        );
+        assert.equal(res.status, 200);
+        const wireText = await res.text();
+        const derived = await deriveProject(
+            db, seed.organization, seed.id,
+        );
+        assert.equal(wireText, JSON.stringify(derived));
+        if (seed.title !== undefined) {
+            assert.equal(derived.title, seed.title);
+            assert.equal(derived.position, seed.position);
+        }
     }
 });
 
-test('a foreign-org id 404s the same way on both planes',
+test('a foreign-org project id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_PROJECTS.find(
         (seed) => seed.organization === '1',
     )!;
-    const otherOrganization = '2';
-    await assert.rejects(
-        () => deriveProject(db, otherOrganization, foreign.id),
-        EntityNotFoundError,
+    const token = await organizationToken('current', '2');
+    const res = await handleRequest(
+        db, req('GET', '/projects/' + foreign.id, token),
+    );
+    assert.equal(res.status, 404);
+    const body = await res.json() as { error: string };
+    assert.equal(
+        body.error, 'Not found: projects/' + foreign.id,
     );
     await assert.rejects(
-        () => organizationScopedAdapter(db, otherOrganization)
-            .projects.getById(foreign.id),
+        () => deriveProject(db, '2', foreign.id),
         EntityNotFoundError,
     );
 });
 
-test('state-history parity across every seeded project',
+// Live fixtures inserted NON-LEX (z, then a, then m) so
+// byIdAscending collection order diverges from insertion.
+test('GET /projects collection is wire byte-identical to a'
++ ' literal id-lex reconstruction after non-lex PUTs',
 async () => {
     const db = await seededDb();
-    for (const { id, organization } of SEEDED_PROJECTS) {
-        const derived = await deriveProjectStateHistory(
-            db, organization, id,
+    const token = await organizationToken();
+    const fixtures = [
+        {
+            id: 'project-drift-z',
+            title: 'Zulu',
+            at: '2026-07-01T00:00:00.000000Z',
+            ev: 'ev-drift-z',
+        },
+        {
+            id: 'project-drift-a',
+            title: 'Alpha',
+            at: '2026-07-01T00:00:01.000000Z',
+            ev: 'ev-drift-a',
+        },
+        {
+            id: 'project-drift-m',
+            title: 'Mike',
+            at: '2026-07-01T00:00:02.000000Z',
+            ev: 'ev-drift-m',
+        },
+    ];
+    for (const f of fixtures) {
+        const put = await handleRequest(db, req(
+            'PUT', '/projects/' + f.id, token,
+            projectDocument(f.title, 'submitted', f.at, f.ev),
+        ));
+        assert.equal(put.status, 200);
+        assert.deepEqual(
+            await put.json(),
+            wireProject(f.id, f.title),
         );
-        const old = await db.states.getAllFor(id);
-        assert.deepEqual(derived, old);
+    }
+    // id-lex expected order: a, m, z — NOT insertion order.
+    const expectedAdded = [
+        wireProject('project-drift-a', 'Alpha'),
+        wireProject('project-drift-m', 'Mike'),
+        wireProject('project-drift-z', 'Zulu'),
+    ];
+    const res = await handleRequest(
+        db, req('GET', '/projects', token),
+    );
+    assert.equal(res.status, 200);
+    const list = await res.json() as { id: string }[];
+    const added = list.filter((row) =>
+        row.id.startsWith('project-drift-'));
+    assert.equal(
+        JSON.stringify(added),
+        JSON.stringify(expectedAdded),
+    );
+    for (const row of expectedAdded) {
+        const single = await handleRequest(
+            db, req('GET', '/projects/' + row.id, token),
+        );
+        assert.equal(single.status, 200);
+        assert.equal(
+            await single.text(), JSON.stringify(row),
+        );
     }
 });
 
-// The OP-level MEMBER_ID CAVEAT (postProjectDocumentOp,
-// routes.ts) has no DERIVATION-layer counterpart:
-// deriveProjectStateHistory's own dedup walks pairs in ARRIVAL
-// order and keeps the FIRST occurrence of each distinct
-// state_event_id. A regression that flipped it to keep-LAST
-// would reattribute the derived event to the SECOND editor —
-// silently, since every other case here uses one actor
-// throughout. Mirrors the op-level scenario at the derivation
-// layer: member A creates the project; member B resends the
-// IDENTICAL trio under a different title; the derived history
-// must still name member A, and must still equal the old-plane
-// states row field-for-field.
 test('derived history keeps the FIRST arrival\'s authorship'
 + ' on a same-trio resend by a different member', async () => {
     const db = await seededDb();
@@ -164,32 +253,20 @@ test('derived history keeps the FIRST arrival\'s authorship'
 
     await handleRequest(db, req(
         'PUT', '/projects/' + projectId, tokenA, {
-            title: 'First',
-            description: 'd',
-            progress: 0,
-            start_date: '2026-04-01',
-            target_end_date: '2026-07-01',
-            estimated_cost: 100,
-            actual_cost: 0,
-            position: 1,
-            state: 'submitted',
-            state_at: '2026-04-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-authorship-caveat',
+            ...projectDocument(
+                'First', 'submitted',
+                '2026-04-01T00:00:00.000000Z',
+                'ev-drift-authorship-caveat',
+            ),
         },
     ));
     await handleRequest(db, req(
         'PUT', '/projects/' + projectId, tokenB, {
-            title: 'Second',
-            description: 'd',
-            progress: 0,
-            start_date: '2026-04-01',
-            target_end_date: '2026-07-01',
-            estimated_cost: 100,
-            actual_cost: 0,
-            position: 1,
-            state: 'submitted',
-            state_at: '2026-04-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-authorship-caveat',
+            ...projectDocument(
+                'Second', 'submitted',
+                '2026-04-01T00:00:00.000000Z',
+                'ev-drift-authorship-caveat',
+            ),
         },
     ));
 
@@ -199,33 +276,33 @@ test('derived history keeps the FIRST arrival\'s authorship'
     assert.equal(derived.length, 1);
     assert.equal(derived[0]!.member_id, 'current');
 
-    const old = await db.states.getAllFor(projectId);
-    assert.deepEqual(derived, old);
+    // Wire entity reflects the SECOND title; authorship of the
+    // head event stays on member A.
+    const getRes = await handleRequest(
+        db, req('GET', '/projects/' + projectId, tokenA),
+    );
+    assert.equal(getRes.status, 200);
+    assert.equal(
+        await getRes.text(),
+        JSON.stringify(wireProject(projectId, 'Second')),
+    );
 });
 
-test('live-write case: create + edit + transition + delete, '
-+ 're-compared on both planes', async () => {
+test('live-write case: create + edit + transition + delete',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const projectId = 'project-drift-lifecycle';
 
-    // Create.
     await handleRequest(db, req(
         'PUT', '/projects/' + projectId, token, {
-            title: 'Lifecycle Project',
-            description: 'd',
-            progress: 0,
-            start_date: '2026-03-01',
-            target_end_date: '2026-06-01',
-            estimated_cost: 200,
-            actual_cost: 0,
-            position: 1,
-            state: 'submitted',
-            state_at: '2026-03-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-lifecycle-genesis',
+            ...projectDocument(
+                'Lifecycle Project', 'submitted',
+                '2026-03-01T00:00:00.000000Z',
+                'ev-drift-lifecycle-genesis',
+            ),
         },
     ));
-    // Edit — same trio, different fields.
     await handleRequest(db, req(
         'PUT', '/projects/' + projectId, token, {
             title: 'Lifecycle Project Edited',
@@ -241,7 +318,6 @@ test('live-write case: create + edit + transition + delete, '
             state_event_id: 'ev-drift-lifecycle-genesis',
         },
     ));
-    // Transition.
     await handleRequest(db, req(
         'PUT', '/projects/' + projectId, token, {
             title: 'Lifecycle Project Edited',
@@ -257,16 +333,24 @@ test('live-write case: create + edit + transition + delete, '
             state_event_id: 'ev-drift-lifecycle-review',
         },
     ));
-    const oldBeforeDelete = await organizationScopedAdapter(
-        db, '1',
-    ).projects.getById(projectId);
-    const derivedBeforeDelete = await deriveProject(
+    const beforeDelete = await handleRequest(
+        db, req('GET', '/projects/' + projectId, token),
+    );
+    assert.equal(beforeDelete.status, 200);
+    const beforeWire = await beforeDelete.json() as {
+        title: string;
+        progress: number;
+    };
+    assert.equal(beforeWire.title, 'Lifecycle Project Edited');
+    assert.equal(beforeWire.progress, 10);
+    const derivedBefore = await deriveProject(
         db, '1', projectId,
     );
-    assert.deepEqual(derivedBeforeDelete, oldBeforeDelete);
+    assert.equal(
+        JSON.stringify(beforeWire),
+        JSON.stringify(derivedBefore),
+    );
 
-    // Delete (a transition to 'deleted' — projects has no
-    // DELETE route).
     await handleRequest(db, req(
         'PUT', '/projects/' + projectId, token, {
             title: 'Lifecycle Project Edited',
@@ -283,51 +367,37 @@ test('live-write case: create + edit + transition + delete, '
         },
     ));
 
+    const deleted = await handleRequest(
+        db, req('GET', '/projects/' + projectId, token),
+    );
+    assert.equal(deleted.status, 404);
     await assert.rejects(
         () => deriveProject(db, '1', projectId),
         EntityNotFoundError,
     );
-    await assert.rejects(
-        () => organizationScopedAdapter(db, '1')
-            .projects.getById(projectId),
-        EntityNotFoundError,
+    const listRes = await handleRequest(
+        db, req('GET', '/projects', token),
     );
-    const derivedList = await deriveProjects(db, '1');
+    const list = await listRes.json() as { id: string }[];
     assert.equal(
-        derivedList.some((p) => p.id === projectId), false,
-    );
-    const oldList = await oldPlaneProjects(db, '1');
-    assert.equal(
-        oldList.some((p) => p.id === projectId), false,
+        list.some((p) => p.id === projectId), false,
     );
 
     const derivedHistory = await deriveProjectStateHistory(
         db, '1', projectId,
     );
-    const oldHistory = await db.states.getAllFor(projectId);
-    assert.deepEqual(derivedHistory, oldHistory);
+    // genesis + under_review + deleted (same-trio edit
+    // does not add a second event)
     assert.equal(derivedHistory.length, 3);
 });
 
-// The Task 4 proof at the derivation layer: a conversion-born
-// project derives IDENTICALLY to a PUT-born one, since Task 4's
-// synthesized document pair is byte-indistinguishable from a
-// live PUT /projects/:id's own pair — so this module needs no
-// conversion special case anywhere. 'current' is a member of
-// BOTH orgs (seeded admin in org '1' AND '2'), so
-// organizationToken('current') is used — never the raw
-// DEV_TOKEN a flat token's implicit org resolution would leave
-// ambiguous. Body shape mirrors ONLY the field values
-// tests/api-idea-conversion.test.ts's projectFields/ideaFields
-// fixtures use — those helpers are file-local there, so the
-// shape is reproduced rather than imported.
 test('live conversion case: a converted idea\'s project'
-+ ' derives identically to a PUT-born one', async () => {
++ ' is wire-visible like a PUT-born one', async () => {
     const db = await seededDb();
     const token = await organizationToken('current');
     const projectId = 'project-drift-conversion';
 
-    await handleRequest(db, req(
+    const conv = await handleRequest(db, req(
         'POST',
         '/ideas/idea-drift-conversion-source/conversion',
         token,
@@ -361,18 +431,27 @@ test('live conversion case: a converted idea\'s project'
             baselines: [],
         },
     ));
+    assert.equal(conv.status, 204);
 
+    const getRes = await handleRequest(
+        db, req('GET', '/projects/' + projectId, token),
+    );
+    assert.equal(getRes.status, 200);
+    const wireText = await getRes.text();
+    const wire = JSON.parse(wireText) as { title: string };
+    assert.equal(wire.title, 'Converted Project');
     const derived = await deriveProject(db, '1', projectId);
-    const old = await organizationScopedAdapter(db, '1')
-        .projects.getById(projectId);
-    assert.deepEqual(derived, old);
+    assert.equal(wireText, JSON.stringify(derived));
 
-    const derivedList = await deriveProjects(db, '1');
-    assert.ok(derivedList.some((p) => p.id === projectId));
+    const listRes = await handleRequest(
+        db, req('GET', '/projects', token),
+    );
+    const list = await listRes.json() as { id: string }[];
+    assert.ok(list.some((p) => p.id === projectId));
 
     const derivedHistory = await deriveProjectStateHistory(
         db, '1', projectId,
     );
-    const oldHistory = await db.states.getAllFor(projectId);
-    assert.deepEqual(derivedHistory, oldHistory);
+    assert.equal(derivedHistory.length, 1);
+    assert.equal(derivedHistory[0]!.state, 'submitted');
 });

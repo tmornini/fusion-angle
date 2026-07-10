@@ -1,8 +1,5 @@
 import type { DbAdapter } from './db.ts';
 import {
-    EntityNotFoundError,
-} from './db.ts';
-import {
     assertInvitationState,
     ValidationError,
     type Id,
@@ -411,7 +408,14 @@ async function grantInvitation(
     // plan defers new-identity creation — of the same demo grade as the
     // client-shipped HMAC key. A server tier would resolve emails
     // without reflecting existence through the status code.
-    const match = (await ctx.base.identityPii.getAll())
+    //
+    // FLIPPED (Phase 15 gate 6): email resolution re-points onto
+    // deriveIdentityPiiRows(ctx.base) — wire-identical to the
+    // hand-written identityPii.getAll() dispatch it replaces
+    // (tests/drift-identities.test.ts case 6 pins the two row
+    // sets equal). PRE-TX only; the derive opens its own
+    // requests/responses transaction.
+    const match = (await deriveIdentityPiiRows(ctx.base))
         .find(p => p.email === email);
     if (match === undefined) {
         return errorJson(
@@ -524,11 +528,11 @@ async function grantInvitation(
     // The member/pending checks and the write run in ONE transaction so
     // two concurrent grants cannot both pass the check and each append a
     // pending invitation (Commandment VII).
+    // Phase Final Task 2: invitations ROW half stripped;
+    // stale 'memberships' tx entry dropped with it;
+    // states ROW half stripped (pair plane only).
     await ctx.base.transaction(
-        [
-            'invitations', 'states', 'memberships',
-            'requests', 'responses',
-        ],
+        ['requests', 'responses'],
         async (view) => {
             const outcome = await grantOutcomeFor(
                 view, organization, identityId);
@@ -543,16 +547,6 @@ async function grantInvitation(
                     + ' and its transaction — retry the'
                     + ' request',
                 );
-            }
-            if (outcome.kind === 'fresh') {
-                await view.invitations.put(invitationId, {
-                    organization_id: organization,
-                    identity_id: identityId,
-                    at: grantAt,
-                });
-                await view.states.postEvent(
-                    grantEventId, invitationId,
-                    'pending', ctx.principal.id, grantAt);
             }
             await appendMessagePair(view, pair);
             if (document !== undefined) {
@@ -610,17 +604,20 @@ async function grantOutcomeFor(
 // re-points onto invitationOpStateFor (api/derive-invitations.ts,
 // Task 1) — wire-identical to the states.getAll()+latestByKey
 // dispatch it replaces (tests/drift-invitation-pending-dedup.
-// test.ts's Step 0 equivalence proof). Candidate DISCOVERY stays
-// on the invitations ROW plane (adapter.invitations.getAll()) —
-// dual-write keeps that table current, and no (organization,
-// identity) index exists on the pair plane to discover candidates
-// without it. `undefined` means "no terminal op yet" — the same
-// 'pending' conclusion the old current.state check reached, since
-// every genuine invitations row already carries its own genesis
-// 'pending' pair (the dual-write invariant grantInvitation's own
-// transaction keeps). Exported for
-// tests/pin-invitation-write-path-parity.test.ts's pre-tx-vs-in-tx
-// pin (Task 2 commit 3) — called BOTH pre-tx (to decide the
+// test.ts's Step 0 equivalence proof).
+//
+// FLIPPED (Phase 15 gate 6): candidate DISCOVERY re-points onto
+// deriveInvitations(adapter) — wire-identical to the hand-
+// written invitations.getAll() filter it replaces while dual-
+// write holds (tests/drift-invitation-pending-dedup.test.ts;
+// pin-invitation-write-path-parity.test.ts). View-safe: only
+// requests/responses getAllWhere + getAll, no nested tx. The
+// grant write-gate already lists requests/responses. `undefined`
+// from invitationOpStateFor still means "no terminal op yet" —
+// the same 'pending' conclusion, since every genuine invitation
+// document carries its genesis pending pair.
+// Exported for tests/pin-invitation-write-path-parity.test.ts's
+// pre-tx-vs-in-tx pin — called BOTH pre-tx (to decide the
 // response) and in-tx (the `agrees` re-check) inside
 // grantInvitation's own transaction, so both calls already run
 // this SAME body; the pin makes that a proven property, not a
@@ -630,7 +627,7 @@ export async function pendingInvitationFor(
     organization: Id,
     identityId: Id,
 ): Promise<{ id: Id; at: string } | null> {
-    const candidates = (await adapter.invitations.getAll())
+    const candidates = (await deriveInvitations(adapter))
         .filter(inv => inv.organization_id === organization
             && inv.identity_id === identityId);
     for (const inv of candidates) {
@@ -732,16 +729,15 @@ async function acceptInvitation(
     // closure — the third memberships writer to join the
     // document plane, after the live PUT route and the seed):
     // PUT-shaped, at the INVITATION's org-nested memberships
-    // address — never the caller's active org, mirroring the
-    // domain write's own organization choice below. Formed
-    // pre-tx (crypto cannot run inside a transaction body) but
-    // appended ONLY inside the `!already` branch, beside the
-    // memberships.put it mirrors — a no-op re-accept or a
-    // conflict writes no membership row, so it appends no
-    // document either. Rides the shared former (Phase 9 Task 2),
-    // which resolves the SAME WRITE_RESPONSE_SPECS
-    // ['memberships/:id'] entry a live PUT /memberships/:id
-    // resolves (documentWriteResponseSpec(MEMBERSHIPS_WIRING)).
+    // address — never the caller's active org. Formed pre-tx
+    // (crypto cannot run inside a transaction body) but
+    // appended ONLY inside the `!already` branch — a no-op
+    // re-accept or a conflict writes no membership document,
+    // so it appends no document either. Phase Final Task 2:
+    // memberships ROW half stripped; the pair IS the write.
+    // Rides the shared former (Phase 9 Task 2), which resolves
+    // the SAME WRITE_RESPONSE_SPECS ['memberships/:id'] entry
+    // a live PUT /memberships/:id resolves.
     const membershipDocumentBody = {
         organization_id: inv.organization_id,
         identity_id: ctx.principal.id,
@@ -758,16 +754,15 @@ async function acceptInvitation(
         },
     );
     // The pending check rides INSIDE the write transaction so a
-    // concurrent revoke/decline cannot slip between the check and the
-    // membership write — a revoke must actually stop access (Commandment
-    // X / II). Mirrors grantAuthorizationCode's in-tx state gate.
+    // concurrent revoke/decline cannot slip between the check
+    // and the membership document write — a revoke must actually
+    // stop access (Commandment X / II).
     let conflict = false;
     let noOp = false;
+    // Phase Final Task 2: memberships ROW half stripped;
+    // states ROW half stripped (pair plane only).
     await ctx.base.transaction(
-        [
-            'memberships', 'states',
-            'requests', 'responses',
-        ],
+        ['requests', 'responses'],
         async (view) => {
             const state = await currentInvitationState(view, id);
             if (state === 'accepted') {
@@ -776,33 +771,17 @@ async function acceptInvitation(
                 return;
             }
             if (state !== 'pending') { conflict = true; return; }
-            // The membership-presence check is FLIPPED (Phase 14
-            // Task 3): re-points onto membershipExistsFor (api/
-            // derive-memberships.ts) — the SAME view.memberships.
-            // getAll().some(...) dispatch it replaces, byte-
-            // identical for member/non-member (tests/drift-
-            // memberships-identity.test.ts leg 5 already proves the
-            // derive via grantOutcomeFor; pin-invitation-write-path-
-            // parity.test.ts adds the accept-tx-table parity leg).
-            // membershipExistsFor is ADAPTER-SHAPED (dbOrView:
-            // DbAdapter) so this in-tx `view` — which already
-            // carries 'requests'/'responses' in its own table list
-            // — calls it directly; no nested transaction. The
-            // 'accepted' no-op short-circuit above still runs FIRST
-            // (KEEP-ATOMIC): a removed member's re-accept never
-            // reaches this check at all.
+            // membershipExistsFor is pair-derived (Phase 14
+            // Task 3) — ADAPTER-SHAPED so this in-tx `view`
+            // (which carries 'requests'/'responses') calls it
+            // directly; no nested transaction. The 'accepted'
+            // no-op short-circuit above still runs FIRST
+            // (KEEP-ATOMIC).
             const already = await membershipExistsFor(
                 view, inv.organization_id, ctx.principal.id);
             if (!already) {
-                await view.memberships.put(membershipId, {
-                    organization_id: inv.organization_id,
-                    identity_id: ctx.principal.id,
-                    at,
-                });
                 await appendMessagePair(view, membershipDocument);
             }
-            await view.states.postEvent(
-                eventId, id, 'accepted', ctx.principal.id, at);
             await appendMessagePair(view, pair);
         },
     );
@@ -844,10 +823,9 @@ async function declineInvitation(
     }
     const body = parse.body;
     let eventId: string;
-    let at: string;
     try {
         eventId = pickString(body, 'declineEventId');
-        at = validateTimestampField(
+        validateTimestampField(
             body, 'declineAt', 'decline',
         );
     } catch (e) {
@@ -872,7 +850,7 @@ async function declineInvitation(
     let conflict = false;
     let noOp = false;
     await ctx.base.transaction(
-        ['states', 'requests', 'responses'],
+        ['requests', 'responses'],
         async (view) => {
             const state = await currentInvitationState(view, id);
             if (state === 'declined') {
@@ -881,8 +859,6 @@ async function declineInvitation(
                 return;
             }
             if (state !== 'pending') { conflict = true; return; }
-            await view.states.postEvent(
-                eventId, id, 'declined', ctx.principal.id, at);
             await appendMessagePair(view, pair);
         },
     );
@@ -927,10 +903,9 @@ async function revokeInvitation(
     }
     const body = parse.body;
     let eventId: string;
-    let at: string;
     try {
         eventId = pickString(body, 'revokeEventId');
-        at = validateTimestampField(
+        validateTimestampField(
             body, 'revokeAt', 'revoke',
         );
     } catch (e) {
@@ -955,7 +930,7 @@ async function revokeInvitation(
     let conflict = false;
     let noOp = false;
     await ctx.base.transaction(
-        ['states', 'requests', 'responses'],
+        ['requests', 'responses'],
         async (view) => {
             const state = await currentInvitationState(view, id);
             if (state === 'revoked') {
@@ -964,8 +939,6 @@ async function revokeInvitation(
                 return;
             }
             if (state !== 'pending') { conflict = true; return; }
-            await view.states.postEvent(
-                eventId, id, 'revoked', ctx.principal.id, at);
             await appendMessagePair(view, pair);
         },
     );
@@ -984,17 +957,22 @@ async function revokeInvitation(
         ctx.base, pair.requestHash, 'revokeInvitation');
 }
 
-// Read one invitation by id from the base store, or null when
-// absent — the 404 the invitation routes raise.
+// Read one invitation by id from the pair plane, or null when
+// absent — the 404 the invitation routes raise. PRE-TX only
+// (accept/decline/revoke call sites).
+//
+// FLIPPED (Phase 15 gate 6): re-points onto deriveInvitations
+// find-by-id — wire-identical to the hand-written
+// invitations.getById it replaces while dual-write holds.
+// Returns the same shape (id, organization_id, identity_id, at)
+// the accept/decline/revoke guards need; the derived state
+// field is present but unused by those callers.
 async function loadInvitation(
     adapter: DbAdapter,
     id: Id,
 ): Promise<{ id: Id; organization_id: Id;
     identity_id: Id; at: string } | null> {
-    try {
-        return await adapter.invitations.getById(id);
-    } catch (e) {
-        if (e instanceof EntityNotFoundError) return null;
-        throw e;
-    }
+    const found = (await deriveInvitations(adapter))
+        .find(inv => inv.id === id);
+    return found === undefined ? null : found;
 }

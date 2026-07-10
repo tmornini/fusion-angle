@@ -35,7 +35,6 @@ export * from './admin.ts';
 export * from './snapshots.ts';
 export * from './flow-queries.ts';
 export * from './flow-mutations.ts';
-export * from './flow-versions.ts';
 export * from './flow-export.ts';
 export * from './flow-publish.ts';
 export * from './project-publish.ts';

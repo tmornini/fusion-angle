@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { GET, POST, PUT, handleRequest } from '../api/api.ts';
 import {
@@ -84,17 +86,27 @@ test(
         }>(db, 'human-members/w1', DEV_TOKEN);
         assert.equal(facet.title, 'Engineer');
         assert.equal(facet.department, 'Product');
-        // No PII row yet — the create body carries no pii key.
+        // No PII yet — the create body carries no pii key.
+        // Phase Final Task 2: identity_pii ROW half stripped —
+        // oracle is deriveIdentityPii.
+        const { deriveIdentityPii } = await import(
+            '../api/derive-identity-spine.ts'
+        );
         await assert.rejects(
-            () => db.identityPii.getById('w1'));
+            () => deriveIdentityPii(db, 'w1'));
         await PUT(db, 'identities/w1/pii', pii('Alice'), DEV_TOKEN);
-        const piiRow = await db.identityPii.getById('w1');
+        const piiRow = await deriveIdentityPii(db, 'w1');
         assert.equal(piiRow.name, 'Alice');
-        const current = await GET<{
+        // Phase Final Stage B: identity spine tables retired.
+        // bare entity-states/:id RETIRED (Phase 15 Task 7);
+        // post-write check rides surviving /history.
+        const history = await GET<{
             state: string;
             member_id: string;
             at: string;
-        }>(db, 'entity-states/w1', DEV_TOKEN);
+        }[]>(db, 'entity-states/w1/history', DEV_TOKEN);
+        assert.equal(history.length, 1);
+        const current = history[0]!;
         assert.equal(current.state, 'active');
         // Authorship is the verified caller, never the body.
         assert.equal(current.member_id, 'current');
@@ -106,34 +118,29 @@ test(
 );
 
 test(
-    'POST human-members rolls back every facet when its'
-    + ' initial state event conflicts',
+    'POST human-members ignores a raw colliding states row'
+    + ' (states ROW half stripped)',
     async () => {
         const db = await freshDb();
-        // Pre-seed a DIFFERENT event at the create's
-        // initialStateEventId. postEvent re-puts that id with a
-        // conflicting payload mid-tx (LedgerImmutability), so
-        // all four facet writes must roll back with it.
-        await db.states.put('ev-x', {
-            entity_id: 'other',
-            state: 'active',
-            member_id: 'current',
-            at: '2020-01-01T00:00:00.000000Z',
-        });
-        await assert.rejects(
-            () => POST(db, 'human-members', {
-                id: 'doomed',
-                detail: detail(),
-                initialState: 'active',
-                initialStateEventId: 'ev-x',
-                initialStateAt: '2099-01-01T00:00:00.000000Z',
-            }, DEV_TOKEN),
+        // Phase Final Task 2: states ROW half stripped —
+        // a raw colliding states row no longer aborts the
+        // pair-plane create.
+    // Phase Final Stage B: states table retired.
+        await POST(db, 'human-members', {
+            id: 'survives',
+            detail: detail(),
+            initialState: 'active',
+            initialStateEventId: 'ev-x',
+            initialStateAt: '2099-01-01T00:00:00.000000Z',
+        }, DEV_TOKEN);
+        const parent = await GET<{ id: string }>(
+            db, 'members/survives', DEV_TOKEN,
         );
-        // Not one facet survived the aborted transaction.
-        await assert.rejects(
-            () => GET(db, 'members/doomed', DEV_TOKEN));
-        await assert.rejects(
-            () => GET(db, 'human-members/doomed', DEV_TOKEN));
+        assert.equal(parent.id, 'survives');
+        const detailRow = await GET<{ id: string }>(
+            db, 'human-members/survives', DEV_TOKEN,
+        );
+        assert.equal(detailRow.id, 'survives');
     },
 );
 
@@ -155,13 +162,18 @@ test(
         await POST(db, 'human-members/w1', {
             detail: { ...detail(), title: 'Director' },
         }, DEV_TOKEN);
-        const piiRow = await db.identityPii.getById('w1');
+        // Phase Final Task 2: identity_pii ROW half stripped.
+        const { deriveIdentityPii } = await import(
+            '../api/derive-identity-spine.ts'
+        );
+        const piiRow = await deriveIdentityPii(db, 'w1');
         assert.equal(piiRow.name, 'Alice');
         const facet = await GET<{ title: string }>(
             db, 'human-members/w1', DEV_TOKEN);
         assert.equal(facet.title, 'Director');
         // The edit wrote no event — the lone create event holds.
-        const events = await db.states.getAllFor('w1');
+        const events = await deriveStatesFor(db, '1', 'w1');
+        // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');
     },
@@ -206,8 +218,12 @@ test(
                     detail: detail(),
                 }));
         assert.equal(deniedEdit.status, 403);
-        // The denied member wrote nothing.
-        const members = await memberDb.members.getAll();
-        assert.equal(members.length, 0);
+        // The denied member wrote nothing on the pair plane
+        // beyond seed pairs — no human-member document for w2.
+        await assert.rejects(
+            () => GET(
+                memberDb, 'human-members/w2', token,
+            ),
+        );
     },
 );

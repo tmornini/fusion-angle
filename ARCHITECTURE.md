@@ -447,20 +447,24 @@ convenience that defaults to the singleton adapter and
 session token. Tests pass `createRequestContext` a
 `MemoryDbAdapter`.
 
-`api/routes.ts` defines four state-route patterns covering
-five HTTP operations — `GET/PUT states/:id`, `GET states`,
-`GET entity-states/:id` (current), and
-`GET entity-states/:id/history` (ordered). The two CONSUMED
-reads derive from the message ledger (Phase 11 Task 7):
-`GET states` → `deriveStates(db, organization)` and
+`api/routes.ts` covers the surviving state-route surface:
+`GET states`, `PUT states/:id`,
+`GET entity-states/:id/history`, and
+`GET states/:id/field-values`. The CONSUMED reads derive from
+the message ledger (Phase 11 Task 7 + Phase 14 Task 6):
+`GET states` → `deriveStates(db, organization)`,
 `GET entity-states/:id/history` →
-`deriveStatesFor(db, organization, entityId)`
-(`api/derive-states.ts`, a six-source union fenced from the
-pair plane). The two zero-caller reads (`GET states/:id` by
-event id, `GET entity-states/:id` current) still dispatch to
-the store methods (`getById`, `getCurrentFor`) and flip at
-Phase Final; `PUT states/:id` still appends through `put`,
-gated by the ownership fence.
+`deriveStatesFor(db, organization, entityId)`, and
+`GET states/:id/field-values` →
+`stateFieldValuesForStateEvent` (two-source union, visibility
+via `stateEventVisibilityFor`). Four zero-caller families
+retired at Phase 15 Task 7 (router 404 except bare
+`GET states/:id` → **405** because `PUT` survives):
+`GET states/:id`, `GET entity-states/:id` (current),
+`PUT|DELETE states/:id/field-values/:fvid`, and
+`GET|POST|PUT|DELETE flows/:id/versions[...]`.
+`PUT states/:id` still appends through `put`, gated by the
+pair-plane ownership fence (`resolveOwningOrganization`).
 When no schema exists, non-entry pages redirect to snapshots.
 
 ## Write-path derives (Phase 14)
@@ -540,9 +544,13 @@ event-append the states log still uses) detects a genuinely
 different re-put of an existing event id via
 `LedgerImmutabilityError`, mapped to HTTP 409 — an identical
 resend still converges silently, the idempotent retry the
-id-keyed PUT exists for. The state plane's mechanism REMAINS
-unreplaced through Phase 14; it retires only when `states`
-itself migrates onto the pair plane at Phase Final.
+id-keyed PUT exists for. Phase 15 Task 6 adds a pair-plane
+strangler beside the row half: `stateEventCollisionFromPairs`
+REDUCES over ALL 2xx pairs at the event-append address
+("at most one 2xx pair" is FALSE — a different-envelope
+resend appends a second pair while the row write no-ops).
+Both planes must agree when both hold an opinion; Final
+strips the row half.
 
 ### SIDECAR-KEEP and undo-as-replay
 
@@ -565,10 +573,11 @@ no new GET route is sanctioned for this). `hasUndoHistory`
 rides the flow's own `GET` response (a document-pair-count
 signal, zero marginal reads) rather than a `flow_versions`
 row count. `flow_versions` consume (undo) and publish (every
-content edit, redo's archive) both STOPPED on the live path —
-the table, its routes, and its cap-trim logic all REMAIN
-(`DELETE NOTHING`), simply unreached; retirement is
-Phase-Final-gated.
+content edit, redo's archive) both STOPPED on the live path
+at Phase 14; Phase 15 Task 7 RETIRED the routes and adapters
+(router 404). The `flow_versions` TABLE remains
+(`DELETE NOTHING`) until Phase Final deletes it with the
+rest of the row plane.
 
 ### Three named deviations
 
@@ -586,18 +595,17 @@ than silently reaching for a workaround:
    `EntityStore.getAll()`'s own deleted-row filter would
    silently exclude a since-deleted work order's field-value
    history — a NEW wire delta, not a safe optimization.
-2. **Region B / `rawHasRow` pair-plane re-anchor infeasible**
-   (Task 7). A field value's parent state event resolves via
-   the pair plane ONLY for event-append-born parents
-   (`states/:id` PUT, indexed by the event's own `uri_id`).
-   The COMMON case — a work-order-transition-folded parent
-   event — has no pair addressed by the event's own id at
-   all (only by the owning work order's id); resolving it
-   needs an unbounded, cross-organization scan. `api/api.ts`'s
-   Region B `rawReadRow('states', parentEventId)` and
-   `derive-state-field-values.ts`'s `rawHasRow` presence
-   probe both REMAIN states-table fence mechanics, retiring
-   at Phase Final alongside `state_field_values` itself.
+   (Carried into Phase Final's residual worklist.)
+2. **Region B / `rawHasRow` pair-plane re-anchor** (Task 7).
+   A field value's parent state event resolves via the pair
+   plane ONLY for event-append-born parents (`states/:id`
+   PUT). Op-born parents (transition/claim/document-trio)
+   have no pair at the event's own id. Phase 15 RETIRED the
+   leaf PUT/DELETE routes (and their Region B fence arm);
+   the surviving GET field-values collection re-anchors
+   visibility onto `stateEventVisibilityFor` (3-tier; see
+   Phase 15 below). Residual dual-write SFV writers still
+   construct the scoped store — Final-only.
 3. **Server-computed undo sidecars** (Task 8). "Client-owned
    graphDelta/revivals," read literally, is impossible under
    the server-side restore-resolution default: the client is
@@ -626,6 +634,98 @@ structurally MOOT for this address (`isLockedWrite`
 exact-matches `family/:id`, never a 4-segment tag address).
 No UI landed this phase (see [TEST-PLAN.md](TEST-PLAN.md));
 the API surface is the sole coverage.
+
+## Last readers (Phase 15)
+
+Phase 15 re-anchored every remaining production decision
+read of a delete-candidate table onto the pair plane and
+retired four zero-caller route families. DELETE NOTHING —
+tables, dual-writes, and seed row halves stay until Final.
+Zero seed deltas (EXPECTED_PAIR_COUNT 1513 / bootstrap 14;
+SNAPSHOT_SCHEMA_VERSION stays 2; simulateLatency 4;
+fingerprints absolute).
+
+### Wire covenant (only these deltas)
+
+1. **Route retirements** → router 404, except bare
+   `GET states/:id` → **405** (PUT survives on that
+   pattern). Retired: `GET states/:id`,
+   `GET entity-states/:id` (current),
+   `PUT|DELETE states/:id/field-values/:fvid`,
+   `GET|POST|PUT|DELETE flows/:id/versions[...]`.
+2. **Fence strengthenings** (same 404 body shape):
+   (2a) WP1 — forged `PUT states/:id` naming an
+   organization id as `entity_id` now 404s (organizations
+   self-as-owner leg); foreign orgs no longer see the
+   forged row on derived reads. (2b) records hard-delete
+   forgery closed — a hard-spliced record's orphaned
+   genesis event no longer admits a foreign forge as an
+   "orphan" (pair plane still resolves the true owner).
+3. **Write-path re-anchors** (claim graph, RESTRICT legs,
+   invitation discovery, identity_pii, clients re-home,
+   PUT immutability strangler): intended byte identity.
+4. **Dangling `state_event_id`** on transition-fold field
+   values → 400 at the gate (forged clients only; shipped
+   UI always mints the transaction's own id).
+
+### Successor derives
+
+All view-accepting (`dbOrView`), entity-scoped where the
+address family allows, opening no nested transaction:
+
+- `workOrderDocumentHeadFor` — claim-gate `flow_graph` head
+  (successor of `workOrders.getById`).
+- `stateEventVisibilityFor` — 3-tier field-values fence:
+  (i) uri_id point-read (event-append), (ii) own-org
+  op-born scan, (iii) widen-on-miss foreign vs nowhere.
+  Disposition: `orphan` | `visible` | `hidden`.
+- `resolveOwningOrganization` — pre-dispatch ownership for
+  `PUT states/:id` and `GET entity-states/:id/history`.
+  Legs: org-nested documents, invitations, memberships,
+  flow-graph history (full graphDelta walk), plus
+  **organizations self-as-owner** (the one new leg). Soft-
+  deleted and hard-spliced parents still resolve.
+- `flowGraphBindingsFromPairs` — RESTRICT graph legs from
+  graphDelta attribute/member events + current node→flow
+  map (soft-delete drops); never the client-authored
+  document `graph` snapshot.
+- `stateEventCollisionFromPairs` — pair-plane twin of
+  `sameEvent`; strangler with the still-live row half.
+
+### Gate 6 re-homes (AS-IS elections)
+
+- Invitation grant email → `deriveIdentityPiiRows`.
+- `pendingInvitationFor` / `loadInvitation` →
+  `deriveInvitations` (no live invitations-table decision
+  read).
+- Client credentials → `rawReadRow('clients', …)` (clients
+  never soft-delete; tombstone filter was a no-op).
+  **clients** and **identity_providers** stay AS-IS tables.
+  Follow-on note: client = kind-`'service'` identity +
+  registration facet is a server-tier client-registration
+  phase candidate (would retire the standalone clients
+  noun; sub vs acting client moves to token claims).
+
+### Addressability election
+
+MEASURE-AND-ACCEPT. Claim/echo history derive remains
+~7.8ms absolute at seed scale (under ~17ms = 1/4 hop
+re-election trigger; under ~68ms simulated hop). Re-elect
+if claim/echo exceeds ~17ms at a growth checkpoint —
+then open a named entity_id index phase. No IndexedDB
+migration this phase. Fence miss/orphan ~1.91ms mean at
+2-org seed (under the Phase 13 3.43ms fence baseline).
+
+### Exit residual (Phase Final's charter)
+
+Only dual-write mechanics still read the old plane for
+decision/control: `StateStore.put` sameEvent row half,
+`EntityStore` tombstone filter on surviving dual-write-era
+reads, dual-write writers themselves, seed row halves,
+snapshot get/put over `TABLE_NAMES`, scoped-store write
+residuals (`#assertMine`, SFV parent resolve via raw
+probes for dual-write puts). Finding-1 production decision
+reads are re-anchored or their routes retired.
 
 ## Storage tiers
 

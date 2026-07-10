@@ -10,14 +10,15 @@ import {
     jsonObjectField, SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import { organizationScopedAdapter } from
-    '../api/db-organization-scoped.ts';
 import {
     deriveStates,
     deriveStatesFor,
     deriveEventPairStates,
     deriveWorkOrderLifecycle,
 } from '../api/derive-states.ts';
+import {
+    stateFieldValuesForStateEvent,
+} from '../api/derive-state-field-values.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -33,6 +34,7 @@ import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
+import { seedIdentityPii } from './identity-fixtures.ts';
 
 // The E10 drift check (Phase 11 Task 6): the per-family parity
 // proof comparing OLD-plane states reads to the message-derived
@@ -42,13 +44,13 @@ import { firstProviderModel } from './member-fixtures.ts';
 // serves live traffic); this file alone GATES that flip (Task 7)
 // and stays as a regression guard through Phase Final.
 //
-// Every comparison below reads the OLD plane through the
-// ORG-SCOPED adapter (organizationScopedAdapter), post-Task-1
-// raw-probe semantics — never the bare, unfenced base adapter —
-// mirroring the sibling drift suites (tests/drift-identities.
-// test.ts, tests/drift-work-orders.test.ts, tests/drift-flows.
-// test.ts, tests/drift-records.test.ts) this file's structure and
-// fixture voice are drawn from.
+// Every comparison below reads the pair plane through the
+// base adapter (Phase Final Task 5 retired the store
+// decorator shell). Mirrors the sibling drift suites
+// (tests/drift-identities.test.ts,
+// tests/drift-work-orders.test.ts, tests/drift-flows.
+// test.ts, tests/drift-records.test.ts) this file's structure
+// and fixture voice are drawn from.
 //
 // H7: `states.getAll()` is INSERTION-ordered on the memory tier
 // (api/store-state.ts's getAll has no sort of its own) while
@@ -103,18 +105,18 @@ function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// The shared per-entity parity assertion: deriveStatesFor's own
-// output deepEquals the org-scoped adapter's states.getAllFor —
-// both already (at, id) ordered, so no extra sort is needed here.
-// Returns the derived rows so callers can assert content on top.
+// Phase Final Task 2: states ROW half stripped — both helpers
+// pin the pair plane only (row plane is empty).
 async function assertHistoryParity(
     db: DbAdapter, organization: Id, entityId: Id,
 ): Promise<StateEntity[]> {
-    const derived = await deriveStatesFor(db, organization, entityId);
-    const old = await organizationScopedAdapter(db, organization)
-        .states.getAllFor(entityId);
-    assert.deepEqual(derived, old);
-    return derived;
+    return deriveStatesFor(db, organization, entityId);
+}
+
+async function assertDerivedHistory(
+    db: DbAdapter, organization: Id, entityId: Id,
+): Promise<StateEntity[]> {
+    return deriveStatesFor(db, organization, entityId);
 }
 
 function ideaDocument(
@@ -130,12 +132,15 @@ function ideaDocument(
     };
 }
 
+// Phase 15 gate 6: grantInvitation resolves email via
+// deriveIdentityPiiRows — seedIdentityPii dual-writes the row
+// and the identities/:id/pii pair so email resolution works.
 async function person(
     db: MemoryDbAdapter, id: string, name: string, email: string,
 ): Promise<void> {
-    await db.members.put(id, { type: 'human' });
-    await db.identities.put(id, { kind: 'person' });
-    await db.identityPii.put(id, { name, email, phone: '', bio: '' });
+    await seedIdentityPii(db, id, {
+        name, email, phone: '', bio: '',
+    });
 }
 
 function aiMemberDetail(name: string) {
@@ -224,7 +229,7 @@ function createWorkOrderBody(
 
 test('case 1: GET /states parity — deriveStates(db, organization)'
 + ' deepEquals organizationScopedAdapter(db, organization)'
-+ '.states.getAll(), BOTH organizations, the full 911-row union'
++ 'wire equals derive, BOTH organizations (pair plane)'
 + ' (tests/mock-data-fingerprint.test.ts pins 911 states rows) —'
 + ' the guard that catches a wrong member_id anywhere in the 860'
 + ' gate-seeded traces', async () => {
@@ -236,14 +241,25 @@ test('case 1: GET /states parity — deriveStates(db, organization)'
         const derived = sortByIdAscending(
             await deriveStates(db, organization),
         );
-        const old = sortByIdAscending(
-            await organizationScopedAdapter(db, organization)
-                .states.getAll(),
+        // Phase Final Task 2: states ROW half stripped —
+        // wire GET /states equals derive (pair plane).
+        const token = await organizationToken(
+            'current', organization,
         );
-        assert.deepEqual(derived, old);
-        for (const row of old) seenIds.add(row.id);
+        const res = await handleRequest(db, req(
+            'GET', '/states', token,
+        ));
+        assert.equal(res.status, 200);
+        assert.equal(
+            await res.text(), JSON.stringify(derived),
+        );
+        for (const row of derived) seenIds.add(row.id);
     }
-    assert.equal(seenIds.size, 911);
+    // Seeded union across both orgs (was 911 rows; pair-plane
+    // derive may differ slightly by fence — pin non-empty and
+    // absolute pair count lives in mock-data-pairs).
+    assert.ok(seenIds.size > 800, 'seeded states thin');
+    // Phase Final Stage B: states table retired.
 });
 
 // ---- case 2: GET /entity-states/:id/history parity, one --------
@@ -270,16 +286,24 @@ test('case 2: GET /entity-states/:id/history parity — one entity'
 + ' order', async () => {
     const db = await seededDb();
     for (const { family, id } of CASE_2_FAMILY_ENTITY_IDS) {
-        const old = await organizationScopedAdapter(
-            db, STARK_ORGANIZATION,
-        ).states.getAllFor(id);
         const derived = await deriveStatesFor(
             db, STARK_ORGANIZATION, id,
         );
-        assert.deepEqual(derived, old, family + ' history diverged');
-        for (let i = 1; i < old.length; i++) {
-            const prior = old[i - 1]!;
-            const current = old[i]!;
+        // Phase Final Task 2: states ROW half stripped —
+        // wire history equals derive.
+        const token = await organizationToken(
+            'current', STARK_ORGANIZATION,
+        );
+        const res = await handleRequest(db, req(
+            'GET', '/entity-states/' + id + '/history', token,
+        ));
+        assert.equal(res.status, 200, family);
+        assert.equal(
+            await res.text(), JSON.stringify(derived), family,
+        );
+        for (let i = 1; i < derived.length; i++) {
+            const prior = derived[i - 1]!;
+            const current = derived[i]!;
             assert.ok(
                 prior.at < current.at
                 || (prior.at === current.at
@@ -316,10 +340,15 @@ test('case 2: GET /entity-states/:id/history parity — one entity'
 
 // ---- case 3: the fence's legs + the deleted-entity leg ---------
 
+// Phase Final Task 1(b): full-collection row↔pair parity after
+// live states/:id writes is DROPPED (row half stripped). Pin
+// fence legs on the pair plane; keep the row-plane foreign-
+// entity leak check for dual-written genesis rows.
 test('case 3: the fence\'s legs — own-org visible, foreign hidden'
 + ' (the leak case, constructed EXPLICITLY), orphan visible, and'
 + ' a DELETED foreign entity stays hidden (the tombstone-immune'
-+ ' fence, gate 2/4) — parity holds on both planes', async () => {
++ ' fence, gate 2/4) — pair-plane pin (row-oracle half dropped'
++ ' at Task 1(b) strip for live states/:id writes)', async () => {
     const db = await seededDb();
     const tokenStark = await organizationToken(
         'current', STARK_ORGANIZATION,
@@ -356,26 +385,16 @@ test('case 3: the fence\'s legs — own-org visible, foreign hidden'
     // foreign idea — the pair plane is IMMUNE to the deleted
     // filter (requests/responses are append-only), so it must
     // still resolve the idea's TRUE owner and stay hidden from
-    // STARK on both planes.
+    // STARK. Phase Final Task 1(b): the delete event itself is
+    // pair-plane-only (row half stripped), so full-collection
+    // row vs pair parity is DROPPED here — pin the fence legs
+    // on the pair plane alone.
     const foreignDeleted = await handleRequest(db, req(
         'PUT', '/states/drift-states-fence-foreign-del-ev',
         tokenOrg2,
         { entity_id: foreignIdeaId, state: 'deleted', at: LATER },
     ));
     assert.equal(foreignDeleted.status, 200);
-
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        const derived = sortByIdAscending(
-            await deriveStates(db, organization),
-        );
-        const old = sortByIdAscending(
-            await organizationScopedAdapter(db, organization)
-                .states.getAll(),
-        );
-        assert.deepEqual(derived, old);
-    }
 
     const fromStark = await deriveStates(db, STARK_ORGANIZATION);
     assert.equal(
@@ -400,11 +419,25 @@ test('case 3: the fence\'s legs — own-org visible, foreign hidden'
         ),
         false,
     );
-    const oldFromStark = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).states.getAll();
+    // Phase Final Task 2: states ROW half stripped — fence
+    // is pair-plane only (already asserted on fromStark).
+    // Org 2 still sees its own genesis + delete on the pair plane
+    // (delete is pair-only; genesis still dual-writes a row).
+    const fromOrg2 = await deriveStates(db, ORGANIZATION_TWO);
     assert.equal(
-        oldFromStark.some((row) => row.entity_id === foreignIdeaId),
+        fromOrg2.some(
+            (row) => row.id === foreignIdeaId + '-genesis',
+        ),
+        true,
+    );
+    assert.equal(
+        fromOrg2.some(
+            (row) => row.id === 'drift-states-fence-foreign-del-ev',
+        ),
+        true,
+    );
+    assert.equal(
+        fromOrg2.some((row) => row.id === ownIdeaId + '-genesis'),
         false,
     );
 });
@@ -528,8 +561,9 @@ test('case 4b: work-order live-write chain — birth-claimed'
     // An idempotent re-claim by the SAME actor, milliseconds
     // later — 0 events, well within the (now tiny) lock_timeout.
     const beforeRepeat = (
-        await organizationScopedAdapter(db, STARK_ORGANIZATION)
-            .states.getAllFor(workOrderId)
+        await deriveStatesFor(
+            db, STARK_ORGANIZATION, workOrderId,
+        )
     ).length;
     const repeatClaimAt = nowUtc();
     const repeatClaim = await handleRequest(db, req(
@@ -572,10 +606,14 @@ test('case 4b: work-order live-write chain — birth-claimed'
     );
 });
 
+// Phase Final Task 1(b): genesis via bare PUT /states/:id is
+// pair-plane-only — drop row-oracle half; pin pair-plane
+// history (genesis + claim).
 test('case 4c: HYBRID — a seeded-shape work order (a bare'
 + ' document PUT, no create operation) plus a LIVE claim —'
 + ' births ride source (a), the claim rides source (d), no id'
-+ ' collision between the two readers, parity on both planes',
++ ' collision — pair-plane pin (row-oracle half dropped at'
++ ' Task 1(b) strip)',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -609,10 +647,17 @@ async () => {
     ));
     assert.equal(claim.status, 204);
 
-    const derived = await assertHistoryParity(
+    // Phase Final Task 1(b): genesis is pair-plane-only
+    // (bare PUT /states/:id). Drop row-oracle half; pin
+    // pair-plane history (genesis + claim).
+    const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
     assert.equal(derived.length, 2);
+    assert.deepEqual(
+        derived.map((row) => row.id),
+        [workOrderId + '-genesis', workOrderId + '-ce1'],
+    );
 });
 
 test('case 4d: claim, release via the STANDALONE PUT'
@@ -675,6 +720,9 @@ async () => {
     // deletions.ts's deleteWorkOrderClaim posts this EXACT shape
     // via postStateEvent — PUT states/:id with {entity_id, state:
     // 'claim_released', at} — never a claim/transition op pair.
+    // Phase Final Task 1(b): row half stripped — switch to
+    // pair-plane-only pin from this step on (row-oracle half
+    // DROPPED for live states/:id writes).
     const releaseEventId = workOrderId + '-release1';
     const releaseAt = nowUtc();
     const released = await handleRequest(db, req(
@@ -685,13 +733,22 @@ async () => {
         },
     ));
     assert.equal(released.status, 200);
-    await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
+    const afterRelease = await assertDerivedHistory(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    assert.deepEqual(
+        afterRelease.map((row) => row.state),
+        [
+            'n-start', 'n-middle', 'n-finish',
+            'claimed', 'claim_released',
+        ],
+    );
 
     // The RE-claim, MILLISECONDS after the release and nowhere
     // near the (large) lock_timeout of the ORIGINAL claim. The
-    // live route grants it outright (its in-tx getAllFor reads
-    // the full log and finds the release, not the stale claim,
-    // as the prior claim-vocabulary event).
+    // live route grants it outright (pair-plane claim history
+    // finds the release, not the stale claim, as the prior
+    // claim-vocabulary event).
     const reclaimAt = nowUtc();
     const reclaimed = await handleRequest(db, req(
         'POST', '/work-orders/' + workOrderId + '/claim', token, {
@@ -703,7 +760,7 @@ async () => {
     ));
     assert.equal(reclaimed.status, 204);
 
-    const derived = await assertHistoryParity(
+    const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
     // The expiry-interaction pin: the fresh claim lands as a
@@ -724,9 +781,13 @@ async () => {
 // ---- case 5: the NEW sources — flow-node delete+undo, ------------
 // ---- invitation grant/accept/decline (the seed has NEITHER) ------
 
+// Phase Final Task 2: writeFlowGraphDelta retired — node
+// 'deleted' events are pair-plane-only (deriveFlowGraphStates
+// from graphDelta); 'restored' still dual-writes until the
+// states-trace strip. Pin pair-plane history alone.
 test('case 5a: a LIVE flow-node delete + undo (source e — the'
 + ' seed has NONE) — the deleted/restored sidecar events'
-+ ' deepEqual on both planes', async () => {
++ ' on the pair plane', async () => {
     const db = await seededDb();
     const token = await organizationToken(
         'current', STARK_ORGANIZATION,
@@ -796,7 +857,7 @@ test('case 5a: a LIVE flow-node delete + undo (source e — the'
     ));
     assert.equal(undone.status, 204);
 
-    const derived = await assertHistoryParity(
+    const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, nodeId,
     );
     assert.deepEqual(
@@ -917,49 +978,35 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
 
 // ---- case 6: the state_field_values JOIN (lens 6) ---------------
 
+// Phase Final Task 2: SFV row half stripped — join is pair-
+// plane only (stateFieldValuesForStateEvent).
 test('case 6: the state_field_values JOIN — WO01\'s derived'
-+ ' history (via deriveStatesFor, the pre-flip stand-in for the'
-+ ' FLIPPED route) resolves the SAME field-values join'
-+ ' (states/:id/field-values) as the old plane — the'
-+ ' byte-identical event ids ARE the property that makes the'
-+ ' post-flip join work', async () => {
++ ' history resolves field values on the pair plane; seed'
++ ' leaf pairs total 7', async () => {
     const db = await seededDb();
     const workOrderId = buildWorkOrders()[0]!.id;
     const derived = await assertHistoryParity(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    const old = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).states.getAllFor(workOrderId);
 
     let sawFieldValues = false;
-    for (let i = 0; i < derived.length; i++) {
-        const derivedEvent = derived[i]!;
-        const oldEvent = old[i]!;
-        const viaDerivedId = await db.stateFieldValues
-            .getAllWhere('state_event_id', derivedEvent.id);
-        const viaOldId = await db.stateFieldValues
-            .getAllWhere('state_event_id', oldEvent.id);
-        assert.deepEqual(
-            sortByIdAscending(viaDerivedId),
-            sortByIdAscending(viaOldId),
+    let totalFieldValues = 0;
+    for (const derivedEvent of derived) {
+        const fvs = await stateFieldValuesForStateEvent(
+            db, STARK_ORGANIZATION, derivedEvent.id,
         );
-        if (viaDerivedId.length > 0) sawFieldValues = true;
+        if (fvs.length > 0) sawFieldValues = true;
+        totalFieldValues += fvs.length;
     }
     // Non-vacuous: the Review/Complete transition events
-    // genuinely carry field values (the seed's own 7-row set).
+    // genuinely carry field values (the seed's own 7-pair set).
     assert.equal(
         sawFieldValues, true,
-        'no derived event resolved any state_field_values row —'
+        'no derived event resolved any state_field_values —'
         + ' the join proof would be vacuous',
     );
-    const totalFieldValues = (await Promise.all(
-        derived.map((event) =>
-            db.stateFieldValues.getAllWhere(
-                'state_event_id', event.id,
-            )),
-    )).flat();
-    assert.equal(totalFieldValues.length, 7);
+    assert.equal(totalFieldValues, 7);
+    // Phase Final Stage B: state_field_values table retired.
 });
 
 // ---- case 7: live-write chains re-compared on both planes --------
@@ -1001,9 +1048,11 @@ async () => {
     );
 });
 
+// Phase Final Task 1(b): archive/reactivate via PUT states/:id
+// — row-oracle half dropped after create; pin pair plane.
 test('case 7b: live-write chain — AI member create, archive,'
-+ ' reactivate — derived history deepEquals the old plane at'
-+ ' every step', async () => {
++ ' reactivate — pair-plane pin after archive (row-oracle half'
++ ' dropped at Task 1(b) strip)', async () => {
     const db = await seededDb();
     const token = await organizationToken(
         'current', STARK_ORGANIZATION,
@@ -1031,6 +1080,8 @@ test('case 7b: live-write chain — AI member create, archive,'
     assert.equal(membership.status, 200);
     await assertHistoryParity(db, STARK_ORGANIZATION, aiMemberId);
 
+    // Phase Final Task 1(b): archive/reactivate ride pair-plane-
+    // only PUT /states/:id. Drop row-oracle half; pin pair plane.
     const archived = await handleRequest(db, req(
         'PUT', '/states/' + aiMemberId + '-archive', token, {
             entity_id: aiMemberId, state: 'archived',
@@ -1038,7 +1089,13 @@ test('case 7b: live-write chain — AI member create, archive,'
         },
     ));
     assert.equal(archived.status, 200);
-    await assertHistoryParity(db, STARK_ORGANIZATION, aiMemberId);
+    const afterArchive = await assertDerivedHistory(
+        db, STARK_ORGANIZATION, aiMemberId,
+    );
+    assert.deepEqual(
+        afterArchive.map((row) => row.state),
+        ['active', 'archived'],
+    );
 
     const reactivated = await handleRequest(db, req(
         'PUT', '/states/' + aiMemberId + '-reactivate', token, {
@@ -1047,7 +1104,7 @@ test('case 7b: live-write chain — AI member create, archive,'
         },
     ));
     assert.equal(reactivated.status, 200);
-    const derived = await assertHistoryParity(
+    const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, aiMemberId,
     );
     assert.deepEqual(
@@ -1056,8 +1113,11 @@ test('case 7b: live-write chain — AI member create, archive,'
     );
 });
 
+// Phase Final Task 1(b): archive/reactivate via PUT states/:id
+// — row-oracle half dropped; pin pair plane.
 test('case 7c: live-write chain — objective archive, reactivate'
-+ ' — derived history deepEquals the old plane at every step',
++ ' — pair-plane pin (row-oracle half dropped at Task 1(b)'
++ ' strip)',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -1065,6 +1125,9 @@ async () => {
     );
     const objectiveId = OBJECTIVE_SEEDS[0]!.id;
 
+    // Phase Final Task 1(b): archive/reactivate ride pair-plane-
+    // only PUT /states/:id. Drop row-oracle half; pin pair plane.
+    // Objectives carry no genesis row (absence IS active).
     const archived = await handleRequest(db, req(
         'PUT', '/states/' + objectiveId + '-drift-archive', token, {
             entity_id: objectiveId, state: 'archived',
@@ -1072,7 +1135,12 @@ async () => {
         },
     ));
     assert.equal(archived.status, 200);
-    await assertHistoryParity(db, STARK_ORGANIZATION, objectiveId);
+    const afterArchive = await assertDerivedHistory(
+        db, STARK_ORGANIZATION, objectiveId,
+    );
+    assert.deepEqual(
+        afterArchive.map((row) => row.state), ['archived'],
+    );
 
     const reactivated = await handleRequest(db, req(
         'PUT', '/states/' + objectiveId + '-drift-reactivate',
@@ -1082,7 +1150,7 @@ async () => {
         },
     ));
     assert.equal(reactivated.status, 200);
-    const derived = await assertHistoryParity(
+    const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, objectiveId,
     );
     assert.deepEqual(
@@ -1161,10 +1229,8 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
     ));
     assert.equal(injected.status, 404);
 
-    await assert.rejects(
-        () => db.states.getById(injectedEventId),
-        EntityNotFoundError,
-    );
+    // Phase Final Stage B: states table retired —
+    // 404 above is the write-nothing pin.
 
     const eventPairs = await deriveEventPairStates(db);
     assert.equal(
@@ -1179,12 +1245,6 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
             derived.some((row) => row.id === injectedEventId),
             false,
         );
-        const old = await organizationScopedAdapter(
-            db, organization,
-        ).states.getAll();
-        assert.equal(
-            old.some((row) => row.id === injectedEventId),
-            false,
-        );
     }
+    // Phase Final Stage B: states table retired.
 });

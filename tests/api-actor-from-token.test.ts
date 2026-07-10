@@ -28,17 +28,21 @@ test(
 
 // With no member_id in the body, the ledger records the
 // verified caller as the author.
+// Phase Final Task 1(b): PUT /states/:id is pair-plane-only;
+// WRITE_RESPONSE_SPECS successBody stamps member_id = actor
+// on the 200 wire body (row half stripped).
 test(
     'a state event is authored by the token',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        await PUT(db, 'states/ev-1', {
-            entity_id: 'current',
-            state: 'active',
-            at: '2026-01-01T00:00:00.000000Z',
-        }, DEV_TOKEN);
-        const event = await db.states.getById('ev-1');
+        const event = await PUT<{ member_id: string }>(
+            db, 'states/ev-1', {
+                entity_id: 'current',
+                state: 'active',
+                at: '2026-01-01T00:00:00.000000Z',
+            }, DEV_TOKEN,
+        );
         assert.equal(event.member_id, 'current');
     },
 );

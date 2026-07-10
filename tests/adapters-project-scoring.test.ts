@@ -341,7 +341,7 @@ test(
     },
 );
 
-test('postProjectBaselineScoring appends event rows',
+test('postProjectBaselineScoring appends via GET scores',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -351,15 +351,18 @@ test('postProjectBaselineScoring appends event rows',
             { objectiveId: 'o1', score: 50 },
             { objectiveId: 'o2', score: -30 },
         ]);
-        const rows =
-            await db.projectObjectiveBaselineScores.getAll();
+        // Phase Final Task 2: score row half stripped —
+        // adapter read derives from the pair plane.
+        const rows = await getBaselineScoresForProject(
+            ctx, 'p1',
+        );
         assert.equal(rows.length, 2);
         for (const r of rows) {
-            assert.equal(r.member_id, 'current');
+            assert.equal(r.memberId, 'current');
         }
     });
 
-test('postProjectActualMeasurement appends actual rows',
+test('postProjectActualMeasurement appends via GET scores',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -368,9 +371,10 @@ test('postProjectActualMeasurement appends actual rows',
         await postProjectActualMeasurement(ctx, 'p1', [
             { objectiveId: 'o1', score: 33 },
         ]);
-        const rows =
-            await db.projectObjectiveActualScores.getAll();
+        const rows = await getActualScoresForProject(
+            ctx, 'p1',
+        );
         assert.equal(rows.length, 1);
         assert.equal(rows[0]!.score, 33);
-        assert.equal(rows[0]!.member_id, 'current');
+        assert.equal(rows[0]!.memberId, 'current');
     });

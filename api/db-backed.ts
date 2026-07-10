@@ -7,48 +7,14 @@ import {
 } from './db.ts';
 import type {
     GuardedDbAdapter,
-    GuardedDbStores,
-    GuardedEntityStore,
+    DbStores,
+    EntityStore,
     StorageBackend,
-    StateStore as IStateStore,
     Tx,
     TxRunner,
 } from './db.ts';
 import type {
-    MemberEntity,
-    HumanMemberEntity,
-    AIMemberEntity,
-    IdentityEntity,
-    IdentityPiiEntity,
-    IdentityCredentialEntity,
-    IdentityTokenRevocationEntity,
-    IdentityDefaultOrganizationEntity,
-    RoleGrantEntity,
     ClientEntity,
-    IdentityProviderEntity,
-    IdeaEntity,
-    ProjectEntity,
-    FlowEntity,
-    FlowVersionEntity,
-    FlowNodeEntity,
-    FlowEdgeEntity,
-    FlowNodeMemberEntity,
-    FlowNodeAttributeEntity,
-    OrganizationEntity,
-    MembershipEntity,
-    InvitationEntity,
-    IdeaSubmissionEntity,
-    ProjectFlowEntity,
-    WorkOrderEntity,
-    FlowWorkOrderEntity,
-    StateFieldValueEntity,
-    RecordEntity,
-    RecordAttributeEntity,
-    FlowRecordEntity,
-    ObjectiveEntity,
-    ObjectiveRevisionEntity,
-    ProjectObjectiveBaselineScoreEntity,
-    ProjectObjectiveActualScoreEntity,
     RequestEntity,
     ResponseEntity,
 } from './types.ts';
@@ -57,54 +23,18 @@ import type {
     NotificationEvent,
     NotificationPost,
 } from './notifications.ts';
-import { EntityStore } from './store-entity.ts';
 import { HistoryEntityStore }
     from './store-history-entity.ts';
-import { StateStore } from './store-state.ts';
 import {
     parseAndValidateSnapshot,
 } from './snapshot-validator.ts';
 import {
-    validateBaselineScoreEntity,
-    validateActualScoreEntity,
-    validateMemberEntity,
-    validateHumanMemberEntity,
-    validateAIMemberEntity,
-    validateIdentityEntity,
-    validateIdentityPiiEntity,
-    validateIdentityCredentialEntity,
-    validateIdentityTokenRevocationEntity,
-    validateIdentityDefaultOrganizationEntity,
-    validateRoleGrantEntity,
     validateClientEntity,
-    validateIdentityProviderEntity,
-    validateIdeaEntity,
-    validateProjectEntity,
-    validateFlowEntity,
-    validateFlowVersionEntity,
-    validateFlowNodeEntity,
-    validateFlowEdgeEntity,
-    validateFlowNodeMemberEntity,
-    validateFlowNodeAttributeEntity,
-    validateProjectFlowEntity,
-    validateWorkOrderEntity,
-    validateFlowWorkOrderEntity,
-    validateStateFieldValueEntity,
-    validateStateEntity,
-    validateRecordEntity,
-    validateRecordAttributeEntity,
-    validateFlowRecordEntity,
-    validateIdeaSubmissionEntity,
-    validateObjectiveEntity,
-    validateObjectiveRevisionEntity,
-    validateOrganizationEntity,
-    validateMembershipEntity,
-    validateInvitationEntity,
     validateRequestEntity,
     validateResponseEntity,
 } from './validators.ts';
 
-// One adapter over any StorageBackend. The 39-store wiring,
+// One adapter over any StorageBackend. The store wiring,
 // the transaction view, and the tx-based snapshot ops live
 // here once (Commandment IX — the third backend, IndexedDB,
 // triggers the abstraction). The per-tier variation rides in
@@ -112,6 +42,9 @@ import {
 // an open hook the async tiers (IndexedDB) use to connect
 // before any store op. Schema lifecycle delegates to the
 // backend, which signals "schema exists" its own way.
+//
+// Phase Final Stage B: states table retired. All three
+// surviving stores ride HistoryEntityStore.
 export class BackedDbAdapter
     implements GuardedDbAdapter, LatencySimulation
 {
@@ -120,66 +53,9 @@ export class BackedDbAdapter
     readonly #open: () => Promise<void>;
     readonly #notify: NotificationPost;
 
-    readonly members!: GuardedEntityStore<MemberEntity>;
-    readonly humanMembers!:
-        GuardedEntityStore<HumanMemberEntity>;
-    readonly aiMembers!: GuardedEntityStore<AIMemberEntity>;
-    readonly identities!:
-        GuardedEntityStore<IdentityEntity>;
-    readonly identityPii!:
-        GuardedEntityStore<IdentityPiiEntity>;
-    readonly identityCredentials!:
-        GuardedEntityStore<IdentityCredentialEntity>;
-    readonly identityTokenRevocations!:
-        GuardedEntityStore<IdentityTokenRevocationEntity>;
-    readonly identityDefaultOrganizations!:
-        GuardedEntityStore<IdentityDefaultOrganizationEntity>;
-    readonly roleGrants!: GuardedEntityStore<RoleGrantEntity>;
-    readonly clients!: GuardedEntityStore<ClientEntity>;
-    readonly identityProviders!:
-        GuardedEntityStore<IdentityProviderEntity>;
-    readonly ideas!: GuardedEntityStore<IdeaEntity>;
-    readonly projects!: GuardedEntityStore<ProjectEntity>;
-    readonly flows!: GuardedEntityStore<FlowEntity>;
-    readonly flowVersions!:
-        GuardedEntityStore<FlowVersionEntity>;
-    readonly flowNodes!: GuardedEntityStore<FlowNodeEntity>;
-    readonly flowEdges!: GuardedEntityStore<FlowEdgeEntity>;
-    readonly flowNodeMembers!:
-        GuardedEntityStore<FlowNodeMemberEntity>;
-    readonly flowNodeAttributes!:
-        GuardedEntityStore<FlowNodeAttributeEntity>;
-    readonly projectFlows!:
-        GuardedEntityStore<ProjectFlowEntity>;
-    readonly workOrders!: GuardedEntityStore<WorkOrderEntity>;
-    readonly flowWorkOrders!:
-        GuardedEntityStore<FlowWorkOrderEntity>;
-    readonly stateFieldValues!:
-        GuardedEntityStore<StateFieldValueEntity>;
-    readonly records!:
-        GuardedEntityStore<RecordEntity>;
-    readonly recordAttributes!:
-        GuardedEntityStore<RecordAttributeEntity>;
-    readonly flowRecords!:
-        GuardedEntityStore<FlowRecordEntity>;
-    readonly organizations!:
-        GuardedEntityStore<OrganizationEntity>;
-    readonly memberships!:
-        GuardedEntityStore<MembershipEntity>;
-    readonly invitations!:
-        GuardedEntityStore<InvitationEntity>;
-    readonly ideaSubmissions!:
-        GuardedEntityStore<IdeaSubmissionEntity>;
-    readonly objectives!: GuardedEntityStore<ObjectiveEntity>;
-    readonly objectiveRevisions!:
-        GuardedEntityStore<ObjectiveRevisionEntity>;
-    readonly projectObjectiveBaselineScores!:
-        GuardedEntityStore<ProjectObjectiveBaselineScoreEntity>;
-    readonly projectObjectiveActualScores!:
-        GuardedEntityStore<ProjectObjectiveActualScoreEntity>;
-    readonly requests!: GuardedEntityStore<RequestEntity>;
-    readonly responses!: GuardedEntityStore<ResponseEntity>;
-    readonly states!: IStateStore;
+    readonly clients!: EntityStore<ClientEntity>;
+    readonly requests!: EntityStore<RequestEntity>;
+    readonly responses!: EntityStore<ResponseEntity>;
 
     constructor(
         backend: StorageBackend,
@@ -289,8 +165,8 @@ export class BackedDbAdapter
         );
     }
 
-    // Raw single-row read bypassing the EntityStore deleted
-    // filter — see GuardedDbAdapter.rawReadRow.
+    // Raw single-row read by primary key — see
+    // GuardedDbAdapter.rawReadRow.
     rawReadRow<T extends { id: string }>(
         table: string,
         id: string,
@@ -301,14 +177,6 @@ export class BackedDbAdapter
         );
     }
 
-    // An adapter whose 39 stores are bound to the open tx
-    // (ambientRunner joins it), so every op runs in one
-    // transaction. Lifecycle methods delegate to the parent;
-    // a nested transaction RE-ENTERS this same tx — it runs
-    // `fn` against this view after asserting the nested tables
-    // are a subset of the outer declared set, so a composing
-    // POST opens one tx and calls the same single-noun store
-    // ops the per-noun routes use, all committing together.
     #viewForTx(
         tx: Tx,
         declaredTables: readonly string[],
@@ -338,12 +206,6 @@ export class BackedDbAdapter
         return view;
     }
 
-    // The nested-tx guard. IndexedDB locks object stores at
-    // tx-open, so a nested op touching a table the outer did
-    // not declare fails there; the simulated tiers would let
-    // it slip (they buffer any table lazily). This asserts
-    // the subset on every tier — a clear error naming the
-    // table, raised before any row op.
     #assertSubset(
         nestedTables: readonly string[],
         declaredTables: readonly string[],
@@ -359,154 +221,11 @@ export class BackedDbAdapter
         }
     }
 
-    // The 39-store wiring lives here once. The constructor
-    // binds it to the backend; the transaction view rebinds
-    // the same wiring to an open tx via ambientRunner.
-    #buildStores(run: TxRunner): GuardedDbStores {
-        const stateStore = new StateStore(
-            run, 'states', validateStateEntity);
+    #buildStores(run: TxRunner): DbStores {
         return {
-            states: stateStore,
-            organizations: new EntityStore(
-                'organizations', run, stateStore,
-                validateOrganizationEntity,
+            clients: new HistoryEntityStore(
+                'clients', run, validateClientEntity,
             ),
-            memberships: new EntityStore(
-                'memberships', run, stateStore,
-                validateMembershipEntity,
-            ),
-            invitations: new EntityStore(
-                'invitations', run, stateStore,
-                validateInvitationEntity,
-            ),
-            members: new EntityStore(
-                'members', run, stateStore,
-                validateMemberEntity,
-            ),
-            humanMembers: new EntityStore(
-                'human_members', run, stateStore,
-                validateHumanMemberEntity,
-            ),
-            aiMembers: new EntityStore(
-                'ai_members', run, stateStore,
-                validateAIMemberEntity,
-            ),
-            identities: new EntityStore(
-                'identities', run, stateStore,
-                validateIdentityEntity,
-            ),
-            identityPii: new EntityStore(
-                'identity_pii', run, stateStore,
-                validateIdentityPiiEntity,
-            ),
-            identityCredentials: new HistoryEntityStore(
-                'identity_credentials', run,
-                validateIdentityCredentialEntity,
-            ),
-            identityTokenRevocations: new HistoryEntityStore(
-                'identity_token_revocations', run,
-                validateIdentityTokenRevocationEntity,
-            ),
-            identityDefaultOrganizations: new HistoryEntityStore(
-                'identity_default_organizations', run,
-                validateIdentityDefaultOrganizationEntity,
-            ),
-            roleGrants: new HistoryEntityStore(
-                'role_grants', run,
-                validateRoleGrantEntity,
-            ),
-            clients: new EntityStore(
-                'clients', run, stateStore,
-                validateClientEntity,
-            ),
-            identityProviders: new HistoryEntityStore(
-                'identity_providers', run,
-                validateIdentityProviderEntity,
-            ),
-            ideas: new EntityStore(
-                'ideas', run, stateStore,
-                validateIdeaEntity,
-            ),
-            projects: new EntityStore(
-                'projects', run, stateStore,
-                validateProjectEntity,
-            ),
-            flows: new EntityStore(
-                'flows', run, stateStore,
-                validateFlowEntity,
-            ),
-            flowVersions: new HistoryEntityStore(
-                'flow_versions', run,
-                validateFlowVersionEntity,
-            ),
-            flowNodes: new EntityStore(
-                'flow_nodes', run, stateStore,
-                validateFlowNodeEntity,
-            ),
-            flowEdges: new EntityStore(
-                'flow_edges', run, stateStore,
-                validateFlowEdgeEntity,
-            ),
-            flowNodeMembers: new HistoryEntityStore(
-                'flow_node_members', run,
-                validateFlowNodeMemberEntity,
-            ),
-            flowNodeAttributes: new HistoryEntityStore(
-                'flow_node_attributes', run,
-                validateFlowNodeAttributeEntity,
-            ),
-            projectFlows: new EntityStore(
-                'project_flows', run, stateStore,
-                validateProjectFlowEntity,
-            ),
-            workOrders: new EntityStore(
-                'work_orders', run, stateStore,
-                validateWorkOrderEntity,
-            ),
-            flowWorkOrders: new EntityStore(
-                'flow_work_orders', run, stateStore,
-                validateFlowWorkOrderEntity,
-            ),
-            stateFieldValues: new EntityStore(
-                'state_field_values', run, stateStore,
-                validateStateFieldValueEntity,
-            ),
-            records: new EntityStore(
-                'records', run, stateStore,
-                validateRecordEntity,
-            ),
-            recordAttributes: new EntityStore(
-                'record_attributes', run, stateStore,
-                validateRecordAttributeEntity,
-            ),
-            flowRecords: new EntityStore(
-                'flow_records', run, stateStore,
-                validateFlowRecordEntity,
-            ),
-            ideaSubmissions: new EntityStore(
-                'idea_submissions', run, stateStore,
-                validateIdeaSubmissionEntity,
-            ),
-            objectives: new EntityStore(
-                'objectives', run, stateStore,
-                validateObjectiveEntity,
-            ),
-            objectiveRevisions: new HistoryEntityStore(
-                'objective_revisions', run,
-                validateObjectiveRevisionEntity,
-            ),
-            projectObjectiveBaselineScores:
-                new HistoryEntityStore(
-                    'project_objective_baseline_scores',
-                    run,
-                    validateBaselineScoreEntity,
-                ),
-            projectObjectiveActualScores:
-                new HistoryEntityStore(
-                    'project_objective_actual_scores',
-                    run,
-                    validateActualScoreEntity,
-                ),
             requests: new HistoryEntityStore(
                 'requests', run, validateRequestEntity,
             ),

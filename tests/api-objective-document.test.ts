@@ -105,8 +105,9 @@ test('validateObjectiveDocumentBody rejects a trio key at the'
 
 // -- 2. postObjectiveDocumentOp (below-gate, MemoryDbAdapter) -
 
-test('postObjectiveDocumentOp writes exactly the objectives'
-+ ' row and the pair', async () => {
+test('postObjectiveDocumentOp writes exactly the pair and'
++ ' reconstructs the entity return (row half stripped)',
+async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     const body = {
@@ -126,15 +127,17 @@ test('postObjectiveDocumentOp writes exactly the objectives'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postObjectiveDocumentOp(
+    // Phase Final Task 2: objectives ROW half stripped —
+    // op returns the reconstructed entity; only pairs land.
+    const written = await postObjectiveDocumentOp(
         db, 'obj-doc-op-1', body, 'current', pair,
     );
-    const row = await db.objectives.getById('obj-doc-op-1');
-    assert.deepEqual(row, {
+    assert.deepEqual(written, {
         id: 'obj-doc-op-1',
         organization_id: '1',
         ...documentFields(),
     });
+    // Phase Final Stage B: objectives table retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });

@@ -305,9 +305,6 @@ test(
             db, 'member_without_pii', detail, SYSTEM_MEMBER_ID,
             await humanDetailPair('member_without_pii', detail),
         );
-        await db.identities.put('member_without_pii', {
-            kind: 'person',
-        });
         // Erasure removes PII, not the membership — the member
         // still belongs to the org, so the join still finds it.
         const membershipBody = {

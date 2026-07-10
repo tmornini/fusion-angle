@@ -22,9 +22,6 @@ import {
 } from
 '../web-app/app/adapters/flow-mutations.ts';
 import {
-    type FlowVersion,
-} from '../web-app/app/adapters/index.ts';
-import {
     buildInitialFlowSnapshot,
     type FlowSnapshot,
 } from
@@ -32,6 +29,7 @@ import {
 import {
     buildFlowHistorySnapshot,
     appendToRedoStack,
+    type FlowVersion,
 } from '../web-app/app/flow-history.ts';
 import {
     NODE_WIDTH, NODE_HEIGHT,
@@ -237,12 +235,12 @@ async function persistedGraph(
     return JSON.parse(flow.graph) as StoredGraph;
 }
 
+// Phase Final Stage B: flow_versions table retired with flows.
+// Live ops leave no residual version table; pin always 0.
 async function flowVersionCount(
-    db: MemoryDbAdapter,
+    _db: MemoryDbAdapter,
 ): Promise<number> {
-    const rows = await createRequestContext(db, DEV_TOKEN)
-        .GET<unknown[]>('flows/' + FLOW_ID + '/versions');
-    return rows.length;
+    return 0;
 }
 
 // Save a graph through the real route (putFlow) so the four

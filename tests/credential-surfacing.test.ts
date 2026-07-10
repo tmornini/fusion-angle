@@ -7,18 +7,19 @@ import {
     type SeededCredentials,
 } from '../api/mock-data.ts';
 import { verifyPassword } from '../shared/password-hash.ts';
+import { deriveCredentialsFor } from
+    '../api/derive-identity-spine.ts';
 
 function currentReveal(creds: SeededCredentials) {
     return creds.identities.find(
         c => c.identityId === 'current');
 }
 
+// Phase Final Task 2: identity_credentials ROW half stripped —
+// admin credential oracle is the pair plane.
 async function adminCredential(db: MemoryDbAdapter) {
-    const rows = await db.identityCredentials.getAll();
-    return rows.find(
-        r => r.identity_id === 'current'
-            && r.kind === 'password',
-    );
+    const rows = await deriveCredentialsFor(db, 'current');
+    return rows.find(r => r.kind === 'password');
 }
 
 test('bootstrap surfaces an admin password that verifies',
@@ -39,6 +40,7 @@ async () => {
     assert.equal(
         await verifyPassword(reveal.password, cred.secret),
         true);
+    // Phase Final Stage B: identity spine tables retired.
 });
 
 test('mock data surfaces a verifying admin password',
@@ -53,6 +55,30 @@ async () => {
     assert.equal(
         await verifyPassword(reveal.password, cred.secret),
         true);
+});
+
+// Phase Final Task 1(d): SeededCredentials count is
+// row-independent — 11 human passwords (buildMembers) for
+// mock-data; 1 for bootstrap. System client_secret is not
+// surfaced in the reveal list.
+test('mock-data surfaces exactly eleven human credentials',
+async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    const creds = await postMockDataLoad(db);
+    assert.equal(creds.identities.length, 11);
+    assert.ok(
+        creds.identities.every((c) => c.password.length >= 16),
+    );
+});
+
+test('bootstrap surfaces exactly one human credential',
+async () => {
+    const db = new MemoryDbAdapter();
+    await db.postSchemaCreation();
+    const creds = await postBootstrap(db);
+    assert.equal(creds.identities.length, 1);
+    assert.equal(creds.identities[0]!.identityId, 'current');
 });
 
 test('each seed run yields a distinct admin password',

@@ -18,6 +18,7 @@ import {
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { seedIdentityPii } from './identity-fixtures.ts';
 
 // Phase 8 Task 6: the invitation document plane — the grant's
 // PUT-shaped invitation document (the entity minus id, NO email
@@ -47,15 +48,18 @@ function req(
     });
 }
 
+// Phase 15 gate 6: grantInvitation resolves email via
+// deriveIdentityPiiRows, so a raw identityPii.put is
+// derivation-invisible. seedIdentityPii dual-writes the row
+// AND the identities/:id/pii pair — id/field values stay
+// identical; only the write mechanism changes.
 async function person(
     db: MemoryDbAdapter,
     id: string,
     name: string,
     email: string,
 ): Promise<void> {
-    await db.members.put(id, { type: 'human' });
-    await db.identities.put(id, { kind: 'person' });
-    await db.identityPii.put(id, {
+    await seedIdentityPii(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -137,7 +141,12 @@ async function seedRoleGrantPair(
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
-    await db.organizations.put('1', organizationRow('Stark'));
+    // Phase Final Stage B: organizations table retired —
+    // seed the tenant root on the pair plane.
+    const { seedOrganizationDocument } = await import(
+        './root-admin-fixture.ts'
+    );
+    await seedOrganizationDocument(db, '1', 'Stark');
     await seedRoleGrantPair(db, 'rg-current-1', {
         organization_id: '1', identity_id: 'current',
         role: 'admin', action: 'granted',
@@ -177,9 +186,11 @@ async () => {
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    // 4: the fixture's own role-grant + membership pair (Phase
-    // 13 Task 1) precede the grant's own 2 pairs.
-    assert.equal(requests.length, 4);
+    // 7: the fixture's own role-grant + membership pair (Phase
+    // 13 Task 1), two identities/:id/pii pairs (Phase 15
+    // gate 6), the organizations/:id document (Stage B), and
+    // the grant's own 2 pairs.
+    assert.equal(requests.length, 7);
     const atAddress = requests.filter(
         r => r.uri_prefix === '/invitations/'
             && r.uri_id === 'inv-doc-1',
@@ -233,11 +244,13 @@ async () => {
     });
     const res = await grant(db, 'inv-doc-fail');
     assert.equal(res.status, 409);
-    // 3: the fixture's own role-grant + membership pair, plus
-    // sarah's own conflicting membership pair (Phase 13 Task 1)
-    // — the failed grant appends nothing further.
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
+    // 6: the fixture's own role-grant + membership pair, two
+    // identities/:id/pii pairs (Phase 15 gate 6), the
+    // organizations/:id document (Stage B), plus sarah's own
+    // conflicting membership pair (Phase 13 Task 1) — the
+    // failed grant appends nothing further.
+    assert.equal((await db.requests.getAll()).length, 6);
+    assert.equal((await db.responses.getAll()).length, 6);
 });
 
 // ── accept: the memberships document pair (the B2 closure) ──
@@ -434,9 +447,11 @@ test('every stored invitation-family message verifies against'
     // x 2 (operation + memberships document) + 1 decline x 1
     // (operation only — decline synthesizes no document) = 9,
     // plus the fixture's own role-grant + membership pair
-    // (Phase 13 Task 1) = 11.
-    assert.equal(requests.length, 11);
-    assert.equal(responses.length, 11);
+    // (Phase 13 Task 1), four identities/:id/pii pairs
+    // (current, sarah, bruce, clark — Phase 15 gate 6), and
+    // the organizations/:id document (Stage B) = 16.
+    assert.equal(requests.length, 16);
+    assert.equal(responses.length, 16);
     for (const row of requests) {
         assert.equal(
             await sha256Hex(row.message), row.message_hash,

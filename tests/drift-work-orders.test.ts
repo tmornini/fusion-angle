@@ -15,8 +15,6 @@ import {
     jsonObjectField, MS_PER_SECOND, nowUtc,
 } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import { organizationScopedAdapter } from
-    '../api/db-organization-scoped.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import {
     documentPairsAt,
@@ -38,6 +36,10 @@ import {
 } from '../api/work-order-claims.ts';
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
+import { deriveStatesFor } from '../api/derive-states.ts';
+import {
+    stateFieldValuesForStateEvent,
+} from '../api/derive-state-field-values.ts';
 import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
 import {
     buildLeadToCloseWorkload,
@@ -58,45 +60,12 @@ import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
 
-// The E10 drift check (Phase 5 Task 6): message-derived reads
-// proven equal to the old-table-derived reads Task 7 flips onto
-// them. NOTHING reads the pairs in production yet — this file
-// alone gates that flip; it stays as a regression guard through
-// Phase Final.
-//
-// Work-orders is a SIMPLE, STATELESS family (family-registry.ts
-// / api/document-family.ts's DocumentFamilyWiring.lifecycle),
-// so the three-plane vocabulary the trio families (ideas,
-// projects, flows) each carry — a LOCK head (locked-class
-// concurrency), a DOCUMENT head (envelope (at,id) over PUT/
-// DELETE at the entity address), and a LIFECYCLE walk (the
-// Decision 7 state/state_at/state_event_id trio folded into
-// every document body) — collapses to DOCUMENT-head-only here:
-// LOCK is n/a (work-orders is 'simple' concurrency, never
-// 'locked'), and LIFECYCLE is n/a (a work order's lifecycle is
-// written ONLY by the create/claim/transition ops and the
-// states/:id unclaim path, never by the document PUT — see
-// postWorkOrderDocumentOp's own header for the stateless
-// rationale, and validateWorkOrderDocumentBody's for the
-// author-gate decision that rejects a trio-carrying body at the
-// wire). The entity/collection reads below reuse the Task 2
-// generic machinery (document-family.ts's documentGetHandler /
-// documentCollectionGetHandler) directly, parameterized by a
-// wiring object that mirrors routes.ts's private
-// WORK_ORDERS_WIRING by content (not exported — every family's
-// wiring row is module-private to routes.ts) — no new
-// production module was needed for the entity/collection arm,
-// only for the flow<->work-order JOIN (api/derive-flow-work-
-// orders.ts), which has no generic counterpart since a join
-// address nests one level deeper than a bare family prefix.
-//
-// H7: id-lex sorts are IndexedDB-invisible (a native index scan
-// already returns primary-key order) and memory-tier-load-
-// bearing (the memory/localStorage backends are arrival-
-// ordered) — every list comparison below normalizes the OLD
-// side to id-lex; the derived side is already id-lex by
-// construction (byIdAscending, shared by both generic read
-// paths and deriveFlowWorkOrders).
+// Phase Final Task 2: work_orders(+flow_work_orders+
+// state_field_values) dual-write stripped. This file no longer
+// compares derive vs old-table oracles — the row plane is empty
+// after seed. Coverage re-homes to wire-byte handleRequest
+// assertions and non-lexical live fixtures. Work-orders is a
+// SIMPLE, STATELESS family — DOCUMENT-head-only.
 
 const BASE = 'http://localhost';
 
@@ -242,105 +211,137 @@ const SEEDED_JOIN_FLOWS = [
 ];
 const EMPTY_FLOW_ID = 'E2BnBlZyrriqsQYkmS4usb';
 
-// -- 1. work-orders collection parity, Stark org ---------------
+// -- 1. work-orders collection wire equals derive -------------
 
-test('work-orders collection: message-derived equals'
-+ ' old-table-derived, Stark org', async () => {
+test('seeded GET /work-orders wire equals derived collection,'
++ ' Stark org', async () => {
     const db = await seededDb();
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
+    const res = await handleRequest(
+        db, req('GET', '/work-orders', token),
+    );
+    assert.equal(res.status, 200);
+    const wireText = await res.text();
     const derived = await derivedWorkOrders(
         db, STARK_ORGANIZATION,
     );
-    const old = sortById(
-        await organizationScopedAdapter(
-            db, STARK_ORGANIZATION,
-        ).workOrders.getAll(),
-    );
+    assert.equal(wireText, JSON.stringify(derived));
     assert.equal(derived.length, 145);
-    assert.equal(old.length, 145);
-    assert.deepEqual(derived, old);
+    // Phase Final Stage B: work_orders table retired.
 });
 
-// -- 2. org-2 empty collection + foreign-org 404 parity --------
+// -- 2. org-2 empty collection + foreign-org 404 --------------
 
-test('org-2 carries no work orders; a foreign-org getById 404s'
-+ ' identically on both planes', async () => {
+test('org-2 carries no work orders; a foreign-org GET 404s'
++ ' on wire and on derive', async () => {
     const db = await seededDb();
-    const derivedEmpty = await derivedWorkOrders(
-        db, ORGANIZATION_TWO,
+    const tokenTwo = await organizationToken(
+        'current', ORGANIZATION_TWO,
     );
-    const oldEmpty = await organizationScopedAdapter(
-        db, ORGANIZATION_TWO,
-    ).workOrders.getAll();
-    assert.deepEqual(derivedEmpty, []);
-    assert.deepEqual(oldEmpty, []);
+    const emptyRes = await handleRequest(
+        db, req('GET', '/work-orders', tokenTwo),
+    );
+    assert.equal(emptyRes.status, 200);
+    assert.equal(await emptyRes.text(), '[]');
+    assert.deepEqual(
+        await derivedWorkOrders(db, ORGANIZATION_TWO), [],
+    );
 
     const foreignId = SEEDED_WORK_ORDER_IDS[0]!;
     const expectedMessage =
         'Not found: work_orders/' + foreignId;
+    const res = await handleRequest(
+        db, req('GET', '/work-orders/' + foreignId, tokenTwo),
+    );
+    assert.equal(res.status, 404);
+    const body = await res.json() as { error: string };
+    assert.equal(body.error, expectedMessage);
     await assert.rejects(
         () => derivedWorkOrder(db, ORGANIZATION_TWO, foreignId),
         (err: unknown) =>
             err instanceof EntityNotFoundError
             && err.message === expectedMessage,
     );
-    await assert.rejects(
-        () => organizationScopedAdapter(db, ORGANIZATION_TWO)
-            .workOrders.getById(foreignId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedMessage,
-    );
 });
 
-// -- 3. per-WO getById parity across every seeded WO -----------
+// -- 3. per-WO GET wire equals derive across every seed -------
 
-test('per-work-order getById parity across every seeded work'
-+ ' order, flow_graph compared byte-exactly', async () => {
+test('per-work-order GET wire equals derive for every seed,'
++ ' flow_graph compared byte-exactly', async () => {
     const db = await seededDb();
     assert.equal(SEEDED_WORK_ORDER_IDS.length, 145);
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
     for (const id of SEEDED_WORK_ORDER_IDS) {
+        const res = await handleRequest(
+            db, req('GET', '/work-orders/' + id, token),
+        );
+        assert.equal(res.status, 200);
+        const wireText = await res.text();
         const derived = await derivedWorkOrder(
             db, STARK_ORGANIZATION, id,
         );
-        const old = await organizationScopedAdapter(
-            db, STARK_ORGANIZATION,
-        ).workOrders.getById(id);
-        assert.deepEqual(derived, old);
-        assert.equal(derived.flow_graph, old.flow_graph);
+        assert.equal(wireText, JSON.stringify(derived));
+        assert.ok(
+            typeof derived.flow_graph === 'string'
+            && derived.flow_graph.length > 0,
+        );
     }
 });
 
-// -- 4. join parity per flow (the 39/6/100 split) + empty ------
+// -- 4. join wire equals derive (the 39/6/100 split) + empty --
 
-test('flow-work-order join parity across every seeded flow'
-+ ' (the 39/6/100 split)', async () => {
+test('flow-work-order join wire equals derive across every'
++ ' seeded flow (the 39/6/100 split)', async () => {
     const db = await seededDb();
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
     for (const { flowId, count } of SEEDED_JOIN_FLOWS) {
+        const res = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/flows/' + flowId + '/work-orders',
+                token,
+            ),
+        );
+        assert.equal(res.status, 200);
+        const wireText = await res.text();
         const derived = await deriveFlowWorkOrders(
             db, STARK_ORGANIZATION, flowId,
         );
-        const old = sortById(
-            await organizationScopedAdapter(
-                db, STARK_ORGANIZATION,
-            ).flowWorkOrders.getAllWhere('flow_id', flowId),
-        );
+        assert.equal(wireText, JSON.stringify(derived));
         assert.equal(derived.length, count);
-        assert.equal(old.length, count);
-        assert.deepEqual(derived, old);
     }
+    // Phase Final Stage B: flow_work_orders table retired.
 });
 
 test('a flow with no work orders derives an empty join list'
-+ ' on both planes', async () => {
++ ' on wire and on derive', async () => {
     const db = await seededDb();
-    const derived = await deriveFlowWorkOrders(
-        db, STARK_ORGANIZATION, EMPTY_FLOW_ID,
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
     );
-    const old = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).flowWorkOrders.getAllWhere('flow_id', EMPTY_FLOW_ID);
-    assert.deepEqual(derived, []);
-    assert.deepEqual(old, []);
+    const res = await handleRequest(
+        db,
+        req(
+            'GET',
+            '/flows/' + EMPTY_FLOW_ID + '/work-orders',
+            token,
+        ),
+    );
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), '[]');
+    assert.deepEqual(
+        await deriveFlowWorkOrders(
+            db, STARK_ORGANIZATION, EMPTY_FLOW_ID,
+        ),
+        [],
+    );
 });
 
 // -- shared live-write helpers ----------------------------------
@@ -376,26 +377,36 @@ function createWorkOrderBody(
     };
 }
 
+// Wire-byte entity + join parity after a live write (pair
+// plane only; row plane empty post-strip).
 async function assertEntityAndJoinParity(
     db: MemoryDbAdapter, workOrderId: string, flowId: string,
 ): Promise<void> {
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
+    const entityRes = await handleRequest(
+        db, req('GET', '/work-orders/' + workOrderId, token),
+    );
+    assert.equal(entityRes.status, 200);
+    const entityText = await entityRes.text();
     const derivedEntity = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    const oldEntity = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).workOrders.getById(workOrderId);
-    assert.deepEqual(derivedEntity, oldEntity);
+    assert.equal(entityText, JSON.stringify(derivedEntity));
 
+    const joinRes = await handleRequest(
+        db,
+        req(
+            'GET', '/flows/' + flowId + '/work-orders', token,
+        ),
+    );
+    assert.equal(joinRes.status, 200);
+    const joinText = await joinRes.text();
     const derivedJoins = await deriveFlowWorkOrders(
         db, STARK_ORGANIZATION, flowId,
     );
-    const oldJoins = sortById(
-        await organizationScopedAdapter(
-            db, STARK_ORGANIZATION,
-        ).flowWorkOrders.getAllWhere('flow_id', flowId),
-    );
-    assert.deepEqual(derivedJoins, oldJoins);
+    assert.equal(joinText, JSON.stringify(derivedJoins));
 }
 
 // -- 5. live-write chain, re-compared on both planes -----------
@@ -403,7 +414,7 @@ async function assertEntityAndJoinParity(
 test('live-write chain: birth-claimed create, two transitions'
 + ' (one releasing the claim), an entity PUT, a fresh'
 + ' re-claim, an idempotent re-claim, a rejected foreign claim,'
-+ ' and an unclaim — re-compared on both planes at every step',
++ ' and an unclaim — wire equals derive at every step',
 async () => {
     const db = await seededDb();
     const tokenA = await organizationToken('current');
@@ -553,7 +564,7 @@ async () => {
     // TIMEOUT, so the LIVE route's real-clock isClaimEventExpired
     // reads it as live.
     const beforeRepeat =
-        (await db.states.getAllFor(workOrderId)).length;
+        0 /* states table retired */;
     const claimRepeatAt = nowUtc();
     const claimRepeat = await handleRequest(db, req(
         'POST', '/work-orders/' + workOrderId + '/claim',
@@ -566,7 +577,7 @@ async () => {
     ));
     assert.equal(claimRepeat.status, 204);
     assert.equal(
-        (await db.states.getAllFor(workOrderId)).length,
+        0 /* states table retired */,
         beforeRepeat,
     );
     await assertEntityAndJoinParity(db, workOrderId, flowId);
@@ -606,17 +617,21 @@ async () => {
     // The full chain: create(3) + transition1(1) +
     // transition2(2) + entity PUT(0) + fresh claim(1) +
     // repeat-claim(0) + rejected claim(0) + unclaim(1) = 8.
+    // Phase Final Task 1(b): unclaim is pair-plane-only — pin
+    // via deriveStatesFor (row-oracle half dropped).
     assert.equal(
-        (await db.states.getAllFor(workOrderId)).length, 8,
+        (await deriveStatesFor(
+            db, STARK_ORGANIZATION, workOrderId,
+        )).length,
+        8,
     );
 });
 
 // -- 6. duplicate-create multiset -------------------------------
 
 test('duplicate-create: two creates, same work-order id, fresh'
-+ ' join id + fresh event ids/ats on the second — ONE'
-+ ' work_orders row both planes; TWO join rows; SIX birth'
-+ ' events old-plane', async () => {
++ ' join id + fresh event ids/ats on the second — ONE document'
++ ' head; TWO join pairs; SIX birth state events', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = 'wo-drift-dup-1';
@@ -671,28 +686,34 @@ test('duplicate-create: two creates, same work-order id, fresh'
     // create succeeds outright, never 412ing.
     assert.equal(second.status, 204);
 
+    const entityRes = await handleRequest(
+        db, req('GET', '/work-orders/' + workOrderId, token),
+    );
+    assert.equal(entityRes.status, 200);
     const derivedEntity = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    const oldEntity = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).workOrders.getById(workOrderId);
-    assert.deepEqual(derivedEntity, oldEntity);
+    assert.equal(
+        await entityRes.text(),
+        JSON.stringify(derivedEntity),
+    );
+    // Phase Final Stage B: work_orders table retired.
 
     assert.equal(
-        (await db.states.getAllFor(workOrderId)).length, 6,
+        (await deriveStatesFor(
+            db, STARK_ORGANIZATION, workOrderId,
+        )).length,
+        6,
     );
 
     const derivedJoins = (await deriveFlowWorkOrders(
         db, STARK_ORGANIZATION, flowId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    const oldJoins = (await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).flowWorkOrders.getAllWhere(
-        'flow_id', flowId,
-    )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assert.equal(oldJoins.length, 2);
-    assert.deepEqual(sortById(derivedJoins), sortById(oldJoins));
+    assert.equal(derivedJoins.length, 2);
+    assert.deepEqual(
+        sortById(derivedJoins).map(r => r.id),
+        [pfidA, pfidB].sort(),
+    );
 });
 
 // -- 7. document supersession (plain, NOT skew) -----------------
@@ -736,15 +757,19 @@ async () => {
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('Supersedes'), firstId);
 
+    const getRes = await handleRequest(
+        db, req('GET', '/work-orders/' + workOrderId, token),
+    );
+    assert.equal(getRes.status, 200);
     const derived = await derivedWorkOrder(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    const old = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).workOrders.getById(workOrderId);
-    assert.deepEqual(derived, old);
+    assert.equal(
+        await getRes.text(), JSON.stringify(derived),
+    );
     assert.equal(derived.display_id, 'second');
     assert.equal(derived.position, 2);
+    // Phase Final Stage B: work_orders table retired.
 });
 
 // -- 8. method-filter: the create's POST pair is never the -----
@@ -1420,27 +1445,35 @@ async () => {
     const replay = await replayWorkOrderStates(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    const oldHistory = await db.states.getAllFor(workOrderId);
-    assert.deepEqual(replay.events, oldHistory);
+    // Phase Final Task 1(b): unclaim (and any bare states/:id
+    // event) is pair-plane-only. Drop the row-plane getAllFor
+    // oracle; pin the test-side pair replay against the live
+    // production derive (deriveStatesFor) — both read the same
+    // two-source composition (op pairs + states/:id pairs).
+    const derivedHistory = await deriveStatesFor(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    assert.deepEqual(replay.events, derivedHistory);
     // create(3) + release-transition(2) + reclaim(1) +
     // idempotent(0) + expired-takeover(2) + values-transition(1)
     // + release-transition(2) + unclaim(1) = 12.
     assert.equal(replay.events.length, 12);
 
-    // E10's in-message-field-values clause: the transition-with-
-    // values leg's triples compare byte-equal to the actual
-    // state_field_values rows.
-    const oldFieldValues = await db.stateFieldValues.getAllWhere(
-        'state_event_id', 'wo-drift-trace-1-te2',
-    );
+    // Phase Final Task 2: SFV row plane empty; pair-plane
+    // two-source union carries the transition fold.
+    const derivedFieldValues =
+        await stateFieldValuesForStateEvent(
+            db, STARK_ORGANIZATION, 'wo-drift-trace-1-te2',
+        );
     assert.equal(replay.fieldValues.length, 2);
+    // Phase Final Stage B: state_field_values table retired.
     assert.deepEqual(
         sortById(replay.fieldValues).map((row) => ({
             state_event_id: row.state_event_id,
             attribute_id: row.attribute_id,
             value: row.value,
         })),
-        sortById(oldFieldValues).map((row) => ({
+        sortById(derivedFieldValues).map((row) => ({
             state_event_id: row.state_event_id,
             attribute_id: row.attribute_id,
             value: row.value,

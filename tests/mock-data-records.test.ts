@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from
@@ -9,9 +11,38 @@ import {
 import {
     validateWorkOrderFlowGraphJson,
 } from '../api/validators.ts';
+import { handleRequest } from '../api/api.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
-    reassembleStoredGraph,
-} from '../api/flow-graph-relations.ts';
+    stateFieldValuesForStateEvent,
+} from '../api/derive-state-field-values.ts';
+import {
+    documentCollectionGetHandler,
+    type DocumentFamilyWiring,
+} from '../api/document-family.ts';
+import {
+    validateRecordDocumentBody,
+    validateRecordAttributeDocumentBody,
+} from '../api/validators.ts';
+import {
+    postRecordDocumentOp,
+    postRecordAttributeDocumentOp,
+} from '../api/routes.ts';
+import {
+    deriveFlowRecords,
+} from '../api/derive-flow-records.ts';
+import { deriveFlows } from '../api/derive-flows.ts';
+import type {
+    RecordEntity,
+    RecordAttributeEntity,
+} from '../api/types.ts';
+import {
+    STARK_ORGANIZATION,
+    ORGANIZATION_TWO,
+} from '../api/mock-data/seed-constants.ts';
+
+// Phase Final Task 2: records(+attributes+flow_records) seed
+// row halves stripped — assertions ride the pair plane.
 
 async function seeded(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
@@ -20,16 +51,83 @@ async function seeded(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+const RECORDS_WIRING: DocumentFamilyWiring = {
+    family: 'records',
+    lifecycle: 'trio',
+    notFoundTable: 'records',
+    validateDocument: validateRecordDocumentBody,
+    documentOp: postRecordDocumentOp,
+    entityOf: (document, organization) => ({
+        id: document.uriId,
+        organization_id: organization,
+        name: String(document.body['name'] ?? ''),
+        description: String(
+            document.body['description'] ?? '',
+        ),
+        position: Number(document.body['position'] ?? 0),
+    }),
+};
+
+const RECORD_ATTRIBUTES_WIRING: DocumentFamilyWiring = {
+    family: 'record-attributes',
+    lifecycle: 'stateless',
+    notFoundTable: 'record_attributes',
+    validateDocument: validateRecordAttributeDocumentBody,
+    documentOp: postRecordAttributeDocumentOp,
+    entityOf: (document, organization) => ({
+        id: document.uriId,
+        organization_id: organization,
+        ...document.body,
+    }),
+};
+
+async function allRecords(
+    db: MemoryDbAdapter,
+): Promise<RecordEntity[]> {
+    const out: RecordEntity[] = [];
+    for (const organization of [
+        STARK_ORGANIZATION, ORGANIZATION_TWO,
+    ]) {
+        out.push(
+            ...await documentCollectionGetHandler(
+                RECORDS_WIRING,
+            )(
+                db, [], 'current', organization,
+            ) as RecordEntity[],
+        );
+    }
+    return out;
+}
+
+async function allAttributes(
+    db: MemoryDbAdapter,
+): Promise<RecordAttributeEntity[]> {
+    const out: RecordAttributeEntity[] = [];
+    for (const organization of [
+        STARK_ORGANIZATION, ORGANIZATION_TWO,
+    ]) {
+        out.push(
+            ...await documentCollectionGetHandler(
+                RECORD_ATTRIBUTES_WIRING,
+            )(
+                db, [], 'current', organization,
+            ) as RecordAttributeEntity[],
+        );
+    }
+    return out;
+}
+
 test(
     'postMockDataLoad seeds at least two Records',
     async () => {
         const db = await seeded();
-        const records = await db.records.getAll();
+        const records = await allRecords(db);
         assert.ok(
             records.length >= 2,
             'expected >=2 records, got '
             + records.length,
         );
+        // Phase Final Stage B: records table retired.
     },
 );
 
@@ -38,9 +136,8 @@ test(
     + ' attributes',
     async () => {
         const db = await seeded();
-        const records = await db.records.getAll();
-        const attrs =
-            await db.recordAttributes.getAll();
+        const records = await allRecords(db);
+        const attrs = await allAttributes(db);
         for (const rec of records) {
             const own = attrs.filter(
                 a => a.record_id === rec.id,
@@ -59,8 +156,7 @@ test(
     + ' attribute_types',
     async () => {
         const db = await seeded();
-        const attrs =
-            await db.recordAttributes.getAll();
+        const attrs = await allAttributes(db);
         const types = new Set(
             attrs.map(a => a.attribute_type),
         );
@@ -77,8 +173,7 @@ test(
     + ' each: regex, range_min, range_max',
     async () => {
         const db = await seeded();
-        const attrs =
-            await db.recordAttributes.getAll();
+        const attrs = await allAttributes(db);
         const allKinds = new Set<string>();
         for (const attr of attrs) {
             const parsed = parseOrThrow(
@@ -120,14 +215,23 @@ test(
     + ' multiple flows via flow_records',
     async () => {
         const db = await seeded();
-        const bindings =
-            await db.flowRecords.getAll();
         const counts = new Map<string, number>();
-        for (const b of bindings) {
-            counts.set(
-                b.record_id,
-                (counts.get(b.record_id) ?? 0) + 1,
-            );
+        for (const organization of [
+            STARK_ORGANIZATION, ORGANIZATION_TWO,
+        ]) {
+            for (const f of await deriveFlows(
+                db, organization,
+            )) {
+                const bindings = await deriveFlowRecords(
+                    db, organization, f.id,
+                );
+                for (const b of bindings) {
+                    counts.set(
+                        b.record_id,
+                        (counts.get(b.record_id) ?? 0) + 1,
+                    );
+                }
+            }
         }
         const max = Math.max(0, ...counts.values());
         assert.ok(
@@ -135,6 +239,7 @@ test(
             'expected >=2 bindings for some record,'
             + ' got max=' + max,
         );
+        // Phase Final Stage B: flow_records table retired.
     },
 );
 
@@ -146,17 +251,30 @@ test(
     async () => {
         const db = await seeded();
         const woId = 'gateV101W0rkOrd3rXY0a1';
-        const wo = await db.workOrders.getById(
-            woId,
+        // Phase Final Task 2: WO + SFV on the pair plane.
+        const token = await organizationToken();
+        const woRes = await handleRequest(
+            db,
+            new Request(
+                'http://localhost/work-orders/' + woId,
+                {
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                    },
+                },
+            ),
         );
+        assert.equal(woRes.status, 200);
+        const wo = await woRes.json() as {
+            flow_graph: string;
+        };
         const flowGraph =
             validateWorkOrderFlowGraphJson(
                 wo.flow_graph,
                 'wo.flow_graph',
             );
 
-        // Compute current node from the state log.
-        const events = await db.states.getAllFor(woId);
+        const events = await deriveStatesFor(db, '1', woId);
         const transitions = events.filter(
             e => e.state !== 'claimed'
                 && e.state !== 'claim_released'
@@ -175,7 +293,6 @@ test(
         );
         const currentNodeId = latest!.state;
 
-        // Find an outgoing target node.
         const outgoing = flowGraph.edges.filter(
             e => e.fromNodeId === currentNodeId,
         );
@@ -191,25 +308,20 @@ test(
             n => targetIds.has(n.id),
         );
 
-        // Stored values seeded on this WO.
-        const values =
-            await db.stateFieldValues.getAll();
-        const eventIds = new Set(
-            transitions.map(t => t.id),
-        );
-        const storedAttrIds = new Set(
-            values
-                .filter(
-                    v => eventIds.has(
-                        v.state_event_id,
+        const eventIds = transitions.map(t => t.id);
+        const values = (
+            await Promise.all(
+                eventIds.map(id =>
+                    stateFieldValuesForStateEvent(
+                        db, STARK_ORGANIZATION, id,
                     ),
-                )
-                .map(v => v.attribute_id),
+                ),
+            )
+        ).flat();
+        const storedAttrIds = new Set(
+            values.map(v => v.attribute_id),
         );
 
-        // At least one target node must reference a
-        // required attribute whose value is not yet
-        // stored.
         const violations: string[] = [];
         for (const node of targetNodes) {
             for (const ref of node.attributes) {
@@ -234,40 +346,72 @@ test(
 );
 
 test(
-    'every seeded flow graph reassembles to the'
-    + ' post-Records shape (attributes[], no'
-    + ' fields[])',
+    'every seeded flow graph carries attributes[]'
+    + ' (no fields[]) via pair-plane derive',
     async () => {
         const db = await seeded();
-        const flows = await db.flows.getAll();
-        const allNodes = await db.flowNodes.getAll();
-        const allEdges = await db.flowEdges.getAll();
-        const allMembers =
-            await db.flowNodeMembers.getAll();
-        const allAttrs =
-            await db.flowNodeAttributes.getAll();
-        for (const flow of flows) {
-            // The graph is no stored blob — reassemble it
-            // from the relation tables, the read source of
-            // record.
-            const graph = reassembleStoredGraph(
-                allNodes.filter(n => n.flow_id === flow.id),
-                allEdges.filter(e => e.flow_id === flow.id),
-                allMembers,
-                allAttrs,
+        // Wire GET /flows/:id carries graph as a JSON string
+        // (flow_graph relation reassembly on the pair plane).
+        async function assertGraphShape(
+            token: string,
+        ): Promise<void> {
+            const res = await handleRequest(
+                db,
+                new Request('http://localhost/flows', {
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                    },
+                }),
             );
-            for (const node of graph.nodes) {
-                assert.ok(
-                    Array.isArray(node.attributes),
-                    'node ' + node.id
-                    + ' is missing attributes[]',
+            assert.equal(res.status, 200);
+            const flows = await res.json() as {
+                id: string;
+            }[];
+            for (const flow of flows) {
+                const detail = await handleRequest(
+                    db,
+                    new Request(
+                        'http://localhost/flows/'
+                        + flow.id,
+                        {
+                            headers: {
+                                Authorization:
+                                    'Bearer ' + token,
+                            },
+                        },
+                    ),
                 );
-                assert.ok(
-                    !('fields' in node),
-                    'node ' + node.id
-                    + ' must not carry fields[]',
-                );
+                assert.equal(detail.status, 200);
+                const body = await detail.json() as {
+                    graph: string;
+                };
+                assert.equal(typeof body.graph, 'string');
+                const graph = JSON.parse(body.graph) as {
+                    nodes: {
+                        id: string;
+                        attributes?: unknown;
+                        fields?: unknown;
+                    }[];
+                };
+                for (const node of graph.nodes) {
+                    assert.ok(
+                        Array.isArray(node.attributes),
+                        'node ' + node.id
+                        + ' is missing attributes[]',
+                    );
+                    assert.ok(
+                        !('fields' in node),
+                        'node ' + node.id
+                        + ' must not carry fields[]',
+                    );
+                }
             }
         }
+        await assertGraphShape(await organizationToken());
+        await assertGraphShape(
+            await organizationToken(
+                'current', ORGANIZATION_TWO,
+            ),
+        );
     },
 );

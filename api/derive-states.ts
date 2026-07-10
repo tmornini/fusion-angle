@@ -1,10 +1,12 @@
 import type { DbAdapter } from './db.ts';
 import type {
     Id, RequestEntity, ResponseEntity, StateEntity,
+    WorkOrderEntity,
 } from './types.ts';
 import { MS_PER_SECOND } from './types.ts';
 import {
-    pickString, validateWorkOrderFlowGraphJson,
+    pickString, pickNumber, pickJsonObjectField,
+    validateWorkOrderFlowGraphJson,
 } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
 import {
@@ -60,12 +62,12 @@ import {
 // entity from the caller directly, so no visibility fence applies
 // there.
 //
-// FLIPPED (Task 7): api/routes.ts's GET /states and GET
-// /entity-states/:id/history dispatch to deriveStates/
+// FLIPPED (Phase 14 Task 7): api/routes.ts's GET /states and
+// GET /entity-states/:id/history dispatch to deriveStates/
 // deriveStatesFor below — Task 1's row-plane fence
 // (api/store-parent-scoped.ts) no longer serves either read.
-// GET /states/:id and GET /entity-states/:id stay on the row
-// plane — zero product callers, deferred to Phase Final.
+// bare GET /states/:id and GET /entity-states/:id RETIRED
+// (Phase 15 Task 7) — zero product callers.
 //
 // THE GATE-15 PRECEDENT (Phase 10, tests/drift-identities.test.ts
 // + api/routes.ts's module-private membershipsAcrossAllOrganiza
@@ -100,9 +102,13 @@ import {
 // event id is client-minted fresh per write, and the states table
 // is ledger-immutable (StateStore.put throws
 // LedgerImmutabilityError on a differing re-put of the same id),
-// so a given uriId is visited by AT MOST one distinct 2xx pair —
+// so a given uriId is visited by at most one distinct-CONTENT
+// pair — a different-envelope resend (fresh x-request-id →
+// different message_hash) may land a SECOND 2xx pair at the same
+// uri_id while the row write no-ops (finding 2; Phase 15 Task 6).
 // documentPairsAt's full pair list IS the event list; no head
-// reduction is needed or appropriate.
+// reduction is needed or appropriate (unionById collapses
+// duplicate-content rows).
 //
 // SEGMENT-BOUNDARY CORRECTNESS (the derive-identity-spine.ts E13
 // precedent): 'states' is organization-nested
@@ -180,6 +186,75 @@ export async function deriveEventPairStates(
     );
 }
 
+// ---- stateEventCollisionFromPairs — gate 7 / finding 6 -------
+//
+// Pair-plane twin of StateStore.put's sameEvent row check
+// (store-state.ts). PUT /states/:id runs BOTH (strangler
+// parity); Final strips the row half. REDUCE over ALL pairs
+// at the event-append address — "at most one 2xx pair" is
+// FALSE (finding 2): a different-envelope resend (fresh
+// x-request-id → different message_hash) appends a SECOND
+// pair at the same uri_id while the row write no-ops.
+//
+// Disposition:
+//   absent   — no 2xx states/:id pair names eventId
+//   same     — every such pair matches candidate (sameEvent
+//              fields: entity_id/state/member_id/at)
+//   conflict — any such pair differs from candidate
+
+export type StateEventCollision =
+    | 'absent'
+    | 'same'
+    | 'conflict';
+
+function stateEventFieldsEqual(
+    a: Omit<StateEntity, 'id'>,
+    b: Omit<StateEntity, 'id'>,
+): boolean {
+    return a.entity_id === b.entity_id
+        && a.state === b.state
+        && a.member_id === b.member_id
+        && a.at === b.at;
+}
+
+// In-tx-safe: accepts a view or a standalone adapter. uri_id
+// point-read only (indexed) — never a whole-plane scan.
+export async function stateEventCollisionFromPairs(
+    dbOrView: DbAdapter,
+    eventId: Id,
+    candidate: Omit<StateEntity, 'id'>,
+): Promise<StateEventCollision> {
+    const [byIdRequests, byIdResponses] = await Promise.all([
+        dbOrView.requests.getAllWhere('uri_id', eventId),
+        dbOrView.responses.getAllWhere('uri_id', eventId),
+    ]);
+    const prefixes = new Set<string>();
+    for (const response of byIdResponses) {
+        if (STATES_ADDRESS_PATTERN.test(response.uri_prefix)) {
+            prefixes.add(response.uri_prefix);
+        }
+    }
+    let sawPair = false;
+    for (const prefix of prefixes) {
+        for (const pair of documentPairsAt(
+            byIdRequests, byIdResponses, prefix,
+        )) {
+            if (pair.uriId !== eventId) continue;
+            sawPair = true;
+            const existing: Omit<StateEntity, 'id'> = {
+                entity_id: pickString(pair.body, 'entity_id'),
+                state: pickString(pair.body, 'state'),
+                member_id: pair.requesterIdentityId,
+                at: pickString(pair.body, 'at'),
+            };
+            if (!stateEventFieldsEqual(existing, candidate)) {
+                return 'conflict';
+            }
+        }
+    }
+    return sawPair ? 'same' : 'absent';
+}
+
 // ---- resolveOwningOrganization — the PAIR-PLANE fence (gate 4) -
 
 // The org-owned, org-nested document families whose OWN id can
@@ -202,6 +277,14 @@ const ORGANIZATION_NESTED_FAMILY_ADDRESS_PATTERN = new RegExp(
 
 const INVITATIONS_PREFIX =
     canonicalUriPrefix(undefined, '/invitations/');
+
+// organizations is the tenant root (global plane, never itself
+// organization-nested — derive-organizations.ts). An
+// organizations document id resolves to itself (Phase 15 Task
+// 1, Author gate 3 — the ONE new resolveOwningOrganization
+// leg).
+const ORGANIZATIONS_ADDRESS_PREFIX =
+    canonicalUriPrefix(undefined, '/organizations/');
 
 // ALL-orgs, server-side ownership resolution — distinct from
 // api/organization-requests.ts's enumerateMyOrganizations, which
@@ -379,14 +462,23 @@ async function computeOwningOrganization(
     entityId: Id,
     boundOrganization: Id,
 ): Promise<Id | null> {
-    // (a) org-nested document families: a targeted uri_id index
-    // read (mirrors message-pair.ts's own headPairIdAt) rather
-    // than a full-ledger scan — an entity id is globally unique
+    // (a) org-nested document families + (e) organizations
+    // self-as-owner: a targeted uri_id index read (mirrors
+    // message-pair.ts's own headPairIdAt) rather than a full-
+    // ledger scan — an entity id is globally unique
     // (generateCryptoSafeBase62), so at most one distinct
-    // org-nested prefix can ever match.
+    // document prefix can ever match.
     const responseHits =
         await db.responses.getAllWhere('uri_id', entityId);
     for (const response of responseHits) {
+        if (
+            response.uri_prefix
+                === ORGANIZATIONS_ADDRESS_PREFIX
+        ) {
+            // (e) organizations self-as-owner: the document
+            // id IS the owning organization.
+            return entityId;
+        }
         const match = ORGANIZATION_NESTED_FAMILY_ADDRESS_PATTERN
             .exec(response.uri_prefix);
         if (match !== null) return match[1]!;
@@ -410,9 +502,11 @@ async function computeOwningOrganization(
     );
 }
 
-// The PAIR-PLANE fence resolver (gate 4). Resolves entityId's
-// owning organization across all four sources above, or null for
-// a genuine orphan (no pair anywhere names the entity).
+// The PAIR-PLANE fence resolver (gate 4 + Phase 15 gate 3).
+// Resolves entityId's owning organization across the five
+// sources above (org-nested, invitations, flow-graph,
+// membership, organizations self-as-owner), or null for a
+// genuine orphan (no pair anywhere names the entity).
 //
 // MEMOIZATION SCOPE: memoized per distinct entityId WITHIN one
 // derivation pass — `memo` is a Map created per call chain (a
@@ -464,6 +558,348 @@ export async function fenceStatesByOwner(
     return rows.filter((_, index) =>
         owners[index] === null
         || owners[index] === boundOrganization);
+}
+
+// ---- stateEventVisibilityFor — the field-values fence --------
+// ---- successor (Phase 15 Task 1, Author gate 2) --------------
+
+// Three-way disposition matching the retired
+// isVisibleStateEvent row-plane branches (now re-pointed
+// onto this function, Phase 15 Task 3): (1) nowhere — a
+// visible orphan; (2) own-org (or owner-null entity) —
+// visible; (3) foreign — hidden. The return type is PART of
+// the gate, not an implementation detail. Boolean isVisible
+// folds as `visibility !== 'hidden'`.
+export type StateEventVisibility =
+    | 'orphan'
+    | 'visible'
+    | 'hidden';
+
+// Does a request body name `eventId` as an op-born state
+// event? Covers document-trio state_event_id, work-order
+// create/claim/transition ids, invitation lifecycle ids,
+// member genesis, and flow-graph deletion/revival sidecars.
+function bodyNamesStateEvent(
+    body: Record<string, unknown>,
+    eventId: Id,
+): boolean {
+    if (body['state_event_id'] === eventId) return true;
+    if (body['claimEventId'] === eventId) return true;
+    if (body['expireEventId'] === eventId) return true;
+    if (body['transitionEventId'] === eventId) return true;
+    if (body['grantEventId'] === eventId) return true;
+    if (body['acceptEventId'] === eventId) return true;
+    if (body['declineEventId'] === eventId) return true;
+    if (body['revokeEventId'] === eventId) return true;
+    if (body['initialStateEventId'] === eventId) {
+        return true;
+    }
+    const stateEventIds = body['stateEventIds'];
+    if (
+        Array.isArray(stateEventIds)
+        && stateEventIds.includes(eventId)
+    ) {
+        return true;
+    }
+    const release = body['release'];
+    if (
+        typeof release === 'object'
+        && release !== null
+        && (release as Record<string, unknown>)['id']
+            === eventId
+    ) {
+        return true;
+    }
+    const delta = body['graphDelta'];
+    if (typeof delta === 'object' && delta !== null) {
+        const deletions = (delta as Record<string, unknown>)[
+            'deletions'
+        ];
+        if (Array.isArray(deletions)) {
+            for (const entry of deletions) {
+                if (
+                    typeof entry === 'object'
+                    && entry !== null
+                    && (entry as Record<string, unknown>)[
+                        'eventId'
+                    ] === eventId
+                ) {
+                    return true;
+                }
+            }
+        }
+    }
+    const revivals = body['revivals'];
+    if (Array.isArray(revivals)) {
+        for (const entry of revivals) {
+            if (
+                typeof entry === 'object'
+                && entry !== null
+                && (entry as Record<string, unknown>)[
+                    'eventId'
+                ] === eventId
+            ) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Tier (ii)/(iii): does any of this organization's op-pair
+// families name eventId? Indexed prefix reads only (the
+// workOrderClaimSourcesFor shape) — never a whole-plane
+// getAll of requests/responses.
+async function organizationHasOpBornEvent(
+    dbOrView: DbAdapter,
+    organization: Id,
+    eventId: Id,
+): Promise<boolean> {
+    for (
+        const family of ORGANIZATION_NESTED_ENTITY_FAMILIES
+    ) {
+        const prefix = canonicalUriPrefix(
+            organization, '/' + family + '/',
+        );
+        const [requests, responses] = await Promise.all([
+            dbOrView.requests.getAllWhere(
+                'uri_prefix', prefix,
+            ),
+            dbOrView.responses.getAllWhere(
+                'uri_prefix', prefix,
+            ),
+        ]);
+        for (const pair of documentPairsAt(
+            requests, responses, prefix,
+        )) {
+            if (bodyNamesStateEvent(pair.body, eventId)) {
+                return true;
+            }
+        }
+        for (const pair of operationPairsAt(
+            requests, responses, prefix,
+        )) {
+            if (bodyNamesStateEvent(pair.body, eventId)) {
+                return true;
+            }
+        }
+    }
+
+    // Claim/transition ride per-work-order sub-prefixes.
+    // Discover work-order ids from the collection responses
+    // already readable via the work-orders family scan above
+    // — re-read that one prefix for the id set, then probe
+    // each sub-resource with an indexed uri_prefix read.
+    const workOrdersPrefix = canonicalUriPrefix(
+        organization, '/work-orders/',
+    );
+    const workOrderResponses =
+        await dbOrView.responses.getAllWhere(
+            'uri_prefix', workOrdersPrefix,
+        );
+    const workOrderIds = new Set<Id>(
+        workOrderResponses.map((r) => r.uri_id),
+    );
+    for (const workOrderId of workOrderIds) {
+        for (const sub of ['claim', 'transition'] as const) {
+            const prefix = canonicalUriPrefix(
+                organization,
+                '/work-orders/' + workOrderId
+                    + '/' + sub + '/',
+            );
+            const [requests, responses] = await Promise.all([
+                dbOrView.requests.getAllWhere(
+                    'uri_prefix', prefix,
+                ),
+                dbOrView.responses.getAllWhere(
+                    'uri_prefix', prefix,
+                ),
+            ]);
+            for (const pair of operationPairsAt(
+                requests, responses, prefix,
+            )) {
+                if (
+                    bodyNamesStateEvent(pair.body, eventId)
+                ) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    // Member genesis (global plane): initialStateEventId rides
+    // the human/AI create-op body. Live create writes the
+    // states row + op body but no states/:id pair and no
+    // membership — disposition via resolveOwningOrganization
+    // (null → visible to every asker; own/foreign as usual),
+    // matching the row-plane owner-null isVisible rule. The
+    // membership boolean alone would mis-orphan unowned
+    // genesis events (create never mints a membership).
+    for (const prefix of [
+        canonicalUriPrefix(undefined, '/ai-members/'),
+        canonicalUriPrefix(undefined, '/human-members/'),
+    ]) {
+        const [requests, responses] = await Promise.all([
+            dbOrView.requests.getAllWhere(
+                'uri_prefix', prefix,
+            ),
+            dbOrView.responses.getAllWhere(
+                'uri_prefix', prefix,
+            ),
+        ]);
+        for (const pair of operationPairsAt(
+            requests, responses, prefix,
+        )) {
+            if (!bodyNamesStateEvent(pair.body, eventId)) {
+                continue;
+            }
+            const owner = await resolveOwningOrganization(
+                dbOrView, pair.uriId, organization,
+            );
+            if (
+                owner === null
+                || owner === organization
+            ) {
+                return true;
+            }
+        }
+    }
+
+    // Invitations (flat address): organization lives in the
+    // grant body; answering ops nest under invitations/:id/.
+    {
+        const [requests, responses] = await Promise.all([
+            dbOrView.requests.getAllWhere(
+                'uri_prefix', INVITATIONS_PREFIX,
+            ),
+            dbOrView.responses.getAllWhere(
+                'uri_prefix', INVITATIONS_PREFIX,
+            ),
+        ]);
+        for (const pair of operationPairsAt(
+            requests, responses, INVITATIONS_PREFIX,
+        )) {
+            if (
+                bodyNamesStateEvent(pair.body, eventId)
+                && pickString(pair.body, 'organization_id')
+                    === organization
+            ) {
+                return true;
+            }
+        }
+        const invitationIds = new Set<Id>(
+            responses.map((r) => r.uri_id),
+        );
+        for (const invitationId of invitationIds) {
+            for (const sub of [
+                'acceptance', 'decline', 'revocation',
+            ] as const) {
+                const prefix = canonicalUriPrefix(
+                    undefined,
+                    '/invitations/' + invitationId
+                        + '/' + sub + '/',
+                );
+                const [opRequests, opResponses] =
+                    await Promise.all([
+                        dbOrView.requests.getAllWhere(
+                            'uri_prefix', prefix,
+                        ),
+                        dbOrView.responses.getAllWhere(
+                            'uri_prefix', prefix,
+                        ),
+                    ]);
+                for (const pair of operationPairsAt(
+                    opRequests, opResponses, prefix,
+                )) {
+                    if (!bodyNamesStateEvent(
+                        pair.body, eventId,
+                    )) {
+                        continue;
+                    }
+                    // Answering ops carry no organization_id;
+                    // ownership is the invitation's own.
+                    const owner =
+                        await resolveInvitationOwner(
+                            dbOrView, invitationId,
+                        );
+                    if (owner === organization) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+// Tiered pair-plane visibility disposition (successor of the
+// retired isVisibleStateEvent row-plane fence; live callers
+// re-pointed Phase 15 Task 3). Always view-accepting
+// (dbOrView); opens no nested transaction.
+// Cheapest tier first:
+//   (i) uri_id point-read over responses — event-append
+//       pairs (every seeded trace + live PUT states/:id);
+//   (ii) own-org op-pair family scan — op-born claim /
+//       transition / document-trio ids;
+//   (iii) widen-on-miss cross-org scan — foreign vs nowhere,
+//       only on the rare miss tail.
+export async function stateEventVisibilityFor(
+    dbOrView: DbAdapter,
+    boundOrganization: Id,
+    eventId: Id,
+): Promise<StateEventVisibility> {
+    // (i) uri_id point-read — a hit is an event-append pair.
+    const [byIdRequests, byIdResponses] = await Promise.all([
+        dbOrView.requests.getAllWhere('uri_id', eventId),
+        dbOrView.responses.getAllWhere('uri_id', eventId),
+    ]);
+    for (const response of byIdResponses) {
+        if (
+            !STATES_ADDRESS_PATTERN.test(response.uri_prefix)
+        ) {
+            continue;
+        }
+        const pairs = documentPairsAt(
+            byIdRequests, byIdResponses, response.uri_prefix,
+        );
+        const pair = pairs.find((p) => p.uriId === eventId);
+        if (pair === undefined) continue;
+        const entityId = pickString(pair.body, 'entity_id');
+        const owner = await resolveOwningOrganization(
+            dbOrView, entityId, boundOrganization,
+        );
+        if (
+            owner === null
+            || owner === boundOrganization
+        ) {
+            return 'visible';
+        }
+        return 'hidden';
+    }
+
+    // (ii) own-org op-born scan.
+    if (
+        await organizationHasOpBornEvent(
+            dbOrView, boundOrganization, eventId,
+        )
+    ) {
+        return 'visible';
+    }
+
+    // (iii) widen-on-miss: distinguish foreign from nowhere.
+    for (const organization of await organizationIds(
+        dbOrView,
+    )) {
+        if (organization === boundOrganization) continue;
+        if (
+            await organizationHasOpBornEvent(
+                dbOrView, organization, eventId,
+            )
+        ) {
+            return 'hidden';
+        }
+    }
+    return 'orphan';
 }
 
 // ---- deriveWorkOrderLifecycle — the op-pair reader (gate 5d) ---
@@ -1160,6 +1596,64 @@ export async function workOrderClaimHistoryFor(
         .sort(atIdCompare);
 }
 
+// ---- workOrderDocumentHeadFor — the claim-gate graph head -----
+// ---- (Phase 15 Task 1, Author gate 4) --------------------------
+
+// Derives the work order's CURRENT document head
+// ({display_id, flow_graph, position, …}) from the entity's
+// OWN document pairs — the pair-plane successor of
+// view.workOrders.getById that postWorkOrderClaimOp still
+// reads for flow_graph (Task 2 re-anchors the call site).
+//
+// REUSE TARGET: the entity-scoped entityPairs computation
+// inside workOrderClaimSourcesFor (uri_id-indexed +
+// collection-prefix filter) — NOT derivedDocumentEntity /
+// documentGetHandler, whose collection-wide prefix scan is
+// the forbidden whole-plane shape inside a write gate.
+//
+// HEAD REDUCTION: documentPairsAt already sorts by (at, id)
+// ascending and admits only PUT/DELETE, so the last pair IS
+// the document head; a DELETE head (or no pairs) yields null
+// so the claim gate can map absent to the same
+// EntityNotFoundError bytes as workOrders.getById.
+// dbOrView-shaped and opens no nested transaction — callable
+// from WITHIN an already-open write-gate transaction.
+export async function workOrderDocumentHeadFor(
+    dbOrView: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+): Promise<WorkOrderEntity | null> {
+    const collectionPrefix = canonicalUriPrefix(
+        organization, '/work-orders/',
+    );
+    const [byIdRequests, byIdResponses] = await Promise.all([
+        dbOrView.requests.getAllWhere('uri_id', workOrderId),
+        dbOrView.responses.getAllWhere('uri_id', workOrderId),
+    ]);
+    const collectionRequests = byIdRequests.filter(
+        (r) => r.uri_prefix === collectionPrefix,
+    );
+    const collectionResponses = byIdResponses.filter(
+        (r) => r.uri_prefix === collectionPrefix,
+    );
+    const entityPairs = documentPairsAt(
+        collectionRequests, collectionResponses,
+        collectionPrefix,
+    );
+    if (entityPairs.length === 0) return null;
+    const head = entityPairs[entityPairs.length - 1]!;
+    if (head.method === 'DELETE') return null;
+    return {
+        id: workOrderId,
+        organization_id: organization,
+        display_id: pickString(head.body, 'display_id'),
+        flow_graph: pickJsonObjectField(
+            head.body, 'flow_graph',
+        ),
+        position: pickNumber(head.body, 'position'),
+    };
+}
+
 // ---- deriveMemberGenesis — the member create-op reader (gate 5c)
 
 // Source (c) of the states-log union. A human/AI member's OWN
@@ -1202,6 +1696,14 @@ export async function deriveMemberGenesis(
                 for (const pair of operationPairsAt(
                     requests, responses, prefix,
                 )) {
+                    // Create ops alone carry the genesis trio;
+                    // edit ops at the same collection prefix
+                    // do not (Phase Final Task 2: no dual-write
+                    // to filter them by a states row).
+                    if (typeof pair.body['initialStateEventId']
+                        !== 'string') {
+                        continue;
+                    }
                     rows.push({
                         id: pickString(
                             pair.body, 'initialStateEventId',
@@ -1699,8 +2201,8 @@ export async function deriveStates(
 //
 // PRECONDITION: callers must already have established
 // entityId's visibility to `organization` before calling — the
-// route's own gate (api/api.ts's entity-states/:id[/history]
-// guard, ownerOrganizationOfEntity) IS the fence. A caller that
+// route's own gate (api/api.ts's entity-states/:id/history
+// guard, resolveOwningOrganization) IS the fence. A caller that
 // trusts an unverified (organization, entityId) pairing reads
 // another organization's rows.
 export async function deriveStatesFor(

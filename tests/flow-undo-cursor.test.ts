@@ -9,9 +9,6 @@ import {
     resolveFlowUndoTarget,
 } from '../api/derive-flows.ts';
 import {
-    organizationScopedAdapter,
-} from '../api/db-organization-scoped.ts';
-import {
     formWritePair, canonicalUriPrefix,
 } from '../api/message-pair.ts';
 import {
@@ -490,11 +487,9 @@ test(
         const flowId = 'stale-basis';
         const organization = '1';
         const actor = 'current';
-        // The live gate always dispatches route handlers
-        // against the ORG-SCOPED adapter (api.ts's `effective`)
-        // — postFlowUndoOp's own flows.put relies on it to stamp
-        // organization_id, exactly like every other document op.
-        const scoped = organizationScopedAdapter(db, organization);
+        // Phase Final Task 5: the store decorator is gone;
+        // handlers and resolveFlowUndoTarget read the base
+        // adapter. Pair-plane tenancy rides uri_prefix.
         await createFlow(db, token, flowId);
         await save(db, token, flowId, 'A', flowId + '-a');
 
@@ -507,7 +502,7 @@ test(
             organization, '/flows/' + flowId + '/undo/',
         );
         const staleResolution = await resolveFlowUndoTarget(
-            scoped, organization, flowId, undoUriPrefix,
+            db, organization, flowId, undoUriPrefix,
         );
         assert.ok(staleResolution, 'a resolution exists');
 
@@ -545,7 +540,7 @@ test(
         });
         await assert.rejects(
             () => postFlowUndoOp(
-                scoped, flowId, actor, organization, pair,
+                db, flowId, actor, organization, pair,
                 staleResolution!,
                 { eventId: flowId + '-stale-ev', at: AT },
             ),

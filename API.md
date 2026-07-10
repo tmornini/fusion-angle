@@ -216,12 +216,17 @@ Legend for classification:
 - `POST /flows` — operation (§3.12). Member-tier.
 - `POST /flows/:id/undo` — operation (§3.14).
 - `POST /flows/:id/redo` — retired (Phase 4 Task 4, R1/E5):
-  folds into a `POST /flows/:id/versions` (§3.16) plus the
-  locked `PUT` above (§3.13); the route leaves the URI tree
-  entirely, so a request against it now 404s (no pattern
-  match) — never a 405 method-absent gap.
-- `GET /flows/:id/versions` · `POST /flows/:id/versions` (§3.16) ·
-  `GET|PUT|DELETE /flows/:id/versions/:vid` — nested (§3.31).
+  the route leaves the URI tree entirely, so a request
+  against it 404s (no pattern match) — never a 405
+  method-absent gap. Live redo is a single locked
+  `PUT /flows/:id` (§3.13).
+- `GET|POST /flows/:id/versions` ·
+  `GET|PUT|DELETE /flows/:id/versions/:vid` — retired
+  (Phase 15 Task 7): zero product callers after
+  undo-as-replay stopped consuming/publishing
+  `flow_versions`. Router 404 (no pattern match). The
+  table remains until Phase Final; historical prose for
+  the dead surface lives at §3.16 / §3.31.
 - `GET /flows/:id/work-orders` ·
   `PUT /flows/:id/work-orders/:woid` — nested.
 - `GET /flows/:id/records` ·
@@ -285,71 +290,79 @@ Legend for classification:
 
 - `GET /states` — primitive, DERIVED (Phase 11 Task 7): the
   collection reads `deriveStates(db, organization)`
-  (`api/derive-states.ts`), a six-source union over the message
-  ledger reduced by `(at, id)`, returned `byIdAscending`. The old
-  `states` table is untouched (Phase Final deletes it); this route no
-  longer reads it. `GET /states/:id` (a single event by its own event
-  id) stays a store primitive — zero product callers, flipped at Phase
-  Final.
-- `PUT /states/:id` — append/stamp a state event; the author is the
-  verified caller, stamped over any client-supplied `member_id`. Gated
-  by the OWNERSHIP FENCE below — a foreign org's entity_id 404s.
-- `GET /entity-states/:id` — the current (latest) state for an entity;
-  a store primitive — zero product callers, flipped at Phase Final.
-- `GET /entity-states/:id/history` — the full event history for an
-  entity, DERIVED (Phase 11 Task 7): reads `deriveStatesFor(db,
-  organization, entityId)` in `(at, id)` order. The GATE still fences
-  it on parent ownership (a foreign org's entity 404s) via the raw
-  probes; the derived handler does NOT re-fence.
-- `GET /states/:id/field-values` ·
-  `PUT|DELETE /states/:id/field-values/:fvid` — nested; PUT/DELETE
-  gated by the ownership fence too, resolved through the leaf's PARENT
-  state event.
+  (`api/derive-states.ts`), a six-source union over the
+  message ledger reduced by `(at, id)`, returned
+  `byIdAscending`. The old `states` table is untouched
+  (Phase Final deletes it); this route no longer reads it.
+- `PUT /states/:id` — append/stamp a state event; the author
+  is the verified caller, stamped over any client-supplied
+  `member_id`. Gated by the OWNERSHIP FENCE below — a
+  foreign org's entity_id 404s. Immutability is a strangler
+  (Phase 15 Task 6): `stateEventCollisionFromPairs` AND the
+  still-live row `sameEvent` check both run; disagreement
+  when both hold an opinion asserts. 409 bytes stay
+  `LedgerImmutabilityError`. Final strips the row half.
+- `GET /states/:id` — retired (Phase 15 Task 7): zero product
+  callers. The pattern STILL matches for PUT, so a bare GET
+  is **405** (method-absent), not the router's open-tree
+  404. Document this honestly — do not collapse it with the
+  other retirements.
+- `GET /entity-states/:id` — retired (Phase 15 Task 7): zero
+  product callers; router 404 (no pattern match). History
+  below is the LIVE current-state surface.
+- `GET /entity-states/:id/history` — the full event history
+  for an entity, DERIVED (Phase 11 Task 7): reads
+  `deriveStatesFor(db, organization, entityId)` in
+  `(at, id)` order. The GATE fences parent ownership via
+  `resolveOwningOrganization` (Phase 15 Task 5); the
+  derived handler does NOT re-fence.
+- `GET /states/:id/field-values` — nested collection,
+  DERIVED (Phase 14 Task 6 + Phase 15 Task 3):
+  `stateFieldValuesForStateEvent` two-source union;
+  visibility via `stateEventVisibilityFor` (3-tier). Wire
+  shape held: ALWAYS 200; orphan/own → rows; foreign → `[]`.
+- `PUT|DELETE /states/:id/field-values/:fvid` — retired
+  (Phase 15 Task 7): zero product callers; live writes ride
+  the transition fold only. Router 404. The
+  `WRITE_RESPONSE_SPECS` entry and seed address formation
+  SURVIVE (§5.16) so reseeds still form the seven nested
+  leaf pairs.
 
-**The state ownership fence** (`api/api.ts`, mirroring the pre-existing
-entity-states GET guard): `MEMBER_VERBS` permits member-tier PUT on
-both `/states/:id` and `/states/:id/field-values/:fvid`
-(`api/authorization.ts`), and each body names its target entity_id
-directly — the field-values leaf via its parent event's entity_id,
-read raw via `adapter.rawReadRow('states', param0)`. Neither
-`PutHandler`/`DeleteHandler` carries an organization argument
-(`routes.ts`), and the route's own `db` is already the ORG-SCOPED
-adapter — which 404s a foreign row as merely absent, making a
-route-level fence a no-op — so both checks run at the GATE, right
-after the body-parse block and before the write dispatches.
-`ownerOrganizationOfEntity` (`api/store-parent-scoped.ts`) resolves
-three outcomes: an OWN-org entity_id passes; a GENUINE orphan (no
-owning row anywhere — an org-less member event, say) passes, since an
-incomplete-but-harmless row is not a foreign tenant's; a foreign
-entity_id — LIVE or already soft-deleted — 404s, byte-identical to the
-existing read guard's `{error: 'Not found: ' + pathname}` (never an
-`EntityNotFoundError`, which keys on the wrong id).
+**The state ownership fence** (`api/api.ts`): `MEMBER_VERBS`
+permits member-tier PUT on `/states/:id`
+(`api/authorization.ts`), and the body names its target
+`entity_id` directly. `PutHandler` carries no organization
+argument (`routes.ts`), and the route's own `db` is already
+the ORG-SCOPED adapter — which 404s a foreign row as merely
+absent, making a route-level fence a no-op — so the check
+runs at the GATE, right after the body-parse block and
+before the write dispatches. Phase 15 Task 5 re-anchored
+ownership onto `resolveOwningOrganization`
+(`api/derive-states.ts`) — the pair-plane resolver with
+org-nested document legs, invitations, memberships, the
+flow-graph history walk, and the organizations
+self-as-owner leg. Outcomes: OWN-org (or owner-null)
+passes; foreign — LIVE, soft-deleted, OR hard-spliced —
+404s, byte-identical to
+`{error: 'Not found: ' + pathname}` (never an
+`EntityNotFoundError`, which keys on the wrong id). The
+leaf field-values write fence retired WITH the leaf routes.
 
-The resolver walks `rawOrganizationOwnedProbes(adapter)` — the SAME
-seven org-owned tables (`ideas`, `projects`, `flows`, `records`,
-`objectives`, `work_orders`, `invitations`) as the filtered
-`organizationOwnedProbes`, but read via `rawReadRow`, bypassing
-`EntityStore`'s deleted filter (the pattern `graphEntityProbe` already
-used for `flow_nodes`/`flow_edges`). This closes a read leak: the
-filtered probes resolve a DELETED entity to "not found" at every
-probed table, falling through to a visible orphan — so an org's OWN
-legitimate deletion of its own entity used to unhide that entity's
-whole lifecycle to every OTHER org's `/states` and
-`/entity-states/:id[/history]` reads. The raw probes resolve the
-entity's TRUE owner whether it is live or deleted, closing both the
-write escalation and the read leak with one probe set. The filtered
-`organizationOwnedProbes` stays exported for any future non-fence
-caller; every fence today — write and read alike — uses the raw one.
+Two named strengthenings closed at the same re-anchor:
+(2a) WP1 — a forged PUT naming an organization id as
+`entity_id` now 404s (self-as-owner); (2b) a hard-deleted
+record's orphaned genesis event no longer admits a foreign
+forge as an "orphan."
 
-Named residual: within ONE org, a member-tier PUT `/states/:id` can
-still post a `'deleted'` event naming a fellow member/membership/
-ai-member/human-member id (MEMBER_VERBS allows it, and those roster
-kinds are not in the organization-owned probe list, so they resolve
-via the membership ledger, not a table). This intra-org reachability
-is unchanged by this fence — the user elected the ORG boundary, not a
-kind/alphabet gate — and is tracked as a named acceptance (see
-`tests/drift-roster.test.ts`'s "states/:id escape hatch"), not a bug
-this task closes.
+Named residual: within ONE org, a member-tier PUT
+`/states/:id` can still post a `'deleted'` event naming a
+fellow member/membership/ai-member/human-member id
+(MEMBER_VERBS allows it; those roster kinds resolve via the
+membership ledger). This intra-org reachability is
+unchanged — the user elected the ORG boundary, not a
+kind/alphabet gate — and is tracked as a named acceptance
+(see `tests/drift-roster.test.ts`'s "states/:id escape
+hatch"), not a bug this phase closes.
 
 ### 2.11 Organizations & memberships
 
@@ -1175,25 +1188,23 @@ pattern match), unlike the retired `POST /ideas` (§2.4/§3.10),
 which 405s because `ideas` GET stays wired — `flows/:id/redo`
 had no other verb left to survive it.
 
-### 3.16 `POST /flows/:id/versions` — publish a version
+### 3.16 `POST /flows/:id/versions` — RETIRED (Phase 15 Task 7)
+
+**Route retired.** A request against `/flows/:id/versions`
+(or the leaf `/flows/:id/versions/:vid`) 404s — no pattern
+match. Historical shape (kept for the dual-write-era
+record; do not re-implement):
 
 - tx: `[flow_versions, requests, responses]`
-- actual: `flowVersions.put(id, version)`; for each `trimId`:
-  `flowVersions.delete(trimId)`; `appendMessagePair(pair)`.
-- doctrinal: `put_flow_version` + `delete_flow_version`* as
-  `post_publish_flow_version`.
-- props: atomic; **no state event**; the web-app computes which
-  versions to trim; member-tier; `validateFlowVersionPublishBody`.
-- **Zero live callers (Phase 14 Task 8, undo-as-replay).** A
-  versioned edit's own save used to call this BEFORE its
-  `PUT /flows/:id` (§3.13), and redo (retired §3.15) called it
-  too, ALONE, to archive the CURRENT state before its own
-  `PUT /flows/:id` landed the redo target — undo-as-replay
-  retired BOTH callers (neither archive served any purpose once
-  undo stopped consuming `flow_versions`). The route, the
-  `flow_versions` table, and its cap-trim logic all REMAIN —
-  reachable, correct, simply unreached by the live UI — until
-  Phase Final retires the table itself.
+- actual: `flowVersions.put(id, version)`; for each
+  `trimId`: `flowVersions.delete(trimId)`;
+  `appendMessagePair(pair)`.
+- **Zero live callers since Phase 14 Task 8
+  (undo-as-replay).** Versioned edits and redo used to
+  archive through this route before `PUT /flows/:id`;
+  undo-as-replay stopped both. Phase 15 Task 7 removed the
+  routes and adapters; the `flow_versions` TABLE remains
+  until Phase Final.
 
 ### 3.17 `POST /work-orders` — create work order
 
@@ -1277,6 +1288,11 @@ like every other atomic write in this catalog.
 - props: atomic; the web-app computes the target node, field values,
   and whether a claim release is needed; member-tier;
   `validateWorkOrderTransitionBody`.
+- **Dangling `state_event_id` (Phase 15 Task 3, wire delta 4).**
+  A field value whose `state_event_id` names no event of THIS
+  transaction 400s at the gate. Observable ONLY to forged
+  clients — the shipped UI always sends the transaction's
+  own id. Pins: `tests/api-work-order-transition.test.ts`.
 
 ### 3.20 `POST /records` — record write (create or edit)
 
@@ -1656,24 +1672,13 @@ as one of their own facet puts.
   byte-identical to what `validateMemberEntity` reconstructed
   before this task.
 
-### 3.31 `flows/:id/versions/:vid` — a named version (not POST)
+### 3.31 `flows/:id/versions/:vid` — RETIRED (Phase 15 Task 7)
 
-The leaf primitive under the `flows/:id/versions` collection (§3.16).
-DOCUMENT-class: a version row is a plain, revisitable row, so a
-repeat `PUT` records `Supersedes` and a `DELETE` tombstones it —
-exactly like `flow_work_orders`/`state_field_values` above. This is
-distinct from the cap-trim machinery inside §3.13/§3.14/§3.15/§3.16,
-which calls `flowVersions.delete` directly, inside ITS OWN
-transaction, to physically splice versions past the retention cap —
-that splice is untouched by this task and stores no pair of its own;
-only a client-addressed request through THIS route appends one.
-
-- tx: `[flow_versions, requests, responses]`
-- actual: `flowVersions.put(id, body)` or `flowVersions.delete(id)`
-  (no organization stamping — a version's org rides its parent flow)
-  → `appendMessagePair(pair)`.
-- props: atomic; `validateFlowVersionEntity` reconstructs the PUT's
-  200 body; the DELETE is the universal 204/no-body shape (§1.1).
+**Route retired** with the collection (§3.16). Historical
+leaf shape: DOCUMENT-class PUT/DELETE over
+`flow_versions` with `appendMessagePair`. Cap-trim splices
+that once lived inside the publish op are gone with the
+route; the table itself remains until Phase Final.
 
 ### 3.32 `PUT /projects/:id` — project document write (not a POST)
 
@@ -3286,3 +3291,33 @@ task flips the row SOURCE only, never a fence or a filter.
 `callerOrganizationIds`'s OWN row source flips later, at Phase
 13 Task 3 (§2.11) — its membership FILTER (caller-only, never
 ALL-orgs) stays exactly as this task left it.
+
+### 5.19 Phase 15 route retirements and seed-address survival
+
+Phase 15 Task 7 retired four zero-caller route families
+(wire delta 1). The router 404s every retired address except
+bare `GET /states/:id`, which is **405** because
+`PUT /states/:id` still matches that pattern. Product
+callers were already zero; the only surviving live surfaces
+from those families are:
+
+- `PUT /states/:id` (unclaim / ownership write fence /
+  immutability strangler)
+- `GET /entity-states/:id/history` (derived)
+- `GET /states/:id/field-values` (derived collection)
+- the `flow_versions` TABLE (no routes; Final deletes)
+
+**Seed constraint (finding 7).** The
+`WRITE_RESPONSE_SPECS['states/:id/field-values/:fvid']`
+entry SURVIVES the leaf-route retirement: reseeds still form
+the seven nested leaf pairs at that address (§5.16). Pair-
+plane derivation of the collection does not require the
+write route to live — historical leaf pairs remain
+addressable. `flows/:id/versions*` specs and handlers are
+gone with the routes; the table is storage-only until Final.
+
+**§5 chronological gap (named).** Tasks 1–6 of Phase 14 and
+the Phase 15 re-anchors live in ARCHITECTURE.md § Write-path
+derives / § Last readers rather than as further §5.N
+narrative chapters here. Phase Final's docs pass may backfill
+if a single chronological voice is required.

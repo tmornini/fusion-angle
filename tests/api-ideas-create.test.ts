@@ -93,14 +93,19 @@ test(
         assert.equal(idea.title, 'Fresh Idea');
         // The fence stamped the bound org — never the body.
         assert.equal(idea.organization_id, '1');
+        // bare entity-states/:id RETIRED (Phase 15 Task 7);
+        // post-write check rides surviving /history.
         const stateRes = await handleRequest(db, req(
-            'GET', '/entity-states/idea-1', DEV_TOKEN,
+            'GET', '/entity-states/idea-1/history',
+            DEV_TOKEN,
         ));
-        const current = await stateRes.json() as {
+        const history = await stateRes.json() as {
             state: string;
             member_id: string;
             at: string;
-        };
+        }[];
+        assert.equal(history.length, 1);
+        const current = history[0]!;
         assert.equal(current.state, 'active');
         // Authorship is the verified caller, never the body.
         assert.equal(current.member_id, 'current');
@@ -113,34 +118,28 @@ test(
 );
 
 test(
-    'a genesis PUT rolls back the idea row when its'
-    + ' initial state event conflicts',
+    'a genesis PUT ignores a raw colliding states row'
+    + ' (states ROW half stripped)',
     async () => {
         const db = await freshDb();
-        // Pre-seed a DIFFERENT event at the create's
-        // state_event_id. postEvent re-puts that id with a
-        // conflicting payload mid-tx (LedgerImmutability), so
-        // the idea write must roll back with it.
-        await db.states.put('ev-x', {
-            entity_id: 'other',
-            state: 'active',
-            member_id: 'current',
-            at: '2020-01-01T00:00:00.000000Z',
-        });
+        // Phase Final Task 2: states ROW half stripped —
+        // a raw colliding states row no longer aborts the
+        // pair-plane genesis PUT.
+    // Phase Final Stage B: states table retired.
         const res = await handleRequest(db, req(
-            'PUT', '/ideas/idea-rollback', DEV_TOKEN,
+            'PUT', '/ideas/idea-survives', DEV_TOKEN,
             {
-                ...ideaFields('Doomed'),
+                ...ideaFields('Survives'),
                 state: 'active',
                 state_at: '2099-01-02T00:00:00.000000Z',
                 state_event_id: 'ev-x',
             },
         ));
-        assert.equal(res.status, 409);
+        assert.equal(res.status, 200);
         const getRes = await handleRequest(db, req(
-            'GET', '/ideas/idea-rollback', DEV_TOKEN,
+            'GET', '/ideas/idea-survives', DEV_TOKEN,
         ));
-        assert.equal(getRes.status, 404);
+        assert.equal(getRes.status, 200);
     },
 );
 
@@ -172,7 +171,12 @@ test(
             second.headers.get('Response-ID'),
             first.headers.get('Response-ID'),
         );
-        const events = await db.states.getAllFor('idea-retry');
+        const { deriveStatesFor } = await import(
+            '../api/derive-states.ts'
+        );
+        const events = await deriveStatesFor(
+            db, '1', 'idea-retry',
+        );
         assert.equal(events.length, 1);
         assert.equal((await db.requests.getAll()).length, 4);
         assert.equal((await db.responses.getAll()).length, 4);

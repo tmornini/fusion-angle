@@ -3,20 +3,21 @@ import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
-import {
-    reassembleStoredGraph,
-} from '../api/flow-graph-relations.ts';
+import { deriveFlow } from '../api/derive-flows.ts';
 import { validateStoredGraphJson } from '../api/validators.ts';
 import type { StoredGraph } from '../api/types.ts';
 
-// The decompose covenant: every seeded flow's AUTHORED
-// build-time graph literal (buildFlows' FlowSeed.graph — the
-// stored flows.graph blob is retired) decomposes into flow_nodes
-// / flow_edges / flow_node_members / flow_node_attributes rows
-// that, run back through reassembleStoredGraph, reproduce the
-// authored graph exactly. Relations are SETS, so the comparison
-// is order-normalized — the covenant is which node carries which
-// members/attributes, not array order.
+// buildFlows() seeds land on Stark (flowSeedBody stamps
+// organization_id: STARK_ORGANIZATION); seed-flow-org2 is a
+// separate postFlowDocumentOp path not covered here.
+const STARK_ORGANIZATION = '1';
+
+// Phase Final Task 2: graph relation ROW halves stripped.
+// The decompose covenant re-homes to the pair plane: every
+// seeded flow's AUTHORED build-time graph must equal the
+// graph deriveFlow returns from the document pair (graph
+// field, not graphDelta). Relations are SETS, so comparison
+// is order-normalized.
 function normalizeGraph(graph: StoredGraph): StoredGraph {
     return {
         nodes: [...graph.nodes]
@@ -36,37 +37,28 @@ function normalizeGraph(graph: StoredGraph): StoredGraph {
     };
 }
 
-test('seed decomposes each flow graph into '
-    + 'relations that reassemble to the authored graph',
+test('seed pair-plane graph equals each flow\'s'
+    + ' authored graph',
 async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
 
-    const allNodes = await db.flowNodes.getAll();
-    const allEdges = await db.flowEdges.getAll();
-    const allMembers = await db.flowNodeMembers.getAll();
-    const allAttributes =
-        await db.flowNodeAttributes.getAll();
-
     for (const flow of buildFlows()) {
         const expected = validateStoredGraphJson(
             flow.graph, 'seed flow ' + flow.id,
         );
-        const nodeRows = allNodes.filter(
-            node => node.flow_id === flow.id,
+        const derived = await deriveFlow(
+            db, STARK_ORGANIZATION, flow.id,
         );
-        const edgeRows = allEdges.filter(
-            edge => edge.flow_id === flow.id,
-        );
-        const reassembled = reassembleStoredGraph(
-            nodeRows, edgeRows, allMembers, allAttributes,
+        const actual = validateStoredGraphJson(
+            derived.graph, 'derived flow ' + flow.id,
         );
         assert.deepEqual(
-            normalizeGraph(reassembled),
+            normalizeGraph(actual),
             normalizeGraph(expected),
-            'flow ' + flow.id + ' relations must '
-                + 'reassemble to its authored graph',
+            'flow ' + flow.id + ' pair graph must '
+                + 'equal its authored graph',
         );
     }
 });

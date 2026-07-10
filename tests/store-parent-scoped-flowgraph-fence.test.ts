@@ -18,7 +18,8 @@ import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 // Flow-graph entity deletion events must be fenced by the
 // flow's owning org. A 'deleted' states event whose entity_id
 // is a flow_nodes or flow_edges id must NOT be visible through
-// another tenant's /states or entity-states/:id reads.
+// another tenant's /states or entity-states/:id/history
+// reads.
 //
 // Before the two-hop probe in ownerOrganizationOfEntity, these ids
 // matched NO org-owned probe and fell through to the membership
@@ -47,10 +48,10 @@ function req(
 
 // A states-log event, posted through the SAME wire-reachable
 // PUT states/:id the live route serves (NAMED re-pin, Task 7):
-// the flipped GET /states and GET /entity-states/:id routes
-// derive from the message ledger, not the raw states table — a
-// raw db.states.put leaves no pair at this address, so this
-// suite's fence assertions must land through the wire.
+// the flipped GET /states and GET entity-states/:id/history
+// routes derive from the message ledger, not the raw states
+// table — a raw db.states.put leaves no pair at this address,
+// so this suite's fence assertions must land through the wire.
 async function seedStateEvent(
     db: MemoryDbAdapter,
     organization: string,
@@ -168,7 +169,9 @@ async function seed(): Promise<MemoryDbAdapter> {
         organization_id: 'A', identity_id: 'current',
         at: AT,
     });
-    await db.organizations.put('B', organizationRow('Beta'));
+    // Phase Final Stage B: organizations table retired
+    // — B need not derive for membership-filter
+    // exclusion of non-members.
     // Seeded through the wire (NAMED re-pin: the READ-side
     // pair-plane fence, api/derive-states.ts's
     // resolveFlowGraphOwner, resolves a flow-node/edge's owner
@@ -239,15 +242,18 @@ async function getStates(
     return res.json() as Promise<{ id: string }[]>;
 }
 
-// GET /organizations/{org}/entity-states/{entityId} status.
-async function entityStatesStatus(
+// GET /organizations/{org}/entity-states/{entityId}/history
+// status. bare entity-states/:id RETIRED (Phase 15 Task 7);
+// re-pin pass-first onto surviving /history (same Region A
+// ownership guard — 200 own / 404 foreign).
+async function entityStatesHistoryStatus(
     db: MemoryDbAdapter, organization: string, entityId: string,
 ): Promise<number> {
     const token = await organizationToken('current', organization);
     const res = await handleRequest(db, req(
         'GET',
         '/organizations/' + organization
-            + '/entity-states/' + entityId,
+            + '/entity-states/' + entityId + '/history',
         token,
     ));
     return res.status;
@@ -265,11 +271,17 @@ test('node deletion event is visible through org A', async () => {
 
 test('node deletion event is hidden from org B', async () => {
     const db = await seed();
-    // Prove the row EXISTS in raw storage — exclusion is
-    // the fence, not an absent row.
-    assert.equal(
-        (await db.states.getById('se-node-del')).id,
-        'se-node-del',
+    // Phase Final Task 1(b): event lives on the pair plane
+    // only (row half stripped). Prove the pair EXISTS —
+    // exclusion is the fence, not an absent write.
+    const nodePairs = await db.responses.getAllWhere(
+        'uri_id', 'se-node-del',
+    );
+    assert.ok(
+        nodePairs.some((r) =>
+            /\/states\/$/.test(r.uri_prefix)
+            && r.status >= 200 && r.status < 300),
+        'se-node-del must exist as a states/:id pair',
     );
     // Grant current admin access to B so the facade opens.
     // B's own organizations/:id document (Phase 13 Task 3's
@@ -307,9 +319,16 @@ test('edge deletion event is visible through org A', async () => {
 
 test('edge deletion event is hidden from org B', async () => {
     const db = await seed();
-    assert.equal(
-        (await db.states.getById('se-edge-del')).id,
-        'se-edge-del',
+    // Phase Final Task 1(b): pair-plane existence pin (row
+    // half stripped).
+    const edgePairs = await db.responses.getAllWhere(
+        'uri_id', 'se-edge-del',
+    );
+    assert.ok(
+        edgePairs.some((r) =>
+            /\/states\/$/.test(r.uri_prefix)
+            && r.status >= 200 && r.status < 300),
+        'se-edge-del must exist as a states/:id pair',
     );
     // B's own organizations/:id document (Phase 13 Task 3's
     // fixture prerequisite; idempotent — a no-op if already
@@ -334,16 +353,18 @@ test('edge deletion event is hidden from org B', async () => {
         'org B must NOT see the edge deletion event');
 });
 
-// ---- entity-states guard ----
+// ---- entity-states history guard (bare route retired) ----
 
-test('entity-states for a node id is 200 in org A', async () => {
+test('entity-states history for a node id is 200 in org A',
+async () => {
     const db = await seed();
-    const status = await entityStatesStatus(
+    const status = await entityStatesHistoryStatus(
         db, 'A', 'node-a');
     assert.equal(status, 200);
 });
 
-test('entity-states for a node id is 404 in org B', async () => {
+test('entity-states history for a node id is 404 in org B',
+async () => {
     const db = await seed();
     // B's own organizations/:id document (Phase 13 Task 3's
     // fixture prerequisite; idempotent — a no-op if already
@@ -362,7 +383,7 @@ test('entity-states for a node id is 404 in org B', async () => {
         organization_id: 'B', identity_id: 'current',
         at: AT,
     });
-    const status = await entityStatesStatus(
+    const status = await entityStatesHistoryStatus(
         db, 'B', 'node-a');
     assert.equal(status, 404);
 });

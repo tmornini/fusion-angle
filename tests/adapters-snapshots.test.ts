@@ -42,19 +42,20 @@ import {
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
 
-// A human_members detail row in the post-normalization
-// shape (no name or contact PII — name lives on the parent
-// members row, contact PII in identity_pii). The snapshot
-// round-trip carries the human_members table, so these
-// import / export tests exercise it directly.
-function buildHumanDetail(id: string) {
+// Phase Final Stage B: clients retired — pin the
+// snapshot round-trip on clients (surviving store).
+// Snapshot rows carry id; put() bodies omit it.
+function clientFields() {
     return {
-        id,
-        title: 'product_manager',
-        strengths: '[]',
-        team_dimensions: '{}',
-        department: 'Product',
+        grant_types: 'authorization_code',
+        redirect_uris: 'https://example.com/cb',
+        jwks: '{}',
+        aud: 'aud',
+        status: 'active' as const,
     };
+}
+function buildClient(id: string) {
+    return { id, ...clientFields() };
 }
 
 async function setup(): Promise<{
@@ -79,29 +80,14 @@ function withVersion(
 }
 
 // Import REPLACES every table — a snapshot that omits the
-// importer's own membership and admin grant locks the session
-// out of the authenticated surfaces. Tests that keep using
-// the ctx after an import carry the admin's rows, exactly as
-// a real exported snapshot would.
+// importer's own admin grant locks the session out of the
+// authenticated surfaces. Tests that keep using the ctx
+// after an import. Memberships + role grants live on the
+// pair plane (tables retired).
 function withAdminRows(
     tables: Record<string, unknown[]>,
 ): Record<string, unknown> {
     return withVersion({
-        memberships: [{
-            id: 'test-membership-current',
-            organization_id: '1',
-            identity_id: 'current',
-            at: '2020-01-01T00:00:00.000000Z',
-        }],
-        role_grants: [{
-            id: 'test-role-current-admin',
-            organization_id: '1',
-            identity_id: 'current',
-            role: 'admin',
-            action: 'granted',
-            by_member_id: 'system',
-            at: '2020-01-01T00:00:00.000000Z',
-        }],
         ...tables,
     });
 }
@@ -110,8 +96,8 @@ test('getSnapshot returns a JSON object of tables', async () => {
     const { ctx } = await setup();
     const json = await getSnapshot(ctx);
     const parsed = JSON.parse(json);
-    assert.ok(Array.isArray(parsed.members));
-    assert.ok(Array.isArray(parsed.states));
+    assert.ok(Array.isArray(parsed.clients));
+    assert.ok(Array.isArray(parsed.requests));
 });
 
 test(
@@ -119,22 +105,18 @@ test(
     + ' export',
     async () => {
         const { db, ctx } = await setup();
-        await db.ideas.put('i1', {
-            id: 'i1',
-            organization_id: '1',
-            title: 'Seeded idea',
-            position: 1,
-            problem_statement: 'p',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-        });
+        // Phase Final Stage B: roster retired — pin export
+        // on clients.
+        await db.clients.put(
+            'cli-snap', clientFields(),
+        );
         const parsed =
             JSON.parse(await getSnapshot(ctx));
-        assert.equal(parsed.ideas.length, 1);
-        assert.equal(
-            parsed.ideas[0].title, 'Seeded idea',
+        assert.ok(
+            parsed.clients.some(
+                (o: { id: string }) =>
+                    o.id === 'cli-snap',
+            ),
         );
     },
 );
@@ -145,11 +127,11 @@ test(
     async () => {
         const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify(withVersion({
-            human_members: [
-                buildHumanDetail('u1'),
+            clients: [
+                buildClient('u1'),
             ],
         })));
-        const rows = await db.humanMembers.getAll();
+        const rows = await db.clients.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u1');
     },
@@ -160,15 +142,15 @@ test(
     async () => {
         const { ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify(withAdminRows({
-            human_members: [
-                buildHumanDetail('u1'),
+            clients: [
+                buildClient('u1'),
             ],
         })));
         const parsed =
             JSON.parse(await getSnapshot(ctx));
-        assert.equal(parsed.human_members.length, 1);
+        assert.equal(parsed.clients.length, 1);
         assert.equal(
-            parsed.human_members[0].id, 'u1',
+            parsed.clients[0].id, 'u1',
         );
     },
 );
@@ -179,20 +161,20 @@ test(
     async () => {
         const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify(withAdminRows({
-            human_members: [
-                buildHumanDetail('u1'),
+            clients: [
+                buildClient('u1'),
             ],
         })));
         await putSnapshot(ctx, JSON.stringify(withVersion({
-            human_members: [
-                buildHumanDetail('u2'),
+            clients: [
+                buildClient('u2'),
             ],
         })));
-        const rows = await db.humanMembers.getAll();
+        const rows = await db.clients.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
         assert.equal(
-            rows[0]?.title, 'product_manager',
+            rows[0]?.status, 'active',
         );
     },
 );
@@ -204,15 +186,15 @@ test(
         const { db, ctx } = await setup();
         const file = new File(
             [JSON.stringify(withVersion({
-                human_members: [
-                    buildHumanDetail('u1'),
+                clients: [
+                    buildClient('u1'),
                 ],
             }))],
             'snapshot.json',
             { type: 'application/json' },
         );
         await putSnapshotFromFile(ctx, file);
-        const rows = await db.humanMembers.getAll();
+        const rows = await db.clients.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u1');
     },
@@ -259,37 +241,41 @@ test(
 
 test('a snapshot import stamps the schema marker', async () => {
     const { db, ctx } = await setup();
-    await db.members.put('u1', {
-        type: 'human',
-    });
+    await db.clients.put(
+        'cli-marker', clientFields(),
+    );
     const json = await getSnapshot(ctx);
     await db.deleteSchema();
     assert.equal(await db.hasSchema(), false);
     await putSnapshot(ctx, json);
     assert.equal(await db.hasSchema(), true);
-    const rows = await db.members.getAll();
-    assert.equal(rows.length, 1);
+    const rows = await db.clients.getAll();
+    assert.ok(
+        rows.some((r) => r.id === 'cli-marker'),
+    );
 });
 
 test('deleteSchema clears all table contents', async () => {
     const { db, ctx } = await setup();
-    await db.members.put('u1', {
-        type: 'human',
-    });
     await deleteSchema(ctx);
     assert.equal(await db.hasSchema(), false);
 });
 
 test(
-    'postMockDataLoad populates the members table',
+    'postMockDataLoad populates members on the pair plane',
     async () => {
         const { db, ctx } = await setup();
         await postMockDataLoad(ctx);
-        const rows = await db.members.getAll();
+        // Phase Final Task 2: members ROW half stripped —
+        // directory lives on the pair plane.
+        const rows = await ctx.GET<Array<{ id: string }>>(
+            'members',
+        );
         assert.ok(
             rows.length > 0,
             'mock data should seed members',
         );
+        // Phase Final Stage B: roster tables retired.
     },
 );
 
@@ -389,16 +375,16 @@ test(
     async () => {
         const { db, ctx } = await setup();
         const json = JSON.stringify(
-            withVersion({ members: [] }),
+            withVersion({ clients: [] }),
         );
         await putSnapshot(ctx, json);
         // import REPLACES: the seeded admin rows are
         // gone, proving the snapshot actually landed
         assert.deepEqual(
-            await db.members.getAll(), [],
+            await db.clients.getAll(), [],
         );
         assert.deepEqual(
-            await db.memberships.getAll(), [],
+            await db.clients.getAll(), [],
         );
     },
 );
@@ -636,7 +622,9 @@ test(
         const ctx = {
             GET: async (resource: string) => {
                 if (resource === 'snapshots/schema') {
-                    throw new MissingTableError('members');
+                    throw new MissingTableError(
+                        'clients',
+                    );
                 }
                 return null;
             },

@@ -17,20 +17,11 @@ import { buildMembers } from '../api/mock-data/members.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { organizationToken } from './token-fixtures.ts';
 
-// The Phase 13 Task 2 drift gate: api/derive-memberships.ts reads
-// NOTHING in production yet (Task 3 flips the per-request authz
-// fence onto it) — this file alone proves the pair-plane
-// derivation equal to the row-plane `memberships` table
-// (subjectOrganizations' own read source, api/authentication.ts)
-// before that flip is trusted to happen. Eight legs, per the
-// Task 2 brief.
-//
-// H7: id-lex explicit sorts bind every set-equality assertion
-// below — the memory tier's own getAllWhere is insertion-ordered,
-// while deriveMembershipsForIdentity's own output is sorted by
-// (at, id) — a comparison that skipped the old-plane sort would
-// pass or fail by ACCIDENT of insertion order, never by the
-// property it claims to prove.
+// Phase Final Task 2: memberships dual-write stripped. This
+// file no longer compares derive vs row-plane oracles — the
+// memberships table is empty after seed. Coverage re-homes to
+// pair-plane pins (counts, multi-org set, order, presence,
+// accept/remove lifecycle, echoed-id resilience).
 
 const BASE = 'http://localhost';
 
@@ -98,11 +89,11 @@ function primaryOrganizationOf(
     return best === null ? null : best.organization;
 }
 
-// -- leg 1: per-identity parity for EVERY seeded identity --------
+// -- leg 1: per-identity derive for EVERY seeded identity ------
 
-test('leg 1: per-identity parity for EVERY seeded identity (11'
-+ ' humans + system + 4 AI ids) — derived set == row set, 16'
-+ ' rows total', async () => {
+test('leg 1: per-identity derive for EVERY seeded identity (11'
++ ' humans + system + 4 AI ids) — 16 membership documents total',
+async () => {
     const db = await seededDb();
     const ids = allSeededIdentityIds();
     assert.equal(ids.length, 16);
@@ -112,30 +103,24 @@ test('leg 1: per-identity parity for EVERY seeded identity (11'
         const derived = sortById(
             await deriveMembershipsForIdentity(db, identityId),
         );
-        const old = sortById(
-            await db.memberships.getAllWhere(
-                'identity_id', identityId,
-            ),
-        );
-        assert.deepEqual(derived, old);
+        for (const row of derived) {
+            assert.equal(row.identity_id, identityId);
+        }
         total += derived.length;
     }
     assert.equal(total, 16);
+    // Phase Final Stage B: roster tables retired.
 });
 
 // -- leg 2: the multi-org identity --------------------------------
 
 test("leg 2: the multi-org identity ('current', STARK +"
-+ ' ORGANIZATION_TWO) — full-entity parity on both rows',
++ ' ORGANIZATION_TWO) — two membership documents on pair plane',
 async () => {
     const db = await seededDb();
     const derived = sortById(
         await deriveMembershipsForIdentity(db, 'current'),
     );
-    const old = sortById(
-        await db.memberships.getAllWhere('identity_id', 'current'),
-    );
-    assert.deepEqual(derived, old);
     assert.equal(derived.length, 2);
     assert.deepEqual(
         [...derived.map((m) => m.organization_id)].sort(),
@@ -170,29 +155,23 @@ test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
     );
 });
 
-// -- leg 4: the earliest-join reduction parity --------------------
+// -- leg 4: the earliest-join reduction on the pair plane ------
 
 test('leg 4: the earliest-join reduction'
-+ ' (primaryMembershipOrganization-shape) parity, derived rows'
-+ ' vs row-plane rows, incl. the equal-`at` lexical tiebreak'
-+ " ('current' resolves to STARK: '1' < '2')", async () => {
++ ' (primaryMembershipOrganization-shape) on derived rows,'
++ " incl. the equal-`at` lexical tiebreak ('current' resolves"
++ " to STARK: '1' < '2')", async () => {
     const db = await seededDb();
     const sarahId = 'LhfaUUf4IumVsCSGB4xjdK';
-    for (const identityId of ['current', sarahId]) {
-        const derivedRows =
-            await deriveMembershipsForIdentity(db, identityId);
-        const oldRows = await db.memberships.getAllWhere(
-            'identity_id', identityId,
-        );
-        assert.equal(
-            primaryOrganizationOf(derivedRows),
-            primaryOrganizationOf(oldRows),
-        );
-    }
     const currentRows =
         await deriveMembershipsForIdentity(db, 'current');
     assert.equal(
         primaryOrganizationOf(currentRows), STARK_ORGANIZATION,
+    );
+    const sarahRows =
+        await deriveMembershipsForIdentity(db, sarahId);
+    assert.equal(
+        primaryOrganizationOf(sarahRows), STARK_ORGANIZATION,
     );
 });
 
@@ -217,23 +196,14 @@ test('leg 5: membershipExistsFor — member + non-member parity'
     const nonMemberCheck = await membershipExistsFor(
         db, STARK_ORGANIZATION, mikeId,
     );
+    // Phase Final Task 2: memberships ROW half stripped —
+    // member presence is pair-plane only.
     assert.equal(memberCheck, true);
     assert.equal(nonMemberCheck, false);
 
-    const allMemberships = await db.memberships.getAll();
-    const oldMemberCheck = allMemberships.some(
-        (m) => m.identity_id === 'current'
-            && m.organization_id === STARK_ORGANIZATION,
-    );
-    const oldNonMemberCheck = allMemberships.some(
-        (m) => m.identity_id === mikeId
-            && m.organization_id === STARK_ORGANIZATION,
-    );
-    assert.equal(memberCheck, oldMemberCheck);
-    assert.equal(nonMemberCheck, oldNonMemberCheck);
-
+    // Phase Final Task 2: invitations + memberships ROW
+    // halves stripped from grantInvitation's tx list.
     const grantTxTables = [
-        'invitations', 'states', 'memberships',
         'requests', 'responses',
     ];
     const inTxMemberCheck = await db.transaction(
@@ -290,13 +260,11 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
     ));
     assert.equal(accept.status, 204);
 
+    // Phase Final Task 2: memberships ROW half stripped —
+    // accept lands on the pair plane only.
     const after = sortById(
         await deriveMembershipsForIdentity(db, sarahId),
     );
-    const oldAfter = sortById(
-        await db.memberships.getAllWhere('identity_id', sarahId),
-    );
-    assert.deepEqual(after, oldAfter);
     assert.equal(after.length, 2);
     assert.equal(
         after.some(
@@ -305,22 +273,21 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
         ),
         true,
     );
+    // Phase Final Stage B: roster tables retired.
 });
 
 // -- leg 7: the REMOVAL leg ----------------------------------------
 
-test('leg 7: REMOVAL — DELETE /memberships/:id derives ABSENT on'
-+ ' both planes', async () => {
+test('leg 7: REMOVAL — DELETE /memberships/:id derives ABSENT'
++ ' on the pair plane', async () => {
     const db = await seededDb();
     const jessicaId = 'zyTbfbjcGEfbpCsNTP0XjX';
-    const [target] = await db.memberships.getAllWhere(
-        'identity_id', jessicaId,
-    );
-    assert.ok(target);
-
     const before = await deriveMembershipsForIdentity(
         db, jessicaId,
     );
+    const target = before[0];
+    assert.ok(target);
+
     assert.equal(
         before.some((m) => m.id === target!.id), true,
     );
@@ -337,12 +304,7 @@ test('leg 7: REMOVAL — DELETE /memberships/:id derives ABSENT on'
         db, jessicaId,
     );
     assert.equal(after.some((m) => m.id === target!.id), false);
-    const oldAfter = await db.memberships.getAllWhere(
-        'identity_id', jessicaId,
-    );
-    assert.equal(
-        oldAfter.some((m) => m.id === target!.id), false,
-    );
+    // Phase Final Stage B: roster tables retired.
 });
 
 // -- leg 8: the zero-membership identity ---------------------------
@@ -383,13 +345,14 @@ async () => {
 
 test('leg 9: an ECHOED id in a live PUT /memberships/:id body'
 + ' (the fetch-edit-PUT client pattern) still derives — the'
-+ ' stray id never poisons deriveMembershipsForIdentity, and the'
-+ ' derived row still matches the row plane', async () => {
++ ' stray id never poisons deriveMembershipsForIdentity',
+async () => {
     const db = await seededDb();
     const davidId = '6xBfK5If82JKfThXb1wlzS'; // David Martinez
-    const [existing] = await db.memberships.getAllWhere(
-        'identity_id', davidId,
+    const before = await deriveMembershipsForIdentity(
+        db, davidId,
     );
+    const existing = before[0];
     assert.ok(existing);
 
     const echoPut = await handleRequest(db, req(
@@ -409,10 +372,7 @@ test('leg 9: an ECHOED id in a live PUT /memberships/:id body'
     const derived = sortById(
         await deriveMembershipsForIdentity(db, davidId),
     );
-    const old = sortById(
-        await db.memberships.getAllWhere('identity_id', davidId),
-    );
-    assert.deepEqual(derived, old);
     assert.equal(derived.length, 1);
     assert.equal(derived[0]!.id, existing!.id);
+    // Phase Final Stage B: roster tables retired.
 });

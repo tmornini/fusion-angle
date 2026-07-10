@@ -31,43 +31,12 @@ function hashIds(ids: string[]): string {
 type TableFingerprint = { count: number; hash: string };
 
 const EXPECTED: Record<string, TableFingerprint> = {
-    'members': { count: 16, hash: '0c164977' },
-    'human_members': { count: 11, hash: 'd8852be1' },
-    'ai_members': { count: 4, hash: 'dca9e5e0' },
-    'identities': { count: 16, hash: '0c164977' },
-    'identity_pii': { count: 11, hash: 'd8852be1' },
-    'identity_credentials': { count: 12, hash: '4990628d' },
-    'identity_token_revocations': { count: 0, hash: '811c9dc5' },
-    'identity_default_organizations': { count: 11, hash: 'ab3efde4' },
-    'role_grants': { count: 12, hash: '4b2311dd' },
+    // All dual-written families RETIRED (Phase Final Task 2):
+    // seed row halves stripped; pairs stay at
+    // EXPECTED_PAIR_COUNT 1513. Tables empty until Stage B
+    // deletion. SFV seed leaf pairs SURVIVE (WRS + 7 pairs).
+    // clients remains empty (no seed dual-write; hash pin).
     'clients': { count: 0, hash: '811c9dc5' },
-    'identity_providers': { count: 0, hash: '811c9dc5' },
-    'ideas': { count: 11, hash: 'bd305274' },
-    'projects': { count: 17, hash: '0a37ad51' },
-    'flows': { count: 5, hash: '96b40589' },
-    'flow_versions': { count: 0, hash: '811c9dc5' },
-    'flow_nodes': { count: 46, hash: '092df8dd' },
-    'flow_edges': { count: 54, hash: '2bde60a6' },
-    'flow_node_members': { count: 11, hash: '24b8b869' },
-    'flow_node_attributes': { count: 16, hash: '5d9c33a6' },
-    'project_flows': { count: 4, hash: 'b7d3ebef' },
-    'work_orders': { count: 145, hash: 'b57d1e25' },
-    'flow_work_orders': { count: 145, hash: 'ffdd07ec' },
-    'state_field_values': { count: 7, hash: '95d00f3a' },
-    'records': { count: 2, hash: '929ffdaa' },
-    'record_attributes': { count: 14, hash: 'f3566e11' },
-    'flow_records': { count: 3, hash: '1f726d32' },
-    'organizations': { count: 2, hash: 'e13d8f06' },
-    'memberships': { count: 16, hash: '2e3db33e' },
-    'invitations': { count: 0, hash: '811c9dc5' },
-    'idea_submissions': { count: 11, hash: '30925c13' },
-    'objectives': { count: 5, hash: '67473fdc' },
-    'objective_revisions': { count: 5, hash: 'dd09a688' },
-    'project_objective_baseline_scores':
-        { count: 49, hash: '01d7b8b0' },
-    'project_objective_actual_scores':
-        { count: 92, hash: 'f7c18b25' },
-    'states': { count: 911, hash: '679a7541' },
 };
 
 // requests/responses are EXCLUDED from this fingerprint (Task
@@ -83,8 +52,21 @@ const EXPECTED: Record<string, TableFingerprint> = {
 // tests/mock-data-pairs.test.ts. The reserved schema-version
 // marker (Phase 12 Task 6) is excluded too — it is a scalar,
 // not a row array, so `rows.map` below would throw on it.
+// All dual-written families + states excluded with Phase Final
+// Task 2 seed row-half strip (EXPECTED rows retired; tables
+// empty until Stage B deletion; pair-plane pins live in
+// mock-data-pairs.test.ts).
 const EXCLUDED_TABLES = new Set([
     'requests', 'responses', SNAPSHOT_SCHEMA_VERSION_KEY,
+    // ideas..work-orders and records families deleted
+    'objectives', 'objective_revisions',
+    'members', 'human_members', 'ai_members',
+    'memberships', 'invitations',
+    'identities', 'identity_pii', 'identity_credentials',
+    'identity_token_revocations',
+    'identity_default_organizations',
+    'role_grants', 'identity_providers',
+    'organizations', 'states',
 ]);
 
 async function seededFingerprint(): Promise<

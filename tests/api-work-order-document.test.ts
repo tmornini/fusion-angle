@@ -128,8 +128,10 @@ test('validateWorkOrderDocumentBody rejects a trio key at the'
 
 // -- 2. postWorkOrderDocumentOp (below-gate, MemoryDbAdapter) --
 
-test('postWorkOrderDocumentOp writes exactly the work_orders'
-+ ' row and the pair', async () => {
+// Phase Final Task 2: work_orders ROW half stripped — op
+// returns a reconstructed entity + appends the pair only.
+test('postWorkOrderDocumentOp returns the entity and the'
++ ' pair; work_orders row plane stays empty', async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     const body = {
@@ -149,15 +151,14 @@ test('postWorkOrderDocumentOp writes exactly the work_orders'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postWorkOrderDocumentOp(
+    const written = await postWorkOrderDocumentOp(
         db, 'wo-doc-op-1', body, 'current', pair,
     );
-    const row = await db.workOrders.getById('wo-doc-op-1');
-    assert.deepEqual(row, {
-        id: 'wo-doc-op-1',
+    assert.deepEqual(written, {
         organization_id: '1',
         ...documentFields(),
     });
+    // Phase Final Stage B: work_orders table retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });
@@ -417,23 +418,21 @@ test('a duplicate work-order create\'s own OPERATION pair'
     );
 });
 
-test('a failed work-order create leaves zero of the three'
-+ ' pairs (whole-tx abort)', async () => {
+test('a work-order create ignores a raw colliding states'
++ ' row (states ROW half stripped)', async () => {
     const db = await freshDb();
-    const flowWorkOrderId = 'wo-c4-doomed-fwo';
-    await db.states.put('ev-2-' + flowWorkOrderId, {
-        entity_id: 'other',
-        state: 'n-finish',
-        member_id: 'current',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
+    const flowWorkOrderId = 'wo-c4-survives-fwo';
+    // Phase Final Task 2: states ROW half stripped — raw
+    // collision no longer aborts the pair-plane create.
+    // Phase Final Stage B: states table retired.
     const res = await handleRequest(db, req(
         'POST', '/work-orders', DEV_TOKEN,
         workOrderCreateBody(
-            'wo-c4-doomed', flowWorkOrderId, 'flow-c4',
+            'wo-c4-survives', flowWorkOrderId, 'flow-c4',
         ),
     ));
-    assert.equal(res.status, 409);
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
+    assert.equal(res.status, 204);
+    // 3 bootstrap pairs + 3 create pairs (op/document/join).
+    assert.equal((await db.requests.getAll()).length, 6);
+    assert.equal((await db.responses.getAll()).length, 6);
 });

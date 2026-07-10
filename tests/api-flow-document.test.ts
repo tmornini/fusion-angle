@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -164,77 +166,104 @@ function decodeRequestMessage(message: string): {
     };
 }
 
-// --- below-gate op tests (postFlowDocumentOp directly — no
-// route called it until the flip below wired flows/:id onto
-// it) ---
+// --- below-gate op tests (postFlowDocumentOp directly).
+// Phase Final Task 2: flows + graph ROW halves stripped;
+// op returns a reconstructed entity + posts states events.
 
-test('postFlowDocumentOp writes the flow row, exactly one'
-+ ' updated event, the graph-delta rows, and nothing in'
+test('postFlowDocumentOp returns the entity, exactly one'
++ ' updated event, no graph rows, nothing in'
 + ' flow_versions', async () => {
     const db = await freshDb();
-    await db.flows.put('flow-op-1', {
-        organization_id: '1',
+    // Phase Final Task 2: states ROW half stripped — drive
+    // create + update through the live PUT so both trios
+    // land on the pair plane.
+    const token = await organizationToken();
+    const createBody = {
         ...flowFields('Original'),
-    });
-    await db.states.postEvent(
-        'flow-op-1-create', 'flow-op-1', 'active',
-        'current', AT,
-    );
-    const written = await postFlowDocumentOp(
-        db, 'flow-op-1',
-        {
-            ...documentBody('Renamed', 'flow-op-1-upd', {
-                graphDelta: {
-                    ...emptyDelta(),
-                    nodes: [{
-                        id: 'n1',
-                        flow_id: 'flow-op-1',
-                        name: 'N1',
-                        position_x: 0,
-                        position_y: 0,
-                        is_create: false,
-                        is_archive: false,
-                        task_instructions: '',
-                        at: AT,
-                    }],
-                },
-            }),
-            organization_id: '1',
-        },
-        'current',
-    );
-    assert.equal(written.name, 'Renamed');
-    const flow = await db.flows.getById('flow-op-1');
-    assert.equal(flow.name, 'Renamed');
-    const events = await db.states.getAllFor('flow-op-1');
+        state: 'active',
+        state_at: AT,
+        state_event_id: 'flow-op-1-create',
+        graph: emptyGraph(),
+        graphDelta: emptyDelta(),
+        revivals: [],
+    };
+    const create = await handleRequest(db, req(
+        'PUT', '/flows/flow-op-1', token, createBody,
+    ));
+    assert.equal(create.status, 200);
+    const headId = create.headers.get('Response-ID')!;
+    const update = await handleRequest(db, req(
+        'PUT', '/flows/flow-op-1', token,
+        documentBody('Renamed', 'flow-op-1-upd', {
+            graphDelta: {
+                ...emptyDelta(),
+                nodes: [{
+                    id: 'n1',
+                    flow_id: 'flow-op-1',
+                    name: 'N1',
+                    position_x: 0,
+                    position_y: 0,
+                    is_create: false,
+                    is_archive: false,
+                    task_instructions: '',
+                    at: AT,
+                }],
+            },
+        }),
+        { 'If-Response-ID': headId },
+    ));
+    assert.equal(update.status, 200);
+    const wire = await update.json() as { name: string };
+    assert.equal(wire.name, 'Renamed');
+    const events = await deriveStatesFor(db, '1', 'flow-op-1');
     assert.deepEqual(
         events.map(e => e.state), ['active', 'updated'],
     );
-    const nodes = await db.flowNodes.getAllWhere(
-        'flow_id', 'flow-op-1',
-    );
-    assert.equal(nodes.length, 1);
-    assert.equal(nodes[0]!.id, 'n1');
-    const versions = await db.flowVersions.getAll();
-    assert.equal(versions.length, 0);
+    // Phase Final Stage B: flow_nodes + flow_versions tables
+    // retired — pair-plane state events are the residual pin.
 });
 
 test('postFlowDocumentOp with revivals posts the restored'
 + ' events (the undo decomposition parity case)', async () => {
     const db = await freshDb();
-    await db.flows.put('flow-op-2', {
-        organization_id: '1',
+    // Phase Final Task 2: pair plane only — create then update
+    // with a deletion + revival on the document body.
+    const token = await organizationToken();
+    const createBody = {
         ...flowFields('Original'),
-    });
-    await db.states.postEvent(
-        'flow-op-2-create', 'flow-op-2', 'active',
-        'current', AT,
-    );
-    await db.states.postEvent(
-        'node-x-delete', 'node-x', 'deleted', 'current', AT,
-    );
-    await postFlowDocumentOp(
-        db, 'flow-op-2',
+        state: 'active',
+        state_at: AT,
+        state_event_id: 'flow-op-2-create',
+        graph: emptyGraph(),
+        graphDelta: {
+            ...emptyDelta(),
+            nodes: [{
+                id: 'node-x',
+                flow_id: 'flow-op-2',
+                name: 'X',
+                position_x: 0,
+                position_y: 0,
+                is_create: false,
+                is_archive: false,
+                task_instructions: '',
+                at: AT,
+            }],
+            deletions: [{
+                eventId: 'node-x-delete',
+                entityId: 'node-x',
+                entityKind: 'node',
+                at: AT,
+            }],
+        },
+        revivals: [],
+    };
+    const create = await handleRequest(db, req(
+        'PUT', '/flows/flow-op-2', token, createBody,
+    ));
+    assert.equal(create.status, 200);
+    const headId = create.headers.get('Response-ID')!;
+    const update = await handleRequest(db, req(
+        'PUT', '/flows/flow-op-2', token,
         {
             ...documentBody('Revived', 'flow-op-2-upd'),
             revivals: [
@@ -244,11 +273,11 @@ test('postFlowDocumentOp with revivals posts the restored'
                     at: AT,
                 },
             ],
-            organization_id: '1',
         },
-        'current',
-    );
-    const nodeEvents = await db.states.getAllFor('node-x');
+        { 'If-Response-ID': headId },
+    ));
+    assert.equal(update.status, 200);
+    const nodeEvents = await deriveStatesFor(db, '1', 'node-x');
     assert.deepEqual(
         nodeEvents.map(e => e.state),
         ['deleted', 'restored'],
@@ -256,16 +285,8 @@ test('postFlowDocumentOp with revivals posts the restored'
 });
 
 test('the document body carries state/state_at/graph while'
-+ ' the old-plane flow row carries none of them', async () => {
++ ' the reconstructed entity carries none of them', async () => {
     const db = await freshDb();
-    await db.flows.put('flow-op-4', {
-        organization_id: '1',
-        ...flowFields('Original'),
-    });
-    await db.states.postEvent(
-        'flow-op-4-create', 'flow-op-4', 'active',
-        'current', AT,
-    );
     const body = {
         ...documentBody('Doc Shape', 'flow-op-4-upd'),
         organization_id: '1',
@@ -273,15 +294,18 @@ test('the document body carries state/state_at/graph while'
     for (const key of ['state', 'state_at', 'graph']) {
         assert.ok(key in body, key + ' missing from wire body');
     }
-    await postFlowDocumentOp(db, 'flow-op-4', body, 'current');
-    const flow = await db.flows.getById('flow-op-4');
+    // Phase Final Task 2: below-facade without a pair still
+    // reconstructs the return entity from the body.
+    const flow = await postFlowDocumentOp(
+        db, 'flow-op-4', body, 'current',
+    );
     for (const key of [
         'state', 'state_at', 'state_event_id',
         'graph', 'graphDelta', 'revivals',
     ]) {
         assert.ok(
             !(key in flow),
-            'flows row must not carry ' + key,
+            'reconstructed entity must not carry ' + key,
         );
     }
 });
@@ -303,7 +327,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     assert.equal(first.status, 200);
     const firstId = first.headers.get('Response-ID');
     const eventsAfterFirst =
-        await db.states.getAllFor('flow-locked-3');
+        await deriveStatesFor(db, '1', 'flow-locked-3');
     const requestsAfterFirst = await db.requests.getAll();
 
     const second = await handleRequest(db, req(
@@ -312,7 +336,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('Response-ID'), firstId);
     const eventsAfterSecond =
-        await db.states.getAllFor('flow-locked-3');
+        await deriveStatesFor(db, '1', 'flow-locked-3');
     assert.equal(
         eventsAfterSecond.length, eventsAfterFirst.length,
     );
@@ -436,27 +460,12 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'flow-undo-old-shape');
-    const published = await handleRequest(db, req(
-        'POST', '/flows/flow-undo-old-shape/versions', token, {
-            id: 'v-undo-old-shape',
-            version: {
-                flow_id: 'flow-undo-old-shape',
-                name: 'v1',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: emptyGraph(),
-                at: AT,
-            },
-            trimIds: [],
-        },
-    ));
-    assert.equal(published.status, 204);
+    // versions setup RETIRED (Phase 15 Task 7); undo no longer
+    // consumes a flow_versions row.
 
     const requestsBefore = await db.requests.getAll();
     const responsesBefore = await db.responses.getAll();
-    const eventsBefore = await db.states.getAllFor(
+    const eventsBefore = await deriveStatesFor(db, '1', 
         'flow-undo-old-shape',
     );
 
@@ -465,7 +474,6 @@ async () => {
             flow: flowFields('Old Shape Undo'),
             eventId: 'flow-undo-old-shape-undo-ev',
             at: AT,
-            consumedVersionId: 'v-undo-old-shape',
             graphDelta: emptyDelta(),
             revivals: [],
             // `graph` deliberately omitted — the old shape.
@@ -475,7 +483,7 @@ async () => {
 
     const requestsAfter = await db.requests.getAll();
     const responsesAfter = await db.responses.getAll();
-    const eventsAfter = await db.states.getAllFor(
+    const eventsAfter = await deriveStatesFor(db, '1', 
         'flow-undo-old-shape',
     );
     assert.equal(requestsAfter.length, requestsBefore.length);
@@ -838,7 +846,12 @@ async () => {
         'exactly one pair may follow the pre-race head',
     );
 
-    const flow = await db.flows.getById('flow-race-1');
+    // Phase Final Task 2: flow name lives on the pair plane.
+    const got = await handleRequest(
+        db, req('GET', '/flows/flow-race-1', token),
+    );
+    assert.equal(got.status, 200);
+    const flow = await got.json() as { name: string };
     if (flow.name === 'Fresh Flow') {
         // Undo won the race, reverting all the way back to
         // genesis (the only pair before "Before Race"); the
@@ -851,7 +864,7 @@ async () => {
         assert.equal(flow.name, 'Saved');
         assert.equal(save.status, 200);
         assert.equal(undo.status, 412);
-        const events = await db.states.getAllFor('flow-race-1');
+        const events = await deriveStatesFor(db, '1', 'flow-race-1');
         assert.ok(
             !events.some(
                 e => e.id === 'flow-race-1-undo-ev',

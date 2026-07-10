@@ -25,11 +25,15 @@ import {
     type Backup,
 } from '../web-app/app/adapters/flow-export.ts';
 import {
-    reassembleStoredGraph,
-} from '../api/flow-graph-relations.ts';
-import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
+import type {
+    FlowWithGraph,
+    StoredGraph,
+} from '../api/types.ts';
+import {
+    asStoredGraph,
+} from '../api/validators.ts';
 
 async function setup(): Promise<{
     db: MemoryDbAdapter;
@@ -103,26 +107,17 @@ function buildBackupWithMembersAndAttrs(
     };
 }
 
-// Reads back all relation rows for a given flow and
-// returns the reassembled domain graph.
-async function readReassembled(
-    db: MemoryDbAdapter,
+// Phase Final Task 2: graph relation ROW halves stripped —
+// read the pair-plane working graph via GET.
+async function readPairGraph(
+    ctx: RequestContext,
     flowId: string,
-) {
-    const nodeRows =
-        await db.flowNodes.getAllWhere(
-            'flow_id', flowId,
-        );
-    const edgeRows =
-        await db.flowEdges.getAllWhere(
-            'flow_id', flowId,
-        );
-    const memberRows =
-        await db.flowNodeMembers.getAll();
-    const attrRows =
-        await db.flowNodeAttributes.getAll();
-    return reassembleStoredGraph(
-        nodeRows, edgeRows, memberRows, attrRows,
+): Promise<StoredGraph> {
+    const flow = await ctx.GET<FlowWithGraph>(
+        'flows/' + flowId,
+    );
+    return asStoredGraph(
+        JSON.parse(flow.graph), 'flow.graph',
     );
 }
 
@@ -130,7 +125,7 @@ test(
     'postFlowFromBackup round-trip preserves'
     + ' node members AND attributes',
     async () => {
-        const { db, ctx } = await setup();
+        const { ctx } = await setup();
         const newFlowId = 'imported-flow-1';
         const backup = buildBackupWithMembersAndAttrs();
 
@@ -141,8 +136,8 @@ test(
             'project-1',
         );
 
-        const graph = await readReassembled(
-            db, newFlowId,
+        const graph = await readPairGraph(
+            ctx, newFlowId,
         );
 
         // Two nodes should be imported

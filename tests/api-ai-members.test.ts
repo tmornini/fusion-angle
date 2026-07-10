@@ -68,11 +68,15 @@ test(
             name: string; description: string;
         }>(db, 'ai-members/a1', DEV_TOKEN);
         assert.equal(facet.name, 'Claude');
-        const current = await GET<{
+        // bare entity-states/:id RETIRED (Phase 15 Task 7);
+        // post-write check rides surviving /history.
+        const history = await GET<{
             state: string;
             member_id: string;
             at: string;
-        }>(db, 'entity-states/a1', DEV_TOKEN);
+        }[]>(db, 'entity-states/a1/history', DEV_TOKEN);
+        assert.equal(history.length, 1);
+        const current = history[0]!;
         assert.equal(current.state, 'active');
         // Authorship is the verified caller, never the body.
         assert.equal(current.member_id, 'current');
@@ -84,34 +88,29 @@ test(
 );
 
 test(
-    'POST ai-members rolls back every facet when its'
-    + ' initial state event conflicts',
+    'POST ai-members ignores a raw colliding states row'
+    + ' (states ROW half stripped)',
     async () => {
         const db = await freshDb();
-        // Pre-seed a DIFFERENT event at the create's
-        // initialStateEventId. postEvent re-puts that id with a
-        // conflicting payload mid-tx (LedgerImmutability), so
-        // both facet writes must roll back with it.
-        await db.states.put('ev-x', {
-            entity_id: 'other',
-            state: 'active',
-            member_id: 'current',
-            at: '2020-01-01T00:00:00.000000Z',
-        });
-        await assert.rejects(
-            () => POST(db, 'ai-members', {
-                id: 'doomed',
-                detail: detail('Doomed'),
-                initialState: 'active',
-                initialStateEventId: 'ev-x',
-                initialStateAt: '2099-01-01T00:00:00.000000Z',
-            }, DEV_TOKEN),
+        // Phase Final Task 2: states ROW half stripped —
+        // a raw colliding states row no longer aborts the
+        // pair-plane create.
+    // Phase Final Stage B: states table retired.
+        await POST(db, 'ai-members', {
+            id: 'survives',
+            detail: detail('Survives'),
+            initialState: 'active',
+            initialStateEventId: 'ev-x',
+            initialStateAt: '2099-01-01T00:00:00.000000Z',
+        }, DEV_TOKEN);
+        const parent = await GET<{ id: string }>(
+            db, 'members/survives', DEV_TOKEN,
         );
-        // Not one facet survived the aborted transaction.
-        await assert.rejects(
-            () => GET(db, 'members/doomed', DEV_TOKEN));
-        await assert.rejects(
-            () => GET(db, 'ai-members/doomed', DEV_TOKEN));
+        assert.equal(parent.id, 'survives');
+        const detailRow = await GET<{ name: string }>(
+            db, 'ai-members/survives', DEV_TOKEN,
+        );
+        assert.equal(detailRow.name, 'Survives');
     },
 );
 
@@ -136,7 +135,10 @@ test(
         assert.equal(facet.name, 'Renamed');
         assert.equal(facet.skill_focus, 'qa');
         // The edit wrote no event — the lone create event holds.
-        const events = await db.states.getAllFor('a1');
+        const { deriveStatesFor } = await import(
+            '../api/derive-states.ts'
+        );
+        const events = await deriveStatesFor(db, '1', 'a1');
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');
     },
@@ -181,8 +183,12 @@ test(
                     detail: detail('Bot'),
                 }));
         assert.equal(deniedEdit.status, 403);
-        // The denied member wrote nothing.
-        const members = await memberDb.members.getAll();
-        assert.equal(members.length, 0);
+        // The denied member wrote nothing on the pair plane
+        // beyond seed pairs — no AI-member document for a2.
+        await assert.rejects(
+            () => GET(
+                memberDb, 'ai-members/a2', token,
+            ),
+        );
     },
 );

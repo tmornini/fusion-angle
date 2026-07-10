@@ -2,11 +2,21 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 
-const aState = {
-    entity_id: 'm1',
-    state: 'active',
-    member_id: 'm1',
+const aClient = {
+    grant_types: '["password"]',
+    redirect_uris: '[]',
+    jwks: '{}',
+    aud: 'fusion-ai',
+    status: 'active' as const,
+};
+
+const aRequest = {
+    uri_prefix: '/organizations/1/ideas/',
+    uri_id: '42',
     at: '2026-01-01T00:00:00.000000Z',
+    requester_identity_id: 'current',
+    message_hash: 'a'.repeat(64),
+    message: '{"kind":"request"}',
 };
 
 test(
@@ -15,18 +25,16 @@ test(
         const db = new MemoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
-            ['members', 'states'],
+            ['clients', 'requests'],
             async (view) => {
-                await view.members.put('m1', {
-                    type: 'human',
-                });
-                await view.states.put('s1', aState);
+                await view.clients.put('c1', aClient);
+                await view.requests.put('r1', aRequest);
             },
         );
-        const member = await db.members.getById('m1');
-        const state = await db.states.getById('s1');
-        assert.equal(member.id, 'm1');
-        assert.equal(state.id, 's1');
+        const client = await db.clients.getById('c1');
+        const request = await db.requests.getById('r1');
+        assert.equal(client.id, 'c1');
+        assert.equal(request.id, 'r1');
     },
 );
 
@@ -37,21 +45,19 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['members', 'states'],
+                ['clients', 'requests'],
                 async (view) => {
-                    await view.members.put('m1', {
-                        type: 'human',
-                    });
-                    await view.states.put('s1', aState);
+                    await view.clients.put('c1', aClient);
+                    await view.requests.put('r1', aRequest);
                     throw new Error('boom');
                 },
             ),
             /boom/,
         );
-        const members = await db.members.getAll();
-        const states = await db.states.getAll();
-        assert.deepEqual(members, []);
-        assert.deepEqual(states, []);
+        const clients = await db.clients.getAll();
+        const requests = await db.requests.getAll();
+        assert.deepEqual(clients, []);
+        assert.deepEqual(requests, []);
     },
 );
 
@@ -61,18 +67,16 @@ test(
         const db = new MemoryDbAdapter();
         await db.postSchemaCreation();
         const seen = await db.transaction(
-            ['members', 'states'],
+            ['clients', 'requests'],
             async (view) => {
-                await view.members.put('m1', {
-                    type: 'human',
-                });
+                await view.clients.put('c1', aClient);
                 // Read back inside the same tx — the put is
                 // visible before commit.
-                return view.members.getAll();
+                return view.clients.getAll();
             },
         );
         assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 'm1');
+        assert.equal(seen[0]!.id, 'c1');
     },
 );
 
@@ -82,23 +86,23 @@ test(
         const db = new MemoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
-            ['members', 'states'],
+            ['clients', 'requests'],
             async (view) => {
                 await view.transaction(
-                    ['members'],
+                    ['clients'],
                     async (inner) => {
-                        await inner.members.put('m1', {
-                            type: 'human',
-                        });
+                        await inner.clients.put(
+                            'c1', aClient,
+                        );
                     },
                 );
-                await view.states.put('s1', aState);
+                await view.requests.put('r1', aRequest);
             },
         );
-        const member = await db.members.getById('m1');
-        const state = await db.states.getById('s1');
-        assert.equal(member.id, 'm1');
-        assert.equal(state.id, 's1');
+        const client = await db.clients.getById('c1');
+        const request = await db.requests.getById('r1');
+        assert.equal(client.id, 'c1');
+        assert.equal(request.id, 'r1');
     },
 );
 
@@ -109,14 +113,14 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['members', 'states'],
+                ['clients', 'requests'],
                 async (view) => {
                     await view.transaction(
-                        ['members'],
+                        ['clients'],
                         async (inner) => {
-                            await inner.members.put('m1', {
-                                type: 'human',
-                            });
+                            await inner.clients.put(
+                                'c1', aClient,
+                            );
                         },
                     );
                     throw new Error('boom');
@@ -124,7 +128,9 @@ test(
             ),
             /boom/,
         );
-        assert.deepEqual(await db.members.getAll(), []);
+        assert.deepEqual(
+            await db.clients.getAll(), [],
+        );
     },
 );
 
@@ -135,15 +141,15 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['members'],
+                ['clients'],
                 async (view) => {
                     await view.transaction(
-                        ['states'],
+                        ['requests'],
                         async () => undefined,
                     );
                 },
             ),
-            /states/,
+            /requests/,
         );
     },
 );

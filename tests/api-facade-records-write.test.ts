@@ -163,8 +163,18 @@ test('a facade records write stamps the bound org'
         await devToken('current'),
         editBody('B')));
     assert.equal(res.status, 204);
-    const stored = await db.records.getById('rec-1');
+    // Phase Final Task 2: records ROW half stripped — wire
+    // GET stamps organization_id from the fence.
+    const get = await handleRequest(db, req(
+        'GET', '/organizations/A/records/rec-1',
+        await devToken('current'),
+    ));
+    assert.equal(get.status, 200);
+    const stored = await get.json() as {
+        organization_id: string;
+    };
     assert.equal(stored.organization_id, 'A');
+    // Phase Final Stage B: records table retired.
 });
 
 test('a facade records write into a non-member org'

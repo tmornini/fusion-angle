@@ -273,8 +273,9 @@ test('validateHumanMemberDocumentBody rejects each missing'
 
 // -- 2. the ops (below-gate, MemoryDbAdapter) ------------------
 
-test('postMemberDocumentOp writes exactly the members row and'
-+ ' the pair', async () => {
+test('postMemberDocumentOp writes exactly the pair and'
++ ' reconstructs the entity return (row half stripped)',
+async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     const body = memberFields();
@@ -291,17 +292,20 @@ test('postMemberDocumentOp writes exactly the members row and'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postMemberDocumentOp(
+    // Phase Final Task 2: members ROW half stripped —
+    // op returns the reconstructed entity; only pairs land.
+    const written = await postMemberDocumentOp(
         db, 'mem-doc-op-1', body, 'current', pair,
     );
-    const row = await db.members.getById('mem-doc-op-1');
-    assert.deepEqual(row, { id: 'mem-doc-op-1', ...body });
+    assert.deepEqual(written, body);
+    // Phase Final Stage B: roster tables retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });
 
-test('postAiMemberDocumentOp writes exactly the ai_members row'
-+ ' and the pair', async () => {
+test('postAiMemberDocumentOp writes exactly the pair and'
++ ' reconstructs the entity return (row half stripped)',
+async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     const body = aiMemberFields();
@@ -318,18 +322,18 @@ test('postAiMemberDocumentOp writes exactly the ai_members row'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postAiMemberDocumentOp(
+    const written = await postAiMemberDocumentOp(
         db, 'ai-doc-op-1', body, 'current', pair,
     );
-    const row = await db.aiMembers.getById('ai-doc-op-1');
-    assert.deepEqual(row, { id: 'ai-doc-op-1', ...body });
+    assert.deepEqual(written, body);
+    // Phase Final Stage B: roster tables retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });
 
-test('postHumanMemberDocumentOp writes exactly the'
-+ ' human_members row and the pair (below-gate only — no live'
-+ ' PUT route dispatches here)', async () => {
+test('postHumanMemberDocumentOp writes exactly the pair and'
++ ' reconstructs the entity return (row half stripped;'
++ ' below-gate only — no live PUT route)', async () => {
     const db = new MemoryDbAdapter();
     await db.postSchemaCreation();
     const body = humanMemberFields();
@@ -346,11 +350,11 @@ test('postHumanMemberDocumentOp writes exactly the'
         responseStatus: 200, responseBody: undefined,
         headPairId: undefined,
     });
-    await postHumanMemberDocumentOp(
+    const written = await postHumanMemberDocumentOp(
         db, 'hm-doc-op-1', body, 'current', pair,
     );
-    const row = await db.humanMembers.getById('hm-doc-op-1');
-    assert.deepEqual(row, { id: 'hm-doc-op-1', ...body });
+    assert.deepEqual(written, body);
+    // Phase Final Stage B: roster tables retired.
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });

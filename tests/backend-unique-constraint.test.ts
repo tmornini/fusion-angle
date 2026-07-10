@@ -80,7 +80,9 @@ async () => {
 test('a failed unique put aborts the whole transaction',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['responses', 'ideas']);
+    // Phase Final Stage B: ideas retired — second table is
+    // clients (a permanent survivor).
+    await backend.ensureTables(['responses', 'clients']);
     await backend.transaction(
         ['responses'], 'readwrite', async (tx) => {
             await tx.put('responses', {
@@ -90,16 +92,15 @@ async () => {
     );
     await assert.rejects(
         backend.transaction(
-            ['responses', 'ideas'], 'readwrite',
+            ['responses', 'clients'], 'readwrite',
             async (tx) => {
-                await tx.put('ideas', {
-                    id: 'i1', organization_id: '1',
-                    title: 't', position: 1,
-                    problem_statement: 'p',
-                    target_users: 'u',
-                    proposed_solution: 's',
-                    expected_outcome: 'o',
-                    success_metrics: 'm',
+                await tx.put('clients', {
+                    id: 'c1',
+                    grant_types: '[]',
+                    redirect_uris: '[]',
+                    jwks: '{}',
+                    aud: 'fusion-ai',
+                    status: 'active',
                 });
                 await tx.put('responses', {
                     id: 'r3', ...RESPONSE_ROW,
@@ -108,11 +109,11 @@ async () => {
             },
         ),
     );
-    const ideas = await backend.transaction(
-        ['ideas'], 'readonly',
-        (tx) => tx.getAll('ideas'),
+    const clients = await backend.transaction(
+        ['clients'], 'readonly',
+        (tx) => tx.getAll('clients'),
     );
-    assert.equal(ideas.length, 0); // never a half-write
+    assert.equal(clients.length, 0); // never a half-write
 });
 
 test(

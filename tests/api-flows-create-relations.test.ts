@@ -14,20 +14,26 @@ import {
 '../web-app/app/adapters/flow-mutations.ts';
 import type {
     StateEntity,
+    FlowWithGraph,
+    StoredGraph,
 } from '../api/types.ts';
 import {
     buildStartAndCompleteNodes,
 } from
 '../web-app/app/adapters/flow-defaults.ts';
 import {
-    reassembleStoredGraph,
-} from '../api/flow-graph-relations.ts';
+    asStoredGraph,
+} from '../api/validators.ts';
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+
+// Phase Final Task 2: graph relation ROW halves stripped.
+// Create still seeds graph on the document pair; oracles
+// re-home to GET /flows/:id (pair-plane graph).
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -40,11 +46,23 @@ async function setupMemDb(): Promise<{
     return { db, ctx };
 }
 
+async function getFlowGraph(
+    ctx: RequestContext,
+    flowId: string,
+): Promise<StoredGraph> {
+    const flow = await ctx.GET<FlowWithGraph>(
+        'flows/' + flowId,
+    );
+    return asStoredGraph(
+        JSON.parse(flow.graph), 'flow.graph',
+    );
+}
+
 test(
-    'postFlowCreation seeds flow_nodes rows'
-    + ' for the default graph',
+    'postFlowCreation seeds default-graph nodes'
+    + ' on the pair plane',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = 'flow-rel-1';
         await postFlowCreation(ctx, {
             flowId,
@@ -52,22 +70,20 @@ test(
             projectId: 'project-1',
             name: 'Rel Test Flow',
         });
-        const nodeRows = await db.flowNodes
-            .getAllWhere('flow_id', flowId);
+        const graph = await getFlowGraph(ctx, flowId);
         assert.equal(
-            nodeRows.length,
+            graph.nodes.length,
             2,
-            'expected 2 node rows for the'
-            + ' default graph',
+            'expected 2 nodes for the default graph',
         );
     },
 );
 
 test(
-    'postFlowCreation: reassembled graph'
+    'postFlowCreation: pair-plane graph'
     + ' equals the default graph',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = 'flow-rel-2';
         await postFlowCreation(ctx, {
             flowId,
@@ -76,37 +92,23 @@ test(
             name: 'Rel Test Flow 2',
         });
 
-        const nodeRows = await db.flowNodes
-            .getAllWhere('flow_id', flowId);
-        const edgeRows = await db.flowEdges
-            .getAllWhere('flow_id', flowId);
-        const memberRows = await db.flowNodeMembers
-            .getAll();
-        const attrRows = await db.flowNodeAttributes
-            .getAll();
-
-        // Reassemble from the seeded relation rows
-        const reassembled = reassembleStoredGraph(
-            nodeRows, edgeRows, memberRows, attrRows,
-        );
-
-        // Build the expected default graph
+        const graph = await getFlowGraph(ctx, flowId);
         const { start, complete } =
             buildStartAndCompleteNodes();
 
         assert.equal(
-            reassembled.nodes.length, 2,
+            graph.nodes.length, 2,
             'expected 2 nodes',
         );
         assert.equal(
-            reassembled.edges.length, 0,
+            graph.edges.length, 0,
             'expected 0 edges',
         );
 
-        const createNode = reassembled.nodes.find(
+        const createNode = graph.nodes.find(
             n => n.isCreate,
         );
-        const archiveNode = reassembled.nodes.find(
+        const archiveNode = graph.nodes.find(
             n => n.isArchive,
         );
 
@@ -143,7 +145,7 @@ test(
     'postFlowCreation: initial active state event'
     + ' still lands',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = 'flow-rel-3';
         await postFlowCreation(ctx, {
             flowId,
@@ -167,10 +169,10 @@ test(
 );
 
 test(
-    'postFlowCreation: flow_edges is empty'
-    + ' for the default graph',
+    'postFlowCreation: pair-plane graph has no'
+    + ' edges for the default graph',
     async () => {
-        const { db, ctx } = await setupMemDb();
+        const { ctx } = await setupMemDb();
         const flowId = 'flow-rel-4';
         await postFlowCreation(ctx, {
             flowId,
@@ -178,12 +180,10 @@ test(
             projectId: 'project-1',
             name: 'Edge Test Flow',
         });
-        const edgeRows = await db.flowEdges
-            .getAllWhere('flow_id', flowId);
+        const graph = await getFlowGraph(ctx, flowId);
         assert.equal(
-            edgeRows.length, 0,
-            'expected 0 edge rows for the'
-            + ' default graph',
+            graph.edges.length, 0,
+            'expected 0 edges for the default graph',
         );
     },
 );

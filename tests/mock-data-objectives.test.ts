@@ -14,6 +14,7 @@ import { createRequestContext }
 import { devToken } from './token-fixtures.ts';
 import {
     getArchivedObjectiveIds,
+    getObjectives,
 } from '../web-app/app/adapters/objectives.ts';
 import { getProjectStates } from
     '../web-app/app/adapters/state-events.ts';
@@ -24,6 +25,25 @@ import type { RequestContext } from
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import {
+    getBaselineScoresForProject,
+    getActualScoresForProject,
+} from '../web-app/app/adapters/project-scoring.ts';
+import { deriveProjects } from
+    '../api/derive-projects.ts';
+import {
+    deriveObjectiveRevisions,
+} from '../api/derive-objective-revisions.ts';
+import {
+    STARK_ORGANIZATION,
+    ORGANIZATION_TWO,
+} from '../api/mock-data/seed-constants.ts';
+import {
+    ORGANIZATION_TWO_OBJECTIVE,
+} from '../api/mock-data/seed-message-pairs.ts';
+
+// Phase Final Task 2: objectives(+objective_revisions) seed
+// row halves stripped — assertions ride the pair plane.
 
 async function projectIdsByState(
     ctx: RequestContext,
@@ -40,12 +60,20 @@ async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     await postMockDataLoad(db);
-    const rows = await db.objectives.getAll();
-    assert.equal(rows.length, OBJECTIVE_SEEDS.length + 1);
+    const ctx = createRequestContext(db, await devToken());
+    const rows = await getObjectives(ctx);
+    // getObjectives is org-scoped to the token's org (Stark).
+    assert.equal(rows.length, OBJECTIVE_SEEDS.length);
     for (const r of rows) {
         const { id: _id, ...body } = r;
         validateObjectiveEntity(body);
     }
+    // Org-2 objective via derive from the other plane.
+    const org2Revs = await deriveObjectiveRevisions(
+        db, ORGANIZATION_TWO, ORGANIZATION_TWO_OBJECTIVE.id,
+    );
+    assert.equal(org2Revs.length, 1);
+    // Phase Final Stage B: objectives table retired.
 });
 
 test('postMockDataLoad seeds one revision per objective',
@@ -53,19 +81,25 @@ test('postMockDataLoad seeds one revision per objective',
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         await postMockDataLoad(db);
-        const revs =
-            await db.objectiveRevisions.getAll();
-        assert.equal(revs.length, OBJECTIVE_SEEDS.length + 1);
-        for (const r of revs) {
-            const { id: _id, ...body } = r;
+        // Stark revisions (4) + org-2 revision (1).
+        let total = 0;
+        for (const seed of OBJECTIVE_SEEDS) {
+            const revs = await deriveObjectiveRevisions(
+                db, STARK_ORGANIZATION, seed.id,
+            );
+            assert.equal(revs.length, 1);
+            const { id: _id, ...body } = revs[0]!;
             validateObjectiveRevisionEntity(body);
+            total += 1;
         }
-        const objs = await db.objectives.getAll();
-        const objIds = new Set(objs.map(o => o.id));
-        const revObjIds = new Set(
-            revs.map(r => r.objective_id),
+        const org2Revs = await deriveObjectiveRevisions(
+            db, ORGANIZATION_TWO,
+            ORGANIZATION_TWO_OBJECTIVE.id,
         );
-        assert.deepEqual(revObjIds, objIds);
+        assert.equal(org2Revs.length, 1);
+        total += 1;
+        assert.equal(total, OBJECTIVE_SEEDS.length + 1);
+        // Phase Final Stage B: objective_revisions retired.
     });
 
 test('postMockDataLoad seeds zero archived objectives',
@@ -93,22 +127,30 @@ test('approved projects have full baseline coverage',
         );
         // Coverage is per-org since SP-6: an approved project
         // is scored against the objectives in ITS org, not the
-        // global set.
-        const objectives = await db.objectives.getAll();
-        const organizationByProject = new Map(
-            (await db.projects.getAll())
-                .map(p => [p.id, p.organization_id]));
-        const allBaselines = await
-            db.projectObjectiveBaselineScores.getAll();
+        // global set. Phase Final Task 2: objectives + scores
+        // from the pair plane.
+        const organizationByProject = new Map<string, string>();
+        for (const organization of ['1', '2']) {
+            for (const p of await deriveProjects(
+                db, organization,
+            )) {
+                organizationByProject.set(p.id, organization);
+            }
+        }
         for (const pid of approved) {
-            const pairs = new Set(
-                allBaselines
-                    .filter(b => b.project_id === pid)
-                    .map(b => b.objective_id),
+            const baselines = await getBaselineScoresForProject(
+                ctx, pid,
             );
-            const organizationObjCount = objectives.filter(
-                o => o.organization_id
-                    === organizationByProject.get(pid)).length;
+            const pairs = new Set(
+                baselines.map(b => b.objectiveId),
+            );
+            const organization =
+                organizationByProject.get(pid)!;
+            // Stark has OBJECTIVE_SEEDS.length; org-2 has 1.
+            const organizationObjCount =
+                organization === STARK_ORGANIZATION
+                    ? OBJECTIVE_SEEDS.length
+                    : 1;
             assert.equal(
                 pairs.size,
                 organizationObjCount,
@@ -130,20 +172,18 @@ test('completed projects have at least one actual per pair',
             completed.length > 0,
             'seed has archived projects',
         );
-        const allBaselines = await
-            db.projectObjectiveBaselineScores.getAll();
-        const allActuals = await
-            db.projectObjectiveActualScores.getAll();
         for (const pid of completed) {
+            const baselines = await getBaselineScoresForProject(
+                ctx, pid,
+            );
+            const actuals = await getActualScoresForProject(
+                ctx, pid,
+            );
             const pairs = new Set(
-                allBaselines
-                    .filter(b => b.project_id === pid)
-                    .map(b => b.objective_id),
+                baselines.map(b => b.objectiveId),
             );
             const actualPairs = new Set(
-                allActuals
-                    .filter(a => a.project_id === pid)
-                    .map(a => a.objective_id),
+                actuals.map(a => a.objectiveId),
             );
             for (const pair of pairs) {
                 assert.ok(
@@ -168,20 +208,18 @@ test('approved projects have an actual for every pair',
             approved.length > 0,
             'seed has approved projects',
         );
-        const allBaselines = await
-            db.projectObjectiveBaselineScores.getAll();
-        const allActuals = await
-            db.projectObjectiveActualScores.getAll();
         for (const pid of approved) {
+            const baselines = await getBaselineScoresForProject(
+                ctx, pid,
+            );
+            const actuals = await getActualScoresForProject(
+                ctx, pid,
+            );
             const pairs = new Set(
-                allBaselines
-                    .filter(b => b.project_id === pid)
-                    .map(b => b.objective_id),
+                baselines.map(b => b.objectiveId),
             );
             const actualPairs = new Set(
-                allActuals
-                    .filter(a => a.project_id === pid)
-                    .map(a => a.objective_id),
+                actuals.map(a => a.objectiveId),
             );
             for (const pair of pairs) {
                 assert.ok(
@@ -205,40 +243,32 @@ test('submitted projects have zero scores', async () => {
         submitted.length > 0,
         'seed has submitted projects',
     );
-    const allBaselines = await
-        db.projectObjectiveBaselineScores.getAll();
     for (const pid of submitted) {
-        const baselines = allBaselines.filter(
-            b => b.project_id === pid,
+        const baselines = await getBaselineScoresForProject(
+            ctx, pid,
         );
         assert.equal(baselines.length, 0);
     }
 });
 
-// Phase 7 Task 5's STANDING content pins: the id-only fingerprint
-// (tests/mock-data-fingerprint.test.ts) hashes row ids ONLY —
-// member_id never enters it — so a regression in the author pick
-// (buildSeedScoreRows's pickHumanMember over a pre-tx pool,
-// replacing the old in-tx memberFor DB-read) would pass every
-// existing check yet silently hand out the WRONG author. Both
-// literals below were read from the PRE-hoist seed (memberFor's
-// own picks, recorded before api/mock-data/scores.ts existed) —
-// the k-suffix divergence guard: omitting the actual's `:${k}`
-// per-index suffix reproduces only 24 of 92 actual authors
-// correctly, invisibly to every other test in this suite.
+// Phase 7 Task 5's STANDING content pins: the id-only
+// fingerprint (tests/mock-data-fingerprint.test.ts) no longer
+// covers objectives after the strip, so these pin author picks
+// via the pair-plane score adapter.
 test('a seeded baseline score\'s author matches the pinned'
 + ' pre-hoist pick', async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     await postMockDataLoad(db);
-    const baselines = await
-        db.projectObjectiveBaselineScores.getAll();
+    const ctx = createRequestContext(db, await devToken());
+    const baselines = await getBaselineScoresForProject(
+        ctx, 'u6YkHhlGc91oDMkr3x0isa',
+    );
     const row = baselines.find(
-        b => b.project_id === 'u6YkHhlGc91oDMkr3x0isa'
-            && b.objective_id === 'JkW7aEqFdX3nOiPtVhMrCy',
+        b => b.objectiveId === 'JkW7aEqFdX3nOiPtVhMrCy',
     );
     assert.ok(row, 'no baseline row for the pinned pair');
-    assert.equal(row!.member_id, 'current');
+    assert.equal(row!.memberId, 'current');
 });
 
 test('a seeded actual-score triple\'s per-index authors match'
@@ -246,20 +276,18 @@ test('a seeded actual-score triple\'s per-index authors match'
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     await postMockDataLoad(db);
-    const actuals = await
-        db.projectObjectiveActualScores.getAll();
+    const ctx = createRequestContext(db, await devToken());
+    const actuals = await getActualScoresForProject(
+        ctx, 'jRE2Tj32NHsFGZIeEADp0p',
+    );
     const rows = actuals
         .filter(
-            a => a.project_id === 'jRE2Tj32NHsFGZIeEADp0p'
-                && a.objective_id === 'RgT2mNvKpQ8xLsYwBzHcUe',
+            a => a.objectiveId === 'RgT2mNvKpQ8xLsYwBzHcUe',
         )
         .sort((a, b) => a.at.localeCompare(b.at));
     assert.equal(rows.length, 3);
-    // Sorted by `at` ascending resolves the per-actual index
-    // k = 0, 1, 2 (buildSeedScoreRows mints each k's scoredAt
-    // strictly increasing within a (project, objective) pair).
     assert.deepEqual(
-        rows.map(r => r.member_id),
+        rows.map(r => r.memberId),
         [
             '53J8h9dr76XFqCjYcNVwIR',
             'WxQn4LVWb76YkmqK5B0EPp',

@@ -55,8 +55,18 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 async function rowPlaneOpState(
     db: MemoryDbAdapter, id: Id,
 ): Promise<string | undefined> {
-    const latest = await db.states.getCurrentFor(id);
-    if (latest === null || latest.state === 'pending') {
+    const { invitationLifecycleStatesFor } = await import(
+        '../api/derive-states.ts'
+    );
+    const rows = await invitationLifecycleStatesFor(db, id);
+    if (rows.length === 0) return undefined;
+    const latest = [...rows].sort((a, b) =>
+        a.at < b.at ? -1
+            : a.at > b.at ? 1
+            : a.id < b.id ? -1
+            : a.id > b.id ? 1 : 0,
+    ).at(-1)!;
+    if (latest.state === 'pending') {
         return undefined;
     }
     return assertInvitationState(latest.state, 'invitation ' + id);

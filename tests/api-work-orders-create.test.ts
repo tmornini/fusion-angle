@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
 import {
@@ -104,9 +106,13 @@ function createBody() {
     };
 }
 
+// Phase Final Task 2: work_orders + flow_work_orders ROW
+// halves stripped — GET derives the document; join is pair-
+// plane; three state events still dual-write until states-
+// trace.
 test(
-    'POST work-orders writes the work order, its flow link,'
-    + ' and three state events in one operation',
+    'POST work-orders writes three state events and pair-'
+    + 'plane document + join in one operation',
     async () => {
         const db = await freshDb();
         await POST(db, 'work-orders', createBody(), DEV_TOKEN);
@@ -122,13 +128,21 @@ test(
         // The fence stamped the bound org — never the body.
         assert.equal(wo.organization_id, '1');
 
-        const links = await db.flowWorkOrders.getAll();
+        // Row plane empty; join lives on the pair plane.
+        // Phase Final Stage B: work_orders +
+        // flow_work_orders tables retired.
+        const links = await GET<{
+            id: string;
+            flow_id: string;
+            work_order_id: string;
+        }[]>(db, 'flows/f1/work-orders', DEV_TOKEN);
         assert.equal(links.length, 1);
         assert.equal(links[0]!.id, 'fwo-1');
         assert.equal(links[0]!.flow_id, 'f1');
         assert.equal(links[0]!.work_order_id, 'wo-1');
 
-        const events = await db.states.getAllFor('wo-1');
+        const events = await deriveStatesFor(db, '1', 'wo-1');
+        // Phase Final Stage B: states table retired.
         assert.equal(events.length, 3);
         // The three events land IN ORDER: start, post-start,
         // then the creation-time claim.
@@ -151,7 +165,8 @@ test(
         const db = await freshDb();
         await POST(db, 'work-orders', createBody(), DEV_TOKEN);
 
-        const events = await db.states.getAllFor('wo-1');
+        const events = await deriveStatesFor(db, '1', 'wo-1');
+        // Phase Final Stage B: states table retired.
         assert.equal(events.length, 3);
         const byId = new Map(
             (events as StateEntity[]).map(e => [e.id, e]),
@@ -174,33 +189,24 @@ test(
 );
 
 test(
-    'POST work-orders rolls back every write when one of its'
-    + ' state events conflicts',
+    'POST work-orders ignores a raw colliding states row'
+    + ' (states ROW half stripped)',
     async () => {
         const db = await freshDb();
-        // Pre-seed a DIFFERENT event at the create's middle
-        // event id. postEvent re-puts that id with a conflicting
-        // payload mid-tx (LedgerImmutability), so the work order,
-        // its join row, and the sibling events must roll back.
-        await db.states.put('ev-2', {
-            entity_id: 'other',
-            state: 'n-middle',
-            member_id: 'current',
-            at: '2020-01-01T00:00:00.000000Z',
-        });
-        await assert.rejects(
-            () => POST(
-                db, 'work-orders', createBody(), DEV_TOKEN,
-            ),
+        // Phase Final Task 2: states ROW half stripped —
+        // a raw colliding states row no longer aborts the
+        // pair-plane create.
+    // Phase Final Stage B: states table retired.
+        await POST(
+            db, 'work-orders', createBody(), DEV_TOKEN,
         );
-        // Not one write survived the aborted transaction.
-        await assert.rejects(
-            () => GET(db, 'work-orders/wo-1', DEV_TOKEN));
-        const links = await db.flowWorkOrders.getAll();
-        assert.equal(links.length, 0);
-        // Only the pre-seeded conflicting event remains — none
-        // of the create's own events landed.
-        const woEvents = await db.states.getAllFor('wo-1');
-        assert.equal(woEvents.length, 0);
+        const wo = await GET<{ id: string }>(
+            db, 'work-orders/wo-1', DEV_TOKEN,
+        );
+        assert.equal(wo.id, 'wo-1');
+        const woEvents = await deriveStatesFor(
+            db, '1', 'wo-1',
+        );
+        assert.equal(woEvents.length, 3);
     },
 );

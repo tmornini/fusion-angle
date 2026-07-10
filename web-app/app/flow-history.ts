@@ -1,4 +1,23 @@
-import type { FlowVersion } from './adapters/index.ts';
+import type {
+    GraphNode,
+    GraphEdge,
+} from '../../api/types.ts';
+
+// Client redo-stack snapshot shape. Relocated here from
+// adapters/flow-versions.ts (Phase 15 Task 7): the type is LIVE
+// via the redo stack; the versions routes/adapters retire.
+export interface FlowVersion {
+    id: string;
+    flowId: string;
+    name: string;
+    isLocked: boolean;
+    isAutoLayout: boolean;
+    isAutoFit: boolean;
+    lockTimeout: number;
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+    createdAt: string;
+}
 
 export interface FlowHistorySnapshot {
     readonly hasUndoHistory: boolean;

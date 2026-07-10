@@ -6,7 +6,7 @@ Know that every entity will be kept in a backend structured in this way: ~/.clau
 
 That mechanism will replace the existing ledger's and common states system by moving said state into each message stored message.
 
-└─|─ /invitations/ • RECONCILED: derived view, but NOT a registered family — the permanent side channel (Author gate 2); grant/accept synthesize PUT-shaped document pairs off the route table, rows derive from PUT-method document heads at /invitations/ and state from op-address pair presence (accepted/declined/revoked/pending), the facade's 404-only verb regime preserved — see the roster seam FLIPPED 2026-07-06 block, go-to-church-peaceful-castle.md §Phases 3…N
+└─|─ /invitations/ • RECONCILED: derived view, but NOT a registered family — the permanent side channel (Author gate 2); grant/accept synthesize PUT-shaped document pairs off the route table, rows derive from PUT-method document heads at /invitations/ and state from op-address pair presence (accepted/declined/revoked/pending), the facade's 404-only verb regime preserved — Phase 15 gate 6 re-homes grant email onto deriveIdentityPiiRows and pendingInvitationFor/loadInvitation onto deriveInvitations (no live invitations-table decision read) — see the roster seam FLIPPED 2026-07-06 block + Phase 15 FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
   |  └── :id
 └─|─ /memberships/ • RECONCILED: shipped as the EIGHTH registered family (organizationNested:true, 'stateless' — a pure join relation, no lifecycle), collection + entity GETs served by the generic document handlers, DELETE a marked tombstone; the members/human-members/ai-members derive-on-read directory is realized over this ∩ the ninth-through-eleventh global-plane member families — see the same block (Author gate 1)
   |  └── :id
@@ -16,8 +16,8 @@ That mechanism will replace the existing ledger's and common states system by mo
   |      └── /attribute-values                • RECONCILED: NOT built — no consumer; would derive the latest value per attribute (same block, B2)
 └─|─ work-orders/ • derived view over org-nested canonical storage
   |  └── :id/
-  |      └── claim
-  |      └── transition
+  |      └── claim                            • RECONCILED: claim graph head from workOrderDocumentHeadFor (Phase 15 Task 2); contention 409 + nonexistent-WO 404 held — see Phase 15 FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
+  |      └── transition                       • RECONCILED: dangling state_event_id on a field value → 400 at the gate (Phase 15 Task 3, wire delta 4; forged clients only)
 └─|─ /identities/
   |  └── :id                                   • default-organization is an attribute of the identity itself
   |      └─|─ /credentials                     • all of them, single document
@@ -42,7 +42,8 @@ That mechanism will replace the existing ledger's and common states system by mo
   |    |  └── /objectives                     • RECONCILED: shipped as per-objective documents at objectives/:id (the seventh registered family, 'simple' + lifecycle 'stateless'), collection served by the generic document handler over per-entity heads, revision history as per-objective message history at objectives/:id/revisions/, NOT a single org document — see the objectives FLIPPED 2026-07-05 block, go-to-church-peaceful-castle.md §Phased sequence (Author gates 1/3)
   |    |  └── /flows/
   |    |      └── :id
-  |    |          └── /undo                    • RECONCILED: undo-as-replay (Phase 14 Task 8) — body shrinks to {eventId, at}, both still client-minted; the restore target resolves SERVER-SIDE pre-tx by replaying this flow's OWN flows/:id document-pair history against its OWN undo operation-pair history (stack+pointer, cursor keyed by the undo pairs' stored REQUEST at, never the response at); graphDelta/revivals are now SERVER-computed (SIDECAR-KEEP: the wire SHAPE persists, the client is never told the target to diff against); flow_versions no longer receives a write on this path — routes/table REMAIN (DELETE NOTHING), Phase Final retires — see .superpowers/sdd/progress.md, Phase 14 Task 8
+  |    |          └── /undo                    • RECONCILED: undo-as-replay (Phase 14 Task 8) — body shrinks to {eventId, at}, both still client-minted; the restore target resolves SERVER-SIDE pre-tx by replaying this flow's OWN flows/:id document-pair history against its OWN undo operation-pair history (stack+pointer, cursor keyed by the undo pairs' stored REQUEST at, never the response at); graphDelta/revivals are now SERVER-computed (SIDECAR-KEEP: the wire SHAPE persists, the client is never told the target to diff against); flow_versions no longer receives a write on this path — Phase 15 Task 7 RETIRED the versions routes (router 404); the flow_versions TABLE remains until Phase Final — see Phase 14 Task 8 + Phase 15 FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
+  |    |          └── /versions/               • RECONCILED: RETIRED (Phase 15 Task 7) — GET|POST /flows/:id/versions and GET|PUT|DELETE /flows/:id/versions/:vid all router-404; zero product callers after undo-as-replay stopped consume+publish; table stays until Final
   |    |          └── /tags/                   • RECONCILED: flow tags (Phase 14 Task 9) — GET|PUT|DELETE flows/:id/tags/:name, SIMPLE class (the locked four-outcome table is structurally MOOT here — isLockedWrite exact-matches flows/:id, never this 4-segment address); the codebase's FIRST document family with NO backing table at all, derived entirely from the pair plane — flow_response_id (one flow document pair's own pinned response id) is the tag's only body field; DELETE is a marked tombstone, no row to splice; API-only this phase, no designer UI — see .superpowers/sdd/progress.md, Phase 14 Task 9
   |    |              └── :name
   |    |  └── /ideas/
@@ -57,14 +58,18 @@ That mechanism will replace the existing ledger's and common states system by mo
    \    \- organization membership authz realm
     \- administration authz realm
 
+└─|─ /states/                                  • RECONCILED (Phase 15 as-built): GET /states DERIVED (deriveStates six-source union); PUT /states/:id lives (dual-write + stateEventCollisionFromPairs strangler with row sameEvent; ownership via resolveOwningOrganization — WP1 organizations self-as-owner + records hard-delete forgery CLOSED); GET /states/:id RETIRED → **405** (PUT survives on the pattern — not the open-tree 404); GET /entity-states/:id RETIRED → router 404; GET /entity-states/:id/history lives (derived + pair-plane fence); GET /states/:id/field-values lives (derived two-source union; visibility via stateEventVisibilityFor 3-tier — always 200; orphan/own → rows; foreign → []); PUT|DELETE /states/:id/field-values/:fvid RETIRED → router 404 (WRITE_RESPONSE_SPECS + seed address formation SURVIVE) — see Phase 15 FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
+└─|─ /clients[/:id]                            • TARGET-STATE: no public /clients routes today (client credentials resolve via rawReadRow on the KEPT clients table — Phase 15 gate 6; AS-IS election). Follow-on: client = kind-'service' identity + registration facet is a server-tier client-registration phase candidate (would retire the standalone clients noun; sub vs acting client moves to token claims)
 └─|─ index.html
 └─|─ /authentication/
   |  ├── token
   |  └── authorize
 └─|─ /snapshots/
-  |  └── export
-  |  └── import
-  |  └── mock-data
-  |  └── pristine
+  |  └── export                               • TARGET-STATE: not shipped as a dedicated route today — export is client-side over GET /snapshots/schema (full snapshot body); a first-class /snapshots/export remains a known future addition
+  |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; version gate SNAPSHOT_SCHEMA_VERSION 2 — Final owns 2→3)
+  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1513 pairs / bootstrap 14 absolute through Phase 15)
+  |  └── schema                               • RECONCILED: GET|DELETE /snapshots/schema (existence + full export, or drop)
+  |  └── bootstrap                            • RECONCILED: POST /snapshots/bootstrap (pristine minimal seed)
+  |  └── pristine                             • TARGET-STATE: deferred — bootstrap covers the minimal seed today; a dedicated /snapshots/pristine remains a known future addition if the two seed paths must diverge on the wire
   \
    \- public realm

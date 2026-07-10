@@ -1,8 +1,13 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
-import type { Id, FlowWithGraph, StateEntity } from './types.ts';
+import type {
+    Id, FlowWithGraph, StateEntity,
+    FlowNodeAttributeEntity, FlowNodeMemberEntity,
+} from './types.ts';
 import {
     pickString, pickNumber, pickBoolean, pickJsonObjectField,
+    validateFlowNodeAttributeEntity,
+    validateFlowNodeMemberEntity,
 } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
 import { normalizedStoredGraphField } from
@@ -281,4 +286,162 @@ export async function deriveFlowStateHistory(
         ),
         flowId,
     );
+}
+
+// ---- flowGraphBindingsFromPairs — RESTRICT graph-leg core ----
+// ---- (Phase 15 Task 1, Author gate 5) ------------------------
+
+// Replays every graphDelta.attributeEvents / memberEvents
+// entry across this organization's flow document-pair history
+// (full history, never merely the head — resolveFlowGraphOwner's
+// own precedent). writeFlowGraphDelta folds the SAME events
+// into flow_node_attributes / flow_node_members, so the
+// latestByKey/relationFailClosed reduction over either source
+// is byte-equal by construction.
+//
+// nodeFlowIds is the CURRENT flow_id stamp per node id —
+// graphDelta.nodes upserts set it, graphDelta.deletions drop
+// it when the entityId is still mapped (soft-deleted nodes
+// are no longer current). Pair-plane successor of
+// flowNodes.getById(flowNodeId).flow_id that RESTRICT uses to
+// name referring flows. A later pair that re-upserts the
+// node restores the map entry (documentPairsAt ascending).
+//
+// Do NOT use the client-authored document `graph` snapshot
+// (unvalidated against the relation ledgers). dbOrView-shaped
+// and opens no nested transaction — callable from WITHIN an
+// already-open write-gate transaction (ATTRIBUTE_RESTRICT_
+// TABLES already lists requests + responses).
+export interface FlowGraphBindingLedgers {
+    readonly attributeEvents:
+        readonly FlowNodeAttributeEntity[];
+    readonly memberEvents: readonly FlowNodeMemberEntity[];
+    readonly nodeFlowIds: ReadonlyMap<Id, Id>;
+}
+
+function attributeEventOf(
+    raw: Record<string, unknown>,
+): FlowNodeAttributeEntity {
+    const { id: _id, ...fields } = raw;
+    return {
+        ...validateFlowNodeAttributeEntity(fields),
+        id: pickString(raw, 'id'),
+    };
+}
+
+function memberEventOf(
+    raw: Record<string, unknown>,
+): FlowNodeMemberEntity {
+    const { id: _id, ...fields } = raw;
+    return {
+        ...validateFlowNodeMemberEntity(fields),
+        id: pickString(raw, 'id'),
+    };
+}
+
+export async function flowGraphBindingsFromPairs(
+    dbOrView: DbAdapter,
+    organization: Id,
+): Promise<FlowGraphBindingLedgers> {
+    const prefix = flowsUriPrefix(organization);
+    const [requests, responses] = await Promise.all([
+        dbOrView.requests.getAllWhere('uri_prefix', prefix),
+        dbOrView.responses.getAllWhere('uri_prefix', prefix),
+    ]);
+    const attributeEvents: FlowNodeAttributeEntity[] = [];
+    const memberEvents: FlowNodeMemberEntity[] = [];
+    const nodeFlowIds = new Map<Id, Id>();
+    for (const pair of documentPairsAt(
+        requests, responses, prefix,
+    )) {
+        const delta = pair.body['graphDelta'];
+        if (typeof delta !== 'object' || delta === null) {
+            continue;
+        }
+        const fields = delta as Record<string, unknown>;
+        const nodes = fields['nodes'];
+        if (Array.isArray(nodes)) {
+            for (const item of nodes) {
+                if (
+                    typeof item !== 'object'
+                    || item === null
+                ) {
+                    continue;
+                }
+                const node = item as Record<string, unknown>;
+                const nodeId = node['id'];
+                const flowId = node['flow_id'];
+                if (
+                    typeof nodeId === 'string'
+                    && typeof flowId === 'string'
+                ) {
+                    // Later pairs win — full-history walk is
+                    // (at, id) ascending (documentPairsAt).
+                    nodeFlowIds.set(nodeId, flowId);
+                }
+            }
+        }
+        // AFTER nodes so a re-upsert in this same delta (or
+        // a later pair) restores before/without a delete
+        // wiping a current node. Soft-delete posts
+        // states 'deleted' only — no attributeEvents
+        // 'removed' — so RESTRICT must drop the node map
+        // entry or residual 'added' bindings 409 forever.
+        const deletions = fields['deletions'];
+        if (Array.isArray(deletions)) {
+            for (const item of deletions) {
+                if (
+                    typeof item !== 'object'
+                    || item === null
+                ) {
+                    continue;
+                }
+                const del = item as Record<string, unknown>;
+                const entityId = del['entityId'];
+                if (
+                    typeof entityId === 'string'
+                    && nodeFlowIds.has(entityId)
+                ) {
+                    nodeFlowIds.delete(entityId);
+                }
+            }
+        }
+        const attrs = fields['attributeEvents'];
+        if (Array.isArray(attrs)) {
+            for (const item of attrs) {
+                if (
+                    typeof item !== 'object'
+                    || item === null
+                ) {
+                    continue;
+                }
+                attributeEvents.push(
+                    attributeEventOf(
+                        item as Record<string, unknown>,
+                    ),
+                );
+            }
+        }
+        const members = fields['memberEvents'];
+        if (Array.isArray(members)) {
+            for (const item of members) {
+                if (
+                    typeof item !== 'object'
+                    || item === null
+                ) {
+                    continue;
+                }
+                memberEvents.push(
+                    memberEventOf(
+                        item as Record<string, unknown>,
+                    ),
+                );
+            }
+        }
+    }
+    return {
+        attributeEvents: attributeEvents.sort(byIdAscending),
+        memberEvents: memberEvents.sort(byIdAscending),
+        nodeFlowIds,
+    };
 }

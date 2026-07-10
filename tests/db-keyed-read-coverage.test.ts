@@ -20,40 +20,6 @@ const KEYED_READS: ReadonlyArray<{
     table: string;
     column: string;
 }> = [
-    { table: 'states', column: 'entity_id' },
-    { table: 'memberships', column: 'identity_id' },
-    {
-        table: 'identity_default_organizations',
-        column: 'identity_id',
-    },
-    { table: 'identity_token_revocations', column: 'identity_id' },
-    { table: 'identity_credentials', column: 'identity_id' },
-    { table: 'role_grants', column: 'identity_id' },
-    { table: 'identity_pii', column: 'email' },
-    { table: 'state_field_values', column: 'attribute_id' },
-    { table: 'state_field_values', column: 'state_event_id' },
-    { table: 'idea_submissions', column: 'idea_id' },
-    { table: 'flow_versions', column: 'flow_id' },
-    { table: 'project_flows', column: 'project_id' },
-    { table: 'flow_nodes', column: 'flow_id' },
-    { table: 'flow_edges', column: 'flow_id' },
-    { table: 'flow_node_members', column: 'flow_node_id' },
-    { table: 'flow_node_attributes', column: 'flow_node_id' },
-    {
-        table: 'flow_node_attributes',
-        column: 'attribute_id',
-    },
-    { table: 'flow_work_orders', column: 'flow_id' },
-    { table: 'flow_records', column: 'flow_id' },
-    { table: 'objective_revisions', column: 'objective_id' },
-    {
-        table: 'project_objective_baseline_scores',
-        column: 'project_id',
-    },
-    {
-        table: 'project_objective_actual_scores',
-        column: 'project_id',
-    },
     { table: 'requests', column: 'message_hash' },
     { table: 'responses', column: 'uri_id' },
     { table: 'requests', column: 'uri_prefix' },

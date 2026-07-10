@@ -5,41 +5,7 @@ import {
 } from './db.ts';
 import { extractErrorMessage } from '../shared/error-helpers.ts';
 import {
-    validateMemberEntity,
-    validateHumanMemberEntity,
-    validateAIMemberEntity,
-    validateIdentityEntity,
-    validateIdentityPiiEntity,
-    validateIdentityCredentialEntity,
-    validateIdentityTokenRevocationEntity,
-    validateIdentityDefaultOrganizationEntity,
-    validateRoleGrantEntity,
     validateClientEntity,
-    validateIdentityProviderEntity,
-    validateIdeaEntity,
-    validateProjectEntity,
-    validateFlowEntity,
-    validateFlowVersionEntity,
-    validateFlowNodeEntity,
-    validateFlowEdgeEntity,
-    validateFlowNodeMemberEntity,
-    validateFlowNodeAttributeEntity,
-    validateProjectFlowEntity,
-    validateWorkOrderEntity,
-    validateFlowWorkOrderEntity,
-    validateStateFieldValueEntity,
-    validateRecordEntity,
-    validateRecordAttributeEntity,
-    validateFlowRecordEntity,
-    validateOrganizationEntity,
-    validateMembershipEntity,
-    validateInvitationEntity,
-    validateIdeaSubmissionEntity,
-    validateStateEntity,
-    validateObjectiveEntity,
-    validateObjectiveRevisionEntity,
-    validateBaselineScoreEntity,
-    validateActualScoreEntity,
     validateRequestEntity,
     validateResponseEntity,
 } from './validators.ts';
@@ -59,114 +25,8 @@ function validateSnapshotRow(
     const { id: _id, ...body } = row;
     try {
         switch (table) {
-            case 'members':
-                validateMemberEntity(body);
-                break;
-            case 'human_members':
-                validateHumanMemberEntity(body);
-                break;
-            case 'ai_members':
-                validateAIMemberEntity(body);
-                break;
-            case 'identities':
-                validateIdentityEntity(body);
-                break;
-            case 'identity_pii':
-                validateIdentityPiiEntity(body);
-                break;
-            case 'identity_credentials':
-                validateIdentityCredentialEntity(body);
-                break;
-            case 'identity_token_revocations':
-                validateIdentityTokenRevocationEntity(body);
-                break;
-            case 'identity_default_organizations':
-                validateIdentityDefaultOrganizationEntity(body);
-                break;
-            case 'role_grants':
-                validateRoleGrantEntity(body);
-                break;
             case 'clients':
                 validateClientEntity(body);
-                break;
-            case 'identity_providers':
-                validateIdentityProviderEntity(body);
-                break;
-            case 'ideas':
-                validateIdeaEntity(body);
-                break;
-            case 'projects':
-                validateProjectEntity(body);
-                break;
-            case 'flows':
-                validateFlowEntity(body);
-                break;
-            case 'flow_versions':
-                validateFlowVersionEntity(body);
-                break;
-            case 'flow_nodes':
-                validateFlowNodeEntity(body);
-                break;
-            case 'flow_edges':
-                validateFlowEdgeEntity(body);
-                break;
-            case 'flow_node_members':
-                validateFlowNodeMemberEntity(body);
-                break;
-            case 'flow_node_attributes':
-                validateFlowNodeAttributeEntity(body);
-                break;
-            case 'project_flows':
-                validateProjectFlowEntity(body);
-                break;
-            case 'work_orders':
-                validateWorkOrderEntity(body);
-                break;
-            case 'flow_work_orders':
-                validateFlowWorkOrderEntity(body);
-                break;
-            case 'state_field_values':
-                validateStateFieldValueEntity(
-                    body,
-                );
-                break;
-            case 'records':
-                validateRecordEntity(body);
-                break;
-            case 'record_attributes':
-                validateRecordAttributeEntity(
-                    body,
-                );
-                break;
-            case 'flow_records':
-                validateFlowRecordEntity(body);
-                break;
-            case 'organizations':
-                validateOrganizationEntity(body);
-                break;
-            case 'memberships':
-                validateMembershipEntity(body);
-                break;
-            case 'invitations':
-                validateInvitationEntity(body);
-                break;
-            case 'idea_submissions':
-                validateIdeaSubmissionEntity(body);
-                break;
-            case 'states':
-                validateStateEntity(body);
-                break;
-            case 'objectives':
-                validateObjectiveEntity(body);
-                break;
-            case 'objective_revisions':
-                validateObjectiveRevisionEntity(body);
-                break;
-            case 'project_objective_baseline_scores':
-                validateBaselineScoreEntity(body);
-                break;
-            case 'project_objective_actual_scores':
-                validateActualScoreEntity(body);
                 break;
             case 'requests':
                 validateRequestEntity(body);

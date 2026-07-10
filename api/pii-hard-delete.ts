@@ -38,11 +38,12 @@ import { appendMessagePair } from './message-pair.ts';
 //
 // Runs INSIDE the caller's own transaction — both callers
 // (`postIdentityPiiDocumentOp`'s PUT, the `identities/:id/pii`
-// DELETE closure, api/routes.ts) already open
-// `['identity_pii', 'requests', 'responses']`; row ops only, per
-// the IndexedDB auto-commit constraint (a transaction body may
-// await only row ops, never crypto or a timer) — `pair` arrives
-// fully formed, all crypto done pre-tx (message-pair.ts).
+// DELETE closure, api/routes.ts) open
+// `['requests', 'responses']` (Phase Final Task 2 stripped the
+// identity_pii ROW half); row ops only, per the IndexedDB
+// auto-commit constraint (a transaction body may await only
+// row ops, never crypto or a timer) — `pair` arrives fully
+// formed, all crypto done pre-tx (message-pair.ts).
 //
 // Cross-tab note: the localStorage demo tier flushes a
 // transaction's touched keys as a multi-key buffer, not a single

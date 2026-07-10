@@ -15,6 +15,7 @@ import { postIdeaCreation } from
 import {
     putProject,
     postProjectStateChange,
+    getProjectEntity,
 } from '../web-app/app/adapters/projects.ts';
 import {
     postFlowCreation,
@@ -240,9 +241,10 @@ test(
         // land as a state-'deleted' document PUT like any other
         // transition (mirrors drift-projects.test.ts's lifecycle
         // case).
+        // Phase Final Task 2: projects row half stripped.
         const {
             id: _id, organization_id: _org, ...fields
-        } = await db.projects.getById('p2');
+        } = await getProjectEntity(ctx, 'p2');
         await postProjectStateChange(
             ctx, 'p2', fields, 'deleted',
         );

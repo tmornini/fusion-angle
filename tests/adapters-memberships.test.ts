@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     validateMembershipEntity,
 } from '../api/validators.ts';
@@ -39,40 +38,5 @@ test('rejects a membership with a bad timestamp', () => {
         }));
 });
 
-test('memberships store round-trips a row', async () => {
-    const db = new MemoryDbAdapter();
-    await db.postSchemaCreation();
-    await db.memberships.put('m1', {
-        organization_id: '1',
-        identity_id: 'current',
-        at: '2026-06-04T00:00:00.000000Z',
-    });
-    const row = await db.memberships.getById('m1');
-    assert.equal(row.identity_id, 'current');
-    assert.equal(row.organization_id, '1');
-});
-
-// The covenant is the enumerate source: a subject's reachable
-// orgs are its membership rows, derived fresh — never cached.
-test('a subject reaches its orgs via memberships', async () => {
-    const db = new MemoryDbAdapter();
-    await db.postSchemaCreation();
-    await db.memberships.put('m1', {
-        organization_id: '1', identity_id: 'alice',
-        at: '2026-06-04T00:00:00.000000Z',
-    });
-    await db.memberships.put('m2', {
-        organization_id: '7', identity_id: 'alice',
-        at: '2026-06-04T00:00:00.000000Z',
-    });
-    await db.memberships.put('m3', {
-        organization_id: '1', identity_id: 'bob',
-        at: '2026-06-04T00:00:00.000000Z',
-    });
-    const all = await db.memberships.getAll();
-    const aliceOrganizations = all
-        .filter(m => m.identity_id === 'alice')
-        .map(m => m.organization_id)
-        .sort();
-    assert.deepEqual(aliceOrganizations, ['1', '7']);
-});
+// Phase Final Stage B: memberships table retired — store
+// round-trip pins live on pair-plane document tests.

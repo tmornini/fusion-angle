@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStates } from
+    '../api/derive-states.ts';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad, postBootstrap } from '../api/mock-data.ts';
@@ -31,6 +33,10 @@ import {
     MOCK_SEED_TIMESTAMP,
 } from '../api/mock-data/seed-constants.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { deriveRoleGrant } from
+    '../api/derive-identity-spine.ts';
+import { deriveOrganization } from
+    '../api/derive-organizations.ts';
 
 // Task 4: the seed's pair-wired op-invocations (human-members,
 // ideas, idea-submissions, flows, ai-members, records,
@@ -55,9 +61,9 @@ import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 // 11 ideas +
 // 2 organizations documents (Phase 12 Task 3: the tenant root's
 // own family onboards — Stark Industries + Wayne Enterprises,
-// each forming its OWN organizations/:id document pair, Path A:
-// the row itself stays the SAME direct adapter.organizations.put,
-// untouched) +
+// each forming its OWN organizations/:id document pair; Phase
+// Final Task 2 strips the organizations ROW half — pairs alone
+// remain) +
 // 11 idea-submissions (Phase 2 Task 4b: one per seeded idea,
 // closing the prior seed-only gap) + 17 projects (16 Stark +
 // seed-project-org2, Phase 3 Task 3) + 13 flow-family pairs
@@ -119,13 +125,12 @@ import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 // system actor's 'active' event — bootstrap forms its OWN mirror
 // of this ONE event separately, counted in the bootstrap pair
 // count below, never here) + 11 identity-default-organization
-// pairs (Phase 11 Task 8: the identity_default_organizations
-// family closes its own LAST "STAYS RAW" deferral — one
-// event-append pair per seeded human member, formed at its own
-// identity-keyed /identities/:id/default-org/ address; Path A —
-// the row itself stays the SAME direct
-// adapter.identityDefaultOrganizations.put, untouched) =
-// 1513. A dropped or reordered invocation changes this count.
+// pairs (Phase 11 Task 8: one event-append pair per seeded
+// human member at its identity-keyed
+// /identities/:id/default-org/ address; Phase Final Task 2
+// strips the identity_default_organizations ROW half — pairs
+// alone remain) = 1513. A dropped or reordered invocation
+// changes this count.
 const EXPECTED_PAIR_COUNT = 1513;
 
 test('a mock-data seed populates balanced pairs',
@@ -178,10 +183,9 @@ async () => {
 
 test('a seeded organizations pair sits at the global'
 + ' (non-org-nested) address, its actor is the system member,'
-+ ' and its stored body\'s fields equal the seeded row\'s'
-+ ' fields exactly (Phase 12 Task 3 content spot-check — a'
-+ ' wrong-but-real body value is otherwise fingerprint-'
-+ ' invisible, since the fingerprint hashes ids only)',
++ ' and its stored body\'s fields equal the derived'
++ ' organization exactly (Phase Final Task 2: organizations'
++ ' ROW half stripped — pair-plane truth)',
 async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
@@ -192,18 +196,21 @@ async () => {
     );
     assert.ok(row, 'no request row for the seeded organization');
     assert.equal(row!.requester_identity_id, SYSTEM_MEMBER_ID);
-    const stored = await db.organizations.getById(STARK_ORGANIZATION);
+    const derived = await deriveOrganization(
+        db, STARK_ORGANIZATION,
+    );
     const embedded = JSON.parse(row!.message) as {
         body: Record<string, unknown>;
     };
     assert.deepEqual(embedded.body, {
-        name: stored.name,
-        domain: stored.domain,
-        next_billing: stored.next_billing,
-        seats: stored.seats,
-        projects_limit: stored.projects_limit,
-        ideas_limit: stored.ideas_limit,
+        name: derived.name,
+        domain: derived.domain,
+        next_billing: derived.next_billing,
+        seats: derived.seats,
+        projects_limit: derived.projects_limit,
+        ideas_limit: derived.ideas_limit,
     });
+    // Phase Final Stage B: organizations table retired.
 });
 
 test('a seeded human-member create pair sits at the global'
@@ -685,7 +692,9 @@ test('a seeded trace pair\'s stored request requester_identity_id'
     const requests = await db.requests.getAll();
     const row = requests.find(r => r.uri_id === firstTrace.id);
     assert.ok(row, 'no request row for the seeded trace event');
-    const written = await db.states.getById(firstTrace.id);
+    const _statesAll = await deriveStates(db, '1');
+    const written = _statesAll.find(s => s.id === firstTrace.id)!;
+    assert.ok(written, 'derived state missing');
     assert.equal(row!.requester_identity_id, written.member_id);
     // Index 0 is its work order's OWN first event, so a
     // regression that sources every trace pair's requester
@@ -704,7 +713,7 @@ test('a seeded trace pair\'s stored request requester_identity_id'
         'no request row for the diverging trace event',
     );
     const divergingWritten =
-        await db.states.getById(divergingTrace.id);
+        (await deriveStates(db, '1')).find(s => s.id === divergingTrace.id)!;
     assert.equal(
         divergingRow!.requester_identity_id,
         divergingWritten.member_id,
@@ -808,17 +817,16 @@ test('a seeded actual-score pair sits at its org-nested'
 });
 
 test('every seeded STARK objective pair\'s embedded revision'
-+ ' author matches the actually written revision row',
++ ' author matches the revision document pair body',
 async () => {
     // Guards the pure pre-tx human-member-pool reconstruction
     // (seed-message-pairs.ts's humanMemberPoolsByOrganization)
     // against a reordered-Promise.all regression: pass 1 forms
     // this pair before pass 2 writes any membership row, so the
     // two MUST already agree on which pool position each seeded
-    // human occupies. Checked over ALL four STARK objectives, not
-    // a single sample; the SAME pool also backs buildSeedScoreRows's
-    // author pick (Phase 7 Task 5, its own STANDING content pins
-    // in tests/mock-data-objectives.test.ts).
+    // human occupies. Phase Final Task 2: objective_revisions
+    // ROW half stripped — compare create-op embedded revision
+    // author against the revision document pair body.
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
@@ -826,13 +834,19 @@ async () => {
         (await db.responses.getAll()).map(r => [r.id, r]),
     );
     for (const starkSeed of OBJECTIVE_SEEDS) {
-        const revision = await db.objectiveRevisions.getById(
-            `${starkSeed.id}:${MOCK_SEED_TIMESTAMP}`,
+        const revisionId =
+            `${starkSeed.id}:${MOCK_SEED_TIMESTAMP}`;
+        const revisionRow = requests.find(
+            r => r.uri_id === revisionId
+                && r.uri_prefix.includes('/revisions/'),
         );
         assert.ok(
-            revision,
-            'no revision row for ' + starkSeed.id,
+            revisionRow,
+            'no revision pair for ' + starkSeed.id,
         );
+        const revisionBody = JSON.parse(
+            revisionRow!.message,
+        ) as { body: { member_id: string } };
         // The operation pair alone embeds the full create body
         // (its own `revision` sub-object) — the document pair
         // now sharing this address carries `{position}` only, so
@@ -849,7 +863,7 @@ async () => {
         };
         assert.equal(
             embedded.body.revision.member_id,
-            revision!.member_id,
+            revisionBody.body.member_id,
         );
     }
 });
@@ -879,16 +893,16 @@ test('a seeded credential\'s response body carries the full'
 });
 
 test('a seeded role grant\'s response body organization_id'
-+ ' matches the row it was actually granted for (Phase 10'
-+ ' Task 6 — the org-stamp regression no fingerprint pin'
-+ ' catches, since requests/responses are excluded'
-+ ' tables)', async () => {
++ ' matches the derived grant (Phase 10 Task 6 org-stamp'
++ ' regression; Phase Final Task 2 strips role_grants ROW'
++ ' half — oracle is the pair plane)', async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const id = 'seed-role-current-admin-org2';
-    const row = await db.roleGrants.getById(id);
-    assert.ok(row, 'no role grant row for ' + id);
-    assert.equal(row!.organization_id, ORGANIZATION_TWO);
+    // Phase Final Task 2: role_grants empty after strip.
+    // Phase Final Stage B: identity spine tables retired.
+    const grant = await deriveRoleGrant(db, id);
+    assert.equal(grant.organization_id, ORGANIZATION_TWO);
     const requests = await db.requests.getAll();
     const requestRow = requests.find(r => r.uri_id === id);
     assert.ok(requestRow, 'no request row for ' + id);
@@ -901,7 +915,7 @@ test('a seeded role grant\'s response body organization_id'
         body: Record<string, unknown>;
     };
     assert.equal(
-        embedded.body.organization_id, row!.organization_id,
+        embedded.body.organization_id, grant.organization_id,
     );
 });
 
@@ -954,8 +968,9 @@ test('a bootstrap seed populates exactly fourteen balanced,'
     // event ('bootstrap-default-org-current') forms its OWN pair
     // too — 12 + 1 = 13. Phase 12 Task 3 mirrors the mock-data
     // seed's own new organizations family: bootstrap's OWN lone
-    // organizations row (STARK_ORGANIZATION — bootstrap seeds no
-    // second org) forms its OWN pair too — 13 + 1 = 14.
+    // organizations pair (STARK_ORGANIZATION — bootstrap seeds
+    // no second org; Phase Final Task 2 strips the ROW half)
+    // — 13 + 1 = 14.
     assert.equal(requests.length, 14);
     assert.equal(responses.length, 14);
     const atSystemStateEvent = requests.filter(

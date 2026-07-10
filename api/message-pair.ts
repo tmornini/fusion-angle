@@ -586,8 +586,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'flows',
     'flows/:id',
     'flows/:id/undo',
-    'flows/:id/versions',
-    'flows/:id/versions/:vid',
+    // flows/:id/versions[+/:vid] RETIRED (Phase 15 Task 7).
     'flows/:id/tags/:name',
     'work-orders',
     'work-orders/:id',
@@ -619,7 +618,9 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'organizations/:id',
     'role-grants/:id',
     'identity-providers/:id',
-    'states/:id/field-values/:fvid',
+    // states/:id/field-values/:fvid RETIRED from live wire
+    // (Phase 15 Task 7); seed still forms pairs at that
+    // address via formSeedPair + WRITE_RESPONSE_SPECS.
 ]);
 
 // Route patterns wired for pair STORAGE (PAIR_WIRED_ROUTE_
@@ -670,13 +671,13 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'projects/:id/flows/:pfid',
         'flows',
         'flows/:id',
-        'flows/:id/versions/:vid',
+        // flows/:id/versions/:vid RETIRED (Phase 15 Task 7).
         // SIMPLE class (Phase 14 Task 9, gate 8): the locked
         // class 'flows' itself rides is structurally MOOT here —
         // api.ts's isLockedWrite exact-matches routePattern ===
-        // family + '/:id', and this 4-segment pattern never
-        // equals 'flows/:id' — so registering it here safely
-        // opts this address into the ordinary head-read/
+        // family + '/:id', and a 4-segment pattern never
+        // equals 'flows/:id' — so registering tags here safely
+        // opts that address into the ordinary head-read/
         // Supersedes chain, never the locked four-outcome table.
         'flows/:id/tags/:name',
         'work-orders',
@@ -700,5 +701,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'identities/:id/credentials/:cid',
         'memberships/:id',
         'organizations/:id',
-        'states/:id/field-values/:fvid',
+        // states/:id/field-values/:fvid RETIRED from live wire
+        // (Phase 15 Task 7); seed still forms pairs at that
+        // address via formSeedPair + WRITE_RESPONSE_SPECS.
     ]);

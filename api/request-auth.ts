@@ -14,7 +14,6 @@ import type {
     AuthenticatedContext,
     RequestContext,
 } from './request-context.ts';
-import { organizationScopedAdapter } from './db-organization-scoped.ts';
 import { HTTP_FORBIDDEN } from './http-errors.ts';
 import {
     currentRolesForInOrganization,
@@ -112,17 +111,19 @@ type FenceResult =
     | { ok: true; ctx: RequestContext }
     | { ok: false; error: string; status: number };
 
-// The fence step: every authenticated request runs
-// org-scoped. The org is resolved ONCE here — the verified
-// token claim, else the identity's default (its set choice,
-// else primary membership) — and rides the vessel, shared by
-// authz and the scoped adapter. A flat token whose identity
-// resolves to no org is DENIED: there is no global default
-// to fall back on. The membership ledger is the live truth;
-// the token's org claim is a mint-time snapshot of it.
-// Membership is re-derived on EVERY fenced request so a
-// revoked membership stops access now — not when the token
-// expires (the 15-minute de-membership window).
+// The fence step: every authenticated request resolves an
+// organization ONCE here — the verified token claim, else the
+// identity's default (its set choice, else primary membership)
+// — and rides the vessel for authz. A flat token whose
+// identity resolves to no organization is DENIED: there is no
+// global default to fall back on. The membership ledger is
+// the live truth; the token's organization claim is a mint-
+// time snapshot of it. Membership is re-derived on EVERY
+// fenced request so a revoked membership stops access now —
+// not when the token expires (the 15-minute de-membership
+// window). Phase Final Task 5 retired the store decorator:
+// handlers receive ctx.base; pair-plane tenancy rides
+// uri_prefix.
 export async function fenceRequest(
     ctx: AuthenticatedContext,
 ): Promise<FenceResult> {
@@ -158,7 +159,6 @@ export async function fenceRequest(
             organization,
             memberOrganizations,
             roles,
-            scoped: organizationScopedAdapter(ctx.base, organization),
         },
     };
 }

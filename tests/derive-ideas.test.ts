@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -247,7 +249,7 @@ test(
         const derivedHistory = await deriveIdeaStateHistory(
             db, STARK_ORGANIZATION, ideaId,
         );
-        const oldHistory = await db.states.getAllFor(ideaId);
+        const oldHistory = await deriveStatesFor(db, '1', ideaId);
         assert.deepEqual(derivedHistory, oldHistory);
     },
 );

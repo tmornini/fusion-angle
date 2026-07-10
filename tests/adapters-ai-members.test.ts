@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import {
     MemoryDbAdapter,
@@ -21,6 +23,7 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import type { StateEntity } from '../api/types.ts';
 
 function aiDraft(name: string) {
     return {
@@ -44,15 +47,22 @@ test(
             ctx, 'ai1', aiDraft('Claude'),
         );
 
-        const parent = await db.members.getById('ai1');
+        // Phase Final Task 2: members/ai_members ROW halves
+        // stripped — parent + detail via pair-plane GET.
+        const parent = await ctx.GET<{ id: string; type: string }>(
+            'members/ai1',
+        );
         assert.equal(parent.type, 'ai');
         const detail = await getAIMemberEntity(ctx, 'ai1');
         assert.equal(detail.name, 'Claude');
-        const events = await db.states.getAllFor('ai1');
+        const events = await deriveStatesFor(db, '1', 'ai1');
+        // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');
         // Authorship is the verified caller, never the body.
         assert.equal(events[0]?.member_id, 'current');
+        // Phase Final Stage B: roster tables retired.
+        // Phase Final Stage B: roster tables retired.
     },
 );
 
@@ -74,10 +84,14 @@ test(
         const detail = await getAIMemberEntity(ctx, 'ai1');
         assert.equal(detail.name, 'Renamed');
         assert.equal(detail.skill_focus, 'qa');
-        const parent = await db.members.getById('ai1');
+        // Phase Final Task 2: parent via pair-plane GET.
+        const parent = await ctx.GET<{ id: string; type: string }>(
+            'members/ai1',
+        );
         assert.equal(parent.type, 'ai');
         // The edit wrote no event — the seeded one holds.
-        const events = await db.states.getAllFor('ai1');
+        const events = await deriveStatesFor(db, '1', 'ai1');
+        // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');
     },
@@ -91,18 +105,23 @@ test(
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         await seedAIMember(db, 'ai1', 'Claude');
-        const before =
-            await db.aiMembers.getById('ai1');
         const ctx = createRequestContext(db, await devToken());
+        const before = await getAIMemberEntity(ctx, 'ai1');
 
         await postAIMemberStateChange(
             ctx, 'ai1', 'archived',
         );
 
-        const after =
-            await db.aiMembers.getById('ai1');
+        // Phase Final Task 2: detail row half stripped —
+        // pair-plane GET is the entity oracle.
+        const after = await getAIMemberEntity(ctx, 'ai1');
         assert.deepEqual(after, before);
-        const events = await db.states.getAllFor('ai1');
+        // Phase Final Task 1(b): archive rides pair-plane-only
+        // PUT /states/:id — pin history via the live derived
+        // path, never the retired row half.
+        const events = await ctx.GET<StateEntity[]>(
+            'entity-states/ai1/history',
+        );
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'archived',

@@ -18,6 +18,7 @@ import {
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { seedIdentityPii } from './identity-fixtures.ts';
 
 // Phase 11 Task 2: the event-pair reader (deriveEventPairStates)
 // plus the PAIR-PLANE org fence (resolveOwningOrganization /
@@ -185,12 +186,13 @@ async function createIdea(
     assert.equal(res.status, 200, 'idea genesis PUT failed');
 }
 
+// Phase 15 gate 6: grantInvitation resolves email via
+// deriveIdentityPiiRows — seedIdentityPii dual-writes the row
+// and the identities/:id/pii pair so email resolution works.
 async function person(
     db: MemoryDbAdapter, id: string, name: string, email: string,
 ): Promise<void> {
-    await db.members.put(id, { type: 'human' });
-    await db.identities.put(id, { kind: 'person' });
-    await db.identityPii.put(id, {
+    await seedIdentityPii(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -239,9 +241,13 @@ async function createFlowWithNode(
 
 // ---- 1. the event-pair mapping + H7 id-lex sort -----------------
 
+// Phase Final Task 1(b): live PUT /states/:id is pair-plane-
+// only. Drop the row-plane getById oracle; pin derived events
+// against the 200 wire bodies (WRITE_RESPONSE_SPECS shape).
 test('deriveEventPairStates maps live PUT /states/:id events'
-+ ' byte-equal to the old plane, id-lex sorted regardless of'
-+ ' insertion order (H7)', async () => {
++ ' byte-equal to the wire body, id-lex sorted regardless of'
++ ' insertion order (H7) — row-oracle half dropped at Task'
++ ' 1(b) strip', async () => {
     const db = await seed();
     const token = await organizationToken('adminA', 'A');
     // Deliberately non-lexical insertion order.
@@ -250,11 +256,13 @@ test('deriveEventPairStates maps live PUT /states/:id events'
         { entity_id: 'ghost-1', state: 'active', at: AT },
     ));
     assert.equal(first.status, 200);
+    const firstBody = await first.json();
     const second = await handleRequest(db, req(
         'PUT', '/states/aa-event', token,
         { entity_id: 'ghost-1', state: 'archived', at: AT },
     ));
     assert.equal(second.status, 200);
+    const secondBody = await second.json();
 
     const derived = await deriveEventPairStates(db);
     const oursIds = ['aa-event', 'zz-event'];
@@ -264,9 +272,8 @@ test('deriveEventPairStates maps live PUT /states/:id events'
     assert.deepEqual(
         ours.map((row) => row.id), ['aa-event', 'zz-event'],
     );
-    for (const row of ours) {
-        assert.deepEqual(row, await db.states.getById(row.id));
-    }
+    assert.deepEqual(ours[0], secondBody);
+    assert.deepEqual(ours[1], firstBody);
 });
 
 test('deriveEventPairStates never includes a document family\'s'
@@ -465,4 +472,50 @@ async () => {
         await resolveOwningOrganization(db, 'ghost-nowhere', 'B'),
         null,
     );
+});
+
+// ---- 7. organizations self-as-owner (Phase 15 Task 1, gate 3) --
+
+test('resolveOwningOrganization: an organizations document id'
++ ' resolves to itself (self-as-owner; own-org visible,'
++ ' foreign hidden)', async () => {
+    const db = await seed();
+    // seed() puts organizations A and B via PUT
+    // /organizations/:id — each document id owns itself.
+    assert.equal(
+        await resolveOwningOrganization(db, 'A', 'A'), 'A',
+    );
+    assert.equal(
+        await resolveOwningOrganization(db, 'A', 'B'), 'A',
+    );
+    assert.equal(
+        await resolveOwningOrganization(db, 'B', 'B'), 'B',
+    );
+    assert.equal(
+        await resolveOwningOrganization(db, 'B', 'A'), 'B',
+    );
+
+    // Fence: a state event on organization A is visible to A
+    // and hidden from B.
+    const keptA = await fenceStatesByOwner(
+        db,
+        [{
+            id: 'ev-org-a', entity_id: 'A',
+            state: 'active', member_id: 'adminA', at: AT,
+        }],
+        'A',
+    );
+    assert.deepEqual(
+        keptA.map((row) => row.id),
+        ['ev-org-a'],
+    );
+    const keptB = await fenceStatesByOwner(
+        db,
+        [{
+            id: 'ev-org-a2', entity_id: 'A',
+            state: 'active', member_id: 'adminA', at: AT,
+        }],
+        'B',
+    );
+    assert.deepEqual(keptB, []);
 });

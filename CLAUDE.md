@@ -143,10 +143,17 @@ is HTTP-only.
   and reassembled at the GET route into `FlowWithGraph`;
   `flows.graph` is retired live but kept frozen
   (`flow_versions.graph`, `work_orders.flow_graph`). Flow
-  undo now resolves its restore target from the flow's own
-  document-pair history (Phase 14 Task 8) — `flow_versions`
-  no longer receives writes on the live path (table/routes
-  remain, Phase Final retires). Flow tags
+  undo resolves its restore target from the flow's own
+  document-pair history (Phase 14 Task 8). Phase 15 retired
+  the `flows/:id/versions[...]` routes (and the zero-caller
+  `GET states/:id` / `GET entity-states/:id` /
+  `PUT|DELETE states/:id/field-values/:fvid` families) —
+  bare `GET states/:id` is **405** because PUT survives; the
+  other retirements are router 404. The `flow_versions`
+  table remains until Phase Final. Ownership fences and
+  field-values visibility resolve on the pair plane
+  (`resolveOwningOrganization`,
+  `stateEventVisibilityFor`). Flow tags
   (`flows/:id/tags/:name`) are the first document family with
   no backing table, derived entirely from message pairs.
 - **Presentation.** Presenters in `web-app/app/presenters/` emit
@@ -336,7 +343,12 @@ invitation write-path parity pin
 (`pin-invitation-write-path-parity.test.ts`), the undo-as-
 replay cursor algorithm (`flow-undo-cursor.test.ts`), and the
 first pair-plane-only document family
-(`api-flow-tags.test.ts`) — see `tests/` for the current set.
+(`api-flow-tags.test.ts`); Phase 15 added the fence/
+visibility/RESTRICT/immutability parity suite
+(`drift-phase15-cores-parity.test.ts`,
+`api-states-ownership-fence.test.ts`,
+`derive-state-event-collision.test.ts`) — see `tests/` for
+the current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so
 adapter and api-layer tests run without `localStorage`.
 
@@ -436,12 +448,19 @@ apply to it (RED is the audit's first finding).
   `StateStore.postEvent` only appends; the table never deletes.
   An entity's lifecycle reads as the latest event on its
   `entity_id`. Reversal is a *new* event with the new state,
-  not an edit of the prior row. The split between
-  entity-lifecycle event (state log) and relationship-row
-  splice (`EntityStore.delete` on relationship rows like
-  `state_field_values`) is the seam — read
-  `api/store-entity.ts` and `api/store-state.ts` together to
-  see both halves.
+  not an edit of the prior row. Surviving HTTP surface:
+  `GET /states` (derived), `PUT /states/:id` (dual-write +
+  pair-plane immutability strangler),
+  `GET /entity-states/:id/history` (derived + pair-plane
+  ownership fence), `GET /states/:id/field-values` (derived
+  collection). Retired: bare `GET /states/:id` (405 — PUT
+  still matches), `GET /entity-states/:id` (404), leaf
+  `PUT|DELETE /states/:id/field-values/:fvid` (404). The
+  split between entity-lifecycle event (state log) and
+  relationship-row splice (`EntityStore.delete` on
+  relationship rows like `state_field_values`) is the seam
+  — read `api/store-entity.ts` and `api/store-state.ts`
+  together to see both halves.
 - **Cross-tab writes are safe (lost-update hazard closed).**
   IndexedDB gives each tab its own connection to one shared
   database, and an append is an O(1) `objectStore.put`, not a

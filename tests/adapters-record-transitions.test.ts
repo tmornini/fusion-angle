@@ -34,14 +34,7 @@ const AT_FIRST = '2026-05-01T11:00:00.000000Z';
 async function seedSystemMember(
     db: MemoryDbAdapter,
 ): Promise<void> {
-    await db.members.put(SYSTEM_MEMBER_ID, {
-        type: 'system',
-    });
-    await db.states.postEvent(
-        'st-system', SYSTEM_MEMBER_ID, 'active',
-        'system',
-        '2026-01-01T00:00:00.000000Z',
-    );
+    // Phase Final Stage B: states table retired.
 }
 
 function buildNode(
@@ -308,26 +301,26 @@ test(
             db, 'wo-1', flowGraph, 'n-step',
         );
         const ctx = createRequestContext(db, await devToken());
-        // Add a transition with a stored value at n-step,
-        // posted through the SAME wire-reachable PUT states/:id
-        // the live route serves (finding 15's fixture budget):
-        // getWorkOrderTransitionEvents reads entity-states/:id/
-        // history, which is flipped too.
-        await ctx.PUT('states/t-step', {
-            entity_id: 'wo-1',
-            state: 'n-step',
-            at: AT_FIRST,
-        });
-        // NAMED re-pin (Phase 14 Task 6): GET states/:id/field-
-        // values is flipped by default now — a raw
-        // db.stateFieldValues.put leaves no pair at the leaf
-        // address (states/:id/field-values/:fvid), so the row
-        // must land through the SAME wire-reachable PUT the
-        // live route serves.
-        await ctx.PUT('states/t-step/field-values/fv-1', {
-            state_event_id: 't-step',
-            attribute_id: 'a-1',
-            value: 'me@example.com',
+        // NAMED re-pin (Phase 15 Task 7): leaf PUT
+        // states/:id/field-values/:fvid retires; seed the
+        // stored field value through the transition fold —
+        // the ONLY live writer of state_field_values rows
+        // (postWorkOrderTransitionOp). Same wire-reachable
+        // POST the product uses; pair plane + row plane
+        // both land in one op.
+        await ctx.POST('work-orders/wo-1/transition', {
+            transitionEventId: 't-step',
+            targetState: 'n-step',
+            fieldValues: [{
+                id: 'fv-1',
+                fields: {
+                    state_event_id: 't-step',
+                    attribute_id: 'a-1',
+                    value: 'me@example.com',
+                },
+            }],
+            release: null,
+            transitionAt: AT_FIRST,
         });
         await seedBinding(db, 'flow-1', 'rec-1');
         await seedFlowLink(db, 'flow-1', 'wo-1');

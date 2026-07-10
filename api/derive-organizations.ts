@@ -58,7 +58,8 @@ import {
 //
 // Reads db.requests/db.responses ONLY;
 // tests/derive-organizations.test.ts is the proof of parity
-// against the live PUT's own written row.
+// against the live PUT's own wire body (Phase Final Task 2:
+// organizations ROW half stripped — pair plane is truth).
 
 const ORGANIZATIONS_TABLE = 'organizations';
 

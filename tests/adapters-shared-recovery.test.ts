@@ -369,11 +369,10 @@ test('a recovering context reads through the vessel token,'
     await seedOrganizationAdmin(db, 'B');
     const aToken = await organizationToken('current', 'A');
     const ctx = createRecoveringRequestContext(db, aToken);
-    // Seeded through the live document PUT (not a raw
-    // db.ideas.put) so a1's message pair exists — the flipped
-    // GET ideas route (Phase 2 Task 5) derives from the ledger,
-    // not the old ideas table. b1 stays a raw row: the vessel
-    // never fences into org B here, so it is never derived.
+    // Seeded through the live document PUT so a1's message
+    // pair exists — GET ideas derives from the ledger. No
+    // foreign b1 seed: ideas table retired (Phase Final Stage
+    // B); vessel A-only visibility is proven by a1 alone.
     const { organization_id: _organizationId, ...a1Fields } =
         ideaBody('A', 'mine');
     await ctx.PUT('ideas/a1', {
@@ -382,7 +381,6 @@ test('a recovering context reads through the vessel token,'
         state_at: '2026-01-01T00:00:00.000000Z',
         state_event_id: 'ev-a1',
     });
-    await db.ideas.put('b1', ideaBody('B', 'theirs'));
     // another tab moves the shared session holder to org B
     putSessionToken(await organizationToken('current', 'B'));
     const rows = await ctx.GET<{ id: string }[]>('ideas');

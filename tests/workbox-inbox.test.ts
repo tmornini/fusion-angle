@@ -355,7 +355,8 @@ test(
         // the raw snake_case row, so the domain object is
         // fetched first (getWorkOrder) and only its position
         // is patched.
-        const created = await db.workOrders.getAll();
+        // Phase Final Task 2: ids from pair-plane list.
+        const created = await getWorkOrders(ctx);
         const explicit = [7.5, 2.5, 5];
         for (let i = 0; i < created.length; i++) {
             const id = created[i]!.id;

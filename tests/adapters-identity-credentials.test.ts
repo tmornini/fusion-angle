@@ -12,12 +12,17 @@ import {
     getIdentityCredentialState,
 } from
     '../web-app/app/adapters/identity-credentials.ts';
+import { deriveCredentialsFor } from
+    '../api/derive-identity-spine.ts';
 
 async function setup() {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
+
+// Phase Final Task 2: identity_credentials ROW half stripped —
+// event count and active state live on the pair plane.
 
 test('ledger retains set, rotate, revoke; latest wins',
 async () => {
@@ -39,9 +44,9 @@ async () => {
     await postIdentityCredentialRevocation(
         ctx, 'p1', 'password',
     );
-    const events =
-        await db.identityCredentials.getAll();
+    const events = await deriveCredentialsFor(db, 'p1');
     assert.equal(events.length, 3);   // retained
+    // Phase Final Stage B: identity spine tables retired.
     const state =
         await getIdentityCredentialState(ctx, 'p1');
     assert.equal(state.active.length, 0); // revoked

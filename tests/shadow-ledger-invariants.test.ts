@@ -1,4 +1,6 @@
 import { test } from 'node:test';
+import { deriveStates } from
+    '../api/derive-states.ts';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
@@ -243,13 +245,18 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     assert.equal(stateAppend.status, 200);
 
     // A FAILED write: a state ledger conflict (org 1) — must
-    // add nothing to either table.
-    await db.states.put('inv-ev-conflict', {
-        entity_id: 'other',
-        state: 'active',
-        member_id: 'current',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
+    // add nothing to either table. Seed the prior event through
+    // the live PUT so both pair and row planes exist (Phase
+    // Final Task 1(b) canary: row-conflict with pair-absent is
+    // a 500 alarm, not a 409).
+    const prior = await handleRequest(db, req(
+        'PUT', '/states/inv-ev-conflict', org1Token, {
+            entity_id: 'other',
+            state: 'active',
+            at: '2020-01-01T00:00:00.000000Z',
+        },
+    ));
+    assert.equal(prior.status, 200);
     const failed = await handleRequest(db, req(
         'PUT', '/states/inv-ev-conflict', org1Token, {
             entity_id: 'inv-idea-1',
@@ -470,9 +477,10 @@ test('a seeded idea\'s create-pair request reproduces its'
             state_at: string;
         };
     };
-    const genesis = await db.states.getById(
-        parsed.body.state_event_id,
-    );
+    const _statesAll = await deriveStates(db, '1');
+    const genesis = _statesAll.find(s => s.id === parsed.body.state_event_id,
+    )!;
+    assert.ok(genesis, 'derived state missing');
     assert.equal(genesis.entity_id, idea.id);
     assert.equal(genesis.state, parsed.body.state);
     assert.equal(genesis.at, parsed.body.state_at);

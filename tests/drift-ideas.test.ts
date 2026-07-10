@@ -3,10 +3,7 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
-import type { IdeaEntity } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import { organizationScopedAdapter } from
-    '../api/db-organization-scoped.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
@@ -19,11 +16,13 @@ import {
     deriveIdeaStateHistory,
 } from '../api/derive-ideas.ts';
 
-// The E10 drift check (Phase 2 Task 4): message-derived reads
-// proven equal to the old-table-derived reads they will replace
-// at the route (Task 5). NOTHING reads the pairs in production
-// yet — this file alone gates that flip; it stays as a
-// regression guard through Phase Final.
+// Phase Final Task 2: ideas(+idea_submissions) dual-write
+// stripped. This file no longer compares derive vs old-table
+// oracles — the row plane is empty after seed. Coverage
+// re-homes to wire-byte handleRequest assertions and
+// non-lexical live fixtures (drift-identity-tokens
+// craftsmanship: byIdAscending must diverge from insertion
+// order; never function-vs-function only).
 
 const BASE = 'http://localhost';
 
@@ -43,21 +42,47 @@ function req(
     });
 }
 
-function sortById<T extends { id: string }>(
-    rows: readonly T[],
-): T[] {
-    return [...rows].sort((a, b) =>
-        a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+function ideaDocument(
+    title: string,
+    state: string,
+    stateAt: string,
+    stateEventId: string,
+    position = 1,
+) {
+    return {
+        title,
+        position,
+        problem_statement: 'p',
+        target_users: 't',
+        proposed_solution: 's',
+        expected_outcome: 'o',
+        success_metrics: 'm',
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
+    };
 }
 
-// Reads through the SAME org-scoped store the live route reads
-// today (organizationScopedAdapter binds the fence the route's
-// verified-token org resolves to).
-function oldPlaneIdeas(
-    db: MemoryDbAdapter, organization: string,
-): Promise<IdeaEntity[]> {
-    return organizationScopedAdapter(db, organization)
-        .ideas.getAll();
+// Wire entity shape WRITE_RESPONSE_SPECS + ideaEntityOf form
+// (id first, organization_id, then entity fields — JSON key
+// order of documentWriteResponseSpec successBody).
+function wireIdea(
+    id: string,
+    title: string,
+    position = 1,
+    organization = '1',
+) {
+    return {
+        id,
+        organization_id: organization,
+        title,
+        position,
+        problem_statement: 'p',
+        target_users: 't',
+        proposed_solution: 's',
+        expected_outcome: 'o',
+        success_metrics: 'm',
+    };
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
@@ -66,81 +91,146 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-// Every seeded idea's own id, paired with the org
-// assignOrganization(index) actually stamped it into — the SAME
-// partition seed-message-pairs.ts's buildMockDataInvocations
-// uses.
 const SEEDED_IDEAS = buildIdeas().map((idea, index) => ({
     id: idea.id,
     organization: assignOrganization(index),
+    title: idea.title,
+    position: idea.position,
+    problem_statement: idea.problem_statement,
+    target_users: idea.target_users,
+    proposed_solution: idea.proposed_solution,
+    expected_outcome: idea.expected_outcome,
+    success_metrics: idea.success_metrics,
 }));
 
-test('ideas: message-derived equals old-table-derived',
+test('seeded GET /ideas wire equals deriveIdeas per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['1', '2']) {
-        const old = sortById(
-            await oldPlaneIdeas(db, organization),
+        const token = await organizationToken(
+            'current', organization,
         );
+        const res = await handleRequest(
+            db, req('GET', '/ideas', token),
+        );
+        assert.equal(res.status, 200);
+        const wireText = await res.text();
         const derived = await deriveIdeas(db, organization);
-        assert.deepEqual(derived, old);
+        assert.equal(wireText, JSON.stringify(derived));
+        assert.ok(derived.length > 0);
     }
 });
 
-test('per-idea getById parity across every seeded idea',
+test('per-idea GET wire equals deriveIdea for every seed',
 async () => {
     const db = await seededDb();
-    for (const { id, organization } of SEEDED_IDEAS) {
-        const derived = await deriveIdea(db, organization, id);
-        const old = await organizationScopedAdapter(
-            db, organization,
-        ).ideas.getById(id);
-        assert.deepEqual(derived, old);
+    for (const seed of SEEDED_IDEAS) {
+        const token = await organizationToken(
+            'current', seed.organization,
+        );
+        const res = await handleRequest(
+            db, req('GET', '/ideas/' + seed.id, token),
+        );
+        assert.equal(res.status, 200);
+        const wireText = await res.text();
+        const derived = await deriveIdea(
+            db, seed.organization, seed.id,
+        );
+        assert.equal(wireText, JSON.stringify(derived));
+        assert.equal(derived.title, seed.title);
+        assert.equal(derived.position, seed.position);
     }
 });
 
-test('a foreign-org id 404s the same way on both planes',
+test('a foreign-org idea id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_IDEAS.find(
         (seed) => seed.organization === '1',
     )!;
-    const otherOrganization = '2';
-    await assert.rejects(
-        () => deriveIdea(db, otherOrganization, foreign.id),
-        EntityNotFoundError,
+    const token = await organizationToken('current', '2');
+    const res = await handleRequest(
+        db, req('GET', '/ideas/' + foreign.id, token),
+    );
+    assert.equal(res.status, 404);
+    const body = await res.json() as { error: string };
+    assert.equal(
+        body.error, 'Not found: ideas/' + foreign.id,
     );
     await assert.rejects(
-        () => organizationScopedAdapter(db, otherOrganization)
-            .ideas.getById(foreign.id),
+        () => deriveIdea(db, '2', foreign.id),
         EntityNotFoundError,
     );
 });
 
-test('state-history parity across every seeded idea',
+// Live fixtures inserted NON-LEX (z, then a, then m) so
+// byIdAscending collection order diverges from insertion.
+test('GET /ideas collection is wire byte-identical to a'
++ ' literal id-lex reconstruction after non-lex PUTs',
 async () => {
     const db = await seededDb();
-    for (const { id, organization } of SEEDED_IDEAS) {
-        const derived = await deriveIdeaStateHistory(
-            db, organization, id,
+    const token = await organizationToken();
+    const fixtures = [
+        {
+            id: 'idea-drift-z',
+            title: 'Zulu',
+            at: '2026-07-01T00:00:00.000000Z',
+            ev: 'ev-drift-z',
+        },
+        {
+            id: 'idea-drift-a',
+            title: 'Alpha',
+            at: '2026-07-01T00:00:01.000000Z',
+            ev: 'ev-drift-a',
+        },
+        {
+            id: 'idea-drift-m',
+            title: 'Mike',
+            at: '2026-07-01T00:00:02.000000Z',
+            ev: 'ev-drift-m',
+        },
+    ];
+    for (const f of fixtures) {
+        const put = await handleRequest(db, req(
+            'PUT', '/ideas/' + f.id, token,
+            ideaDocument(f.title, 'active', f.at, f.ev),
+        ));
+        assert.equal(put.status, 200);
+        // PUT response is canonicalJson (sorted keys) from
+        // the stored pair; values match WRITE_RESPONSE_SPECS.
+        assert.deepEqual(
+            await put.json(),
+            wireIdea(f.id, f.title),
         );
-        const old = await db.states.getAllFor(id);
-        assert.deepEqual(derived, old);
+    }
+    // id-lex expected order: a, m, z — NOT insertion order.
+    const expectedAdded = [
+        wireIdea('idea-drift-a', 'Alpha'),
+        wireIdea('idea-drift-m', 'Mike'),
+        wireIdea('idea-drift-z', 'Zulu'),
+    ];
+    const res = await handleRequest(
+        db, req('GET', '/ideas', token),
+    );
+    assert.equal(res.status, 200);
+    const list = await res.json() as { id: string }[];
+    const added = list.filter((row) =>
+        row.id.startsWith('idea-drift-'));
+    assert.equal(
+        JSON.stringify(added),
+        JSON.stringify(expectedAdded),
+    );
+    for (const row of expectedAdded) {
+        const single = await handleRequest(
+            db, req('GET', '/ideas/' + row.id, token),
+        );
+        assert.equal(single.status, 200);
+        assert.equal(
+            await single.text(), JSON.stringify(row),
+        );
     }
 });
 
-// The OP-level MEMBER_ID CAVEAT (api-idea-document.test.ts) has
-// no DERIVATION-layer counterpart: deriveIdeaStateHistory's own
-// dedup (ideaLifecycleEvents, api/derive-ideas.ts) walks pairs in
-// ARRIVAL order and keeps the FIRST occurrence of each distinct
-// state_event_id. A regression that flipped it to keep-LAST
-// would reattribute the derived event to the SECOND editor —
-// silently, since every other case here uses one actor
-// throughout. Mirrors the op-level scenario at the derivation
-// layer: member A creates the idea; member B resends the
-// IDENTICAL trio under a different title; the derived history
-// must still name member A, and must still equal the old-plane
-// states row field-for-field.
 test('derived history keeps the FIRST arrival\'s authorship'
 + ' on a same-trio resend by a different member', async () => {
     const db = await seededDb();
@@ -151,30 +241,20 @@ test('derived history keeps the FIRST arrival\'s authorship'
 
     await handleRequest(db, req(
         'PUT', '/ideas/' + ideaId, tokenA, {
-            title: 'First',
-            position: 1,
-            problem_statement: 'p',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'active',
-            state_at: '2026-04-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-authorship-caveat',
+            ...ideaDocument(
+                'First', 'active',
+                '2026-04-01T00:00:00.000000Z',
+                'ev-drift-authorship-caveat',
+            ),
         },
     ));
     await handleRequest(db, req(
         'PUT', '/ideas/' + ideaId, tokenB, {
-            title: 'Second',
-            position: 1,
-            problem_statement: 'p',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'active',
-            state_at: '2026-04-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-authorship-caveat',
+            ...ideaDocument(
+                'Second', 'active',
+                '2026-04-01T00:00:00.000000Z',
+                'ev-drift-authorship-caveat',
+            ),
         },
     ));
 
@@ -184,220 +264,188 @@ test('derived history keeps the FIRST arrival\'s authorship'
     assert.equal(derived.length, 1);
     assert.equal(derived[0]!.member_id, 'current');
 
-    const old = await db.states.getAllFor(ideaId);
-    assert.deepEqual(derived, old);
+    // Wire entity reflects the SECOND title; authorship of the
+    // head event stays on member A.
+    const getRes = await handleRequest(
+        db, req('GET', '/ideas/' + ideaId, tokenA),
+    );
+    assert.equal(getRes.status, 200);
+    assert.equal(
+        await getRes.text(),
+        JSON.stringify(wireIdea(ideaId, 'Second')),
+    );
 });
 
-test('submissions parity for a live-written submission',
+test('submission PUT/GET wire matches literal reconstruction',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = 'idea-drift-submission-parity';
     await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token, {
-            title: 'Submission Parity',
-            position: 1,
-            problem_statement: 'p',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'active',
-            state_at: '2026-02-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-submission-parity',
-        },
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Submission Parity', 'active',
+            '2026-02-01T00:00:00.000000Z',
+            'ev-drift-submission-parity',
+        ),
     ));
-    const res = await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId + '/submissions/sub-drift-1',
-        token, {
-            idea_id: ideaId,
-            member_id: 'current',
-            at: '2026-02-01T00:00:01.000000Z',
-        },
+    const subBody = {
+        idea_id: ideaId,
+        member_id: 'current',
+        at: '2026-02-01T00:00:01.000000Z',
+    };
+    const putRes = await handleRequest(db, req(
+        'PUT',
+        '/ideas/' + ideaId + '/submissions/sub-drift-1',
+        token, subBody,
     ));
-    assert.equal(res.status, 200);
+    assert.equal(putRes.status, 200);
+    // derive / GET insertion order (id, idea_id, member_id, at).
+    const expectedSub = {
+        id: 'sub-drift-1',
+        idea_id: ideaId,
+        member_id: 'current',
+        at: '2026-02-01T00:00:01.000000Z',
+    };
+    // PUT response is canonicalJson (sorted keys); values match.
+    assert.deepEqual(await putRes.json(), expectedSub);
+    const listRes = await handleRequest(db, req(
+        'GET', '/ideas/' + ideaId + '/submissions', token,
+    ));
+    assert.equal(listRes.status, 200);
+    assert.equal(
+        await listRes.text(),
+        JSON.stringify([expectedSub]),
+    );
     const derived = await deriveIdeaSubmissions(
         db, '1', ideaId,
     );
-    const old = await organizationScopedAdapter(db, '1')
-        .ideaSubmissions.getAllWhere('idea_id', ideaId);
-    assert.deepEqual(derived, sortById(old));
+    assert.deepEqual(derived, [expectedSub]);
 });
 
-// GAP CLOSED (Phase 2 Task 4b): the 11 seeded ideas' submissions
-// (api/mock-data.ts, buildIdeaSubmissions) now form their
-// message pair through postIdeaSubmissionOp exactly as a
-// live PUT does (api/mock-data/seed-message-pairs.ts's
-// ideaSubmissionSeedBody), so every seeded submission is fully
-// derivable — no seed-only exception remains for this family.
-test('seeded idea submissions: message-derived equals'
-+ ' old-table-derived, for every seeded idea, per org',
-async () => {
+test('seeded idea submissions: derive non-empty for every'
++ ' seeded idea, per org', async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_IDEAS) {
-        const old = sortById(
-            await organizationScopedAdapter(db, organization)
-                .ideaSubmissions.getAllWhere('idea_id', id),
-        );
-        assert.ok(old.length > 0);
         const derived = await deriveIdeaSubmissions(
             db, organization, id,
         );
-        assert.deepEqual(derived, old);
+        assert.ok(
+            derived.length > 0,
+            'seeded submission missing for ' + id,
+        );
+        const token = await organizationToken(
+            'current', organization,
+        );
+        const res = await handleRequest(db, req(
+            'GET', '/ideas/' + id + '/submissions', token,
+        ));
+        assert.equal(res.status, 200);
+        assert.equal(
+            await res.text(), JSON.stringify(derived),
+        );
     }
 });
 
-test('live-write case: create + edit + transition + delete, '
-+ 're-compared on both planes', async () => {
+test('live-write lifecycle: create + edit + transition +'
++ ' delete, wire and derive agree', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = 'idea-drift-lifecycle';
 
-    // Create.
     await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token, {
-            title: 'Lifecycle Idea',
-            position: 1,
-            problem_statement: 'p',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'active',
-            state_at: '2026-03-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-lifecycle-genesis',
-        },
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Lifecycle Idea', 'active',
+            '2026-03-01T00:00:00.000000Z',
+            'ev-drift-lifecycle-genesis',
+        ),
     ));
-    // Edit — same trio, different fields.
     await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token, {
-            title: 'Lifecycle Idea Edited',
-            position: 2,
-            problem_statement: 'p2',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'active',
-            state_at: '2026-03-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-lifecycle-genesis',
-        },
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Lifecycle Idea Edited', 'active',
+            '2026-03-01T00:00:00.000000Z',
+            'ev-drift-lifecycle-genesis',
+            2,
+        ),
     ));
-    // Transition.
     await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token, {
-            title: 'Lifecycle Idea Edited',
-            position: 2,
-            problem_statement: 'p2',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'in_review',
-            state_at: '2026-03-02T00:00:00.000000Z',
-            state_event_id: 'ev-drift-lifecycle-review',
-        },
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Lifecycle Idea Edited', 'in_review',
+            '2026-03-02T00:00:00.000000Z',
+            'ev-drift-lifecycle-review',
+            2,
+        ),
     ));
-    const oldBeforeDelete = await organizationScopedAdapter(
-        db, '1',
-    ).ideas.getById(ideaId);
-    const derivedBeforeDelete = await deriveIdea(
-        db, '1', ideaId,
+    const beforeDelete = await handleRequest(
+        db, req('GET', '/ideas/' + ideaId, token),
     );
-    assert.deepEqual(derivedBeforeDelete, oldBeforeDelete);
+    assert.equal(beforeDelete.status, 200);
+    assert.equal(
+        await beforeDelete.text(),
+        JSON.stringify(
+            wireIdea(ideaId, 'Lifecycle Idea Edited', 2),
+        ),
+    );
 
-    // Delete (a transition to 'deleted' — ideas has no DELETE
-    // route).
     await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token, {
-            title: 'Lifecycle Idea Edited',
-            position: 2,
-            problem_statement: 'p2',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'deleted',
-            state_at: '2026-03-03T00:00:00.000000Z',
-            state_event_id: 'ev-drift-lifecycle-deleted',
-        },
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Lifecycle Idea Edited', 'deleted',
+            '2026-03-03T00:00:00.000000Z',
+            'ev-drift-lifecycle-deleted',
+            2,
+        ),
     ));
 
+    const afterDelete = await handleRequest(
+        db, req('GET', '/ideas/' + ideaId, token),
+    );
+    assert.equal(afterDelete.status, 404);
     await assert.rejects(
         () => deriveIdea(db, '1', ideaId),
         EntityNotFoundError,
     );
-    await assert.rejects(
-        () => organizationScopedAdapter(db, '1')
-            .ideas.getById(ideaId),
-        EntityNotFoundError,
+    const listRes = await handleRequest(
+        db, req('GET', '/ideas', token),
     );
-    const derivedList = await deriveIdeas(db, '1');
+    const list = await listRes.json() as { id: string }[];
     assert.equal(
-        derivedList.some((idea) => idea.id === ideaId), false,
-    );
-    const oldList = await oldPlaneIdeas(db, '1');
-    assert.equal(
-        oldList.some((idea) => idea.id === ideaId), false,
+        list.some((idea) => idea.id === ideaId), false,
     );
 
     const derivedHistory = await deriveIdeaStateHistory(
         db, '1', ideaId,
     );
-    const oldHistory = await db.states.getAllFor(ideaId);
-    assert.deepEqual(derivedHistory, oldHistory);
     assert.equal(derivedHistory.length, 3);
 });
 
-// Phase 5 Task 5: the conversion now synthesizes a THIRD pair —
-// the idea's OWN document address — closing the standing
-// 'promoted' watch-point (Phase 2/3): before this task, a
-// converted idea's derived history MISSED its 'promoted' event
-// because no pair recorded it. A full approve -> convert chain
-// drives a live PUT (genesis) then a live PUT (approve) before
-// the conversion, so the idea's address already carries a head
-// pair — the conversion's own idea pair records Supersedes
-// against it, exactly like any other live PUT /ideas/:id would.
 test('live approve then convert: derived idea history'
-+ ' includes \'promoted\' and matches the old plane',
-async () => {
++ ' includes \'promoted\'', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ideaId = 'idea-drift-conversion-promoted';
     const projectId = 'project-drift-conversion-promoted';
 
-    // Create.
     await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token, {
-            title: 'Approve Then Convert',
-            position: 1,
-            problem_statement: 'p',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'active',
-            state_at: '2026-06-01T00:00:00.000000Z',
-            state_event_id: 'ev-drift-conversion-active',
-        },
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Approve Then Convert', 'active',
+            '2026-06-01T00:00:00.000000Z',
+            'ev-drift-conversion-active',
+        ),
     ));
-    // Approve.
     await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token, {
-            title: 'Approve Then Convert',
-            position: 1,
-            problem_statement: 'p',
-            target_users: 't',
-            proposed_solution: 's',
-            expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'approved',
-            state_at: '2026-06-02T00:00:00.000000Z',
-            state_event_id: 'ev-drift-conversion-approved',
-        },
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Approve Then Convert', 'approved',
+            '2026-06-02T00:00:00.000000Z',
+            'ev-drift-conversion-approved',
+        ),
     ));
-    // Convert.
-    await handleRequest(db, req(
+    const convert = await handleRequest(db, req(
         'POST', '/ideas/' + ideaId + '/conversion', token, {
             projectId,
             project: {
@@ -428,14 +476,25 @@ async () => {
             baselines: [],
         },
     ));
+    assert.equal(convert.status, 204);
 
     const derived = await deriveIdeaStateHistory(
         db, '1', ideaId,
     );
-    const old = await db.states.getAllFor(ideaId);
-    assert.deepEqual(derived, old);
     assert.equal(derived.length, 3);
     assert.ok(
         derived.some((event) => event.state === 'promoted'),
+    );
+    // Entity GET still serves the promoted idea (only
+    // 'deleted' tombstones); list filters via ideaIsVisible.
+    const getRes = await handleRequest(
+        db, req('GET', '/ideas/' + ideaId, token),
+    );
+    assert.equal(getRes.status, 200);
+    assert.equal(
+        await getRes.text(),
+        JSON.stringify(
+            wireIdea(ideaId, 'Approve Then Convert'),
+        ),
     );
 });

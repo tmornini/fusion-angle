@@ -1,5 +1,8 @@
 import { EntityNotFoundError } from './db.ts';
-import type { DbAdapter } from './db.ts';
+import type {
+    DbAdapter,
+    GuardedDbAdapter,
+} from './db.ts';
 import {
     verifyClientAssertion,
 } from './client-assertion.ts';
@@ -802,14 +805,16 @@ async function grantClientCredentials(
         typeof body.client_assertion === 'string'
             ? body.client_assertion
             : '';
-    let client: ClientEntity;
-    try {
-        client = await adapter.clients.getById(clientId);
-    } catch (e) {
-        if (e instanceof EntityNotFoundError) {
-            return failure(401, 'unknown client');
-        }
-        throw e;
+    // FLIPPED (Phase 15 gate 6): raw keyed client row — clients
+    // never soft-delete, so rawReadRow is byte-identical to the
+    // EntityStore.getById it replaces (null ≡ EntityNotFoundError
+    // → same 401 'unknown client' path). No EntityStore/states
+    // transaction. handleRequest always supplies a GuardedDbAdapter
+    // (the unfenced base); cast is the type-narrowing seam only.
+    const client = await (adapter as GuardedDbAdapter)
+        .rawReadRow<ClientEntity>('clients', clientId);
+    if (client === null) {
+        return failure(401, 'unknown client');
     }
     if (client.status !== 'active') {
         return failure(401, 'client is disabled');

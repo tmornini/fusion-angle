@@ -127,13 +127,15 @@ const MEMBER_VERBS: Readonly<
     '/objectives': ['GET', 'PUT', 'POST'],
     '/objectives/:id/revisions': ['GET', 'PUT'],
     '/flows': ['GET', 'PUT', 'POST'],
-    '/flows/:id/versions': ['GET', 'PUT', 'POST', 'DELETE'],
+    // /flows/:id/versions RETIRED (Phase 15 Task 7).
     '/flows/:id/work-orders': ['GET', 'PUT'],
     '/flows/:id/records': ['GET', 'PUT', 'DELETE'],
     '/flows/:id/tags': ['GET', 'PUT', 'DELETE'],
     '/records': ['GET', 'PUT', 'DELETE', 'POST'],
     '/record-attributes': ['GET', 'PUT', 'DELETE'],
-    '/states/:id/field-values': ['GET', 'PUT', 'DELETE'],
+    // leaf PUT/DELETE retired (Phase 15 Task 7); collection
+    // GET survives.
+    '/states/:id/field-values': ['GET'],
     '/work-orders': ['GET', 'PUT', 'POST'],
     '/states': ['GET', 'PUT'],
     '/entity-states': ['GET'],

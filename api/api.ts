@@ -41,11 +41,11 @@ import {
 import {
     identityTargetsFor,
 } from './notifications.ts';
+import { resolveOwningOrganization } from './derive-states.ts';
 import {
-    ownerOrganizationOfEntity,
-    rawOrganizationOwnedProbes,
-    graphEntityProbe,
-} from './store-parent-scoped.ts';
+    writeOwnershipFenceFor,
+    assertWritableInOrganization,
+} from './write-ownership-fence.ts';
 import {
     exchangeBearerForOrganization,
     postToken,
@@ -288,11 +288,12 @@ export async function handleRequest(
     const { route: matched, params } = match;
 
     const routePattern = matched.segments.join('/');
-    // Every authenticated request runs org-scoped — see
-    // fenceRequest, which completes the vessel: the org, the
-    // live memberships, the roles, and the scoped adapter.
-    // Organization-owned stores fence to the org; the global
-    // identity/auth spine passes through.
+    // Every authenticated request is fenced — see
+    // fenceRequest, which completes the vessel: the
+    // organization, the live memberships, and the roles.
+    // Surviving stores are global (clients + message plane);
+    // pair-plane tenancy rides uri_prefix. effective stays
+    // the unfenced base adapter.
     let effective: DbAdapter = adapter;
     // The acting member, sourced from the verified token and
     // handed to every handler so authorship is never client-
@@ -331,10 +332,11 @@ export async function handleRequest(
         // Region A of the pre-dispatch ownership fence (Phase 12
         // Task 1): every read below — fenceRequest's own
         // memberships/roleGrants/requests/responses reads, and
-        // the entity-states guard's rawReadRow probes — is
-        // storage-corruption territory should it throw. Redact
-        // through the shared helper rather than letting the
-        // fault reach the wire; MissingTableError still escapes.
+        // the entity-states guard's pair-plane ownership
+        // resolve — is storage-corruption territory should it
+        // throw. Redact through the shared helper rather than
+        // letting the fault reach the wire; MissingTableError
+        // still escapes.
         try {
             const fence = await fenceRequest(authed);
             if (!fence.ok) {
@@ -369,26 +371,27 @@ export async function handleRequest(
                     { status: HTTP_NOT_FOUND },
                 );
             }
-            // entity-states/:id[/history] read StateStore
-            // methods the store fence cannot cover; gate on
-            // PARENT ownership — a DIFFERENT org's entity 404s,
-            // an orphan or own entity passes. The history-leak
-            // bug gated on entity_id alone.
+            // entity-states/:id/history reads derived state
+            // the store fence cannot cover; gate on PARENT
+            // ownership — a DIFFERENT org's entity 404s, an
+            // orphan or own entity passes. The history-leak
+            // bug gated on entity_id alone. Bare
+            // entity-states/:id RETIRED (Phase 15 Task 7).
             if (method === 'GET'
-                && (routePattern === 'entity-states/:id'
-                    || routePattern
-                        === 'entity-states/:id/history')) {
-                // The owner resolves through the memberships
-                // identity_id index, never a whole-ledger scan.
-                // The graphProbe closes the flow_nodes /
-                // flow_edges two-hop for node/edge deletion
-                // events. rawReadRow bypasses EntityStore's
-                // deleted filter.
-                const owner = await ownerOrganizationOfEntity(
-                    rawOrganizationOwnedProbes(adapter),
-                    adapter.memberships, fenced.organization,
+                && routePattern
+                    === 'entity-states/:id/history') {
+                // PAIR-PLANE (Phase 15 Task 5): ownership
+                // resolves through resolveOwningOrganization
+                // (org-nested documents, invitations, flow-
+                // graph history, memberships, organizations
+                // self-as-owner) — never the raw entity-table
+                // probes. Soft-deleted and hard-spliced parents
+                // still report their true owner via the
+                // append-only pair plane.
+                const owner = await resolveOwningOrganization(
+                    adapter,
                     param(params, 0),
-                    graphEntityProbe(adapter, adapter.flows),
+                    fenced.organization,
                 );
                 if (owner !== null
                     && owner !== fenced.organization) {
@@ -398,7 +401,6 @@ export async function handleRequest(
                     );
                 }
             }
-            effective = fenced.scoped;
             actor = fenced.principal.id;
             organization = fenced.organization;
             callerIsAdmin = fenced.roles.includes('admin');
@@ -449,18 +451,16 @@ export async function handleRequest(
         // foreign row as merely absent), so the fence cannot
         // live in the route closure — it runs HERE, pre-
         // dispatch, mirroring the entity-states GET guard
-        // above. The RAW probes resolve a foreign entity's true
-        // owner even after it is soft-deleted — the filtered
-        // organizationOwnedProbes would let a self-deleted
-        // foreign row masquerade as an orphan.
+        // above. PAIR-PLANE (Phase 15 Task 5): ownership
+        // resolves through resolveOwningOrganization — soft-
+        // deleted parents, hard-spliced records, and
+        // organization document ids all report their true
+        // owner via the append-only pair plane.
         if (method === 'PUT' && routePattern === 'states/:id') {
             const entityId = body?.entity_id;
             if (typeof entityId === 'string') {
-                const owner = await ownerOrganizationOfEntity(
-                    rawOrganizationOwnedProbes(adapter),
-                    adapter.memberships, organization!,
-                    entityId,
-                    graphEntityProbe(adapter, adapter.flows),
+                const owner = await resolveOwningOrganization(
+                    adapter, entityId, organization!,
                 );
                 if (owner !== null && owner !== organization) {
                     return Response.json(
@@ -470,52 +470,8 @@ export async function handleRequest(
                 }
             }
         }
-        // The field-values sibling: the leaf carries no
-        // entity_id of its own — it is owned by whatever owns
-        // its PARENT state event (states/:id/field-values/:fvid
-        // — param 0 is the parent event, param 1 the leaf).
-        // Read raw so an event whose entity was since deleted
-        // still resolves.
-        if (
-            (method === 'PUT' || method === 'DELETE')
-            && routePattern === 'states/:id/field-values/:fvid'
-        ) {
-            // NAMED DEVIATION (Phase 14 Task 7, controller-
-            // adjudicated): Author gate 6 intended this
-            // lookup re-anchored onto the pair plane.
-            // INFEASIBLE — op-born parent events (work-order
-            // transition/claim, document-trio embedded
-            // events) carry NO states/:id pair; the id lives
-            // only inside an op pair's BODY, addressed by the
-            // OWNING ENTITY, never the event id — exactly why
-            // deriveStates/deriveStatesFor (derive-states.ts)
-            // union SIX sources rather than read states/:id
-            // pairs alone. A pair-plane lookup here would need
-            // an unbounded cross-organization scan on this hot
-            // pre-dispatch path, or silently misread an
-            // op-born foreign parent as absent — a cross-
-            // tenant regression. Stays states-table-based,
-            // joining the Final-gated residual family (entity-
-            // table probes, EntityStore tombstones); retires
-            // at Phase Final alongside state_field_values.
-            const parentEvent = await adapter.rawReadRow<
-                { id: string; entity_id: Id }
-            >('states', param(params, 0));
-            if (parentEvent !== null) {
-                const owner = await ownerOrganizationOfEntity(
-                    rawOrganizationOwnedProbes(adapter),
-                    adapter.memberships, organization!,
-                    parentEvent.entity_id,
-                    graphEntityProbe(adapter, adapter.flows),
-                );
-                if (owner !== null && owner !== organization) {
-                    return Response.json(
-                        { error: 'Not found: ' + pathname },
-                        { status: HTTP_NOT_FOUND },
-                    );
-                }
-            }
-        }
+        // field-values leaf write fence RETIRED with the leaf
+        // routes (Phase 15 Task 7).
         // WP8 (Phase 13 Task 8): the self-only revocation guard.
         // MEMBER_VERBS widens PUT /identity-token-revocations to
         // the member tier (Region A's route-policy check already
@@ -571,6 +527,34 @@ export async function handleRequest(
             && matched.delete !== undefined);
 
     try {
+        // Phase Final Task 1(e): pre-write ownership gate for
+        // the 9 org-scoped families' existing-id PUT/DELETE.
+        // Pair-plane owner-null → genesis proceeds; foreign →
+        // EntityNotFoundError (today's #assertMine 404 bytes).
+        // Runs BEFORE formWritePair so a forged foreign id
+        // never pays crypto or stores a pair. Row-plane
+        // #assertMine still dual-runs until Stage A strips.
+        if (
+            isWrite
+            && hasWriteHandler
+            && !bearerExempt
+            && organization !== undefined
+        ) {
+            const writeFence = writeOwnershipFenceFor(
+                routePattern, method,
+            );
+            if (writeFence !== undefined) {
+                const entityId = params[writeFence.idParamIndex];
+                if (entityId !== undefined && entityId !== '') {
+                    await assertWritableInOrganization(
+                        effective,
+                        entityId,
+                        organization,
+                        writeFence.table,
+                    );
+                }
+            }
+        }
         // The shadow-ledger pair: formed pre-tx (all crypto and
         // address resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in

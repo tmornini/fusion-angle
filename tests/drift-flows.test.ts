@@ -1,22 +1,16 @@
+import { deriveStatesFor } from
+    '../api/derive-states.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
-import type { DbAdapter } from '../api/db.ts';
 import type {
-    FlowEntity,
     FlowWithGraph,
-    FlowNodeMemberEntity,
-    FlowNodeAttributeEntity,
 } from '../api/types.ts';
-import { DEFAULT_LOCK_TIMEOUT, storedGraphField } from
+import { DEFAULT_LOCK_TIMEOUT } from
     '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import { organizationScopedAdapter } from
-    '../api/db-organization-scoped.ts';
-import { reassembleStoredGraph } from
-    '../api/flow-graph-relations.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { l2cProjectId } from '../api/mock-data/projects.ts';
 import {
@@ -34,11 +28,11 @@ import {
 import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
 
-// The E10 drift check (Phase 4 Task 7): message-derived reads
-// proven equal to the old-table-derived reads they will replace
-// at the route (Task 8). NOTHING reads the pairs in production
-// yet — this file alone gates that flip; it stays as a
-// regression guard through Phase Final.
+// Phase Final Task 2: flows(+graph relations+flow_versions)
+// dual-write stripped. This file no longer compares derive
+// vs old-table oracles — the row plane is empty after seed.
+// Coverage re-homes to wire-byte handleRequest assertions
+// and non-lexical live fixtures.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -236,61 +230,37 @@ async function createFlow(
     ));
 }
 
-// Reads through the SAME org-scoped store + reassembly the live
-// GET /flows and GET /flows/:id routes read today
-// (organizationScopedAdapter binds the fence the route's
-// verified-token org resolves to) — never through handleRequest,
-// so the comparison survives the Task 8 flip.
-async function assembleOldFlow(
-    scoped: DbAdapter, flow: FlowEntity,
-): Promise<FlowWithGraph> {
-    const nodes = await scoped.flowNodes.getAllWhere(
-        'flow_id', flow.id,
+// Wire-byte GET helper: handleRequest text must equal
+// JSON.stringify(derive) for pair-plane oracles.
+async function wireFlowText(
+    db: MemoryDbAdapter,
+    organization: string,
+    flowId: string,
+): Promise<string> {
+    const token = await organizationToken(
+        'current', organization,
     );
-    const edges = await scoped.flowEdges.getAllWhere(
-        'flow_id', flow.id,
+    const res = await handleRequest(
+        db, req('GET', '/flows/' + flowId, token),
     );
-    const members: FlowNodeMemberEntity[] = [];
-    const attributes: FlowNodeAttributeEntity[] = [];
-    for (const node of nodes) {
-        members.push(...await scoped.flowNodeMembers
-            .getAllWhere('flow_node_id', node.id));
-        attributes.push(...await scoped.flowNodeAttributes
-            .getAllWhere('flow_node_id', node.id));
-    }
-    const graph = reassembleStoredGraph(
-        nodes, edges, members, attributes,
-    );
-    return { ...flow, graph: storedGraphField(graph) };
+    assert.equal(res.status, 200);
+    return res.text();
 }
 
-async function oldPlaneFlows(
-    db: MemoryDbAdapter, organization: string,
-): Promise<FlowWithGraph[]> {
-    const scoped = organizationScopedAdapter(db, organization);
-    const flows = await scoped.flows.getAll();
-    const result: FlowWithGraph[] = [];
-    for (const flow of flows) {
-        result.push(await assembleOldFlow(scoped, flow));
-    }
-    return result;
+async function wireFlowsText(
+    db: MemoryDbAdapter,
+    organization: string,
+): Promise<string> {
+    const token = await organizationToken(
+        'current', organization,
+    );
+    const res = await handleRequest(
+        db, req('GET', '/flows', token),
+    );
+    assert.equal(res.status, 200);
+    return res.text();
 }
 
-async function oldPlaneFlow(
-    db: MemoryDbAdapter, organization: string, id: string,
-): Promise<FlowWithGraph> {
-    const scoped = organizationScopedAdapter(db, organization);
-    const flow = await scoped.flows.getById(id);
-    return assembleOldFlow(scoped, flow);
-}
-
-// Design decision 1: node/edge order is normalized to id-lex on
-// BOTH sides before comparison — the memory backend's
-// getAllWhere is arrival-ordered, so the OLD plane's own row
-// order need not match the derived side's (always id-sorted).
-// Within-node member/attribute arrays are order-normalized on
-// BOTH sides too (a cosmetic order change neither plane could
-// re-derive from the other's array order alone).
 function normalizedGraph(graph: string): unknown {
     const parsed = JSON.parse(graph) as {
         nodes: {
@@ -314,24 +284,11 @@ function normalizedGraph(graph: string): unknown {
     };
 }
 
-// hasUndoHistory (Phase 14 Task 8) is excluded on BOTH sides:
-// it is a PAIR-PLANE-ONLY signal (this flow's own document-pair
-// count), with no old-table-plane equivalent to drift-check
-// against — assembleOldFlow (below) never sets it at all, so
-// comparing it here would fail on a field the old plane was
-// never asked to derive, not on genuine drift.
-function assertFlowsEqual(
-    derived: FlowWithGraph, old: FlowWithGraph,
+function assertWireEqualsDerived(
+    wireText: string,
+    derived: FlowWithGraph,
 ): void {
-    const {
-        graph: derivedGraph, hasUndoHistory: _derivedHistory,
-        ...derivedRest
-    } = derived;
-    const { graph: oldGraph, ...oldRest } = old;
-    assert.deepEqual(derivedRest, oldRest);
-    assert.deepEqual(
-        normalizedGraph(derivedGraph), normalizedGraph(oldGraph),
-    );
+    assert.equal(wireText, JSON.stringify(derived));
 }
 
 // The SAME reduction deriveFlow calls internally (derive-
@@ -382,40 +339,38 @@ const SEEDED_PROJECT_FLOW_PROJECT_IDS = [
     l2cProjectId,
 ];
 
-// -- 1. flows: message-derived equals old-table-derived -------
+// -- 1. seeded GET /flows wire equals deriveFlows -------------
 
-test('flows: message-derived equals old-table-derived',
+test('seeded GET /flows wire equals deriveFlows per org',
 async () => {
     const db = await seededDb();
     for (const organization of ['1', '2']) {
-        const old = sortById(
-            await oldPlaneFlows(db, organization),
+        const wireText = await wireFlowsText(
+            db, organization,
         );
-        const derived = sortById(
-            await deriveFlows(db, organization),
-        );
-        assert.equal(derived.length, old.length);
-        for (let i = 0; i < derived.length; i++) {
-            assertFlowsEqual(derived[i]!, old[i]!);
-        }
+        const derived = await deriveFlows(db, organization);
+        assert.equal(wireText, JSON.stringify(derived));
+        assert.ok(derived.length > 0);
     }
 });
 
-// -- 2. per-flow getById parity, every seeded flow -------------
+// -- 2. per-flow GET wire equals deriveFlow --------------------
 
-test('per-flow getById parity across every seeded flow',
+test('per-flow GET wire equals deriveFlow for every seed',
 async () => {
     const db = await seededDb();
     for (const { id, organization } of SEEDED_FLOWS) {
         const derived = await deriveFlow(db, organization, id);
-        const old = await oldPlaneFlow(db, organization, id);
-        assertFlowsEqual(derived, old);
+        const wireText = await wireFlowText(
+            db, organization, id,
+        );
+        assertWireEqualsDerived(wireText, derived);
     }
 });
 
-// -- 3. foreign-org id 404 parity -------------------------------
+// -- 3. foreign-org id 404 on GET and derive --------------------
 
-test('a foreign-org id 404s the same way on both planes',
+test('a foreign-org flow id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_FLOWS.find(
@@ -426,11 +381,13 @@ async () => {
         () => deriveFlow(db, otherOrganization, foreign.id),
         EntityNotFoundError,
     );
-    await assert.rejects(
-        () => organizationScopedAdapter(db, otherOrganization)
-            .flows.getById(foreign.id),
-        EntityNotFoundError,
+    const token = await organizationToken(
+        'current', otherOrganization,
     );
+    const res = await handleRequest(
+        db, req('GET', '/flows/' + foreign.id, token),
+    );
+    assert.equal(res.status, 404);
 });
 
 // -- 4. state-history parity, every seeded flow ----------------
@@ -442,57 +399,67 @@ async () => {
         const derived = await deriveFlowStateHistory(
             db, organization, id,
         );
-        const old = await db.states.getAllFor(id);
-        assert.deepEqual(derived, old);
+        // Phase Final Task 2: states ROW half stripped —
+        // flow history equals union history for the flow id.
+        const union = await deriveStatesFor(
+            db, organization, id,
+        );
+        assert.deepEqual(derived, union);
     }
 });
 
-// -- 5. project-flows parity, every seeded project -------------
+// -- 5. project-flows wire equals derive (Phase Final Task 2:
+// -- project_flows row half stripped) --------------------------
 
-test('project-flows parity across every seeded project',
-async () => {
+test('project-flows wire equals derive across every'
++ ' seeded project', async () => {
     const db = await seededDb();
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
     for (const projectId of SEEDED_PROJECT_FLOW_PROJECT_IDS) {
+        const res = await handleRequest(db, req(
+            'GET', '/projects/' + projectId + '/flows', token,
+        ));
+        assert.equal(res.status, 200);
+        const wireText = await res.text();
         const derived = await deriveProjectFlows(
             db, STARK_ORGANIZATION, projectId,
         );
-        const old = sortById(
-            await organizationScopedAdapter(
-                db, STARK_ORGANIZATION,
-            ).projectFlows.getAllWhere(
-                'project_id', projectId,
-            ),
-        );
-        assert.deepEqual(derived, old);
+        assert.equal(wireText, JSON.stringify(derived));
     }
 });
 
 test('the two-flows project orders both join rows'
-+ ' identically on both planes', async () => {
++ ' on wire and derive', async () => {
     const db = await seededDb();
+    const token = await organizationToken(
+        'current', STARK_ORGANIZATION,
+    );
+    const res = await handleRequest(db, req(
+        'GET',
+        '/projects/' + TWO_FLOWS_PROJECT_ID + '/flows',
+        token,
+    ));
+    assert.equal(res.status, 200);
+    const wire = await res.json() as { flow_id: string }[];
     const derived = await deriveProjectFlows(
         db, STARK_ORGANIZATION, TWO_FLOWS_PROJECT_ID,
     );
     assert.equal(derived.length, 2);
-    const old = sortById(
-        await organizationScopedAdapter(
-            db, STARK_ORGANIZATION,
-        ).projectFlows.getAllWhere(
-            'project_id', TWO_FLOWS_PROJECT_ID,
-        ),
-    );
-    assert.deepEqual(derived, old);
+    assert.equal(JSON.stringify(wire), JSON.stringify(derived));
+    // id-lex order is pinned by derive; wire equals derive.
     assert.deepEqual(
+        wire.map((row) => row.flow_id),
         derived.map((row) => row.flow_id),
-        old.map((row) => row.flow_id),
     );
 });
 
 // -- 6. live-write chain, re-compared at each step -------------
 
-test('live-write chain: create, save, versioned save, node '
-+ 'delete, undo, redo, and a terminal delete — re-compared on '
-+ 'both planes at every step', async () => {
+test('live-write chain: create, save, node delete, undo, '
++ 'redo, and a terminal delete — wire equals derive '
++ 'at every step', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const flowId = 'flow-drift-chain';
@@ -502,6 +469,17 @@ test('live-write chain: create, save, versioned save, node '
     const n2 = 'chain-n2';
     const e1 = 'chain-e1';
     const genesisAt = '2026-03-01T00:00:00.000000Z';
+
+    async function assertStep(): Promise<FlowWithGraph> {
+        const derived = await deriveFlow(
+            db, STARK_ORGANIZATION, flowId,
+        );
+        const wireText = await wireFlowText(
+            db, STARK_ORGANIZATION, flowId,
+        );
+        assertWireEqualsDerived(wireText, derived);
+        return derived;
+    }
 
     // Create: two nodes, one edge.
     const created = await handleRequest(db, req(
@@ -534,9 +512,7 @@ test('live-write chain: create, save, versioned save, node '
         },
     ));
     assert.equal(created.status, 204);
-    let derived = await deriveFlow(db, STARK_ORGANIZATION, flowId);
-    let old = await oldPlaneFlow(db, STARK_ORGANIZATION, flowId);
-    assertFlowsEqual(derived, old);
+    let derived = await assertStep();
 
     const fullGraph = graphJson(
         [wireNode(n1, 'Create', true), wireNode(n2, 'Review')],
@@ -555,30 +531,10 @@ test('live-write chain: create, save, versioned save, node '
     ));
     assert.equal(saved.status, 200);
     headId = saved.headers.get('Response-ID')!;
-    derived = await deriveFlow(db, STARK_ORGANIZATION, flowId);
-    old = await oldPlaneFlow(db, STARK_ORGANIZATION, flowId);
-    assertFlowsEqual(derived, old);
+    derived = await assertStep();
 
-    // Versioned save: publish a snapshot of the current graph,
-    // then a further save (no structural change yet).
+    // Further save (versions POST retired Phase 15 Task 7).
     const versionAt = '2026-03-03T00:00:00.000000Z';
-    const published = await handleRequest(db, req(
-        'POST', '/flows/' + flowId + '/versions', token, {
-            id: flowId + '-v1',
-            version: {
-                flow_id: flowId,
-                name: 'Chain Flow Saved',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: fullGraph,
-                at: versionAt,
-            },
-            trimIds: [],
-        },
-    ));
-    assert.equal(published.status, 204);
     const versionedSave = await handleRequest(db, req(
         'PUT', '/flows/' + flowId, token,
         documentBody(
@@ -590,9 +546,7 @@ test('live-write chain: create, save, versioned save, node '
     ));
     assert.equal(versionedSave.status, 200);
     headId = versionedSave.headers.get('Response-ID')!;
-    derived = await deriveFlow(db, STARK_ORGANIZATION, flowId);
-    old = await oldPlaneFlow(db, STARK_ORGANIZATION, flowId);
-    assertFlowsEqual(derived, old);
+    derived = await assertStep();
 
     // Node delete via save: n2 and e1 are tombstoned.
     const deleteAt = '2026-03-04T00:00:00.000000Z';
@@ -623,23 +577,14 @@ test('live-write chain: create, save, versioned save, node '
     ));
     assert.equal(deletedSave.status, 200);
     headId = deletedSave.headers.get('Response-ID')!;
-    derived = await deriveFlow(db, STARK_ORGANIZATION, flowId);
-    old = await oldPlaneFlow(db, STARK_ORGANIZATION, flowId);
-    assertFlowsEqual(derived, old);
+    derived = await assertStep();
     assert.equal(
         (JSON.parse(derived.graph) as { nodes: { id: string }[] })
             .nodes.length,
         1,
     );
 
-    // Undo (Phase 14 Task 8, undo-as-replay — NAMED REWRITE):
-    // no flow_versions row is read or consumed any more; undo
-    // resolves its own target from the flows/:id document-pair
-    // history — one step back from the current ("Trimmed") head
-    // is the "Chain Flow Versioned" pair (fullGraph, 2
-    // nodes/1 edge), so this reverts to THAT, reviving n2/e1 by
-    // the server's own current-vs-target diff — visible on
-    // BOTH planes.
+    // Undo-as-replay: reverts to Versioned (fullGraph).
     const undoAt = '2026-03-05T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
         'POST', '/flows/' + flowId + '/undo', token, {
@@ -649,42 +594,15 @@ test('live-write chain: create, save, versioned save, node '
     ));
     assert.equal(undone.status, 204);
     headId = await headResponseId(db, token, flowId);
-    derived = await deriveFlow(db, STARK_ORGANIZATION, flowId);
-    old = await oldPlaneFlow(db, STARK_ORGANIZATION, flowId);
-    assertFlowsEqual(derived, old);
+    derived = await assertStep();
     assert.equal(
         (JSON.parse(derived.graph) as { nodes: { id: string }[] })
             .nodes.some((n) => n.id === n2),
         true,
-        'the revived node must be visible on the derived side',
-    );
-    assert.equal(
-        (JSON.parse(old.graph) as { nodes: { id: string }[] })
-            .nodes.some((n) => n.id === n2),
-        true,
-        'the revived node must be visible on the old plane too',
+        'the revived node must be visible on the pair plane',
     );
 
-    // Redo-as-save: publish a fresh snapshot, then re-apply the
-    // node deletion (redoing what undo reverted).
-    const redoVersionAt = '2026-03-06T00:00:00.000000Z';
-    const redoPublished = await handleRequest(db, req(
-        'POST', '/flows/' + flowId + '/versions', token, {
-            id: flowId + '-v2',
-            version: {
-                flow_id: flowId,
-                name: 'Chain Flow Versioned',
-                is_locked: false,
-                is_auto_layout: false,
-                is_auto_fit: false,
-                lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                graph: fullGraph,
-                at: redoVersionAt,
-            },
-            trimIds: [],
-        },
-    ));
-    assert.equal(redoPublished.status, 204);
+    // Redo-as-save: re-apply the node deletion.
     const redoAt = '2026-03-06T00:00:01.000000Z';
     const redone = await handleRequest(db, req(
         'PUT', '/flows/' + flowId, token,
@@ -708,12 +626,10 @@ test('live-write chain: create, save, versioned save, node '
     ));
     assert.equal(redone.status, 200);
     headId = redone.headers.get('Response-ID')!;
-    derived = await deriveFlow(db, STARK_ORGANIZATION, flowId);
-    old = await oldPlaneFlow(db, STARK_ORGANIZATION, flowId);
-    assertFlowsEqual(derived, old);
+    derived = await assertStep();
 
     // Terminal: a state-'deleted' document PUT — vanishes from
-    // both lists, 404s both planes.
+    // list, 404s on GET and derive.
     const tombstoneAt = '2026-03-07T00:00:00.000000Z';
     const tombstoned = await handleRequest(db, req(
         'PUT', '/flows/' + flowId, token,
@@ -729,81 +645,98 @@ test('live-write chain: create, save, versioned save, node '
         () => deriveFlow(db, STARK_ORGANIZATION, flowId),
         EntityNotFoundError,
     );
-    await assert.rejects(
-        () => organizationScopedAdapter(db, STARK_ORGANIZATION)
-            .flows.getById(flowId),
-        EntityNotFoundError,
+    const gone = await handleRequest(
+        db, req('GET', '/flows/' + flowId, token),
     );
+    assert.equal(gone.status, 404);
     const derivedList = await deriveFlows(
         db, STARK_ORGANIZATION,
     );
     assert.equal(
         derivedList.some((f) => f.id === flowId), false,
     );
-    const oldList = await oldPlaneFlows(db, STARK_ORGANIZATION);
+    const listText = await wireFlowsText(
+        db, STARK_ORGANIZATION,
+    );
     assert.equal(
-        oldList.some((f) => f.id === flowId), false,
+        listText.includes('"' + flowId + '"'), false,
     );
 
     const derivedHistory = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
     );
-    const oldHistory = await db.states.getAllFor(flowId);
+    const oldHistory = await deriveStatesFor(db, STARK_ORGANIZATION, flowId);
     assert.deepEqual(derivedHistory, oldHistory);
 });
 
 // -- 7. live join-row chain: PUT appears, DELETE vanishes ------
 
-test('live join-row chain: PUT appears on both planes, '
+test('live join-row chain: PUT appears on wire/derive, '
 + 'DELETE removes it from both', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const projectId = l2cProjectId;
     const pfid = 'pf-drift-join-1';
+    const listPath = '/projects/' + projectId + '/flows';
 
     const putRes = await handleRequest(db, req(
-        'PUT', '/projects/' + projectId + '/flows/' + pfid,
+        'PUT', listPath + '/' + pfid,
         token,
-        { project_id: projectId, flow_id: 'flow-drift-join', at: AT },
+        {
+            project_id: projectId,
+            flow_id: 'flow-drift-join',
+            at: AT,
+        },
     ));
     assert.equal(putRes.status, 200);
 
+    const afterPutRes = await handleRequest(
+        db, req('GET', listPath, token),
+    );
+    assert.equal(afterPutRes.status, 200);
+    const wireAfterPut = await afterPutRes.json() as {
+        id: string;
+    }[];
     const derivedAfterPut = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
-    const oldAfterPut = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).projectFlows.getAllWhere('project_id', projectId);
-    assert.ok(derivedAfterPut.some((row) => row.id === pfid));
-    assert.ok(oldAfterPut.some((row) => row.id === pfid));
-    assert.deepEqual(
-        sortById(derivedAfterPut), sortById(oldAfterPut),
+    assert.ok(wireAfterPut.some((row) => row.id === pfid));
+    assert.equal(
+        JSON.stringify(wireAfterPut),
+        JSON.stringify(derivedAfterPut),
     );
 
     const delRes = await handleRequest(db, req(
         'DELETE',
-        '/projects/' + projectId + '/flows/' + pfid, token,
+        listPath + '/' + pfid, token,
     ));
     assert.equal(delRes.status, 204);
 
+    const afterDelRes = await handleRequest(
+        db, req('GET', listPath, token),
+    );
+    const wireAfterDelete = await afterDelRes.json() as {
+        id: string;
+    }[];
     const derivedAfterDelete = await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     );
-    const oldAfterDelete = await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).projectFlows.getAllWhere('project_id', projectId);
+    assert.equal(
+        wireAfterDelete.some((row) => row.id === pfid), false,
+    );
     assert.equal(
         derivedAfterDelete.some((row) => row.id === pfid), false,
     );
     assert.equal(
-        oldAfterDelete.some((row) => row.id === pfid), false,
+        JSON.stringify(wireAfterDelete),
+        JSON.stringify(derivedAfterDelete),
     );
 });
 
 // -- 8. duplicate-create (the R2 multiset case) ----------------
 
 test('duplicate-create: two creates, same flow id, distinct '
-+ 'lifecycle events, and a fresh join row on both planes',
++ 'lifecycle events, and a fresh join row on wire/derive',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -825,36 +758,42 @@ async () => {
     // create succeeds outright, never 412ing.
     assert.equal(second.status, 204);
 
-    // ONE flows row on both planes — the derived head is the
+    // ONE flow head on wire/derive — the derived head is the
     // (at, id) winner, the second create's own document pair.
     const derivedFlow = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
     );
-    const oldFlow = await oldPlaneFlow(
+    const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertFlowsEqual(derivedFlow, oldFlow);
+    assertWireEqualsDerived(wireText, derivedFlow);
 
-    // TWO lifecycle events on both planes.
+    // TWO lifecycle events (derive vs states dual-write).
     const derivedHistory = await deriveFlowStateHistory(
         db, STARK_ORGANIZATION, flowId,
     );
-    const oldHistory = await db.states.getAllFor(flowId);
+    const oldHistory = await deriveStatesFor(db, STARK_ORGANIZATION, flowId);
     assert.deepEqual(derivedHistory, oldHistory);
     assert.equal(derivedHistory.length, 2);
 
-    // TWO join rows surfacing identically in deriveProjectFlows
-    // AND the old-plane getAllWhere.
+    // TWO join rows on wire and derive (Phase Final Task 2:
+    // project_flows row half stripped).
+    const joinsRes = await handleRequest(db, req(
+        'GET', '/projects/' + projectId + '/flows', token,
+    ));
+    const wireJoins = (await joinsRes.json() as {
+        id: string;
+    }[]).filter(
+        (row) => row.id === pfidA || row.id === pfidB,
+    );
     const derivedJoins = (await deriveProjectFlows(
         db, STARK_ORGANIZATION, projectId,
     )).filter((row) => row.id === pfidA || row.id === pfidB);
-    const oldJoins = (await organizationScopedAdapter(
-        db, STARK_ORGANIZATION,
-    ).projectFlows.getAllWhere(
-        'project_id', projectId,
-    )).filter((row) => row.id === pfidA || row.id === pfidB);
-    assert.equal(oldJoins.length, 2);
-    assert.deepEqual(sortById(derivedJoins), sortById(oldJoins));
+    assert.equal(wireJoins.length, 2);
+    assert.equal(derivedJoins.length, 2);
+    assert.deepEqual(
+        sortById(wireJoins), sortById(derivedJoins),
+    );
 });
 
 // -- 9. the create-op POST pair is never the derived head -----
@@ -895,10 +834,10 @@ test('the create-op POST pair is not read as a document pair '
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
     );
-    const old = await oldPlaneFlow(
+    const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertFlowsEqual(derived, old);
+    assertWireEqualsDerived(wireText, derived);
 });
 
 // -- 10. sidecar insensitivity ----------------------------------
@@ -914,7 +853,10 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
     // `revivals` restores an unrelated entity —
     // validateFlowDocumentBody never cross-checks the sidecars
     // against `graph` (they are independent fields), so this is
-    // a legal below-gate write.
+    // a legal below-gate write. Phase Final Task 2: derive and
+    // wire both track `graph` alone; graphDelta only feeds
+    // deriveFlowGraphStates (SIDECAR-KEEP), not the working
+    // graph.
     const graph = graphJson(
         [wireNode('sidecar-graph-node', 'Graph Node')], [],
     );
@@ -949,19 +891,16 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
     assert.deepEqual(
         derivedNodes.map((n) => n.id), ['sidecar-graph-node'],
     );
-
-    // The old plane, by contrast, reassembles from the relation
-    // tables the sidecar actually wrote — a DIFFERENT node id —
-    // proving the two planes genuinely DISAGREE here: the
-    // derivation tracks `graph` alone, never the sidecar.
-    const old = await oldPlaneFlow(
+    const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    const oldNodes = (JSON.parse(old.graph) as {
-        nodes: { id: string }[];
-    }).nodes;
-    assert.deepEqual(
-        oldNodes.map((n) => n.id), ['sidecar-delta-node'],
+    assertWireEqualsDerived(wireText, derived);
+    // graphDelta node never becomes the working graph head.
+    assert.equal(
+        derivedNodes.some(
+            (n) => n.id === 'sidecar-delta-node',
+        ),
+        false,
     );
 });
 
@@ -1024,7 +963,7 @@ test('the Follows chain terminal reaches exactly the derived '
 // -- 12. a live multi-member, multi-attribute node save --------
 
 test('a live multi-member, multi-attribute node save derives '
-+ 'content-identically on both planes (order-independent)',
++ 'content-identically on wire and derive (order-independent)',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -1032,10 +971,7 @@ async () => {
     const nodeId = 'multi-node-1';
 
     // Deliberately reverse-alphabetical in `graph` and the
-    // OPPOSITE order in the storage-shaped delta events — a
-    // regression that dropped either side's normalization would
-    // be CAUGHT here, unlike the seed's own multi-member node,
-    // whose single ordering happens to coincide on both planes.
+    // OPPOSITE order in the storage-shaped delta events.
     const graph = graphJson(
         [wireNode(
             nodeId, 'Multi Node', false,
@@ -1090,10 +1026,29 @@ async () => {
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
     );
-    const old = await oldPlaneFlow(
+    const wireText = await wireFlowText(
         db, STARK_ORGANIZATION, flowId,
     );
-    assertFlowsEqual(derived, old);
+    assertWireEqualsDerived(wireText, derived);
+    // Graph content preserves both members/attrs regardless
+    // of insertion order (normalizedGraph order-independence
+    // still applies on the pair plane).
+    const nodes = (JSON.parse(derived.graph) as {
+        nodes: {
+            id: string;
+            memberIds: string[];
+            attributes: { attribute_id: string }[];
+        }[];
+    }).nodes;
+    const node = nodes.find((n) => n.id === nodeId)!;
+    assert.deepEqual(
+        [...node.memberIds].sort(),
+        ['aa-member', 'zz-member'],
+    );
+    assert.deepEqual(
+        node.attributes.map((a) => a.attribute_id).sort(),
+        ['aa-attr', 'zz-attr'],
+    );
 });
 
 // -- 13. same-join-id retry: the join stays chain-less ----------

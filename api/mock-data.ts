@@ -41,7 +41,6 @@ import { hashPassword } from '../shared/password-hash.ts';
 import type { MessagePair } from './message-pair.ts';
 import { appendMessagePair } from './message-pair.ts';
 import {
-    daysFromNow,
     humanMemberPoolsByOrganization,
     pickHumanMember,
 } from './mock-data/seed-kit.ts';
@@ -91,7 +90,6 @@ import {
     humanMemberSeedBody,
     ideaSeedBody,
     ideaSubmissionSeedBody,
-    organizationSeedBody,
     projectSeedBody,
     projectOrg2,
     projectOrganizationFor,
@@ -112,10 +110,6 @@ import {
     membershipSeedBody,
     bootstrapMembershipId,
     bootstrapRoleGrantId,
-    bootstrapSystemStateEventId,
-    bootstrapDefaultOrganizationEventId,
-    defaultOrganizationSeedEventId,
-    memberPrimaryOrganization,
     humanMemberPiiSeedBody,
     bootstrapCurrentMemberPiiBody,
     roleGrantSeedBody,
@@ -180,23 +174,29 @@ export interface SeededCredentials {
 // ['identity_credentials', 'requests', 'responses'] transaction
 // on the nested-subset guard (api/db-backed.ts's #assertSubset:
 // 'requests'/'responses' not in the outer declared set).
+//
+// Phase Final Task 1(d): recipients are the in-memory
+// person/PII list (buildMembers / bootstrap PII body) — never
+// a post-tx identityPii/identities row scan. Stripping the
+// identity-spine row halves must not drop 1513→1502 /
+// 14→13 or empty SeededCredentials on the wire.
+type CredentialRecipient = {
+    readonly identityId: string;
+    readonly email: string;
+};
+
 async function seedHumanCredentials(
     adapter: DbAdapter,
+    recipients: readonly CredentialRecipient[],
 ): Promise<SeededCredentials> {
-    const piiById = new Map(
-        (await adapter.identityPii.getAll())
-            .map(p => [p.id, p]));
-    const persons = (await adapter.identities.getAll())
-        .filter(i => i.kind === 'person'
-            && piiById.has(i.id));
     const planned = await Promise.all(
-        persons.map(async identity => {
+        recipients.map(async recipient => {
             const password = generateCryptoSafeBase62();
             return {
                 id: 'seed-cred-'
-                    + identity.id + '-password',
-                identityId: identity.id,
-                username: piiById.get(identity.id)!.email,
+                    + recipient.identityId + '-password',
+                identityId: recipient.identityId,
+                username: recipient.email,
                 password,
                 secret: await hashPassword(password),
             };
@@ -217,12 +217,12 @@ async function seedHumanCredentials(
         { id: systemCredentialId, secret: systemSecret },
         requestAt,
     );
-    // Pass 2: the widened tx — row ops only, each paired with its
-    // pre-formed pass-1 pair via postIdentityCredentialDocumentOp,
-    // the SAME extracted op every live PUT
+    // Pass 2: pair-plane only (Phase Final Task 2 stripped the
+    // identity_credentials ROW half). postIdentityCredential
+    // DocumentOp is the SAME op every live PUT
     // identities/:id/credentials/:cid rides.
     await adapter.transaction(
-        ['identity_credentials', 'requests', 'responses'],
+        ['requests', 'responses'],
         async (view) => {
             await Promise.all([
                 ...planned.map(cred =>
@@ -230,7 +230,8 @@ async function seedHumanCredentials(
                         view,
                         cred.id,
                         identityCredentialSeedBody(
-                            cred.identityId, 'password', cred.secret,
+                            cred.identityId, 'password',
+                            cred.secret,
                         ),
                         SYSTEM_MEMBER_ID,
                         requirePair(
@@ -293,7 +294,15 @@ export async function postMockDataLoad(
         TABLE_NAMES,
         (view) => postMockDataLoadIn(view, pairs),
     );
-    const creds = await seedHumanCredentials(adapter);
+    // Task 1(d): same buildMembers enumeration that pass 2
+    // used for PII — no row read after strip.
+    const creds = await seedHumanCredentials(
+        adapter,
+        buildMembers().map((member) => ({
+            identityId: member.id,
+            email: member.email,
+        })),
+    );
     await adapter.postSchemaCreation();
     return creds;
 }
@@ -335,20 +344,8 @@ async function postMockDataLoadIn(
                             ),
                         ),
                     )),
-                // Task 8 (Phase 11): the row itself STAYS RAW
-                // (Path A) — the SAME direct put as before — but
-                // now forms its OWN message pair beside it,
-                // closing the identity_default_organizations
-                // family's last deferral.
-                adapter.identityDefaultOrganizations.put(
-                    defaultOrganizationSeedEventId(member.id), {
-                        identity_id: member.id,
-                        organization_id:
-                            memberPrimaryOrganization(
-                                member.id, index,
-                            ),
-                        at: MOCK_SEED_TIMESTAMP,
-                    }),
+                // Phase Final Task 2: identity_default_
+                // organizations ROW half stripped — pair only.
                 appendMessagePair(
                     adapter,
                     requirePair(
@@ -535,38 +532,25 @@ async function postMockDataLoadIn(
                 ),
             );
         }),
-        // Task 3 (Phase 12): the row itself STAYS RAW (Path A) —
-        // the SAME direct adapter.organizations.put as before,
-        // via organizationSeedBody's shared construction (the
-        // SAME one seed-message-pairs.ts used to form each row's
-        // pair, so the two can never drift) — but now forms its
-        // OWN message pair beside it.
-        adapter.organizations.put(
-            STARK_ORGANIZATION,
-            organizationSeedBody(
-                'Stark Industries', 'acmecorp.com',
-                daysFromNow(300, 0, 0),
+        // Phase Final Task 2: organizations ROW half stripped —
+        // pair-plane only (organizationSeedBody still shapes
+        // the pair body in seed-message-pairs.ts).
+        appendMessagePair(
+            adapter,
+            requirePair(
+                pairs,
+                seedPairKey(
+                    'organizations/:id', STARK_ORGANIZATION,
+                ),
             ),
         ),
         appendMessagePair(
             adapter,
             requirePair(
                 pairs,
-                seedPairKey('organizations/:id', STARK_ORGANIZATION),
-            ),
-        ),
-        adapter.organizations.put(
-            ORGANIZATION_TWO,
-            organizationSeedBody(
-                'Wayne Enterprises', 'wayne.example.com',
-                daysFromNow(200, 0, 0),
-            ),
-        ),
-        appendMessagePair(
-            adapter,
-            requirePair(
-                pairs,
-                seedPairKey('organizations/:id', ORGANIZATION_TWO),
+                seedPairKey(
+                    'organizations/:id', ORGANIZATION_TWO,
+                ),
             ),
         ),
     ]);
@@ -651,15 +635,14 @@ async function postMockDataLoadIn(
 
     // One state event per seeded Record — the
     // creation moment of each Record on the states
-    // log. Records start at 'active'. DELETE records/:id splices ONLY
-    // the record row; no cascade exists (record_attributes /
-    // state_field_values / flow_records rows orphan silently — a
-    // pre-existing, named gap). Driven through postRecordWriteOp below,
-    // alongside each record's row and attributes.
-    // recordStateEvents is imported from
-    // seed-message-pairs.ts — pass 1 there needs the
-    // SAME array to form each record's pair before
-    // this transaction opens.
+    // log. Records start at 'active'. Phase Final
+    // Task 2: records + record_attributes +
+    // flow_records ROW halves stripped — seed drives
+    // through postRecordWriteOp / postFlowRecordDocumentOp
+    // (pairs + states.postEvent only). recordStateEvents
+    // is imported from seed-message-pairs.ts — pass 1
+    // there needs the SAME array to form each record's
+    // pair before this transaction opens.
     const recordStateEventByRecordId = new Map(
         recordStateEvents.map(e => [e.entity_id, e]),
     );
@@ -792,33 +775,23 @@ async function postMockDataLoadIn(
         // in this SAME transaction (Path A: appendMessagePair
         // writes ONLY requests/responses, so the row write itself
         // is byte-identical to before).
-        ...mockStateEvents.flatMap(r => [
-            adapter.states.put(r.id, {
-                entity_id: r.entity_id,
-                state: r.state,
-                member_id: r.member_id,
-                at: r.at,
-            }),
+        ...mockStateEvents.map(r =>
             appendMessagePair(
                 adapter,
                 requirePair(pairs, seedPairKey('states/:id', r.id)),
             ),
-        ]),
-        ...memberStateEvents.flatMap(r => [
-            adapter.states.put(r.id, {
-                entity_id: r.entity_id,
-                state: r.state,
-                member_id: r.member_id,
-                at: r.at,
-            }),
+        ),
+        ...memberStateEvents.map(r =>
             appendMessagePair(
                 adapter,
                 requirePair(pairs, seedPairKey('states/:id', r.id)),
             ),
-        ]),
-        ...mockStateFieldValues.flatMap(r => [
-            adapter.stateFieldValues
-                .put(r.id, r),
+        ),
+        // Phase Final Task 2: state_field_values ROW half
+        // stripped — seed still forms leaf pairs at
+        // states/:id/field-values/:fvid (WRITE_RESPONSE_SPECS
+        // survives; two-source union reads them).
+        ...mockStateFieldValues.map(r =>
             appendMessagePair(
                 adapter,
                 requirePair(
@@ -828,7 +801,7 @@ async function postMockDataLoadIn(
                     ),
                 ),
             ),
-        ]),
+        ),
         // AI members start at 'active' on creation — same
         // single-event seeding as humans, driven through
         // postAiMemberCreationOp. POST /ai-members (and so
@@ -924,18 +897,12 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        ...leadToCloseData.stateEvents.flatMap(r => [
-            adapter.states.put(r.id, {
-                entity_id: r.entity_id,
-                state: r.state,
-                member_id: r.member_id,
-                at: r.at,
-            }),
+        ...leadToCloseData.stateEvents.map(r =>
             appendMessagePair(
                 adapter,
                 requirePair(pairs, seedPairKey('states/:id', r.id)),
             ),
-        ]),
+        ),
         ...mockRecords.map((r, i) => {
             const event = recordStateEventByRecordId.get(r.id)!;
             const attributes = mockRecordAttributes.filter(
@@ -1004,6 +971,9 @@ async function postMockDataLoadIn(
     // deferral below (buildSeedScoreRows) draws from this SAME
     // pool now too — the former in-tx memberFor DB-read retired
     // once its pick moved onto pickHumanMember (Phase 7 Task 5).
+    // Phase Final Task 2: objectives + objective_revisions
+    // ROW halves stripped — seed drives through
+    // postObjectiveCreationOp (pairs only).
     const objectiveMemberPools =
         humanMemberPoolsByOrganization(members);
     for (const seed of OBJECTIVE_SEEDS) {
@@ -1011,14 +981,12 @@ async function postMockDataLoadIn(
             objectiveMemberPools, STARK_ORGANIZATION,
             `${seed.id}:revision`,
         );
-        // Task 3: create threads the triple — the operation
-        // pair plus its two synthesized siblings (document,
-        // revision), each pre-formed in pass 1 under its own
-        // deterministic key (seed-message-pairs.ts) — the
-        // flows precedent, objectives' own fixed 1+1+1. The
+        // Create threads the triple — the operation pair plus
+        // its two synthesized siblings (document, revision),
+        // each pre-formed in pass 1 under its own deterministic
+        // key (seed-message-pairs.ts) — fixed 1+1+1. The
         // revision id is recomputed identically to
-        // objectiveSeedBody's own construction (deterministic,
-        // never random), the mock-data-pairs.test.ts precedent.
+        // objectiveSeedBody's own construction (deterministic).
         const revisionId = `${seed.id}:${MOCK_SEED_TIMESTAMP}`;
         const objectivePairs: ObjectiveCreationPairs = {
             operation: requirePair(
@@ -1043,7 +1011,8 @@ async function postMockDataLoadIn(
         );
     }
 
-    // Organization '2' owns one objective so each org owns at least one.
+    // Organization '2' owns one objective so each org owns
+    // at least one (pair plane only after Task 2 strip).
     const org2RevisionId =
         `${ORGANIZATION_TWO_OBJECTIVE.id}:${MOCK_SEED_TIMESTAMP}`;
     await postObjectiveCreationOp(
@@ -1158,7 +1127,6 @@ export async function postBootstrap(
         systemIdentityPair,
         roleGrantPair,
         systemStateEventPair,
-        systemStateEventAt,
         defaultOrganizationPair,
         organizationPair,
     } = await formBootstrapMessagePair(nowUtc());
@@ -1174,11 +1142,26 @@ export async function postBootstrap(
             view, currentMemberBody, currentMemberPairs,
             membershipPair, systemMemberPair, piiPair,
             systemIdentityPair, roleGrantPair,
-            systemStateEventPair, systemStateEventAt,
+            systemStateEventPair,
             defaultOrganizationPair, organizationPair,
         ),
     );
-    const creds = await seedHumanCredentials(adapter);
+    // Task 1(d): bootstrap's lone human is 'current' with
+    // the same PII body pass 2 wrote — no row read.
+    const bootstrapPii = bootstrapCurrentMemberPiiBody();
+    const bootstrapEmail = bootstrapPii['email'];
+    if (typeof bootstrapEmail !== 'string') {
+        throw new Error(
+            'bootstrap PII body lacks email',
+        );
+    }
+    const creds = await seedHumanCredentials(
+        adapter,
+        [{
+            identityId: 'current',
+            email: bootstrapEmail,
+        }],
+    );
     await adapter.postSchemaCreation();
     return creds;
 }
@@ -1193,7 +1176,6 @@ async function postBootstrapIn(
     systemIdentityPair: MessagePair,
     roleGrantPair: MessagePair,
     systemStateEventPair: MessagePair,
-    systemStateEventAt: string,
     defaultOrganizationPair: MessagePair,
     organizationPair: MessagePair,
 ): Promise<void> {
@@ -1236,16 +1218,8 @@ async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             membershipPair,
         ),
-        // Task 8 (Phase 11): the row itself STAYS RAW (Path A) —
-        // the SAME direct put as before — but now forms its OWN
-        // message pair beside it, mirroring the mock-data seed's
-        // own per-member sites.
-        adapter.identityDefaultOrganizations.put(
-            bootstrapDefaultOrganizationEventId, {
-                identity_id: 'current',
-                organization_id: STARK_ORGANIZATION,
-                at: MOCK_SEED_TIMESTAMP,
-            }),
+        // Phase Final Task 2: identity_default_organizations
+        // ROW half stripped — pair only.
         appendMessagePair(adapter, defaultOrganizationPair),
         // The 'current' human member row shares its shape
         // with postMockDataLoadIn's human-member seed —
@@ -1273,26 +1247,9 @@ async function postBootstrapIn(
         // pass 1's frozen timestamp (see postBootstrap), never a
         // second nowUtc() call, so it can never drift from what
         // systemStateEventPair was hashed from.
-        adapter.states.postEvent(
-            bootstrapSystemStateEventId,
-            SYSTEM_MEMBER_ID,
-            'active',
-            SYSTEM_MEMBER_ID,
-            systemStateEventAt,
-        ),
         appendMessagePair(adapter, systemStateEventPair),
-        // Task 3 (Phase 12): the row itself STAYS RAW (Path A) —
-        // the SAME direct adapter.organizations.put as before,
-        // via organizationSeedBody's shared construction — but
-        // now forms its OWN message pair beside it, mirroring
-        // postMockDataLoadIn's own organizations sites.
-        adapter.organizations.put(
-            STARK_ORGANIZATION,
-            organizationSeedBody(
-                'Stark Industries', 'acmecorp.com',
-                daysFromNow(300, 0, 0),
-            ),
-        ),
+        // Phase Final Task 2: organizations ROW half stripped
+        // — pair-plane only, mirroring postMockDataLoadIn.
         appendMessagePair(adapter, organizationPair),
         // Task 6: bootstrap's own admin role grant — driven
         // through postRoleGrantDocumentOp, the SAME op

@@ -591,11 +591,12 @@ async () => {
 test('a clients store fault is a 500, never 401',
 async () => {
     const db = await freshDb();
-    // Only EntityNotFoundError means 'unknown client'; any other
+    // Only a null rawReadRow means 'unknown client'; any other
     // fault is a bug and must surface, not wear a 401 mask.
-    (db.clients as unknown as {
-        getById: () => Promise<never>;
-    }).getById = async () => {
+    // Phase 15 gate 6 re-homes the lookup onto rawReadRow.
+    (db as unknown as {
+        rawReadRow: () => Promise<never>;
+    }).rawReadRow = async () => {
         throw new Error('store exploded');
     };
     const res = await handleRequest(db, tokenRequest({
