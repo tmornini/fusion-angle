@@ -15,6 +15,7 @@ import {
     getRecordAttributesByRecord,
 } from './record-attributes.ts';
 import {
+    getWorkOrderCurrentNodeId,
     getWorkOrderTransitionEvents,
 } from './state-events.ts';
 import {
@@ -44,10 +45,13 @@ export class RecordTransitionViolations
     }
 }
 
+// Gate the leave of the CURRENT node — the same node
+// the workbox action screen paints. Required attrs and
+// constraint checks run against that node's refs only;
+// the target node's fields are collected after arrival.
 export async function validateRecordTransition(
     ctx: RequestContext,
     workOrderId: Id,
-    targetNodeId: Id,
     pendingValues:
         ReadonlyMap<RecordAttributeId, string>,
 ): Promise<ConstraintViolation[]> {
@@ -57,14 +61,24 @@ export async function validateRecordTransition(
     const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
-    const targetNode = fg.nodes.find(
-        n => n.id === targetNodeId,
-    );
-    if (!targetNode) {
+    const currentNodeId =
+        await getWorkOrderCurrentNodeId(
+            ctx, workOrderId,
+        );
+    if (currentNodeId === null) {
         throw new Error(
-            'target node not found in work'
+            'work order has no current node: '
+            + workOrderId,
+        );
+    }
+    const currentNode = fg.nodes.find(
+        n => n.id === currentNodeId,
+    );
+    if (!currentNode) {
+        throw new Error(
+            'current node not found in work'
             + ' order flow graph: '
-            + targetNodeId,
+            + currentNodeId,
         );
     }
     const recordId = await getRecordForWorkOrder(
@@ -106,13 +120,13 @@ export async function validateRecordTransition(
     }
 
     const out: ConstraintViolation[] = [];
-    for (const ref of targetNode.attributes) {
+    for (const ref of currentNode.attributes) {
         const attribute = attributeById.get(
             ref.attributeId,
         );
         if (!attribute) {
             throw new Error(
-                'node ' + targetNodeId
+                'node ' + currentNodeId
                 + ' references unknown'
                 + ' attribute '
                 + ref.attributeId,

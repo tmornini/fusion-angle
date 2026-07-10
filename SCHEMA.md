@@ -143,7 +143,7 @@ clients noun).
 
 The append-only ledgers every pair-wired HTTP write appends
 into. Seeded demo data forms pairs pre-tx (`formSeedPair`);
-`EXPECTED_PAIR_COUNT` 1513 / bootstrap 14 is absolute.
+`EXPECTED_PAIR_COUNT` 1514 / bootstrap 14 is absolute.
 Global-spine (pass-through), NOT org-fenced at the store:
 tenancy lives IN `uri_prefix`, enforced at the route gate
 and the write-ownership fence

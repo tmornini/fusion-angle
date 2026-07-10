@@ -99,13 +99,17 @@ applicability rule has two enforcement sites:
 editor filtering the kind picker.
 
 The property-test gate at work-order transitions:
-`validateRecordTransition(ctx, workOrderId, targetNodeId,
-pendingValues)` walks work order → flow → Record →
-attributes; gathers stored values from the pair-plane
-field-values derive (`stateFieldValuesForStateEvent` and
-kin); overlays pending values from the form; runs
-requiredness + `validateAttributeValue`. Returns aggregated
-`ConstraintViolation[]`. `postWorkOrderTransition` throws
+`validateRecordTransition(ctx, workOrderId, pendingValues)`
+resolves the work order's CURRENT node from the ledger,
+walks that node's attribute refs → Record attributes,
+gathers stored values from the pair-plane field-values
+derive (`stateFieldValuesForStateEvent` and kin), overlays
+pending values from the form, and runs requiredness +
+`validateAttributeValue`. The gate matches the workbox
+action screen (current-node fields only) — target-node
+required attrs are checked when the operator leaves that
+node later. Returns aggregated `ConstraintViolation[]`.
+`postWorkOrderTransition` throws
 `RecordTransitionViolations` on non-empty results; the
 workbox page module catches the typed error and surfaces
 the violations banner.
@@ -615,7 +619,7 @@ halves stripped (Stage A); doomed tables +
 `EntityStore` / `StateStore` + the three scoping
 decorators deleted (Stage B); `clients` re-pointed to
 `HistoryEntityStore`; `SNAPSHOT_SCHEMA_VERSION` 2→3;
-seed absolute at EXPECTED_PAIR_COUNT 1513 / bootstrap 14;
+seed absolute at EXPECTED_PAIR_COUNT 1514 / bootstrap 14;
 `simulateLatency` 4.
 
 ### Two claims (never collapse)

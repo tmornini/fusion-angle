@@ -324,7 +324,7 @@ round-trip, in-browser ZIP, snapshot import-validation /
 quota / atomic-import / v2-reject / v3 round-trip, the
 memory + localStorage transaction backends, the tx runners
 and view, the commit batch route, api routing, navigation,
-mock-data validity (pair count 1513 / bootstrap 14 absolute;
+mock-data validity (pair count 1514 / bootstrap 14 absolute;
 fingerprint file shrunk to the clients sentinel), the
 two-tier hazard predicate (`flow-graph-hazard.test.ts`),
 presenter SafeHtml, flow-stats pure math + adapter +

@@ -129,9 +129,10 @@ import { deriveOrganization } from
 // human member at its identity-keyed
 // /identities/:id/default-org/ address; Phase Final Task 2
 // strips the identity_default_organizations ROW half — pairs
-// alone remain) = 1513. A dropped or reordered invocation
+// alone remain) + 1 gate0001 Capture step (R1-FIX-A
+// re-home) = 1514. A dropped or reordered invocation
 // changes this count.
-const EXPECTED_PAIR_COUNT = 1513;
+const EXPECTED_PAIR_COUNT = 1514;
 
 test('a mock-data seed populates balanced pairs',
 async () => {

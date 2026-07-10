@@ -33,7 +33,7 @@ type TableFingerprint = { count: number; hash: string };
 const EXPECTED: Record<string, TableFingerprint> = {
     // All dual-written families RETIRED (Phase Final Task 2):
     // seed row halves stripped; pairs stay at
-    // EXPECTED_PAIR_COUNT 1513. Tables empty until Stage B
+    // EXPECTED_PAIR_COUNT 1514. Tables empty until Stage B
     // deletion. SFV seed leaf pairs SURVIVE (WRS + 7 pairs).
     // clients remains empty (no seed dual-write; hash pin).
     'clients': { count: 0, hash: '811c9dc5' },

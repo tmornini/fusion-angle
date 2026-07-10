@@ -67,7 +67,7 @@ That mechanism will replace the existing ledger's and common states system by mo
 └─|─ /snapshots/
   |  └── export                               • TARGET-STATE: not shipped as a dedicated route today — export is client-side over GET /snapshots/schema (full snapshot body); a first-class /snapshots/export remains a known future addition
   |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; version gate SNAPSHOT_SCHEMA_VERSION 3 — pre-Final v2 rejected; survivor keys clients+requests+responses)
-  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1513 pairs / bootstrap 14 absolute through Phase Final; SeededCredentials re-pointed off identity rows at Final Task 1(d))
+  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1514 pairs / bootstrap 14 absolute through Phase Final; SeededCredentials re-pointed off identity rows at Final Task 1(d))
   |  └── schema                               • RECONCILED: GET|DELETE /snapshots/schema (existence + full export, or drop)
   |  └── bootstrap                            • RECONCILED: POST /snapshots/bootstrap (pristine minimal seed)
   |  └── pristine                             • TARGET-STATE: deferred — bootstrap covers the minimal seed today; a dedicated /snapshots/pristine remains a known future addition if the two seed paths must diverge on the wire

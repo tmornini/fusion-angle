@@ -245,9 +245,8 @@ test(
 
 test(
     'the gate-violation work order has a current'
-    + ' node whose next-edge target has at least'
-    + ' one required attribute with a null stored'
-    + ' value',
+    + ' node with at least one required attribute'
+    + ' with a null stored value',
     async () => {
         const db = await seeded();
         const woId = 'gateV101W0rkOrd3rXY0a1';
@@ -292,6 +291,14 @@ test(
             + ' transition',
         );
         const currentNodeId = latest!.state;
+        const currentNode = flowGraph.nodes.find(
+            n => n.id === currentNodeId,
+        );
+        assert.ok(
+            currentNode,
+            'current node must exist on the'
+            + ' frozen flow graph',
+        );
 
         const outgoing = flowGraph.edges.filter(
             e => e.fromNodeId === currentNodeId,
@@ -300,12 +307,6 @@ test(
             outgoing.length > 0,
             'current node should have outgoing'
             + ' edges so the gate is reachable',
-        );
-        const targetIds = new Set(
-            outgoing.map(e => e.toNodeId),
-        );
-        const targetNodes = flowGraph.nodes.filter(
-            n => targetIds.has(n.id),
         );
 
         const eventIds = transitions.map(t => t.id);
@@ -322,25 +323,26 @@ test(
             values.map(v => v.attribute_id),
         );
 
+        // Current-node gate: required refs on the
+        // node the operator is leaving, not the
+        // target of the next edge.
         const violations: string[] = [];
-        for (const node of targetNodes) {
-            for (const ref of node.attributes) {
-                if (
-                    ref.isRequired
-                    && !storedAttrIds.has(
-                        ref.attributeId,
-                    )
-                ) {
-                    violations.push(
-                        ref.attributeId,
-                    );
-                }
+        for (const ref of currentNode!.attributes) {
+            if (
+                ref.isRequired
+                && !storedAttrIds.has(
+                    ref.attributeId,
+                )
+            ) {
+                violations.push(
+                    ref.attributeId,
+                );
             }
         }
         assert.ok(
             violations.length > 0,
             'gate WO must trip on at least one'
-            + ' required attribute',
+            + ' required CURRENT attribute',
         );
     },
 );

@@ -218,11 +218,12 @@ export async function postWorkOrderTransition(
     const pendingValues = new Map(
         Object.entries(values),
     );
+    // Current-node gate: form fields + requiredness
+    // match the node the operator is leaving.
     const violations = await
         validateRecordTransition(
             ctx,
             workOrderId,
-            edge.toNodeId,
             pendingValues,
         );
     if (violations.length > 0) {

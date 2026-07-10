@@ -409,12 +409,12 @@ export function buildWorkOrders():
             flow_graph: prcGraph(),
             position: 44,
         },
-        // Gate violation case: sits at Create with
-        // no values captured. The next transition
-        // to Data Capture must trip the property-
-        // test gate on Company Name + Contact
-        // Email (both Required, both null) — the
-        // reachable browser-testing case.
+        // Gate violation case: sits at Data Capture
+        // with no values captured. Leaving Capture
+        // (submit → Review) trips the property-test
+        // gate on Company Name + Contact Email (both
+        // Required on the CURRENT node, both null) —
+        // the fillable browser-testing case (R13/R14).
         {
             id: 'gateV101W0rkOrd3rXY0a1',
             display_id: 'gate0001',
@@ -2534,9 +2534,10 @@ export function buildWorkOrderStateEvents():
             at: daysFromNow(-3, 14, 0),
         },
         // stays at Decision -- no more transitions
-        // Gate-violation work order: only a Create
-        // event; transitioning to Data Capture
-        // trips the gate on Company Name + Email.
+        // Gate-violation work order: Create then
+        // Data Capture with no field values. Leaving
+        // Capture trips the gate on Company Name +
+        // Email (current-node required attrs).
         {
             id: 'gvSe01CreateGateV101AB',
             entity_id:
@@ -2544,6 +2545,14 @@ export function buildWorkOrderStateEvents():
             state: woNodeNew,
             member_id: woPersonSarah,
             at: daysFromNow(-1, 9, 0),
+        },
+        {
+            id: 'gvSe02CaptureGateV101C',
+            entity_id:
+                'gateV101W0rkOrd3rXY0a1',
+            state: woNodeCapture,
+            member_id: woPersonSarah,
+            at: daysFromNow(-1, 10, 0),
         },
     ];
 }

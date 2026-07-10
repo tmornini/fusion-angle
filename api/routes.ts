@@ -2860,7 +2860,7 @@ export const WRITE_RESPONSE_SPECS:
     // SURVIVES — formSeedPair re-forms the 7 mock
     // state_field_values pairs at
     // states/:id/field-values/:fvid on every reseed
-    // (EXPECTED_PAIR_COUNT 1513 absolute). Live product
+    // (EXPECTED_PAIR_COUNT 1514 absolute). Live product
     // writes ride the transition fold only; address-
     // formation machinery must stay for seed fidelity.
     'states/:id/field-values/:fvid': {

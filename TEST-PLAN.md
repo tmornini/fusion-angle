@@ -556,7 +556,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
-- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly three: `clients`, `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 14; demo seed 1513). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread. Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
+- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly three: `clients`, `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 14; demo seed 1514). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread. Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -2655,16 +2655,19 @@ write-domain collision.
   + Required checkbox + remove (×) button; picker dropdown
   lists unreferenced attributes only.
 - [ ] **R13** From workbox, open the gate-violation work
-  order (`#gate0001`). PASS: current node is the Create
-  node; the transition to Data Capture is blocked and a
-  violations banner appears below the attributes naming
-  Company Name and Contact Email as the required fields
-  that failed. (The banner is rendered by
-  `WorkboxDetailPresenter.buildViolations` from the typed
-  `RecordTransitionViolations` error — not a generic
-  toast.)
-- [ ] **R14** Fill the required values, transition. PASS:
-  transition succeeds; the work order advances.
+  order (`#gate0001`). PASS: current node is Data Capture;
+  the action screen shows Company Name and Contact Email
+  inputs (fillable path); empty submit is blocked — the
+  page-module empty-required pre-check toasts "Please fill
+  all required attributes" before the POST. The typed
+  gate (`validateRecordTransition` on CURRENT-node refs)
+  is the durable covenant; CLI pins it; constraint
+  failures still surface via
+  `WorkboxDetailPresenter.buildViolations` banner.
+- [ ] **R14** Fill Company Name + Contact Email, click
+  submit. PASS: transition succeeds; work order advances
+  to Review (does NOT demand Reviewer Notes — that is
+  current-node only when leaving Review).
 - [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
 - [ ] **R15** Archive a Record from its detail page (if a
   control exists in the toy) or via the snapshot wipe.
@@ -2679,7 +2682,7 @@ Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fus
 
 - [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 4 object stores (3 tables in `TABLE_NAMES` — `clients`, `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
-- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org (1513 pairs absolute).
+- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org (1514 pairs absolute).
 - [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
 - [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct pairs concurrently (e.g. two lifecycle state changes). PASS: both pairs survive (count grows by 2) — the old localStorage clobber is gone.
 - [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).

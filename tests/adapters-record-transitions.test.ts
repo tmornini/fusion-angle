@@ -111,10 +111,10 @@ async function seedWorkOrder(
 
 // NAMED re-pin (Task 7): the flipped GET flows/:id/records
 // derives from the message ledger too, the SAME reason as
-// seedFlowLink's own flows/:id/work-orders re-pin above — a raw
-// db.flowRecords.put leaves no pair at this address, so the
-// binding must land through the SAME wire-reachable PUT the
-// live route serves.
+// seedFlowLink's own flows/:id/work-orders re-pin above — a
+// raw db.flowRecords.put leaves no pair at this address, so
+// the binding must land through the SAME wire-reachable PUT
+// the live route serves.
 async function seedBinding(
     db: MemoryDbAdapter,
     flowId: string,
@@ -222,7 +222,7 @@ test(
         );
         const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target', new Map(),
+            ctx, 'wo-1', new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -230,8 +230,55 @@ test(
 
 test(
     'validateRecordTransition returns a required'
-    + ' violation when the target node has a'
+    + ' violation when the CURRENT node has a'
     + ' required attribute with no stored value',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedSystemMember(db);
+        const flowGraph = buildFlowGraph(
+            [
+                buildNode('n-create', [], {
+                    isCreate: true,
+                }),
+                buildNode('n-step', [{
+                    attributeId: 'a-1',
+                    mode: 'editable',
+                    isRequired: true,
+                }]),
+                buildNode('n-target'),
+            ],
+            [
+                buildEdge('e-1', 'n-create', 'n-step'),
+                buildEdge('e-2', 'n-step', 'n-target'),
+            ],
+        );
+        // WO sits ON the step that owns the required
+        // attr — the form paints current-node fields;
+        // the gate must check the same node.
+        await seedWorkOrder(
+            db, 'wo-1', flowGraph, 'n-step',
+        );
+        await seedBinding(db, 'flow-1', 'rec-1');
+        await seedFlowLink(db, 'flow-1', 'wo-1');
+        await seedAttribute(db, 'a-1', 'rec-1', {
+            name: 'Email',
+        });
+        const ctx = createRequestContext(db, await devToken());
+        const out = await validateRecordTransition(
+            ctx, 'wo-1', new Map(),
+        );
+        assert.equal(out.length, 1);
+        assert.equal(out[0]!.kind, 'required');
+        if (out[0]!.kind !== 'required') return;
+        assert.equal(out[0]!.attributeName, 'Email');
+    },
+);
+
+test(
+    'validateRecordTransition does not require'
+    + ' TARGET-node attributes when the current'
+    + ' node is clean',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -249,6 +296,9 @@ test(
             ],
             [buildEdge('e-1', 'n-create', 'n-target')],
         );
+        // At Create (no attrs). Target requires Email —
+        // pre-fix gate would fail; current-node gate
+        // must pass so the operator can enter and fill.
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-create',
         );
@@ -259,19 +309,16 @@ test(
         });
         const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target', new Map(),
+            ctx, 'wo-1', new Map(),
         );
-        assert.equal(out.length, 1);
-        assert.equal(out[0]!.kind, 'required');
-        if (out[0]!.kind !== 'required') return;
-        assert.equal(out[0]!.attributeName, 'Email');
+        assert.deepEqual(out, []);
     },
 );
 
 test(
     'validateRecordTransition passes when a'
-    + ' required attribute has a satisfying'
-    + ' stored value',
+    + ' required CURRENT attribute has a'
+    + ' satisfying stored value',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -328,7 +375,7 @@ test(
             name: 'Email',
         });
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target', new Map(),
+            ctx, 'wo-1', new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -337,7 +384,7 @@ test(
 test(
     'validateRecordTransition lets pendingValues'
     + ' override stored values to satisfy a'
-    + ' required check',
+    + ' required check on the CURRENT node',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -347,16 +394,20 @@ test(
                 buildNode('n-create', [], {
                     isCreate: true,
                 }),
-                buildNode('n-target', [{
+                buildNode('n-step', [{
                     attributeId: 'a-1',
                     mode: 'editable',
                     isRequired: true,
                 }]),
+                buildNode('n-target'),
             ],
-            [buildEdge('e-1', 'n-create', 'n-target')],
+            [
+                buildEdge('e-1', 'n-create', 'n-step'),
+                buildEdge('e-2', 'n-step', 'n-target'),
+            ],
         );
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-create',
+            db, 'wo-1', flowGraph, 'n-step',
         );
         await seedBinding(db, 'flow-1', 'rec-1');
         await seedFlowLink(db, 'flow-1', 'wo-1');
@@ -365,7 +416,7 @@ test(
         });
         const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target',
+            ctx, 'wo-1',
             new Map([['a-1', 'ABC']]),
         );
         assert.deepEqual(out, []);
@@ -384,16 +435,20 @@ test(
                 buildNode('n-create', [], {
                     isCreate: true,
                 }),
-                buildNode('n-target', [{
+                buildNode('n-step', [{
                     attributeId: 'a-1',
                     mode: 'editable',
                     isRequired: false,
                 }]),
+                buildNode('n-target'),
             ],
-            [buildEdge('e-1', 'n-create', 'n-target')],
+            [
+                buildEdge('e-1', 'n-create', 'n-step'),
+                buildEdge('e-2', 'n-step', 'n-target'),
+            ],
         );
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-create',
+            db, 'wo-1', flowGraph, 'n-step',
         );
         await seedBinding(db, 'flow-1', 'rec-1');
         await seedFlowLink(db, 'flow-1', 'wo-1');
@@ -408,7 +463,7 @@ test(
         });
         const ctx = createRequestContext(db, await devToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', 'n-target',
+            ctx, 'wo-1',
             new Map([['a-1', 'not-an-email']]),
         );
         assert.equal(out.length, 1);
@@ -418,7 +473,7 @@ test(
 
 test(
     'validateRecordTransition throws when the'
-    + ' target node id does not exist on the'
+    + ' current node id does not exist on the'
     + ' work order flow graph',
     async () => {
         const db = new MemoryDbAdapter();
@@ -433,16 +488,17 @@ test(
             ],
             [buildEdge('e-1', 'n-create', 'n-real')],
         );
+        // Ledger points at a node the frozen graph
+        // never had — gate must refuse, not coerce.
         await seedWorkOrder(
-            db, 'wo-1', flowGraph, 'n-create',
+            db, 'wo-1', flowGraph, 'n-ghost',
         );
         const ctx = createRequestContext(db, await devToken());
         await assert.rejects(
             () => validateRecordTransition(
-                ctx, 'wo-1', 'n-ghost',
-                new Map(),
+                ctx, 'wo-1', new Map(),
             ),
-            /target node not found/,
+            /current node not found/,
         );
     },
 );

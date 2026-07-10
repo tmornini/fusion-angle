@@ -178,7 +178,7 @@ export interface SeededCredentials {
 // Phase Final Task 1(d): recipients are the in-memory
 // person/PII list (buildMembers / bootstrap PII body) — never
 // a post-tx identityPii/identities row scan. Stripping the
-// identity-spine row halves must not drop 1513→1502 /
+// identity-spine row halves must not drop 1514→1503 /
 // 14→13 or empty SeededCredentials on the wire.
 type CredentialRecipient = {
     readonly identityId: string;
