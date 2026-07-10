@@ -431,6 +431,41 @@ async function buildFlowPutBody(
 // transient, capped).
 const MAX_PUT_ATTEMPTS = 3;
 
+// Per-flowId save serialization (Phase 14 Task 8 fast-follow).
+// Presenter gestures and flow-operations commitFlowMutation
+// both enqueue here so concurrent puts targeting the same
+// baseline cannot race. Keyed by flowId so DIFFERENT flows
+// never head-of-line block each other. Module-scope Map is a
+// demo-tier concession (single-flow-per-tab); not
+// correctness-load-bearing for multi-tab (putFlow's 412
+// retry still absorbs cross-tab contention).
+const saveChains = new Map<string, Promise<void>>();
+
+// Run `work` after any prior save for this flowId settles.
+// Returns THIS work's own promise (rejects on work failure).
+// The stored chain tail always settles so a later enqueue
+// still runs after a prior failure.
+export function enqueueFlowSave(
+    flowId: string,
+    work: () => Promise<void>,
+): Promise<void> {
+    const previous =
+        saveChains.get(flowId) ?? Promise.resolve();
+    const gated = previous.then(
+        () => undefined,
+        () => undefined,
+    );
+    const thisWork = gated.then(work);
+    saveChains.set(
+        flowId,
+        thisWork.then(
+            () => undefined,
+            () => undefined,
+        ),
+    );
+    return thisWork;
+}
+
 // Save a flow: the flow row PUT, its 'updated' state event, and
 // the graph delta — written atomically through the locked-class
 // PUT /flows/:id. The client echoes the baseline it just read

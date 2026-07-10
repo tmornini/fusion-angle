@@ -37,16 +37,21 @@ pre-Final (v2) export is rejected by a post-Final import
 `identity_tokens` + `authorization_codes`; Phase Final's 2→3
 bump retires every remaining doomed entity table.
 
-**Orphan stores (gate 6).** IndexedDB opens unversioned: a
-pre-Final origin keeps dropped object stores as inert unread
-orphans until `deleteSchema` (full database delete) or a
-fresh reseed. On localStorage, `deleteSchema` iterates only
-the CURRENT `TABLE_NAMES`, so demo-tier orphan keys are never
-reclaimed by reseed. Named residual: pre-Final
-`identity_pii` rows can remain unspliceable after first-time
+**Orphan stores (gate 6) — CANONICAL residual statement.**
+Author gate 6 elected leave-inert (no sweep). IndexedDB opens
+unversioned: a pre-Final origin keeps dropped object stores
+as inert unread orphans until `deleteSchema` (full database
+delete) or a fresh reseed. On localStorage, `deleteSchema`
+iterates only the CURRENT `TABLE_NAMES`, so demo-tier orphan
+keys are never reclaimed by reseed. Named residual: pre-Final
+`identity_pii` rows may remain unspliceable after first-time
 erasure of a pre-Final identity until a full reseed
-(IndexedDB) — see the erasure-completeness theorem's named
-disclaimer.
+(IndexedDB) — live writes no longer dual-write rows, so
+erasure completeness is pair-plane only; the orphan store is
+unread by post-Final code. Named beside the
+erasure-completeness theorem's exported-snapshots disclaimer
+(API.md § THE ERASURE-COMPLETENESS PIN). All other docs
+cross-reference this paragraph; do not restate it.
 
 **Timestamp width:** every persisted timestamp is RFC-3339
 zulu at EXACTLY six fraction digits (`…T12:00:00.000000Z`)

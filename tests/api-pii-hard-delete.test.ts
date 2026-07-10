@@ -324,10 +324,7 @@ test('grant -> accept -> human-member create -> edit -> erase'
     // localStorage session-credentials JWT name claim, and
     // replay resurrection of a RETAINED pre-erasure PUT request
     // are named residuals OUTSIDE this theorem — see API.md.
-    // Gate 6 residual (Phase Final Task 2): the identity_pii
-    // orphan store may hold pre-Final rows on old origins until
-    // Stage B table deletion; live writes no longer dual-write
-    // rows, so completeness is pair-plane only.
+    // Gate 6 residual: SCHEMA.md § Orphan stores (canonical).
     // Phase Final Stage B: identity spine tables retired.
 });
 

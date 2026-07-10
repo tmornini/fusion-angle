@@ -584,6 +584,17 @@ async function performConversion(
             objectiveId, score,
         }),
     );
+    // Strip server-stamped keys: postIdeaConversion's
+    // promotedIdea is Omit<IdeaEntity,'id'|'organization_id'>.
+    // Passing the full entity through a variable bypasses
+    // excess-property checks and 400s at the validator.
+    const {
+        id: _id,
+        organization_id: _organizationId,
+        ...promotedIdea
+    } = ideaEntity;
+    void _id;
+    void _organizationId;
     await postIdeaConversion(
         ctx,
         ideaId,
@@ -604,7 +615,7 @@ async function performConversion(
             position,
         },
         'submitted',
-        ideaEntity,
+        promotedIdea,
         baselines,
         activeObjectives.map(o => o.id),
     );

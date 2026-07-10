@@ -417,9 +417,9 @@ row halves. `EntityStore`, `StateStore`, and the three
 scoping decorators are GONE. IndexedDB's own open is
 UNVERSIONED, so an origin that already has a database never
 re-runs `onupgradeneeded`: an EXISTING pre-Final origin keeps
-dropped stores as harmless, unread orphans (gate 6 PII
-residual named); only `deleteSchema` (a full database
-delete) clears them on IndexedDB.
+dropped stores as harmless, unread orphans (gate 6 residual
+— see SCHEMA.md § Orphan stores); only `deleteSchema` (a
+full database delete) clears them on IndexedDB.
 
 `web-app/app/adapters/init.ts` wires the production IndexedDB
 adapter singleton (`initAdapter()` / `getDbAdapter()`); the
@@ -689,14 +689,9 @@ watch-point).
 
 ### Exit residual (named, not dual-write)
 
-Gate 6 **PII orphan residual**: on a pre-Final origin,
-`identity_pii` rows may persist as an orphan IndexedDB
-store that post-Final code can no longer splice —
-first-time erasure of a pre-Final identity leaves
-orphan-store PII until full `deleteSchema`/reseed; on
-localStorage, reseed never reclaims orphan keys at all.
-Named beside the erasure-completeness theorem's exported-
-snapshots disclaimer. Dual-write mechanics are GONE.
+Gate 6 **PII orphan residual** (leave-inert stands): see
+SCHEMA.md § Orphan stores (gate 6) — the single canonical
+statement. Dual-write mechanics are GONE.
 
 ## Storage tiers
 

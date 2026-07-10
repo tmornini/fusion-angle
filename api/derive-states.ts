@@ -2056,10 +2056,12 @@ export async function invitationLifecycleStatesFor(
 // a document pair at the family's own prefix — via documentPairsAt,
 // the shared family-agnostic reduction (derive-documents.ts),
 // NEVER the family's own document derivation — so an id whose
-// CURRENT head is a hard DELETE (records only, Author gate 9) is
-// still walked: its earlier trio-embedded transitions belong on
-// the real states log forever (append-only), even after the
-// document itself is gone.
+// CURRENT head is a tombstone pair (document DELETE; post-Final
+// every document family is soft-delete on the pair plane; the
+// sole physical hard-delete is PII erasure) is still walked:
+// its earlier trio-embedded transitions belong on the real
+// states log forever (append-only), even after the document
+// itself is gone.
 interface TrioFamily {
     readonly prefix: string;
     readonly stateHistory: (

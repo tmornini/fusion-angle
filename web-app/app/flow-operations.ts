@@ -15,6 +15,7 @@ import {
 import { RequestError } from '../../api/api.ts';
 import {
     putFlow,
+    enqueueFlowSave,
     notifyFlowChange,
     getFlowGraph,
     generateCryptoSafeBase62,
@@ -87,17 +88,20 @@ function snapToSave(
 // row to consume. putFlow's own document pair (written on every
 // call, always) is now what a LATER undo's pair-plane walk finds
 // as "the state before this edit," so the archive write is dead.
+// Routed through enqueueFlowSave (same per-flowId chain as the
+// designer's #queueSave) so graph-edit commits cannot race
+// presenter-originated puts against the same baseline.
 async function commitFlowMutation(
     ctx: RequestContext,
     snap: FlowSnapshot,
     nodes: GraphNode[],
     edges: GraphEdge[],
 ): Promise<void> {
-    await putFlow(
+    await enqueueFlowSave(snap.flowId, () => putFlow(
         ctx,
         snap.flowId,
         snapToSave(snap, nodes, edges),
-    );
+    ));
 }
 
 export type ToastVariant =
