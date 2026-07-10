@@ -149,25 +149,35 @@ time budgets while keeping per-entity mutation domains disjoint:
 
 #### Entity mutation domain scoping
 
-Phase 2 agents share one IndexedDB database but each owns a
-disjoint subset of tables:
+Phase 2 agents share one IndexedDB database. Post-Phase-
+Final there are only three tables (`clients`, `requests`,
+`responses`); every product write appends pairs only. Agents
+own **disjoint pair-address families** (URI prefixes), not
+entity tables — the historical table names below name the
+ADDRESS family each agent mutates:
 
-| Agent | Mutation domain |
+| Agent | Mutation domain (pair-address families) |
 |---|---|
-| Agent-B | creates one human member via signup |
-| Agent-D | `ideas` |
-| Agent-E | `projects` (plus one flow via the project-detail New Flow path) |
-| Agent-F | `flows`, `flow_versions` |
-| Agent-F2 | `work_orders`, `flow_work_orders`, `states` (work-order entity_ids), `state_field_values`, plus its own private flow in `flows`/`flow_versions` |
-| Agent-G | `members`, `human_members`, `ai_members`, `memberships`, `invitations`, `role_grants`, `organizations`, `identities`, `identity_pii`, `identity_credentials`, `identity_providers`, `identity_token_revocations` (the global identity spine + the org-nested roster join tables — disjoint from every other agent's domain; creating/erasing identities and PII does not touch the org-owned entity tables, and roster mutations — Add Member, Invite/accept/decline, membership writes — stay within this agent, so no write-domain collision. Post-roster-flip: `members`/`human_members`/`ai_members`/`memberships` GETs derive from the message ledger, `invitations` derives via the permanent side channel; `identity_providers`/`identity_token_revocations` GETs joined the same derivation at Phase 10; the drift check `tests/drift-roster.test.ts` pins parity. Post-organizations-flip (Phase 12): `GET /organizations` and `GET /organizations/:id` also derive from the message ledger (`api/derive-organizations.ts`); the drift check `tests/drift-organizations.test.ts` pins parity. Post-auth-spine-flip (Phase 13): the per-request tenancy fence (`callerOrganizationIds`) and role fence (`callerRolesInOrganization`, `callerIsOrganizationAdmin`) now derive too (`deriveMembershipsForIdentity`, `deriveRoleGrants`) — reads only, so this agent's write domain is unaffected; the invitation grant's membership-dedup gate derives via `membershipExistsFor` (`grantOutcomeFor`, `api/invitations-domain.ts`); WP8 widens `PUT /identity-token-revocations/:id` to member-tier for a SELF-target only (a member may revoke its own token chain — Region B ownership fence in `api/api.ts` — naming another identity still requires admin), still inside this agent's `identity_token_revocations` domain) |
+| Agent-B | creates one human member via signup (identity + membership + human-member addresses) |
+| Agent-D | `ideas` document + idea lifecycle state pairs |
+| Agent-E | `projects` document pairs (plus one flow via the project-detail New Flow path) |
+| Agent-F | `flows` document + undo operation pairs (graphDelta/revivals live in the flow document body) |
+| Agent-F2 | `work-orders` (claim/transition ops), work-order state pairs, field-values folded into transitions, plus its own private flow document pairs |
+| Agent-G | roster + identity spine + tenancy addresses: `members` / `human-members` / `ai-members`, `memberships`, `invitations`, `role-grants`, `organizations`, `identities` (+ credentials / pii / token-revocations / default-organization). All GETs derive from the message ledger; invitation grant membership-dedup via `membershipExistsFor`; WP8 self-revoke still inside this agent |
 | Agent-CH | none (read-only) |
 
-`identity_tokens` and `identity_default_organizations` stay un-domained. `identity_tokens` is un-domained WITH its table: Phase 13 Task 9 retired the row store outright (alongside `authorization_codes`, also gone) — grant, rotation, and revocation now append their own message pair only, leaving no row-plane write for an agent to own. `identity_default_organizations` stays un-domained because its read (`identityDefaultOrganization`) is shared by the authz fence itself, not read solely for display.
+`identity_tokens` addresses stay un-domained: grant,
+rotation, and revocation append message pairs only (row
+store retired Phase 13 Task 9 with `authorization_codes`).
+`identity_default_organizations` stays un-domained because
+its read (`identityDefaultOrganization`) is shared by the
+authz fence itself.
 
 Agent-F2 owns its source flow because `postWorkOrderCreation`
-freezes `flow_graph` at creation time. If Agent-F edits the
-shared flow concurrently, the captured snapshot reflects
-mid-edit state, not a clean baseline.
+freezes `flow_graph` into the work-order document pair at
+creation time. If Agent-F edits the shared flow
+concurrently, the captured snapshot reflects mid-edit
+state, not a clean baseline.
 
 Because a sibling tab's commit posts a scoped notification
 event (BroadcastChannel) naming the organization/identity it
@@ -177,36 +187,26 @@ matches the current database at read time" framing rather
 than frozen expected values. Agent-CH's dashboard count
 checks are non-zero + consistency, not numeric equality.
 
-**Shared states-log writes are now safe.** The mutation domains
-above partition the *entity* tables, and the append-only
-`states` log is written by several agents at once — Agent-D
-(idea lifecycle), Agent-E (project lifecycle), Agent-G (member
-lifecycle), and Agent-F2 (work-order transitions and claims) all
-append to it. On IndexedDB an append is an O(1) per-row
-`objectStore.put`, not a whole-table rewrite, so concurrent
-appends from sibling tabs both survive — the lost-update hazard
-the localStorage tier could not close is gone (CLAUDE.md §
-Gotchas — "Cross-tab writes are safe"). Re-read tolerantly
-(`≥ N`) for timing rather than asserting exact event counts.
+**Shared pair-plane appends are safe.** Several agents append
+to `requests`/`responses` at once — Agent-D (idea lifecycle),
+Agent-E (project lifecycle), Agent-G (member lifecycle), and
+Agent-F2 (work-order transitions and claims). On IndexedDB an
+append is an O(1) per-row `objectStore.put`, so concurrent
+appends from sibling tabs both survive (CLAUDE.md § Gotchas —
+"Cross-tab writes are safe"). Re-read tolerantly (`≥ N`) for
+timing rather than asserting exact pair counts.
 
-Post-states-flip (Phase 11) + last-readers (Phase 15): the
-appends above still land in the `states` table, but the
-`GET /states` and `GET /entity-states/:id/history` READS
-DERIVE from the message ledger (`deriveStates`/
-`deriveStatesFor`, `api/derive-states.ts`), so every
-states-backed surface (workbox inbox, flow-stats, dashboard,
-the members roster, idea/project/record/objective state
-badges + history views) reads a six-source union, not the
-log — the log stays a storage-only truth until Phase Final.
-`tests/drift-states.test.ts` pins full parity between the
-two planes over the seeded dataset plus live writes. The
-ownership fence re-anchored onto `resolveOwningOrganization`
-(Phase 15 Task 5) makes a foreign org's `entity_id` 404 on
-both the write (`PUT /states/:id`) and the history read
-(`GET /entity-states/:id/history`) — UI-invisible, since no
-legitimate browser flow names a foreign entity's opaque id.
-Also closed: WP1 (organization-as-entity_id forge) and the
-records hard-delete forgery channel.
+Post-Phase-Final: every states-backed surface (workbox inbox,
+flow-stats, dashboard, members roster, idea/project/record/
+objective state badges + history views) reads the six-source
+union from the message ledger (`deriveStates` /
+`deriveStatesFor`). There is no `states` table. The ownership
+fence (`resolveOwningOrganization`) makes a foreign org's
+`entity_id` 404 on both `PUT /states/:id` and
+`GET /entity-states/:id/history`. Also closed: WP1 and the
+records hard-delete forgery channel. Write-ownership fence
+preserves foreign-id PUT/DELETE 404 bytes on org-scoped
+families.
 
 **Retired routes (Phase 15 Task 7) — no browser cases.**
 These addresses have zero product callers; a manual pass
@@ -218,13 +218,11 @@ need not open them. Automated pins cover the status bytes:
   (collection `GET /states/:id/field-values` SURVIVES,
   derived; live writes ride the transition fold only)
 - `GET|POST|PUT|DELETE /flows/:id/versions[...]` → router 404
-  (table remains until Final; F66 still asserts NO live
-  `flow_versions` writes)
+  (table DELETED at Phase Final; F66 is MOOT — see F66)
 
-Browser-gate residual for Final (not a phase abort): a
-full interactive chrome sweep for undo/redo visual +
-cross-tab is still recommended (Phase 14 lesson); Phase 15
-Task 9 covered wire contracts via the 127-test security
+Browser residual (not a phase abort): full interactive
+chrome for undo/redo visual + cross-tab remains useful
+(Phase 14 lesson); wire contracts covered by the security
 suite + HTTP page smoke.
 
 #### Parallel session & connection isolation
@@ -366,14 +364,15 @@ lockups — seven sections fanned out at once, none wedged.
   `drag-reorder.ts`, which uses native HTML5 drag-and-drop
   on the `.drag-handle`, NOT pointer-capture, so they are
   driveable. Work around the gesture cases by
-  validating end-state via direct injection into the
-  `flows` object store (IndexedDB), then reloading and
-  verifying render. When
-  the injection succeeds and the SVG renders the expected end
-  state, the case is **PASS** with the note `verified via JSON
-  injection` — NOT BLOCKED. `BLOCKED` is reserved for cases
-  where neither gesture nor injection produces a verifiable
-  end state.
+  validating end-state via pair-plane fixtures (PUT a
+  flow document pair through the gate, or inspect the
+  `requests`/`responses` stores for the flow's
+  `uri_prefix`/`uri_id`), then reloading and verifying
+  render. When the fixture succeeds and the SVG renders
+  the expected end state, the case is **PASS** with the
+  note `verified via pair fixture` — NOT BLOCKED.
+  `BLOCKED` is reserved for cases where neither gesture
+  nor fixture produces a verifiable end state.
 - **`resize_window`** does not change the CSS viewport;
   responsive tests at specific widths (I10) cannot be driven.
   Inspect `layout.css` manually to verify the mobile-breakpoint
@@ -557,7 +556,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
-- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts`) plus the `__schema__` marker — empty stores plus bootstrap data, including the `states` event log (with the seeded `'system'`-member and `'current'`-user 'active' bootstrap events).
+- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly three: `clients`, `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 14; demo seed 1513). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread. Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -730,8 +729,8 @@ on. Run these in order.
   effect on the canvas.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
-  via direct injection into the `flows` object store
-  (IndexedDB) per the CLAUDE.md workaround.)
+  via pair fixture on the flow document address
+  (`requests`/`responses`) per the protocol workaround.)
 - [ ] **AA29** Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
@@ -897,7 +896,7 @@ on. Run these in order.
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, so create the zero-membership state via DevTools (the B21 precedent): sign in as a single-org seeded member, open Application → IndexedDB → `memberships`, delete every row whose `identity_id` is that member (also clear their `identity_default_organizations` rows). `getOrganizations` is fenced to the `memberships` ledger, so the identity now reaches no org. Their login credential is untouched.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, so create the zero-membership state via pair fixtures (the B21 precedent): sign in as a single-org seeded member, then append a DELETE-shaped membership document pair (and clear any default-organization pairs) for that identity through the gate or by inserting matching `requests`/`responses` rows — do NOT poke a retired `memberships` table. `getOrganizations` is fenced to the derived membership ledger, so the identity now reaches no org. Their login credential is untouched.
 
 - [ ] **B25** From the zero-membership state, sign out, then sign in again with that member's credentials. PASS: lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher.
 - [ ] **B26** From the zero-membership state while signed in, open `dashboard/index.html` (or any org-gated page) directly and reload (Cmd-R). PASS: redirected to `invitations/index.html` by the boot org gate — no dashboard error card, no retry loop (the returning-user path, not just fresh login).
@@ -1201,8 +1200,8 @@ opens and renders.)
   transitions.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
-  via direct injection into the `flows` object store
-  (IndexedDB) per the CLAUDE.md workaround.)
+  via pair fixture on the flow document address per
+  the protocol workaround.)
 - [ ] **F12** Pan so a node sits near the right
   edge of the canvas, then double-click it. PASS:
   the properties panel slides out from the
@@ -1211,8 +1210,8 @@ opens and renders.)
   of the canvas region not covered by the panel.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
-  via direct injection into the `flows` object store
-  (IndexedDB) per the CLAUDE.md workaround.)
+  via pair fixture on the flow document address per
+  the protocol workaround.)
 - [ ] **F13** While the panel is open, double-click
   a different node. PASS: panel content updates to
   the new selection and the canvas re-centers on
@@ -1451,11 +1450,10 @@ each step.)
   reverts in order — undo history is NO LONGER capped at 10
   (Phase 14 Task 8 retired the `FLOW_VERSION_CAP` trim from the
   live path; undo now walks the flow's own full document-pair
-  history). Inspect the `flow_versions` store in DevTools: it
-  stays EMPTY for this `flow_id` throughout — the table is no
-  longer written on the live path (`tests/adapters-flow-
-  versions.test.ts` still covers its dead-but-present
-  publish/cap-trim logic directly, off the live route).
+  history). The `flow_versions` store is DELETED (Phase
+  Final) — there is nothing to inspect; the flow's own
+  document-pair history in `requests`/`responses` is the
+  sole undo source.
 - [ ] **F46** Edit a flow (rename a state), let auto-save complete.
   Navigate away from the designer to `flows/index.html`. Re-open the
   same flow. Click Undo. PASS: the rename reverts — the undo history
@@ -1526,9 +1524,10 @@ designer "tag current" action lands.)
 - [ ] **F59** Tick one human checkbox and one AI checkbox.
   Reload the page and reopen the same node panel. PASS:
   the same two checkboxes are still ticked. Inspect the
-  `flows` object store (DevTools → Application → IndexedDB →
-  `fusion-ai`) — the node carries
-  `memberIds: [<humanId>, <aiId>]`.
+  flow's head document pair in `requests`/`responses`
+  (DevTools → Application → IndexedDB → `fusion-ai`) —
+  the stored graphDelta / graph body carries
+  `memberIds: [<humanId>, <aiId>]` on that node.
 - [ ] **F60** Untick one of the two checkboxes. Reload the
   page and reopen the panel. PASS: only the remaining
   ticked member persists in `memberIds`.
@@ -1549,13 +1548,11 @@ designer "tag current" action lands.)
 - [ ] **F65** Open an edge panel. PASS: the header shows
   "Transition Properties" title and close button — no
   Members fieldset.
-- [ ] **F66** Inspect the `flow_versions` object store
-  (IndexedDB) before and after a `memberIds` change. PASS: NO
-  new row appears — `flow_versions` is no longer written on
-  the live path (Phase 14 Task 8) and its HTTP routes are
-  retired (Phase 15 Task 7, router 404); member assignment is
-  captured only in the flow's own document-pair history, in
-  `requests`/`responses`. F67 confirms the change is still
+- [ ] **F66** MOOT (Phase Final). The `flow_versions` table and
+  object store are DELETED; there is nothing to inspect.
+  Member assignment is captured only in the flow's own
+  document-pair history (`requests`/`responses`). Confirm
+  via pair fixtures or F67: a `memberIds` change is still
   undoable through that history.
 - [ ] **F67** Tick one checkbox in the Members fieldset,
   then press Cmd+Z (Mac) / Ctrl+Z (Win/Linux). PASS: the
@@ -1759,20 +1756,22 @@ designer "tag current" action lands.)
 - [ ] **WB18** Open the same unclaimed work order in two browser
   tabs. In tab 1, click the row to claim it. In tab 2, attempt the
   same. PASS: tab 2 either navigates to a read-only/already-claimed
-  view or the claim is rejected — and the `states` store
-  contains at most one live `'claimed'` event for this work
-  order's `entity_id` (a stale prior claim is superseded by a
-  materialized `'claim_expired'` event, never overwritten in
-  place).
+  view or the claim is rejected — and the pair plane carries at
+  most one live `'claimed'` event for this work order's
+  `entity_id` under the `(at, id)` reduction (a stale prior claim
+  is superseded by a `'claim_expired'` event, never overwritten
+  in place). Inspect via `requests`/`responses` or derived
+  `GET /entity-states/:id/history`.
 - [ ] **WB19** After transitioning a work order through at
-  least two states, read the `states` store from DevTools and
-  filter to `entity_id` = this work order's id. PASS: each
+  least two states, read the derived history
+  (`GET /entity-states/:id/history` or the matching pairs in
+  `requests`/`responses`) for this work order's id. PASS: each
   non-claim event has the immutable shape `{id, entity_id,
   state, member_id, at}`, with `state` carrying the target
-  node's base62 id — the field values themselves live in the
-  `state_field_values` join table per Codd 1NF, referencing
-  the parent event by `state_event_id`. Verify no app code
-  path mutates an existing event row — the states log is
+  node's base62 id — field values derive from the
+  transition-fold / leaf pairs (`stateFieldValuesForStateEvent`),
+  referencing the parent event by `state_event_id`. Verify no
+  app code path mutates an existing pair — the message plane is
   append-only.
 
 ### Workbox — All-See-All Visibility
@@ -2206,27 +2205,19 @@ restored data.)
   saved it — continue" → redirects to `dashboard/index.html`.
   Dashboard renders with zeroed-out metrics (empty
   database except for the required bootstrap seed). Empty
-  bootstrap seeds only org `'1'` (Stark Industries). Every
-  object store maps to a table in `TABLE_NAMES` and is empty
-  EXCEPT `members` (parent rows for the System member,
-  `type` 'system', and Tony Stark, `type` 'human'),
-  `identities` (the System service + the 'current' person),
-  `identity_pii` (Tony Stark's PII), `human_members` (Tony
-  Stark's detail row), `identity_credentials` (current's
-  password + the System client secret), `memberships` and
-  `identity_default_organizations` (current bound to Stark),
-  `role_grants` (current's admin grant on Stark),
-  `organizations` (Stark Industries), and `states`
-  (bootstrap state events for those rows). NOTE: pristine
-  seeds NO Records —
-  `records` and `record_attributes` are empty like every
-  other non-essential table. Source of truth:
-  `postBootstrap` in `api/mock-data.ts`. IndexedDB
-  stores each row as an object — no `gz1` compression, which
-  was the localStorage tier — and the `__schema__` marker
-  store holds one row. The full table set is the constant
-  `TABLE_NAMES` in `api/db.ts`; cross-check against that. No
-  object stores outside that list (plus `__schema__`) appear.
+  bootstrap seeds only org `'1'` (Stark Industries) as
+  **14 message pairs** (absolute) covering System + Tony
+  Stark identity/PII/credentials/membership/role-grant/
+  organization/state events — derived reads, not entity
+  tables. `clients` is empty (sentinel). NOTE: pristine
+  seeds NO Records. Source of truth: `postBootstrap` in
+  `api/mock-data.ts`. IndexedDB stores each row as an
+  object — no `gz1` compression — and the `__schema__`
+  marker store holds one row. The full table set is
+  `TABLE_NAMES` in `api/db.ts` (three survivors); no
+  object stores outside that list (plus `__schema__`)
+  appear on a post-Final origin (pre-Final orphans may
+  linger inert — gate 6).
 - [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — Stark's 6 ideas are back (the seed plants 11 ideas total, split across both orgs via `assignOrg`; the org fence shows only the active org's).
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 - [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion.active-org` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/org-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/org-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrg`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
@@ -2248,21 +2239,20 @@ restored data.)
   `tests/snapshot-wipe-on-fail.test.ts` (now atomic-rollback) —
   this case verifies the error toast/inline-error surfaces in the
   UI.)
-- [ ] **G41** Member lifecycle is recorded in the `states`
-  event log. On a member detail page (human OR AI), click
+- [ ] **G41** Member lifecycle is recorded on the pair
+  plane. On a member detail page (human OR AI), click
   Edit, change the State select (active / pending /
   archived), and Save. PASS: the chosen state is written
   via `postHumanMemberStateChange` /
   `postAIMemberStateChange` — both kinds expose the same
   State select and share the 3-value vocabulary per
-  Commandment III (Uniformity). Verify by inspecting the
-  `states` store in DevTools: a row appears with
+  Commandment III (Uniformity). Verify via
+  `GET /entity-states/:id/history` or the matching pairs
+  in `requests`/`responses`: an event with
   `entity_id` = the member's id, `state` = the chosen
-  value, `member_id` = the actor, and the member row in
-  `members` / `ai_members` itself is unchanged — the
-  states log carries the lifecycle stage, not a column on
-  the entity. After reload the member's badge text and
-  styling reflect the persisted state.
+  value, `member_id` = the actor appears — lifecycle is
+  not a column on a member row. After reload the member's
+  badge text and styling reflect the persisted state.
 - [ ] **G37 — Boot recovery from a missing schema** With the app loaded, open DevTools → Application → IndexedDB and delete the `fusion-ai` database (or clear the `__schema__` store). Reload a schema-requiring page (e.g. `dashboard/index.html`). PASS: boot reopens a fresh empty database, `hasSchema()` is false, and `core.ts` REDIRECTS to `snapshots/index.html` with the "Your database is empty." banner and the four recovery cards (Download Snapshot / Upload Snapshot / Wipe and Load Mock Data / Create Pristine) — never the terminal "Failed to initialize database" dead-end. Afterward, Wipe and Load Mock Data to restore a healthy DB before continuing. (Unlike the old localStorage tier, IndexedDB object stores always exist post-upgrade, so a hand-corrupted "partial table" shape is no longer reproducible; a genuinely missing store arises only on a schema version bump, where boot throws `MissingTableError` and `redirectIfMissingTable` routes to `snapshots/index.html?missing-table=<name>` with the matching "The schema is missing the \"<name>\" table" banner.) Source: `web-app/app/core.ts` (`redirectIfMissingTable` + the `initDatabase()` catch), `web-app/app/adapters/snapshots.ts` (`getHasAnyHumanMembers`), `web-app/snapshots/index.ts` (`mutateMissingTableBanner`).
 
 ### Billing (`billing/`) — STUB
@@ -2687,15 +2677,15 @@ Backend: `api/backend-indexeddb.ts`. No Node test (no fake-IDB, zero devDeps) �
 
 Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fusion-ai` database, so they need exclusive DB access alongside G30–G35 — never concurrently with the seven Phase 2 agents.
 
-- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 40 object stores (39 tables + `__schema__`).
+- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 4 object stores (3 tables in `TABLE_NAMES` — `clients`, `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
-- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and table rows persist; the dashboard renders the seeded org.
+- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org (1513 pairs absolute).
 - [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
-- [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct `states` rows concurrently. PASS: both rows survive (count grows by 2) — the old localStorage clobber is gone.
+- [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct pairs concurrently (e.g. two lifecycle state changes). PASS: both pairs survive (count grows by 2) — the old localStorage clobber is gone.
 - [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).
-- [ ] **L7** Atomic import. The clear+put import runs in one `IDBTransaction`. PASS: a rejected import leaves prior data intact (no corruption).
+- [ ] **L7** Atomic import. The clear+put import runs in one `IDBTransaction`. PASS: a rejected import leaves prior data intact (no corruption). A real pre-Final v2 snapshot REJECTS with `SnapshotVersionMismatchError`.
 - [ ] **L8** Quota pre-flight. PASS: an oversize snapshot rejects with `SnapshotTooLargeError` before any write (also `tests/snapshot-quota.test.ts`).
-- [ ] **L9** Bare-DB self-heal. On a 404 path (no app connection), run `indexedDB.deleteDatabase('fusion-ai')` then `indexedDB.open('fusion-ai', 1)` with NO `onupgradeneeded` handler — forging a v1 DB with 0 object stores and no `__schema__` — then load a real page. PASS: `open()` (`api/backend-indexeddb.ts`) sees the missing `__schema__` store, deletes and reopens so the upgrade rebuilds all 40 stores, and the app boots to the graceful empty-state (Snapshots route + working "Wipe and Load Mock Data"), NOT a "Failed to initialize database" dead-end.
+- [ ] **L9** Bare-DB self-heal. On a 404 path (no app connection), run `indexedDB.deleteDatabase('fusion-ai')` then `indexedDB.open('fusion-ai', 1)` with NO `onupgradeneeded` handler — forging a v1 DB with 0 object stores and no `__schema__` — then load a real page. PASS: `open()` (`api/backend-indexeddb.ts`) sees the missing `__schema__` store, deletes and reopens so the upgrade rebuilds all 4 stores (3 tables + `__schema__`), and the app boots to the graceful empty-state (Snapshots route + working "Wipe and Load Mock Data"), NOT a "Failed to initialize database" dead-end.
 
 ## J. Teardown
 

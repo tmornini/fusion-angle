@@ -114,60 +114,67 @@ is HTTP-only.
   removed or re-gated when the Postgres server tier lands; see
   [ARCHITECTURE.md](ARCHITECTURE.md) § Server-tier deploy
   blockers.
-- **Tenancy.** Every authenticated request runs org-scoped:
-  `handleRequest` wraps the adapter in
-  `organizationScopedAdapter` bound to the org from the
-  VERIFIED token claim (never the path). A flat (un-exchanged)
-  token resolves its org via `identityDefaultOrganization`:
-  the identity's SET default org
-  (`identity_default_organizations` ledger, latest wins), else its
-  PRIMARY membership org, else a 403 — there is no global default.
-  The membership fence itself derives fresh every request too
-  (`callerOrganizationIds` → `deriveMembershipsForIdentity`,
-  Phase 13), so a revoked membership loses access on the very
-  next request, never waiting on token expiry. `organizations`
-  is the tenant root; `memberships` joins identity↔org; the
-  members roster is derived from that ledger. A `memberships`
-  row is created when an invitee ACCEPTS an `invitations`
-  grant (the only live membership write;
+- **Tenancy.** Every authenticated request runs org-scoped
+  on the **pair plane**. `fenceRequest` completes the vessel
+  with organization, live memberships, and roles from the
+  VERIFIED token claim (never the path); handlers receive
+  `ctx.base` — there is no `organizationScopedAdapter`.
+  Surviving stores are global; tenancy rides `uri_prefix`.
+  A flat (un-exchanged) token resolves its org via
+  `identityDefaultOrganization`: the identity's SET default
+  org (`identity_default_organizations` ledger, latest
+  wins), else its PRIMARY membership org, else a 403 — there
+  is no global default. Membership and roles derive fresh
+  every request (`callerOrganizationIds` →
+  `deriveMembershipsForIdentity`; `deriveRoleGrants`), so a
+  revoked grant loses access on the very next request.
+  Org-scoped PUT/DELETE hit the write-ownership fence
+  (`writeOwnershipFenceFor` → `resolveOwningOrganization`)
+  so a foreign id 404s rather than genesis-ing in the
+  caller's namespace. `organizations` is the tenant root;
+  `memberships` joins identity↔org; the members roster is
+  derived. A membership pair is created when an invitee
+  ACCEPTS an invitation (the only live membership write;
   `web-app/app/adapters/invitations.ts` + the `invitations`
-  facade in `api/api.ts`) — accept stamps the INVITATION's
-  org, not the caller's active org. Per-org roles (also
-  derived, `deriveRoleGrants`) via
-  `currentRolesForInOrganization`. See [SCHEMA.md](SCHEMA.md) /
-  [ARCHITECTURE.md](ARCHITECTURE.md).
+  facade) — accept stamps the INVITATION's org, not the
+  caller's active org. Per-org roles via
+  `currentRolesForInOrganization`. See
+  [SCHEMA.md](SCHEMA.md) / [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over IndexedDB. Adapters
-  in `web-app/app/adapters/` shape rows for pages. The live
-  flow graph is normalized into four relations (`flow_nodes`,
-  `flow_edges`, `flow_node_members`, `flow_node_attributes`)
-  and reassembled at the GET route into `FlowWithGraph`;
-  `flows.graph` is retired live but kept frozen
-  (`flow_versions.graph`, `work_orders.flow_graph`). Flow
+  in `web-app/app/adapters/` shape pages from pair-plane
+  derives. The live flow graph is pair-plane only:
+  `graphDelta` / `revivals` in the flow document body feed
+  `deriveFlowGraphStates`; GET reassemblies
+  `FlowWithGraph`. A work order freezes its own
+  `flow_graph` inside the work-order document pair. Flow
   undo resolves its restore target from the flow's own
   document-pair history (Phase 14 Task 8). Phase 15 retired
   the `flows/:id/versions[...]` routes (and the zero-caller
   `GET states/:id` / `GET entity-states/:id` /
   `PUT|DELETE states/:id/field-values/:fvid` families) —
   bare `GET states/:id` is **405** because PUT survives; the
-  other retirements are router 404. The `flow_versions`
-  table remains until Phase Final. Ownership fences and
-  field-values visibility resolve on the pair plane
-  (`resolveOwningOrganization`,
+  other retirements are router 404. Phase Final DELETED the
+  graph/version tables with the rest of the row plane.
+  Ownership fences and field-values visibility resolve on
+  the pair plane (`resolveOwningOrganization`,
   `stateEventVisibilityFor`). Flow tags
-  (`flows/:id/tags/:name`) are the first document family with
-  no backing table, derived entirely from message pairs.
+  (`flows/:id/tags/:name`) are the first document family that
+  never had a backing table; post-Final every family shares
+  that posture.
 - **Presentation.** Presenters in `web-app/app/presenters/` emit
   `SafeHtml`.
 - **Database.** IndexedDB (`api/backend-indexeddb.ts`): one
   object store per table (`keyPath: 'id'`) plus a `__schema__`
-  marker store, at version 1. Every store op crosses the
+  marker store, at version 1. `TABLE_NAMES` is three:
+  `clients`, `requests`, `responses` — all on
+  `HistoryEntityStore`. Every store op crosses the
   `StorageBackend` transaction seam (`api/db.ts`) — a real
   `IDBTransaction` that commits on `oncomplete` and aborts on a
   thrown body. The memory + localStorage backends simulate the
   same transaction (buffer then flush) for the automated suite
-  and the demo tier. The `states` table is the unified
-  append-only event log — storage truth and the state
-  alphabets in [SCHEMA.md](SCHEMA.md).
+  and the demo tier. Domain state derives from the message
+  plane; alphabets live in `api/types.ts` /
+  [SCHEMA.md](SCHEMA.md).
 - **State.** Module-level vars + pub-sub for theme, mobile,
   auth, sidebar.
 
@@ -308,47 +315,30 @@ Two layers, both zero-dependency.
 Node's built-in `node:test` runner with `--strip-types`,
 no test-framework dependency (the only devDependencies are
 `esbuild` and `typescript`, for ./build and ./validate).
-Tests cover
-pure modules, flow-edit business logic and the connection-
-validation rules (`tests/flow-operations.test.ts`), the flow
-version/query adapters, every data adapter (including
-`adapters-members-union.test.ts` for the member union seam
-and `adapters-flow-publish.test.ts` for
-`validateFlowForCreation` / `getFlowsForCreation`), the
-workbox inbox aggregation, the mermaid round-trip,
-in-browser ZIP, snapshot import-validation/quota/atomic-import,
-the memory + localStorage transaction backends
-(`backend-tx-memory`, `backend-tx-localstorage`), the tx
-runners and view, the org-fence-in-tx, the commit batch route,
-api routing, navigation, mock-data validity, the two-tier
-hazard predicate (`tests/flow-graph-hazard.test.ts` covers
-`shouldShowMemberHazard`), and the SafeHtml output of the
-presenters (`presenter-member-detail.test.ts` checks the AI
-variant renders its model and skill focus); the
-automated suite also covers `flow-stats-aggregate`
-(pure heat / sojourn / path /
-clan math), `adapters-flow-stats` (the read-only adapter
-via `MemoryDbAdapter`), `presenter-flow-stats` (the SafeHtml
-shape — including the *absence* of editor affordances), and
-`duration-units` (the compact ascending-unit duration
-formatter), and the invitation lifecycle
-(`adapters-invitations.test.ts` for grant/accept/decline/
-revoke + derive-from-states, `api-invitations-fence.test.ts`
-for the org fence + authz, `presenter-invitation-list.test.ts`
-for the SafeHtml); Phase 14 added the view-accepting
-write-path cores' drift/parity suite
-(`drift-phase14-cores-parity.test.ts`), the SFV two-source-
-union derive (`drift-state-field-values.test.ts`), the
-invitation write-path parity pin
-(`pin-invitation-write-path-parity.test.ts`), the undo-as-
-replay cursor algorithm (`flow-undo-cursor.test.ts`), and the
-first pair-plane-only document family
-(`api-flow-tags.test.ts`); Phase 15 added the fence/
-visibility/RESTRICT/immutability parity suite
-(`drift-phase15-cores-parity.test.ts`,
+Tests cover pure modules, flow-edit business logic
+(`tests/flow-operations.test.ts`), every data adapter
+(including `adapters-members-union.test.ts` and
+`adapters-flow-publish.test.ts`), workbox inbox, mermaid
+round-trip, in-browser ZIP, snapshot import-validation /
+quota / atomic-import / v2-reject / v3 round-trip, the
+memory + localStorage transaction backends, the tx runners
+and view, the commit batch route, api routing, navigation,
+mock-data validity (pair count 1513 / bootstrap 14 absolute;
+fingerprint file shrunk to the clients sentinel), the
+two-tier hazard predicate (`flow-graph-hazard.test.ts`),
+presenter SafeHtml, flow-stats pure math + adapter +
+presenter, `duration-units`, and the invitation lifecycle.
+Phase 14 cores: `drift-phase14-cores-parity.test.ts`,
+`drift-state-field-values.test.ts`,
+`pin-invitation-write-path-parity.test.ts`,
+`flow-undo-cursor.test.ts`, `api-flow-tags.test.ts`.
+Phase 15 cores: `drift-phase15-cores-parity.test.ts`,
 `api-states-ownership-fence.test.ts`,
-`derive-state-event-collision.test.ts`) — see `tests/` for
-the current set.
+`derive-state-event-collision.test.ts`. Phase Final adds
+the write-ownership fence pin
+(`api-write-ownership-fence.test.ts`); store/decorator unit
+tests and dual-write shadow-ledger row oracles retired with
+their subjects. See `tests/` for the current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so
 adapter and api-layer tests run without `localStorage`.
 
@@ -426,16 +416,17 @@ apply to it (RED is the audit's first finding).
   its multi-key flush is still not OS-atomic on a mid-write
   quota error — the one gap IndexedDB closes.
 - **Snapshot version gate.** Every export is stamped with
-  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`) at the reserved key
-  `__schema_version__`. Every import REJECTS an absent or
-  mismatched version SERVER-side
+  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`, currently **3**) at
+  the reserved key `__schema_version__`. Every import REJECTS
+  an absent or mismatched version SERVER-side
   (`parseAndValidateSnapshot`, `SnapshotVersionMismatchError`)
   — before the atomicity above ever runs. ASYMMETRIC: it only
   closes "a new build imports an old export"; an old build's
   importer ignores the unknown key and imports anyway. The
   constant bumps whenever `TABLE_NAMES` shrinks — Phase 13
-  Task 9 (identity_tokens + authorization_codes retire) is
-  the first bump, 1→2.
+  Task 9 (identity_tokens + authorization_codes) was 1→2;
+  Phase Final Stage B (doomed entity tables deleted) is 2→3.
+  A pre-Final v2 export is rejected by a post-Final import.
 - **`file:///` protocol.** Page URLs use relative paths.
   Code supports `file:///` locally but testing is HTTP-only.
 - **View Transition aborts.** rapid programmatic navigation
@@ -444,36 +435,35 @@ apply to it (RED is the audit's first finding).
   console — Chromium throws both classes for the same root
   cause. Browser-internal (no app code calls
   `startViewTransition`); no app impact.
-- **The states log is append-only by convention.**
-  `StateStore.postEvent` only appends; the table never deletes.
-  An entity's lifecycle reads as the latest event on its
-  `entity_id`. Reversal is a *new* event with the new state,
-  not an edit of the prior row. Surviving HTTP surface:
-  `GET /states` (derived), `PUT /states/:id` (dual-write +
-  pair-plane immutability strangler),
+- **Lifecycle is append-only on the pair plane.** An
+  entity's current state is the latest derived event on its
+  `entity_id` under the `(at, id)` total order. Reversal is
+  a *new* event with the new state, not an edit of a prior
+  pair. Surviving HTTP surface: `GET /states` (derived),
+  `PUT /states/:id` (pair-only append +
+  `stateEventCollisionFromPairs` immutability),
   `GET /entity-states/:id/history` (derived + pair-plane
   ownership fence), `GET /states/:id/field-values` (derived
   collection). Retired: bare `GET /states/:id` (405 — PUT
   still matches), `GET /entity-states/:id` (404), leaf
   `PUT|DELETE /states/:id/field-values/:fvid` (404). The
-  split between entity-lifecycle event (state log) and
-  relationship-row splice (`EntityStore.delete` on
-  relationship rows like `state_field_values`) is the seam
-  — read `api/store-entity.ts` and `api/store-state.ts`
-  together to see both halves.
+  `states` table, `StateStore`, and `EntityStore` are
+  DELETED (Phase Final). Document DELETE is a marked
+  tombstone pair; the sole physical hard-delete is PII
+  erasure on the message plane.
 - **Cross-tab writes are safe (lost-update hazard closed).**
   IndexedDB gives each tab its own connection to one shared
-  database, and an append is an O(1) `objectStore.put`, not a
-  whole-table rewrite — so two tabs appending to `states`
-  concurrently both survive (verified in-browser). A
-  successful write posts a scoped `NotificationEvent`
-  (organization/identity ids, or a full-refresh event) over a
-  `BroadcastChannel` (`adapters/broadcast-channel.ts`); a
-  subscriber refreshes when the event names its active
-  organization or its own identity, or is a full event. The
-  poster is never echoed, so it does not double-refresh.
-  Theme/sidebar still sync over `StorageEvent` (they stay in
-  localStorage).
+  database, and a pair append is an O(1) `objectStore.put`
+  per row on `requests`/`responses` — concurrent tabs both
+  survive (verified in-browser; H8 app-wide write queue is
+  the accepted single-user cost). A successful write posts a
+  scoped `NotificationEvent` (organization/identity ids, or
+  a full-refresh event) over a `BroadcastChannel`
+  (`adapters/broadcast-channel.ts`); a subscriber refreshes
+  when the event names its active organization or its own
+  identity, or is a full event. The poster is never echoed,
+  so it does not double-refresh. Theme/sidebar still sync
+  over `StorageEvent` (they stay in localStorage).
 - **IndexedDB auto-commit constraint.** An `IDBTransaction`
   lives only while it has pending requests; awaiting any
   NON-IDB promise inside a `transaction(…)` body (a timer,
@@ -481,10 +471,11 @@ apply to it (RED is the audit's first finding).
   commits early. So every `transaction(…)` body awaits ONLY
   row ops — validators, crypto, and compression run OUTSIDE
   the tx. Sync compute between row ops is fine.
-- **`state_field_values.attribute_id` references
-  `record_attributes.id`** (not a table named `attributes`).
-  The semantic note lives in [SCHEMA.md](SCHEMA.md) §
-  state_field_values.
+- **Field values reference record attributes by id** in the
+  pair-plane body (`attribute_id` → a record-attribute
+  document id), never a table named `attributes`. See
+  [SCHEMA.md](SCHEMA.md) and
+  `api/derive-state-field-values.ts`.
 
 ## Commits
 

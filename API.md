@@ -286,22 +286,22 @@ Legend for classification:
 - `GET /objectives/:id/revisions` ·
   `PUT /objectives/:id/revisions/:rid` — nested.
 
-### 2.10 States — the append-only event log
+### 2.10 States — the derived event log
 
-- `GET /states` — primitive, DERIVED (Phase 11 Task 7): the
-  collection reads `deriveStates(db, organization)`
-  (`api/derive-states.ts`), a six-source union over the
-  message ledger reduced by `(at, id)`, returned
-  `byIdAscending`. The old `states` table is untouched
-  (Phase Final deletes it); this route no longer reads it.
-- `PUT /states/:id` — append/stamp a state event; the author
-  is the verified caller, stamped over any client-supplied
-  `member_id`. Gated by the OWNERSHIP FENCE below — a
-  foreign org's entity_id 404s. Immutability is a strangler
-  (Phase 15 Task 6): `stateEventCollisionFromPairs` AND the
-  still-live row `sameEvent` check both run; disagreement
-  when both hold an opinion asserts. 409 bytes stay
-  `LedgerImmutabilityError`. Final strips the row half.
+- `GET /states` — primitive, DERIVED: the collection reads
+  `deriveStates(db, organization)` (`api/derive-states.ts`),
+  a six-source union over the message ledger reduced by
+  `(at, id)`, returned `byIdAscending`. The `states` table
+  is DELETED (Phase Final); this route never read a row
+  store post-flip.
+- `PUT /states/:id` — append/stamp a state event as a pair
+  only; the author is the verified caller, stamped over any
+  client-supplied `member_id`. Gated by the OWNERSHIP FENCE
+  below — a foreign org's entity_id 404s. Immutability is
+  pair-plane only: `stateEventCollisionFromPairs` reduces
+  over 2xx pairs at the event-append address; 409 bytes stay
+  `LedgerImmutabilityError`. The dual-write row half is
+  GONE (Phase Final).
 - `GET /states/:id` — retired (Phase 15 Task 7): zero product
   callers. The pattern STILL matches for PUT, so a bare GET
   is **405** (method-absent), not the router's open-tree
@@ -311,16 +311,16 @@ Legend for classification:
   product callers; router 404 (no pattern match). History
   below is the LIVE current-state surface.
 - `GET /entity-states/:id/history` — the full event history
-  for an entity, DERIVED (Phase 11 Task 7): reads
+  for an entity, DERIVED: reads
   `deriveStatesFor(db, organization, entityId)` in
   `(at, id)` order. The GATE fences parent ownership via
-  `resolveOwningOrganization` (Phase 15 Task 5); the
-  derived handler does NOT re-fence.
+  `resolveOwningOrganization`; the derived handler does NOT
+  re-fence.
 - `GET /states/:id/field-values` — nested collection,
-  DERIVED (Phase 14 Task 6 + Phase 15 Task 3):
-  `stateFieldValuesForStateEvent` two-source union;
-  visibility via `stateEventVisibilityFor` (3-tier). Wire
-  shape held: ALWAYS 200; orphan/own → rows; foreign → `[]`.
+  DERIVED: `stateFieldValuesForStateEvent` two-source
+  union; visibility via `stateEventVisibilityFor` (3-tier).
+  Wire shape held: ALWAYS 200; orphan/own → rows; foreign →
+  `[]`.
 - `PUT|DELETE /states/:id/field-values/:fvid` — retired
   (Phase 15 Task 7): zero product callers; live writes ride
   the transition fold only. Router 404. The
@@ -332,21 +332,20 @@ Legend for classification:
 permits member-tier PUT on `/states/:id`
 (`api/authorization.ts`), and the body names its target
 `entity_id` directly. `PutHandler` carries no organization
-argument (`routes.ts`), and the route's own `db` is already
-the ORG-SCOPED adapter — which 404s a foreign row as merely
-absent, making a route-level fence a no-op — so the check
-runs at the GATE, right after the body-parse block and
-before the write dispatches. Phase 15 Task 5 re-anchored
-ownership onto `resolveOwningOrganization`
-(`api/derive-states.ts`) — the pair-plane resolver with
+argument (`routes.ts`). Surviving stores are global (no
+org-scoped adapter); the check runs at the GATE via
+`resolveOwningOrganization` (`api/derive-states.ts`) —
 org-nested document legs, invitations, memberships, the
 flow-graph history walk, and the organizations
 self-as-owner leg. Outcomes: OWN-org (or owner-null)
 passes; foreign — LIVE, soft-deleted, OR hard-spliced —
 404s, byte-identical to
 `{error: 'Not found: ' + pathname}` (never an
-`EntityNotFoundError`, which keys on the wrong id). The
-leaf field-values write fence retired WITH the leaf routes.
+`EntityNotFoundError`, which keys on the wrong id). Org-
+scoped document PUT/DELETE also hit the write-ownership
+fence (`api/write-ownership-fence.ts`) so a foreign id
+cannot genesis in the caller's namespace. The leaf
+field-values write fence retired WITH the leaf routes.
 
 Two named strengthenings closed at the same re-anchor:
 (2a) WP1 — a forged PUT naming an organization id as
@@ -412,8 +411,9 @@ runs on the base adapter with explicit guards:
 
 - `GET /snapshots/schema` — schema existence + full export, else null.
   The export (`getSnapshot`, `api/db-backed.ts`) stamps one reserved
-  top-level key, `__schema_version__` (`SNAPSHOT_SCHEMA_VERSION`,
-  `api/db.ts`, Phase 12 Task 6), beside the `TABLE_NAMES` arrays.
+  top-level key, `__schema_version__` (`SNAPSHOT_SCHEMA_VERSION`
+  = 3 post-Phase-Final, `api/db.ts`), beside the survivor
+  `TABLE_NAMES` arrays (`clients`, `requests`, `responses`).
 - `DELETE /snapshots/schema` — drop the schema and reopen clean.
 - `POST /snapshots/mock-data` — seed the full demo dataset (§3.26).
 - `POST /snapshots/bootstrap` — seed the pristine minimal state
@@ -1786,14 +1786,20 @@ not a POST issuing sub-requests; it is the org fence re-dispatching the
 
 ## 5. The Shadow Ledger
 
+The message plane IS the schema of record (Phase Final).
 Every pair-wired write (`PAIR_WIRED_ROUTE_PATTERNS`, plus the
-invitations/default-org side channels and the two `/authentication`
-grant routes) appends one row to `requests` and one to `responses` —
-sharing an `id` — as the LAST act of its own transaction
-(`appendMessagePair`, `api/message-pair.ts`). §1.1 covers where this
-runs in the dispatch order; this section covers what it produces on
-the wire, how a secret crosses it, and how the seeded demo data
-carries its own pre-formed pairs.
+invitations/default-org side channels and the two
+`/authentication` grant routes) appends one row to
+`requests` and one to `responses` — sharing an `id` — as
+the LAST (and only storage) act of its own transaction
+(`appendMessagePair`, `api/message-pair.ts`). There is no
+dual-write row half and no entity table beside the ledger.
+§1.1 covers where this runs in the dispatch order; this
+section covers what it produces on the wire, how a secret
+crosses it, and how the seeded demo data carries its own
+pre-formed pairs. The name "Shadow Ledger" is KEPT (load-
+bearing section title + `api-shadow-ledger-*` test file
+names); only dual-write/strangler qualifiers are retired.
 
 ### 5.1 Response headers and the wire-visible, UI-invisible class
 
@@ -3302,10 +3308,12 @@ callers were already zero; the only surviving live surfaces
 from those families are:
 
 - `PUT /states/:id` (unclaim / ownership write fence /
-  immutability strangler)
+  pair-plane immutability)
 - `GET /entity-states/:id/history` (derived)
 - `GET /states/:id/field-values` (derived collection)
-- the `flow_versions` TABLE (no routes; Final deletes)
+
+`flow_versions` routes and table are GONE (Phase 15
+retired routes; Phase Final deleted the table).
 
 **Seed constraint (finding 7).** The
 `WRITE_RESPONSE_SPECS['states/:id/field-values/:fvid']`
@@ -3314,10 +3322,12 @@ the seven nested leaf pairs at that address (§5.16). Pair-
 plane derivation of the collection does not require the
 write route to live — historical leaf pairs remain
 addressable. `flows/:id/versions*` specs and handlers are
-gone with the routes; the table is storage-only until Final.
+gone with the routes.
 
-**§5 chronological gap (named).** Tasks 1–6 of Phase 14 and
-the Phase 15 re-anchors live in ARCHITECTURE.md § Write-path
-derives / § Last readers rather than as further §5.N
-narrative chapters here. Phase Final's docs pass may backfill
-if a single chronological voice is required.
+**§5 chronological gap (named) — DEFERRED.** Tasks 1–6 of
+Phase 14, the Phase 15 re-anchors, and the Phase Final
+deletion as-built live in ARCHITECTURE.md § Write-path
+derives / § Last readers → Phase Final as-built rather than
+as further §5.N narrative chapters here. A single
+chronological §5 voice is optional prose work, not a
+contract gate — elected DEFER at Phase Final Task 7.
