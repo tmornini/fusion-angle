@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -16,6 +16,7 @@ import type {
 } from '../api/types.ts';
 import {
     jsonObjectField, MS_PER_SECOND, nowUtc,
+    setClockForTest, resetClock,
 } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
@@ -95,13 +96,11 @@ function sortById<T extends { id: string }>(
         a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
-// A genuine real-time wait — case 9's expired-takeover leg needs
-// REAL elapsed time to cross a tiny lockTimeout, since the LIVE
-// route's isClaimEventExpired checks real Date.now(), never a
-// body timestamp.
-function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Claim-expiry legs advance the test clock (msSinceUtc seam);
+// reset so no suite poisons the next.
+afterEach(() => {
+    resetClock();
+});
 
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = new MemoryDbAdapter();
@@ -1275,13 +1274,13 @@ async () => {
     const flowWorkOrderId = 'wo-drift-trace-1-fwo';
     const flowId = EMPTY_FLOW_ID;
     // A TINY lockTimeout: isClaimEventExpired checks the LIVE
-    // route's decision against REAL Date.now(), never a body
-    // timestamp, so every claim-related `at` below is minted via
-    // nowUtc() at the point of use (never a fixed literal — see
-    // case 5's own note) and the expired-takeover leg (5) waits
-    // out this tiny window for real, via sleep() below —
+    // route's decision via msSinceUtc (the clock seam), never a
+    // body timestamp, so every claim-related `at` below is minted
+    // via nowUtc() at the point of use (never a fixed literal —
+    // see case 5's own note) and the expired-takeover leg (5)
+    // advances the test clock past this tiny window —
     // client-minted ats far from the boundary either way, since
-    // the wait comfortably clears it.
+    // the advance comfortably clears it.
     const tinyLockTimeoutSeconds = 1;
     const graph = workOrderFlowGraph(tinyLockTimeoutSeconds);
 
@@ -1387,10 +1386,12 @@ async () => {
     ));
     assert.equal(idempotent.status, 204);
 
-    // Real wait, comfortably past the tiny lockTimeout, so leg
+    // Advance the test clock past the tiny lockTimeout so leg
     // 3's claim genuinely reads as expired to the LIVE route's
-    // real-clock isClaimEventExpired.
-    await sleep((tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
+    // isClaimEventExpired (msSinceUtc seam).
+    setClockForTest(() =>
+        Date.now()
+        + (tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
 
     // Leg 5: expired takeover by B — 2 events ('claim_expired'
     // naming A, 'claimed' naming B).

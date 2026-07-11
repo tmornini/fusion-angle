@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -8,6 +8,7 @@ import type { Id, StateEntity } from '../api/types.ts';
 import {
     nowUtc, DEFAULT_LOCK_TIMEOUT, MS_PER_SECOND,
     jsonObjectField, SYSTEM_MEMBER_ID,
+    setClockForTest, resetClock,
 } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
@@ -100,9 +101,11 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Claim-expiry legs advance the test clock (msSinceUtc seam);
+// reset so no suite poisons the next.
+afterEach(() => {
+    resetClock();
+});
 
 // Phase Final Task 2: states ROW half stripped — both helpers
 // pin the pair plane only (row plane is empty).
@@ -455,7 +458,7 @@ async () => {
 test('case 4b: work-order live-write chain — birth-claimed'
 + ' create, a transition, a transition+release, a MOVING'
 + ' lock_timeout entity PUT, a fresh claim, an idempotent'
-+ ' re-claim (0 events), and a real-clock claim_expired takeover'
++ ' re-claim (0 events), and a claim_expired takeover'
 + ' — re-compared on both planes at every step', async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -567,12 +570,14 @@ test('case 4b: work-order live-write chain — birth-claimed'
     );
     assert.equal(afterRepeat.length, beforeRepeat);
 
-    // A REAL wait past the tiny lock_timeout — isClaimEventExpired
-    // checks the LIVE route's real Date.now(), never a body
-    // timestamp — then a claim_expired takeover: 2 events
-    // (claim_expired naming the prior claimant, claimed naming the
-    // new one).
-    await sleep((tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
+    // Advance the test clock past the tiny lock_timeout —
+    // isClaimEventExpired checks msSinceUtc (the clock seam),
+    // never a body timestamp — then a claim_expired takeover:
+    // 2 events (claim_expired naming the prior claimant,
+    // claimed naming the new one).
+    setClockForTest(() =>
+        Date.now()
+        + (tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
     const takeoverExpireAt = nowUtc();
     const takeoverClaimAt = nowUtc();
     const takeover = await handleRequest(db, req(

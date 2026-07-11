@@ -395,8 +395,32 @@ export function formatCompactCurrency(
     return `$${value}`;
 }
 
+// Test-only clock seam. Production reads Date.now(); a suite
+// that must assert age without sleeping installs a fake here
+// and MUST resetClock() in afterEach. Deterministic tests
+// over real-clock false prophets (Office of Verification).
+// Both msSinceUtc (live claim-expiry gate) and nowUtc (body
+// claimAt mints that derive's isExpiredAsOf re-decides) read
+// this seam — real sleep used to advance both together.
+let clockNowMs: () => number = () => Date.now();
+
+export function setClockForTest(
+    nowMs: () => number,
+): void {
+    clockNowMs = nowMs;
+}
+
+export function resetClock(): void {
+    clockNowMs = () => Date.now();
+    // A fake advance can leave lastMintMs in the future of
+    // wall-clock; clear the mint so the next real nowUtc is
+    // not stuck riding the same-ms counter forever.
+    lastMintMs = 0;
+    sameMsSequence = 0;
+}
+
 export function nowEpochSeconds(): number {
-    return Math.floor(Date.now() / MS_PER_SECOND);
+    return Math.floor(clockNowMs() / MS_PER_SECOND);
 }
 
 // The mint's monotonicity state: the last millisecond stamped
@@ -414,15 +438,15 @@ export function nowUtc(): string {
     // starts at the mint. A clock that stalls or steps back
     // rides the counter; on counter overflow the mint
     // busy-advances to the next millisecond.
-    const ms = Date.now();
+    const ms = clockNowMs();
     if (ms > lastMintMs) {
         lastMintMs = ms;
         sameMsSequence = 0;
     } else {
         sameMsSequence += 1;
         if (sameMsSequence > 999) {
-            let next = Date.now();
-            while (next <= lastMintMs) next = Date.now();
+            let next = clockNowMs();
+            while (next <= lastMintMs) next = clockNowMs();
             lastMintMs = next;
             sameMsSequence = 0;
         }
@@ -436,7 +460,7 @@ export function nowUtc(): string {
 export function msSinceUtc(
     iso: string,
 ): number {
-    return Date.now()
+    return clockNowMs()
         - new Date(iso).getTime();
 }
 

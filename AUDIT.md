@@ -5,10 +5,10 @@
 
 A whole-repository audit of this codebase against every section
 of the Church of Code scripture — one indoctrinated agent per
-thematic bucket of sections, report-only. Run it as an
-ultracode workflow; the harness announces itself in-session,
-and absent that announcement you stop and ask — never improvise
-a different engine.
+section, report-only. Run it as an ultracode workflow; the
+harness announces itself in-session, and absent that
+announcement you stop and ask — never improvise a different
+engine.
 
 The audit follows the codebase scroll policy (CLAUDE.md
 § Subagents): its orchestrator conducts as master and goes
@@ -18,10 +18,9 @@ its hunters and refuters fan out as subagents and go Medium
 
 ## Scope
 
-- The unit of audit is the scripture section; the unit of
-  dispatch is the thematic bucket (~12), each a set of related
-  sections. The surface is every tracked file, plus git history
-  where the doctrine demands it (the Office of the Commit).
+- The unit of audit is the scripture section; the surface is
+  every tracked file, plus git history where the doctrine
+  demands it (the Office of the Commit).
 - Report-only. No agent mutates the repo; the orchestrator
   writes `AUDIT-REPORT.md` once.
 - Static. No build, no server, no browser. Browser truth belongs
@@ -53,37 +52,43 @@ is the verdict delivered without reading the code.
    Commandments, The Book of Abominations, and The Daily
    Offices, plus every bold-led paragraph under The Articles of
    Faith — ≈60 sections, derived by grep each run, never from a
-   stored list, not even one kept in this file. Partition those
-   sections into ≈12 thematic buckets by shared concern — every
-   section in exactly one bucket, Commandment II alone in its
-   own (so its findings route to the double-refute), the buckets
-   balanced by section count. The bucketing is a rule applied
-   each run, never a stored list; the bucket→section map goes in
-   the header so the run reproduces. Record the
+   stored list, not even one kept in this file. Record the
    header facts and the KNOWN-list count m (§ Security: KNOWN
    vs NEW). Run `./validate` (sandbox form per CLAUDE.md
-   § Sandbox invocation). RED aborts nothing: this audit is static and
-   builds no bundle — the abort rule is TEST-PLAN's, for the
-   browser. RED is finding #1 under Commandment I, and
-   test-based measurements carry a caveat.
-1. **Hunt (parallel, ≈12).** One agent per bucket, prompt per
-   the template below. Each hunter logs its hunts per section,
-   so the per-section coverage roster stays complete.
+   § Sandbox invocation) THREE times — and once more under the
+   hunt fan-out's concurrent load, if agents are already
+   dispatched. Report the modal verdict AND any test whose
+   pass/fail varies across runs: a load-sensitive test is a
+   *false prophet* (Office of Verification), finding #1 under
+   Commandment I whether or not HEAD is green today. RED aborts
+   nothing: this audit is static and builds no bundle — the
+   abort rule is TEST-PLAN's, for the browser. Test-based
+   measurements carry a caveat.
+1. **Hunt (parallel, ≈60).** One agent per section, prompt per
+   the template below.
 2. **Consolidate (serial).** Dedup BEFORE refutation, or one
    defect is refuted N times with N verdicts.
-3. **Refute (parallel, batched by part).** One fresh
-   indoctrinated refuter per scripture part receives all that
-   part's merged findings and is mandated to DISPROVE each:
-   re-read the cited lines; hunt an upstream guard, a gate
-   validator, a deleted symbol, a correct doc; prefer a runnable
-   read-only measurement over prose. The refuter also
-   adjudicates each commandment trace — moving it requires a
-   scripture quote — and may SPLIT a bad merge. CONFIRMED lands.
-   REFUTED drops but stays in the ledger. DISPUTED goes to one
-   tie-breaker who must return a measurement. Commandment II /
-   security-NEW findings keep the dedicated double-refute — two
-   fresh refuters, both confirming, NOT folded into the part
-   batch. Exemplars land unrefuted — credit, not claims.
+3. **Refute (parallel).** One fresh indoctrinated refuter per
+   finding, mandated to DISPROVE it: re-read the cited lines;
+   hunt an upstream guard, a gate validator, a deleted symbol, a
+   correct doc; prefer a runnable read-only measurement over
+   prose. The refuter also adjudicates the commandment trace —
+   moving it requires a scripture quote — and may SPLIT a bad
+   merge. CONFIRMED lands. REFUTED drops but stays in the
+   ledger. DISPUTED goes to one tie-breaker who must return a
+   measurement. A NEW finding tracing to Commandment II needs
+   two refuters, both confirming. Every consolidated finding
+   gets a verdict — none ships UNVERIFIED (§ Failure modes).
+   Exemplars land unrefuted — credit, not claims.
+3b. **Challenge kills-by-contract (parallel).** A refuter may
+   kill a finding by citing a contract of record
+   (ARCHITECTURE.md, API.md, CLAUDE.md, SCHEMA.md). Each such
+   REFUTED verdict draws ONE narrow adjudicator asking a single
+   question: does the cited contract address THIS charge, or a
+   neighbor of it? A doc that blesses shape X does not refute a
+   charge about shape Y. The adjudicator returns a measurement;
+   it restores the finding to CONFIRMED or upholds the kill.
+   Triggers only on killed-by-contract verdicts.
 4. **Report (serial).** Write `AUDIT-REPORT.md` once, wrapped
    to pass the root-`.md` lint (CLAUDE.md § Validate
    semantics); snippet lines may be truncated to fit, marked
@@ -99,13 +104,13 @@ repository's absolute path and HEAD SHA, then add:
 Go to Medium Church!
 
 You audit the fusion-ai repository at <ABS_PATH>,
-HEAD <SHA>, against ONE thematic bucket of
-scripture sections: <bucket: section list>. After
-the skill loads, read YOUR bucket's sections from
-the Medium scroll (CHURCH-OF-CODE-medium-context.md
-in the skill's base directory). They are your whole
-mandate — derive the hunt from them. The repo-root
-*.md files are the contracts of record.
+HEAD <SHA>, against ONE scripture section:
+<section name>. After the skill loads, read YOUR
+section from the Medium scroll
+(CHURCH-OF-CODE-medium-context.md in the skill's
+base directory). It is your whole mandate — derive
+the hunt from it. The repo-root *.md files are the
+contracts of record.
 
 Scope: the entire repository, read-only. You may
 run read-only commands and single test files to
@@ -120,10 +125,9 @@ Evidence binds every claim.
   count plus up to 3 representative citations.
 - Credit exemplars — scripture leads with the
   righteous.
-- Log every hunt, including empty ones, and name
-  the section it covers; say whether each was
-  exhaustive or sampled. Sample breadth-first if
-  the surface exceeds your context.
+- Log every hunt, including empty ones; say whether
+  each was exhaustive or sampled. Sample
+  breadth-first if the surface exceeds your context.
 
 Return JSON matching the findings schema.
 ```
@@ -135,8 +139,8 @@ consolidation is a mechanical fold over it.
 
 ```json
 {
-  "bucket": "Reliability & Failure",
-  "hunts": [{"section": "", "what": "", "how": "",
+  "section": "the Greedy Catch",
+  "hunts": [{"what": "", "how": "",
              "scope": "exhaustive|sampled", "hits": 0}],
   "findings": [{
     "title": "", "file": "", "line": 0, "symbol": "",
@@ -152,17 +156,14 @@ consolidation is a mechanical fold over it.
 }
 ```
 
-A `hunts` row with `hits: 0` is the empty-hunt proof; its
-`section` is the per-section coverage key, so the roster folds
-from the bucket returns. `sites`/`more_sites` is the flood
-valve; `context` is the honesty bit for hunts larger than one
-context; `symbol` is the enclosing function or class, empty at
-file scope, so the merge key computes from JSON alone.
+A `hunts` row with `hits: 0` is the empty-hunt proof;
+`sites`/`more_sites` is the flood valve; `context` is the
+honesty bit for hunts larger than one context; `symbol` is the
+enclosing function or class, empty at file scope, so the merge
+key computes from JSON alone.
 
-Each refuter receives its part's merged findings verbatim,
-contributors included, and returns one verdict object per
-finding (the Commandment II / security-NEW double-refuters each
-receive their single finding):
+Each refuter receives one merged finding verbatim, contributors
+included, and returns:
 
 ```json
 {
@@ -188,6 +189,12 @@ receive their single finding):
   `[II] [section] title — file:line`.
 - A doc that misstates fact X violates Clarity (V), not X —
   unless the misstatement conceals a live exposure.
+- **Internal-consistency gate.** Before the report is written,
+  reconcile verdicts across sites: any two findings — or a
+  finding and a refutation — citing the same enclosing-symbol
+  SHAPE in different files must resolve to ONE verdict. A
+  CONFIRMED site and a REFUTED twin of the same defect cannot
+  both ship.
 
 ## Security: KNOWN vs NEW
 
@@ -201,13 +208,28 @@ carries a pointer to that list; it re-confirms every seam flag
 and tags each finding `KNOWN` or `NEW` in the schema's
 `security` field.
 
+Section hunts miss whole vulnerability classes: a single
+Commandment II section hunter greps toward one class and misses
+its neighbors. So run a fixed roster of CLASS hunters IN
+ADDITION to the section hunt, each swept end to end:
+
+- **Injection** — SQL, regex (ReDoS), template, command.
+- **Authn/authz flow** — token lifecycle, OAuth grant
+  completeness (PKCE, TTL, client binding), replay, enumeration.
+- **Secret handling** — logs, error bodies, config defaults.
+- **Untrusted-input DoS** — ReDoS, zip-bomb, unbounded
+  allocation.
+
+Each class hunter returns the findings schema and tags KNOWN or
+NEW like any Commandment II finding.
+
 ## The report
 
 `AUDIT-REPORT.md`, repo root, written once:
 
 1. **Header** — the Rule of Evidence reproducibility fields,
-   the bucket→section map and counts (≈12 buckets / ≈60
-   sections), agents dispatched / re-dispatched / FAILED.
+   roster counts by kind, agents dispatched / re-dispatched /
+   FAILED.
 2. **Executive summary** — verdict first; finding tally by
    commandment numeral; KNOWN re-confirmed n/m (per § Security:
    KNOWN vs NEW); the top NEW items.
@@ -232,10 +254,33 @@ and tags each finding `KNOWN` or `NEW` in the schema's
   appended.
 - Context exhaustion: the sampled/truncated bits make it
   visible. Never pre-bound a hunt.
-- Refuter budget strain: refute in severity order; mark the
-  tail UNVERIFIED, never silently drop it.
+- Refuter budget strain: never truncate. Refute EVERY
+  consolidated finding — pipeline the refuters if the fleet is
+  large. A finding without a verdict is a FAILED roster row,
+  not a shipped finding; there is no UNVERIFIED tail.
 - Orchestrator bloat: after Phase 0 the orchestrator reads no
   repo source — it consumes JSON and writes one file.
+
+## Reconciliation (when more than one audit runs)
+
+Two audits of one HEAD are not merged by union, nor is either
+trusted wholesale — independent runs fail in opposite
+directions (one over-includes an unverified tail, the other
+over-refutes via contracts of record; each can miss a security
+class the other caught).
+
+Diff the two findings ledgers. For every delta — a site one
+audit CONFIRMED and the other REFUTED or missed — dispatch ONE
+adversarial adjudicator with a re-measurement mandate: read the
+cited lines THIS run, side with neither auditor, let the number
+rule (§ The Rule of Evidence). The reconciled ledger is the
+verified union: every finding either audit confirmed that
+survives adjudication, minus every one a re-measurement kills.
+
+Cheapest high-value pass available once two audits exist — it
+recovers the findings each run missed alone and catches the
+errors each made independently, including an audit that
+contradicts itself.
 
 ## Remediation (separately invoked)
 

@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -7,6 +7,7 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import type { StateEntity } from '../api/types.ts';
 import {
     jsonObjectField, MS_PER_SECOND, nowUtc, SYSTEM_MEMBER_ID,
+    setClockForTest, resetClock,
 } from '../api/types.ts';
 import {
     deriveWorkOrderLifecycle,
@@ -43,13 +44,13 @@ function req(
     });
 }
 
-// A genuine real-time wait — the expired-takeover legs need REAL
-// elapsed time to cross a tiny lockTimeout, since the LIVE route's
-// isClaimEventExpired checks real Date.now(), never a body
-// timestamp (tests/drift-work-orders.test.ts case 9's own idiom).
-function sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// Claim-expiry legs advance the test clock past a tiny
+// lockTimeout — isClaimEventExpired reads msSinceUtc, which
+// honors setClockForTest (never a body timestamp). Reset in
+// afterEach so no suite poisons the next.
+afterEach(() => {
+    resetClock();
+});
 
 // Below-facade pair formation (the member-fixtures.ts idiom, the
 // derive-states-events.test.ts precedent): every write below
@@ -284,8 +285,12 @@ test('a claim, then a claim past lockTimeout supersedes with'
     ));
     assert.equal(claim1.status, 204);
 
-    // Real wait, comfortably past the tiny lockTimeout.
-    await sleep((tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
+    // Advance the test clock past the tiny lockTimeout so the
+    // live route's isClaimEventExpired (via msSinceUtc) reads
+    // the prior claim as expired without a real sleep.
+    setClockForTest(() =>
+        Date.now()
+        + (tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
 
     // expireAt minted strictly BEFORE claimAt (nowUtc()'s own
     // monotonicity) — the same ordering the live route's own
@@ -515,7 +520,7 @@ test('the MOVING lock_timeout case: an entity PUT changing'
     // Shrink lock_timeout mid-history — the entity PUT that makes
     // the AS-OF lookup load-bearing: under the OLD (big) value the
     // prior claim would still read as live; under the NEW (tiny)
-    // value, comfortably crossed by the sleep below, it reads as
+    // value, crossed by the fake-clock advance below, it reads as
     // expired.
     const put2 = await handleRequest(db, req(
         'PUT', '/work-orders/' + workOrderId, token,
@@ -528,7 +533,9 @@ test('the MOVING lock_timeout case: an entity PUT changing'
     ));
     assert.equal(put2.status, 200);
 
-    await sleep((tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
+    setClockForTest(() =>
+        Date.now()
+        + (tinyLockTimeoutSeconds + 2) * MS_PER_SECOND);
 
     // expireAt minted strictly BEFORE claimAt — see case 3's own
     // note on the tie-break this ordering avoids.
