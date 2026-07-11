@@ -287,6 +287,33 @@ function asNodeAttribute(
     };
 }
 
+const MAX_REGEX_PATTERN_LENGTH = 200;
+
+// A quantifier applied to a group that itself contains an
+// unbounded quantifier — (a+)+, (a*)*, (.+)* — is the classic
+// catastrophic-backtracking family. Full ReDoS detection is
+// undecidable; this rejects that family and the length cap
+// bounds worst-case input regardless.
+const NESTED_QUANTIFIER = /\([^)]*[+*][^)]*\)[+*]/;
+
+export function assertSafeRegexPattern(
+    pattern: string,
+    label: string,
+): void {
+    if (pattern.length > MAX_REGEX_PATTERN_LENGTH) {
+        throw new ValidationError(
+            'regex ' + label + ' exceeds '
+            + MAX_REGEX_PATTERN_LENGTH + ' chars',
+        );
+    }
+    if (NESTED_QUANTIFIER.test(pattern)) {
+        throw new ValidationError(
+            'regex ' + label
+            + ' has nested unbounded quantifiers',
+        );
+    }
+}
+
 export function asConstraint(
     value: unknown,
     label: string,
@@ -296,13 +323,11 @@ export function asConstraint(
         obj['kind'], label + '.kind',
     );
     if (kind === 'regex') {
-        return {
-            kind: 'regex',
-            pattern: asString(
-                obj['pattern'],
-                label + '.pattern',
-            ),
-        };
+        const pattern = asString(
+            obj['pattern'], label + '.pattern',
+        );
+        assertSafeRegexPattern(pattern, label + '.pattern');
+        return { kind: 'regex', pattern };
     }
     if (kind === 'range_min') {
         return {

@@ -15,6 +15,7 @@ import {
     validateProjectFlowEntity,
     validateRecordAttributeEntity,
     asStoredGraph,
+    asConstraint,
 } from '../api/validators.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
@@ -1004,4 +1005,33 @@ test(
             + '"pattern":"^[^@]+@[^@]+\\\\.[^@]+$"}]',
     });
     assert.equal(result.name, 'Priority');
+});
+
+test('asConstraint rejects nested-quantifier regex', () => {
+    assert.throws(
+        () => asConstraint(
+            { kind: 'regex', pattern: '(a+)+$' }, 'c',
+        ),
+        /nested unbounded quantifiers/,
+    );
+});
+
+test('asConstraint rejects an over-long pattern', () => {
+    assert.throws(
+        () => asConstraint(
+            { kind: 'regex', pattern: 'a'.repeat(201) },
+            'c',
+        ),
+        /exceeds 200 chars/,
+    );
+});
+
+test('asConstraint accepts a safe pattern', () => {
+    assert.equal(
+        asConstraint(
+            { kind: 'regex', pattern: '^[a-z]{3,10}$' },
+            'c',
+        ).kind,
+        'regex',
+    );
 });
