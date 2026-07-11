@@ -4,7 +4,6 @@ import {
 import {
     getSessionToken,
     sessionIsAuthenticated,
-    sessionIsOrganizationScoped,
     sessionTokenIsSeeded,
 } from './adapters/init.ts';
 import {
@@ -51,15 +50,15 @@ export function createSubscriptionChannel(
 ): SubscriptionChannel {
     const channel = createChannel<void>();
     // A full-refresh event always fires; otherwise a scoped
-    // event fires when it names this tab's active organization
-    // (org-scoped sessions) or this tab's own identity
-    // (authenticated sessions) — the poster's own tab never
-    // hears the message, so it does not double-refresh. This
-    // subscription is wired at module load, before boot has
-    // seeded the session token — a scoped event from another
-    // tab can arrive first. Unseeded means neither org-scoped
-    // nor authenticated, so it cannot match; return before the
-    // token read that would otherwise throw.
+    // event fires when it names this tab's active organization,
+    // a reachable org on a flat (un-exchanged) session, or this
+    // tab's own identity — the poster's own tab never hears the
+    // message, so it does not double-refresh. This subscription
+    // is wired at module load, before boot has seeded the
+    // session token — a scoped event from another tab can arrive
+    // first. Unseeded means neither org-scoped nor authenticated,
+    // so it cannot match; return before the token read that
+    // would otherwise throw.
     subscribeNotificationEvents((event) => {
         if (event.kind === 'full') {
             channel.send();
@@ -70,11 +69,20 @@ export function createSubscriptionChannel(
         }
         const principal =
             principalFromToken(getSessionToken());
+        // Active org claim wins when present (post-exchange).
+        // A flat login token has only `organizations`; the
+        // pair-plane fence still serves the default org, so
+        // match any reachable org the event names.
         const organizationHit =
-            sessionIsOrganizationScoped()
-            && principal.organization !== undefined
-            && event.organizationIds
-                .includes(principal.organization);
+            principal.organization !== undefined
+                ? event.organizationIds.includes(
+                    principal.organization,
+                )
+                : sessionIsAuthenticated()
+                    && (principal.organizations ?? [])
+                        .some(id =>
+                            event.organizationIds
+                                .includes(id));
         const identityHit =
             sessionIsAuthenticated()
             && event.identityIds.includes(principal.id);

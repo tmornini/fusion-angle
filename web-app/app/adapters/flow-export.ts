@@ -1,7 +1,6 @@
 import {
     nowUtc,
     storedGraph,
-    storedGraphField,
     DEFAULT_LOCK_TIMEOUT,
     DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
@@ -857,6 +856,16 @@ export async function postFlowFromMermaid(
                 + ' intermediate state',
         );
     }
+    // The graph lands in the relation tables via the delta —
+    // the flow row carries no blob. Empty baseline: pure
+    // upserts for every imported node/edge.
+    const graphDelta = buildSaveEvents(
+        { nodes: [], edges: [] },
+        graph,
+        flowId,
+        generateCryptoSafeBase62,
+        now,
+    );
     const linkId = generateCryptoSafeBase62();
     await ctx.POST('flows', {
         id: flowId,
@@ -866,7 +875,6 @@ export async function postFlowFromMermaid(
             is_auto_layout: true,
             is_auto_fit: true,
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: storedGraphField(graph),
         },
         projectFlowId: linkId,
         projectFlow: {
@@ -877,6 +885,7 @@ export async function postFlowFromMermaid(
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
         initialStateAt: nowUtc(),
+        graphDelta,
     });
 
     notifyFlowChange();
@@ -1194,6 +1203,15 @@ export async function postFlowFromZip(
         ? sidecar.name
         : firstNode!.name + ' (import)';
 
+    // Same graphDelta posture as mermaid/backup create —
+    // relation upserts, no graph blob on the flow row.
+    const graphDelta = buildSaveEvents(
+        { nodes: [], edges: [] },
+        graph,
+        flowId,
+        generateCryptoSafeBase62,
+        now,
+    );
     const linkId = generateCryptoSafeBase62();
     await ctx.POST('flows', {
         id: flowId,
@@ -1203,7 +1221,6 @@ export async function postFlowFromZip(
             is_auto_layout: true,
             is_auto_fit: true,
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: storedGraphField(graph),
         },
         projectFlowId: linkId,
         projectFlow: {
@@ -1214,6 +1231,7 @@ export async function postFlowFromZip(
         initialState: 'active',
         initialStateEventId: generateCryptoSafeBase62(),
         initialStateAt: nowUtc(),
+        graphDelta,
     });
 
     notifyFlowChange();

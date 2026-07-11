@@ -182,6 +182,31 @@ test('a scoped event naming this identity fires', async () => {
     assert.equal(fired, 1);
 });
 
+// K29: a flat (un-exchanged) login token has reachable orgs
+// but no active org claim. Score writes post org ids with
+// empty identityIds; the tab must still refresh.
+test(
+    'a scoped event naming a reachable org fires'
+    + ' on a flat session',
+    async () => {
+        putSessionToken(
+            await reachableToken('current', ['1', '2']),
+        );
+        const ch = createSubscriptionChannel();
+        let fired = 0;
+        ch.subscribe(() => { fired += 1; });
+        const poster = new BroadcastChannel(CHANNEL_NAME);
+        poster.postMessage({
+            kind: 'scoped',
+            organizationIds: ['1'],
+            identityIds: [],
+        });
+        await deliver();
+        poster.close();
+        assert.equal(fired, 1);
+    },
+);
+
 test(
     'a scoped event naming neither is a miss',
     async () => {

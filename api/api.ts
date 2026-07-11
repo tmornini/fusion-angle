@@ -157,27 +157,34 @@ async function facadeRequest(
 // IndexedDB the commit has already reached `oncomplete`).
 // BOOTSTRAP_ROUTES (the snapshot plane) replace the whole
 // store, so they post a full-refresh event rather than a
-// scoped one; every other write posts the fenced organization
-// plus whatever identity targets the route/body name.
+// scoped one; every other write posts the fenced organization,
+// identity targets the route/body name, and the actor so the
+// writer's other tabs refresh even when the session is a flat
+// (un-exchanged) token that cannot match on organization.
 function postWriteNotification(
     adapter: GuardedDbAdapter,
     routePattern: string,
     params: readonly string[],
     body: Record<string, unknown> | undefined,
     organization: Id | undefined,
+    actor: Id,
 ): void {
     if (BOOTSTRAP_ROUTES.has(routePattern)) {
         adapter.postNotification({ kind: 'full' });
         return;
+    }
+    const identityIds = new Set(
+        identityTargetsFor(routePattern, params, body),
+    );
+    if (actor !== ANONYMOUS_ID) {
+        identityIds.add(actor);
     }
     adapter.postNotification({
         kind: 'scoped',
         organizationIds:
             organization === undefined
                 ? [] : [organization],
-        identityIds: identityTargetsFor(
-            routePattern, params, body,
-        ),
+        identityIds: [...identityIds],
     });
 }
 
@@ -820,13 +827,13 @@ export async function handleRequest(
                     }
                     postWriteNotification(
                         adapter, routePattern, params,
-                        body, organization,
+                        body, organization, actor,
                     );
                     return responseFromStored(stored);
                 }
                 postWriteNotification(
                     adapter, routePattern, params,
-                    body, organization,
+                    body, organization, actor,
                 );
                 if (result === undefined) {
                     return new Response(null, {
@@ -866,13 +873,13 @@ export async function handleRequest(
                     }
                     postWriteNotification(
                         adapter, routePattern, params,
-                        body, organization,
+                        body, organization, actor,
                     );
                     return responseFromStored(stored);
                 }
                 postWriteNotification(
                     adapter, routePattern, params,
-                    body, organization,
+                    body, organization, actor,
                 );
                 return new Response(null, {
                     status: 204,
@@ -984,7 +991,7 @@ export async function handleRequest(
                     }
                     postWriteNotification(
                         adapter, routePattern, params,
-                        body, organization,
+                        body, organization, actor,
                     );
                     return responseFromStored(stored);
                 }
@@ -1013,7 +1020,7 @@ export async function handleRequest(
                 ) {
                     postWriteNotification(
                         adapter, routePattern, params,
-                        body, organization,
+                        body, organization, actor,
                     );
                 }
                 if (result === undefined) {

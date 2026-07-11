@@ -42,16 +42,15 @@ async function getSidebarMember(
     const { sessionContext } = await import('./adapters');
     const { getOrganizations } =
         await import('./adapters/organizations.ts');
-    const { activeOrganization } =
-        await import('./adapters/shared.ts');
     const ctx = sessionContext();
     // The chip is the caller's own row, drawn from role-independent
     // sources: id + display name from the verified token
     // (member.id === identity.id, name resolved per identity kind
     // at mint). The org enumeration is best-effort enrichment — a
-    // zero-membership identity resolves no org context (a 403), so
-    // the chip still renders its name while the org line and
-    // switcher stay empty.
+    // zero-membership identity has no org claim and resolves no
+    // org context (a 403), so the chip still renders its name
+    // while the org line and switcher stay empty. Never call
+    // activeOrganization here: it throws without an org claim.
     let organizations: OrganizationEntity[] = [];
     try {
         organizations = await getOrganizations(ctx);
@@ -61,13 +60,20 @@ async function getSidebarMember(
             throw err;
         }
     }
-    const activeOrganizationId = activeOrganization(ctx);
-    const active = organizations.find(o => o.id === activeOrganizationId);
+    const activeOrganizationId =
+        ctx.identity.organization ?? '';
+    const active = activeOrganizationId === ''
+        ? undefined
+        : organizations.find(
+            o => o.id === activeOrganizationId,
+        );
     return {
         id: ctx.identity.id,
         name: ctx.identity.name,
         organization: active ? active.name : '',
-        organizations: organizations.map(o => ({ id: o.id, name: o.name })),
+        organizations: organizations.map(
+            o => ({ id: o.id, name: o.name }),
+        ),
         activeOrganizationId,
     };
 }

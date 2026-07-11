@@ -22,6 +22,7 @@ import {
 } from './member-fixtures.ts';
 import {
     postFlowFromBackup,
+    postFlowFromMermaid,
     type Backup,
 } from '../web-app/app/adapters/flow-export.ts';
 import {
@@ -176,6 +177,49 @@ test(
         );
         assert.equal(
             attr.isRequired, true,
+        );
+    },
+);
+
+// F5/F43: mermaid import must POST graphDelta (the flow
+// row no longer carries a graph blob). A simple stateDiagram
+// with one intermediate state seeds start + intermediate
+// + complete via the import auto-wire path.
+test(
+    'postFlowFromMermaid creates a flow with'
+    + ' a pair-plane graph from simple .mmd',
+    async () => {
+        const { ctx } = await setup();
+        const flowId = 'mermaid-import-1';
+        const mmd = [
+            'stateDiagram-v2',
+            '[*] --> Draft',
+            'Draft --> [*]',
+        ].join('\n');
+
+        const result = await postFlowFromMermaid(
+            ctx, flowId, mmd, 'project-1',
+        );
+        assert.equal(result.flowId, flowId);
+
+        const graph = await readPairGraph(
+            ctx, flowId,
+        );
+        assert.ok(
+            graph.nodes.length >= 2,
+            'expected start + complete at minimum',
+        );
+        assert.ok(
+            graph.nodes.some(n => n.isCreate),
+            'start node present',
+        );
+        assert.ok(
+            graph.nodes.some(n => n.isArchive),
+            'complete node present',
+        );
+        assert.ok(
+            graph.edges.length >= 1,
+            'at least one edge after auto-wire',
         );
     },
 );
