@@ -301,29 +301,39 @@ async function inflate(
     // expands a few KB into gigabytes hits the cap
     // before we allocate the rest. DecompressionStream
     // has no built-in bound; the bound lives here.
+    // Reader cancel lives in finally so every exit
+    // — success, maxBytes throw, or read() reject
+    // on malformed deflate — releases the lock.
+    // cancel() on an already-closed stream is a
+    // safe no-op.
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
     let total = 0;
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        total += value.byteLength;
-        if (total > maxBytes) {
-            await reader.cancel();
-            throw new ZipLimitExceeded(
-                'Decompressed entry exceeds limit: '
-                + total + ' > ' + maxBytes,
-            );
+    try {
+        while (true) {
+            const { done, value } =
+                await reader.read();
+            if (done) break;
+            total += value.byteLength;
+            if (total > maxBytes) {
+                throw new ZipLimitExceeded(
+                    'Decompressed entry exceeds '
+                    + 'limit: '
+                    + total + ' > ' + maxBytes,
+                );
+            }
+            chunks.push(value);
         }
-        chunks.push(value);
+        const out = new Uint8Array(total);
+        let off = 0;
+        for (const c of chunks) {
+            out.set(c, off);
+            off += c.byteLength;
+        }
+        return out;
+    } finally {
+        await reader.cancel();
     }
-    const out = new Uint8Array(total);
-    let off = 0;
-    for (const c of chunks) {
-        out.set(c, off);
-        off += c.byteLength;
-    }
-    return out;
 }
 
 function getLocalData(

@@ -3,6 +3,7 @@ import {
     $select,
 } from '../app/dom.ts';
 import { log } from '../app/logger.ts';
+import { reportFault } from '../app/error-helpers.ts';
 import { setHtml, html } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import {
@@ -1358,45 +1359,89 @@ async function handleBindRecord(
     recordId: RecordId | null,
 ): Promise<void> {
     const ctx = sessionContext();
+    // Four covenants — get, delete, bind, reload —
+    // each owns its own try so a failure names the
+    // step that broke (and any half-state left behind).
+    let existing: RecordId | null;
     try {
-        const existing = await
-            getRecordForFlow(ctx, flowId);
-        if (existing === recordId) return;
-        if (existing !== null) {
+        existing = await getRecordForFlow(
+            ctx, flowId,
+        );
+    } catch (err) {
+        reportFault(
+            ctx,
+            'Failed to read Record binding',
+            err,
+        );
+        return;
+    }
+    if (existing === recordId) return;
+    if (existing !== null) {
+        try {
             await deleteFlowRecordForFlow(
                 ctx, flowId,
             );
+        } catch (err) {
+            reportFault(
+                ctx,
+                'Failed to clear Record binding',
+                err,
+            );
+            return;
         }
-        if (recordId !== null) {
+    }
+    if (recordId !== null) {
+        try {
             await postFlowRecordBinding(
                 ctx, flowId, recordId,
             );
+        } catch (err) {
+            // Delete may already have cleared a prior
+            // binding — name that half-state explicitly.
+            reportFault(
+                ctx,
+                existing !== null
+                    ? 'Prior Record binding cleared,'
+                        + ' but new binding failed'
+                    : 'Failed to bind Record',
+                err,
+            );
+            return;
         }
-        const attributes =
-            recordId === null
-                ? []
-                : await
-                    getRecordAttributesByRecord(
-                        ctx, recordId,
-                    );
-        commit(
-            pageState.presenter()
-                .withRecordAttributes(attributes),
-        );
-        showToast(
-            'Record binding updated',
-            'success',
-        );
-    } catch (err) {
-        log.error(
-            'handleBindRecord failed',
-            'flow-detail', err,
-        );
-        showToast(
-            'Failed to update Record binding',
-            'error',
-        );
     }
+    let attributes: Awaited<
+        ReturnType<
+            typeof getRecordAttributesByRecord
+        >
+    >;
+    if (recordId === null) {
+        attributes = [];
+    } else {
+        try {
+            attributes =
+                await getRecordAttributesByRecord(
+                    ctx, recordId,
+                );
+        } catch (err) {
+            // Binding is already written; only the
+            // attribute panel is stale.
+            reportFault(
+                ctx,
+                'Record binding updated, but'
+                + ' attributes failed to load',
+                err,
+            );
+            return;
+        }
+    }
+    commit(
+        pageState.presenter()
+            .withRecordAttributes(attributes),
+    );
+    showToast(
+        'Record binding updated',
+        'success',
+    );
 }
 
 export async function init(

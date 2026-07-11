@@ -176,8 +176,10 @@ async function scopeBootIfCredentialed(): Promise<void> {
     let creds: SessionCredentials | null;
     try {
         creds = getSessionCredentials();
-    } catch {
-        return;   // a corrupt blob here just stays anonymous
+    } catch (err) {
+        // a corrupt blob here just stays anonymous
+        log.warn('corrupt session credential', 'core', err);
+        return;
     }
     const now = nowEpochSeconds();
     const decision = resolveCredentialDecision(creds, now);
@@ -206,8 +208,9 @@ async function bootAuthGate(): Promise<boolean> {
     let creds: SessionCredentials | null;
     try {
         creds = getSessionCredentials();
-    } catch {
+    } catch (err) {
         // a corrupt blob is unrecoverable — scrub and bounce
+        log.warn('corrupt session credential', 'core', err);
         deleteSessionCredentials();
         redirectToLogin();
         return false;

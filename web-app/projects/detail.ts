@@ -658,26 +658,42 @@ async function handleSave(): Promise<void> {
     const entity = state.entity;
     const detail = state.detail;
     const ctx = sessionContext();
+    // Inside the first try: a draft with an empty/invalid
+    // cost throws here and surfaces as the toast. The put
+    // and the lifecycle hop are separate tries — put
+    // success + post failure must not share one catch.
+    let fields;
+    let nextState;
+    let stateChanged;
     try {
-        // Inside the try: a draft with an empty/invalid
-        // cost throws here and surfaces as the toast.
         const patch = projectPatchFromDraft(
             state.view,
             state.draft,
         );
-        const fields = trimStrings(patch.fields);
-        const stateChanged =
+        fields = trimStrings(patch.fields);
+        nextState = patch.state;
+        stateChanged =
             patch.state !== state.view.stateValue();
         await putProjectFields(
             ctx, projectId, fields, detail,
         );
-        if (stateChanged) {
-            // DATA-CORRUPTION TRAP: the eight fields come
-            // from the RETAINED RAW entity (progress,
-            // actual_cost, position never touched by this
-            // form) plus the patch's five edited fields —
-            // never from ProjectView's display-transformed
-            // accessors.
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to save project', err,
+        );
+        return;
+    }
+    // Fields are now patched. If the lifecycle hop
+    // fails, the entity carries new fields with a
+    // stale state — name the half-state explicitly.
+    if (stateChanged) {
+        // DATA-CORRUPTION TRAP: the eight fields come
+        // from the RETAINED RAW entity (progress,
+        // actual_cost, position never touched by this
+        // form) plus the patch's five edited fields —
+        // never from ProjectView's display-transformed
+        // accessors.
+        try {
             const {
                 id: _id,
                 organization_id: _org,
@@ -695,14 +711,17 @@ async function handleSave(): Promise<void> {
                     estimated_cost:
                         fields.estimatedCost,
                 },
-                patch.state,
+                nextState,
             );
+        } catch (err) {
+            reportFault(
+                ctx,
+                'Project fields saved, but state'
+                + ' change failed',
+                err,
+            );
+            return;
         }
-    } catch (err) {
-        reportFault(
-            ctx, 'Failed to save project', err,
-        );
-        return;
     }
     showToast('Project saved', 'success');
 }

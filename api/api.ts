@@ -1152,6 +1152,28 @@ async function unwrapResponse<T>(
     );
 }
 
+// Wire-side Authorization (+ optional Content-Type) plus the
+// client vessel's requestId. Absent requestId keeps the prior
+// mint-on-gate path (direct test callers); the client facade
+// always supplies the vessel id so reportFault and the server
+// trace share one identity.
+function facadeHeaders(
+    token: string,
+    requestId: string | undefined,
+    contentType: boolean,
+): Record<string, string> {
+    const headers: Record<string, string> = {
+        'Authorization': 'Bearer ' + token,
+    };
+    if (contentType) {
+        headers['Content-Type'] = 'application/json';
+    }
+    if (requestId !== undefined) {
+        headers[REQUEST_ID_HEADER] = requestId;
+    }
+    return headers;
+}
+
 // The ONE await site for a GET-shaped facade call — GET and
 // GETWithResponseId are both thin wrappers over this, so the
 // simulateLatency literal-count pin (pair-write-coverage.test.ts)
@@ -1161,6 +1183,7 @@ async function getResponse(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
+    requestId?: string,
 ): Promise<Response> {
     await adapter.simulateLatency();
     return handleRequest(
@@ -1168,9 +1191,9 @@ async function getResponse(
         new Request(
             `${BASE_URL}/${resource}`,
             {
-                headers: {
-                    'Authorization': 'Bearer ' + token,
-                },
+                headers: facadeHeaders(
+                    token, requestId, false,
+                ),
             },
         ),
     );
@@ -1180,9 +1203,12 @@ export async function GET<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
+    requestId?: string,
 ): Promise<T> {
     return unwrapResponse<T>(
-        await getResponse(adapter, resource, token),
+        await getResponse(
+            adapter, resource, token, requestId,
+        ),
     );
 }
 
@@ -1195,8 +1221,11 @@ export async function GETWithResponseId<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
+    requestId?: string,
 ): Promise<{ body: T; responseId: string | undefined }> {
-    const response = await getResponse(adapter, resource, token);
+    const response = await getResponse(
+        adapter, resource, token, requestId,
+    );
     const body = await unwrapResponse<T>(response);
     return {
         body,
@@ -1211,12 +1240,10 @@ export async function PUT<T>(
     payload: Record<string, unknown>,
     token: string,
     headerFields?: readonly (readonly [string, string])[],
+    requestId?: string,
 ): Promise<T> {
     await adapter.simulateLatency();
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + token,
-    };
+    const headers = facadeHeaders(token, requestId, true);
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
     }
@@ -1239,6 +1266,7 @@ export async function DELETE(
     adapter: ClientFacadeAdapter,
     resource: string,
     token: string,
+    requestId?: string,
 ): Promise<void> {
     await adapter.simulateLatency();
     await unwrapResponse(
@@ -1248,9 +1276,9 @@ export async function DELETE(
                 `${BASE_URL}/${resource}`,
                 {
                     method: 'DELETE',
-                    headers: {
-                        'Authorization': 'Bearer ' + token,
-                    },
+                    headers: facadeHeaders(
+                        token, requestId, false,
+                    ),
                 },
             ),
         ),
@@ -1262,6 +1290,7 @@ export async function POST<T>(
     resource: string,
     payload: Record<string, unknown>,
     token: string,
+    requestId?: string,
 ): Promise<T> {
     await adapter.simulateLatency();
     return unwrapResponse<T>(
@@ -1271,11 +1300,9 @@ export async function POST<T>(
                 `${BASE_URL}/${resource}`,
                 {
                     method: 'POST',
-                    headers: {
-                        'Content-Type':
-                            'application/json',
-                        'Authorization': 'Bearer ' + token,
-                    },
+                    headers: facadeHeaders(
+                        token, requestId, true,
+                    ),
                     body: JSON.stringify(payload),
                 },
             ),

@@ -104,3 +104,138 @@ test('exceeding maxDecompressedTotal throws', async () => {
         ZipLimitExceeded,
     );
 });
+
+// Craft a single-entry ZIP with method DEFLATE and
+// arbitrary compressed payload. buildZip only stores;
+// inflate is only reached when method === 8.
+function buildDeflateZip(
+    name: string,
+    compressed: Uint8Array,
+): Uint8Array {
+    const LOCAL_SIG = 0x04034B50;
+    const CENTRAL_SIG = 0x02014B50;
+    const END_SIG = 0x06054B50;
+    const LOCAL_HEADER = 30;
+    const CENTRAL_HEADER = 46;
+    const END_RECORD = 22;
+    const DEFLATE = 8;
+    const nameBytes = new TextEncoder().encode(name);
+    const total =
+        LOCAL_HEADER + nameBytes.length
+        + compressed.length
+        + CENTRAL_HEADER + nameBytes.length
+        + END_RECORD;
+    const buf = new ArrayBuffer(total);
+    const view = new DataView(buf);
+    const out = new Uint8Array(buf);
+    let off = 0;
+
+    view.setUint32(off, LOCAL_SIG, true);
+    view.setUint16(off + 4, 20, true);
+    view.setUint16(off + 8, DEFLATE, true);
+    view.setUint32(
+        off + 18, compressed.length, true,
+    );
+    view.setUint32(
+        off + 22, compressed.length, true,
+    );
+    view.setUint16(
+        off + 26, nameBytes.length, true,
+    );
+    off += LOCAL_HEADER;
+    out.set(nameBytes, off);
+    off += nameBytes.length;
+    out.set(compressed, off);
+    off += compressed.length;
+
+    const centralStart = off;
+    view.setUint32(off, CENTRAL_SIG, true);
+    view.setUint16(off + 4, 20, true);
+    view.setUint16(off + 6, 20, true);
+    view.setUint16(off + 10, DEFLATE, true);
+    view.setUint32(
+        off + 20, compressed.length, true,
+    );
+    view.setUint32(
+        off + 24, compressed.length, true,
+    );
+    view.setUint16(
+        off + 28, nameBytes.length, true,
+    );
+    // localOffset = 0
+    off += CENTRAL_HEADER;
+    out.set(nameBytes, off);
+    off += nameBytes.length;
+
+    const centralSize = off - centralStart;
+    view.setUint32(off, END_SIG, true);
+    view.setUint16(off + 8, 1, true);
+    view.setUint16(off + 10, 1, true);
+    view.setUint32(off + 12, centralSize, true);
+    view.setUint32(off + 16, centralStart, true);
+    return out;
+}
+
+test(
+    'malformed DEFLATE rejects and cancels the reader',
+    async () => {
+        // Garbage deflate-raw bytes: DecompressionStream
+        // rejects on reader.read(). The inflate finally
+        // must cancel so the lock never leaks.
+        const garbage = new Uint8Array([
+            0x00, 0x01, 0x02, 0x03,
+            0x04, 0x05, 0xff, 0xfe,
+        ]);
+        const zip = buildDeflateZip(
+            'bad.bin', garbage,
+        );
+
+        let cancelCalls = 0;
+        const proto =
+            ReadableStreamDefaultReader
+                .prototype;
+        const origCancel = proto.cancel;
+        proto.cancel = function (
+            this: ReadableStreamDefaultReader,
+            reason?: unknown,
+        ) {
+            cancelCalls += 1;
+            return origCancel.call(
+                this, reason,
+            );
+        };
+
+        try {
+            await assert.rejects(
+                () => getZipEntries(
+                    zip, DEFAULT_ZIP_LIMITS,
+                ),
+            );
+            assert.ok(
+                cancelCalls >= 1,
+                'inflate must cancel the reader '
+                + 'on deflate failure; cancel '
+                + 'calls=' + cancelCalls,
+            );
+
+            // Second call: a well-formed empty
+            // deflate stream still inflates after
+            // the prior failure — no global lock
+            // residue from an abandoned reader.
+            const emptyDeflate =
+                new Uint8Array([3, 0]);
+            const okZip = buildDeflateZip(
+                'empty.bin', emptyDeflate,
+            );
+            const entries = await getZipEntries(
+                okZip, DEFAULT_ZIP_LIMITS,
+            );
+            assert.equal(entries.length, 1);
+            assert.equal(
+                entries[0]!.data.byteLength, 0,
+            );
+        } finally {
+            proto.cancel = origCancel;
+        }
+    },
+);

@@ -38,6 +38,7 @@ import { getOrganizations } from './organizations.ts';
 import {
     getIdentityDefaultOrganization,
 } from './identity-default-organization.ts';
+import { log } from '../logger.ts';
 import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
@@ -113,15 +114,22 @@ function makeRequestContext(
             : make(token);
     }
 
+    // One vessel id for the whole client request: reportFault
+    // logs it, and every wire verb carries it as
+    // REQUEST_ID_HEADER so the server gate reuses it instead
+    // of minting a second, unrelated trace.
+    const requestId = generateCryptoSafeBase62();
     const ctx: RequestContext = {
-        requestId: generateCryptoSafeBase62(),
+        requestId,
         identity,
         GET: <T>(resource: string) =>
-            run<T>(tok => httpGet<T>(adapter, resource, tok)),
+            run<T>(tok => httpGet<T>(
+                adapter, resource, tok, requestId,
+            )),
         GETWithResponseId: <T>(resource: string) =>
             run<{ body: T; responseId: string | undefined }>(
                 tok => httpGetWithResponseId<T>(
-                    adapter, resource, tok,
+                    adapter, resource, tok, requestId,
                 ),
             ),
         PUT: <T>(
@@ -131,16 +139,21 @@ function makeRequestContext(
                 readonly (readonly [string, string])[],
         ) => run<T>(
             tok => httpPut<T>(
-                adapter, resource, body, tok, headerFields,
+                adapter, resource, body, tok,
+                headerFields, requestId,
             )),
         DELETE: (resource: string) =>
             run<void>(
-                tok => httpDelete(adapter, resource, tok)),
+                tok => httpDelete(
+                    adapter, resource, tok, requestId,
+                )),
         POST: <T>(
             resource: string,
             body: Record<string, unknown>,
         ) => run<T>(
-            tok => httpPost<T>(adapter, resource, body, tok)),
+            tok => httpPost<T>(
+                adapter, resource, body, tok, requestId,
+            )),
     };
     return ctx;
 }
@@ -238,8 +251,13 @@ async function recoverSession(
     let creds: SessionCredentials | null;
     try {
         creds = getSessionCredentials();
-    } catch {
+    } catch (err) {
         // a corrupt blob is unrecoverable — scrub and bounce
+        log.warn(
+            'corrupt session credential',
+            'shared',
+            err,
+        );
         deleteSessionCredentials();
         redirectToLogin();
         return null;

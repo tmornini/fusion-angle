@@ -115,3 +115,27 @@ test(
         assert.ok(a.requestId.length > 0);
     },
 );
+
+// The client vessel mints one requestId; the wire verbs must
+// hoist it so incomingContext reuses it (pair-plane request
+// message carries the header) instead of minting a second
+// unrelated trace that reportFault cannot correlate.
+test(
+    'client requestId rides the wire as x-request-id',
+    async () => {
+        const db = new MemoryDbAdapter();
+        await seedAdminSchema(db);
+        const ctx = createRequestContext(db, DEV_TOKEN);
+        await ctx.PUT(
+            'identities/trace-me',
+            { kind: 'person' },
+        );
+        const rows = await db.requests.getAll();
+        assert.ok(
+            rows.some(
+                r => r.message.includes(ctx.requestId),
+            ),
+            'stored pair must carry the client requestId',
+        );
+    },
+);

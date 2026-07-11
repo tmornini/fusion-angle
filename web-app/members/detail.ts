@@ -21,7 +21,6 @@ import {
     bindPageListeners,
 } from '../app/page-lifecycle.ts';
 import { reportFault } from '../app/error-helpers.ts';
-import { log } from '../app/logger.ts';
 import {
     buildSkeleton,
     loadInto,
@@ -30,6 +29,9 @@ import {
     navigateTo,
     trimStrings,
 } from '../app/core.ts';
+import {
+    RequestError,
+} from '../../api/api.ts';
 import {
     sessionContext,
     getHumanMember,
@@ -117,6 +119,16 @@ function rerender(): void {
         .renderUpdate(pageContainer);
 }
 
+// Try human, then AI. A 404 on either kind is expected
+// absence for that kind; only a dual 404 is genuine
+// not-found (return null → caller redirects). Any other
+// status is a real fault and must surface — never collapse
+// into the silent redirect that absence uses.
+function isNotFound(err: unknown): boolean {
+    return err instanceof RequestError
+        && err.status === 404;
+}
+
 async function loadMemberByEitherKind(
     memberId: string,
 ): Promise<HumanMember | AIMember | null> {
@@ -126,18 +138,18 @@ async function loadMemberByEitherKind(
             ctx, memberId,
         );
     } catch (errHuman) {
+        if (!isNotFound(errHuman)) {
+            throw errHuman;
+        }
         try {
             return await getAIMember(
                 ctx, memberId,
             );
         } catch (errAi) {
-            log.error(
-                'member lookup failed'
-                + ' for both kinds',
-                'members',
-                { errHuman, errAi },
-            );
-            return null;
+            if (isNotFound(errAi)) {
+                return null;
+            }
+            throw errAi;
         }
     }
 }
@@ -504,16 +516,29 @@ async function saveHumanMember(
                     s.member.stateEventIdValue(),
             }, piiPatch,
         );
-        if (stateChanged) {
-            await postHumanMemberStateChange(
-                ctx, memberId, s.draft.state,
-            );
-        }
     } catch (err) {
         reportFault(
             ctx, 'Failed to save member', err,
         );
         return;
+    }
+    // Detail is now patched. If the lifecycle hop
+    // fails, the entity carries new fields with a
+    // stale state — name the half-state explicitly.
+    if (stateChanged) {
+        try {
+            await postHumanMemberStateChange(
+                ctx, memberId, s.draft.state,
+            );
+        } catch (err) {
+            reportFault(
+                ctx,
+                'Member details saved, but state'
+                + ' change failed',
+                err,
+            );
+            return;
+        }
     }
     showToast('Member saved', 'success');
 }
@@ -559,11 +584,6 @@ async function saveAIMember(
                     s.member.stateEventIdValue(),
             },
         );
-        if (stateChanged) {
-            await postAIMemberStateChange(
-                ctx, memberId, s.draft.state,
-            );
-        }
     } catch (err) {
         reportFault(
             ctx,
@@ -571,6 +591,24 @@ async function saveAIMember(
             err,
         );
         return;
+    }
+    // Detail is now patched. If the lifecycle hop
+    // fails, the entity carries new fields with a
+    // stale state — name the half-state explicitly.
+    if (stateChanged) {
+        try {
+            await postAIMemberStateChange(
+                ctx, memberId, s.draft.state,
+            );
+        } catch (err) {
+            reportFault(
+                ctx,
+                'AI member details saved, but'
+                + ' state change failed',
+                err,
+            );
+            return;
+        }
     }
     showToast(
         'AI member saved', 'success',

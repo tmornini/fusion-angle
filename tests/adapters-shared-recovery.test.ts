@@ -40,6 +40,8 @@ import {
     getSessionCredentials,
     putSessionCredentials,
 } from '../web-app/app/adapters/session-credentials.ts';
+import { STORAGE_KEY_AUTHORIZATION } from
+    '../web-app/app/storage-keys.ts';
 import {
     ideaBody, organizationRow, seedAdminSchema,
     seedOrganizationDocument as seedOrganizationDocumentPair,
@@ -360,6 +362,43 @@ async () => {
     // ...and the tab was redirected to the login page
     assert.match(
         window.location.href, /auth.*return=dashboard/);
+});
+
+// Corrupt credential is unrecoverable: scrub + bounce, and
+// the catch must leave a warn (empty catch destroys evidence).
+test('recovery with a corrupt credential scrubs, bounces,'
++ ' and warns',
+async () => {
+    localStorage.clear();
+    window.location.href = '';
+    const db = await freshDb();
+    localStorage.setItem(
+        STORAGE_KEY_AUTHORIZATION, 'not json at all');
+    const dead = await expiredToken();
+    putSessionToken(dead);
+    const warns: unknown[][] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+        warns.push(args);
+    };
+    try {
+        const ctx = createRecoveringRequestContext(
+            db, dead);
+        await assert.rejects(
+            () => ctx.GET('members'), UnauthorizedError);
+    } finally {
+        console.warn = originalWarn;
+    }
+    assert.equal(
+        localStorage.getItem(STORAGE_KEY_AUTHORIZATION),
+        null);
+    assert.match(
+        window.location.href, /auth.*return=dashboard/);
+    assert.ok(
+        warns.some(args =>
+            args.includes('corrupt session credential')),
+        'corrupt credential must log.warn, not silent catch',
+    );
 });
 
 test('a recovering context reads through the vessel token,'
