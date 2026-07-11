@@ -211,7 +211,8 @@ export class IdeaConversionPresenter {
                     }"
                     id=${'convert'
                         + '-back-to'
-                        + '-ideas'}>
+                        + '-ideas'}
+                    aria-label="Back">
                     ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div class="flex

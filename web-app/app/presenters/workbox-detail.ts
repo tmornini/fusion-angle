@@ -273,7 +273,8 @@ export class WorkboxDetailPresenter {
                 <button
                     id="work-order-back-btn"
                     class="btn btn-ghost
-                        btn-icon">
+                        btn-icon"
+                    aria-label="Back">
                     ${iconArrowLeft(ICON_SIZE.xl, '')}
                 </button>
                 <div>

@@ -94,10 +94,12 @@ export function buildFlowNameHeader(
 <button class="${
     'btn btn-ghost btn-icon'
 }" id="flow-name-save-btn"
+    aria-label="Save name"
     >${iconCheck(ICON_SIZE.base, '')}</button>
 <button class="${
     'btn btn-ghost btn-icon'
 }" id="flow-name-cancel-btn"
+    aria-label="Cancel rename"
     >${iconX(ICON_SIZE.base, '')}</button>
 </div>`;
     }
@@ -112,6 +114,7 @@ export function buildFlowNameHeader(
     'btn btn-ghost btn-icon'
     + ' flow-name-edit-btn'
 }" id="flow-name-edit-btn"
+    aria-label="Edit name"
     >${iconEdit(ICON_SIZE.sm, '')}</button>
 </div>`;
 }

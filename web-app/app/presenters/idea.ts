@@ -266,9 +266,10 @@ function buildEditableInput(
 ): SafeHtml {
     return html`
         <div>
-            <p class="${
+            <label class="${
                 'text-xs text-muted mb-1'
-            }">${label}</p>
+                + ' block'
+            }" for="${id}">${label}</label>
             <input class="input"
                 id="${id}"
                 data-idea-field="${field}"
@@ -299,9 +300,10 @@ function buildEditableTextarea(
 ): SafeHtml {
     return html`
         <div>
-            <p class="${
+            <label class="${
                 'text-xs text-muted mb-1'
-            }">${label}</p>
+                + ' block'
+            }" for="${id}">${label}</label>
             <textarea
                 class="${
                     'textarea resize-none'
@@ -398,6 +400,13 @@ function buildApprovalDialogs(): SafeHtml {
             </p>
         </div>
         <div class="py-4">
+            <label class="${
+                'text-xs text-muted mb-1'
+                + ' block'
+            }" for="${
+                'approval-send-back'
+                + '-feedback'
+            }">Feedback</label>
             <textarea
                 class="${
                     'textarea resize-none'

@@ -60,6 +60,12 @@
   color: hsl(var(--foreground));
 }
 
+.command-palette-input:focus-visible {
+  outline: var(--focus-ring-width) solid
+    hsl(var(--focus-ring-color));
+  outline-offset: var(--focus-ring-offset);
+}
+
 .command-palette-input::placeholder {
   color: hsl(var(--muted-foreground));
 }

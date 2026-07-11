@@ -61,7 +61,8 @@ export class RecordDetailPresenter {
                         class="${
                             'btn btn-ghost'
                             + ' btn-icon'
-                        }">
+                        }"
+                        aria-label="Back">
                         ${iconArrowLeft(ICON_SIZE.xl, '')}
                     </button>
                     <div>
@@ -261,7 +262,8 @@ export class RecordDetailEditPresenter {
                         class="${
                             'btn btn-ghost'
                             + ' btn-icon'
-                        }">
+                        }"
+                        aria-label="Cancel">
                         ${iconX(ICON_SIZE.xl, '')}
                     </button>
                     <input
