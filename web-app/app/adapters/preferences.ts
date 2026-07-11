@@ -76,8 +76,10 @@ function putPreference(
         ) {
             log.warn(
                 'preference write skipped'
-                + ' due to quota: ' + key,
-                'preferences', err,
+                + ' due to quota',
+                'preferences',
+                { key },
+                err,
             );
             return false;
         }

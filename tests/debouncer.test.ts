@@ -51,8 +51,19 @@ test(
 
 test(
     'flush with nothing pending is a no-op',
-    () => {
-        new Debouncer(800).flush();
+    (t) => {
+        t.mock.timers.enable({
+            apis: ['setTimeout'],
+        });
+        const d = new Debouncer(800);
+        let runs = 0;
+        // Empty flush invents no save and leaves the
+        // debouncer ready for a later schedule.
+        d.flush();
+        assert.equal(runs, 0);
+        d.schedule(() => { runs += 1; });
+        t.mock.timers.tick(800);
+        assert.equal(runs, 1);
     },
 );
 

@@ -110,8 +110,26 @@ async () => {
     assert.deepEqual(viaGetWithResponseId, viaGet);
 });
 
-test('jitteredBackoff resolves (the C6 retry loop\'s pacing'
-+ ' primitive)', async () => {
-    await jitteredBackoff(1);
-    assert.ok(true);
+test('jitteredBackoff waits base*2^(attempt-1) plus jitter'
++ ' (the C6 retry loop\'s pacing primitive)',
+async (t) => {
+    // BACKOFF_BASE_MS is 100; random fixed at 0 → delay
+    // equals the base with no jitter added.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    t.mock.method(Math, 'random', () => 0);
+
+    let resolved = false;
+    const p = jitteredBackoff(2).then(() => {
+        resolved = true;
+    });
+    // attempt 2 → base = 100 * 2^(2-1) = 200
+    t.mock.timers.tick(199);
+    await Promise.resolve();
+    assert.equal(
+        resolved, false,
+        'must not resolve before the backoff delay',
+    );
+    t.mock.timers.tick(1);
+    await p;
+    assert.equal(resolved, true);
 });

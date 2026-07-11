@@ -12,6 +12,7 @@ import {
 import type { LatencySimulation } from './latency.ts';
 import {
     ValidationError,
+    msSinceUtc,
 } from './types.ts';
 import type { Id } from './types.ts';
 import { messageAddress } from './message-address.ts';
@@ -232,6 +233,8 @@ function redactedFenceFailure(
     }
     console.error('fence read failed', {
         requestId: ctx.requestId,
+        requestAt: ctx.requestAt,
+        latencyMs: msSinceUtc(ctx.requestAt),
         method: ctx.method,
         pathname: ctx.pathname,
     }, error);
@@ -1114,6 +1117,8 @@ export async function handleRequest(
         // by the request identity so the story correlates.
         console.error('request failed', {
             requestId: ctx.requestId,
+            requestAt: ctx.requestAt,
+            latencyMs: msSinceUtc(ctx.requestAt),
             method,
             pathname,
         }, error);

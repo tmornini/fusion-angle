@@ -23,11 +23,19 @@ async function bootstrappedDb(): Promise<MemoryDbAdapter> {
 
 test('pristine bootstrap seeds no Records', async () => {
     const db = await bootstrappedDb();
-    // Phase Final Task 2: records family row halves stripped
-    // — bootstrap also writes zero pairs for records.
-    // Phase Final Stage B: records table retired.
-    // Phase Final Stage B: record_attributes table retired.
-    // Phase Final Stage B: flow_records table retired.
+    // Pair plane: no records-family document pairs. Sample
+    // Records are demo content from postMockDataLoad, not
+    // bootstrap. Covers records, record-attributes, and
+    // flow_records joins (…/flows/:id/records/).
+    const requests = await db.requests.getAll();
+    const recordFamily = requests.filter((r) =>
+        r.uri_prefix.includes('/records/')
+        || r.uri_prefix.includes('/record-attributes/')
+    );
+    assert.equal(
+        recordFamily.length, 0,
+        'bootstrap seeds no records-family pairs',
+    );
 });
 
 test(

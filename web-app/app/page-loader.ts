@@ -30,9 +30,9 @@ export function handlePageLoadError(
     err: unknown,
 ): void {
     log.error(
-        `Page "${pageName}"`
-        + ' failed to init:',
+        'page failed to init',
         'core',
+        { page: pageName },
         err,
     );
     const container =

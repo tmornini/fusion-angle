@@ -132,11 +132,11 @@ export async function init(
             creds = await action();
         } catch (err) {
             log.error(
-                label
-                + ' failed after schema'
+                'action failed after schema'
                 + ' deletion (database'
                 + ' is now empty)',
                 'snapshots',
+                { label },
                 err,
             );
             showToast(

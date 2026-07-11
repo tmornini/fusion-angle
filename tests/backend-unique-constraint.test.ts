@@ -75,6 +75,15 @@ async () => {
         },
     );
     // absent keys are unindexed — genesis rows coexist
+    const rows = await backend.transaction(
+        ['responses'], 'readonly',
+        (tx) => tx.getAll('responses'),
+    );
+    assert.equal(rows.length, 2);
+    assert.deepEqual(
+        rows.map((r) => r['id']).sort(),
+        ['r1', 'r2'],
+    );
 });
 
 test('a failed unique put aborts the whole transaction',
