@@ -85,6 +85,30 @@ test('a live authorization code is fingerprinted on the'
         .includes('AUTH-CODE-SECRET'));
 });
 
+test('a live code_verifier is fingerprinted on the token'
++ ' request arm', async () => {
+    const model = buildRequestModel({
+        method: 'POST',
+        target: '/authentication/token',
+        fields: [],
+        body: {
+            grant_type: 'authorization_code',
+            code: 'AUTH-CODE-SECRET',
+            code_verifier: 'CODE-VERIFIER-SECRET',
+        },
+    });
+    const redacted = await redactAuthenticationRequest(
+        'authentication/token', model,
+    );
+    const body = bodyOf(redacted);
+    assert.equal(
+        body.code_verifier,
+        'sha256:' + await sha256Hex('CODE-VERIFIER-SECRET'),
+    );
+    assert.ok(!canonicalJson(redacted)
+        .includes('CODE-VERIFIER-SECRET'));
+});
+
 test('a present code on the authorize request arm is'
 + ' equally fingerprinted', async () => {
     const model = buildRequestModel({

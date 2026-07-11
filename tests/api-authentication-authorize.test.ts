@@ -9,6 +9,9 @@ import {
     seedIdentityCredential,
     seedIdentityPii,
 } from './identity-fixtures.ts';
+import {
+    MS_PER_SECOND, setClockForTest, resetClock,
+} from '../api/types.ts';
 
 const BASE = 'http://localhost';
 
@@ -69,11 +72,43 @@ async () => {
     assert.ok(code.length > 0);
     const tok = await handleRequest(db, token({
         grant_type: 'authorization_code', code,
+        client_id: 'web',
     }));
     assert.equal(tok.status, 200);
     const body = await tok.json() as { access_token: string };
     assert.ok(Array.isArray(
         await GET(db, 'members', body.access_token)));
+});
+
+// authorization_code TTL: a code older than
+// AUTHORIZATION_CODE_TTL_SECONDS (10 min) is the same shared
+// 401 as unknown/spent — grant-first, no mint, no append.
+// Clock seam (Task 1) advances past the TTL without sleeping.
+test('an expired authorization code is a 401', async () => {
+    const db = await dbWithPasswordUser();
+    await seedRootAdmin(db);
+    const res = await handleRequest(db, authorize({
+        method: 'password', username: 'demo@example.com',
+        password: 's3cret', client_id: 'web',
+    }));
+    assert.equal(res.status, 200);
+    const { code } = await res.json() as { code: string };
+    // 10 min TTL + 1 s past the bound.
+    setClockForTest(() =>
+        Date.now() + (10 * 60 + 1) * MS_PER_SECOND);
+    try {
+        const tok = await handleRequest(db, token({
+            grant_type: 'authorization_code', code,
+            client_id: 'web',
+        }));
+        assert.equal(tok.status, 401);
+        assert.deepEqual(
+            await tok.json(),
+            { error: 'invalid or used authorization code' },
+        );
+    } finally {
+        resetClock();
+    }
 });
 
 test('a wrong password is a 401 with no code issued',

@@ -344,10 +344,28 @@ Remaining seams — no client-tier mitigation exists:
   untrusted client and an unauthenticated wipe of a populated
   tenant store is catastrophic. Until then it is KNOWN and
   accepted; do not re-raise it.
+- **Soft-optional PKCE on authorize.** `code_challenge` is
+  optional at `/authentication/authorize`; when omitted,
+  `grantAuthorizationCode` skips the verifier check so the
+  password-loop demo works without PKCE. OAuth 2.1 mandates
+  PKCE for public clients — hard enforcement (reject
+  authorize without a challenge for public clients) is a
+  residual for the server tier. When a challenge IS present,
+  S256 verification is real (mitigated below).
 
 Mitigated client-tier — the seam is narrowed in this codebase,
 re-verified by the automated suite:
 
+- **Authorization-code grant hardening**
+  (`grantAuthorizationCode`, `api/authentication.ts`): the
+  code is TTL-bound (`AUTHORIZATION_CODE_TTL_SECONDS`,
+  10 min from the authorize pair's `at`), client-bound
+  (redeeming `client_id` must equal authorize's), and —
+  when authorize stored a `code_challenge` — PKCE S256-
+  verified (`code_verifier` → base64url(sha256) must match).
+  Unknown, spent, expired, wrong-client, or bad-PKCE all
+  share one 401 and mint nothing (grant-first). Soft residual
+  when authorize omits the challenge: see remaining seams.
 - **Token-exchange delegation** (`grantTokenExchange`,
   `api/authentication.ts`): self-delegation ONLY — a
   cross-party exchange (subject ≠ actor) is 403 until a

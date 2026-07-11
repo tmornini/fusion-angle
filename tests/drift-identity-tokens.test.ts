@@ -302,6 +302,7 @@ test('SECURITY: a session minted via a real grant is admitted'
     const { code } = await authorizeRes.json() as { code: string };
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
+        client_id: 'web',
     });
     assert.equal(grantRes.status, 200);
     const { refresh_token: refreshToken } =
@@ -386,6 +387,7 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
 
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
+        client_id: 'web',
     });
     assert.equal(grantRes.status, 200);
 

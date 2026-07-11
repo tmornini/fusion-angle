@@ -25,6 +25,8 @@ import {
 import {
     deriveIdentityTokens,
 } from '../api/derive-identity-tokens.ts';
+import { sha256Bytes } from '../shared/digest.ts';
+import { bytesToBase64Url } from '../shared/base64url.ts';
 
 const BASE = 'http://localhost';
 
@@ -50,6 +52,7 @@ async function seedAuthorizationCodePair(
     code: string,
     identityId: string,
     clientId: string,
+    extras: { code_challenge?: string } = {},
 ): Promise<void> {
     const seed: AuthPairSeed = {
         requestAt: nowUtc(),
@@ -60,10 +63,13 @@ async function seedAuthorizationCodePair(
         routeSegments: ['authentication', 'authorize'],
         pathSegments: ['authentication', 'authorize'],
     };
-    const requestBody = {
+    const requestBody: Record<string, unknown> = {
         method: 'password', username: 'seed@example.com',
         password: 'seed-password', client_id: clientId,
     };
+    if (extras.code_challenge !== undefined) {
+        requestBody.code_challenge = extras.code_challenge;
+    }
     const pair = await formAuthPair(
         seed, requestBody, identityId, 200, { code },
     );
@@ -178,6 +184,113 @@ async () => {
         (await deriveIdentityTokens(db)).length, 0);
 });
 
+// authorization_code client binding: a code issued under
+// client_id A is not redeemable under client_id B. Same shared
+// 401 as unknown/spent/expired — grant-first, no mint.
+// Two codes: mismatch first (codes are single-use), then match.
+test('an authorization code is bound to its issuing client',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    await seedAuthorizationCodePair(
+        db, 'code-for-a', 'current', 'client-a');
+    await seedAuthorizationCodePair(
+        db, 'code-for-match', 'current', 'client-a');
+    const mismatch = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code',
+        code: 'code-for-a',
+        client_id: 'client-b',
+    }));
+    assert.equal(mismatch.status, 401);
+    assert.deepEqual(
+        await mismatch.json(),
+        { error: INVALID_CODE_ERROR },
+    );
+    const match = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code',
+        code: 'code-for-match',
+        client_id: 'client-a',
+    }));
+    assert.equal(match.status, 200);
+});
+
+// PKCE S256 (RFC 7636): when authorize stored a code_challenge,
+// redeem requires code_verifier whose S256 matches. Missing or
+// wrong verifier is the same shared 401 as unknown/spent —
+// grant-first, no mint. No challenge stored = current behavior
+// (password-loop demo keeps working without PKCE).
+async function s256Challenge(
+    verifier: string,
+): Promise<string> {
+    return bytesToBase64Url(await sha256Bytes(verifier));
+}
+
+test('authorization_code with PKCE accepts a matching verifier',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    const verifier = 'pkce-verifier-correct-value';
+    const challenge = await s256Challenge(verifier);
+    await seedAuthorizationCodePair(
+        db, 'pkce-code-ok', 'current', 'web',
+        { code_challenge: challenge },
+    );
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code',
+        code: 'pkce-code-ok',
+        client_id: 'web',
+        code_verifier: verifier,
+    }));
+    assert.equal(res.status, 200);
+});
+
+test('authorization_code with PKCE rejects a wrong verifier',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    const challenge = await s256Challenge(
+        'pkce-verifier-correct-value',
+    );
+    await seedAuthorizationCodePair(
+        db, 'pkce-code-bad', 'current', 'web',
+        { code_challenge: challenge },
+    );
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code',
+        code: 'pkce-code-bad',
+        client_id: 'web',
+        code_verifier: 'pkce-verifier-WRONG',
+    }));
+    assert.equal(res.status, 401);
+    assert.deepEqual(
+        await res.json(),
+        { error: INVALID_CODE_ERROR },
+    );
+});
+
+test('authorization_code with PKCE rejects a missing verifier',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    const challenge = await s256Challenge(
+        'pkce-verifier-correct-value',
+    );
+    await seedAuthorizationCodePair(
+        db, 'pkce-code-none', 'current', 'web',
+        { code_challenge: challenge },
+    );
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code',
+        code: 'pkce-code-none',
+        client_id: 'web',
+    }));
+    assert.equal(res.status, 401);
+    assert.deepEqual(
+        await res.json(),
+        { error: INVALID_CODE_ERROR },
+    );
+});
+
 test('authorization_code grant issues a gate-valid token pair',
 async () => {
     const db = await freshDb();
@@ -186,6 +299,7 @@ async () => {
         db, 'the-code', 'current', 'web');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
+        client_id: 'web',
     }));
     assert.equal(res.status, 200);
     const body = await res.json() as {
@@ -206,11 +320,13 @@ test('replaying a consumed code is a 401 no-op', async () => {
         db, 'the-code', 'current', 'web');
     const first = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
+        client_id: 'web',
     }));
     assert.equal(first.status, 200);
     const before = (await deriveIdentityTokens(db)).length;
     const replay = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
+        client_id: 'web',
     }));
     assert.equal(replay.status, 401);
     // no new token chain minted on the replay
@@ -230,10 +346,12 @@ test(
             handleRequest(db, tokenRequest({
                 grant_type: 'authorization_code',
                 code: 'the-code',
+                client_id: 'web',
             })),
             handleRequest(db, tokenRequest({
                 grant_type: 'authorization_code',
                 code: 'the-code',
+                client_id: 'web',
             })),
         ]);
         assert.deepEqual(
@@ -278,11 +396,13 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
     const first = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code',
         code: 'the-code-spent',
+        client_id: 'web',
     }));
     assert.equal(first.status, 200);
     const spent = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code',
         code: 'the-code-spent',
+        client_id: 'web',
     }));
     assert.equal(spent.status, 401);
     assert.deepEqual(
@@ -294,10 +414,12 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
         handleRequest(db, tokenRequest({
             grant_type: 'authorization_code',
             code: 'the-code-raced',
+            client_id: 'web',
         })),
         handleRequest(db, tokenRequest({
             grant_type: 'authorization_code',
             code: 'the-code-raced',
+            client_id: 'web',
         })),
     ]);
     assert.deepEqual([a.status, b.status].sort(), [200, 401]);
@@ -321,6 +443,7 @@ async function initialPair(
         db, 'the-code', 'current', 'web');
     const res = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
+        client_id: 'web',
     }));
     return res.json();
 }

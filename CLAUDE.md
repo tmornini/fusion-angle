@@ -100,10 +100,14 @@ is HTTP-only.
 - **Auth.** Real OAuth 2.1 spine. `/authentication/token`
   (grant dispatch) + `/authentication/authorize` (password
   loop) mint/verify HMAC-SHA256 JWTs (`api/access-token.ts`);
-  a Bearer gate in `handleRequest` enforces them. Token
-  lifecycle (issue/rotate/revoke) lives only as message-pair
-  events now — `identity_tokens` and `authorization_codes`
-  are RETIRED tables (Phase 13 Task 9); the
+  a Bearer gate in `handleRequest` enforces them. The
+  `authorization_code` grant is TTL-bound, client-bound, and
+  PKCE-verified when authorize carries a `code_challenge`
+  (soft-optional when omitted — password-loop demo residual;
+  hard PKCE is a server-tier residual). Token lifecycle
+  (issue/rotate/revoke) lives only as message-pair events
+  now — `identity_tokens` and `authorization_codes` are
+  RETIRED tables (Phase 13 Task 9); the
   `identity_token_revocations` ledger and PBKDF2 password
   hashing back the gate too. Every per-request check —
   revocation, the tenancy fence, roles — derives fresh from

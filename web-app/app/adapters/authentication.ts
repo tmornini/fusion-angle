@@ -53,6 +53,7 @@ export async function postPasswordLogin(
         }>('authentication/token', {
             grant_type: 'authorization_code',
             code,
+            client_id: WEB_CLIENT_ID,
         });
     } catch (err) {
         if (err instanceof UnauthorizedError) {

@@ -29,7 +29,7 @@ const PASSWORD_FIELD = 'password';
 const REDACTED_HEADERS = ['authorization', 'cookie'];
 const HIGH_ENTROPY_REQUEST_FIELDS = [
     'refresh_token', 'subject_token', 'actor_token',
-    'client_assertion', 'code',
+    'client_assertion', 'code', 'code_verifier',
 ];
 const HIGH_ENTROPY_RESPONSE_FIELDS = [
     'access_token', 'refresh_token', 'code',

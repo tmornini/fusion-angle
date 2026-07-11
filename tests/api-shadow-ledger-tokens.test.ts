@@ -20,7 +20,9 @@ import type { DbAdapter } from '../api/db.ts';
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
-import type { IdentityTokenEntity } from '../api/types.ts';
+import {
+    nowUtc, type IdentityTokenEntity,
+} from '../api/types.ts';
 import {
     deriveIdentityToken,
     deriveIdentityTokens,
@@ -438,8 +440,10 @@ async function seedAuthorizationCodePair(
     identityId: string,
     clientId: string,
 ): Promise<void> {
+    // Fresh `at` (nowUtc): authorization_code TTL is 10 min;
+    // a fixed historical AT would expire before the grant.
     const seed: AuthPairSeed = {
-        requestAt: AT,
+        requestAt: nowUtc(),
         headerFields: [],
         method: 'POST',
         pathname: '/authentication/authorize',
@@ -464,6 +468,7 @@ async () => {
     await seedAuthorizationCodePair(db, 'the-code', 'current', 'web');
     const res = await postToken(db, {
         grant_type: 'authorization_code', code: 'the-code',
+        client_id: 'web',
     });
     assert.equal(res.status, 200);
     await assertRootEventPair(db);

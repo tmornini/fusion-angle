@@ -69,6 +69,7 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
             body: JSON.stringify({
                 grant_type: 'authorization_code',
                 code: 'the-code',
+                client_id: 'web',
             }),
         }));
     return res.json();

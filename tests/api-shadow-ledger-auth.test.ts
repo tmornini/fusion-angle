@@ -115,6 +115,7 @@ async function fullLoginFlow(db: GuardedDbAdapter): Promise<{
     const tokenRes = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'authorization_code', code,
+            client_id: 'web',
         }));
     assert.equal(tokenRes.status, 200);
     const grant = await tokenRes.json() as {
@@ -308,6 +309,7 @@ async () => {
     const replay = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'authorization_code', code,
+            client_id: 'web',
         }, { [REQUEST_ID_HEADER]: 'replay-attempt' }));
     assert.equal(replay.status, 401);
     assert.equal((await db.requests.getAll()).length, before);
@@ -562,6 +564,7 @@ async () => {
     const res = await handleRequest(db, jsonPost(
         'authentication/token', {
             grant_type: 'authorization_code', code,
+            client_id: 'web',
             refresh_token: 999999,
         }));
     assert.equal(res.status, 200);
@@ -615,6 +618,7 @@ test('an Authorization header sent alongside the token grant is'
         body: JSON.stringify({
             grant_type: 'authorization_code',
             code,
+            client_id: 'web',
         }),
     });
     const res = await handleRequest(db, req);
