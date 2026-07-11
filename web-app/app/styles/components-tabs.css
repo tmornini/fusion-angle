@@ -1,41 +1,41 @@
 /* Tabs and view-toggle buttons: segmented navigation. */
 
 .tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  background-color: hsl(var(--muted));
-  border-radius: var(--radius-lg);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1);
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius-lg);
 }
 
 .tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  color: hsl(var(--muted-foreground));
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: var(--transition-colors);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    color: hsl(var(--muted-foreground));
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition-colors);
 }
 
 .tab:hover { color: hsl(var(--foreground)); }
 
 .tab.active {
-  background-color: hsl(var(--card));
-  color: hsl(var(--foreground));
-  box-shadow: var(--shadow-sm);
+    background-color: hsl(var(--card));
+    color: hsl(var(--foreground));
+    box-shadow: var(--shadow-sm);
 }
 
 /* Idea list — show actions on hover */
 .idea-actions {
-  transition:
-    opacity var(--duration-fast);
+    transition:
+        opacity var(--duration-fast);
 }

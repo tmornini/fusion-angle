@@ -1,107 +1,107 @@
 /* Workbox: work-order inbox, detail. */
 
 .work-order-history-fields {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-1) var(--space-3);
-  font-size: 0.8125rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-1) var(--space-3);
+    font-size: 0.8125rem;
 }
 
 .dropdown-section-label {
-  padding:
-      var(--space-2) var(--space-2) var(--space-1);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
+    padding:
+        var(--space-2) var(--space-2) var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: hsl(var(--muted-foreground));
 }
 
 .dropdown-empty {
-  padding: var(--space-2);
-  font-size: var(--text-sm);
-  color: hsl(var(--muted-foreground));
-  text-align: center;
+    padding: var(--space-2);
+    font-size: var(--text-sm);
+    color: hsl(var(--muted-foreground));
+    text-align: center;
 }
 
 .dropdown-item-disabled {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  color: hsl(var(--muted-foreground));
-  pointer-events: none;
-  cursor: default;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
+    cursor: default;
 }
 
 .not-ready-icon {
-  display: inline-flex;
-  align-items: center;
-  color: hsl(var(--danger));
-  flex-shrink: 0;
-  margin-top: 0.125rem;
+    display: inline-flex;
+    align-items: center;
+    color: hsl(var(--danger));
+    flex-shrink: 0;
+    margin-top: 0.125rem;
 }
 
 .not-ready-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
 }
 
 .not-ready-name {
-  color: hsl(var(--muted-foreground));
+    color: hsl(var(--muted-foreground));
 }
 
 .not-ready-subtitle {
-  font-size: var(--text-xs);
-  font-style: italic;
-  color: hsl(var(--muted-foreground));
+    font-size: var(--text-xs);
+    font-style: italic;
+    color: hsl(var(--muted-foreground));
 }
 
 /* Rejected-transition banner: the Record gate's
-   constraint violations, one line per failed attribute. */
+    constraint violations, one line per failed attribute. */
 .violations-banner {
-  margin-bottom: var(--space-6);
-  padding: var(--space-4) 1.25rem;
-  background: hsl(var(--error-soft));
-  border: 1px solid hsl(var(--error-border));
-  border-radius: var(--radius-lg);
-  color: hsl(var(--error-text));
+    margin-bottom: var(--space-6);
+    padding: var(--space-4) 1.25rem;
+    background: hsl(var(--error-soft));
+    border: 1px solid hsl(var(--error-border));
+    border-radius: var(--radius-lg);
+    color: hsl(var(--error-text));
 }
 
 .violations-banner-title {
-  font-weight: 600;
-  margin-bottom: var(--space-2);
+    font-weight: 600;
+    margin-bottom: var(--space-2);
 }
 
 .violations-banner-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  list-style: disc;
+    margin: 0;
+    padding-left: 1.25rem;
+    list-style: disc;
 }
 
 .radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
 }
 
 .radio-option {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
 }
 
 /* A radio-group attribute row is a fieldset (its caption names
-   the whole group, not one control); strip the UA chrome so it
-   renders identically to the sibling label rows. */
+    the whole group, not one control); strip the UA chrome so it
+    renders identically to the sibling label rows. */
 .attribute-group-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
+    border: 0;
+    padding: 0;
+    margin: 0;
 }

@@ -1,71 +1,71 @@
 /* Metric widgets, gauges, score rows: numeric displays. */
 
 .gauge-card {
-  padding: var(--space-4) var(--space-6) var(--space-6);
+    padding: var(--space-4) var(--space-6) var(--space-6);
 }
 
 /* Borders carry 0.4 alpha, not 0.15: at 0.15 the blue
-   "primary" tint sits too close to the dark navy page
-   background, blurring the Cost card's edges so it reads
-   as shorter than its equal-height siblings. A crisper
-   edge defines every card regardless of fill contrast. */
+    "primary" tint sits too close to the dark navy page
+    background, blurring the Cost card's edges so it reads
+    as shorter than its equal-height siblings. A crisper
+    edge defines every card regardless of fill contrast. */
 .gauge-card[data-tone="primary"] {
-  background: hsl(var(--primary-soft));
-  border-color: hsl(var(--primary) / 0.4);
+    background: hsl(var(--primary-soft));
+    border-color: hsl(var(--primary) / 0.4);
 }
 
 .gauge-card[data-tone="success"] {
-  background: hsl(var(--success-soft));
-  border-color: hsl(var(--success) / 0.4);
+    background: hsl(var(--success-soft));
+    border-color: hsl(var(--success) / 0.4);
 }
 
 .gauge-card[data-tone="warning"] {
-  background: hsl(var(--warning-soft));
-  border-color: hsl(var(--warning) / 0.4);
+    background: hsl(var(--warning-soft));
+    border-color: hsl(var(--warning) / 0.4);
 }
 
 .gauge-arc-container {
-  display: flex;
-  justify-content: center;
-  margin-top: -3.5rem;
-  margin-bottom: var(--space-3);
+    display: flex;
+    justify-content: center;
+    margin-top: -3.5rem;
+    margin-bottom: var(--space-3);
 }
 
 .gauge-arc-track,
 .gauge-arc-outer,
 .gauge-arc-inner,
 .gauge-arc-bipolar-half {
-  stroke-width: var(--gauge-stroke-width);
+    stroke-width: var(--gauge-stroke-width);
 }
 
 .gauge-arc-outer,
 .gauge-arc-inner,
 .gauge-arc-bipolar-half {
-  animation: gauge-draw var(--duration-pulse)
-    ease-out;
+    animation: gauge-draw var(--duration-pulse)
+        ease-out;
 }
 
 /* Matches the hue the arc gradient carries at its
- * center — the zero point. */
+    * center — the zero point. */
 .gauge-arc-zero-mark {
-  fill: hsl(var(--warning));
+    fill: hsl(var(--warning));
 }
 
 .gauge-arc-inner.overrun {
-  animation:
-    gauge-draw var(--duration-pulse) ease-out,
-    gauge-flash var(--flash-speed, 0.5s)
-      infinite;
+    animation:
+        gauge-draw var(--duration-pulse) ease-out,
+        gauge-flash var(--flash-speed, 0.5s)
+        infinite;
 }
 
 @keyframes gauge-draw {
-  from {
-    stroke-dashoffset: var(--dash-full);
-  }
+    from {
+        stroke-dashoffset: var(--dash-full);
+    }
 }
 
 /* Score row — used by ProjectObjectives and
-   DashboardObjectiveAggregates */
+    DashboardObjectiveAggregates */
 .score-row {
     display: grid;
     grid-template-columns:
@@ -76,14 +76,14 @@
 }
 
 /* DashboardObjectiveAggregates rows: name, small
-   bipolar gauge, sparkline trend. */
+    bipolar gauge, sparkline trend. */
 .objective-aggregates-card .score-row {
     grid-template-columns: 140px 110px 1fr;
 }
 
 /* Width of one top-row gauge column: the grid is
-   repeat(3, 1fr) with a --space-6 gap. Full-width on
-   mobile via responsive.css. */
+    repeat(3, 1fr) with a --space-6 gap. Full-width on
+    mobile via responsive.css. */
 .objective-aggregates-card {
     width: calc((100% - 2 * var(--space-6)) / 3);
 }
@@ -143,8 +143,8 @@
 }
 
 /* Baseline dot is grey (the origin); measurement dots
-   take the colour of the segment that lands on them,
-   mirroring .sparkline-seg. */
+    take the colour of the segment that lands on them,
+    mirroring .sparkline-seg. */
 .spark-dot {
     position: absolute;
     left: var(--x);
@@ -236,12 +236,12 @@
 }
 
 .metric-icon-box {
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius);
-  background: hsl(var(--primary) / 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius);
+    background: hsl(var(--primary) / 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }

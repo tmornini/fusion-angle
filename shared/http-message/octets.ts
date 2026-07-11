@@ -3,10 +3,11 @@ import { HttpMessageError } from './types.ts';
 // An immutable octet sequence — the body payload and any
 // byte-valued field carry one. btoa/atob speak Latin-1 binary
 // strings (one char per byte), so the codec maps each byte to
-// one char and back, like api/base64url.ts — but in STANDARD
-// padded base64 (the deterministic, lossless body encoding),
-// not the URL-safe, padding-stripped variant. Platform
-// primitives only — zero runtime deps. The inner array is
+// one char and back, like shared/base64url.ts — but in
+// STANDARD padded base64 (the deterministic, lossless body
+// encoding), not the URL-safe, padding-stripped variant.
+// Platform primitives only — zero runtime deps. The inner
+// array is
 // copied on the way in and on the way out, so the value is
 // sealed: no aliased reference can mutate it.
 export class Octets {

@@ -1,17 +1,17 @@
 /* Inputs and form fields: text, textarea, select, focus rings. */
 
 .input {
-  display: flex;
-  height: 2.5rem;
-  width: 100%;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--input));
-  background-color: hsl(var(--background));
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  color: hsl(var(--foreground));
-  transition: border-color var(--duration-fast) var(--ease-default),
-              box-shadow var(--duration-fast) var(--ease-default);
+    display: flex;
+    height: 2.5rem;
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--input));
+    background-color: hsl(var(--background));
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground));
+    transition: border-color var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
 }
 
 .input::placeholder { color: hsl(var(--muted-foreground)); }
@@ -19,9 +19,9 @@
     border-color: hsl(var(--border-strong));
 }
 .input:focus {
-  outline: none;
-  border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+    outline: none;
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
 }
 .input:disabled { opacity: 0.5; cursor: not-allowed; }
 .input-error { border-color: hsl(var(--destructive)); }
@@ -31,34 +31,34 @@
 .dialog-wide { max-width: 36rem; }
 
 .dialog-scroll {
-  max-height: 60vh;
-  overflow-y: auto;
+    max-height: 60vh;
+    overflow-y: auto;
 }
 
 .textarea {
-  display: block;
-  width: 100%;
-  min-height: 5rem;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--input));
-  background-color: hsl(var(--background));
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--text-sm);
-  color: hsl(var(--foreground));
-  resize: vertical;
-  transition: border-color var(--duration-fast) var(--ease-default),
-              box-shadow var(--duration-fast) var(--ease-default);
+    display: block;
+    width: 100%;
+    min-height: 5rem;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--input));
+    background-color: hsl(var(--background));
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground));
+    resize: vertical;
+    transition: border-color var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
 }
 .textarea::placeholder { color: hsl(var(--muted-foreground)); }
 .textarea:focus {
-  outline: none;
-  border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
+    outline: none;
+    border-color: hsl(var(--ring));
+    box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2);
 }
 
 .label {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  color: hsl(var(--foreground));
-  line-height: 1;
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    color: hsl(var(--foreground));
+    line-height: 1;
 }

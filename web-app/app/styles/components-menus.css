@@ -1,21 +1,21 @@
 /* Dropdown menus and tooltips: floating UI panels. */
 
 .dropdown {
-  position: relative;
-  display: inline-block;
+    position: relative;
+    display: inline-block;
 }
 
 .dropdown-content {
-  position: absolute;
-  z-index: var(--z-dropdown);
-  min-width: 10rem;
-  background-color: hsl(var(--popover));
-  color: hsl(var(--popover-foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: var(--space-1);
-  animation: fade-in-down var(--duration-fast) var(--ease-out);
+    position: absolute;
+    z-index: var(--z-dropdown);
+    min-width: 10rem;
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: var(--space-1);
+    animation: fade-in-down var(--duration-fast) var(--ease-out);
 }
 
 .dropdown-content[hidden] { display: none; }
@@ -23,40 +23,40 @@
 .dropdown-content[data-align="start"] { left: 0; }
 
 .dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-2) var(--space-2);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  border: none;
-  background: none;
-  color: hsl(var(--popover-foreground));
-  text-align: left;
-  transition: background-color var(--duration-instant) var(--ease-default);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    padding: var(--space-2) var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: hsl(var(--popover-foreground));
+    text-align: left;
+    transition: background-color var(--duration-instant) var(--ease-default);
 }
 .dropdown-item:hover {
-  background-color: hsl(var(--muted));
+    background-color: hsl(var(--muted));
 }
 .dropdown-item:focus-visible {
-  background-color: hsl(var(--muted));
-  outline: var(--focus-ring-width) solid
-    hsl(var(--focus-ring-color));
-  outline-offset:
-    calc(-1 * var(--focus-ring-width));
+    background-color: hsl(var(--muted));
+    outline: var(--focus-ring-width) solid
+        hsl(var(--focus-ring-color));
+    outline-offset:
+        calc(-1 * var(--focus-ring-width));
 }
 
 .tooltip {
-  position: absolute;
-  z-index: var(--z-tooltip);
-  padding: 0.375rem var(--space-3);
-  background-color: hsl(var(--foreground));
-  color: hsl(var(--background));
-  font-size: var(--text-xs);
-  border-radius: var(--radius);
-  white-space: nowrap;
-  pointer-events: none;
-  animation: fade-in var(--duration-fast) var(--ease-out);
+    position: absolute;
+    z-index: var(--z-tooltip);
+    padding: 0.375rem var(--space-3);
+    background-color: hsl(var(--foreground));
+    color: hsl(var(--background));
+    font-size: var(--text-xs);
+    border-radius: var(--radius);
+    white-space: nowrap;
+    pointer-events: none;
+    animation: fade-in var(--duration-fast) var(--ease-out);
 }

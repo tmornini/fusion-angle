@@ -291,7 +291,7 @@ test(
         await postRecordStateChange(
             ctx, rec1, 'archived',
         );
-        const events = await deriveStatesFor(db, '1', 
+        const events = await deriveStatesFor(db, '1',
             'rec-1',
         );
         const values = events

@@ -1,101 +1,101 @@
 /* Dark theme: semantic HSL overrides on [data-theme="dark"]. */
 
 [data-theme="dark"] {
-  color-scheme: dark;
-  --background: var(--gray-900);
-  --background-subtle: var(--gray-800);
-  --foreground: var(--gray-100);
+    color-scheme: dark;
+    --background: var(--gray-900);
+    --background-subtle: var(--gray-800);
+    --foreground: var(--gray-100);
 
-  --card: var(--gray-800);
-  --color-card-bg: hsl(var(--card));
-  --color-surface: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-muted-foreground:
-      hsl(var(--muted-foreground));
-  --card-foreground: var(--gray-100);
-  --popover: var(--gray-800);
-  --popover-foreground: var(--gray-100);
+    --card: var(--gray-800);
+    --color-card-bg: hsl(var(--card));
+    --color-surface: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-muted-foreground:
+        hsl(var(--muted-foreground));
+    --card-foreground: var(--gray-100);
+    --popover: var(--gray-800);
+    --popover-foreground: var(--gray-100);
 
-  --primary: 217 45% 60%;
-  --primary-foreground: var(--gray-900);
-  --primary-hover: 217 45% 55%;
-  --primary-active: 217 45% 50%;
+    --primary: 217 45% 60%;
+    --primary-foreground: var(--gray-900);
+    --primary-hover: 217 45% 55%;
+    --primary-active: 217 45% 50%;
 
-  --secondary: var(--gray-700);
-  --secondary-foreground: var(--gray-200);
-  --secondary-hover: var(--gray-600);
+    --secondary: var(--gray-700);
+    --secondary-foreground: var(--gray-200);
+    --secondary-hover: var(--gray-600);
 
-  --muted: var(--gray-700);
-  --muted-foreground: var(--gray-400);
+    --muted: var(--gray-700);
+    --muted-foreground: var(--gray-400);
 
-  --border: var(--gray-700);
-  --border-strong: var(--gray-600);
-  --input: var(--gray-700);
+    --border: var(--gray-700);
+    --border-strong: var(--gray-600);
+    --input: var(--gray-700);
 
-  --destructive: 0 65% 55%;
-  --destructive-hover: 0 72% 55%;
+    --destructive: 0 65% 55%;
+    --destructive-hover: 0 72% 55%;
 
-  --accent-soft: 48 40% 15%;
-  --accent-text: 48 80% 65%;
+    --accent-soft: 48 40% 15%;
+    --accent-text: 48 80% 65%;
 
-  --success: 152 55% 50%;
-  --success-hover: 152 55% 45%;
-  --success-foreground: 152 60% 10%;
-  --success-soft: 152 40% 15%;
-  --success-border: 152 40% 30%;
-  --success-text: 152 55% 65%;
+    --success: 152 55% 50%;
+    --success-hover: 152 55% 45%;
+    --success-foreground: 152 60% 10%;
+    --success-soft: 152 40% 15%;
+    --success-border: 152 40% 30%;
+    --success-text: 152 55% 65%;
 
-  --warning: 38 85% 55%;
-  --warning-foreground: 38 90% 10%;
-  --warning-soft: 38 40% 15%;
-  --warning-border: 38 40% 30%;
-  --warning-text: 38 80% 65%;
+    --warning: 38 85% 55%;
+    --warning-foreground: 38 90% 10%;
+    --warning-soft: 38 40% 15%;
+    --warning-border: 38 40% 30%;
+    --warning-text: 38 80% 65%;
 
-  --danger: 0 75% 60%;
+    --danger: 0 75% 60%;
 
-  --error: 0 65% 58%;
-  --error-foreground: 0 0% 100%;
-  --error-soft: 0 40% 15%;
-  --error-border: 0 40% 30%;
-  --error-text: 0 65% 70%;
+    --error: 0 65% 58%;
+    --error-foreground: 0 0% 100%;
+    --error-soft: 0 40% 15%;
+    --error-border: 0 40% 30%;
+    --error-text: 0 65% 70%;
 
-  --info: 217 45% 60%;
-  --info-foreground: 0 0% 100%;
-  --info-soft: 217 40% 15%;
-  --info-border: 217 40% 30%;
-  --info-text: 217 45% 70%;
+    --info: 217 45% 60%;
+    --info-foreground: 0 0% 100%;
+    --info-soft: 217 40% 15%;
+    --info-border: 217 40% 30%;
+    --info-text: 217 45% 70%;
 
-  --primary-soft: 217 40% 15%;
-  --muted-soft: var(--gray-800);
+    --primary-soft: 217 40% 15%;
+    --muted-soft: var(--gray-800);
 
-  --chart-5: 217 71% 63%;
-  --chart-6: 280 65% 70%;
+    --chart-5: 217 71% 63%;
+    --chart-6: 280 65% 70%;
 
-  /* Heat-map ramp -- desaturated and lifted for dark surfaces.       */
-  --heat-stop-low:  210 60% 60%;
-  --heat-stop-mid:  145 50% 55%;
-  --heat-stop-high:  48 80% 60%;
-  --heat-stop-peak:   0 65% 60%;
+    /* Heat-map ramp -- desaturated and lifted for dark surfaces.       */
+    --heat-stop-low:  210 60% 60%;
+    --heat-stop-mid:  145 50% 55%;
+    --heat-stop-high:  48 80% 60%;
+    --heat-stop-peak:   0 65% 60%;
 
-  --shadow-card:
-      0 1px 3px 0 hsl(0 0% 0% / 0.2),
-      0 1px 2px -1px hsl(0 0% 0% / 0.2);
-  --shadow-card-hover:
-      0 8px 16px -4px hsl(0 0% 0% / 0.3),
-      0 4px 6px -2px hsl(0 0% 0% / 0.2);
+    --shadow-card:
+        0 1px 3px 0 hsl(0 0% 0% / 0.2),
+        0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-card-hover:
+        0 8px 16px -4px hsl(0 0% 0% / 0.3),
+        0 4px 6px -2px hsl(0 0% 0% / 0.2);
 
-  --gradient-subtle:
-      linear-gradient(180deg,
-          hsl(var(--gray-900)) 0%,
-          hsl(var(--gray-800)) 100%);
+    --gradient-subtle:
+        linear-gradient(180deg,
+        hsl(var(--gray-900)) 0%,
+        hsl(var(--gray-800)) 100%);
 }
 
 [data-theme="dark"] dialog.dialog::backdrop,
 [data-theme="dark"] .sheet-backdrop,
 [data-theme="dark"]
-    .command-palette-backdrop {
-  background-color:
-    hsl(var(--backdrop) / 0.7);
+.command-palette-backdrop {
+    background-color:
+        hsl(var(--backdrop) / 0.7);
 }
 
 /* Component dark-mode overrides */
@@ -103,93 +103,93 @@
 /* Cards: stronger border for contrast */
 [data-theme="dark"] .card,
 [data-theme="dark"] .card-flat {
-  border-color: hsl(var(--gray-600));
+    border-color: hsl(var(--gray-600));
 }
 
 /* Tables: subtle hover row */
 [data-theme="dark"]
-    .table tbody tr:hover {
-  background-color:
-    hsl(var(--gray-700) / 0.5);
+.table tbody tr:hover {
+    background-color:
+        hsl(var(--gray-700) / 0.5);
 }
 
 /* Inputs: focus glow in dark */
 [data-theme="dark"]
-    .input:focus-visible,
+.input:focus-visible,
 [data-theme="dark"]
-    .textarea:focus-visible {
-  box-shadow:
-    0 0 0 2px hsl(var(--ring) / 0.3);
+.textarea:focus-visible {
+    box-shadow:
+        0 0 0 2px hsl(var(--ring) / 0.3);
 }
 
 /* Dropdowns: elevated surface */
 [data-theme="dark"] .dropdown-content {
-  border-color: hsl(var(--gray-600));
-  box-shadow:
-    0 8px 24px hsl(0 0% 0% / 0.4);
+    border-color: hsl(var(--gray-600));
+    box-shadow:
+        0 8px 24px hsl(0 0% 0% / 0.4);
 }
 
 /* Tooltips: inverted for contrast */
 [data-theme="dark"] .tooltip {
-  background-color:
-    hsl(var(--gray-200));
-  color: hsl(var(--gray-900));
+    background-color:
+        hsl(var(--gray-200));
+    color: hsl(var(--gray-900));
 }
 
 /* Progress bar: visible track */
 [data-theme="dark"] .progress {
-  background-color:
-    hsl(var(--gray-700));
+    background-color:
+        hsl(var(--gray-700));
 }
 
 /* Switch: visible track/thumb */
 [data-theme="dark"] .switch {
-  background-color:
-    hsl(var(--gray-600));
+    background-color:
+        hsl(var(--gray-600));
 }
 [data-theme="dark"] .switch-thumb {
-  background-color:
-    hsl(var(--gray-300));
+    background-color:
+        hsl(var(--gray-300));
 }
 
 /* Badges: visible borders */
 [data-theme="dark"] .badge {
-  border-color:
-    hsl(var(--border) / 0.5);
+    border-color:
+        hsl(var(--border) / 0.5);
 }
 [data-theme="dark"] .status-badge {
-  border-color:
-    hsl(var(--border) / 0.5);
+    border-color:
+        hsl(var(--border) / 0.5);
 }
 
 /* Flow designer: dark surfaces */
 [data-theme="dark"]
-    .flow-toolbar {
-  background-color:
-    hsl(var(--gray-800));
-  border-color: hsl(var(--gray-700));
+.flow-toolbar {
+    background-color:
+        hsl(var(--gray-800));
+    border-color: hsl(var(--gray-700));
 }
 [data-theme="dark"]
-    .flow-canvas-wrap {
-  background-color:
-    hsl(var(--gray-900));
-  border-color: hsl(var(--gray-700));
+.flow-canvas-wrap {
+    background-color:
+        hsl(var(--gray-900));
+    border-color: hsl(var(--gray-700));
 }
 [data-theme="dark"]
-    .flow-props-panel {
-  background-color:
-    hsl(var(--gray-800));
-  border-color: hsl(var(--gray-700));
+.flow-props-panel {
+    background-color:
+        hsl(var(--gray-800));
+    border-color: hsl(var(--gray-700));
 }
 
 /* Hero button: softer glow in dark */
 [data-theme="dark"] .btn-hero {
-  box-shadow:
-    0 2px 8px hsl(var(--primary) / 0.2);
+    box-shadow:
+        0 2px 8px hsl(var(--primary) / 0.2);
 }
 [data-theme="dark"]
-    .btn-hero:hover {
-  box-shadow:
-    0 4px 12px
-    hsl(var(--primary) / 0.3);
+.btn-hero:hover {
+    box-shadow:
+        0 4px 12px
+        hsl(var(--primary) / 0.3);
 }

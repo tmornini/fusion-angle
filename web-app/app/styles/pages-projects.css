@@ -1,203 +1,203 @@
 /* Projects: list, detail. */
 
 .action-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
 }
 
 /* An empty review-actions slot leaves the header flex row,
- * so it adds no phantom gap before the Edit button. */
+    * so it adds no phantom gap before the Edit button. */
 #project-review-actions:empty {
-  display: none;
+    display: none;
 }
 
 /* Inline Objectives section on project detail.
- * Card wrapper + per-row gauge + one phase slider. */
+    * Card wrapper + per-row gauge + one phase slider. */
 .project-objectives-card {
-  margin-top: var(--space-6);
+    margin-top: var(--space-6);
 }
 
 .project-objectives-rows {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
 }
 
 .project-objective-row {
-  display: grid;
-  grid-template-columns:
-    140px 110px 1fr;
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    "name gauge slider"
-    "caption caption caption";
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid
-    hsl(var(--border) / 0.5);
+    display: grid;
+    grid-template-columns:
+        140px 110px 1fr;
+    grid-template-rows: auto auto;
+    grid-template-areas:
+        "name gauge slider"
+        "caption caption caption";
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid
+        hsl(var(--border) / 0.5);
 }
 
 .project-objective-row:last-child {
-  border-bottom: none;
+    border-bottom: none;
 }
 
 .project-objective-header {
-  grid-area: name;
+    grid-area: name;
 }
 
 .project-objective-name {
-  font-weight: 600;
-  font-size: var(--text-sm);
+    font-weight: 600;
+    font-size: var(--text-sm);
 }
 
 .project-objective-gauge {
-  grid-area: gauge;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    grid-area: gauge;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .project-objective-slider {
-  grid-area: slider;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: var(--space-2);
+    grid-area: slider;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--space-2);
 }
 
 .project-objective-slider input[type="range"] {
-  width: 100%;
+    width: 100%;
 }
 
 .project-objective-slider input:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 .project-objective-slider .slider-value {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  min-width: 3ch;
-  text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 3ch;
+    text-align: right;
 }
 
 .project-objective-caption {
-  grid-area: caption;
-  font-size: var(--text-xs);
-  color: hsl(var(--muted-foreground));
+    grid-area: caption;
+    font-size: var(--text-xs);
+    color: hsl(var(--muted-foreground));
 }
 
 .project-objectives-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-4);
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-4);
 }
 
 @media (max-width: 768px) {
-  .project-objective-row {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "name"
-      "gauge"
-      "slider"
-      "caption";
-  }
+    .project-objective-row {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "name"
+            "gauge"
+            "slider"
+            "caption";
+    }
 }
 
 .project-metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 7.5rem);
-  gap: var(--space-4);
-  align-items: center;
-  flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 7.5rem);
+    gap: var(--space-4);
+    align-items: center;
+    flex-shrink: 0;
 }
 
 @media (max-width: 640px) {
-  .project-metric-grid {
-    grid-template-columns: 1fr;
-  }
+    .project-metric-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .detail-grid-spaced {
-  gap: var(--space-8);
+    gap: var(--space-8);
 }
 
 .metric-cell {
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: hsl(var(--muted) / 0.3);
-  border: 1px solid hsl(var(--border));
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    background: hsl(var(--muted) / 0.3);
+    border: 1px solid hsl(var(--border));
 }
 
 .metric-cell-row-divider {
-  padding-top: var(--space-2);
-  border-top: 1px solid
-    hsl(var(--border));
+    padding-top: var(--space-2);
+    border-top: 1px solid
+        hsl(var(--border));
 }
 
 .summary-stat-cell {
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: hsl(var(--muted) / 0.5);
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: hsl(var(--muted) / 0.5);
 }
 
 .flow-icon-pill {
-  padding: var(--space-2);
-  border-radius: var(--radius);
-  background: hsl(var(--primary) / 0.1);
+    padding: var(--space-2);
+    border-radius: var(--radius);
+    background: hsl(var(--primary) / 0.1);
 }
 
 .flow-card-link {
-  padding: var(--space-4);
-  text-decoration: none;
-  color: inherit;
-  display: block;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
+    padding: var(--space-4);
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
 }
 
 .input-narrow-num {
-  width: 5rem;
-  text-align: right;
+    width: 5rem;
+    text-align: right;
 }
 
 .variance-good {
-  color: hsl(var(--success-text));
+    color: hsl(var(--success-text));
 }
 .variance-bad {
-  color: hsl(var(--error-text));
+    color: hsl(var(--error-text));
 }
 
 .dialog-section {
-  padding: var(--space-6);
+    padding: var(--space-6);
 }
 .dialog-section-divider-bottom {
-  border-bottom: 1px solid
-    hsl(var(--border));
+    border-bottom: 1px solid
+        hsl(var(--border));
 }
 .dialog-section-divider-top {
-  border-top: 1px solid
-    hsl(var(--border));
+    border-top: 1px solid
+        hsl(var(--border));
 }
 .dialog-actions-row {
-  padding: var(--space-4) var(--space-6);
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
+    padding: var(--space-4) var(--space-6);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-3);
 }
 
 .select-auto {
-  width: auto;
+    width: auto;
 }
 
 .input-md-bold {
-  font-size: 1.125rem;
-  font-weight: var(--font-weight-bold);
+    font-size: 1.125rem;
+    font-weight: var(--font-weight-bold);
 }

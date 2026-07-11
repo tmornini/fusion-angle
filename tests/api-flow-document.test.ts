@@ -468,7 +468,7 @@ async () => {
 
     const requestsBefore = await db.requests.getAll();
     const responsesBefore = await db.responses.getAll();
-    const eventsBefore = await deriveStatesFor(db, '1', 
+    const eventsBefore = await deriveStatesFor(db, '1',
         'flow-undo-old-shape',
     );
 
@@ -486,7 +486,7 @@ async () => {
 
     const requestsAfter = await db.requests.getAll();
     const responsesAfter = await db.responses.getAll();
-    const eventsAfter = await deriveStatesFor(db, '1', 
+    const eventsAfter = await deriveStatesFor(db, '1',
         'flow-undo-old-shape',
     );
     assert.equal(requestsAfter.length, requestsBefore.length);

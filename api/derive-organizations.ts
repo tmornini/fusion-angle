@@ -30,20 +30,19 @@ import {
 // convention (id-first, field-by-field pickString/pickNumber):
 // organizationEntityOf instead re-runs the head pair's own
 // REQUEST body through validateOrganizationEntity — the SAME
-// validator route('organizations/:id')'s PUT handler already
-// runs via EntityStore.put (api/store-entity.ts's own `{
-// ...validate(body), id }` spread) — so the derived shape is
-// byte-identical to the STORED ROW, id-LAST, never id-first.
-// Reusing the validator rather than re-listing its six field
-// names here is the DRY choice: ORGANIZATION_BODY_KEYS
-// (validators.ts) stays the one place that vocabulary lives.
-// withoutId strips a stray `id` FIRST — the fetch-edit-PUT
-// client pattern echoes the GET body's own `id` right back into
-// the PUT payload, and the STORED request body is the raw wire
-// body, echoed id and all (formWritePair stores the caller's
-// body verbatim; only the route handler's own withoutId(body)
-// call, ahead of EntityStore.put, strips it before validating
-// the ROW — api/routes.ts's PUT organizations/:id handler).
+// validator WRITE_RESPONSE_SPECS['organizations/:id']
+// .successBody already runs (api/routes.ts; pair-plane only
+// since Phase Final Task 2 retired the organizations ROW) —
+// so the derived shape is byte-identical to the STORED wire
+// body, id-LAST, never id-first. Reusing the validator rather
+// than re-listing its six field names here is the DRY choice:
+// ORGANIZATION_BODY_KEYS (validators.ts) stays the one place
+// that vocabulary lives. withoutId strips a stray `id` FIRST
+// — the fetch-edit-PUT client pattern echoes the GET body's
+// own `id` right back into the PUT payload, and the STORED
+// request body is the raw wire body, echoed id and all
+// (formWritePair stores the caller's body verbatim;
+// successBody's withoutId(body) strips it before validating).
 // Mirroring that same strip here is what keeps assertOnlyKeys
 // from rejecting a head pair the live PUT legitimately formed.
 //

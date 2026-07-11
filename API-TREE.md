@@ -36,7 +36,7 @@ That mechanism will replace the existing ledger's and common states system by mo
   |        |      └── /revocation              • is this a POST? — YES, see the /tokens/ RECONCILED note above
   |        |      └── /revocation              • is this a POST, if not, a PUT/GET pair? — POST, see above
   |        \
-  |         \- identity authz realm 
+  |         \- identity authz realm
 └─|─ /organizations/
   |  └─|─ :id
   |    |  └── /notifications                  • postgres LISTEN/NOTIFY for all changes to organization

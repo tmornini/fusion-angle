@@ -1,7 +1,7 @@
 /* Layout primitives: stack, entity, legend cell, list item. */
 
 /* Objective list item — used by Organization
-   Objectives box */
+    Objectives box */
 .objective-list-item {
     display: flex;
     align-items: flex-start;
@@ -22,7 +22,7 @@
 }
 
 .objective-list-item[data-archived='true']
-    .objective-text strong {
+.objective-text strong {
     text-decoration: line-through;
 }
 
@@ -42,68 +42,68 @@
 }
 
 .legend-cell {
-  text-align: center;
-  padding: var(--space-3);
-  border-radius: var(--radius);
-  background: hsl(var(--card) / 0.8);
-  border: 1px solid hsl(var(--border) / 0.5);
+    text-align: center;
+    padding: var(--space-3);
+    border-radius: var(--radius);
+    background: hsl(var(--card) / 0.8);
+    border: 1px solid hsl(var(--border) / 0.5);
 }
 
 .legend-cell-label {
-  font-size: var(--text-xs);
-  color: hsl(var(--muted-foreground));
-  font-weight: var(--font-weight-medium);
+    font-size: var(--text-xs);
+    color: hsl(var(--muted-foreground));
+    font-weight: var(--font-weight-medium);
 }
 
 .legend-cell-value {
-  font-size: var(--text-2xl);
-  font-weight: var(--font-weight-bold);
-  color: hsl(var(--foreground));
+    font-size: var(--text-2xl);
+    font-weight: var(--font-weight-bold);
+    color: hsl(var(--foreground));
 }
 
 .legend-dot {
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: var(--radius-full);
-  display: inline-block;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: var(--radius-full);
+    display: inline-block;
 }
 .legend-dot[data-tone="success"] {
-  background: hsl(var(--success));
+    background: hsl(var(--success));
 }
 .legend-dot[data-tone="primary"] {
-  background: hsl(var(--primary));
+    background: hsl(var(--primary));
 }
 .legend-dot[data-tone="error"] {
-  background: hsl(var(--error));
+    background: hsl(var(--error));
 }
 .legend-dot[data-tone="muted"] {
-  background: hsl(var(--muted-foreground));
+    background: hsl(var(--muted-foreground));
 }
 
 .stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
 }
 .stack-lg {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
 }
 
 .entity {
-  max-width: var(--width-entity);
-  margin-left: auto;
-  margin-right: auto;
+    max-width: var(--width-entity);
+    margin-left: auto;
+    margin-right: auto;
 }
 .overview {
-  max-width: var(--width-overview);
-  margin-left: auto;
-  margin-right: auto;
+    max-width: var(--width-overview);
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .workspace {
-  max-width: var(--width-workspace);
-  margin-left: auto;
-  margin-right: auto;
+    max-width: var(--width-workspace);
+    margin-left: auto;
+    margin-right: auto;
 }

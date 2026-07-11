@@ -1,174 +1,174 @@
 /* Ideas: detail, create, conversion pages. */
 
 .convert-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  color: hsl(var(--primary-foreground));
+    width: 2.25rem;
+    height: 2.25rem;
+    color: hsl(var(--primary-foreground));
 }
 
 .convert-grid-2-3 {
-  grid-template-columns: 2fr 3fr;
-  gap: var(--space-8);
+    grid-template-columns: 2fr 3fr;
+    gap: var(--space-8);
 }
 
 .convert-progress-bar {
-  width: 6rem;
-  height: 0.5rem;
-  background: hsl(var(--muted));
-  border-radius: var(--radius-full);
-  overflow: hidden;
+    width: 6rem;
+    height: 0.5rem;
+    background: hsl(var(--muted));
+    border-radius: var(--radius-full);
+    overflow: hidden;
 }
 
 .convert-progress-fill {
-  height: 100%;
-  background: hsl(var(--success));
-  transition: width var(--duration-progress);
-  width: var(--convert-progress, 0%);
+    height: 100%;
+    background: hsl(var(--success));
+    transition: width var(--duration-progress);
+    width: var(--convert-progress, 0%);
 }
 
 .convert-summary-sticky {
-  position: sticky;
-  top: 6rem;
+    position: sticky;
+    top: 6rem;
 }
 
 .field-check {
-  color: hsl(var(--success));
+    color: hsl(var(--success));
 }
 
 .field-check[data-ready="false"] {
-  visibility: hidden;
+    visibility: hidden;
 }
 
 .input-prefix-wrap {
-  position: relative;
+    position: relative;
 }
 
 .input-prefix-symbol {
-  position: absolute;
-  left: var(--space-3);
-  top: 50%;
-  transform: translateY(-50%);
-  color: hsl(var(--muted-foreground));
-  pointer-events: none;
+    position: absolute;
+    left: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
 }
 
 .input-suffix-symbol {
-  position: absolute;
-  right: var(--space-3);
-  top: 50%;
-  transform: translateY(-50%);
-  color: hsl(var(--muted-foreground));
-  pointer-events: none;
+    position: absolute;
+    right: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: hsl(var(--muted-foreground));
+    pointer-events: none;
 }
 
 .input-with-prefix {
-  padding-left: 1.75rem;
+    padding-left: 1.75rem;
 }
 
 .input-with-suffix {
-  padding-right: 2.5rem;
+    padding-right: 2.5rem;
 }
 
 .convert-confirm-section {
-  border: 2px solid transparent;
+    border: 2px solid transparent;
 }
 
 .convert-confirm-section[data-ready="true"] {
-  border-color:
-    hsl(var(--success) / 0.3);
-  background:
-    hsl(var(--success) / 0.05);
+    border-color:
+        hsl(var(--success) / 0.3);
+    background:
+        hsl(var(--success) / 0.05);
 }
 
 .convert-confirm-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: hsl(var(--muted));
-  color: hsl(var(--muted-foreground));
+    width: 3rem;
+    height: 3rem;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
 }
 
 .convert-confirm-icon[data-ready="true"] {
-  background: hsl(var(--success));
-  color: hsl(var(--success-foreground));
+    background: hsl(var(--success));
+    color: hsl(var(--success-foreground));
 }
 
 
 .idea-create-icon {
-  width: 2.25rem;
-  height: 2.25rem;
-  color: hsl(var(--primary-foreground));
+    width: 2.25rem;
+    height: 2.25rem;
+    color: hsl(var(--primary-foreground));
 }
 
 .input-large-title {
-  font-size: 1.125rem;
-  padding: var(--space-3) var(--space-4);
+    font-size: 1.125rem;
+    padding: var(--space-3) var(--space-4);
 }
 
 .section-divider-top {
-  border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid hsl(var(--border));
 }
 
 
 .idea-actions-stack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--space-2);
-  min-width: 8rem;
-  padding-bottom: var(--space-2);
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    min-width: 8rem;
+    padding-bottom: var(--space-2);
 }
 
 .idea-edit-title {
-  font-size: 1.125rem;
-  font-weight: var(--font-weight-bold);
+    font-size: 1.125rem;
+    font-weight: var(--font-weight-bold);
 }
 
 .dialog-narrow {
-  max-width: 28rem;
+    max-width: 28rem;
 }
 
 .convert-scores-row {
-  display: grid;
-  grid-template-columns:
-    minmax(8rem, 14rem) 1fr auto;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
+    display: grid;
+    grid-template-columns:
+        minmax(8rem, 14rem) 1fr auto;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
 }
 
 .convert-scores-row + .convert-scores-row {
-  border-top: 1px solid hsl(var(--border));
+    border-top: 1px solid hsl(var(--border));
 }
 
 .convert-scores-row input[type="range"] {
-  width: 100%;
+    width: 100%;
 }
 
 .convert-scores-row .slider-value {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  min-width: 3ch;
-  text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    min-width: 3ch;
+    text-align: right;
 }
 
 /* Unscored is genuine absence, not a measured 0:
-   render the row as pending until the user scores. */
+    render the row as pending until the user scores. */
 .convert-scores-row[data-touched="false"]
-  input[type="range"] {
-  opacity: 0.5;
+input[type="range"] {
+    opacity: 0.5;
 }
 
 .convert-scores-row[data-touched="false"]
-  .slider-value {
-  color: hsl(var(--muted-foreground));
-  font-weight: 400;
+.slider-value {
+    color: hsl(var(--muted-foreground));
+    font-weight: 400;
 }
 
 @media (max-width: 768px) {
-  .convert-scores-row {
-    grid-template-columns: 1fr;
-  }
+    .convert-scores-row {
+        grid-template-columns: 1fr;
+    }
 }

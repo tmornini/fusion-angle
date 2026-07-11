@@ -1027,7 +1027,8 @@ export function roleGrantSeedBody(
 // (mock-data.ts) share the SAME construction — the
 // membershipSeedBody precedent above, for the credential ledger.
 // `secret` is the POST-HASH value only — the plaintext never
-// reaches this construction (CLAUDE.md § the threshold of trust).
+// reaches this construction (scripture: We guard the
+// threshold of trust).
 export function identityCredentialSeedBody(
     identityId: Id, kind: IdentityCredentialKind, secret: string,
 ): Record<string, unknown> {

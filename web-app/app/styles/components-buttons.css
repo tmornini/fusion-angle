@@ -1,125 +1,125 @@
 /* Buttons: primary, secondary, outline, ghost, destructive, link. */
 
 /* Inline link affordance on a real button — strips the UA
-   button chrome so JS-navigation text reads as plain inline
-   content (font and color inherit via base.css). */
+    button chrome so JS-navigation text reads as plain inline
+    content (font and color inherit via base.css). */
 .link {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
 }
 
 .btn-accent {
-  background: var(--gradient-accent);
-  color: hsl(var(--accent-foreground));
-  font-weight: var(--font-weight-semibold);
+    background: var(--gradient-accent);
+    color: hsl(var(--accent-foreground));
+    font-weight: var(--font-weight-semibold);
 }
 .btn-accent:hover { filter: brightness(0.95); }
 
 .btn-outline-hero {
-  border: 1px solid hsl(var(--border));
-  background-color: transparent;
-  color: hsl(var(--foreground));
+    border: 1px solid hsl(var(--border));
+    background-color: transparent;
+    color: hsl(var(--foreground));
 }
 .btn-outline-hero:hover {
-  background-color: hsl(var(--secondary));
+    background-color: hsl(var(--secondary));
 }
 
 .btn-outline-light {
-  border: 1px solid hsl(var(--primary-foreground) / 0.3);
-  background-color: hsl(var(--primary-foreground) / 0.1);
-  color: hsl(var(--primary-foreground));
+    border: 1px solid hsl(var(--primary-foreground) / 0.3);
+    background-color: hsl(var(--primary-foreground) / 0.1);
+    color: hsl(var(--primary-foreground));
 }
 .btn-outline-light:hover {
-  background-color: hsl(var(--primary-foreground) / 0.2);
+    background-color: hsl(var(--primary-foreground) / 0.2);
 }
 
 
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  white-space: nowrap;
-  border-radius: var(--radius);
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: background-color var(--duration-fast) var(--ease-default),
-              border-color var(--duration-fast) var(--ease-default),
-              color var(--duration-fast) var(--ease-default),
-              box-shadow var(--duration-fast) var(--ease-default);
-  height: 2.5rem;
-  padding: 0 var(--space-4);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    white-space: nowrap;
+    border-radius: var(--radius);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    line-height: 1;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color var(--duration-fast) var(--ease-default),
+        border-color var(--duration-fast) var(--ease-default),
+        color var(--duration-fast) var(--ease-default),
+        box-shadow var(--duration-fast) var(--ease-default);
+    height: 2.5rem;
+    padding: 0 var(--space-4);
 }
 
 .btn:disabled {
-  opacity: 0.5;
-  pointer-events: none;
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 .btn:focus-visible {
-  outline: var(--focus-ring-width) solid hsl(var(--ring));
-  outline-offset: var(--focus-ring-offset);
+    outline: var(--focus-ring-width) solid hsl(var(--ring));
+    outline-offset: var(--focus-ring-offset);
 }
 
 /* Variants */
 .btn-primary {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
 }
 .btn-primary:hover { background-color: hsl(var(--primary-hover)); }
 .btn-primary:active { background-color: hsl(var(--primary-active)); }
 
 .btn-secondary {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
 }
 .btn-secondary:hover { background-color: hsl(var(--secondary-hover)); }
 
 .btn-outline {
-  border-color: hsl(var(--border));
-  background-color: transparent;
-  color: hsl(var(--foreground));
+    border-color: hsl(var(--border));
+    background-color: transparent;
+    color: hsl(var(--foreground));
 }
 .btn-outline:hover {
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
 }
 
 .btn-outline-error {
-  border: 1px solid hsl(var(--error) / 0.3);
-  background-color: transparent;
-  color: hsl(var(--error));
+    border: 1px solid hsl(var(--error) / 0.3);
+    background-color: transparent;
+    color: hsl(var(--error));
 }
 .btn-outline-error:hover {
-  background-color: hsl(var(--error-soft));
+    background-color: hsl(var(--error-soft));
 }
 
 .btn-ghost {
-  background-color: transparent;
-  color: hsl(var(--foreground));
+    background-color: transparent;
+    color: hsl(var(--foreground));
 }
 .btn-ghost:hover { background-color: hsl(var(--muted)); }
 
 .btn-destructive {
-  background-color: hsl(var(--destructive));
-  color: hsl(var(--destructive-foreground));
+    background-color: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
 }
 .btn-destructive:hover { background-color: hsl(var(--destructive-hover)); }
 
 .btn-success {
-  background-color: hsl(var(--success));
-  color: hsl(var(--success-foreground));
+    background-color: hsl(var(--success));
+    color: hsl(var(--success-foreground));
 }
 .btn-success:hover { background-color: hsl(var(--success-hover)); }
 
 .btn-destructive:focus-visible,
 .btn-success:focus-visible {
-  outline-color: white;
+    outline-color: white;
 }
 
 /* Sizes */
@@ -148,30 +148,30 @@
 .btn-icon.btn-xs { height: 1.75rem; width: 1.75rem; }
 
 .btn-hero {
-  background: linear-gradient(135deg,
-      hsl(var(--primary)),
-      hsl(var(--primary) / 0.8));
-  color: hsl(var(--primary-foreground));
-  font-weight: var(--font-weight-semibold);
-  box-shadow:
-    0 2px 8px hsl(var(--primary) / 0.3);
+    background: linear-gradient(135deg,
+        hsl(var(--primary)),
+        hsl(var(--primary) / 0.8));
+    color: hsl(var(--primary-foreground));
+    font-weight: var(--font-weight-semibold);
+    box-shadow:
+        0 2px 8px hsl(var(--primary) / 0.3);
 }
 .btn-hero:hover {
-  opacity: 0.9;
-  box-shadow:
-    0 4px 12px hsl(var(--primary) / 0.4);
+    opacity: 0.9;
+    box-shadow:
+        0 4px 12px hsl(var(--primary) / 0.4);
 }
 .btn-hero:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  box-shadow: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+    box-shadow: none;
 }
 
 /* Reorder grab handle: a real button (arrow keys move the
-   focused card) stripped of button chrome. */
+    focused card) stripped of button chrome. */
 .drag-handle {
-  cursor: grab;
-  background: none;
-  border: 0;
-  padding: 0;
+    cursor: grab;
+    background: none;
+    border: 0;
+    padding: 0;
 }

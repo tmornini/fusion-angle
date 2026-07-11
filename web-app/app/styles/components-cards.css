@@ -1,143 +1,143 @@
 /* Cards: panels, action cards, icon-box cards, selection ring. */
 
 .objective-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
 .objective-list-divider {
-  margin: 1em 0 0.4em;
-  font-size: 0.85em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.6;
+    margin: 1em 0 0.4em;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.6;
 }
 
 /* Snapshot card — vertical stack with header row */
 .snapshot-card {
-  padding: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+    padding: var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
 }
 
 /* Tone-bordered outline button (success/warning/error) */
 .btn-outline[data-tone="success"] {
-  border-color: hsl(var(--success));
-  color: hsl(var(--success-text));
+    border-color: hsl(var(--success));
+    color: hsl(var(--success-text));
 }
 .btn-outline[data-tone="warning"] {
-  border-color: hsl(var(--warning));
-  color: hsl(var(--warning-text));
+    border-color: hsl(var(--warning));
+    color: hsl(var(--warning-text));
 }
 .btn-outline[data-tone="error"] {
-  border-color: hsl(var(--error));
-  color: hsl(var(--error-text));
+    border-color: hsl(var(--error));
+    color: hsl(var(--error-text));
 }
 
 /* Empty-state info banner */
 .empty-banner {
-  padding: var(--space-4) 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  grid-column: 1 / -1;
-  background: hsl(var(--primary) / 0.06);
-  border: 1px solid hsl(var(--primary) / 0.2);
+    padding: var(--space-4) 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    grid-column: 1 / -1;
+    background: hsl(var(--primary) / 0.06);
+    border: 1px solid hsl(var(--primary) / 0.2);
 }
 .empty-banner-icon {
-  color: hsl(var(--primary));
-  flex-shrink: 0;
+    color: hsl(var(--primary));
+    flex-shrink: 0;
 }
 
 .icon-box {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 .icon-box-lg {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: var(--radius-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: var(--radius-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 .icon-box[data-tone="primary"],
 .icon-box-lg[data-tone="primary"] {
-  background: linear-gradient(135deg,
-    hsl(var(--primary) / 0.2),
-    hsl(var(--primary) / 0.05));
-  color: hsl(var(--primary));
+    background: linear-gradient(135deg,
+        hsl(var(--primary) / 0.2),
+        hsl(var(--primary) / 0.05));
+    color: hsl(var(--primary));
 }
 
 .icon-box[data-tone="success"],
 .icon-box-lg[data-tone="success"] {
-  background: linear-gradient(135deg,
-    hsl(var(--success) / 0.2),
-    hsl(var(--success) / 0.05));
-  color: hsl(var(--success-text));
+    background: linear-gradient(135deg,
+        hsl(var(--success) / 0.2),
+        hsl(var(--success) / 0.05));
+    color: hsl(var(--success-text));
 }
 
 .icon-box[data-tone="warning"],
 .icon-box-lg[data-tone="warning"] {
-  background: linear-gradient(135deg,
-    hsl(var(--warning) / 0.2),
-    hsl(var(--warning) / 0.05));
-  color: hsl(var(--warning-text));
+    background: linear-gradient(135deg,
+        hsl(var(--warning) / 0.2),
+        hsl(var(--warning) / 0.05));
+    color: hsl(var(--warning-text));
 }
 
 .icon-box[data-tone="error"],
 .icon-box-lg[data-tone="error"] {
-  background: linear-gradient(135deg,
-    hsl(var(--error) / 0.2),
-    hsl(var(--error) / 0.05));
-  color: hsl(var(--error-text));
+    background: linear-gradient(135deg,
+        hsl(var(--error) / 0.2),
+        hsl(var(--error) / 0.05));
+    color: hsl(var(--error-text));
 }
 
 .icon-box[data-tone="info"],
 .icon-box-lg[data-tone="info"] {
-  background: linear-gradient(135deg,
-    hsl(var(--info) / 0.2),
-    hsl(var(--info) / 0.05));
-  color: hsl(var(--info-text));
+    background: linear-gradient(135deg,
+        hsl(var(--info) / 0.2),
+        hsl(var(--info) / 0.05));
+    color: hsl(var(--info-text));
 }
 
 .icon-box[data-tone="muted"],
 .icon-box-lg[data-tone="muted"] {
-  background: linear-gradient(135deg,
-    hsl(var(--muted) / 0.2),
-    hsl(var(--muted) / 0.05));
-  color: hsl(var(--muted-foreground));
+    background: linear-gradient(135deg,
+        hsl(var(--muted) / 0.2),
+        hsl(var(--muted) / 0.05));
+    color: hsl(var(--muted-foreground));
 }
 
 .card {
-  background-color: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border-radius: var(--radius-lg);
-  border: 1px solid hsl(var(--border));
-  box-shadow: var(--shadow-card);
-  transition: box-shadow var(--duration-normal) var(--ease-default),
-              transform var(--duration-normal) var(--ease-default);
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border-radius: var(--radius-lg);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--duration-normal) var(--ease-default),
+        transform var(--duration-normal) var(--ease-default);
 }
 
 .card-hover:hover {
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-1px);
 }
 
 .card-flat {
-  background-color: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border-radius: var(--radius-lg);
-  border: 1px solid hsl(var(--border));
-  box-shadow: var(--shadow-xs);
+    background-color: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border-radius: var(--radius-lg);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-xs);
 }

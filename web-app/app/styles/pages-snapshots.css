@@ -1,85 +1,85 @@
 /* Snapshots page: responsive card grid. */
 
 .snapshots-grid {
-  display: grid;
-  grid-template-columns:
-      repeat(auto-fill, minmax(18rem, 1fr));
-  gap: var(--space-6);
-  margin-top: var(--space-6);
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fill, minmax(18rem, 1fr));
+    gap: var(--space-6);
+    margin-top: var(--space-6);
 }
 
 /* One-time admin credential reveal after wipe-and-load. The
-   wrap lifts the card and continue button out of the snapshot
-   card grid into one left-aligned column so they line up. */
+    wrap lifts the card and continue button out of the snapshot
+    card grid into one left-aligned column so they line up. */
 
 .credential-reveal-wrap {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  max-width: 34rem;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    max-width: 34rem;
 }
 
 .credential-reveal-wrap > .btn {
-  align-self: flex-start;
+    align-self: flex-start;
 }
 
 .credential-reveal {
-  padding: var(--space-5);
-  border: 1px solid hsl(var(--warning));
-  border-radius: var(--radius);
-  background: hsl(var(--card));
+    padding: var(--space-5);
+    border: 1px solid hsl(var(--warning));
+    border-radius: var(--radius);
+    background: hsl(var(--card));
 }
 
 .credential-reveal-title {
-  font-weight: 600;
-  color: hsl(var(--foreground));
-  margin-bottom: var(--space-2);
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    margin-bottom: var(--space-2);
 }
 
 .credential-reveal-note {
-  font-size: 0.875rem;
-  color: hsl(var(--muted-foreground));
-  margin-bottom: var(--space-4);
+    font-size: 0.875rem;
+    color: hsl(var(--muted-foreground));
+    margin-bottom: var(--space-4);
 }
 
 .credential-reveal-secret {
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  user-select: all;
-  overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    user-select: all;
+    overflow-wrap: anywhere;
 }
 
 .credential-reveal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-2);
 }
 
 /* A two-column grid so emails and secrets line up across
-   rows. The per-row wrapper is display: contents so its two
-   spans land directly in the grid. Temporary one-time panel —
-   it grows with the content rather than scrolling. */
+    rows. The per-row wrapper is display: contents so its two
+    spans land directly in the grid. Temporary one-time panel —
+    it grows with the content rather than scrolling. */
 .credential-reveal-box {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-5);
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  background: hsl(var(--muted) / 0.4);
-  padding: var(--space-2) var(--space-3);
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-5);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    background: hsl(var(--muted) / 0.4);
+    padding: var(--space-2) var(--space-3);
 }
 
 .credential-reveal-line {
-  display: contents;
+    display: contents;
 }
 
 .credential-reveal-user {
-  color: hsl(var(--muted-foreground));
-  white-space: nowrap;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
 }

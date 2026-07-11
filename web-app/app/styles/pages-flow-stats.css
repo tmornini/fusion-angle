@@ -1,121 +1,121 @@
 /* Flow Stats: read-only heat-mapped diagram, stepper, legend. */
 /*
- * Read-only diagram, data-forward by design: the heat
- * fill, the highlighted path, and the hover card carry
- * the message; the flow structure (edges, node borders,
- * grid) is muted context. Heat ramp blue@0 -> green@0.5
- * -> yellow@0.75 -> red@1, driven by the per-node
- * --heat-t (0..1) through three chained color-mix
- * segments, each clamped to its t-range. Loop-back edges
- * (data-cycle) are dashed + warning-coloured, mirroring
- * the designer. Every paint property lives here; the SVG
- * renderer emits structure only.
- */
+    * Read-only diagram, data-forward by design: the heat
+    * fill, the highlighted path, and the hover card carry
+    * the message; the flow structure (edges, node borders,
+    * grid) is muted context. Heat ramp blue@0 -> green@0.5
+    * -> yellow@0.75 -> red@1, driven by the per-node
+    * --heat-t (0..1) through three chained color-mix
+    * segments, each clamped to its t-range. Loop-back edges
+    * (data-cycle) are dashed + warning-coloured, mirroring
+    * the designer. Every paint property lives here; the SVG
+    * renderer emits structure only.
+*/
 
 html[data-page="flow-stats"],
 html[data-page="flow-stats"] body {
-  height: 100vh;
-  margin: 0;
-  overflow: hidden;
+    height: 100vh;
+    margin: 0;
+    overflow: hidden;
 }
 html[data-page="flow-stats"] #page-root {
-  display: flex;
-  flex-direction: column;
+    display: flex;
+    flex-direction: column;
 }
 html[data-page="flow-stats"] .sidebar-layout {
-  height: 100vh;
+    height: 100vh;
 }
 html[data-page="flow-stats"] .main-content {
-  min-height: 0;
+    min-height: 0;
 }
 html[data-page="flow-stats"] .page-content {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
 }
 /* The page-content fragment wraps .flow-stats in #flow-stats;   */
 /* keep it in the flex chain so the canvas shrinks to make room  */
 /* for the stepper bar and legend instead of pushing them off.   */
 html[data-page="flow-stats"] #flow-stats {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .flow-stats {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 .flow-stats-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border-bottom: 1px solid hsl(var(--border));
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-bottom: 1px solid hsl(var(--border));
 }
 .flow-stats-title-block {
-  flex: 1;
-  min-width: 0;
+    flex: 1;
+    min-width: 0;
 }
 /* Scoped to beat .page-title's display size, which the */
 /* h1 also carries — a stats sub-page wants a calmer head. */
 .flow-stats-header .flow-stats-flow-name {
-  margin: 0;
-  font-size: var(--text-2xl);
+    margin: 0;
+    font-size: var(--text-2xl);
 }
 .flow-stats-flow-desc {
-  margin: 0;
-  font-size: var(--text-sm);
-  color: hsl(var(--muted-foreground));
+    margin: 0;
+    font-size: var(--text-sm);
+    color: hsl(var(--muted-foreground));
 }
 .flow-stats-window-badge {
-  flex-shrink: 0;
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--muted));
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-full);
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    color: hsl(var(--muted-foreground));
+    background: hsl(var(--muted));
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-full);
 }
 
 .flow-stats-body {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 .flow-stats-canvas-area {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  /* Matches .flow-stats-grid-bg so the letterboxed */
-  /* margins around the SVG's viewBox don't show a seam. */
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-lg);
-  margin: var(--space-3);
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    /* Matches .flow-stats-grid-bg so the letterboxed */
+    /* margins around the SVG's viewBox don't show a seam. */
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-lg);
+    margin: var(--space-3);
 }
 .flow-stats-canvas-host {
-  width: 100%;
-  height: 100%;
+    width: 100%;
+    height: 100%;
 }
 svg.flow-stats-canvas {
-  width: 100%;
-  height: 100%;
-  display: block;
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 .flow-stats-grid-bg {
-  fill: hsl(var(--card));
+    fill: hsl(var(--card));
 }
 .flow-stats-grid-dot {
-  fill: hsl(var(--border));
+    fill: hsl(var(--border));
 }
 
 /* Edges are muted context. The single #stats-arrow   */
@@ -123,67 +123,67 @@ svg.flow-stats-canvas {
 /* context-stroke (fallback: --border), so default,   */
 /* on-path, and loop-back arrows all match for free.  */
 .flow-stats-edge {
-  opacity: 0.75;
+    opacity: 0.75;
 }
 .flow-stats-edge-path {
-  fill: none;
-  stroke: hsl(var(--border));
-  stroke-width: 1.5;
-  marker-end: url(#stats-arrow);
+    fill: none;
+    stroke: hsl(var(--border));
+    stroke-width: 1.5;
+    marker-end: url(#stats-arrow);
 }
 .flow-stats-arrowhead {
-  fill: hsl(var(--border));
-  fill: context-stroke;
+    fill: hsl(var(--border));
+    fill: context-stroke;
 }
 /* Loop-back edges: dashed + warning, mirroring the   */
 /* designer's CYCLE_DASH ("6 3"). The on-path rule    */
 /* below wins (equal specificity, later in source).   */
 .flow-stats-canvas .flow-stats-edge[data-cycle="true"]
-    .flow-stats-edge-path {
-  stroke: hsl(var(--warning));
-  stroke-dasharray: 6 3;
+.flow-stats-edge-path {
+    stroke: hsl(var(--warning));
+    stroke-dasharray: 6 3;
 }
 
 /* Heat fill -- the doctrine. blue->green->yellow->red, */
 /* non-uniform stops, three chained color-mix segments.  */
 svg.flow-stats-canvas .flow-stats-node-rect {
-  --seg1: clamp(
-      0%,
-      calc(var(--heat-t, 0) / 0.5 * 100%),
-      100%);
-  --seg2: clamp(
-      0%,
-      calc((var(--heat-t, 0) - 0.5) / 0.25 * 100%),
-      100%);
-  --seg3: clamp(
-      0%,
-      calc((var(--heat-t, 0) - 0.75) / 0.25 * 100%),
-      100%);
-  --c01: color-mix(
-      in oklch,
-      hsl(var(--heat-stop-low)),
-      hsl(var(--heat-stop-mid)) var(--seg1));
-  --c012: color-mix(
-      in oklch,
-      var(--c01),
-      hsl(var(--heat-stop-high)) var(--seg2));
-  fill: color-mix(
-      in oklch,
-      var(--c012),
-      hsl(var(--heat-stop-peak)) var(--seg3));
-  /* The heat fill is the data; the border recedes. */
-  stroke: hsl(var(--border));
-  stroke-width: 1;
+    --seg1: clamp(
+        0%,
+        calc(var(--heat-t, 0) / 0.5 * 100%),
+        100%);
+    --seg2: clamp(
+        0%,
+        calc((var(--heat-t, 0) - 0.5) / 0.25 * 100%),
+        100%);
+    --seg3: clamp(
+        0%,
+        calc((var(--heat-t, 0) - 0.75) / 0.25 * 100%),
+        100%);
+    --c01: color-mix(
+        in oklch,
+        hsl(var(--heat-stop-low)),
+        hsl(var(--heat-stop-mid)) var(--seg1));
+    --c012: color-mix(
+        in oklch,
+        var(--c01),
+        hsl(var(--heat-stop-high)) var(--seg2));
+    fill: color-mix(
+        in oklch,
+        var(--c012),
+        hsl(var(--heat-stop-peak)) var(--seg3));
+    /* The heat fill is the data; the border recedes. */
+    stroke: hsl(var(--border));
+    stroke-width: 1;
 }
 svg.flow-stats-canvas
-    [data-special="start"] .flow-stats-node-rect {
-  stroke: hsl(var(--success));
-  stroke-width: 2;
+[data-special="start"] .flow-stats-node-rect {
+    stroke: hsl(var(--success));
+    stroke-width: 2;
 }
 svg.flow-stats-canvas
-    [data-special="archive"] .flow-stats-node-rect {
-  stroke: hsl(var(--error));
-  stroke-width: 2;
+[data-special="archive"] .flow-stats-node-rect {
+    stroke: hsl(var(--error));
+    stroke-width: 2;
 }
 
 /* Node labels stay legible on any heat colour: a card-  */
@@ -191,34 +191,34 @@ svg.flow-stats-canvas
 /* order) acts as a halo. text-anchor lives here too.    */
 .flow-stats-node-name,
 .flow-stats-node-face {
-  text-anchor: middle;
-  pointer-events: none;
-  paint-order: stroke fill;
-  stroke: hsl(var(--card));
-  stroke-width: 3px;
-  stroke-linejoin: round;
+    text-anchor: middle;
+    pointer-events: none;
+    paint-order: stroke fill;
+    stroke: hsl(var(--card));
+    stroke-width: 3px;
+    stroke-linejoin: round;
 }
 .flow-stats-node-name {
-  fill: hsl(var(--foreground));
-  font-size: var(--text-xs);
-  font-weight: 600;
+    fill: hsl(var(--foreground));
+    font-size: var(--text-xs);
+    font-weight: 600;
 }
 .flow-stats-node-face {
-  fill: hsl(var(--muted-foreground));
-  font-size: var(--text-2xs);
+    fill: hsl(var(--muted-foreground));
+    font-size: var(--text-2xs);
 }
 .flow-stats-node-warning {
-  color: hsl(var(--warning));
+    color: hsl(var(--warning));
 }
 .flow-stats-node-danger {
-  color: hsl(var(--danger));
+    color: hsl(var(--danger));
 }
 .flow-stats-node {
-  cursor: pointer;
+    cursor: pointer;
 }
 .flow-stats-node:hover .flow-stats-node-rect {
-  stroke: hsl(var(--border-strong));
-  stroke-width: 2;
+    stroke: hsl(var(--border-strong));
+    stroke-width: 2;
 }
 
 /* Path highlight. A path is lit by default (the most-   */
@@ -226,91 +226,91 @@ svg.flow-stats-canvas
 /* desaturate — the lit path is then the only colour on  */
 /* the canvas, reading as "featured", not "broken".      */
 .flow-stats-canvas [data-dim="true"] {
-  opacity: 0.3;
-  filter: saturate(0.2);
+    opacity: 0.3;
+    filter: saturate(0.2);
 }
 .flow-stats-canvas [data-on-path="true"] {
-  opacity: 1;
+    opacity: 1;
 }
 .flow-stats-canvas [data-on-path="true"]
-    .flow-stats-node-rect {
-  stroke: hsl(var(--accent));
-  stroke-width: 4;
-  filter: drop-shadow(0 0 4px hsl(var(--accent) / 0.5));
+.flow-stats-node-rect {
+    stroke: hsl(var(--accent));
+    stroke-width: 4;
+    filter: drop-shadow(0 0 4px hsl(var(--accent) / 0.5));
 }
 .flow-stats-canvas .flow-stats-edge[data-on-path="true"]
-    .flow-stats-edge-path {
-  stroke: hsl(var(--accent));
-  stroke-width: 4;
+.flow-stats-edge-path {
+    stroke: hsl(var(--accent));
+    stroke-width: 4;
 }
 
 .flow-stats-card {
-  position: absolute;
-  z-index: 20;
-  max-width: 22rem;
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-xl);
-  padding: var(--space-4);
-  /* Page module sets --card-x / --card-y (unitless px). */
-  left: clamp(
-      0px,
-      calc(var(--card-x, 0) * 1px),
-      calc(100% - 22rem));
-  top: clamp(
-      0px,
-      calc(var(--card-y, 0) * 1px - 50%),
-      calc(100% - 8rem));
+    position: absolute;
+    z-index: 20;
+    max-width: 22rem;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-xl);
+    padding: var(--space-4);
+    /* Page module sets --card-x / --card-y (unitless px). */
+    left: clamp(
+        0px,
+        calc(var(--card-x, 0) * 1px),
+        calc(100% - 22rem));
+    top: clamp(
+        0px,
+        calc(var(--card-y, 0) * 1px - 50%),
+        calc(100% - 8rem));
 }
 .flow-stats-card.hidden {
-  display: none;
+    display: none;
 }
 .flow-stats-card-title {
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid hsl(var(--border));
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semibold);
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid hsl(var(--border));
+    font-size: var(--text-base);
+    font-weight: var(--font-weight-semibold);
 }
 .flow-stats-card-sub {
-  display: block;
-  margin-top: var(--space-1);
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-regular);
-  color: hsl(var(--muted-foreground));
+    display: block;
+    margin-top: var(--space-1);
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-regular);
+    color: hsl(var(--muted-foreground));
 }
 .flow-stats-card-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-2) var(--space-4);
-  margin: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
 }
 .flow-stats-card-grid dt {
-  font-size: var(--text-xs);
-  color: hsl(var(--muted-foreground));
+    font-size: var(--text-xs);
+    color: hsl(var(--muted-foreground));
 }
 /* Stat values are tabular mono so percentages, */
 /* durations, and counts line up and scan fast. */
 .flow-stats-card-grid dd {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--font-weight-semibold);
-  color: hsl(var(--foreground));
+    margin: 0;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-semibold);
+    color: hsl(var(--foreground));
 }
 /* Full-width rows (Model, Top producer, Next, clan) are */
 /* tinted blocks; their values are prose, so drop the    */
 /* mono and let sentences read naturally.                */
 .flow-stats-card-wide {
-  grid-column: 1 / -1;
-  padding: var(--space-1) var(--space-2);
-  background: hsl(var(--muted));
-  border-radius: var(--radius-sm);
+    grid-column: 1 / -1;
+    padding: var(--space-1) var(--space-2);
+    background: hsl(var(--muted));
+    border-radius: var(--radius-sm);
 }
 .flow-stats-card-wide dd {
-  font-family: inherit;
-  font-weight: var(--font-weight-medium);
+    font-family: inherit;
+    font-weight: var(--font-weight-medium);
 }
 
 /* The stepper is the page's hidden tool: walk the flow's */
@@ -319,78 +319,78 @@ svg.flow-stats-canvas
 /* prev/label/next below — and flag it with an accent edge */
 /* whenever it's lighting a path, tying control to canvas. */
 .flow-stats-stepper-bar {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  margin: 0 var(--space-3) var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+    margin: 0 var(--space-3) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
 }
 .flow-stats-body:has([data-on-path])
-    .flow-stats-stepper-bar {
-  border-color: hsl(var(--accent));
-  box-shadow: inset var(--space-1) 0 0 hsl(var(--accent));
+.flow-stats-stepper-bar {
+    border-color: hsl(var(--accent));
+    box-shadow: inset var(--space-1) 0 0 hsl(var(--accent));
 }
 .flow-stats-stepper-eyebrow {
-  font-size: var(--text-xs);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
-  color: hsl(var(--muted-foreground));
+    font-size: var(--text-xs);
+    font-weight: var(--font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-wide);
+    color: hsl(var(--muted-foreground));
 }
 .flow-stats-stepper {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
 }
 .flow-stats-stepper button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 .flow-stats-stepper-label {
-  font-size: var(--text-sm);
-  color: hsl(var(--foreground));
+    font-size: var(--text-sm);
+    color: hsl(var(--foreground));
 }
 
 /* Legend rhymes with the stepper bar — same surface, */
 /* same margins — so the two read as the chart's key.  */
 .flow-stats-legend {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 var(--space-3) var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: hsl(var(--muted));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius);
-  font-size: var(--text-xs);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: 0 var(--space-3) var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    font-size: var(--text-xs);
 }
 .flow-stats-legend-end {
-  color: hsl(var(--muted-foreground));
+    color: hsl(var(--muted-foreground));
 }
 .flow-stats-legend-bar {
-  display: inline-block;
-  height: 0.75rem;
-  flex: 1;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--radius-sm);
-  background: linear-gradient(
-      to right,
-      hsl(var(--heat-stop-low))  0%,
-      hsl(var(--heat-stop-mid)) 50%,
-      hsl(var(--heat-stop-high)) 75%,
-      hsl(var(--heat-stop-peak)) 100%);
+    display: inline-block;
+    height: 0.75rem;
+    flex: 1;
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius-sm);
+    background: linear-gradient(
+        to right,
+        hsl(var(--heat-stop-low))  0%,
+        hsl(var(--heat-stop-mid)) 50%,
+        hsl(var(--heat-stop-high)) 75%,
+        hsl(var(--heat-stop-peak)) 100%);
 }
 .flow-stats-legend-caption {
-  color: hsl(var(--muted-foreground));
-  margin-left: var(--space-3);
+    color: hsl(var(--muted-foreground));
+    margin-left: var(--space-3);
 }
 .flow-stats-footnote {
-  margin: 0 var(--space-3) var(--space-3);
-  padding: 0 var(--space-3);
-  font-size: var(--text-xs);
-  color: hsl(var(--muted-foreground));
+    margin: 0 var(--space-3) var(--space-3);
+    padding: 0 var(--space-3);
+    font-size: var(--text-xs);
+    color: hsl(var(--muted-foreground));
 }

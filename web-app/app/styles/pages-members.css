@@ -1,46 +1,46 @@
 /* Members: humans + AIs list, detail. */
 
 .user-dim-row {
-  margin-bottom: var(--space-4);
+    margin-bottom: var(--space-4);
 }
 
 .user-dim-progress {
-  height: 0.5rem;
+    height: 0.5rem;
 }
 
 .member-avatar {
-  width: 6rem;
-  height: 6rem;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg,
-    hsl(var(--primary) / 0.2),
-    hsl(var(--primary) / 0.05));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+    width: 6rem;
+    height: 6rem;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg,
+        hsl(var(--primary) / 0.2),
+        hsl(var(--primary) / 0.05));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 .card[data-self="true"] {
-  position: relative;
-  background: hsl(var(--primary) / 0.05);
-  border-left: 3px solid hsl(var(--primary));
+    position: relative;
+    background: hsl(var(--primary) / 0.05);
+    border-left: 3px solid hsl(var(--primary));
 }
 
 .card[data-self="true"]:hover {
-  background: hsl(var(--primary) / 0.1);
+    background: hsl(var(--primary) / 0.1);
 }
 
 .member-section-header {
-  padding: 0.5rem 0.25rem;
-  letter-spacing: 0.05em;
+    padding: 0.5rem 0.25rem;
+    letter-spacing: 0.05em;
 }
 
 .sidebar-member {
-  cursor: pointer;
-  transition: background var(--duration-fast);
+    cursor: pointer;
+    transition: background var(--duration-fast);
 }
 
 .sidebar-member:hover {
-  background: hsl(var(--muted) / 0.5);
+    background: hsl(var(--muted) / 0.5);
 }

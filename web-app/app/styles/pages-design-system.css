@@ -1,235 +1,235 @@
 /* Design system showcase page. */
 
 .ds-page {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding-bottom: var(--space-16);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-12);
+    padding-bottom: var(--space-16);
 }
 
 .ds-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
 }
 
 .ds-grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-6);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
 }
 .ds-grid-3 {
-  display: grid;
-  grid-template-columns:
-    repeat(3, 1fr);
-  gap: var(--space-6);
+    display: grid;
+    grid-template-columns:
+        repeat(3, 1fr);
+    gap: var(--space-6);
 }
 .ds-grid-4 {
-  display: grid;
-  grid-template-columns:
-    repeat(4, 1fr);
-  gap: var(--space-6);
+    display: grid;
+    grid-template-columns:
+        repeat(4, 1fr);
+    gap: var(--space-6);
 }
 .ds-grid-5 {
-  display: grid;
-  grid-template-columns:
-    repeat(5, 1fr);
-  gap: var(--space-6);
+    display: grid;
+    grid-template-columns:
+        repeat(5, 1fr);
+    gap: var(--space-6);
 }
 .ds-grid-6 {
-  display: grid;
-  grid-template-columns:
-    repeat(6, 1fr);
-  gap: var(--space-6);
+    display: grid;
+    grid-template-columns:
+        repeat(6, 1fr);
+    gap: var(--space-6);
 }
 
 .ds-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
 }
 
 .ds-hr {
-  border: none;
-  border-top: 1px solid
-    hsl(var(--border));
+    border: none;
+    border-top: 1px solid
+        hsl(var(--border));
 }
 
 .color-swatch {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
 }
 
 .color-swatch-block {
-  height: 4rem;
-  width: 100%;
-  border-radius: var(--radius);
-  border: 1px solid hsl(var(--border));
+    height: 4rem;
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid hsl(var(--border));
 }
 
 .shadow-swatch {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
 }
 
 .shadow-swatch-block {
-  width: 100%;
-  height: 5rem;
-  border-radius: var(--radius-lg);
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+    width: 100%;
+    height: 5rem;
+    border-radius: var(--radius-lg);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
 }
 
 .type-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid
-    hsl(var(--border));
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid
+        hsl(var(--border));
 }
 
 .icon-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  width: 3.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    width: 3.5rem;
 }
 
 .icon-size-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
 }
 
 .ds-soft-row {
-  padding: var(--space-4);
-  border-radius: var(--radius);
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
 }
 .ds-soft-row[data-tone="error"] {
-  background: hsl(var(--error-soft));
-  border: 1px solid
-    hsl(var(--error-border));
+    background: hsl(var(--error-soft));
+    border: 1px solid
+        hsl(var(--error-border));
 }
 .ds-soft-row[data-tone="warning"] {
-  background: hsl(var(--warning-soft));
-  border: 1px solid
-    hsl(var(--warning-border));
+    background: hsl(var(--warning-soft));
+    border: 1px solid
+        hsl(var(--warning-border));
 }
 
 .ds-upload-fail {
-  padding: var(--space-6);
-  border-radius: var(--radius-lg);
-  background: hsl(var(--error-soft));
-  border: 1px solid
-    hsl(var(--error-border));
-  text-align: center;
+    padding: var(--space-6);
+    border-radius: var(--radius-lg);
+    background: hsl(var(--error-soft));
+    border: 1px solid
+        hsl(var(--error-border));
+    text-align: center;
 }
 
 .ds-do-card {
-  padding: var(--space-6);
-  border-color:
-    hsl(var(--success) / 0.3);
-  background:
-    hsl(var(--success-soft) / 0.3);
+    padding: var(--space-6);
+    border-color:
+        hsl(var(--success) / 0.3);
+    background:
+        hsl(var(--success-soft) / 0.3);
 }
 .ds-dont-card {
-  padding: var(--space-6);
-  border-color:
-    hsl(var(--error) / 0.3);
-  background:
-    hsl(var(--error-soft) / 0.3);
+    padding: var(--space-6);
+    border-color:
+        hsl(var(--error) / 0.3);
+    background:
+        hsl(var(--error-soft) / 0.3);
 }
 
 .ds-space-bar {
-  height: 1rem;
-  width: var(--space-w, 0);
-  background: hsl(var(--primary));
-  border-radius: 0.25rem;
+    height: 1rem;
+    width: var(--space-w, 0);
+    background: hsl(var(--primary));
+    border-radius: 0.25rem;
 }
 
 .ds-prop-panel {
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  max-width: 18rem;
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    max-width: 18rem;
 }
 
 .ds-prop-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
 }
 
 .ds-fullpage-err-desc {
-  max-width: 28rem;
-  margin: var(--space-2) auto 0;
+    max-width: 28rem;
+    margin: var(--space-2) auto 0;
 }
 
 .ds-success-border {
-  border-color: hsl(var(--success));
+    border-color: hsl(var(--success));
 }
 
 .ds-accent-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-full);
-  font-size: 0.75rem;
-  font-weight: var(--font-weight-medium);
-  background: hsl(var(--accent-soft));
-  color: hsl(var(--accent-text));
-  border: 1px solid
-    hsl(var(--accent) / 0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: var(--font-weight-medium);
+    background: hsl(var(--accent-soft));
+    color: hsl(var(--accent-text));
+    border: 1px solid
+        hsl(var(--accent) / 0.3);
 }
 
 .ds-soft-btn[data-tone="primary"] {
-  background: hsl(var(--primary) / 0.1);
-  color: hsl(var(--primary));
+    background: hsl(var(--primary) / 0.1);
+    color: hsl(var(--primary));
 }
 .ds-soft-btn[data-tone="success"] {
-  background: hsl(var(--success-soft));
-  color: hsl(var(--success-text));
+    background: hsl(var(--success-soft));
+    color: hsl(var(--success-text));
 }
 .ds-soft-btn[data-tone="warning"] {
-  background: hsl(var(--warning-soft));
-  color: hsl(var(--warning-text));
+    background: hsl(var(--warning-soft));
+    color: hsl(var(--warning-text));
 }
 .ds-soft-btn[data-tone="error"] {
-  background: hsl(var(--error-soft));
-  color: hsl(var(--error-text));
+    background: hsl(var(--error-soft));
+    color: hsl(var(--error-text));
 }
 
 .ds-toast-col {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  max-width: 24rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-width: 24rem;
 }
 
 /* Token swatch fills. These class names never appear as
-   literals: buildColorSwatch (design-system/index.ts)
-   CONSTRUCTS them from the token name at runtime
-   ('bg' + variable.replace('--', '-')), so a dead-CSS
-   sweep that greps for literal usage will not match
-   them. Do not delete without checking that builder. */
+    literals: buildColorSwatch (design-system/index.ts)
+    CONSTRUCTS them from the token name at runtime
+    ('bg' + variable.replace('--', '-')), so a dead-CSS
+    sweep that greps for literal usage will not match
+    them. Do not delete without checking that builder. */
 .bg-primary { background-color: hsl(var(--primary)); }
 .bg-primary-foreground {
-  background-color: hsl(var(--primary-foreground));
+    background-color: hsl(var(--primary-foreground));
 }
 .bg-accent { background-color: hsl(var(--accent)); }
 .bg-accent-foreground {
-  background-color: hsl(var(--accent-foreground));
+    background-color: hsl(var(--accent-foreground));
 }
 .bg-foreground { background-color: hsl(var(--foreground)); }
 .bg-card { background-color: hsl(var(--card)); }
@@ -237,15 +237,15 @@
 .bg-border { background-color: hsl(var(--border)); }
 .bg-ring { background-color: hsl(var(--ring)); }
 .bg-destructive {
-  background-color: hsl(var(--destructive));
+    background-color: hsl(var(--destructive));
 }
 .bg-success { background-color: hsl(var(--success)); }
 .bg-success-soft {
-  background-color: hsl(var(--success-soft));
+    background-color: hsl(var(--success-soft));
 }
 .bg-warning { background-color: hsl(var(--warning)); }
 .bg-warning-soft {
-  background-color: hsl(var(--warning-soft));
+    background-color: hsl(var(--warning-soft));
 }
 .bg-error-soft { background-color: hsl(var(--error-soft)); }
 .bg-info { background-color: hsl(var(--info)); }

@@ -640,11 +640,12 @@ export function pickOptionalString(
 }
 
 // RFC-3339 zulu at EXACTLY six fraction digits — the one
-// width the mints emit (nowUtc/dt/isoFromMs) and the ledgers
-// sort. The Office of Time's enemy is AMBIGUITY (a date-only
-// stamp shifts the day across zones; a zoned offset is
-// localtime), and the latest-wins reductions add a second
-// enemy: WIDTH. Lexical compare is chronological only within
+// width the mints emit (nowUtc/daysFromNow/isoFromMs) and
+// the ledgers sort. The Office of Time's enemy is AMBIGUITY
+// (a date-only stamp shifts the day across zones; a zoned
+// offset is localtime), and the latest-wins reductions add
+// a second enemy: WIDTH. Lexical compare is chronological
+// only within
 // one width — a fractionless second sorts AFTER every
 // fractional stamp inside it ('Z' > '.'), so an admitted
 // off-width stamp could shadow the true latest event. The
@@ -2012,8 +2013,8 @@ export function validateOrganizationEntity(
         domain: pickString(
             body, 'domain',
         ),
-        next_billing: pickString(
-            body, 'next_billing',
+        next_billing: validateTimestampField(
+            body, 'next_billing', 'OrganizationEntity',
         ),
         seats: pickNumber(
             body, 'seats',

@@ -134,7 +134,7 @@ function makeOrganization() {
         id: 'org-1',
         name: 'Acme Innovations',
         domain: 'acme.example',
-        next_billing: '2026-07-01',
+        next_billing: '2026-07-01T00:00:00.000000Z',
         seats: 50,
         projects_limit: 100,
         ideas_limit: 200,

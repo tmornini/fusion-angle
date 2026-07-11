@@ -560,7 +560,7 @@ test(
 const validOrganization = {
     name: 'Acme Corp',
     domain: 'acme.com',
-    next_billing: '2025-01-01',
+    next_billing: '2025-01-01T00:00:00.000000Z',
     seats: 10,
     projects_limit: 50,
     ideas_limit: 200,
@@ -628,6 +628,19 @@ test(
             used_seats: 5,
         }),
         /unexpected key "used_seats"/,
+    );
+});
+
+test(
+    'validateOrganizationEntity rejects a bare'
+    + ' calendar date for next_billing',
+    () => {
+    assert.throws(
+        () => validateOrganizationEntity({
+            ...validOrganization,
+            next_billing: '2025-01-01',
+        }),
+        /invalid timestamp/,
     );
 });
 

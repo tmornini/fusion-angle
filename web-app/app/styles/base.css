@@ -1,57 +1,57 @@
 /* Global resets, typography, focus, view transitions. */
 
 *, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 html {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  line-height: var(--leading-normal);
-  font-size: 16px;
-  tab-size: 4;
-  color-scheme: light;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    line-height: var(--leading-normal);
+    font-size: 16px;
+    tab-size: 4;
+    color-scheme: light;
 }
 
 body {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  font-family: var(--font-sans);
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
-  min-height: 100vh;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--leading-normal);
+    min-height: 100vh;
 }
 
 img, svg, video, canvas, audio, iframe, embed, object {
-  display: block;
-  max-width: 100%;
+    display: block;
+    max-width: 100%;
 }
 
 input, button, textarea, select {
-  font: inherit;
-  color: inherit;
+    font: inherit;
+    color: inherit;
 }
 
 a {
-  color: inherit;
-  text-decoration: none;
+    color: inherit;
+    text-decoration: none;
 }
 
 ul, ol {
-  list-style: none;
+    list-style: none;
 }
 
 /* Typography */
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--tracking-tight);
-  color: hsl(var(--foreground));
-  line-height: var(--leading-tight);
+    font-family: var(--font-display);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: var(--tracking-tight);
+    color: hsl(var(--foreground));
+    line-height: var(--leading-tight);
 }
 
 h1 { font-size: var(--text-3xl); }
@@ -77,79 +77,79 @@ p { line-height: var(--leading-normal); }
 /* Focus and selection */
 
 :focus-visible {
-  outline: var(--focus-ring-width) solid hsl(var(--focus-ring-color));
-  outline-offset: var(--focus-ring-offset);
+    outline: var(--focus-ring-width) solid hsl(var(--focus-ring-color));
+    outline-offset: var(--focus-ring-offset);
 }
 
 ::selection {
-  background-color: hsl(var(--blue-200));
-  color: hsl(var(--blue-900));
+    background-color: hsl(var(--blue-200));
+    color: hsl(var(--blue-900));
 }
 
 /* Skip-to-content link: off-screen until keyboard focus,
-   then slides into the top-left over the layout. */
+    then slides into the top-left over the layout. */
 .skip-link {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  z-index: 100;
-  padding: var(--space-2) var(--space-4);
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-radius: var(--radius);
-  transform: translateY(-150%);
-  transition: transform var(--duration-fast) var(--ease-default);
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: 100;
+    padding: var(--space-2) var(--space-4);
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border-radius: var(--radius);
+    transform: translateY(-150%);
+    transition: transform var(--duration-fast) var(--ease-default);
 }
 
 .skip-link:focus {
-  transform: translateY(0);
+    transform: translateY(0);
 }
 
 /* View transitions */
 
 @view-transition {
-  navigation: auto;
+    navigation: auto;
 }
 
 #desktop-sidebar {
-  view-transition-name: sidebar;
+    view-transition-name: sidebar;
 }
 
 .top-header {
-  view-transition-name: header;
+    view-transition-name: header;
 }
 
 .page-content {
-  view-transition-name: page-content;
+    view-transition-name: page-content;
 }
 
 ::view-transition-old(page-content) {
-  animation: var(--duration-fast) var(--ease-in) fade-out;
+    animation: var(--duration-fast) var(--ease-in) fade-out;
 }
 
 ::view-transition-new(page-content) {
-  animation: var(--duration-normal) var(--ease-out) fade-in-up;
+    animation: var(--duration-normal) var(--ease-out) fade-in-up;
 }
 
 ::view-transition-old(sidebar),
 ::view-transition-new(sidebar),
 ::view-transition-old(header),
 ::view-transition-new(header) {
-  animation: none;
+    animation: none;
 }
 
 /* Reduced motion: the universal reset in responsive.css cannot
-   reach the ::view-transition-* pseudo tree, so neutralize the
-   page-content transition here. */
+    reach the ::view-transition-* pseudo tree, so neutralize the
+    page-content transition here. */
 @media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none;
-  }
+    ::view-transition-group(*),
+        ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation: none;
+    }
 }
 
 @keyframes fade-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
+    from { opacity: 1; }
+    to { opacity: 0; }
 }
