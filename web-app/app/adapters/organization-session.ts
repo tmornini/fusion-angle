@@ -1,9 +1,15 @@
 import type { RequestContext } from './shared.ts';
+import { STORAGE_KEY_ACTIVE_ORGANIZATION_ID } from
+    '../storage-keys.ts';
 
-// The persisted active-org key — the CLIENT-side org vessel.
-// We persist the org id, NEVER the token (a 15-min TTL would
-// rot it); boot re-exchanges a fresh scoped token from this id.
-export const ACTIVE_ORGANIZATION_KEY = 'fusion.active-org';
+// localStorage slot for the active organization id — the
+// CLIENT-side org vessel. We persist the org id, NEVER the
+// token (a 15-min TTL would rot it); boot re-exchanges a
+// fresh scoped token from this id. Alias of
+// STORAGE_KEY_ACTIVE_ORGANIZATION_ID for call sites that
+// speak the domain name.
+export const ACTIVE_ORGANIZATION_ID =
+    STORAGE_KEY_ACTIVE_ORGANIZATION_ID;
 
 // Exchange the held bearer for a token scoped to `org` via the
 // real OAuth token-exchange (RFC 8693 self-delegation: subject

@@ -272,7 +272,8 @@ ledger (never the possibly-stale token claim).
 
 `core.ts::scopeBootToActiveOrg` always scopes the session
 before first render: enumerate reachable orgs →
-`resolveActiveOrg` (the persisted `fusion.active-org`, else
+`resolveActiveOrg` (the persisted
+`fusion-ai:active-organization-id`, else
 the identity's default org if reachable, else the first
 reachable) → `postOrgSessionExchange` → install the scoped
 token. The

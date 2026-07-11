@@ -2655,13 +2655,14 @@ hidden:
    carries the pre-erasure PII rows verbatim (§ Snapshots,
    §3.26-§3.28); the theorem covers live storage, not files
    already written to disk.
-3. **The browser's own session credential.** The `fusion.
-   session-credentials` localStorage entry carries the caller's
-   own JWT, whose `name` claim is base64-decodable client-side
-   for the token's lifetime (up to the 30-day refresh TTL). The
-   pin does not scan localStorage — an erased member's OWN prior
-   session token, if retained, still decodes to the pre-erasure
-   name until it expires or is revoked.
+3. **The browser's own session credential.** The
+   `fusion-ai:authorization` localStorage entry carries the
+   caller's own JWT, whose `name` claim is base64-decodable
+   client-side for the token's lifetime (up to the 30-day
+   refresh TTL). The pin does not scan localStorage — an
+   erased member's OWN prior session token, if retained,
+   still decodes to the pre-erasure name until it expires or
+   is revoked.
 4. **Replay resurrection.** A client that retained a pre-erasure
    PUT request (the exact bytes, not merely the values) can
    resend it: hash-keyed idempotency composed with hard-delete

@@ -54,7 +54,7 @@ import {
     principalFromToken,
 } from '../api/access-token.ts';
 import {
-    ACTIVE_ORGANIZATION_KEY,
+    ACTIVE_ORGANIZATION_ID,
 } from '../web-app/app/adapters/organization-session.ts';
 import {
     getSessionToken,
@@ -408,7 +408,7 @@ test('recovery re-scopes to the vessel org claim, not the'
     });
     putSessionToken(deadA);
     // another tab last selected org B (the cross-tab preference)
-    localStorage.setItem(ACTIVE_ORGANIZATION_KEY, 'B');
+    localStorage.setItem(ACTIVE_ORGANIZATION_ID, 'B');
     const ctx = createRecoveringRequestContext(db, deadA);
     // the 401 drives refresh + re-scope; recovery must honor the
     // vessel's own org A, never the preference another tab wrote
@@ -436,12 +436,12 @@ test('recovery leaves the cross-tab active-org preference'
     });
     putSessionToken(deadA);
     // the foreground tab is viewing org B
-    localStorage.setItem(ACTIVE_ORGANIZATION_KEY, 'B');
+    localStorage.setItem(ACTIVE_ORGANIZATION_ID, 'B');
     const ctx = createRecoveringRequestContext(db, deadA);
     await ctx.GET('ideas');
     // the background recovery scopes ITS session to vessel org A...
     assert.equal(
         principalFromToken(getSessionToken()).organization, 'A');
     // ...but never clobbers the foreground tab's chosen org
-    assert.equal(localStorage.getItem(ACTIVE_ORGANIZATION_KEY), 'B');
+    assert.equal(localStorage.getItem(ACTIVE_ORGANIZATION_ID), 'B');
 });

@@ -1,11 +1,14 @@
 import { decodeAccessToken } from '../../../api/access-token.ts';
+import { STORAGE_KEY_AUTHORIZATION } from '../storage-keys.ts';
 
 // The persisted session credential: the OAuth token pair the
 // web tier holds so a login survives the navigateTo() reload.
 // Domain shape is camelCase; the stored JSON is snake_case to
 // match the OAuth wire (access_token / refresh_token), so a
 // blob reads straight against a network trace. An immutable
-// value — replaced, never mutated.
+// value — replaced, never mutated. Stored under
+// STORAGE_KEY_AUTHORIZATION; the access token becomes the
+// Authorization: Bearer value on authenticated requests.
 export interface SessionCredentials {
     readonly accessToken: string;
     readonly refreshToken: string;
@@ -23,18 +26,14 @@ export class SessionCredentialsCorruptError extends Error {
     }
 }
 
-// NOT under the localStorage backend's 'fusion-ai:' table
-// namespace: a credential is session state, not schema
-// data, and must survive a deleteSchema wipe of the table
-// keys. Mirrors ACTIVE_ORGANIZATION_KEY ('fusion.active-org').
-const SESSION_CREDENTIALS_KEY = 'fusion.session-credentials';
-
 // Parse + validate at the gate. null ONLY for honest absence
 // (logged out / first run); a present-but-broken blob throws
 // Corrupt and is never null-masked.
 export function getSessionCredentials():
     SessionCredentials | null {
-    const raw = localStorage.getItem(SESSION_CREDENTIALS_KEY);
+    const raw = localStorage.getItem(
+        STORAGE_KEY_AUTHORIZATION,
+    );
     if (raw === null) {
         return null;
     }
@@ -53,7 +52,7 @@ export function putSessionCredentials(
     creds: SessionCredentials,
 ): void {
     localStorage.setItem(
-        SESSION_CREDENTIALS_KEY,
+        STORAGE_KEY_AUTHORIZATION,
         JSON.stringify({
             access_token: creds.accessToken,
             refresh_token: creds.refreshToken,
@@ -63,7 +62,7 @@ export function putSessionCredentials(
 
 // Idempotent: removing an absent credential is a no-op.
 export function deleteSessionCredentials(): void {
-    localStorage.removeItem(SESSION_CREDENTIALS_KEY);
+    localStorage.removeItem(STORAGE_KEY_AUTHORIZATION);
 }
 
 function parseBlob(raw: string): Record<string, unknown> {

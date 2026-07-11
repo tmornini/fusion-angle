@@ -36,7 +36,7 @@ import {
 import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
-    ACTIVE_ORGANIZATION_KEY,
+    ACTIVE_ORGANIZATION_ID,
 } from './adapters/organization-session.ts';
 import {
     getIdentityDefaultOrganization,
@@ -152,13 +152,13 @@ async function scopeBootToActiveOrganization(): Promise<boolean> {
     if (reachable.length === 0) return false;
     const active = resolveActiveOrganization(
         reachable,
-        getPreference(ACTIVE_ORGANIZATION_KEY),
+        getPreference(ACTIVE_ORGANIZATION_ID),
         await getIdentityDefaultOrganization(ctx),
     );
     putSessionToken(
         await postOrganizationSessionExchange(
             ctx, getSessionToken(), active));
-    putPreference(ACTIVE_ORGANIZATION_KEY, active);
+    putPreference(ACTIVE_ORGANIZATION_ID, active);
     return true;
 }
 

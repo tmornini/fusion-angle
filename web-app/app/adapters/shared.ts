@@ -325,7 +325,7 @@ async function refreshCredentials(
 // request's own org, resolving the target from the REACHABLE
 // set first so the exchange never targets a non-member org
 // (H13). Unlike boot, recovery neither reads nor writes the
-// cross-tab ACTIVE_ORGANIZATION_KEY preference: the target is the
+// cross-tab ACTIVE_ORGANIZATION_ID preference: the target is the
 // vessel's verified org claim, so a recovering request stays in
 // the org it was operating in — and a background recovery never
 // clobbers the org another tab is viewing (F-109). A flat vessel

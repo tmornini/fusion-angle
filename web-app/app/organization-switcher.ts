@@ -2,7 +2,7 @@ import { html, type SafeHtml } from './safe-html.ts';
 import { $, $$, $select } from './dom.ts';
 import {
     shouldShowOrganizationSwitcher,
-    ACTIVE_ORGANIZATION_KEY,
+    ACTIVE_ORGANIZATION_ID,
 } from './adapters/organization-session.ts';
 import { putPreference } from './adapters/preferences.ts';
 import { showToast } from './toast.ts';
@@ -36,7 +36,7 @@ export function organizationSwitcherHtml(
 // confirmed persist — a false return means the id never
 // landed, so a reload would silently keep the prior org.
 function switchToOrganization(organization: string): void {
-    if (!putPreference(ACTIVE_ORGANIZATION_KEY, organization)) {
+    if (!putPreference(ACTIVE_ORGANIZATION_ID, organization)) {
         showToast(
             'Could not switch organization —'
             + ' please try again.',

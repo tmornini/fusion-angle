@@ -237,13 +237,13 @@ disjoint, but three resources are shared per **origin**, not
 per tab, and the mutation-domain table does not fence them.
 A Phase-2 run that ignores them collapses:
 
-- **`fusion.session-credentials`** is one localStorage key
+- **`fusion-ai:authorization`** is one localStorage key
   per origin. Every agent that logs in as the same identity
   in the same origin overwrites the prior agent's credential
   blob (last write wins); a sibling tab's silent refresh
   then reads a stranger's tokens
   (`web-app/app/adapters/session-credentials.ts`).
-- **`fusion.active-org`** is likewise one per-origin key, so
+- **`fusion-ai:active-organization-id`** is likewise one per-origin key, so
   concurrent org switches race the same slot.
 - **Sign-out is identity-wide.** `postSessionLogout` calls
   `postIdentityLogoutEverywhere` — a coarse server-side
@@ -286,7 +286,7 @@ read-only work. Simpler, slower, equally correct.
    own origin/tab — never while a sibling shares the
    identity.
 2. **One credential writer per origin at a time.** Only one
-   login (or refresh) may write `fusion.session-credentials`
+   login (or refresh) may write `fusion-ai:authorization`
    per origin; per-origin isolation makes this automatic.
 3. **Schema mutations need exclusive origin access.** Any
    wipe / seed / snapshot import (`deleteSchema`) runs with
@@ -883,7 +883,7 @@ on. Run these in order.
 
 ### Auth Session & Redirect
 
-- [ ] **B15** With no stored credential (sign out, or delete the `localStorage` key `fusion.session-credentials`), open `dashboard/index.html` directly. PASS: bounced to `auth/index.html?return=dashboard` (the Sign In page), not the dashboard.
+- [ ] **B15** With no stored credential (sign out, or delete the `localStorage` key `fusion-ai:authorization`), open `dashboard/index.html` directly. PASS: bounced to `auth/index.html?return=dashboard` (the Sign In page), not the dashboard.
 - [ ] **B16** From the B15 bounce, sign in with the seeded admin credentials. PASS: lands on `dashboard/index.html` — the `?return=` target, not a generic default.
 - [ ] **B17** With no credential, open `flows/detail.html?flowId=<id>` directly. PASS: bounced to `auth` with the flow preserved in `?return=`; after signing in, lands back on that exact flow with `flowId` intact.
 - [ ] **B18** After signing in on the dashboard, reload (Cmd-R). PASS: stays authenticated on the dashboard — no bounce to `auth` (the credential persisted across the hard-reload).
@@ -896,7 +896,7 @@ on. Run these in order.
 
 ### Sidebar Sign-out
 
-- [ ] **B23** On any gated page (e.g. dashboard), click "Sign out" in the sidebar. PASS: `fusion.session-credentials` is removed from `localStorage`, a revocation row is recorded, and the page navigates to `auth`; pressing Back to the protected page bounces again to `auth`.
+- [ ] **B23** On any gated page (e.g. dashboard), click "Sign out" in the sidebar. PASS: `fusion-ai:authorization` is removed from `localStorage`, a revocation row is recorded, and the page navigates to `auth`; pressing Back to the protected page bounces again to `auth`.
 - [ ] **B24** Open the app in two tabs (both signed in). Click "Sign out" in tab A, then trigger a fetch in tab B (navigate within it). PASS: tab B's next request 401s against the shared revocation ledger and bounces to `auth` — eventual cross-tab convergence, no corruption.
 
 ### Zero-membership landing (org gate)
@@ -2246,7 +2246,7 @@ restored data.)
   linger inert — gate 6).
 - [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — Stark's 6 ideas are back (the seed plants 11 ideas total, split across both orgs via `assignOrg`; the org fence shows only the active org's).
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
-- [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion.active-org` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/org-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/org-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrg`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
+- [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/org-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/org-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrg`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
 
 ### Snapshot & User Lifecycle — Error/Edge Cases
 
@@ -2339,7 +2339,7 @@ feature is implemented.
 - [ ] **I2** Navigate to another page. PASS: dark theme persists across navigation.
 - [ ] **I3** Select "Light" theme. PASS: page returns to light theme.
 - [ ] **I4** Select "System" theme. PASS: theme follows OS preference (matches `prefers-color-scheme`).
-- [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-theme`).
+- [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-ai:theme`).
 - [ ] **I6** Open the app in a second browser tab. Change theme in the first tab. PASS: second tab updates to the new theme without manual reload (cross-tab sync via StorageEvent).
 
 ### Sidebar
@@ -2348,7 +2348,7 @@ feature is implemented.
 - [ ] **I8** Navigate to another page. PASS:
   collapsed state persists (stored in
   `localStorage` key
-  `fusion-sidebar-collapsed`).
+  `fusion-ai:sidebar-collapsed`).
 - [ ] **I9** Click the expand button. PASS: sidebar returns to full width with labels.
 
 ### Mobile Responsive
@@ -2392,7 +2392,7 @@ feature is implemented.
 - [ ] **I28** Open the app in two tabs. In tab 1 collapse the
   sidebar. PASS: tab 2 reflects the collapsed state without manual
   reload (cross-tab sync via StorageEvent on
-  `fusion-sidebar-collapsed`).
+  `fusion-ai:sidebar-collapsed`).
 
 ### Accessibility
 

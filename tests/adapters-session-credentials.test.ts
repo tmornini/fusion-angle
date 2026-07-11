@@ -27,9 +27,11 @@ import {
     deleteSessionCredentials,
     SessionCredentialsCorruptError,
 } from '../web-app/app/adapters/session-credentials.ts';
+import { STORAGE_KEY_AUTHORIZATION } from
+    '../web-app/app/storage-keys.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 
-const KEY = 'fusion.session-credentials';
+const KEY = STORAGE_KEY_AUTHORIZATION;
 
 test('an unset credential reads as null (honest absence)',
 () => {
