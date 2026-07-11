@@ -117,7 +117,11 @@ function makeHumanMember() {
             phone: '555-0100',
             bio: 'Builds things.',
         },
-        'active',
+        {
+            state: 'active',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'st-hw_1',
+        },
     );
 }
 
@@ -136,7 +140,11 @@ function makeAIMember() {
                 'Deep reasoning over long docs.',
             model: firstProviderModel().id,
         },
-        'active',
+        {
+            state: 'active',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'st-ai_1',
+        },
     );
 }
 

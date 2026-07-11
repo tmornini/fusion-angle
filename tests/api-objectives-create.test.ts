@@ -22,8 +22,8 @@ function objectiveFields() {
 }
 
 // A first-revision body. member_id is a row column (who authored
-// the definition), supplied in the body — objective creation
-// writes NO state event, so there is no authored event here.
+// the definition), supplied in the body. Genesis is a separate
+// lifecycle trio on the create body (states-address retirement).
 function revisionFields(id: string, name: string) {
     return {
         objective_id: id,
@@ -31,6 +31,14 @@ function revisionFields(id: string, name: string) {
         description: 'd',
         member_id: 'current',
         at: '2026-05-14T00:00:00.000000Z',
+    };
+}
+
+function genesisTrio(id: string) {
+    return {
+        initialState: 'active',
+        initialStateEventId: id + '-active',
+        initialStateAt: '2026-05-14T00:00:00.000000Z',
     };
 }
 
@@ -44,6 +52,7 @@ test(
             objective: objectiveFields(),
             revisionId: 'rev-1',
             revision: revisionFields('obj-1', 'Revenue'),
+            ...genesisTrio('obj-1'),
         }, DEV_TOKEN);
         // Phase Final Task 2: row halves stripped — GET is
         // pair-derived.
@@ -86,6 +95,7 @@ test(
                 objective: objectiveFields(),
                 revisionId: 'rev-rollback',
                 revision: revisionFields('obj-rollback', ''),
+                ...genesisTrio('obj-rollback'),
             }, DEV_TOKEN),
         );
         await assert.rejects(

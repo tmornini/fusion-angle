@@ -1,11 +1,14 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { PUT } from '../api/api.ts';
+import { PUT, handleRequest } from '../api/api.ts';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import {
+    DEV_TOKEN,
+    organizationToken,
+} from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
-import { ValidationError } from '../api/types.ts';
+import { ValidationError, nowUtc } from '../api/types.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import {
     validateMemberDocumentBody,
@@ -29,20 +32,54 @@ import {
     documentGetHandler,
 } from '../api/document-family.ts';
 
-// Phase 8 Task 3 (ninth/tenth/eleventh families, the FIRST
-// global-plane families — organizationNested:false — and the
-// FIRST 'stateless' bucket sharing REAL states events): PUT
-// /members/:id and PUT /ai-members/:id take the entity's OWN
-// fields only, no lifecycle trio, since the shared member id
-// already receives a genesis states event at create and
-// archive/reactivate via PUT states/:id — a document-address
-// trio would FREEZE that lifecycle at genesis forever.
+// Members are a lifecycle-trio family (states-address
+// retirement): PUT /members/:id carries {type} plus the trio
+// (state/state_at/state_event_id). The old FREEZE-at-genesis
+// refutation is RETIRED — its premise (a competing states/:id
+// log) died with the address; documentLifecycleEvents' echo
+// dedup by state_event_id is what keeps a re-put from minting
+// a phantom transition.
 // human-members/:id has NO live PUT route (the first registered
 // family without one), so its op/validator/wiring are exercised
 // below-gate only, never through PUT().
 
-function memberFields() {
-    return { type: 'human' as const };
+const BASE = 'http://localhost';
+const AT = '2026-01-01T00:00:00.000000Z';
+
+function req(
+    method: string,
+    path: string,
+    token: string,
+    body?: unknown,
+): Request {
+    return new Request(`${BASE}${path}`, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+        },
+        ...(body === undefined
+            ? {} : { body: JSON.stringify(body) }),
+    });
+}
+
+function memberEntityFields(type: 'human' | 'ai' | 'system'
+= 'human') {
+    return { type };
+}
+
+function memberFields(
+    type: 'human' | 'ai' | 'system' = 'human',
+    state = 'active',
+    stateAt = AT,
+    stateEventId = 'ev-1',
+) {
+    return {
+        ...memberEntityFields(type),
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
+    };
 }
 
 function aiMemberFields() {
@@ -65,26 +102,37 @@ function humanMemberFields() {
 
 // -- 1. validators: accept + the label mandate + missing keys --
 
-test('validateMemberDocumentBody accepts the exact one-key'
-+ ' body', () => {
+test('validateMemberDocumentBody accepts type plus the'
++ ' lifecycle trio', () => {
     const doc = validateMemberDocumentBody(memberFields());
-    assert.deepEqual(doc.entity, memberFields());
+    assert.deepEqual(doc.entity, memberEntityFields());
+    assert.equal(doc.state, 'active');
+    assert.equal(doc.state_at, AT);
+    assert.equal(doc.state_event_id, 'ev-1');
 });
 
 test('validateMemberDocumentBody rejects a stray key with the'
 + ' byte-identical message validateMemberEntity produces for'
 + ' the SAME violation (the label mandate)', () => {
-    const body = { ...memberFields(), bogus: 'nope' };
+    // Entity path only knows `type`; document path admits the
+    // trio. Both reject an unknown key under the SAME
+    // 'MemberEntity' label — compare the stray-key message
+    // shape, each on a body that is otherwise valid for its
+    // path.
     let documentMessage: string | undefined;
     let entityMessage: string | undefined;
     try {
-        validateMemberDocumentBody(body);
+        validateMemberDocumentBody({
+            ...memberFields(), bogus: 'nope',
+        });
     } catch (e) {
         assert.ok(e instanceof ValidationError);
         documentMessage = (e as ValidationError).message;
     }
     try {
-        validateMemberEntity(body);
+        validateMemberEntity({
+            ...memberEntityFields(), bogus: 'nope',
+        });
     } catch (e) {
         assert.ok(e instanceof ValidationError);
         entityMessage = (e as ValidationError).message;
@@ -96,8 +144,9 @@ test('validateMemberDocumentBody rejects a stray key with the'
     assert.equal(documentMessage, entityMessage);
 });
 
-test('validateMemberDocumentBody rejects the missing key,'
-+ ' byte-identical to validateMemberEntity on both paths', () => {
+test('validateMemberDocumentBody rejects the missing type key,'
++ ' byte-identical to validateMemberEntity on both paths',
+() => {
     const body: Record<string, unknown> = {};
     let documentMessage: string | undefined;
     let entityMessage: string | undefined;
@@ -118,6 +167,77 @@ test('validateMemberDocumentBody rejects the missing key,'
         'missing required key "type" for MemberEntity',
     );
     assert.equal(documentMessage, entityMessage);
+});
+
+test('validateMemberDocumentBody rejects a body missing the'
++ ' lifecycle trio', () => {
+    assert.throws(
+        () => validateMemberDocumentBody(
+            memberEntityFields(),
+        ),
+        ValidationError,
+    );
+});
+
+test('validateMemberDocumentBody rejects a state outside'
++ " ['active','pending','archived']", () => {
+    assert.throws(
+        () => validateMemberDocumentBody(
+            memberFields('human', 'deleted', AT, 'ev-bad'),
+        ),
+        ValidationError,
+    );
+});
+
+// -- 1b. PUT members/:id wire trio ---------------------------
+
+test('PUT members/:id accepts the lifecycle trio and echoes'
++ ' the entity fields', async () => {
+    const db = new MemoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PUT', '/members/mem-trio-1', token, {
+            type: 'human',
+            state: 'active',
+            state_at: nowUtc(),
+            state_event_id: 'mem-trio-1-ev1',
+        },
+    ));
+    assert.equal(res.status, 200);
+    const wire = await res.json() as Record<string, unknown>;
+    assert.equal(wire.id, 'mem-trio-1');
+    assert.equal(wire.type, 'human');
+    assert.ok(!('state' in wire));
+    assert.ok(!('state_at' in wire));
+    assert.ok(!('state_event_id' in wire));
+});
+
+test('PUT members/:id with {type} alone is 400', async () => {
+    const db = new MemoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PUT', '/members/mem-trio-2', token,
+        { type: 'human' },
+    ));
+    assert.equal(res.status, 400);
+});
+
+test('PUT members/:id rejects a state outside the member'
++ ' alphabet', async () => {
+    const db = new MemoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PUT', '/members/mem-trio-3', token, {
+            type: 'human',
+            state: 'deleted',
+            state_at: nowUtc(),
+            state_event_id: 'mem-trio-3-ev1',
+        },
+    ));
+    assert.equal(res.status, 400);
 });
 
 test('validateAiMemberDocumentBody accepts the exact'
@@ -294,6 +414,8 @@ async () => {
     });
     // Phase Final Task 2: members ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
+    // Mid-stage: body still includes the trio (Task 6 may
+    // thin the op return to entity fields alone).
     const written = await postMemberDocumentOp(
         db, 'mem-doc-op-1', body, 'current', pair,
     );
@@ -399,12 +521,8 @@ test('a byte-identical PUT resend to ai-members/:id converges'
 // -- 4. below-route via the generic handlers (the drift-file
 // mirror idiom, against the REAL registered wiring rows) — a
 // PUT chain Supersedes-chains and the head derives the LATEST
-// body; a DELETE head derives to absence. No states event is
-// ever posted in any of these tests — the stateless arm's ONLY
-// tombstone signal is the DELETE-method head itself (derive-
-// documents.ts), so a clean pass here is itself proof no
-// lifecycle walk ever runs for any of the three families,
-// exactly as the memberships precedent established. -----------
+// body; a DELETE head derives to absence. Members is the trio
+// family; ai-members/human-members stay facet-stateless. ----
 
 async function putDocumentPair(
     db: MemoryDbAdapter,
@@ -471,8 +589,8 @@ const FAMILY_CASES: readonly {
     {
         family: 'members',
         notFoundTable: 'members',
-        fields: memberFields,
-        revise: () => ({ type: 'ai' }),
+        fields: () => memberFields(),
+        revise: (f) => ({ ...f, type: 'ai' }),
     },
     {
         family: 'ai-members',
@@ -505,9 +623,15 @@ for (const {
         const headAfterFirst = await documentGetHandler(wiring)(
             db, [family + '-chain-1'], 'current', 'ignored',
         );
-        assert.deepEqual(headAfterFirst, {
-            id: family + '-chain-1', ...first,
-        });
+        // members entityOf strips the lifecycle trio (MemberEntity
+        // is id+type only); facet families surface the full body.
+        const expectedFirst = family === 'members'
+            ? {
+                id: family + '-chain-1',
+                type: first['type'],
+            }
+            : { id: family + '-chain-1', ...first };
+        assert.deepEqual(headAfterFirst, expectedFirst);
 
         const second = revise(first);
         const secondId = await putDocumentPair(
@@ -521,9 +645,13 @@ for (const {
         const headAfterSecond = await documentGetHandler(wiring)(
             db, [family + '-chain-1'], 'current', 'ignored',
         );
-        assert.deepEqual(headAfterSecond, {
-            id: family + '-chain-1', ...second,
-        });
+        const expectedSecond = family === 'members'
+            ? {
+                id: family + '-chain-1',
+                type: second['type'],
+            }
+            : { id: family + '-chain-1', ...second };
+        assert.deepEqual(headAfterSecond, expectedSecond);
     });
 
     test('a DELETE-head derives absent through the generic'

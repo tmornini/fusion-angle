@@ -48,6 +48,7 @@ import type {
     FlowRecordEntity,
     FlowTagEntity,
     ObjectiveEntity,
+    ObjectiveState,
     ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
@@ -61,6 +62,7 @@ import {
     assertFlowState,
     assertIdeaState,
     assertMemberState,
+    assertObjectiveState,
     assertProjectState,
     assertRecordState,
 } from './types.ts';
@@ -773,29 +775,35 @@ export function validateMemberEntity(
 
 const MEMBER_DOCUMENT_BODY_KEYS: readonly string[] = [
     'type',
+    'state', 'state_at', 'state_event_id',
 ];
 
 export interface MemberDocumentBody {
     readonly entity: Omit<MemberEntity, 'id'>;
+    readonly state: MemberState;
+    readonly state_at: string;
+    readonly state_event_id: string;
 }
 
 // The HTTP-body gate for PUT /members/:id: the ninth family,
-// and the FIRST of the roster's shared-log-with-genesis
-// 'stateless' bucket (see MEMBERS_WIRING in routes.ts for the
-// full rationale-contrast). THE LABEL MANDATE (the Phase 7
-// Objective precedent, a NAMED byte-parity-over-convention
-// choice): the assertOnlyKeys label is 'MemberEntity', matching
-// TODAY'S store validator (validateMemberEntity) byte-for-byte,
-// NOT the 'MemberDocumentBody' naming convention every other
-// *DocumentBody validator uses — the label appears in the wire
-// 400 body ("unexpected key ... for MemberEntity"), and the
-// convention's label would change those bytes. `type`'s own
-// rule (validateEnumField over the SAME three-member enum) is
-// IDENTICAL to validateMemberEntity's, so the missing/stray-key
-// 400s stay byte-identical on both paths too. Global plane
-// (family-registry.ts: organizationNested:false) — no
-// organization_id exists on this entity, so nothing is
-// tolerated beyond `type`.
+// now a lifecycle-trio one (states-address retirement). The
+// old FREEZE-at-genesis refutation is RETIRED — its premise
+// (a competing states/:id log) died with the address; the
+// body carries {type} plus the trio. THE LABEL MANDATE (the
+// Phase 7 Objective precedent, a NAMED byte-parity-over-
+// convention choice): the assertOnlyKeys label is
+// 'MemberEntity', matching TODAY'S store validator
+// (validateMemberEntity) byte-for-byte, NOT the
+// 'MemberDocumentBody' naming convention every other
+// *DocumentBody validator uses — the label appears in the
+// wire 400 body ("unexpected key ... for MemberEntity"),
+// and the convention's label would change those bytes.
+// `type`'s own rule (validateEnumField over the SAME three-
+// member enum) is IDENTICAL to validateMemberEntity's, so
+// the missing-type 400 stays byte-identical on both paths.
+// Global plane (family-registry.ts: organizationNested:
+// false) — no organization_id exists on this entity, so
+// nothing is tolerated beyond type + trio.
 export function validateMemberDocumentBody(
     body: Record<string, unknown>,
 ): MemberDocumentBody {
@@ -806,10 +814,25 @@ export function validateMemberDocumentBody(
         body, 'type', ['human', 'ai', 'system'],
         'member type', 'MemberEntity',
     );
+    const state = assertMemberState(
+        pickString(body, 'state'),
+        'MemberEntity.state',
+    );
+    const stateEventId = pickString(body, 'state_event_id');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'MemberEntity.state_event_id must be non-empty',
+        );
+    }
     return {
         entity: {
             type,
         },
+        state,
+        state_at: validateTimestampField(
+            body, 'state_at', 'MemberEntity.state_at',
+        ),
+        state_event_id: stateEventId,
     };
 }
 
@@ -2142,45 +2165,46 @@ export function validateObjectiveEntity(
     };
 }
 
+// The HTTP-body gate for PUT /objectives/:id: entity field
+// plus the lifecycle trio — the fifth trio family (states-
+// address retirement). The old absence-as-active covenant
+// (R2) and the genesis dilemma are RETIRED: genesis is an
+// explicit event minted at create, archive/reactivate ride
+// this SAME address, and no states/:id pair ever carries an
+// objective lifecycle again. THE LABEL MANDATE (a NAMED
+// byte-parity-over-convention choice): the assertOnlyKeys
+// label is 'Objective', matching TODAY'S store validator
+// (validateObjectiveEntity) byte-for-byte, NOT the
+// 'ObjectiveDocumentBody' naming convention every other
+// *DocumentBody validator uses — the label appears in the
+// wire 400 body ("unexpected key ... for Objective"), and
+// the convention's label would change those bytes.
+// organization_id is a TOLERATED-BUT-IGNORED optional
+// allowance, never expected: the live client's PUT body
+// carries entity fields plus the trio, but the seed's
+// below-facade create bodies carry organization_id too
+// (documentOperationOrganization's read-back shape in
+// routes.ts, mirrored by every sibling *DocumentBody
+// validator), and the org-scoped store always stamps
+// organization_id downstream regardless of what it finds —
+// so a caller-forged value is tolerated, never rejected.
+// position's own rule (pickNumber) is IDENTICAL to
+// validateObjectiveEntity's — the missing-position 400 is
+// the SAME assertOnlyKeys call with the SAME label, so its
+// message stays byte-identical on both paths.
 const OBJECTIVE_DOCUMENT_BODY_KEYS: readonly string[] = [
     'position',
+    'state', 'state_at', 'state_event_id',
 ];
 
 export interface ObjectiveDocumentBody {
     readonly entity:
         Omit<ObjectiveEntity, 'id' | 'organization_id'>;
+    readonly state: ObjectiveState;
+    readonly state_at: string;
+    readonly state_event_id: string;
 }
 
-// The HTTP-body gate for PUT /objectives/:id: the seventh
-// family, and the THIRD 'stateless' one (work-orders and
-// record-attributes are the first two) — Author gate 3's
-// SECOND named partial amendment to Decision 7. The trio
-// COULD represent the objective alphabet, but is FORBIDDEN
-// three ways: the wire body would have to grow it (the
-// unavoidable zero-delta violation); a minted genesis event
-// would abort the states 911 pin at reseed (the genesis
-// dilemma); and absence-as-active is R2's named covenant. So
-// this validator admits the entity field alone, exactly as
-// the other two 'stateless' document bodies do — no trio, no
-// exceptions. THE LABEL MANDATE (a NAMED byte-parity-over-
-// convention choice): the assertOnlyKeys label is 'Objective',
-// matching TODAY'S store validator (validateObjectiveEntity)
-// byte-for-byte, NOT the 'ObjectiveDocumentBody' naming
-// convention every other *DocumentBody validator uses — the
-// label appears in the wire 400 body ("unexpected key ... for
-// Objective"), and the convention's label would change those
-// bytes. organization_id is a TOLERATED-BUT-IGNORED optional
-// allowance, never expected: the live client's PUT body is
-// `{position}` alone, but the seed's below-facade create
-// bodies carry organization_id too (documentOperationOrganization's
-// read-back shape in routes.ts, mirrored by every sibling
-// *DocumentBody validator), and the org-scoped store always
-// stamps organization_id downstream regardless of what it
-// finds — so a caller-forged value is tolerated, never
-// rejected. position's own rule (pickNumber) is IDENTICAL to
-// validateObjectiveEntity's — the missing-position 400 is the
-// SAME assertOnlyKeys call with the SAME label, so its message
-// stays byte-identical on both paths.
 export function validateObjectiveDocumentBody(
     body: Record<string, unknown>,
 ): ObjectiveDocumentBody {
@@ -2188,10 +2212,26 @@ export function validateObjectiveDocumentBody(
         body, OBJECTIVE_DOCUMENT_BODY_KEYS, 'Objective',
         ['organization_id'],
     );
+    const state = assertObjectiveState(
+        pickString(body, 'state'),
+        'ObjectiveDocumentBody.state',
+    );
+    const stateEventId = pickString(body, 'state_event_id');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'ObjectiveDocumentBody.state_event_id must be'
+            + ' non-empty',
+        );
+    }
     return {
         entity: {
             position: pickNumber(body, 'position'),
         },
+        state,
+        state_at: validateTimestampField(
+            body, 'state_at', 'ObjectiveDocumentBody.state_at',
+        ),
+        state_event_id: stateEventId,
     };
 }
 
@@ -2433,30 +2473,6 @@ export function validateStateEntity(
         ),
         at: validateTimestampField(
             body, 'at', 'StateEntity',
-        ),
-    };
-}
-
-// The HTTP-body gate for PUT /states/:id: NO member_id —
-// authorship is stamped from the verified token, never the
-// body. A body that names a member is malformed and 400s.
-const STATE_BODY_KEYS: readonly string[] = [
-    'entity_id', 'state', 'at',
-];
-
-export function validateStateBody(
-    body: Record<string, unknown>,
-): Omit<StateEntity, 'id' | 'member_id'> {
-    assertOnlyKeys(
-        body, STATE_BODY_KEYS, 'StateEvent',
-    );
-    return {
-        entity_id: pickString(
-            body, 'entity_id',
-        ),
-        state: pickString(body, 'state'),
-        at: validateTimestampField(
-            body, 'at', 'StateEvent',
         ),
     };
 }
@@ -3146,23 +3162,28 @@ export interface ObjectiveCreateBody {
     readonly objective: Record<string, unknown>;
     readonly revisionId: string;
     readonly revision: Record<string, unknown>;
+    readonly initialState: ObjectiveState;
+    readonly initialStateEventId: string;
+    readonly initialStateAt: string;
 }
 
 const OBJECTIVE_CREATE_KEYS: readonly string[] = [
     'id', 'objective', 'revisionId', 'revision',
+    'initialState', 'initialStateEventId', 'initialStateAt',
 ];
 
 // The HTTP-body gate for POST /objectives: the objective row
-// plus its FIRST revision, written atomically. Objective
-// creation writes NO state event — an objective with no event
-// reads as active, archival is a later event — so the handler
-// needs no actor. The objective fields are NOT fully validated
-// here: the org-scoped store stamps organization_id from the
-// verified token and re-validates through validateObjectiveEntity
-// AFTER the stamp, so the body OMITS it. The revision sub-object
-// is re-validated by the objective_revisions store's own
-// validator; its member_id is a row column (who authored the
-// definition), not state authorship.
+// plus its FIRST revision and the genesis lifecycle trio,
+// written atomically. Genesis is an explicit event minted at
+// create (states-address retirement); the trio folds onto
+// the document pair via objectiveDocumentBodyOf. The
+// objective fields are NOT fully validated here: the org-
+// scoped store stamps organization_id from the verified
+// token and re-validates through validateObjectiveEntity
+// AFTER the stamp, so the body OMITS it. The revision sub-
+// object is re-validated by the objective_revisions store's
+// own validator; its member_id is a row column (who authored
+// the definition), not state authorship.
 export function validateObjectiveCreateBody(
     body: Record<string, unknown>,
 ): ObjectiveCreateBody {
@@ -3187,7 +3208,26 @@ export function validateObjectiveCreateBody(
     const revision = asObject(
         body['revision'], 'ObjectiveCreateBody.revision',
     );
-    return { id, objective, revisionId, revision };
+    const initialState = assertObjectiveState(
+        pickString(body, 'initialState'),
+        'ObjectiveCreateBody.initialState',
+    );
+    const initialStateEventId = pickString(
+        body, 'initialStateEventId',
+    );
+    if (initialStateEventId === '') {
+        throw new ValidationError(
+            'ObjectiveCreateBody.initialStateEventId'
+            + ' must be non-empty',
+        );
+    }
+    const initialStateAt = validateTimestampField(
+        body, 'initialStateAt', 'ObjectiveCreateBody',
+    );
+    return {
+        id, objective, revisionId, revision,
+        initialState, initialStateEventId, initialStateAt,
+    };
 }
 
 export interface FlowCreateBody {
@@ -3891,21 +3931,59 @@ export function validateWorkOrderClaimBody(
     return { claimEventId, claimAt, expireEventId, expireAt };
 }
 
+const WORK_ORDER_RELEASE_KEYS: readonly string[] = [
+    'releaseEventId', 'releaseAt',
+];
+
+export interface WorkOrderReleaseBody {
+    readonly releaseEventId: string;
+    readonly releaseAt: string;
+}
+
+// Gate for POST /work-orders/:id/release. The caller mints
+// the event id and timestamp (the claim-body precedent);
+// authorship is server-derived (actor) — never supplied by
+// the caller. A single terminal event, so no expire pair.
+export function validateWorkOrderReleaseBody(
+    body: Record<string, unknown>,
+): WorkOrderReleaseBody {
+    assertOnlyKeys(
+        body, WORK_ORDER_RELEASE_KEYS, 'WorkOrderReleaseBody',
+    );
+    const releaseEventId = pickString(body, 'releaseEventId');
+    if (releaseEventId === '') {
+        throw new ValidationError(
+            'WorkOrderReleaseBody.releaseEventId'
+            + ' must be non-empty',
+        );
+    }
+    const releaseAt = validateTimestampField(
+        body, 'releaseAt', 'WorkOrderReleaseBody',
+    );
+    return { releaseEventId, releaseAt };
+}
+
 export interface AIMemberEditBody {
     readonly detail: Record<string, unknown>;
+    readonly state: MemberState;
+    readonly stateAt: string;
+    readonly stateEventId: string;
 }
 
 const AI_MEMBER_EDIT_KEYS: readonly string[] = [
     'detail',
+    'state', 'stateAt', 'stateEventId',
 ];
 
 // The HTTP-body gate for POST /ai-members/:id: the parent
-// member row plus the ai_members detail row re-put, NO state
-// event (an edit does not move the member's lifecycle), so the
-// handler needs no actor. As with create, the ai_members store
-// re-validates its own body when the composing POST puts it;
-// the id is the route param, the member type is a server-
-// supplied fact.
+// member row plus the ai_members detail row re-put. The edit
+// body ECHOES the current lifecycle trio verbatim; a byte-
+// identical echoed members/:id body folds by message_hash
+// (the memberDocument fold, api/message-pair.ts) so an echo
+// never mints a phantom transition. As with create, the
+// ai_members store re-validates its own body when the
+// composing POST puts it; the id is the route param, the
+// member type is a server-supplied fact.
 export function validateAIMemberEditBody(
     body: Record<string, unknown>,
 ): AIMemberEditBody {
@@ -3915,28 +3993,47 @@ export function validateAIMemberEditBody(
     const detail = asObject(
         body['detail'], 'AIMemberEditBody.detail',
     );
-    return { detail };
+    const state = assertMemberState(
+        pickString(body, 'state'),
+        'AIMemberEditBody.state',
+    );
+    const stateEventId = pickString(body, 'stateEventId');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'AIMemberEditBody.stateEventId must be non-empty',
+        );
+    }
+    const stateAt = validateTimestampField(
+        body, 'stateAt', 'AIMemberEditBody',
+    );
+    return { detail, state, stateAt, stateEventId };
 }
 
 export interface HumanMemberEditBody {
     readonly detail: Record<string, unknown>;
+    readonly state: MemberState;
+    readonly stateAt: string;
+    readonly stateEventId: string;
 }
 
 const HUMAN_MEMBER_EDIT_KEYS: readonly string[] = [
     'detail',
+    'state', 'stateAt', 'stateEventId',
 ];
 
-// The HTTP-body gate for POST /human-members/:id: the member and
-// identity facets re-pin, the detail facet re-puts, NO state
-// event (an edit does not move the member's lifecycle), so the
-// handler needs no actor. PII no longer rides this body (Phase
-// 10 Task 2's intake decomposition) — it changes ONLY via the
-// separate PUT identities/:id/pii, fired by the client IFF the
-// caller's dirty check finds it changed. As with create, the
-// detail facet is NOT fully validated here — human_members
-// re-validates its own body when the composing POST puts it;
-// the id is the route param, the member type and identity kind
-// are server-supplied facts.
+// The HTTP-body gate for POST /human-members/:id: the member
+// and identity facets re-pin, the detail facet re-puts. The
+// edit body ECHOES the current lifecycle trio verbatim; a
+// byte-identical echoed members/:id body folds by
+// message_hash (the memberDocument fold) so an echo never
+// mints a phantom transition. PII no longer rides this body
+// (Phase 10 Task 2's intake decomposition) — it changes ONLY
+// via the separate PUT identities/:id/pii, fired by the
+// client IFF the caller's dirty check finds it changed. As
+// with create, the detail facet is NOT fully validated here —
+// human_members re-validates its own body when the composing
+// POST puts it; the id is the route param, the member type
+// and identity kind are server-supplied facts.
 export function validateHumanMemberEditBody(
     body: Record<string, unknown>,
 ): HumanMemberEditBody {
@@ -3946,7 +4043,21 @@ export function validateHumanMemberEditBody(
     const detail = asObject(
         body['detail'], 'HumanMemberEditBody.detail',
     );
-    return { detail };
+    const state = assertMemberState(
+        pickString(body, 'state'),
+        'HumanMemberEditBody.state',
+    );
+    const stateEventId = pickString(body, 'stateEventId');
+    if (stateEventId === '') {
+        throw new ValidationError(
+            'HumanMemberEditBody.stateEventId'
+            + ' must be non-empty',
+        );
+    }
+    const stateAt = validateTimestampField(
+        body, 'stateAt', 'HumanMemberEditBody',
+    );
+    return { detail, state, stateAt, stateEventId };
 }
 
 // ── Flow graph delta ─────────────────

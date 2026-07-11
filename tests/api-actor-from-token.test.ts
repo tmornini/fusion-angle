@@ -8,10 +8,12 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 
-// The author of a state event is the verified token: a body
-// that names a member_id is malformed and rejected.
+// States-address retirement: /states/:id is a router 404.
+// Actor-stamping for lifecycle rides document trios —
+// PUT members/:id stamps requester_identity_id on the
+// pair, derived as member_id on GET entity-states history.
 test(
-    'a state event body may not name its author',
+    'a retired states/:id body with forged member_id is 404',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -22,28 +24,36 @@ test(
                 member_id: 'forged',
                 at: '2026-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
+            (err: unknown) =>
+                err instanceof Error
+                && /Not found/.test(err.message),
         );
     },
 );
 
-// With no member_id in the body, the ledger records the
-// verified caller as the author.
-// Phase Final Task 1(b): PUT /states/:id is pair-plane-only;
-// WRITE_RESPONSE_SPECS successBody stamps member_id = actor
-// on the 200 wire body (row half stripped).
+// Member lifecycle via PUT members/:id — the document
+// trio is authored by the verified token.
 test(
-    'a state event is authored by the token',
+    'a member state change is authored by the token',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        const event = await PUT<{ member_id: string }>(
-            db, 'states/ev-1', {
-                entity_id: 'current',
-                state: 'active',
-                at: '2026-01-01T00:00:00.000000Z',
-            }, DEV_TOKEN,
+        await seedHumanMember(db, 'current', 'Demo');
+        await PUT(db, 'members/current', {
+            type: 'human',
+            state: 'archived',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-1',
+        }, DEV_TOKEN);
+        const history = await GET<Array<{
+            id: string;
+            member_id: string;
+        }>>(
+            db, 'entity-states/current/history', DEV_TOKEN,
         );
-        assert.equal(event.member_id, 'current');
+        const event = history.find(e => e.id === 'ev-1');
+        assert.ok(event, 'trio event missing from history');
+        assert.equal(event!.member_id, 'current');
     },
 );
 

@@ -362,10 +362,10 @@ re-verified by the automated suite:
   the console, never the wire. Through Phase 11 this covered
   only the domain-boundary catch; a thrown pre-dispatch
   ownership-fence read (`fenceRequest` itself, or the
-  `states/:id` PUT / field-values ownership guards) still
+  field-values visibility / history ownership guards) still
   propagated unredacted. Phase 12 Task 1 closed that gap: the
-  two fence regions now share one redaction catch with the
-  same fixed body, so the claim holds everywhere a request can
+  fence regions now share one redaction catch with the same
+  fixed body, so the claim holds everywhere a request can
   fault. `MissingTableError` still re-raises past all three
   catches, recovered by `redirectIfMissingTable`
   (`web-app/app/core.ts`).
@@ -436,26 +436,25 @@ session token. Tests pass `createRequestContext` a
 `MemoryDbAdapter`.
 
 `api/routes.ts` covers the surviving state-route surface:
-`GET states`, `PUT states/:id`,
-`GET entity-states/:id/history`, and
+`GET states`, `GET entity-states/:id/history`, and
 `GET states/:id/field-values`. All reads derive from the
 message ledger: `GET states` →
-`deriveStates(db, organization)`,
+`deriveStates(db, organization)` (five-source union),
 `GET entity-states/:id/history` →
 `deriveStatesFor(db, organization, entityId)`, and
 `GET states/:id/field-values` →
-`stateFieldValuesForStateEvent` (two-source union, visibility
-via `stateEventVisibilityFor`). Four zero-caller families
-retired at Phase 15 Task 7 (router 404 except bare
-`GET states/:id` → **405** because `PUT` survives):
-`GET states/:id`, `GET entity-states/:id` (current),
+`stateFieldValuesForStateEvent` (transition-fold
+single-source, visibility via `stateEventVisibilityFor`).
+Every verb on `/states/:id` is router 404 (the address
+itself is retired). Phase 15 Task 7 also retired
+`GET entity-states/:id` (current),
 `PUT|DELETE states/:id/field-values/:fvid`, and
-`GET|POST|PUT|DELETE flows/:id/versions[...]`.
-`PUT states/:id` appends a pair only, gated by the
-pair-plane ownership fence (`resolveOwningOrganization`)
-and immutability via `stateEventCollisionFromPairs` (no
-row half — Phase Final stripped it). When no schema
-exists, non-entry pages redirect to snapshots.
+`GET|POST|PUT|DELETE flows/:id/versions[...]` — all
+router 404. Lifecycle writes ride document-trio PUTs
+and named ops (work-order create/claim/transition/
+release, invitations), not a shared event-append
+address. When no schema exists, non-entry pages
+redirect to snapshots.
 
 ## Write-path derives (Phase 14)
 
@@ -494,17 +493,17 @@ New Phase 14 cores riding this shape: `invitationOpStateFor`
 whole-ledger `invitationOpStates`/`deriveStatesFor`, wired
 into `pendingInvitationFor`/`currentInvitationState`);
 `workOrderClaimHistoryFor` (`derive-states.ts`, pair-plane
-claim history — op pairs ∪ `states/:id` event-append pairs,
-disjoint by id, no dedup needed); `documentStateHeadFor`
-(`derive-states.ts`, the one helper behind all four
-member_id-echo head-reads); and `stateFieldValuesFrom` /
+claim history — op pairs only: create/claim/transition/
+release; the `states/:id` event-append arm is retired with
+the address); `documentStateHeadFor` (`derive-states.ts`,
+the one helper behind all four member_id-echo head-reads —
+document-history only); and `stateFieldValuesFrom` /
 `deriveStateFieldValueReferrers` /
 `stateFieldValuesForStateEvent` (`derive-state-field-
-values.ts`, a TWO-SOURCE UNION — transition-pair-folded
-field values ∪ standalone leaf-PUT/DELETE pairs, head-reduced
-by the shared `(at, id)` order — backing both the
-`record-attributes` RESTRICT gate and `GET
-states/:id/field-values`).
+values.ts`, SINGLE-SOURCE — transition-pair-folded field
+values only, head-reduced by the shared `(at, id)` order —
+backing both the `record-attributes` RESTRICT gate and
+`GET states/:id/field-values`).
 
 ### Nested-transaction re-entry
 
@@ -520,22 +519,20 @@ caller already holds, so nesting is never needed to reach the
 open tx, and a caller's own table list stays the single,
 auditable source of truth for what one transaction touches.
 
-### LedgerImmutabilityError vs. the document-plane 412
+### Document-plane 412 (sole conflict mechanism)
 
-Two DIFFERENT conflict mechanisms coexist. The DOCUMENT
-plane — every `flows/:id`-shaped save, including undo's own
-restore write — detects a stale basis via the
+The DOCUMENT plane — every `flows/:id`-shaped save,
+including undo's own restore write, and every other
+document-trio PUT — detects a stale basis via the
 `responses.follows` unique index: a racing write against
 the same head throws `UniqueConstraintError`, mapped to
 HTTP 412 by `handleRequest`, and the caller retries with a
-fresh basis. The STATE plane (event-append at `states/:id`)
-detects a genuinely different re-put of an existing event
-id via `stateEventCollisionFromPairs` →
-`LedgerImmutabilityError`, mapped to HTTP 409 — an
-identical resend still converges silently, the idempotent
-retry the id-keyed PUT exists for. Phase Final stripped
-the row half; the pair-plane collision check is the sole
-immutability gate.
+fresh basis. The old STATE-plane 409
+(`stateEventCollisionFromPairs` →
+`LedgerImmutabilityError` on a re-put of an existing
+event id) retired with the `/states/:id` address itself;
+identical resends of a document PUT still converge via
+the follows index, not a separate immutability class.
 
 ### SIDECAR-KEEP and undo-as-replay
 
@@ -572,14 +569,16 @@ than silently reaching for a workaround:
    `view.requests.getAll()`/`view.responses.getAll()` inside
    the RESTRICT write gate — a whole-plane scan rule (d)
    above otherwise forbids. No `attribute_id` index exists on
-   the pair plane; the leaf family has no cheaper entity-id
-   source. Stands post-Final (pair-only RESTRICT).
+   the pair plane; transition-fold field values live on
+   work-order op bodies with no cheaper entity-id source.
+   Stands post-Final (pair-only RESTRICT).
 2. **Region B / leaf SFV routes** (Task 7). Phase 15 RETIRED
    the leaf PUT/DELETE routes (and their Region B fence
    arm); the surviving GET field-values collection re-anchors
    visibility onto `stateEventVisibilityFor` (3-tier; see
    Phase 15 / Phase Final as-built below). Dual-write SFV
-   writers are GONE with Final.
+   writers are GONE with Final; the derive is single-source
+   (transition fold only).
 3. **Server-computed undo sidecars** (Task 8). "Client-owned
    graphDelta/revivals," read literally, is impossible under
    the server-side restore-resolution default: the client is
@@ -619,7 +618,9 @@ halves stripped (Stage A); doomed tables +
 `EntityStore` / `StateStore` + the three scoping
 decorators deleted (Stage B); `clients` re-pointed to
 `HistoryEntityStore`; `SNAPSHOT_SCHEMA_VERSION` 2→3;
-seed absolute at EXPECTED_PAIR_COUNT 1514 / bootstrap 14;
+states-address retirement bumps 3→4 and deletes every
+verb on `/states/:id`; seed absolute at
+EXPECTED_PAIR_COUNT 1506 / bootstrap 13;
 `simulateLatency` 4.
 
 ### Two claims (never collapse)
@@ -641,15 +642,15 @@ seed absolute at EXPECTED_PAIR_COUNT 1514 / bootstrap 14;
 
 ### Wire covenant (Phase 15 deltas still hold)
 
-1. **Route retirements** → router 404, except bare
-   `GET states/:id` → **405** (PUT survives on that
-   pattern).
+1. **Route retirements** → router 404 (including every
+   verb on `/states/:id`; the old 405 exception is gone
+   with the address).
 2. **Fence strengthenings** (same 404 body shape):
    (2a) WP1 organizations self-as-owner; (2b) records
    hard-delete forgery closed.
 3. **Write-path re-anchors** (claim graph, RESTRICT legs,
-   invitation discovery, identity_pii, clients, PUT
-   immutability): pair-plane only post-Final.
+   invitation discovery, identity_pii, clients):
+   pair-plane only post-Final.
 4. **Dangling `state_event_id`** on transition-fold field
    values → 400 at the gate (forged clients only).
 
@@ -662,12 +663,10 @@ address family allows, opening no nested transaction:
 - `stateEventVisibilityFor` — 3-tier field-values fence
   (orphan | visible | hidden)
 - `resolveOwningOrganization` — pre-dispatch ownership for
-  `PUT states/:id` and `GET entity-states/:id/history`,
-  plus the write-ownership fence for org-scoped families
+  `GET entity-states/:id/history`, plus the write-
+  ownership fence for org-scoped families
 - `flowGraphBindingsFromPairs` — RESTRICT graph legs from
   graphDelta
-- `stateEventCollisionFromPairs` — sole immutability gate
-  for event-append (row half gone)
 
 ### Gate 6 re-homes + survivors
 

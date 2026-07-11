@@ -1,28 +1,29 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
-import { createRequestContext } from
-    '../web-app/app/adapters/shared.ts';
+import {
+    createRequestContext,
+    type RequestContext,
+} from '../web-app/app/adapters/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getObjectives,
     getArchivedObjectiveIds,
     getObjectiveRevisionsByObjective,
-    getObjectiveArchivalEvents,
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
     postObjectiveCreation,
-    postObjectiveRevision,
     postObjectiveArchival,
-    postObjectiveReactivation,
     putObjectivePosition,
 } from '../web-app/app/adapters/objectives.ts';
+import {
+    getObjectiveStateDetails,
+} from '../web-app/app/adapters/state-events.ts';
 import {
     computeNewPosition,
 } from '../web-app/app/drag-reorder-positions.ts';
 import {
     seedCurrentMember,
-    seedHumanMember,
 } from './member-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
@@ -30,12 +31,35 @@ function ctxFor(db: MemoryDbAdapter) {
     return createRequestContext(db, DEV_TOKEN);
 }
 
+// Seed an objective document with a lifecycle trio — raw
+// PUT objectives/:id requires state/state_at/state_event_id
+// after the states-address retirement gate (Task 1).
+function objectiveDoc(
+    position: number,
+    state: 'active' | 'archived',
+    eventId: string,
+    at = '2026-01-01T00:00:00.000000Z',
+) {
+    return {
+        position,
+        state,
+        state_at: at,
+        state_event_id: eventId,
+    };
+}
+
 test('getObjectives returns all', async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
-    await ctx.PUT('objectives/o1', { position: 0 });
-    await ctx.PUT('objectives/o2', { position: 1 });
+    await ctx.PUT(
+        'objectives/o1',
+        objectiveDoc(0, 'active', 'ev-o1'),
+    );
+    await ctx.PUT(
+        'objectives/o2',
+        objectiveDoc(1, 'active', 'ev-o2'),
+    );
     const rows = await getObjectives(ctx);
     assert.equal(rows.length, 2);
 });
@@ -158,16 +182,13 @@ test('getArchivedObjectiveIds returns a Set', async () => {
     const db = new MemoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
-    await ctx.PUT('objectives/o1', { position: 0 });
-    // Re-pointed onto the wire-reachable PUT states/:id
-    // (finding 15's fixture budget): getArchivedObjectiveIds
-    // reads ctx.GET('states'), which is now ledger-derived, so
-    // a raw db.states.postEvent here would never surface.
-    await ctx.PUT('states/e1', {
-        entity_id: 'o1',
-        state: 'archived',
-        at: '2026-01-01T00:00:00.000000Z',
-    });
+    // Seed archived via the document PUT carrying the
+    // lifecycle trio — GET states derives objective
+    // history from the document plane (Task 2).
+    await ctx.PUT(
+        'objectives/o1',
+        objectiveDoc(0, 'archived', 'ev-o1-arch'),
+    );
     const ids = await getArchivedObjectiveIds(ctx);
     assert.ok(ids.has('o1'));
     assert.equal(ids.size, 1);
@@ -237,8 +258,9 @@ test(
             others.map(o => o.position),
             1,
         );
+        const details = await getObjectiveStateDetails(ctx);
         await putObjectivePosition(
-            ctx, 'o3', newPos,
+            ctx, 'o3', newPos, details.get('o3')!,
         );
 
         // Phase Final Task 2: positions from GET (pair plane).
@@ -271,8 +293,13 @@ test(
             ctx, 'o3', 'C', 'd', 3,
         );
 
-        await putObjectivePosition(ctx, 'o2', 1.5);
-        await putObjectivePosition(ctx, 'o3', 1.25);
+        const details = await getObjectiveStateDetails(ctx);
+        await putObjectivePosition(
+            ctx, 'o2', 1.5, details.get('o2')!,
+        );
+        await putObjectivePosition(
+            ctx, 'o3', 1.25, details.get('o3')!,
+        );
 
         // Phase Final Task 2: positions from GET (pair plane).
         const all = await getObjectives(ctx);
@@ -282,5 +309,124 @@ test(
         assert.equal(map.get('o1'), 1);
         assert.equal(map.get('o3'), 1.25);
         assert.equal(map.get('o2'), 1.5);
+    },
+);
+
+type RecordedCall = {
+    method: string;
+    path: string;
+    body?: Record<string, unknown>;
+};
+
+// Recording fake RequestContext — pins the hop shape of
+// get-then-put writers without spinning up a MemoryDb.
+function recordingCtx(
+    handlers: {
+        GET?: (
+            path: string,
+        ) => Promise<unknown>;
+        PUT?: (
+            path: string,
+            body: Record<string, unknown>,
+        ) => Promise<unknown>;
+    },
+): { ctx: RequestContext; calls: RecordedCall[] } {
+    const calls: RecordedCall[] = [];
+    const ctx = {
+        requestId: 'r1',
+        identity: { id: 'current' },
+        GET: async <T>(path: string): Promise<T> => {
+            calls.push({ method: 'GET', path });
+            if (!handlers.GET) {
+                throw new Error('unexpected GET ' + path);
+            }
+            return handlers.GET(path) as Promise<T>;
+        },
+        PUT: async <T>(
+            path: string,
+            body: Record<string, unknown>,
+        ): Promise<T> => {
+            calls.push({ method: 'PUT', path, body });
+            if (!handlers.PUT) {
+                throw new Error('unexpected PUT ' + path);
+            }
+            return handlers.PUT(path, body) as Promise<T>;
+        },
+        POST: async () => {
+            throw new Error('unexpected POST');
+        },
+        DELETE: async () => {
+            throw new Error('unexpected DELETE');
+        },
+        GETWithResponseId: async () => {
+            throw new Error(
+                'unexpected GETWithResponseId',
+            );
+        },
+    } as unknown as RequestContext;
+    return { ctx, calls };
+}
+
+test(
+    'postObjectiveArchival PUTs the document with an'
+    + ' archived trio and the current position',
+    async () => {
+        const { ctx, calls } = recordingCtx({
+            GET: async (path) => {
+                assert.equal(path, 'objectives/o1');
+                return {
+                    id: 'o1',
+                    organization_id: '1',
+                    position: 3,
+                };
+            },
+            PUT: async () => ({}),
+        });
+        await postObjectiveArchival(ctx, 'o1');
+        assert.equal(calls.length, 2);
+        assert.equal(calls[0]!.method, 'GET');
+        assert.equal(calls[0]!.path, 'objectives/o1');
+        assert.equal(calls[1]!.method, 'PUT');
+        assert.equal(calls[1]!.path, 'objectives/o1');
+        const body = calls[1]!.body!;
+        assert.equal(body['position'], 3);
+        assert.equal(body['state'], 'archived');
+        assert.equal(typeof body['state_at'], 'string');
+        assert.match(
+            body['state_at'] as string,
+            /^\d{4}-\d{2}-\d{2}T/,
+        );
+        assert.equal(
+            typeof body['state_event_id'], 'string',
+        );
+        assert.ok(
+            (body['state_event_id'] as string).length > 0,
+        );
+    },
+);
+
+test(
+    'putObjectivePosition echoes the supplied trio'
+    + ' verbatim',
+    async () => {
+        const { ctx, calls } = recordingCtx({
+            PUT: async () => ({}),
+        });
+        await putObjectivePosition(
+            ctx, 'o1', 1.5, {
+                state: 'active',
+                stateAt: '2026-01-01T00:00:00.000000Z',
+                stateEventId: 'ev-fixed',
+            },
+        );
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0]!.method, 'PUT');
+        assert.equal(calls[0]!.path, 'objectives/o1');
+        assert.deepEqual(calls[0]!.body, {
+            position: 1.5,
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-fixed',
+        });
     },
 );

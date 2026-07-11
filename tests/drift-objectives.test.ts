@@ -52,11 +52,14 @@ import {
 // craftsmanship: byIdAscending must diverge from insertion
 // order; never function-vs-function only).
 //
-// Objectives remain the THIRD 'stateless' family (Author
-// gate 3). OBJECTIVES_TEST_WIRING mirrors routes.ts's
-// private OBJECTIVES_WIRING so derived reads exercise the
-// ACTUAL generic handlers. Nested revisions/scores ride
-// bespoke derives (no generic family wiring for nests).
+// Objectives are the FIFTH lifecycle-trio family (states-
+// address retirement). Absence-as-active (R2) is RETIRED —
+// every objective carries an explicit genesis event; archive/
+// reactivate ride PUT /objectives/:id. OBJECTIVES_TEST_WIRING
+// mirrors routes.ts's private OBJECTIVES_WIRING so derived
+// reads exercise the ACTUAL generic handlers. Nested
+// revisions/scores ride bespoke derives (no generic family
+// wiring for nests).
 
 const BASE = 'http://localhost';
 
@@ -84,7 +87,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
-    lifecycle: 'stateless',
+    lifecycle: 'trio',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
@@ -161,6 +164,9 @@ function objectiveCreateBody(
             objective_id: id, name, description: 'd',
             member_id: 'current', at,
         },
+        initialState: 'active',
+        initialStateEventId: id + '-active',
+        initialStateAt: at,
     };
 }
 
@@ -505,9 +511,16 @@ test('live-write chain: create, reposition, revision edit,'
         assert.equal(revs.length, 1);
     }
 
+    // Position PUT echoes the genesis trio (putObjectivePosition
+    // shape) — same state_event_id so echo-dedup mints no event.
     const reposition = await handleRequest(db, req(
         'PUT', '/objectives/' + objectiveId, token,
-        { position: 77 },
+        {
+            position: 77,
+            state: 'active',
+            state_at: '2026-06-01T00:00:00.000000Z',
+            state_event_id: objectiveId + '-active',
+        },
     ));
     assert.equal(reposition.status, 200);
     const repositionResponseId =
@@ -555,13 +568,17 @@ test('live-write chain: create, reposition, revision edit,'
         assert.equal(latestByAt.id, revisionId2);
     }
 
-    // ARCHIVE via PUT /states/:id — objective STAYS in the
-    // collection (stateless election, Author gate 3).
+    // ARCHIVE via PUT /objectives/:id with the archived
+    // lifecycle trio — objective STAYS in the collection
+    // (trio families exclude only 'deleted'; archived is a
+    // live objective state).
     const archived = await handleRequest(db, req(
-        'PUT', '/states/' + objectiveId + '-archived', token,
+        'PUT', '/objectives/' + objectiveId, token,
         {
-            entity_id: objectiveId, state: 'archived',
-            at: '2026-06-03T00:00:00.000000Z',
+            position: 50,
+            state: 'archived',
+            state_at: '2026-06-03T00:00:00.000000Z',
+            state_event_id: objectiveId + '-archived',
         },
     ));
     assert.equal(archived.status, 200);
@@ -582,13 +599,18 @@ test('live-write chain: create, reposition, revision edit,'
     }
 
     const reactivated = await handleRequest(db, req(
-        'PUT', '/states/' + objectiveId + '-reactivated', token,
+        'PUT', '/objectives/' + objectiveId, token,
         {
-            entity_id: objectiveId, state: 'active',
-            at: '2026-06-04T00:00:00.000000Z',
+            position: 50,
+            state: 'active',
+            state_at: '2026-06-04T00:00:00.000000Z',
+            state_event_id: objectiveId + '-reactivated',
         },
     ));
     assert.equal(reactivated.status, 200);
+    const reactivatedResponseId =
+        reactivated.headers.get('Response-ID');
+    assert.ok(reactivatedResponseId);
     {
         const getRes = await handleRequest(
             db, req('GET', '/objectives/' + objectiveId, token),
@@ -733,6 +755,9 @@ test('live-write chain: create, reposition, revision edit,'
     assert.equal(derivedActualsFinal.length, 1);
 
     // Duplicate create — same id, fresh revisionId.
+    // Entity-address pairs before: create op + create doc +
+    // reposition + archive + reactivate = 5 (archive/reactivate
+    // ride PUT /objectives/:id after states-address retirement).
     const revisionId3 = objectiveId + '-rev-3';
     const objectivesPrefix = canonicalUriPrefix(
         STARK_ORGANIZATION, '/objectives/',
@@ -745,7 +770,7 @@ test('live-write chain: create, reposition, revision edit,'
         ).filter((r) => r.uri_id === objectiveId)
             .map((r) => r.id),
     );
-    assert.equal(beforeDuplicateIds.size, 3);
+    assert.equal(beforeDuplicateIds.size, 5);
 
     const duplicate = await handleRequest(db, req(
         'POST', '/objectives', token,
@@ -755,8 +780,11 @@ test('live-write chain: create, reposition, revision edit,'
         ),
     ));
     assert.equal(duplicate.status, 204);
+    // Supersedes the latest prior entity-address response
+    // (reactivate), not the earlier reposition.
     assert.equal(
-        duplicate.headers.get('Supersedes'), repositionResponseId,
+        duplicate.headers.get('Supersedes'),
+        reactivatedResponseId,
     );
 
     const [afterRequests, afterResponses] = await Promise.all([
@@ -766,24 +794,27 @@ test('live-write chain: create, reposition, revision edit,'
     const afterAtAddress = afterResponses.filter(
         (r) => r.uri_id === objectiveId,
     );
-    assert.equal(afterAtAddress.length, 5);
+    assert.equal(afterAtAddress.length, 7);
     const newRows = afterAtAddress.filter(
         (r) => !beforeDuplicateIds.has(r.id),
     );
     assert.equal(newRows.length, 2);
     for (const row of newRows) {
-        assert.equal(row.supersedes, repositionResponseId);
+        assert.equal(row.supersedes, reactivatedResponseId);
     }
     const documentPairsAfter = documentPairsAt(
         afterRequests, afterResponses, objectivesPrefix,
     ).filter((pair) => pair.uriId === objectiveId);
-    assert.equal(documentPairsAfter.length, 3);
+    // create doc + reposition + archive + reactivate +
+    // duplicate create's document = 5
+    assert.equal(documentPairsAfter.length, 5);
     const newestDocumentPair = documentPairsAfter.at(-1)!;
     const newestDocumentResponseRow = afterAtAddress.find(
         (r) => r.id === newestDocumentPair.id,
     )!;
     assert.equal(
-        newestDocumentResponseRow.supersedes, repositionResponseId,
+        newestDocumentResponseRow.supersedes,
+        reactivatedResponseId,
     );
 
     const finalGet = await handleRequest(
@@ -868,10 +899,18 @@ async () => {
         ),
     ));
 
+    // Position body carries the echoed genesis trio — required
+    // by the document gate after states-address retirement.
+    const positionBody = {
+        position: 99,
+        state: 'active' as const,
+        state_at: '2026-06-11T00:00:00.000000Z',
+        state_event_id: objectiveId + '-active',
+    };
     const beforeReposition = (await db.requests.getAll()).length;
     const first = await handleRequest(db, req(
         'PUT', '/objectives/' + objectiveId, token,
-        { position: 99 },
+        positionBody,
     ));
     assert.equal(first.status, 200);
     const afterFirst = (await db.requests.getAll()).length;
@@ -879,7 +918,7 @@ async () => {
 
     const second = await handleRequest(db, req(
         'PUT', '/objectives/' + objectiveId, token,
-        { position: 99 },
+        positionBody,
     ));
     assert.equal(second.status, 200);
     const afterSecond = (await db.requests.getAll()).length;
@@ -902,9 +941,9 @@ async () => {
 // -- 8. THE ARCHIVED-INCLUSION PIN -----------------------------
 
 test('THE ARCHIVED-INCLUSION PIN: an objective with a live'
-+ " 'archived' states event appears in GET /objectives AND GET"
-+ ' objectives/:id 200 — the deliberate CONTRAST to the trio'
-+ " families' deleted-exclusion (Author gate 3)",
++ " 'archived' document-plane event appears in GET /objectives"
++ ' AND GET objectives/:id 200 — archived is NOT deleted;'
++ " trio families exclude only state='deleted'",
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -918,10 +957,12 @@ async () => {
         ),
     ));
     const archived = await handleRequest(db, req(
-        'PUT', '/states/' + objectiveId + '-archived', token,
+        'PUT', '/objectives/' + objectiveId, token,
         {
-            entity_id: objectiveId, state: 'archived',
-            at: '2026-06-12T00:00:01.000000Z',
+            position: 1,
+            state: 'archived',
+            state_at: '2026-06-12T00:00:01.000000Z',
+            state_event_id: objectiveId + '-archived',
         },
     ));
     assert.equal(archived.status, 200);
@@ -968,7 +1009,12 @@ async () => {
     for (const f of fixtures) {
         const put = await handleRequest(db, req(
             'PUT', '/objectives/' + f.id, token,
-            { position: f.position },
+            {
+                position: f.position,
+                state: 'active',
+                state_at: '2026-06-13T00:00:00.000000Z',
+                state_event_id: f.id + '-active',
+            },
         ));
         assert.equal(put.status, 200);
         assert.deepEqual(

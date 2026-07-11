@@ -20,15 +20,14 @@ import {
     documentGetHandler,
 } from '../api/document-family.ts';
 
-// Phase 10 Task 4 (twelfth registered family, joining
-// MEMBERS_WIRING's shared-log-with-genesis 'stateless' bucket):
-// PUT /identities/:id takes the entity's OWN field only ({kind}),
-// no lifecycle trio — the shared identity id already receives a
-// genesis states event at create and archive/reactivate via PUT
-// states/:id, so a document-address trio would FREEZE that
-// lifecycle at genesis forever. Global plane
-// (organizationNested:false), like members/ai-members/
-// human-members: no organization_id on the wire.
+// Phase 10 Task 4 (twelfth registered family): PUT
+// /identities/:id takes the entity's OWN field only ({kind}),
+// no lifecycle trio — member lifecycle rides the members/:id
+// document address (states-address retirement), and the shared
+// identity id (member.id === identity.id) must not carry a
+// competing trio that would FREEZE or double-emit lifecycle.
+// Global plane (organizationNested:false), like members/
+// ai-members/human-members: no organization_id on the wire.
 
 function identityFields() {
     return { kind: 'person' as const };

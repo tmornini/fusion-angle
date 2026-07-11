@@ -5,8 +5,6 @@ import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { documentStateHeadFor } from '../api/derive-states.ts';
-import { generateCryptoSafeBase62 } from
-    '../shared/crypto-safe-base62.ts';
 import { organizationToken } from './token-fixtures.ts';
 
 // Phase 14 Task 5's shared head helper: documentStateHeadFor
@@ -14,10 +12,8 @@ import { organizationToken } from './token-fixtures.ts';
 // (postIdeaDocumentOp, postProjectDocumentOp, postRecordDocumentOp,
 // postRecordWriteOp's edit arm) — see its own header in
 // api/derive-states.ts. This file proves its OWN correctness
-// (genesis, a real transition, and the states/:id union leg)
-// against the row-plane oracle (db.states.getCurrentFor) before
-// any production route depends on it; the flip commits wire it in
-// and the standing pins prove the ternary unchanged.
+// (genesis and a later document-trio transition). The
+// standalone states/:id union leg retired with the address.
 
 const BASE = 'http://localhost';
 
@@ -106,39 +102,4 @@ test('documentStateHeadFor: a later transition matches the'
     assert.ok(head !== null); // Phase Final Task 2: pair plane only
     assert.equal(head?.state, 'archived');
     assert.equal(head?.id, id + '-ev2');
-});
-
-// Phase Final Task 1(b): standalone states/:id is pair-plane-
-// only (row half stripped). Drop the row-plane oracle half;
-// pin the head against the live write's own fields.
-test('documentStateHeadFor: a standalone states/:id event'
-+ ' UNIONS in and wins when it is the LATEST — pair-plane pin'
-+ ' (row-oracle half dropped at Task 1(b) strip)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const id = 'idea-head-standalone';
-    await handleRequest(db, req(
-        'PUT', '/ideas/' + id, token,
-        ideaDocument('active', nowUtc(), id + '-ev1'),
-    ));
-
-    const standaloneEventId = generateCryptoSafeBase62();
-    const standaloneAt = nowUtc();
-    const standalone = await handleRequest(db, req(
-        'PUT', '/states/' + standaloneEventId, token, {
-            entity_id: id,
-            state: 'archived',
-            at: standaloneAt,
-        },
-    ));
-    assert.equal(standalone.status, 200);
-
-    const head = await documentStateHeadFor(db, id);
-    assert.deepEqual(head, {
-        id: standaloneEventId,
-        entity_id: id,
-        state: 'archived',
-        member_id: 'current',
-        at: standaloneAt,
-    });
 });

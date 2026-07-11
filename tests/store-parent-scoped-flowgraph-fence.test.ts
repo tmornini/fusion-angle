@@ -46,23 +46,53 @@ function req(
     });
 }
 
-// A states-log event, posted through the SAME wire-reachable
-// PUT states/:id the live route serves (NAMED re-pin, Task 7):
-// the flipped GET /states and GET entity-states/:id/history
-// routes derive from the message ledger, not the raw states
-// table — a raw db.states.put leaves no pair at this address,
-// so this suite's fence assertions must land through the wire.
-async function seedStateEvent(
+// Flow-graph deletion/revival sidecar events ride a locked
+// flows/:id PUT's graphDelta.deletions / revivals (states/:id
+// retired). Caller supplies the If-Response-ID of the current
+// document head.
+async function seedGraphDeletions(
     db: MemoryDbAdapter,
     organization: string,
-    id: string,
-    entityId: string,
-    state: string,
+    flowId: string,
+    deletions: readonly {
+        eventId: string;
+        entityId: string;
+        at: string;
+    }[],
+    ifResponseId: string,
 ): Promise<void> {
-    const token = await organizationToken('current', organization);
-    const res = await handleRequest(db, req(
-        'PUT', '/states/' + id, token,
-        { entity_id: entityId, state, at: AT },
+    const token = await organizationToken(
+        'current', organization,
+    );
+    const res = await handleRequest(db, new Request(
+        BASE + '/flows/' + flowId, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: 'Bearer ' + token,
+                'If-Response-ID': ifResponseId,
+            },
+            body: JSON.stringify({
+                name: 'Flow A',
+                is_locked: false,
+                is_auto_layout: false,
+                is_auto_fit: false,
+                lock_timeout: 0,
+                state: 'updated',
+                state_at: AT,
+                state_event_id: flowId + '-del-save',
+                graph: JSON.stringify({
+                    nodes: [], edges: [],
+                }),
+                graphDelta: {
+                    nodes: [], edges: [],
+                    deletions,
+                    memberEvents: [],
+                    attributeEvents: [],
+                },
+                revivals: [],
+            }),
+        },
     ));
     assert.equal(res.status, 200);
 }
@@ -219,13 +249,32 @@ async function seed(): Promise<MemoryDbAdapter> {
         },
     ));
     assert.equal(created.status, 204);
-    // Post 'deleted' state events with the node/edge ids as
-    // entity_id — these are the events that must be fenced.
-    await seedStateEvent(
-        db, 'A', 'se-node-del', 'node-a', 'deleted',
+    // Locked flows/:id PUT needs the DOCUMENT head's
+    // Response-ID (GET, not the create operation pair).
+    const token = await organizationToken('current', 'A');
+    const got = await handleRequest(
+        db, req('GET', '/flows/flow-a', token),
     );
-    await seedStateEvent(
-        db, 'A', 'se-edge-del', 'edge-a', 'deleted',
+    assert.equal(got.status, 200);
+    const headId = got.headers.get('Response-ID');
+    assert.ok(headId, 'GET /flows must mint Response-ID');
+    // Sidecar 'deleted' events for node-a / edge-a ride
+    // graphDelta.deletions — these are the events that must
+    // be fenced by the flow's owning org.
+    await seedGraphDeletions(
+        db, 'A', 'flow-a', [
+            {
+                eventId: 'se-node-del',
+                entityId: 'node-a',
+                at: AT,
+            },
+            {
+                eventId: 'se-edge-del',
+                entityId: 'edge-a',
+                at: AT,
+            },
+        ],
+        headId!,
     );
     return db;
 }
@@ -271,17 +320,13 @@ test('node deletion event is visible through org A', async () => {
 
 test('node deletion event is hidden from org B', async () => {
     const db = await seed();
-    // Phase Final Task 1(b): event lives on the pair plane
-    // only (row half stripped). Prove the pair EXISTS —
-    // exclusion is the fence, not an absent write.
-    const nodePairs = await db.responses.getAllWhere(
-        'uri_id', 'se-node-del',
-    );
+    // Sidecar event rides the flow document pair (graphDelta
+    // deletions). Prove the derived collection carries it in
+    // org A before proving B cannot see it.
+    const aRows = await getStates(db, 'A');
     assert.ok(
-        nodePairs.some((r) =>
-            /\/states\/$/.test(r.uri_prefix)
-            && r.status >= 200 && r.status < 300),
-        'se-node-del must exist as a states/:id pair',
+        aRows.some(r => r.id === 'se-node-del'),
+        'se-node-del must derive from graphDelta.deletions',
     );
     // Grant current admin access to B so the facade opens.
     // B's own organizations/:id document (Phase 13 Task 3's
@@ -319,16 +364,10 @@ test('edge deletion event is visible through org A', async () => {
 
 test('edge deletion event is hidden from org B', async () => {
     const db = await seed();
-    // Phase Final Task 1(b): pair-plane existence pin (row
-    // half stripped).
-    const edgePairs = await db.responses.getAllWhere(
-        'uri_id', 'se-edge-del',
-    );
+    const aRows = await getStates(db, 'A');
     assert.ok(
-        edgePairs.some((r) =>
-            /\/states\/$/.test(r.uri_prefix)
-            && r.status >= 200 && r.status < 300),
-        'se-edge-del must exist as a states/:id pair',
+        aRows.some(r => r.id === 'se-edge-del'),
+        'se-edge-del must derive from graphDelta.deletions',
     );
     // B's own organizations/:id document (Phase 13 Task 3's
     // fixture prerequisite; idempotent — a no-op if already
@@ -388,17 +427,28 @@ async () => {
     assert.equal(status, 404);
 });
 
-// ---- Orphan path: entity_id matches nothing → null → visible
-// This preserves the existing orphan rule — do NOT break it.
-// An event whose entity matches no org-owned store, no
-// flow_node, no flow_edge, and no membership is visible.
+// ---- Orphan path retired with states/:id --------------------
+// A standalone event whose entity_id matched nothing used to
+// be visible to every org. No surviving writer can mint an
+// orphan entity_id (document trios and ops name owned
+// entities), so the wire pin is: PUT /states/:id is a router
+// 404 even for a ghost body.
 
-test('orphan deletion event remains visible to all orgs',
+test('orphan states/:id write is a router 404',
 async () => {
     const db = await seed();
-    await seedStateEvent(db, 'A', 'se-ghost', 'ghost', 'deleted');
-    const rows = await getStates(db, 'A');
-    const ids = rows.map(r => r.id);
-    assert.ok(ids.includes('se-ghost'),
-        'orphan event must stay visible (null owner rule)');
+    const token = await organizationToken('current', 'A');
+    const res = await handleRequest(db, req(
+        'PUT', '/states/se-ghost', token, {
+            entity_id: 'ghost',
+            state: 'deleted',
+            at: AT,
+        },
+    ));
+    assert.equal(res.status, 404);
+    const rowsA = await getStates(db, 'A');
+    assert.ok(
+        !rowsA.some(r => r.id === 'se-ghost'),
+        'no orphan event lands after the 404',
+    );
 });

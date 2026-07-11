@@ -428,8 +428,9 @@ async () => {
 
     // Every `at`/`claimAt`/`expireAt` below is minted via
     // nowUtc() at the point of use — exactly as a real client
-    // mints them (postStateEvent, deleteWorkOrderClaim) — NEVER
-    // a fixed past literal: the claim steps below are checked by
+    // mints them (claim/release ops, deleteWorkOrderClaim) —
+    // NEVER a fixed past literal: the claim steps below are
+    // checked by
     // the LIVE route's isClaimEventExpired against REAL
     // Date.now(), so a fixed literal far from the sandbox's real
     // clock would read as already-expired and corrupt the
@@ -601,24 +602,25 @@ async () => {
     );
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
-    // Unclaim by A via deleteWorkOrderClaim's wire path: a bare
-    // PUT states/:id recording 'claim_released'.
+    // Unclaim by A via deleteWorkOrderClaim's wire path:
+    // POST work-orders/:id/release with caller-minted
+    // releaseEventId + releaseAt.
     const unclaimEventId = generateCryptoSafeBase62();
     const unclaim = await handleRequest(db, req(
-        'PUT', '/states/' + unclaimEventId, tokenA, {
-            entity_id: workOrderId,
-            state: 'claim_released',
-            at: nowUtc(),
+        'POST',
+        '/work-orders/' + workOrderId + '/release',
+        tokenA, {
+            releaseEventId: unclaimEventId,
+            releaseAt: nowUtc(),
         },
     ));
-    assert.equal(unclaim.status, 200);
+    assert.equal(unclaim.status, 204);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // The full chain: create(3) + transition1(1) +
     // transition2(2) + entity PUT(0) + fresh claim(1) +
     // repeat-claim(0) + rejected claim(0) + unclaim(1) = 8.
-    // Phase Final Task 1(b): unclaim is pair-plane-only — pin
-    // via deriveStatesFor (row-oracle half dropped).
+    // Release is pair-plane-only — pin via deriveStatesFor.
     assert.equal(
         (await deriveStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
@@ -1095,6 +1097,35 @@ function applyTransitionPair(
     }
 }
 
+// Replays postWorkOrderReleaseOp: a live unexpired claim as
+// of releaseAt → claim_released; otherwise zero events.
+function applyReleasePair(
+    replayed: StateEntity[],
+    entityPairs: readonly DocumentPair[],
+    release: AnyPair,
+    workOrderId: string,
+): void {
+    const releaseEventId = pickString(
+        release.body, 'releaseEventId',
+    );
+    const releaseAt = pickString(release.body, 'releaseAt');
+    const lockTimeout = lockTimeoutAsOf(
+        entityPairs, release.at,
+    );
+    const prior = latestClaimEvent(replayed, workOrderId);
+    const priorLive = prior !== null
+        && prior.state === 'claimed'
+        && !isExpiredAsOf(releaseAt, prior.at, lockTimeout);
+    if (!priorLive) return;
+    replayed.push({
+        id: releaseEventId,
+        entity_id: workOrderId,
+        state: 'claim_released',
+        member_id: release.requesterIdentityId,
+        at: releaseAt,
+    });
+}
+
 interface ReplayResult {
     readonly events: StateEntity[];
     readonly fieldValues: FieldValueTriple[];
@@ -1141,6 +1172,23 @@ async function replayWorkOrderStates(
         claimRequests, claimResponses, claimPrefix,
     ).filter((p) => p.method === 'POST');
 
+    const releasePrefix = canonicalUriPrefix(
+        organization,
+        '/work-orders/' + workOrderId + '/release/',
+    );
+    const [releaseRequests, releaseResponses] =
+        await Promise.all([
+            db.requests.getAllWhere(
+                'uri_prefix', releasePrefix,
+            ),
+            db.responses.getAllWhere(
+                'uri_prefix', releasePrefix,
+            ),
+        ]);
+    const releasePairs = allPairsAt(
+        releaseRequests, releaseResponses, releasePrefix,
+    ).filter((p) => p.method === 'POST');
+
     const transitionPrefix = canonicalUriPrefix(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
@@ -1155,27 +1203,6 @@ async function replayWorkOrderStates(
         transitionRequests, transitionResponses,
         transitionPrefix,
     ).filter((p) => p.method === 'POST');
-
-    // The unclaim event recovers from the states/:id pair by
-    // BODY entity_id predicate — an UNINDEXED CROSS-FAMILY FULL
-    // SCAN of the organization's entire states/ prefix (four
-    // OTHER families — ideas, projects, flows, records — post
-    // through the same postStateEvent/states/:id address, so no
-    // keyed lookup by entity_id exists at the message plane).
-    // Test-tier only (E13-class); never a production pattern.
-    const statesPrefix = canonicalUriPrefix(
-        organization, '/states/',
-    );
-    const [stateRequests, stateResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', statesPrefix),
-        db.responses.getAllWhere('uri_prefix', statesPrefix),
-    ]);
-    const unclaimPairs = allPairsAt(
-        stateRequests, stateResponses, statesPrefix,
-    ).filter(
-        (p) => p.method === 'PUT'
-            && pickString(p.body, 'entity_id') === workOrderId,
-    );
 
     // The create pair's 3-slot arrays synthesize the three birth
     // events, all authored by the create pair's own
@@ -1198,7 +1225,7 @@ async function replayWorkOrderStates(
     }
 
     const fieldValues: FieldValueTriple[] = [];
-    type Kind = 'claim' | 'transition' | 'unclaim';
+    type Kind = 'claim' | 'transition' | 'release';
     const actions: { kind: Kind; pair: AnyPair }[] = [
         ...claimPairs.map((pair) => ({
             kind: 'claim' as const, pair,
@@ -1206,8 +1233,8 @@ async function replayWorkOrderStates(
         ...transitionPairs.map((pair) => ({
             kind: 'transition' as const, pair,
         })),
-        ...unclaimPairs.map((pair) => ({
-            kind: 'unclaim' as const, pair,
+        ...releasePairs.map((pair) => ({
+            kind: 'release' as const, pair,
         })),
     ].sort((a, b) => atIdCompare(a.pair, b.pair));
 
@@ -1221,13 +1248,9 @@ async function replayWorkOrderStates(
                 events, fieldValues, action.pair, workOrderId,
             );
         } else {
-            events.push({
-                id: action.pair.uriId,
-                entity_id: workOrderId,
-                state: pickString(action.pair.body, 'state'),
-                member_id: action.pair.requesterIdentityId,
-                at: pickString(action.pair.body, 'at'),
-            });
+            applyReleasePair(
+                events, entityPairs, action.pair, workOrderId,
+            );
         }
     }
 
@@ -1278,9 +1301,9 @@ async () => {
     assert.equal(created.status, 204);
 
     // Leg 2: release — a transition carrying release, ending
-    // A's birth claim (distinct from leg 8's direct unclaim).
-    // Mint transitionAt before releaseAt (the api-work-order-
-    // transition.test.ts idiom).
+    // A's birth claim (distinct from leg 8's named release
+    // op). Mint transitionAt before releaseAt (the api-work-
+    // order-transition.test.ts idiom).
     const releaseTransitionAt = nowUtc();
     const releaseAt = nowUtc();
     const release = await handleRequest(db, req(
@@ -1411,53 +1434,49 @@ async () => {
     ));
     assert.equal(withValues.status, 204);
 
-    // Leg 7: transition with release, by B — ends B's takeover
-    // claim. Mint transitionAt before releaseAt.
-    const withReleaseTransitionAt = nowUtc();
-    const withReleaseAt = nowUtc();
-    const withRelease = await handleRequest(db, req(
+    // Leg 7: transition to finish by B — claim stays live so
+    // Leg 8's named release op has a live claim to end
+    // (distinct from Leg 2's embedded transition+release).
+    const finishTransitionAt = nowUtc();
+    const finish = await handleRequest(db, req(
         'POST', '/work-orders/' + workOrderId + '/transition',
         tokenB, {
             transitionEventId: 'wo-drift-trace-1-te3',
             targetState: 'n-finish',
             fieldValues: [],
-            release: {
-                id: 'wo-drift-trace-1-rel2',
-                state: 'claim_released',
-                at: withReleaseAt,
-            },
-            transitionAt: withReleaseTransitionAt,
+            release: null,
+            transitionAt: finishTransitionAt,
         },
     ));
-    assert.equal(withRelease.status, 204);
+    assert.equal(finish.status, 204);
 
-    // Leg 8: unclaim — a bare PUT states/:id, by A.
+    // Leg 8: unclaim via POST work-orders/:id/release
+    // (deleteWorkOrderClaim's wire path), by A.
     const unclaimEventId = generateCryptoSafeBase62();
     const unclaim = await handleRequest(db, req(
-        'PUT', '/states/' + unclaimEventId, tokenA, {
-            entity_id: workOrderId,
-            state: 'claim_released',
-            at: nowUtc(),
+        'POST',
+        '/work-orders/' + workOrderId + '/release',
+        tokenA, {
+            releaseEventId: unclaimEventId,
+            releaseAt: nowUtc(),
         },
     ));
-    assert.equal(unclaim.status, 200);
+    assert.equal(unclaim.status, 204);
 
     const replay = await replayWorkOrderStates(
         db, STARK_ORGANIZATION, workOrderId,
     );
-    // Phase Final Task 1(b): unclaim (and any bare states/:id
-    // event) is pair-plane-only. Drop the row-plane getAllFor
-    // oracle; pin the test-side pair replay against the live
+    // Pin the test-side pair replay against the live
     // production derive (deriveStatesFor) — both read the same
-    // two-source composition (op pairs + states/:id pairs).
+    // op-pair composition (create/claim/release/transition).
     const derivedHistory = await deriveStatesFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
     assert.deepEqual(replay.events, derivedHistory);
     // create(3) + release-transition(2) + reclaim(1) +
     // idempotent(0) + expired-takeover(2) + values-transition(1)
-    // + release-transition(2) + unclaim(1) = 12.
-    assert.equal(replay.events.length, 12);
+    // + finish-transition(1) + unclaim(1) = 11.
+    assert.equal(replay.events.length, 11);
 
     // Phase Final Task 2: SFV row plane empty; pair-plane
     // two-source union carries the transition fold.

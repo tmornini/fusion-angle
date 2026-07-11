@@ -787,34 +787,32 @@ test('residual pin: stateEventVisibilityFor matches the'
     }
 });
 
-test('residual pin: organizations self-as-owner feeds'
-+ ' stateEventVisibilityFor for a states/:id event on an'
-+ ' organization entity_id', async () => {
+test('residual pin: organizations self-as-owner —'
++ ' resolveOwningOrganization maps an org id to itself',
+async () => {
     const db = await seededDb();
-    const token = await organizationToken();
-    const eventId = 'ev-org-self-owner-p15';
-    // PUT states/:id naming the organization id itself as
-    // entity_id — legal once the pre-dispatch fence rides
-    // resolveOwningOrganization (Phase 15 Task 5).
-    const put = await handleRequest(db, req(
-        'PUT', '/states/' + eventId, token, {
-            entity_id: STARK_ORGANIZATION,
-            state: 'active',
-            at: nowUtc(),
-        },
-    ));
-    assert.equal(put.status, 200);
+    // No surviving writer mints a state event whose
+    // entity_id is an organization id (states/:id retired).
+    // Pin the ownership probe that once fed that event's
+    // visibility: an org id self-as-owner resolves to itself
+    // regardless of the caller's bound organization.
     assert.equal(
-        await stateEventVisibilityFor(
-            db, STARK_ORGANIZATION, eventId,
+        await resolveOwningOrganization(
+            db, STARK_ORGANIZATION, STARK_ORGANIZATION,
         ),
-        'visible',
+        STARK_ORGANIZATION,
     );
     assert.equal(
-        await stateEventVisibilityFor(
-            db, ORGANIZATION_TWO, eventId,
+        await resolveOwningOrganization(
+            db, STARK_ORGANIZATION, ORGANIZATION_TWO,
         ),
-        'hidden',
+        STARK_ORGANIZATION,
+    );
+    assert.equal(
+        await resolveOwningOrganization(
+            db, ORGANIZATION_TWO, STARK_ORGANIZATION,
+        ),
+        ORGANIZATION_TWO,
     );
 });
 

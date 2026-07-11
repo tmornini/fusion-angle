@@ -29,8 +29,8 @@ import {
 // /work-orders/:id takes the entity's OWN fields only — no
 // lifecycle trio, unlike ideas/projects/flows (Decision 7). A
 // work order's lifecycle is written ONLY by the create/claim/
-// transition ops and the states/:id unclaim path, so a body
-// carrying state/state_at/state_event_id 400s at the gate
+// transition/release ops, so a body carrying state/state_at/
+// state_event_id 400s at the gate
 // (validateWorkOrderDocumentBody), and the op posts no states
 // event of its own.
 

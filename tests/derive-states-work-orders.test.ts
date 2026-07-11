@@ -10,7 +10,6 @@ import {
 } from '../api/types.ts';
 import {
     deriveWorkOrderLifecycle,
-    deriveEventPairStates,
 } from '../api/derive-states.ts';
 import {
     postMembershipDocumentOp,
@@ -19,19 +18,11 @@ import {
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 
-// Phase 11 Task 4: the work-order lifecycle derivation — source
-// (d) of the states-log union. deriveEventPairStates (Task 2,
-// source (a)) reads the states/:id address directly; this reader
-// is DIFFERENT — it replays the work-order create/claim/
-// transition OPERATION pairs, the one source the states/:id
-// address never carries. Every SEEDED work order (the real
-// mock-data seed) was formed via a bare document PUT with zero
-// operation pairs, so its births ride source (a) alone — this
-// reader emits NOTHING for it. Its own output materializes only
-// for a work order created, claimed, or transitioned through the
-// LIVE route, so a HYBRID work order (a seeded document plus a
-// live claim) draws its births from source (a) and its claim from
-// here, never both for the same event (case 6, below).
+// The work-order lifecycle derivation — create/claim/
+// transition/release OPERATION pairs (states-address
+// retirement: the sole work-order source; bare states/:id
+// births are gone). Seeded traces reshape into transition
+// ops, so this reader also covers historical births.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -324,6 +315,100 @@ test('a claim, then a claim past lockTimeout supersedes with'
     );
 });
 
+// -- 3b. claim → release → reclaim; release with no live claim --
+
+test('claim → release → reclaim derives claimed,'
++ ' claim_released, claimed; a release with no live claim'
++ ' derives zero events', async () => {
+    const db = await seed();
+    const token = await organizationToken('adminA', 'A');
+    const workOrderId = 'wo-lifecycle-release-1';
+
+    const put = await handleRequest(db, req(
+        'PUT', '/work-orders/' + workOrderId, token,
+        {
+            display_id: 'releasable',
+            flow_graph: workOrderFlowGraph(8 * 60 * 60),
+            position: 1,
+        },
+    ));
+    assert.equal(put.status, 200);
+
+    // Release with no live claim — pair appends, derives zero.
+    const bareReleaseId = workOrderId + '-rel-bare';
+    const bareRelease = await handleRequest(db, req(
+        'POST',
+        '/work-orders/' + workOrderId + '/release',
+        token, {
+            releaseEventId: bareReleaseId,
+            releaseAt: nowUtc(),
+        },
+    ));
+    assert.equal(bareRelease.status, 204);
+    assert.deepEqual(
+        forWorkOrder(
+            await deriveWorkOrderLifecycle(db), workOrderId,
+        ),
+        [],
+    );
+
+    const claim1At = nowUtc();
+    const claim1 = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim', token,
+        {
+            claimEventId: workOrderId + '-ce1',
+            claimAt: claim1At,
+            expireEventId: workOrderId + '-ee1',
+            expireAt: claim1At,
+        },
+    ));
+    assert.equal(claim1.status, 204);
+
+    const releaseEventId = workOrderId + '-rel1';
+    const releaseAt = nowUtc();
+    const release = await handleRequest(db, req(
+        'POST',
+        '/work-orders/' + workOrderId + '/release',
+        token, {
+            releaseEventId,
+            releaseAt,
+        },
+    ));
+    assert.equal(release.status, 204);
+
+    const claim2At = nowUtc();
+    const claim2 = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim', token,
+        {
+            claimEventId: workOrderId + '-ce2',
+            claimAt: claim2At,
+            expireEventId: workOrderId + '-ee2',
+            expireAt: claim2At,
+        },
+    ));
+    assert.equal(claim2.status, 204);
+
+    const derived = forWorkOrder(
+        await deriveWorkOrderLifecycle(db), workOrderId,
+    );
+    assert.deepEqual(
+        derived.map((row) => row.state),
+        ['claimed', 'claim_released', 'claimed'],
+    );
+    assert.deepEqual(
+        derived.map((row) => row.id),
+        [
+            workOrderId + '-ce1',
+            releaseEventId,
+            workOrderId + '-ce2',
+        ],
+    );
+    assert.ok(
+        !derived.some((row) => row.id === bareReleaseId),
+        'no-live-claim release must derive zero events',
+    );
+});
+
 // -- 4. a transition, then a transition with release --------------
 
 test('a transition, then a transition with release ends the'
@@ -470,11 +555,11 @@ test('the MOVING lock_timeout case: an entity PUT changing'
     );
 });
 
-// -- 6. HYBRID: a seeded-shape work order plus a live claim -------
+// -- 6. HYBRID: bare document + transition genesis + claim ------
 
-test('HYBRID: a seeded-shape work order plus a live claim —'
-+ ' births ride source (a), the claim rides source (d), no id'
-+ ' collision between the two readers', async () => {
+test('HYBRID: a bare document PUT plus a transition genesis'
++ ' and a live claim — both events ride the lifecycle'
++ ' reader (states/:id retired)', async () => {
     const db = await seed();
     const token = await organizationToken('adminA', 'A');
     const workOrderId = 'wo-lifecycle-hybrid-1';
@@ -489,14 +574,18 @@ test('HYBRID: a seeded-shape work order plus a live claim —'
     ));
     assert.equal(put.status, 200);
 
-    // The seed's own trace: a direct PUT /states/:id genesis
-    // event, source (a)'s address — entirely disjoint from this
-    // function's own operation-pair addresses.
     const genesis = await handleRequest(db, req(
-        'PUT', '/states/' + workOrderId + '-genesis', token,
-        { entity_id: workOrderId, state: 'n-start', at: AT },
+        'POST',
+        '/work-orders/' + workOrderId + '/transition',
+        token, {
+            transitionEventId: workOrderId + '-genesis',
+            targetState: 'n-start',
+            fieldValues: [],
+            release: null,
+            transitionAt: AT,
+        },
     ));
-    assert.equal(genesis.status, 200);
+    assert.equal(genesis.status, 204);
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -513,43 +602,9 @@ test('HYBRID: a seeded-shape work order plus a live claim —'
     const ours = forWorkOrder(
         await deriveWorkOrderLifecycle(db), workOrderId,
     );
-    assert.deepEqual(ours, [{
-        id: workOrderId + '-ce1',
-        entity_id: workOrderId,
-        state: 'claimed',
-        member_id: 'adminA',
-        at: claimAt,
-    }]);
-
-    const fromEventPairs = forWorkOrder(
-        await deriveEventPairStates(db), workOrderId,
-    );
     assert.deepEqual(
-        fromEventPairs.map((row) => row.id),
-        [workOrderId + '-genesis'],
-    );
-
-    // Disjoint addresses: no id from one reader ever appears in
-    // the other's output — the no-double-count guarantee.
-    const oursIds = new Set(ours.map((row) => row.id));
-    assert.ok(
-        fromEventPairs.every((row) => !oursIds.has(row.id)),
-        'the two readers must never emit overlapping ids',
-    );
-
-    // Phase Final Task 1(b): genesis rides pair-plane-only
-    // states/:id (row half stripped). Drop the row-plane
-    // getAllFor union oracle; pin the two-source composition
-    // itself (claim + genesis), (at, id) ordered.
-    const union = [...ours, ...fromEventPairs].sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-                : a.id < b.id ? -1
-                    : a.id > b.id ? 1
-                        : 0);
-    assert.deepEqual(
-        union.map((row) => row.id),
+        ours.map((row) => row.id),
         [workOrderId + '-genesis', workOrderId + '-ce1'],
     );
-    assert.equal(union.length, 2);
+    assert.equal(ours.length, 2);
 });

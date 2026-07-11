@@ -206,7 +206,11 @@ async function person(
     name: string,
     email: string,
 ): Promise<void> {
-    const body = memberDocumentBodyOf('human');
+    const body = memberDocumentBodyOf('human', {
+        state: 'active',
+        stateAt: AT,
+        stateEventId: 'seed-member-' + id + '-active',
+    });
     const spec = WRITE_RESPONSE_SPECS['members/:id'];
     if (spec === undefined || !('status' in spec)) {
         throw new Error(

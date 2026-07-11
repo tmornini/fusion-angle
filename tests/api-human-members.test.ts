@@ -161,6 +161,9 @@ test(
         await PUT(db, 'identities/w1/pii', pii('Alice'), DEV_TOKEN);
         await POST(db, 'human-members/w1', {
             detail: { ...detail(), title: 'Director' },
+            state: 'active',
+            stateAt: '2099-01-01T00:00:00.000000Z',
+            stateEventId: 'ev-1',
         }, DEV_TOKEN);
         // Phase Final Task 2: identity_pii ROW half stripped.
         const { deriveIdentityPii } = await import(
@@ -196,6 +199,9 @@ test(
         const edit = await handleRequest(adminDb, req(
             'POST', '/human-members/w1', DEV_TOKEN, {
                 detail: detail(),
+                state: 'active',
+                stateAt: '2099-01-01T00:00:00.000000Z',
+                stateEventId: 'ev-1',
             }));
         assert.equal(edit.status, 204);
 
@@ -216,6 +222,9 @@ test(
             memberDb, req(
                 'POST', '/human-members/w2', token, {
                     detail: detail(),
+                    state: 'active',
+                    stateAt: '2099-01-01T00:00:00.000000Z',
+                    stateEventId: 'ev-2',
                 }));
         assert.equal(deniedEdit.status, 403);
         // The denied member wrote nothing on the pair plane

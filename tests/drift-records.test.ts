@@ -1164,7 +1164,8 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
 + ' live, ledger-backed transition', async () => {
     const db = await seededDb();
 
-    // Seeded flagship WO: SFV via pair-plane derive (7 rows).
+    // Seeded flagship WO: SFV folds into transition op
+    // bodies (states-address retirement Task 12) — 7 rows.
     const flagshipWorkOrderId = 'wg25b0R2gwy5kYPIhQB6cS';
     const flagshipAttributeIds = [
         '5JZ0LeKdPCa4QMtg1RsF1M', // Company Name
@@ -1180,7 +1181,10 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     const flagshipScan = await transitionFieldValueCounts(
         db, STARK_ORGANIZATION, flagshipWorkOrderId,
     );
-    assert.equal(flagshipScan.size, 0);
+    assert.equal(flagshipScan.size, 7);
+    for (const attributeId of flagshipAttributeIds) {
+        assert.equal(flagshipScan.get(attributeId), 1);
+    }
 
     const flagshipReferrers = await collectAttributeReferrers(
         db, STARK_ORGANIZATION, flagshipAttributeIds,

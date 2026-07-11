@@ -23,20 +23,17 @@ import {
 } from '../api/routes.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 
-// Phase 11 Task 5: the six-source union (deriveStates) and its
-// per-entity counterpart (deriveStatesFor) — the assembly this
-// whole phase has been building toward. tests/derive-states-
-// events.test.ts and tests/derive-states-work-orders.test.ts
-// already prove each source's OWN mechanics (the pair-plane fence,
-// the work-order replay); THIS file proves the ASSEMBLY: a hand-
-// built, multi-family fixture drives ONE representative event
-// through each of the six sources — a direct states/:id write, an
-// idea's embedded trio, an AI member's create-op genesis, a work
-// order's create-op birth, a flow-node delete AND restore, and an
-// invitation's grant AND accept — across TWO organizations, so the
-// assembled union's own fence and ordering are proven end to end,
-// plus the dedup invariant's both branches (an identical collision
-// is a harmless no-op; a divergent one crashes loud).
+// The five-source union (deriveStates) and its per-entity
+// counterpart (deriveStatesFor). A hand-built multi-family
+// fixture drives ONE representative event through each source
+// — an idea document trio, an objectives document trio, an AI
+// member's document-trio genesis, a work order's create-op
+// birth, a flow-node delete AND restore, and an invitation's
+// grant AND accept — across TWO organizations, so the
+// assembled union's own fence and ordering are proven end to
+// end, plus the dedup invariant's both branches (an identical
+// collision is a harmless no-op; a divergent one crashes loud).
+// The states/:id orphan leg retired with the address.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -368,12 +365,12 @@ async function grantAndAccept(
 interface UnionFixture {
     readonly db: MemoryDbAdapter;
     readonly ideaId: string;
+    readonly objectiveId: string;
     readonly aiMemberId: string;
     readonly workOrderId: string;
     readonly deletedNodeId: string;
     readonly restoredNodeId: string;
     readonly invitationId: string;
-    readonly ghostEntityId: string;
     readonly foreignIdeaId: string;
 }
 
@@ -385,17 +382,9 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     const tokenA = await organizationToken('adminA', 'A');
     const tokenB = await organizationToken('adminB', 'B');
 
-    // (a) a direct states/:id write, naming a genuine orphan —
-    // no document pair anywhere names this entity.
-    const ghostEntityId = 'ghost-union';
-    const ghost = await handleRequest(db, req(
-        'PUT', '/states/ev-ghost-union', tokenA,
-        { entity_id: ghostEntityId, state: 'active', at: AT },
-    ));
-    assert.equal(ghost.status, 200);
-
-    // (b) an idea's own embedded genesis trio, in org A — plus a
-    // FOREIGN idea in org B (never included in A's own union).
+    // (a-idea) an idea's own embedded genesis trio, in org A —
+    // plus a FOREIGN idea in org B (never included in A's own
+    // union).
     const ideaId = 'idea-union';
     const ideaRes = await handleRequest(db, req(
         'PUT', '/ideas/' + ideaId, tokenA,
@@ -416,10 +405,25 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     ));
     assert.equal(foreignIdeaRes.status, 200);
 
-    // (c) an AI member's create-op genesis — membered into org A
-    // so the fence resolves it there rather than as an orphan
-    // (ai-members/human-members are GLOBAL plane; ownership rides
-    // the membership pair plane, gate 4's leg (b)).
+    // (a-objective) an objectives document trio — the
+    // states/:id orphan leg's replacement in the five-source
+    // union proof (objectives join ideas/projects/records/
+    // flows on the document-trio source).
+    const objectiveId = 'obj-union';
+    const objectiveRes = await handleRequest(db, req(
+        'PUT', '/objectives/' + objectiveId, tokenA, {
+            position: 1,
+            state: 'active',
+            state_at: '2026-01-02T00:00:00.000002Z',
+            state_event_id: objectiveId + '-genesis',
+        },
+    ));
+    assert.equal(objectiveRes.status, 200);
+
+    // (b) an AI member's document-trio genesis — membered into
+    // org A so the fence resolves it there rather than as an
+    // orphan (members are GLOBAL plane; ownership rides the
+    // membership pair plane).
     const aiMemberId = 'ai-union';
     await createAiMember(
         db, tokenA, aiMemberId, 'active',
@@ -431,11 +435,11 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     ));
     assert.equal(membershipRes.status, 200);
 
-    // (d) a work order's create-op birth (3 events).
+    // (c) a work order's create-op birth (3 events).
     const workOrderId = 'wo-union';
     await createWorkOrder(db, tokenA, workOrderId);
 
-    // (e) a flow with two nodes, then ONE save that deletes one
+    // (d) a flow with two nodes, then ONE save that deletes one
     // node and restores the other — both sidecar kinds in one
     // write.
     const flowId = 'flow-union';
@@ -459,7 +463,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
         'flow-union-saved', '2026-01-04T00:00:00.000002Z',
     );
 
-    // (f) an invitation's grant + accept.
+    // (e) an invitation's grant + accept.
     await person(
         db, 'invitee-union', 'Union Invitee',
         'invitee-union@x.com',
@@ -477,9 +481,9 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     );
 
     return {
-        db, ideaId, aiMemberId, workOrderId,
+        db, ideaId, objectiveId, aiMemberId, workOrderId,
         deletedNodeId, restoredNodeId, invitationId,
-        ghostEntityId, foreignIdeaId,
+        foreignIdeaId,
     };
 }
 
@@ -492,8 +496,8 @@ test('deriveStates: every family\'s event appears exactly once,'
     const rowsA = await deriveStates(fx.db, 'A');
 
     const expectedIds = [
-        'ev-ghost-union',
         fx.ideaId + '-genesis',
+        fx.objectiveId + '-genesis',
         fx.aiMemberId + '-genesis',
         fx.workOrderId + '-ev1',
         fx.workOrderId + '-ev2',
@@ -558,18 +562,12 @@ test('deriveStates: an identical cross-source id collision is a'
 });
 
 // A DIVERGENT collision cannot be constructed through two LIVE
-// routes: both an idea's document write and an AI-member's
-// create-op ALSO post to the real (old-plane) states table via
-// states.postEvent, whose OWN LedgerImmutabilityError already
-// rejects a differing re-put of the same event id before either
-// write's message pair could ever be appended — the invariant
-// this union's dedup-assert exists to catch is, for these two
-// sources, already unreachable via any legitimate write sequence.
-// So this test injects the colliding pairs directly at the
-// message plane (formWritePair + appendMessagePair, which touch
-// ONLY requests/responses, never the states table) — a forced,
-// otherwise-impossible id collision, standing in for a genuine
-// bug in one of the six derivations.
+// routes (document trios do not share one immutability ledger
+// across families). So this test injects the colliding pairs
+// directly at the message plane (formWritePair +
+// appendMessagePair) — a forced, otherwise-impossible id
+// collision, standing in for a genuine bug in one of the five
+// derivations.
 test('deriveStates: a DIVERGENT cross-source id collision crashes'
 + ' loud rather than silently picking a winner', async () => {
     const db = await seed();
@@ -596,23 +594,27 @@ test('deriveStates: a DIVERGENT cross-source id collision crashes'
     });
     await appendMessagePair(db, ideaPair);
 
+    // Member lifecycle derives from members/:id document trio
+    // (states-address retirement Task 6) — not the create-op
+    // body. Seed a members document carrying the SAME event id
+    // as the idea document above so the union collision fires.
     const aiPair = await formWritePair({
-        method: 'POST',
-        pathname: '/ai-members',
-        routePattern: 'ai-members',
-        routeSegments: ['ai-members'],
-        pathSegments: ['ai-members'],
+        method: 'PUT',
+        pathname: '/members/ai-collide',
+        routePattern: 'members/:id',
+        routeSegments: ['members', ':id'],
+        pathSegments: ['members', 'ai-collide'],
         headerFields: [],
         body: {
-            id: 'ai-collide',
-            initialStateEventId: collidingEventId,
-            initialState: 'archived',
-            initialStateAt: '2026-03-03T00:00:00.000001Z',
+            type: 'ai',
+            state: 'archived',
+            state_at: '2026-03-03T00:00:00.000001Z',
+            state_event_id: collidingEventId,
         },
         requesterIdentityId: 'adminA',
         requestAt: '2026-03-03T00:00:00.000001Z',
         organization: undefined,
-        responseStatus: 204,
+        responseStatus: 200,
         responseBody: undefined,
         headPairId: undefined,
     });
@@ -630,14 +632,14 @@ test('deriveStatesFor: each family\'s own entity subset', async () => {
     const fx = await buildUnionFixture();
 
     assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.ghostEntityId))
-            .map((row) => row.id),
-        ['ev-ghost-union'],
-    );
-    assert.deepEqual(
         (await deriveStatesFor(fx.db, 'A', fx.ideaId))
             .map((row) => row.id),
         [fx.ideaId + '-genesis'],
+    );
+    assert.deepEqual(
+        (await deriveStatesFor(fx.db, 'A', fx.objectiveId))
+            .map((row) => row.id),
+        [fx.objectiveId + '-genesis'],
     );
     assert.deepEqual(
         (await deriveStatesFor(fx.db, 'A', fx.aiMemberId))

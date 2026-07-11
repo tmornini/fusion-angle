@@ -5,7 +5,7 @@ import type {
 import { pickString } from './validators.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import {
-    documentPairsAt, byIdAscending, type DocumentPair,
+    byIdAscending, type DocumentPair,
 } from './derive-documents.ts';
 import {
     operationPairsAt,
@@ -22,30 +22,11 @@ import {
 // (work-orders/:id/transition) whose body carries the fold
 // (fieldValues: [{id, fields}]) — no per-value pair of its
 // own. The STANDALONE leaf address
-// (states/:id/field-values/:fvid) RETIRED its live routes
-// (Phase 15 Task 7) but SEED still forms pairs there via
-// formSeedPair + WRITE_RESPONSE_SPECS (finding 7); historical
-// leaf pairs remain in the two-source union.
-//
-// ELECTED (a) TWO-SOURCE UNION (spec B2) over (b) close-the-gap:
-// zero ledger growth. The union is EXACT, not approximate — the
-// row plane's own writers are exhaustively these two addresses
-// (nothing else ever calls state_field_values.put), so every row
-// the table could ever hold has a pair on one of these two
-// addresses.
-//
-// DELETION REPRODUCED, NOT RESURRECTED: the leaf address is
-// DOCUMENT_CLASS, so its own DELETE pair IS the tombstone signal
-// — head-reduced away below exactly as deriveDocumentsAt (derive-
-// documents.ts) excludes a DELETE head. A row born from a
-// transition and LATER revised or deleted through the standalone
-// leaf address is head-reduced by the SAME (at, id) order across
-// BOTH sources (latestByKey below), so the leaf write — which can
-// only ever land strictly after its own originating transition —
-// wins, exactly as the row plane's own re-PUT/DELETE already
-// works. No second pair gap.
-const FIELD_VALUES_LEAF_ADDRESS_PATTERN =
-    /^(?:\/organizations\/([^/]+))?\/states\/[^/]+\/field-values\/$/;
+// (states/:id/field-values/:fvid) is RETIRED with the states
+// address itself; this derive is SINGLE-SOURCE (transition
+// fold only). Seed forms transition op pairs that carry the
+// same fold, so historical leaf pairs are no longer a derive
+// source.
 
 function matchingPrefixes(
     requests: readonly RequestEntity[],
@@ -65,18 +46,14 @@ interface TransitionFieldValue {
     readonly fields: Record<string, unknown>;
 }
 
-// One transition pair's fieldValues fold, reshaped into the SAME
-// DocumentPair shape documentPairsAt already returns for the leaf
-// address — so the union below head-reduces both sources through
-// ONE latestByKey call rather than two merge strategies.
-// `id`/`at` are the TRANSITION pair's OWN envelope (every row it
-// folds landed inside that ONE atomic write, so they share one
-// order-key); `uriId` is the field-value row's OWN id — the SAME
-// id a historical leaf PUT/DELETE pair (or seed pair) at
-// states/:id/field-values/:fvid revisits. `method: 'PUT'` — a
-// transition only ever CREATES a row
-// (validateWorkOrderTransitionBody carries no delete arm),
-// never tombstones one.
+// One transition pair's fieldValues fold, reshaped into the
+// DocumentPair shape so head-reduction below shares latestByKey
+// with every other derive. `id`/`at` are the TRANSITION pair's
+// OWN envelope (every row it folds landed inside that ONE
+// atomic write, so they share one order-key); `uriId` is the
+// field-value row's OWN id. `method: 'PUT'` — a transition only
+// ever CREATES a row (validateWorkOrderTransitionBody carries
+// no delete arm), never tombstones one.
 function transitionFieldValueCandidates(
     requests: readonly RequestEntity[],
     responses: readonly ResponseEntity[],
@@ -106,43 +83,21 @@ function transitionFieldValueCandidates(
     return candidates;
 }
 
-// The leaf address's own document pairs, across every state
-// event's field-values sub-collection — UNFENCED (a caller
-// narrows to its own organization; see isVisibleStateEvent
-// → stateEventVisibilityFor below), matching
-// deriveEventPairStates' own unfenced read at gate 5a
-// (derive-states.ts).
-function leafFieldValueCandidates(
-    requests: readonly RequestEntity[],
-    responses: readonly ResponseEntity[],
-): DocumentPair[] {
-    const candidates: DocumentPair[] = [];
-    for (const prefix of matchingPrefixes(
-        requests, FIELD_VALUES_LEAF_ADDRESS_PATTERN,
-    )) {
-        candidates.push(
-            ...documentPairsAt(requests, responses, prefix),
-        );
-    }
-    return candidates;
-}
-
-// The two-source union (Author gate 5, election (a)): transition-
-// fold candidates ∪ leaf document pairs, head-reduced by the
-// field-value row's OWN id via latestByKey's default (at, id)
-// order — the SAME reduction every other derive in this migration
-// applies. A DELETE head excludes the row (this module's own
-// header). UNFENCED: callers narrow to their own organization
+// The single-source fold (Author gate 5): transition-fold
+// candidates, head-reduced by the field-value row's OWN id via
+// latestByKey's default (at, id) order — the SAME reduction
+// every other derive in this migration applies. A DELETE head
+// excludes the row (defensive; transitions never tombstone).
+// UNFENCED: callers narrow to their own organization
 // (deriveStateFieldValueReferrers / stateFieldValuesForStateEvent
-// below), never before this union runs.
+// below), never before this fold runs.
 export function stateFieldValuesFrom(
     requests: readonly RequestEntity[],
     responses: readonly ResponseEntity[],
 ): StateFieldValueEntity[] {
-    const candidates = [
-        ...transitionFieldValueCandidates(requests, responses),
-        ...leafFieldValueCandidates(requests, responses),
-    ];
+    const candidates = transitionFieldValueCandidates(
+        requests, responses,
+    );
     const heads = latestByKey(candidates, (pair) => pair.uriId);
     const rows: StateFieldValueEntity[] = [];
     for (const [uriId, head] of heads) {
@@ -201,32 +156,23 @@ async function isVisibleStateEvent(
 // 1(d) disfavors in favor of entity-scoped indexed reads (the
 // workOrderClaimSourcesFor precedent this header cites). The
 // deviation PERSISTS BY DESIGN at the browser tier — it is not
-// a Phase Final residual for the SFV count. TWO family-scoped
-// alternatives were investigated and REJECTED before falling
-// back here, not skipped:
-//   - Leaf family (states/:id/field-values/): no cheaper
-//     entity-id source exists. A leaf pair's own uri_prefix is
-//     keyed by state_event_id (api/message-address.ts), and
-//     nothing enumerates "every state event that might carry a
-//     field value" more cheaply than reading the plane that
-//     would answer it.
-//   - Transition family (work-orders/:id/transition/): WOULD be
-//     servable via N indexed requests/responses.getAllWhere
-//     ('uri_prefix', ...) reads (api/db.ts's TABLE_INDEXES: both
-//     tables index uri_prefix — an EXACT-match index, one value
-//     per entity, not a family-wide constant), one per known
-//     work-order id, EXCEPT enumerating those ids WITHOUT the
-//     EntityStore deleted-filter would drop a since-deleted
-//     work order's field-value history from the RESTRICT count
-//     — a genuine wire delta vs the old table-plane read (a
-//     field-value row survives its work order's own deletion).
-//     Rejected for that reason.
-// Contrast: Phase 15 Task 4 re-anchored the three GRAPH legs of
+// a Phase Final residual for the SFV count. The transition
+// family (work-orders/:id/transition/) WOULD be servable via N
+// indexed requests/responses.getAllWhere ('uri_prefix', ...)
+// reads (api/db.ts's TABLE_INDEXES: both tables index
+// uri_prefix — an EXACT-match index, one value per entity, not
+// a family-wide constant), one per known work-order id, EXCEPT
+// enumerating those ids WITHOUT the EntityStore deleted-filter
+// would drop a since-deleted work order's field-value history
+// from the RESTRICT count — a genuine wire delta vs the old
+// table-plane read (a field-value row survives its work order's
+// own deletion). Rejected for that reason. Contrast: Phase 15
+// Task 4 re-anchored the three GRAPH legs of
 // collectAttributeReferrers onto organization-scoped pair
 // prefixes (WO document heads) and graphDelta replay
 // (flowGraphBindingsFromPairs) — those legs are no longer a
 // whole-plane scan. This SFV comment's scope is the field-value
-// count alone. Task 11 measures the residual whole-plane cost.
+// count alone.
 export async function deriveStateFieldValueReferrers(
     view: DbAdapter,
     boundOrganization: Id,
@@ -284,8 +230,7 @@ export async function deriveStateFieldValueReferrers(
 // trivially found no rows for an absent event, and the SFV
 // parentScope resolver fenced a foreign event's rows to
 // invisible — this route never 404s). Once visible, ONE shared
-// readonly tx over requests+responses (the
-// deriveEventPairStates torn-read closure, derive-states.ts)
+// readonly tx over requests+responses (torn-read closure)
 // derives the WHOLE plane: the GET path may scan wider than the
 // RESTRICT write gate (Author gate 5's own hard constraint),
 // and the transition fold has no address of its own keyed by

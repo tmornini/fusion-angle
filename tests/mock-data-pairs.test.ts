@@ -20,7 +20,6 @@ import {
 import {
     mockFlowRecords,
     mockStateFieldValues,
-    memberStateEvents,
     buildScoreSeedProjects,
 } from '../api/mock-data/seed-message-pairs.ts';
 import { humanMemberPoolsByOrganization }
@@ -82,7 +81,9 @@ import { deriveOrganization } from
 // closed through postFlowRecordDocumentOp) +
 // 15 objectives-family (5 ops + 5 documents + 5 revisions —
 // Phase 7 Task 3's fixed 1+1+1 bundle synthesis, the flows
-// precedent, over the same 4 STARK + seed-objective-org2 set)
+// precedent, over the same 4 STARK + seed-objective-org2 set;
+// states-address retirement rides the genesis trio on those
+// same create/document bodies — pair COUNT unchanged)
 // + 145 work-order documents + 145 flow-work-order joins
 // (Phase 5 Task 4: the entity/join gap closed, one document
 // pair and one join pair per seeded work order) + 49 baseline
@@ -113,26 +114,25 @@ import { deriveOrganization } from
 // this file's shared pre-tx pass) + 12 role-grant document pairs
 // (Phase 10 Task 6: the 2 admin grants for `current` plus one
 // member grant per non-admin human, one role-grants/:id pair per
-// row) + 860 work-order historical-trace pairs (Phase 11 Task 3:
-// the migration's LAST carve-out closes — 211 hand-authored + 649
-// generated states/:id events, each event's OWN member_id
-// authoring its OWN pair; Path A — the states row itself stays
-// the SAME direct `adapter.states.put`, untouched) + 7
-// state_field_value pairs (the SAME carve-out's nested captures,
-// states/:id/field-values/:fvid, idParams [stateEventId, fvId],
-// authored by the PARENT event's own member_id) + 1 system-member
-// genesis pair (the mock-data seed's OWN last raw-write site, the
-// system actor's 'active' event — bootstrap forms its OWN mirror
-// of this ONE event separately, counted in the bootstrap pair
-// count below, never here) + 11 identity-default-organization
-// pairs (Phase 11 Task 8: one event-append pair per seeded
-// human member at its identity-keyed
-// /identities/:id/default-org/ address; Phase Final Task 2
-// strips the identity_default_organizations ROW half — pairs
-// alone remain) + 1 gate0001 Capture step (R1-FIX-A
-// re-home) = 1514. A dropped or reordered invocation
+// row) + 861 work-order historical-trace transition op pairs
+// (states-address retirement Task 12: 211 hand-authored + 650
+// generated events reshape into work-orders/:id/transition
+// pairs — same count as the bare states/:id traces they
+// replace; each event's OWN member_id authors its OWN pair;
+// field values fold into the parent transition body — no bare
+// states/:id or states/:id/field-values/:fvid pairs) + 11
+// identity-default-organization pairs (Phase 11 Task 8: one
+// event-append pair per seeded human member at its identity-
+// keyed /identities/:id/default-org/ address; Phase Final
+// Task 2 strips the identity_default_organizations ROW half —
+// pairs alone remain) + 1 gate0001 Capture step (R1-FIX-A
+// re-home) = 1506. System-member genesis folds into the
+// members/:id document trio (states-address retirement Task 8)
+// — no bare states/:id pair. A dropped or reordered invocation
 // changes this count.
-const EXPECTED_PAIR_COUNT = 1514;
+// Accounting: 1513 − 861 bare traces − 7 leaf SFV
+// + 861 transition ops = 1506.
+const EXPECTED_PAIR_COUNT = 1506;
 
 test('a mock-data seed populates balanced pairs',
 async () => {
@@ -302,8 +302,8 @@ test('a seeded ai-member create pair sits at the global'
 });
 
 test('a seeded ai-member\'s member-document pair sits at the'
-+ ' shared members/:id address, its body carrying `type`'
-+ ' alone', async () => {
++ ' shared members/:id address, its body carrying type plus'
++ ' the lifecycle trio', async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const firstAiMember = buildAiMembers()[0]!;
@@ -319,7 +319,13 @@ test('a seeded ai-member\'s member-document pair sits at the'
     const embedded = JSON.parse(memberRow!.message) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(embedded.body, { type: 'ai' });
+    assert.deepEqual(embedded.body, {
+        type: 'ai',
+        state: 'active',
+        state_at: MOCK_SEED_TIMESTAMP,
+        state_event_id:
+            `seed-member-${firstAiMember.id}-active`,
+    });
 });
 
 test('a seeded ai-member\'s detail-document pair sits at its'
@@ -355,8 +361,8 @@ test('a seeded ai-member\'s detail-document pair sits at its'
 });
 
 test('a seeded system member\'s member-document pair sits at'
-+ ' the shared members/:id address, its body carrying `type`'
-+ ' alone', async () => {
++ ' the shared members/:id address, its body carrying type'
++ ' plus the lifecycle trio (genesis folded in)', async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
@@ -371,7 +377,13 @@ test('a seeded system member\'s member-document pair sits at'
     const embedded = JSON.parse(memberRow!.message) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(embedded.body, { type: 'system' });
+    assert.deepEqual(embedded.body, {
+        type: 'system',
+        state: 'active',
+        state_at: MOCK_SEED_TIMESTAMP,
+        state_event_id:
+            `seed-member-${SYSTEM_MEMBER_ID}-active`,
+    });
 });
 
 test('a seeded membership document pair sits at its org-nested'
@@ -531,8 +543,8 @@ test('a seeded objective create pair sits at its org-nested'
 });
 
 test('a seeded objective\'s document pair sits at its'
-+ ' entity address, its body carrying no organization_id'
-+ ' key', async () => {
++ ' entity address, body carrying position plus the'
++ ' lifecycle trio and no organization_id key', async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const starkSeed = OBJECTIVE_SEEDS[0]!;
@@ -557,7 +569,15 @@ test('a seeded objective\'s document pair sits at its'
     const embedded = JSON.parse(documentRow!.message) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(Object.keys(embedded.body), ['position']);
+    assert.deepEqual(
+        Object.keys(embedded.body),
+        ['position', 'state', 'state_at', 'state_event_id'],
+    );
+    assert.equal(embedded.body.state, 'active');
+    assert.equal(
+        embedded.body.state_event_id,
+        'seed-objective-' + starkSeed.id + '-active',
+    );
 });
 
 test('a seeded objective\'s revision pair sits at its own'
@@ -661,38 +681,72 @@ test('a seeded flow-record join pair sits at its org-nested'
 // (the states / state_field_values rows themselves stay the SAME
 // direct writes mock-data.ts already made).
 
+function transitionRequestForEvent(
+    requests: readonly { message: string; uri_prefix: string;
+        requester_identity_id: string }[],
+    eventId: string,
+): { message: string; uri_prefix: string;
+    requester_identity_id: string } | undefined {
+    return requests.find((r) => {
+        try {
+            const embedded = JSON.parse(r.message) as {
+                body?: { transitionEventId?: string };
+            };
+            return embedded.body?.transitionEventId
+                === eventId;
+        } catch {
+            return false;
+        }
+    });
+}
+
 test('a seeded work-order trace event\'s pair sits at its'
-+ ' org-nested states address, its body carrying the three'
-+ ' state-event keys (no id or member_id key)', async () => {
++ ' org-nested transition address, its body carrying the'
++ ' transition keys (states/:id retired)', async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const firstTrace = buildWorkOrderStateEvents()[0]!;
     const requests = await db.requests.getAll();
-    const row = requests.find(r => r.uri_id === firstTrace.id);
-    assert.ok(row, 'no request row for the seeded trace event');
+    const row = transitionRequestForEvent(
+        requests, firstTrace.id,
+    );
+    assert.ok(row, 'no request row for the seeded transition');
     assert.equal(
         row!.uri_prefix,
-        `/organizations/${STARK_ORGANIZATION}/states/`,
+        `/organizations/${STARK_ORGANIZATION}/work-orders/`
+            + `${firstTrace.entity_id}/transition/`,
     );
     const embedded = JSON.parse(row!.message) as {
         body: Record<string, unknown>;
     };
     assert.deepEqual(
         Object.keys(embedded.body).sort(),
-        ['at', 'entity_id', 'state'],
+        [
+            'fieldValues', 'release', 'targetState',
+            'transitionAt', 'transitionEventId',
+        ],
+    );
+    assert.equal(
+        embedded.body['transitionEventId'], firstTrace.id,
+    );
+    assert.equal(
+        embedded.body['targetState'], firstTrace.state,
     );
 });
 
-test('a seeded trace pair\'s stored request requester_identity_id'
-+ ' matches its states row\'s member_id (the role-grant'
-+ ' precedent: fingerprints hash ids only, so a wrong-but-real'
-+ ' member_id is otherwise fingerprint-invisible)', async () => {
+test('a seeded transition pair\'s stored request'
++ ' requester_identity_id matches its derived event\'s'
++ ' member_id (the role-grant precedent: fingerprints hash'
++ ' ids only, so a wrong-but-real member_id is otherwise'
++ ' fingerprint-invisible)', async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const firstTrace = buildWorkOrderStateEvents()[0]!;
     const requests = await db.requests.getAll();
-    const row = requests.find(r => r.uri_id === firstTrace.id);
-    assert.ok(row, 'no request row for the seeded trace event');
+    const row = transitionRequestForEvent(
+        requests, firstTrace.id,
+    );
+    assert.ok(row, 'no request row for the seeded transition');
     const _statesAll = await deriveStates(db, '1');
     const written = _statesAll.find(s => s.id === firstTrace.id)!;
     assert.ok(written, 'derived state missing');
@@ -701,60 +755,97 @@ test('a seeded trace pair\'s stored request requester_identity_id'
     // regression that sources every trace pair's requester
     // from the work order's first-event member (rather than
     // the event's own) would pass the assertion above
-    // undetected. Index 2 (state woNodeReview, member
-    // woPersonEmily) is the SAME work order's third event, and
-    // its member_id diverges from index 0's (woPersonSarah) —
+    // undetected. Index 2 is the SAME work order's third
+    // event, and its member_id diverges from index 0's —
     // only the per-event implementation matches it.
     const divergingTrace = buildWorkOrderStateEvents()[2]!;
-    const divergingRow = requests.find(
-        r => r.uri_id === divergingTrace.id,
+    const divergingRow = transitionRequestForEvent(
+        requests, divergingTrace.id,
     );
     assert.ok(
         divergingRow,
-        'no request row for the diverging trace event',
+        'no request row for the diverging transition',
     );
     const divergingWritten =
-        (await deriveStates(db, '1')).find(s => s.id === divergingTrace.id)!;
+        (await deriveStates(db, '1')).find(
+            s => s.id === divergingTrace.id,
+        )!;
     assert.equal(
         divergingRow!.requester_identity_id,
         divergingWritten.member_id,
     );
 });
 
-test('a seeded state_field_value pair sits at its nested'
-+ ' states/field-values address, its body carrying the three'
-+ ' field-value keys (no id key)', async () => {
+test('a seeded state_field_value folds into its parent'
++ ' transition body (no bare leaf pair)', async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
     const firstFieldValue = mockStateFieldValues[0]!;
     const requests = await db.requests.getAll();
-    const row = requests.find(r => r.uri_id === firstFieldValue.id);
-    assert.ok(row, 'no request row for the seeded field value');
-    assert.equal(
+    const row = requests.find((r) => {
+        try {
+            const embedded = JSON.parse(r.message) as {
+                body?: {
+                    fieldValues?: readonly { id: string }[];
+                };
+            };
+            return (embedded.body?.fieldValues ?? [])
+                .some(fv => fv.id === firstFieldValue.id);
+        } catch {
+            return false;
+        }
+    });
+    assert.ok(row, 'no transition carries the seeded field value');
+    assert.match(
         row!.uri_prefix,
-        `/organizations/${STARK_ORGANIZATION}/states/`
-            + `${firstFieldValue.state_event_id}/field-values/`,
+        new RegExp(
+            `^/organizations/${STARK_ORGANIZATION}`
+                + '/work-orders/[^/]+/transition/$',
+        ),
     );
     const embedded = JSON.parse(row!.message) as {
-        body: Record<string, unknown>;
+        body: {
+            fieldValues: readonly {
+                id: string;
+                fields: Record<string, unknown>;
+            }[];
+        };
     };
+    const fold = embedded.body.fieldValues.find(
+        fv => fv.id === firstFieldValue.id,
+    )!;
     assert.deepEqual(
-        Object.keys(embedded.body).sort(),
+        Object.keys(fold.fields).sort(),
         ['attribute_id', 'state_event_id', 'value'],
+    );
+    assert.equal(
+        fold.fields['state_event_id'],
+        firstFieldValue.state_event_id,
     );
 });
 
-test('the mock-data seed\'s own system-member genesis pair sits'
-+ ' at the GLOBAL (non-org-nested) states address', async () => {
+test('the mock-data seed\'s system-member genesis rides the'
++ ' members/:id document trio — no bare states/:id pair',
+async () => {
     const db = new MemoryDbAdapter();
     await postMockDataLoad(db);
-    const systemEvent = memberStateEvents[0]!;
+    const eventId =
+        `seed-member-${SYSTEM_MEMBER_ID}-active`;
     const requests = await db.requests.getAll();
-    const row = requests.find(r => r.uri_id === systemEvent.id);
-    assert.ok(
-        row, 'no request row for the system-member genesis event',
+    const atStates = requests.filter(
+        r => r.uri_prefix === '/states/'
+            && r.uri_id === eventId,
     );
-    assert.equal(row!.uri_prefix, '/states/');
+    assert.equal(atStates.length, 0);
+    const memberRow = requests.find(
+        r => r.uri_prefix === '/members/'
+            && r.uri_id === SYSTEM_MEMBER_ID,
+    );
+    assert.ok(memberRow, 'no system members/:id pair');
+    const embedded = JSON.parse(memberRow!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.equal(embedded.body.state_event_id, eventId);
 });
 
 // Phase 7 Task 5: the scores half of the seed deferral closes —
@@ -935,7 +1026,7 @@ test('seed pairs verify against their hashes', async () => {
     }
 });
 
-test('a bootstrap seed populates exactly fourteen balanced,'
+test('a bootstrap seed populates exactly thirteen balanced,'
 + ' hash-verified pairs for the current member and the system'
 + ' member', async () => {
     const db = new MemoryDbAdapter();
@@ -961,24 +1052,18 @@ test('a bootstrap seed populates exactly fourteen balanced,'
     // + the system member's OWN identity-credential documents
     // (formed by seedHumanCredentials' local pass-1/pass-2
     // split, api/mock-data.ts) — 7 + 1 + 1 + 2 = 11. Phase 11
-    // Task 3 mirrors the mock-data seed's OWN last raw-write
-    // site: bootstrap's OWN system-member genesis event
-    // ('bootstrap-system-active') forms its OWN pair too —
-    // 11 + 1 = 12. Phase 11 Task 8 mirrors the mock-data seed's
-    // own last "STAYS RAW" deferral: bootstrap's OWN default-org
-    // event ('bootstrap-default-org-current') forms its OWN pair
-    // too — 12 + 1 = 13. Phase 12 Task 3 mirrors the mock-data
+    // Task 8 mirrors the mock-data seed's own last "STAYS RAW"
+    // deferral: bootstrap's OWN default-org event
+    // ('bootstrap-default-org-current') forms its OWN pair too
+    // — 11 + 1 = 12. Phase 12 Task 3 mirrors the mock-data
     // seed's own new organizations family: bootstrap's OWN lone
     // organizations pair (STARK_ORGANIZATION — bootstrap seeds
     // no second org; Phase Final Task 2 strips the ROW half)
-    // — 13 + 1 = 14.
-    assert.equal(requests.length, 14);
-    assert.equal(responses.length, 14);
-    const atSystemStateEvent = requests.filter(
-        r => r.uri_prefix === '/states/'
-            && r.uri_id === 'bootstrap-system-active',
-    );
-    assert.equal(atSystemStateEvent.length, 1);
+    // — 12 + 1 = 13. States-address retirement Task 8 folds
+    // system-member genesis into the members/:id document trio
+    // — the bare states/:id pair is gone (was 14, now 13).
+    assert.equal(requests.length, 13);
+    assert.equal(responses.length, 13);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/human-members/'
             && r.uri_id === 'current',
@@ -998,6 +1083,13 @@ test('a bootstrap seed populates exactly fourteen balanced,'
             && r.uri_id === SYSTEM_MEMBER_ID,
     );
     assert.equal(atSystemMember.length, 1);
+    const systemMemberEmbedded = JSON.parse(
+        atSystemMember[0]!.message,
+    ) as { body: Record<string, unknown> };
+    assert.equal(
+        systemMemberEmbedded.body.state_event_id,
+        'bootstrap-system-active',
+    );
     const atMembership = requests.filter(
         r => r.uri_prefix
             === `/organizations/${STARK_ORGANIZATION}/memberships/`

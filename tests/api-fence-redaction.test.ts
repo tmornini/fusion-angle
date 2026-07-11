@@ -59,15 +59,16 @@ test(
 );
 
 test(
-    'a Region B fence-read fault (the states/:id PUT ownership'
-    + ' guard) redacts to the fixed 500',
+    'a Region A entity-states history fence-read fault redacts'
+    + ' to the fixed 500',
     async () => {
         const db = await freshDb();
-        // The states/:id PUT ownership fence resolves the named
-        // entity's owner via resolveOwningOrganization (pair
-        // plane), which reads responses by uri_id first. Fault
-        // THAT read alone, keyed to the entity id this PUT
-        // names.
+        // Surviving ownership guard: GET entity-states/:id/
+        // history resolves the named entity's owner via
+        // resolveOwningOrganization (pair plane), which reads
+        // responses by uri_id first. Fault THAT read alone.
+        // (The states/:id PUT ownership fence retired with the
+        // route; the redaction contract is the subject.)
         const original =
             db.responses.getAllWhere.bind(db.responses);
         (db.responses as unknown as {
@@ -82,18 +83,16 @@ test(
         };
         const response = await handleRequest(
             db,
-            new Request('http://localhost/states/s1', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + DEV_TOKEN,
+            new Request(
+                'http://localhost/entity-states/'
+                    + 'fault-entity/history',
+                {
+                    headers: {
+                        'Authorization':
+                            'Bearer ' + DEV_TOKEN,
+                    },
                 },
-                body: JSON.stringify({
-                    entity_id: 'fault-entity',
-                    state: 'active',
-                    at: '2026-01-01T00:00:00.000000Z',
-                }),
-            }),
+            ),
         );
         assert.equal(response.status, 500);
         const { error } =

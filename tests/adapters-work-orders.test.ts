@@ -212,22 +212,46 @@ async function pause(ms: number): Promise<void> {
     );
 }
 
-// A states-log event, posted through the SAME wire-reachable
-// PUT the live route serves (states/:id) — required for the
-// flipped GET /states and GET /entity-states/:id/history routes
-// (Task 7), which getWorkOrderActiveClaim/
-// getActiveClaimsByWorkOrder/getWorkOrderCurrentNodeId read, to
-// derive them. A raw db.states.put left no message pair here.
-async function seedStateEvent(
+// Work-order claim lifecycle rides the named ops
+// (states/:id retired). Helpers mint claimAt/releaseAt so
+// lock-window pins can backdate.
+async function seedClaim(
     ctx: RequestContext,
-    entityId: string,
-    state: string,
-    at: string,
+    workOrderId: string,
+    claimAt: string,
 ): Promise<void> {
-    await ctx.PUT(`states/${generateCryptoSafeBase62()}`, {
-        entity_id: entityId,
-        state,
-        at,
+    await ctx.POST(`work-orders/${workOrderId}/claim`, {
+        claimEventId: generateCryptoSafeBase62(),
+        claimAt,
+        expireEventId: generateCryptoSafeBase62(),
+        expireAt: claimAt,
+    });
+}
+
+async function seedRelease(
+    ctx: RequestContext,
+    workOrderId: string,
+    releaseAt: string,
+): Promise<void> {
+    await ctx.POST(`work-orders/${workOrderId}/release`, {
+        releaseEventId: generateCryptoSafeBase62(),
+        releaseAt,
+    });
+}
+
+async function seedBareWorkOrder(
+    ctx: RequestContext,
+    workOrderId: string,
+): Promise<void> {
+    await putWorkOrder(ctx, workOrderId, {
+        displayId: 'WO-T',
+        flowGraph: {
+            name: 'test',
+            nodes: [],
+            edges: [],
+            lockTimeout: DEFAULT_LOCK_TIMEOUT,
+        },
+        position: 0,
     });
 }
 
@@ -486,9 +510,7 @@ test(
         // Record an explicit release so no live
         // claim remains, simulating an unclaimed
         // work order.
-        await seedStateEvent(
-            ctx, woId, 'claim_released', nowUtc(),
-        );
+        await seedRelease(ctx, woId, nowUtc());
 
         await postWorkOrderTransition(ctx, {
             workOrderId: woId,
@@ -545,9 +567,7 @@ test(
         // Release the creation-time claim so this
         // test exercises pure claim-creation
         // without the expiration-notice branch.
-        await seedStateEvent(
-            ctx, woId, 'claim_released', nowUtc(),
-        );
+        await seedRelease(ctx, woId, nowUtc());
         await pause(2);
         await postWorkOrderClaim(ctx, woId);
 
@@ -571,9 +591,7 @@ test(
         // Release the creation-time claim so the
         // two explicit claim calls below are the
         // only contributors to the count.
-        await seedStateEvent(
-            ctx, woId, 'claim_released', nowUtc(),
-        );
+        await seedRelease(ctx, woId, nowUtc());
         await pause(2);
         await postWorkOrderClaim(ctx, woId);
         await pause(2);
@@ -654,13 +672,14 @@ test(
         );
         const ctx = createRequestContext(db, await devToken());
         const woId = generateCryptoSafeBase62();
+        await seedBareWorkOrder(ctx, woId);
         // Backdate ten seconds; lockTimeout=1s
         // means this is past the live window.
         const longAgo = new Date(
             Date.now() - 10_000,
         ).toISOString()
         .replace('Z', '000Z');
-        await seedStateEvent(ctx, woId, 'claimed', longAgo);
+        await seedClaim(ctx, woId, longAgo);
         const claim = await getWorkOrderActiveClaim(
             ctx, woId, 1,
         );
@@ -679,7 +698,8 @@ test(
         );
         const ctx = createRequestContext(db, await devToken());
         const woId = generateCryptoSafeBase62();
-        await seedStateEvent(ctx, woId, 'claimed', nowUtc());
+        await seedBareWorkOrder(ctx, woId);
+        await seedClaim(ctx, woId, nowUtc());
         const claim = await getWorkOrderActiveClaim(
             ctx, woId, DEFAULT_LOCK_TIMEOUT,
         );
@@ -711,13 +731,22 @@ test(
             Date.now() - 10_000,
         ).toISOString()
         .replace('Z', '000Z');
-        const claimed = (entityId: string, at: string) =>
-            seedStateEvent(ctx, entityId, 'claimed', at);
-        await claimed(fresh1, now);
-        await claimed(fresh2, now);
-        await claimed(stale, longAgo);
-        await claimed(orphan, now);
-        await seedStateEvent(ctx, released, 'claim_released', now);
+        for (const id of [
+            fresh1, fresh2, stale, released, orphan,
+        ]) {
+            await seedBareWorkOrder(ctx, id);
+        }
+        await seedClaim(ctx, fresh1, now);
+        await seedClaim(ctx, fresh2, now);
+        await seedClaim(ctx, stale, longAgo);
+        await seedClaim(ctx, orphan, now);
+        await seedClaim(ctx, released, now);
+        // releaseAt strictly after claimAt so the replay
+        // sees a live prior claim and emits claim_released.
+        const later = new Date(Date.now() + 1_000)
+            .toISOString()
+            .replace('Z', '000Z');
+        await seedRelease(ctx, released, later);
         const timeouts = new Map<string, number>([
             [fresh1, DEFAULT_LOCK_TIMEOUT],
             [fresh2, DEFAULT_LOCK_TIMEOUT],
@@ -743,22 +772,28 @@ test(
     },
 );
 
-test('deleteWorkOrderClaim appends a claim_released event',
-async () => {
-    const db = new MemoryDbAdapter();
-    await seedAdminSchema(db);
-    await seedHumanMember(db, 'current', 'Demo Test');
-    const ctx = createRequestContext(db, await devToken());
-    await deleteWorkOrderClaim(ctx, 'wo-release-1');
-    // Phase Final Task 1(b): claim_released is pair-plane-only
-    // (bare PUT /states/:id). Pin via the live derived history
-    // path, never the retired row half.
-    const events = await ctx.GET<StateEntity[]>(
-        'entity-states/wo-release-1/history',
-    );
-    assert.equal(events.length, 1);
-    assert.equal(events[0]!.state, 'claim_released');
-});
+test(
+    'deleteWorkOrderClaim posts release with releaseEventId'
+    + ' + releaseAt and derives claim_released',
+    async () => {
+        const { db, ctx } = await setupDb();
+        await seedFlow(db, 'f1', buildLinearGraph());
+        // Birth create leaves a live claim; the named release
+        // op ends it. Body shape is {releaseEventId,
+        // releaseAt} — both caller-minted.
+        const woId = await createWorkOrder(ctx, 'f1');
+        await deleteWorkOrderClaim(ctx, woId);
+        const events = await ctx.GET<StateEntity[]>(
+            'entity-states/' + woId + '/history',
+        );
+        const released = events.filter(
+            (e) => e.state === 'claim_released',
+        );
+        assert.equal(released.length, 1);
+        assert.ok(released[0]!.id.length > 0);
+        assert.ok(released[0]!.at.length > 0);
+    },
+);
 
 // Regression: transitionAt must be minted before release.at
 // so the at-ordered ledger puts claim_released last (latest

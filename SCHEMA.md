@@ -31,11 +31,15 @@ lifecycle state from the pair plane (`api/derive-*.ts`);
 writes append pairs only (`tx` lists
 `['requests','responses']` on every pair-wired path).
 
-`SNAPSHOT_SCHEMA_VERSION` is **3** (Phase Final Stage B). A
-pre-Final (v2) export is rejected by a post-Final import
-(`SnapshotVersionMismatchError`). Phase 13's 1→2 bump retired
-`identity_tokens` + `authorization_codes`; Phase Final's 2→3
-bump retires every remaining doomed entity table.
+`SNAPSHOT_SCHEMA_VERSION` is **4** (states-address
+retirement). A pre-retirement (v3) export is rejected by a
+post-retirement import (`SnapshotVersionMismatchError`).
+Phase 13's 1→2 bump retired `identity_tokens` +
+`authorization_codes`; Phase Final's 2→3 bump retires every
+remaining doomed entity table; the 3→4 bump retires the
+`states/:id` address (not a `TABLE_NAMES` shrink —
+pre-retirement v3 exports still carry pairs no derive source
+reads).
 
 **Orphan stores (gate 6) — CANONICAL residual statement.**
 Author gate 6 elected leave-inert (no sweep). IndexedDB opens
@@ -78,17 +82,18 @@ the event.
 
 **State and deletion.** Entity rows themselves never carry
 state columns. Every entity lifecycle change is a message
-pair (document PUT, operation POST, or a `states/:id`
-event-append). Current state is the latest event under the
-`(at, id)` total order on the derived plane
-(`api/derive-states.ts`). `'deleted'` is a state event value
-on that plane, not a table flag. Document families mark
+pair (document PUT or operation POST). Current state is the
+latest event under the `(at, id)` total order on the derived
+plane (`api/derive-states.ts`). `'deleted'` is a state event
+value on that plane, not a table flag. Document families mark
 DELETE as a tombstone pair excluded from the head by
 `deriveDocumentsAt` — there is no row to splice. The sole
 physical hard-delete is PII erasure (`identity_pii` pairs +
 related credentials), which remains a real splice of the
 message plane. History tables and the old `EntityStore` /
 `StateStore` tombstone filter are GONE (Phase Final Task 5).
+The `states/:id` event-append address is retired with every
+verb on it — router 404.
 
 **The `'system'` member:** `SYSTEM_MEMBER_ID = 'system'`
 in `api/types.ts` is a derived directory entry with
@@ -143,7 +148,7 @@ clients noun).
 
 The append-only ledgers every pair-wired HTTP write appends
 into. Seeded demo data forms pairs pre-tx (`formSeedPair`);
-`EXPECTED_PAIR_COUNT` 1514 / bootstrap 14 is absolute.
+`EXPECTED_PAIR_COUNT` 1506 / bootstrap 13 is absolute.
 Global-spine (pass-through), NOT org-fenced at the store:
 tenancy lives IN `uri_prefix`, enforced at the route gate
 and the write-ownership fence
@@ -239,11 +244,19 @@ conceptual alphabets remain in `api/types.ts`
 (`MEMBER_STATES`, `IDEA_STATES`, `PROJECT_STATES`, …) and
 are asserted by validators and derive cores. Reads:
 
-- `GET /states` → `deriveStates` (six-source union)
+- `GET /states` → `deriveStates` (five-source union:
+  trio families, members, work-order lifecycle, flow
+  graph, invitations)
 - `GET /entity-states/:id/history` → `deriveStatesFor`
-- `PUT /states/:id` → pair-only event append, fenced by
-  `resolveOwningOrganization` and immutability via
-  `stateEventCollisionFromPairs` (no row half)
+- `GET /states/:id/field-values` →
+  `stateFieldValuesForStateEvent` (transition-fold
+  single-source)
+
+Every verb on `/states/:id` is router 404. Lifecycle
+writes ride document-trio PUTs
+(ideas/projects/records/flows/objectives/members) and
+named ops (work-order create/claim/transition/release,
+invitations).
 
 Domain notes (vocabulary, not storage):
 
@@ -261,8 +274,9 @@ Domain notes (vocabulary, not storage):
   `'restored'` revives under the `(at, id)` total order.
   A fresh node/edge is born live and event-free.
 
-`buildStateEventOp(ctx, entityId, state)` in
-`adapters/state-events.ts` remains the canonical helper for
-state-event op construction on the client; entity-lifecycle
-adapters compose it into a `ctx.commit` batch with sibling
-document ops. All of that lands as pairs only.
+`adapters/state-events.ts` holds the READ helpers only
+(latest-per-id reduction, claim/transition projections,
+per-family state-detail getters). Lifecycle writes no
+longer funnel through a shared state-event op — each
+family's document PUT or named op owns its own pair
+formation.

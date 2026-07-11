@@ -150,7 +150,14 @@ test(
         await seedHumanMember(
             db, 'hw_sarah', 'Sarah Chen',
         );
-        const systemBody = memberDocumentBodyOf('system');
+        // Lifecycle rides the members/:id document trio —
+        // the same path a live PUT members/:id state change
+        // would take (states-address retirement).
+        const systemBody = memberDocumentBodyOf('system', {
+            state: 'active',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'st-system',
+        });
         await postMemberDocumentOp(
             db, 'system', systemBody, SYSTEM_MEMBER_ID,
             await flatDocumentPair(
@@ -158,15 +165,6 @@ test(
             ),
         );
         const ctx = createRequestContext(db, await devToken());
-        // Re-pointed onto the wire-reachable PUT states/:id
-        // (finding 15's fixture budget): getMembers/getMemberMap
-        // read ctx.GET('states'), which is now ledger-derived,
-        // so a raw db.states.postEvent here would never surface.
-        await ctx.PUT('states/st-system', {
-            entity_id: 'system',
-            state: 'active',
-            at: '2026-01-01T00:00:00.000000Z',
-        });
         const roster = await getMembers(ctx);
         assert.ok(
             !roster.some(
@@ -286,7 +284,13 @@ test(
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
-        const memberBody = memberDocumentBodyOf('human');
+        // Lifecycle rides the members/:id document trio —
+        // same path as the system-member seed above.
+        const memberBody = memberDocumentBodyOf('human', {
+            state: 'active',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'st-member_without_pii',
+        });
         await postMemberDocumentOp(
             db, 'member_without_pii', memberBody,
             SYSTEM_MEMBER_ID,
@@ -321,13 +325,6 @@ test(
             ),
         );
         const ctx = createRequestContext(db, await devToken());
-        // Re-pointed onto the wire-reachable PUT states/:id —
-        // same reason as the system-member seed above.
-        await ctx.PUT('states/st-member_without_pii', {
-            entity_id: 'member_without_pii',
-            state: 'active',
-            at: '2026-01-01T00:00:00.000000Z',
-        });
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'member_without_pii'),

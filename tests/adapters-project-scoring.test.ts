@@ -138,7 +138,12 @@ async function seedTwoApprovedProjects(
         stateAt: '2026-01-01T00:00:01.000000Z',
         stateEventId: 'st-p2',
     });
-    await ctx.PUT('objectives/o1', { position: 0 });
+    await ctx.PUT('objectives/o1', {
+        position: 0,
+        state: 'active',
+        state_at: '2026-01-01T00:00:00.000000Z',
+        state_event_id: 'o1-genesis',
+    });
     await ctx.PUT('objectives/o1/revisions/o1:t0', {
         objective_id: 'o1', name: 'O', description: 'd',
         member_id: 'w1',
@@ -327,7 +332,12 @@ test(
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
-        await ctx.PUT('objectives/o1', { position: 0 });
+        await ctx.PUT('objectives/o1', {
+            position: 0,
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'o1-genesis',
+        });
         await ctx.PUT('objectives/o1/revisions/o1:t0', {
             objective_id: 'o1',
             name: 'O', description: 'd',

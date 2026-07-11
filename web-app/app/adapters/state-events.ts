@@ -1,46 +1,27 @@
 import type {
     Id, IdeaEntity, IdeaState, IdeaStateDetail,
+    ObjectiveEntity, ObjectiveStateDetail,
     ProjectEntity, ProjectState, ProjectStateDetail,
     RecordEntity, RecordStateDetail,
-    StateEntity, MemberEntity, MemberState,
+    StateEntity, MemberEntity,
+    MemberStateDetail,
 } from '../../../api/types.ts';
 import {
     assertIdeaState,
+    assertObjectiveState,
     assertProjectState,
     assertRecordState,
     assertMemberState,
     msSinceUtc,
     MS_PER_SECOND,
-    nowUtc,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
-import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
 import {
     latestByKey,
 } from '../../../shared/ledger-reduction.ts';
 import {
     isClaimState,
 } from '../../../api/work-order-claims.ts';
-
-// A single state transition is one idempotent row — write it
-// straight to PUT /states/:id. The author is stamped server-
-// side from the verified token, so the body carries no
-// member_id; nowUtc stamps the moment. The client mints the
-// event id (retries hit one row).
-export async function postStateEvent(
-    ctx: RequestContext,
-    entityId: Id,
-    state: string,
-): Promise<void> {
-    const eventId = generateCryptoSafeBase62();
-    await ctx.PUT(`states/${eventId}`, {
-        entity_id: entityId,
-        state,
-        at: nowUtc(),
-    });
-}
 
 // The states log is shared across entity types and the
 // alphabets overlap ('active', 'archived', 'approved',
@@ -339,6 +320,33 @@ export async function getIdeaStateDetails(
     return out;
 }
 
+// Bulk objective trio read — the getIdeaStateDetails shape.
+// Consumed by the organization page so archive/reactivate
+// and drag-reorder can echo each objective's current trio
+// without minting a fresh event.
+export async function getObjectiveStateDetails(
+    ctx: RequestContext,
+): Promise<Map<Id, ObjectiveStateDetail>> {
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<ObjectiveEntity[]>('objectives'),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    const inScope = events.filter(ev => ids.has(ev.entity_id));
+    const latest = latestByKey(inScope, ev => ev.entity_id);
+    const out = new Map<Id, ObjectiveStateDetail>();
+    for (const [id, ev] of latest) {
+        out.set(id, {
+            state: assertObjectiveState(
+                ev.state, 'objective ' + id,
+            ),
+            stateAt: ev.at,
+            stateEventId: ev.id,
+        });
+    }
+    return out;
+}
+
 // Read the current state for one project from the
 // states log. Returns the validated ProjectState.
 // Throws when no event has been recorded — every
@@ -488,19 +496,20 @@ export async function getRecordStateDetails(
     return out;
 }
 
-// Read the current state for one member from the
-// states log. Returns the validated MemberState.
-// Throws when no event has been recorded — every
-// member created through the supported paths gets
-// an initial state event, so absence is a bug,
-// not a missing default. The member id is unique
-// across the human and AI tables — both produce
-// base62 ids from the same generator — so this
-// reader serves both kinds without discrimination.
-export async function getMemberState(
+// Single-member state read, widened to carry the STORED
+// head event's `at`/`id` alongside the state — the trio
+// Decision 7 folds into the member document (state_at,
+// state_event_id). Throws when no event has been recorded
+// — every member created through the supported paths gets
+// an initial state event, so absence is a bug, not a
+// missing default. The member id is unique across the
+// human and AI tables — both produce base62 ids from the
+// same generator — so this reader serves both kinds
+// without discrimination.
+export async function getMemberStateDetail(
     ctx: RequestContext,
     memberId: Id,
-): Promise<MemberState> {
+): Promise<MemberStateDetail> {
     const events = await ctx.GET<StateEntity[]>(
         `entity-states/${memberId}/history`,
     );
@@ -511,21 +520,39 @@ export async function getMemberState(
             'no state event for member ' + memberId,
         );
     }
-    return assertMemberState(
-        latest.state, 'member ' + memberId,
-    );
+    return {
+        state: assertMemberState(
+            latest.state, 'member ' + memberId,
+        ),
+        stateAt: latest.at,
+        stateEventId: latest.id,
+    };
 }
 
-// Bulk variant for the human/ai/system member maps, which
-// call this — so it reads the parent members table
+// Bulk sibling of getMemberStateDetail, widened the same
+// way. Consumed by the human/ai/system member maps so a
+// plain detail edit can echo each row's trio without
+// minting a fresh event. Reads the parent members table
 // directly (covering all three kinds) to avoid recursing.
-export async function getMemberStates(
+export async function getMemberStateDetails(
     ctx: RequestContext,
-): Promise<Map<Id, MemberState>> {
+): Promise<Map<Id, MemberStateDetail>> {
     const [events, rows] = await Promise.all([
         ctx.GET<StateEntity[]>('states'),
         ctx.GET<MemberEntity[]>('members'),
     ]);
     const ids = new Set<Id>(rows.map(r => r.id));
-    return latestStatesForIds<MemberState>(events, ids);
+    const inScope = events.filter(ev => ids.has(ev.entity_id));
+    const latest = latestByKey(inScope, ev => ev.entity_id);
+    const out = new Map<Id, MemberStateDetail>();
+    for (const [id, ev] of latest) {
+        out.set(id, {
+            state: assertMemberState(
+                ev.state, 'member ' + id,
+            ),
+            stateAt: ev.at,
+            stateEventId: ev.id,
+        });
+    }
+    return out;
 }

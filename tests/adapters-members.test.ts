@@ -70,7 +70,7 @@ test(
 
 test(
     'postHumanMemberStateChange records a state'
-    + ' event without touching the member row',
+    + ' change via PUT members/:id',
     async () => {
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
@@ -79,6 +79,7 @@ test(
         const before = await ctx.GET<{
             id: string; type: string;
         }>('members/w1');
+        assert.equal(before.type, 'human');
 
         await postHumanMemberStateChange(
             ctx, 'w1', 'archived',
@@ -87,10 +88,12 @@ test(
         const after = await ctx.GET<{
             id: string; type: string;
         }>('members/w1');
-        assert.deepEqual(after, before);
-        // Phase Final Task 1(b): archive rides pair-plane-only
-        // PUT /states/:id — pin history via the live derived
-        // path, never the retired row half.
+        // Type is a server-supplied fact; only the
+        // lifecycle trio on the members/:id document moves.
+        assert.equal(after.type, 'human');
+        assert.equal(after.id, before.id);
+        // Archive rides PUT members/:id with a fresh
+        // trio — pin history via the live derived path.
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/w1/history',
         );

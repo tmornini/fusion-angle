@@ -102,6 +102,9 @@ test('postMockDataLoad seeds one revision per objective',
         // Phase Final Stage B: objective_revisions retired.
     });
 
+// All five objective seeds mint genesis state 'active' via
+// the create-body trio (states-address retirement) — none
+// are archived. Pair-plane GET /states derives those rows.
 test('postMockDataLoad seeds zero archived objectives',
     async () => {
         const db = new MemoryDbAdapter();

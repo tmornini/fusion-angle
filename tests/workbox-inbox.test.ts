@@ -295,17 +295,18 @@ test(
     async () => {
         const { ctx, woId, tables } =
             await setupOneWorkOrder();
-        // Hand-stitch a state event on the complete node, dated
-        // after the others — posted through the SAME wire-
-        // reachable PUT states/:id the live route serves (Task
-        // 7): the flipped GET /states route, which
-        // getTransitionEventsByWorkOrder reads, derives from the
-        // message ledger, not the raw states table.
-        await ctx.PUT('states/extra', {
-            entity_id: woId,
-            state: 'n-finish',
-            at: '2030-01-01T00:00:00.000000Z',
-        });
+        // Hand-stitch a transition onto the complete node
+        // via the named op (states/:id retired). Dated after
+        // the create events so the inbox sees a finished WO.
+        await ctx.POST(
+            'work-orders/' + woId + '/transition', {
+                transitionEventId: 'extra',
+                targetState: 'n-finish',
+                fieldValues: [],
+                release: null,
+                transitionAt: '2030-01-01T00:00:00.000000Z',
+            },
+        );
         const {
             workOrders, transitionsByWo, memberMap,
         } = await tables();

@@ -137,7 +137,7 @@ const MEMBER_VERBS: Readonly<
     // GET survives.
     '/states/:id/field-values': ['GET'],
     '/work-orders': ['GET', 'PUT', 'POST'],
-    '/states': ['GET', 'PUT'],
+    '/states': ['GET'],
     '/entity-states': ['GET'],
     '/members': ['GET'],
     '/ai-members': ['GET'],

@@ -4,7 +4,6 @@ import type {
 } from './db.ts';
 import {
     EntityNotFoundError,
-    LedgerImmutabilityError,
     MissingTableError,
     UniqueConstraintError,
 } from './db.ts';
@@ -60,7 +59,6 @@ import {
     HTTP_INTERNAL_ERROR,
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
-    HTTP_CONFLICT,
     HTTP_PRECONDITION_FAILED,
 } from './http-errors.ts';
 import {
@@ -440,45 +438,12 @@ export async function handleRequest(
 
     // Region B of the pre-dispatch ownership fence (Phase 12
     // Task 1, joined by WP8's self-only revocation guard below):
-    // the three UNCONDITIONAL write guards below run after body-
+    // the one UNCONDITIONAL write guard below runs after body-
     // parse regardless of bearerExempt, mirroring Region A above.
-    // routePattern makes the `if` bodies mutually exclusive per
-    // request, so one try over all three spans the same fence-
-    // read fault class Region A redacts — never more than one
-    // guard's reads for the same request.
+    // The states/:id ownership fence RETIRED with the route
+    // (states-address retirement Task 13); field-values leaf
+    // write fence RETIRED with the leaf routes (Phase 15 Task 7).
     try {
-        // THE STATE OWNERSHIP WRITE FENCE (Phase 11 Task 1):
-        // MEMBER_VERBS permits member-tier PUT here, and the
-        // body names entity_id itself — with no upstream
-        // ownership check, a member of one org could PUT a
-        // state event naming ANOTHER org's entity and forge or
-        // tombstone its lifecycle. PutHandler carries no
-        // organization argument (routes.ts) and the route's
-        // `db` is already the SCOPED adapter (which 404s a
-        // foreign row as merely absent), so the fence cannot
-        // live in the route closure — it runs HERE, pre-
-        // dispatch, mirroring the entity-states GET guard
-        // above. PAIR-PLANE (Phase 15 Task 5): ownership
-        // resolves through resolveOwningOrganization — soft-
-        // deleted parents, hard-spliced records, and
-        // organization document ids all report their true
-        // owner via the append-only pair plane.
-        if (method === 'PUT' && routePattern === 'states/:id') {
-            const entityId = body?.entity_id;
-            if (typeof entityId === 'string') {
-                const owner = await resolveOwningOrganization(
-                    adapter, entityId, organization!,
-                );
-                if (owner !== null && owner !== organization) {
-                    return Response.json(
-                        { error: 'Not found: ' + pathname },
-                        { status: HTTP_NOT_FOUND },
-                    );
-                }
-            }
-        }
-        // field-values leaf write fence RETIRED with the leaf
-        // routes (Phase 15 Task 7).
         // WP8 (Phase 13 Task 8): the self-only revocation guard.
         // MEMBER_VERBS widens PUT /identity-token-revocations to
         // the member tier (Region A's route-policy check already
@@ -1063,14 +1028,6 @@ export async function handleRequest(
             return Response.json(
                 { error: error.message },
                 { status: HTTP_NOT_FOUND },
-            );
-        }
-        if (
-            error instanceof LedgerImmutabilityError
-        ) {
-            return Response.json(
-                { error: error.message },
-                { status: HTTP_CONFLICT },
             );
         }
         if (

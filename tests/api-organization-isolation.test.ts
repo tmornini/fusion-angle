@@ -335,14 +335,20 @@ async function seedChain(
     ));
     assert.equal(flowWrite.status, 200);
     // Phase Final Task 2: objectives row half stripped — seed
-    // through the live document PUT so the pair plane owns it
+    // through the live document PUT with the lifecycle trio
+    // (states-address retirement) so the pair plane owns it
     // (nested revisions/scores re-pins already ride pairs).
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
             + '/objectives/o' + s,
         await organizationToken(identity, organization),
-        { position: 0 },
+        {
+            position: 0,
+            state: 'active',
+            state_at: T8_AT,
+            state_event_id: 'o' + s + '-genesis',
+        },
     ));
     // Phase Final Stage B: records table retired — seed
     // through the live document PUT so the pair plane owns it.
@@ -447,81 +453,31 @@ async function seedChain(
             score: 2, member_id: 'system', at: T8_AT,
         },
     ));
-    // NAMED re-pin (Task 7): the flipped GET /states route
-    // derives from the message ledger, not the raw states
-    // table — a raw db.states.put leaves no pair at this
-    // address, so the 'states lists only the bound org events'
-    // test must land through the SAME wire-reachable PUT the
-    // live route serves.
-    await handleRequest(db, req(
-        'PUT', '/states/se' + s,
+    // Transition op with a fieldValues fold — the sole SFV
+    // source after the states-address retirement (leaf pairs
+    // and states/:id writes are gone). transitionEventId
+    // keeps the se* ids the fence tests name.
+    const transition = await handleRequest(db, req(
+        'POST',
+        '/organizations/' + organization
+            + '/work-orders/wo' + s + '/transition',
         await organizationToken(identity, organization),
-        { entity_id: 'i' + s, state: 'active', at: T8_AT },
-    ));
-    // NAMED re-pin (Phase 15 Task 7): leaf PUT
-    // states/:id/field-values/:fvid retires; seed the SFV pair
-    // below-gate via formWritePair + row put — WRITE_RESPONSE_
-    // SPECS entry SURVIVES for seed address formation
-    // (finding 7). Transition fold is work-order-only; these
-    // nest under idea-backed se* events. Collection GET still
-    // derives from the pair plane.
-    await seedStateFieldValuePair(
-        db, organization, 'se' + s, 'sfv' + s,
-    );
-}
-
-// Below-gate SFV pair (leaf route retired; seed-formation
-// WRITE_RESPONSE_SPECS entry remains).
-async function seedStateFieldValuePair(
-    db: MemoryDbAdapter,
-    organization: string,
-    stateEventId: string,
-    fvId: string,
-): Promise<void> {
-    const spec = WRITE_RESPONSE_SPECS[
-        'states/:id/field-values/:fvid'
-    ];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no write response spec for field-values leaf',
-        );
-    }
-    const body = {
-        state_event_id: stateEventId,
-        attribute_id: 'x',
-        value: 'v',
-    };
-    const pair: MessagePair = await formWritePair({
-        method: 'PUT',
-        pathname: '/states/' + stateEventId
-            + '/field-values/' + fvId,
-        routePattern: 'states/:id/field-values/:fvid',
-        routeSegments: [
-            'states', ':id', 'field-values', ':fvid',
-        ],
-        pathSegments: [
-            'states', stateEventId, 'field-values', fvId,
-        ],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [stateEventId, fvId], body,
-            SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    // Phase Final Stage B: state_field_values table retired —
-    // seed pair only (WRITE_RESPONSE_SPECS still forms address).
-    await db.transaction(
-        ['requests', 'responses'],
-        async (view) => {
-            await appendMessagePair(view, pair);
+        {
+            transitionEventId: 'se' + s,
+            targetState: 'n-start',
+            fieldValues: [{
+                id: 'sfv' + s,
+                fields: {
+                    state_event_id: 'se' + s,
+                    attribute_id: 'x',
+                    value: 'v',
+                },
+            }],
+            release: null,
+            transitionAt: T8_AT,
         },
-    );
+    ));
+    assert.equal(transition.status, 204);
 }
 
 // Two full chains (A, B) plus the identity spine; `current` is
@@ -682,23 +638,24 @@ async function deepDb(): Promise<MemoryDbAdapter> {
     await seedRoleGrantPair(
         db, 'rg-pb-admin-b', 'B', 'pb', 'admin', T8_AT,
     );
-    // NAMED re-pin (Task 7): the flipped GET /states route
-    // derives from the message ledger, not the raw states
-    // table — a raw db.states.put leaves no pair at this
-    // address. Landed here (after pb's own admin grant above,
-    // the only identity authorized to write in B) so both pa's
-    // and pb's genesis event can ride the SAME wire-reachable
-    // PUT the live route serves. pa's own event is authored by
-    // 'current' (admin in A already) — no case in this file
-    // exercises pa's OWN authorization either.
+    // Member document trios for pa/pb (states/:id retired).
+    // seMem-* event ids keep the collection-fence assertions
+    // stable. Members are global-plane; ownership rides the
+    // membership pairs already seeded above.
     for (const [id, organization, author] of [
         ['pa', 'A', 'current'], ['pb', 'B', 'pb'],
     ] as const) {
-        await handleRequest(db, req(
-            'PUT', '/states/seMem-' + id,
+        const memberWrite = await handleRequest(db, req(
+            'PUT', '/members/' + id,
             await organizationToken(author, organization),
-            { entity_id: id, state: 'active', at: T8_AT },
+            {
+                type: 'human',
+                state: 'active',
+                state_at: T8_AT,
+                state_event_id: 'seMem-' + id,
+            },
         ));
+        assert.equal(memberWrite.status, 200);
     }
     await seedChain(db, 'A', 'A', 'current');
     await seedChain(db, 'B', 'B', 'pb');
@@ -938,23 +895,25 @@ test('states lists only the bound org events', async () => {
     assert.ok(!ids.has('seMem-pb'));  // B-only member hidden
 });
 
-// STEALTH-WEAKENING trap (Phase 15 Task 7): bare GET
-// states/:id retired — a router 404 would pass for ANY id.
-// Re-point to the surviving collection GET which still
-// fences by ownership. Phase Final Task 1(b): seB lives on
-// the pair plane only (row half stripped); pin pair presence
-// then prove the collection omits it.
+// STEALTH-WEAKENING trap: bare GET states/:id is a router
+// 404 for ANY id. Re-point to the surviving collection GET
+// which still fences by ownership. seB derives from B's
+// work-order transition op — pin that B can see it, then
+// prove A's collection omits it.
 test('states collection hides a foreign event id',
 async () => {
     const db = await deepDb();
-    const pairResponses = await db.responses.getAllWhere(
-        'uri_id', 'seB',
-    );
+    const foreign = await handleRequest(db, req(
+        'GET', '/states',
+        await organizationToken('pb', 'B'),
+    ));
+    assert.equal(foreign.status, 200);
+    const foreignIds = new Set(
+        (await foreign.json() as { id: string }[])
+            .map(r => r.id));
     assert.ok(
-        pairResponses.some((r) =>
-            /\/states\/$/.test(r.uri_prefix)
-            && r.status >= 200 && r.status < 300),
-        'seB must exist as a states/:id pair',
+        foreignIds.has('seB'),
+        'seB must derive from B\'s transition op',
     );
     const res = await facadeGet(db, '/states');
     assert.equal(res.status, 200);
@@ -1174,21 +1133,22 @@ async () => {
     assert.deepEqual(ids, ['orphan']);
 });
 
-test('states show an orphan event with no owner', async () => {
+// Orphan states/:id writes retired with the address. Pin
+// that a ghost body is a router 404 and that the collection
+// still hides foreign events (no orphan injection path).
+test('states/:id orphan write is router 404; foreign still'
++ ' hidden', async () => {
     const db = await deepDb();
-    // NAMED re-pin (Task 7): the flipped GET /states route
-    // derives from the message ledger, not the raw states
-    // table — a raw db.states.put leaves no pair at this
-    // address.
-    await handleRequest(db, req(
+    const ghost = await handleRequest(db, req(
         'PUT', '/states/seGhost',
         await organizationToken('current', 'A'),
         { entity_id: 'ghost', state: 'active', at: T8_AT },
     ));
+    assert.equal(ghost.status, 404);
     const res = await facadeGet(db, '/states');
     assert.equal(res.status, 200);
     const ids = new Set(
         (await res.json() as { id: string }[]).map(r => r.id));
-    assert.ok(ids.has('seGhost'));  // unowned → visible orphan
-    assert.ok(!ids.has('seB'));     // B's event → still hidden
+    assert.ok(!ids.has('seGhost'));
+    assert.ok(!ids.has('seB'));
 });

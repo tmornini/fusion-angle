@@ -4,6 +4,7 @@ import type {
     ObjectiveId,
     ObjectiveRevisionEntity,
     ObjectiveState,
+    ObjectiveStateDetail,
     StateEntity,
 } from '../../../api/types.ts';
 import {
@@ -19,7 +20,6 @@ import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
 import {
-    postStateEvent,
     latestStatesForIds,
 } from './state-events.ts';
 import {
@@ -43,6 +43,13 @@ export async function getObjectives(
     ctx: RequestContext,
 ): Promise<ObjectiveEntity[]> {
     return ctx.GET<ObjectiveEntity[]>('objectives');
+}
+
+export async function getObjective(
+    ctx: RequestContext,
+    id: ObjectiveId,
+): Promise<ObjectiveEntity> {
+    return ctx.GET<ObjectiveEntity>(`objectives/${id}`);
 }
 
 export async function getArchivedObjectiveIds(
@@ -233,7 +240,9 @@ export async function postObjectiveCreation(
     // transaction server-side. The body OMITS organization_id —
     // the org fence stamps it from the verified token. The
     // revision's member_id is a row column (who authored the
-    // definition), supplied here; no state event is written.
+    // definition), supplied here. Genesis trio mints with the
+    // create body (states-address retirement) — no separate
+    // states/:id event.
     await ctx.POST('objectives', {
         id,
         objective: {
@@ -247,6 +256,9 @@ export async function postObjectiveCreation(
             member_id: member.id,
             at,
         },
+        initialState: 'active',
+        initialStateEventId: generateCryptoSafeBase62(),
+        initialStateAt: at,
     });
     notifyObjectiveChange();
 }
@@ -273,11 +285,21 @@ export async function postObjectiveRevision(
     notifyObjectiveChange();
 }
 
+// Read-then-put: position is echoed from the current head;
+// the trio is minted fresh. The get-then-put race against a
+// concurrent drag-reorder is ACCEPTED (spec §2) — objectives
+// concurrency is 'simple' and the page is admin-facing.
 export async function postObjectiveArchival(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    await postStateEvent(ctx, id, 'archived');
+    const current = await getObjective(ctx, id);
+    await ctx.PUT(`objectives/${id}`, {
+        position: current.position,
+        state: 'archived',
+        state_at: nowUtc(),
+        state_event_id: generateCryptoSafeBase62(),
+    });
     notifyObjectiveChange();
 }
 
@@ -285,7 +307,13 @@ export async function postObjectiveReactivation(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<void> {
-    await postStateEvent(ctx, id, 'active');
+    const current = await getObjective(ctx, id);
+    await ctx.PUT(`objectives/${id}`, {
+        position: current.position,
+        state: 'active',
+        state_at: nowUtc(),
+        state_event_id: generateCryptoSafeBase62(),
+    });
     notifyObjectiveChange();
 }
 
@@ -293,9 +321,13 @@ export async function putObjectivePosition(
     ctx: RequestContext,
     id: ObjectiveId,
     position: number,
+    stateDetail: ObjectiveStateDetail,
 ): Promise<void> {
     await ctx.PUT(`objectives/${id}`, {
         position,
+        state: stateDetail.state,
+        state_at: stateDetail.stateAt,
+        state_event_id: stateDetail.stateEventId,
     });
     notifyObjectiveChange();
 }

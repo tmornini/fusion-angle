@@ -102,10 +102,14 @@ async function seedWorkOrder(
         flowGraph,
         position: 0,
     });
-    await ctx.PUT('states/t-create-' + id, {
-        entity_id: id,
-        state: currentNodeId,
-        at: AT_CREATED,
+    // Genesis transition via the named op (states/:id
+    // retired). fieldValues empty; no claim release.
+    await ctx.POST('work-orders/' + id + '/transition', {
+        transitionEventId: 't-create-' + id,
+        targetState: currentNodeId,
+        fieldValues: [],
+        release: null,
+        transitionAt: AT_CREATED,
     });
 }
 

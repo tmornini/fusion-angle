@@ -33,6 +33,7 @@ import {
     getActiveObjectives,
     getObjectives,
     getArchivedObjectiveIds,
+    getObjectiveStateDetails,
     getCurrentObjectiveDefinition,
     getCurrentObjectiveDefinitions,
     postObjectiveCreation,
@@ -114,11 +115,14 @@ async function rerender(): Promise<void> {
 
 async function renderObjectives(): Promise<void> {
     const ctx = sessionContext();
-    const [active, allObjs, archivedIds] =
+    // One bulk trio read per load — drag-reorder echoes
+    // each id's detail from this map (no per-drag GET).
+    const [active, allObjs, archivedIds, stateDetails] =
         await Promise.all([
             getActiveObjectives(ctx),
             getObjectives(ctx),
             getArchivedObjectiveIds(ctx),
+            getObjectiveStateDetails(ctx),
         ]);
     const archived = allObjs.filter(
         o => archivedIds.has(o.id),
@@ -148,8 +152,15 @@ async function renderObjectives(): Promise<void> {
         'data-objective-id',
         async (id, newPosition) => {
             const dragCtx = sessionContext();
+            const detail = stateDetails.get(id);
+            if (detail === undefined) {
+                throw new Error(
+                    'no state detail for objective '
+                        + id,
+                );
+            }
             await putObjectivePosition(
-                dragCtx, id, newPosition,
+                dragCtx, id, newPosition, detail,
             );
         },
     );

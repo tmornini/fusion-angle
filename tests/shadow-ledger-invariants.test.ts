@@ -197,16 +197,15 @@ function createRecordBody(
 // A mock-data seed (EXPECTED_PAIR_COUNT pre-formed pairs, see
 // mock-data-pairs.test.ts) plus one live-write batch layered on
 // top via handleRequest: one document PUT (Supersedes minted,
-// ideas), one event-append PUT (states/:id), one FAILED write
-// (a state ledger conflict), one create POST (records — Phase 6
-// Task 4's own bundle: operation + document + one attribute
-// pair, not a single pair), one entity PUT (work-orders —
-// Phase 1's final-review deferral, folded in now that Phase 2's
-// drift check has landed), one DELETE (records, superseding its
-// own PUT), one operation POST (identity-tokens revocation), one
+// ideas), one idea state-change trio PUT (states/:id retired),
+// one FAILED write (work-order claim conflict 409), one create
+// POST (records — Phase 6 Task 4's own bundle: operation +
+// document + one attribute pair, not a single pair), one entity
+// PUT (work-orders), one DELETE (records, superseding its own
+// PUT), one operation POST (identity-tokens revocation), one
 // GENESIS document PUT (flows — Task 7's additive pin), and one
-// work-order CREATE (Phase 5 Task 3's own three-pair append — a
-// genesis POST needs no headers, so this addition is purely
+// work-order CREATE (Phase 5 Task 3's own three-pair append —
+// a genesis POST needs no headers, so this addition is purely
 // additive) — five families beyond the seed's own, spanning
 // both seeded orgs.
 async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
@@ -234,37 +233,17 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         secondIdea.headers.get('Supersedes'), firstIdeaId,
     );
 
-    // Event-append PUT (states/:id, org 1) on that idea.
+    // Idea state-change trio PUT (states/:id retired) — a
+    // second lifecycle stamp on the same document address.
     const stateAppend = await handleRequest(db, req(
-        'PUT', '/states/inv-ev-review', org1Token, {
-            entity_id: 'inv-idea-1',
+        'PUT', '/ideas/inv-idea-1', org1Token, {
+            ...ideaFields('Invariant Idea Reviewed'),
             state: 'in_review',
-            at: AT,
+            state_at: AT,
+            state_event_id: 'inv-ev-review',
         },
     ));
     assert.equal(stateAppend.status, 200);
-
-    // A FAILED write: a state ledger conflict (org 1) — must
-    // add nothing to either table. Seed the prior event through
-    // the live PUT so both pair and row planes exist (Phase
-    // Final Task 1(b) canary: row-conflict with pair-absent is
-    // a 500 alarm, not a 409).
-    const prior = await handleRequest(db, req(
-        'PUT', '/states/inv-ev-conflict', org1Token, {
-            entity_id: 'other',
-            state: 'active',
-            at: '2020-01-01T00:00:00.000000Z',
-        },
-    ));
-    assert.equal(prior.status, 200);
-    const failed = await handleRequest(db, req(
-        'PUT', '/states/inv-ev-conflict', org1Token, {
-            entity_id: 'inv-idea-1',
-            state: 'promoted',
-            at: '2026-02-01T00:00:01.000000Z',
-        },
-    ));
-    assert.equal(failed.status, 409);
 
     // Create POST (records, org 2) — Task 4's bundle: the
     // operation pair, its synthesized document pair, and one
@@ -351,6 +330,20 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         ),
     ));
     assert.equal(workOrderCreated.status, 204);
+
+    // A FAILED write: 404 on the retired states/:id address
+    // — must add nothing to either table. (The prior
+    // LedgerImmutabilityError 409 retired with the route;
+    // a claim conflict 409 still exists on the claim op but
+    // needs a second member with a live prior claim.)
+    const failed = await handleRequest(db, req(
+        'PUT', '/states/inv-ev-conflict', org1Token, {
+            entity_id: 'inv-idea-1',
+            state: 'promoted',
+            at: '2026-02-01T00:00:01.000000Z',
+        },
+    ));
+    assert.equal(failed.status, 404);
 
     return db;
 }

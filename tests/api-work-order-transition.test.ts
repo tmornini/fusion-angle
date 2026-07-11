@@ -144,14 +144,14 @@ test(
         const db = await seededDb();
         // A live claim exists; the web-app decided to release
         // it and carried the release event in the body.
-        // Phase Final Task 2: claim event on pair plane
-        // (states ROW half stripped).
+        // Claim rides the named op (states/:id retired).
         const claimAt = nowUtc();
-        await PUT(
-            db, 'states/cl-1', {
-                entity_id: 'wo1',
-                state: 'claimed',
-                at: claimAt,
+        await POST(
+            db, 'work-orders/wo1/claim', {
+                claimEventId: 'cl-1',
+                claimAt,
+                expireEventId: 'cl-1-exp',
+                expireAt: claimAt,
             },
             DEV_TOKEN,
         );
@@ -402,14 +402,14 @@ test(
     'release.at is recorded as the release event at',
     async () => {
         const db = await seededDb();
-        // Phase Final Task 2: claim event on pair plane
-        // (states ROW half stripped).
+        // Claim rides the named op (states/:id retired).
         const claimAt = nowUtc();
-        await PUT(
-            db, 'states/cl-1', {
-                entity_id: 'wo1',
-                state: 'claimed',
-                at: claimAt,
+        await POST(
+            db, 'work-orders/wo1/claim', {
+                claimEventId: 'cl-1',
+                claimAt,
+                expireEventId: 'cl-1-exp',
+                expireAt: claimAt,
             },
             DEV_TOKEN,
         );

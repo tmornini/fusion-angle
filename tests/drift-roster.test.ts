@@ -67,21 +67,13 @@ import {
 // wiring rows so generic-handler cases exercise the ACTUAL
 // documentCollectionGetHandler/documentGetHandler.
 //
-// THE STATES/:ID ESCAPE HATCH (roster edition, Author gate 12 as
-// RE-GRADED): every EntityStore — members, memberships,
-// ai_members, human_members alike — consults the SAME shared
-// states-log tombstone (EntityStore.getById/getAll/getAllWhere
-// each call StateStore.isDeletedIn/getDeletedIdsIn) before
-// answering. A hand-crafted 'deleted' state event posted through
-// the generic, member-tier-reachable PUT /states/:id route (a
-// pre-existing, cross-family fact — MEMBER_VERBS['/states'] =
-// ['GET', 'PUT'] in api/authorization.ts) would hide such a row
-// on the OLD plane while api/derive-members.ts's own ledger
-// derivation — which consults no states row at all — still shows
-// it. This is a NAMED divergence acceptance, NOT drift-tested
-// here: pinning parity for it would pin a divergence the OLD
-// plane loses, not a property this migration owns. Outside that
-// one escape hatch, the deleted-filter is otherwise VACUOUS for
+// THE STATES/:ID ESCAPE HATCH RETIRED (roster edition): the
+// generic, member-tier-reachable PUT /states/:id route is
+// gone. Member lifecycle archive/reactivate rides PUT
+// members/:id (document trio); work-order unclaim rides POST
+// work-orders/:id/release. EntityStore tombstone scans are
+// retired with the row plane. Outside that retired path, the
+// deleted-filter is otherwise VACUOUS for
 // every roster family across this entire file (finding 15 as
 // corrected) — no shipped route ever posts a 'deleted' state for
 // a member/membership/ai_member/human_member id (MEMBER_STATES is
@@ -125,13 +117,15 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 const MEMBERS_TEST_WIRING: DocumentFamilyWiring = {
     family: 'members',
-    lifecycle: 'stateless',
+    lifecycle: 'trio',
     notFoundTable: 'members',
     validateDocument: validateMemberDocumentBody,
     documentOp: postMemberDocumentOp,
+    // Mirror routes.ts memberDocumentEntityOf: type alone —
+    // the lifecycle trio is history, not the directory row.
     entityOf: (document, _organization) => ({
         id: document.uriId,
-        ...document.body,
+        type: document.body['type'],
     }),
 };
 
@@ -284,7 +278,11 @@ function aiMemberCreateBody(
     };
 }
 
-function aiMemberEditBody(name: string): Record<string, unknown> {
+function aiMemberEditBody(
+    name: string,
+    stateEventId: string,
+    stateAt: string,
+): Record<string, unknown> {
     return {
         detail: {
             name,
@@ -292,6 +290,9 @@ function aiMemberEditBody(name: string): Record<string, unknown> {
             skill_focus: 'sf2',
             model: 'mnte677fU2G1V2B9vJp9z7',
         },
+        state: 'active',
+        stateAt,
+        stateEventId,
     };
 }
 
@@ -331,13 +332,19 @@ function humanMemberCreateBody(
 // PII no longer rides the edit body (Phase 10 Task 2's intake
 // decomposition) — it changes ONLY via a separate PUT
 // identities/:id/pii, which this drift chain does not exercise.
-function humanMemberEditBody(): Record<string, unknown> {
+function humanMemberEditBody(
+    stateEventId: string,
+    stateAt: string,
+): Record<string, unknown> {
     return {
         detail: {
             title: 't2', department: 'd2',
             strengths: jsonArrayField([]),
             team_dimensions: jsonObjectField({}),
         },
+        state: 'active',
+        stateAt,
+        stateEventId,
     };
 }
 
@@ -634,10 +641,12 @@ async () => {
     // Step 1: create an AI member — bundle balance 3; the
     // derived parent + detail see it immediately.
     const beforeCreate = (await db.requests.getAll()).length;
+    const aiGenesisAt = nowUtc();
+    const aiGenesisEventId = aiId + '-genesis';
     const created = await handleRequest(db, req(
         'POST', '/ai-members', token,
         aiMemberCreateBody(
-            aiId, 'Chain AI', aiId + '-genesis', nowUtc(),
+            aiId, 'Chain AI', aiGenesisEventId, aiGenesisAt,
         ),
     ));
     assert.equal(created.status, 204);
@@ -653,10 +662,13 @@ async () => {
     // Phase Final Stage B: roster tables retired.
     // Phase Final Stage B: roster tables retired.
 
-    // Step 2: composed edit (POST /ai-members/:id).
+    // Step 2: composed edit (POST /ai-members/:id) — echoes
+    // the create trio so the members/:id document folds.
     const edited = await handleRequest(db, req(
         'POST', '/ai-members/' + aiId, token,
-        aiMemberEditBody('Chain AI Edited'),
+        aiMemberEditBody(
+            'Chain AI Edited', aiGenesisEventId, aiGenesisAt,
+        ),
     ));
     assert.equal(edited.status, 204);
     const derivedAiDetail2 = await derivedAiMember(
@@ -679,11 +691,13 @@ async () => {
     // Step 4: create a human member — bundle balance 4.
     const humanId = 'human-drift-chain-1';
     const beforeHumanCreate = (await db.requests.getAll()).length;
+    const humanGenesisAt = nowUtc();
+    const humanGenesisEventId = humanId + '-genesis';
     const humanCreated = await handleRequest(db, req(
         'POST', '/human-members', token,
         humanMemberCreateBody(
-            humanId, 'Chain Human', humanId + '-genesis',
-            nowUtc(),
+            humanId, 'Chain Human', humanGenesisEventId,
+            humanGenesisAt,
         ),
     ));
     assert.equal(humanCreated.status, 204);
@@ -699,10 +713,13 @@ async () => {
     assert.equal(derivedHumanDetail1.title, 't');
     // Phase Final Stage B: roster tables retired.
 
-    // Step 5: composed edit (POST /human-members/:id).
+    // Step 5: composed edit (POST /human-members/:id) — echoes
+    // the create trio so the members/:id document folds.
     const humanEdited = await handleRequest(db, req(
         'POST', '/human-members/' + humanId, token,
-        humanMemberEditBody(),
+        humanMemberEditBody(
+            humanGenesisEventId, humanGenesisAt,
+        ),
     ));
     assert.equal(humanEdited.status, 204);
     const derivedHumanDetail2 = await derivedHumanMember(

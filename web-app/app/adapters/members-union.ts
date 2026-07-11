@@ -5,10 +5,13 @@ import type {
     HumanMemberEntity,
     AIMemberEntity,
     IdentityPiiEntity,
-    MemberState,
+    MemberStateDetail,
     StateEntity,
 } from '../../../api/types.ts';
-import { SystemMember } from '../../../api/types.ts';
+import {
+    SystemMember,
+    assertMemberState,
+} from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     buildHumanMemberMap,
@@ -17,9 +20,11 @@ import {
     buildAIMemberMap,
 } from './ai-members.ts';
 import {
-    getMemberStates,
-    latestStatesForIds,
+    getMemberStateDetails,
 } from './state-events.ts';
+import {
+    latestByKey,
+} from '../../../shared/ledger-reduction.ts';
 
 export {
     SystemMember,
@@ -31,6 +36,33 @@ export type {
     Member,
 } from '../../../api/types.ts';
 
+// Reduce the states log to a MemberStateDetail map for the
+// given id set — the getMemberStateDetails shape, pure over
+// already-read rows so getMembers can share one ledger read
+// across both builders.
+function memberStateDetailsForIds(
+    events: readonly StateEntity[],
+    ids: ReadonlySet<MemberId>,
+): Map<MemberId, MemberStateDetail> {
+    const inScope = events.filter(
+        ev => ids.has(ev.entity_id),
+    );
+    const latest = latestByKey(
+        inScope, ev => ev.entity_id,
+    );
+    const out = new Map<MemberId, MemberStateDetail>();
+    for (const [id, ev] of latest) {
+        out.set(id, {
+            state: assertMemberState(
+                ev.state, 'member ' + id,
+            ),
+            stateAt: ev.at,
+            stateEventId: ev.id,
+        });
+    }
+    return out;
+}
+
 // The system member has no detail row — it is a parent
 // row (type 'system') plus its lifecycle state. Read it
 // here so getMemberMap can resolve a system-authored
@@ -40,32 +72,34 @@ async function getSystemMembers(
 ): Promise<SystemMember[]> {
     const [parents, stateMap] = await Promise.all([
         ctx.GET<MemberEntity[]>('members'),
-        getMemberStates(ctx),
+        getMemberStateDetails(ctx),
     ]);
     const out: SystemMember[] = [];
     for (const parent of parents) {
         if (parent.type !== 'system') continue;
-        const state = stateMap.get(parent.id);
-        if (state === undefined) {
+        const detail = stateMap.get(parent.id);
+        if (detail === undefined) {
             throw new Error(
                 'no state event for system member '
                 + parent.id,
             );
         }
-        out.push(new SystemMember(parent, state));
+        out.push(
+            new SystemMember(parent, detail.state),
+        );
     }
     return out;
 }
 
 // The roster. Reads members, human-members, identity-pii,
 // ai-members and the states log ONCE, derives the latest
-// state per member a single time via latestStatesForIds,
-// then feeds both pure builders. Earlier this fanned out to
-// getHumanMembers + getAIMembers, each of which re-read
-// members and the states log via getMemberStates — so the
-// members table was read four times and the states log
-// twice per roster load. The states log read is the costly
-// one (the org fence resolves every event's owning org), so
+// state detail per member a single time, then feeds both
+// pure builders. Earlier this fanned out to getHumanMembers
+// + getAIMembers, each of which re-read members and the
+// states log via getMemberStateDetails — so the members
+// table was read four times and the states log twice per
+// roster load. The states log read is the costly one (the
+// org fence resolves every event's owning org), so
 // deriving once is the "read the ledger once" cleanup.
 export async function getMembers(
     ctx: RequestContext,
@@ -83,7 +117,7 @@ export async function getMembers(
         parents.map(p => p.id),
     );
     const stateMap =
-        latestStatesForIds<MemberState>(events, ids);
+        memberStateDetailsForIds(events, ids);
     const humans = buildHumanMemberMap(
         parents, humanDetails, piiRows, stateMap,
     );

@@ -55,6 +55,20 @@ function aiDetail() {
     };
 }
 
+// Default trio for in-memory domain fixtures — mirrors the
+// seed's initialState* so a make*Member and a seed*Member
+// for the same id share event id / at when a test cares.
+function memberStateDetailOf(
+    id: string,
+    state: MemberState,
+) {
+    return {
+        state,
+        stateAt: '2026-01-01T00:00:00.000000Z',
+        stateEventId: `st-${id}`,
+    };
+}
+
 export function makeHumanMember(
     id: string,
     name: string,
@@ -70,7 +84,7 @@ export function makeHumanMember(
             phone: '',
             bio: '',
         },
-        state,
+        memberStateDetailOf(id, state),
     );
 }
 
@@ -82,7 +96,7 @@ export function makeAIMember(
     return new AIMember(
         { id, type: 'ai' },
         { id, name, ...aiDetail() },
-        state,
+        memberStateDetailOf(id, state),
     );
 }
 
@@ -105,6 +119,11 @@ async function memberDocumentPair(
     id: Id,
     type: 'human' | 'ai',
     requestAt: string,
+    trio: {
+        readonly state: MemberState;
+        readonly stateAt: string;
+        readonly stateEventId: string;
+    },
 ): Promise<MessagePair> {
     const spec = WRITE_RESPONSE_SPECS['members/:id'];
     if (spec === undefined || !('status' in spec)) {
@@ -112,7 +131,7 @@ async function memberDocumentPair(
             'no per-write response spec for members/:id',
         );
     }
-    const body = memberDocumentBodyOf(type);
+    const body = memberDocumentBodyOf(type, trio);
     return formWritePair({
         method: 'PUT',
         pathname: `/members/${id}`,
@@ -290,19 +309,20 @@ export async function seedHumanMember(
         phone: '',
         bio: '',
     };
+    const trio = memberStateDetailOf(id, state);
     const body = {
         id,
         detail: humanDetail(),
         initialState: state,
-        initialStateEventId: `st-${id}`,
-        initialStateAt: '2026-01-01T00:00:00.000000Z',
+        initialStateEventId: trio.stateEventId,
+        initialStateAt: trio.stateAt,
     };
     const pairs: MemberWritePairs = {
         operation: await memberCreateOperationPair(
             'human-members', body, requestAt,
         ),
         memberDocument: await memberDocumentPair(
-            id, 'human', requestAt,
+            id, 'human', requestAt, trio,
         ),
         detailDocument: await detailDocumentPair(
             'human-members/:id', id,
@@ -330,19 +350,20 @@ export async function seedAIMember(
     state: MemberState = 'active',
 ): Promise<void> {
     const requestAt = nowUtc();
+    const trio = memberStateDetailOf(id, state);
     const body = {
         id,
         detail: { name, ...aiDetail() },
         initialState: state,
-        initialStateEventId: `st-${id}`,
-        initialStateAt: '2026-01-01T00:00:00.000000Z',
+        initialStateEventId: trio.stateEventId,
+        initialStateAt: trio.stateAt,
     };
     const pairs: MemberWritePairs = {
         operation: await memberCreateOperationPair(
             'ai-members', body, requestAt,
         ),
         memberDocument: await memberDocumentPair(
-            id, 'ai', requestAt,
+            id, 'ai', requestAt, trio,
         ),
         detailDocument: await detailDocumentPair(
             'ai-members/:id', id,

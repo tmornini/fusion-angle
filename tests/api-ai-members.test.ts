@@ -128,6 +128,9 @@ test(
         }, DEV_TOKEN);
         await POST(db, 'ai-members/a1', {
             detail: { ...detail('Renamed'), skill_focus: 'qa' },
+            state: 'active',
+            stateAt: '2099-01-01T00:00:00.000000Z',
+            stateEventId: 'ev-1',
         }, DEV_TOKEN);
         const facet = await GET<{
             name: string; skill_focus: string;
@@ -161,6 +164,9 @@ test(
         const edit = await handleRequest(adminDb, req(
             'POST', '/ai-members/a1', DEV_TOKEN, {
                 detail: detail('Renamed'),
+                state: 'active',
+                stateAt: '2099-01-01T00:00:00.000000Z',
+                stateEventId: 'ev-1',
             }));
         assert.equal(edit.status, 204);
 
@@ -181,6 +187,9 @@ test(
             memberDb, req(
                 'POST', '/ai-members/a2', token, {
                     detail: detail('Bot'),
+                    state: 'active',
+                    stateAt: '2099-01-01T00:00:00.000000Z',
+                    stateEventId: 'ev-2',
                 }));
         assert.equal(deniedEdit.status, 403);
         // The denied member wrote nothing on the pair plane

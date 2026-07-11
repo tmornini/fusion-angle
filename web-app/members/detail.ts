@@ -497,7 +497,12 @@ async function saveHumanMember(
         s.draft.state !== s.member.stateValue();
     try {
         await putHumanMember(
-            ctx, memberId, nextDetail, piiPatch,
+            ctx, memberId, nextDetail, {
+                state: s.member.stateValue(),
+                stateAt: s.member.stateAtValue(),
+                stateEventId:
+                    s.member.stateEventIdValue(),
+            }, piiPatch,
         );
         if (stateChanged) {
             await postHumanMemberStateChange(
@@ -547,6 +552,12 @@ async function saveAIMember(
         await putAIMember(
             ctx, memberId,
             { ...rest, ...patch },
+            {
+                state: s.member.stateValue(),
+                stateAt: s.member.stateAtValue(),
+                stateEventId:
+                    s.member.stateEventIdValue(),
+            },
         );
         if (stateChanged) {
             await postAIMemberStateChange(

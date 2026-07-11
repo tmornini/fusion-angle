@@ -121,19 +121,14 @@ const SUPERSEDES_FIELD = 'supersedes';
 const FOLLOWS_FIELD = 'follows';
 const RESPONSE_ID_FIELD = 'response-id';
 
-// One entry per FIRST PATH SEGMENT — note the multi-word
-// nouns whose segment diverges from the table-name root:
-// 'record-attributes' rode this fallback until it
-// registered (family-registry.ts) — genuinely organization-
-// owned (organization-scoped store, organization_id index)
-// despite sharing no segment with 'records'. Audit any new
-// write route's first segment against the organization-
-// scoped adapter before trusting this set. A registered
-// family answers ONLY from its registration — its entry
-// here is deleted, never kept as a parallel truth.
+// Fallback for first path segments that are organization-
+// nested but not yet registered in family-registry.ts. A
+// registered family answers ONLY from its registration — its
+// entry here is deleted, never kept as a parallel truth. The
+// states/:id address retirement emptied this set; the
+// mechanism stays for any future un-registered nested segment.
 const ORGANIZATION_NESTED_FIRST_SEGMENTS: ReadonlySet<string> =
     new Set([
-        'states',
     ]);
 
 // The tier rule, exported so gate, seed, and derivations share
@@ -580,7 +575,6 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'ideas/:id',
     'ideas/:id/conversion',
     'ideas/:id/submissions/:sid',
-    'states/:id',
     'projects/:id',
     'projects/:id/flows/:pfid',
     'flows',
@@ -592,6 +586,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'work-orders/:id',
     'work-orders/:id/claim',
     'work-orders/:id/transition',
+    'work-orders/:id/release',
     'flows/:id/work-orders/:woid',
     'records',
     'records/:id',

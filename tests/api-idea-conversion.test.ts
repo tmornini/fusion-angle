@@ -76,12 +76,19 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         state_event_id: 'st-idea-1',
     }, DEV_TOKEN);
     // Phase Final Stage B: objectives table retired — seed
-    // through the live document PUT so the pair plane owns it.
+    // through the live document PUT with the lifecycle trio
+    // (states-address retirement) so the pair plane owns it.
     await PUT(db, 'objectives/obj-1', {
         position: 1,
+        state: 'active',
+        state_at: '2026-01-01T00:00:00.000000Z',
+        state_event_id: 'obj-1-genesis',
     }, DEV_TOKEN);
     await PUT(db, 'objectives/obj-2', {
         position: 2,
+        state: 'active',
+        state_at: '2026-01-01T00:00:00.000000Z',
+        state_event_id: 'obj-2-genesis',
     }, DEV_TOKEN);
     return db;
 }

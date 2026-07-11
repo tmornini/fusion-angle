@@ -3,6 +3,7 @@ import type {
     MemberEntity,
     AIMemberEntity,
     MemberState,
+    MemberStateDetail,
 } from '../../../api/types.ts';
 import { AIMember, nowUtc } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
@@ -13,9 +14,8 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
-    postStateEvent,
-    getMemberState,
-    getMemberStates,
+    getMemberStateDetail,
+    getMemberStateDetails,
 } from './state-events.ts';
 
 export {
@@ -23,6 +23,7 @@ export {
 } from '../../../api/types.ts';
 export type {
     AIMemberEntity,
+    MemberStateDetail,
 } from '../../../api/types.ts';
 
 const aiMemberChanges =
@@ -44,7 +45,7 @@ export type AIMemberDraft =
 export function buildAIMemberMap(
     parents: readonly MemberEntity[],
     details: readonly AIMemberEntity[],
-    stateMap: ReadonlyMap<MemberId, MemberState>,
+    stateMap: ReadonlyMap<MemberId, MemberStateDetail>,
 ): Map<MemberId, AIMember> {
     const detailById = new Map(
         details.map(d => [d.id, d]),
@@ -80,7 +81,7 @@ export async function getAIMemberMap(
         await Promise.all([
             ctx.GET<MemberEntity[]>('members'),
             ctx.GET<AIMemberEntity[]>('ai-members'),
-            getMemberStates(ctx),
+            getMemberStateDetails(ctx),
         ]);
     return buildAIMemberMap(parents, details, stateMap);
 }
@@ -102,7 +103,7 @@ export async function getAIMember(
             ctx.GET<AIMemberEntity>(
                 `ai-members/${id}`,
             ),
-            getMemberState(ctx, id),
+            getMemberStateDetail(ctx, id),
         ]);
     return new AIMember(parent, detail, state);
 }
@@ -119,16 +120,22 @@ export async function getAIMemberEntity(
 // Split an AI-member write across the parent (type) and the
 // detail row. Used by edits; creation goes through
 // postAIMemberCreation. The named composing POST /ai-members/:id
-// lands both facet puts in ONE transaction; no state event (an
-// edit does not move the member's lifecycle).
+// lands both facet puts in ONE transaction. The edit body
+// ECHOES the current lifecycle trio verbatim so a byte-
+// identical members/:id re-put folds by message_hash rather
+// than minting a phantom transition.
 export async function putAIMember(
     ctx: RequestContext,
     id: MemberId,
     input: AIMemberDraft,
+    stateEcho: MemberStateDetail,
 ): Promise<void> {
     await ctx.POST(`ai-members/${id}`, {
         detail: input as unknown as
             Record<string, unknown>,
+        state: stateEcho.state,
+        stateAt: stateEcho.stateAt,
+        stateEventId: stateEcho.stateEventId,
     });
     aiMemberChanges.notify();
 }
@@ -156,11 +163,19 @@ export async function postAIMemberCreation(
     aiMemberChanges.notify();
 }
 
+// A state change is an honest document write: PUT members/:id
+// with a FRESH trio — the postIdeaStateChange composition,
+// pointed at the members document address.
 export async function postAIMemberStateChange(
     ctx: RequestContext,
     id: MemberId,
     state: MemberState,
 ): Promise<void> {
-    await postStateEvent(ctx, id, state);
+    await ctx.PUT(`members/${id}`, {
+        type: 'ai',
+        state,
+        state_at: nowUtc(),
+        state_event_id: generateCryptoSafeBase62(),
+    });
     aiMemberChanges.notify();
 }

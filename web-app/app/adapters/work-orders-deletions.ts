@@ -1,24 +1,25 @@
 import type { RequestContext } from './shared.ts';
 import {
-    postStateEvent,
-} from './state-events.ts';
+    generateCryptoSafeBase62,
+} from '../../../shared/crypto-safe-base62.ts';
+import { nowUtc } from '../../../api/types.ts';
 import {
     notifyWorkOrderChanges,
 } from './work-orders-mutations.ts';
 
-// Records a 'claim_released' state event — the
-// caller's intent is "stop the claim". The
-// operation appends a single event to the log;
-// the `delete` prefix preserves caller-facing
-// continuity (the user action is "release the
-// work order"), but semantically this is an
-// append in the append-only state log.
+// Releases the live claim via the named release op — the
+// caller's intent is "stop the claim". The read-decide-append
+// lives server-side (postWorkOrderReleaseOp), closing the
+// old funnel's decide-client-side race; the `delete` prefix
+// preserves caller-facing continuity (the user action is
+// "release the work order").
 export async function deleteWorkOrderClaim(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
-    await postStateEvent(
-        ctx, workOrderId, 'claim_released',
-    );
+    await ctx.POST(`work-orders/${workOrderId}/release`, {
+        releaseEventId: generateCryptoSafeBase62(),
+        releaseAt: nowUtc(),
+    });
     notifyWorkOrderChanges();
 }

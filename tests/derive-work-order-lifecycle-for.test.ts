@@ -299,25 +299,16 @@ async () => {
     // row-plane oracle.
 });
 
-// A standalone unclaim (a bare PUT /states/:id, never a claim/
-// transition op) rides the states/:id direct address — gate 5a's
-// OWN union source (deriveEventPairStates), never
-// deriveWorkOrderLifecycle's own op-pair replay (its header:
-// statesAddressEvents feeds ONLY applyClaimPair's prior-claim
-// decision, never the returned events array itself — the six-
-// source union in deriveStates keeps the two apart so the SAME
-// event is never double-counted). workOrderLifecycleStatesFor
-// mirrors that exact split: it excludes the standalone unclaim
-// too, matching deriveWorkOrderLifecycle's own bulk subset.
-// Phase Final Task 1(b): row half of PUT states/:id stripped —
-// the old row-plane "4 events" oracle is DROPPED; pin instead
-// that workOrderClaimHistoryFor STILL sees the unclaim while
-// this function excludes it.
-test('workOrderLifecycleStatesFor: a standalone unclaim (bare'
-+ ' PUT /states/:id) is EXCLUDED, matching'
+// Named unclaim via POST work-orders/:id/release — an op-pair
+// leg of deriveWorkOrderLifecycle's own replay (applyReleasePair),
+// so workOrderLifecycleStatesFor INCLUDES the claim_released
+// event and matches the bulk subset. Claim history sees the
+// same row (it rides the replayed half, not gate 5a's states
+// address).
+test('workOrderLifecycleStatesFor: a release op\'s'
++ ' claim_released is INCLUDED, matching'
 + ' deriveWorkOrderLifecycle\'s own bulk subset — claim-history'
-+ ' still includes it (row-oracle half dropped at Task 1(b)'
-+ ' strip)', async () => {
++ ' sees it too', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = 'wo-task1-unclaim';
@@ -341,27 +332,32 @@ test('workOrderLifecycleStatesFor: a standalone unclaim (bare'
     ));
     assert.equal(created.status, 204);
 
-    const unclaimEventId = generateCryptoSafeBase62();
-    const unclaim = await handleRequest(db, req(
-        'PUT', '/states/' + unclaimEventId, token, {
-            entity_id: workOrderId,
-            state: 'claim_released',
-            at: nowUtc(),
+    const releaseEventId = generateCryptoSafeBase62();
+    const releaseAt = nowUtc();
+    const release = await handleRequest(db, req(
+        'POST',
+        '/work-orders/' + workOrderId + '/release',
+        token, {
+            releaseEventId,
+            releaseAt,
         },
     ));
-    assert.equal(unclaim.status, 200);
+    assert.equal(release.status, 204);
 
     const scoped = sortByAtId(
         await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.equal(scoped.length, 3);
+    assert.equal(scoped.length, 4);
     assert.deepEqual(scoped, await bulkRowsFor(db, workOrderId));
-    assert.ok(
-        !scoped.some((row) => row.id === unclaimEventId),
-        'lifecycle must exclude the standalone unclaim',
+    const released = scoped.find(
+        (row) => row.id === releaseEventId,
     );
+    assert.ok(released !== undefined);
+    assert.equal(released!.state, 'claim_released');
+    assert.equal(released!.member_id, 'current');
+    assert.equal(released!.at, releaseAt);
     const claimHistory = sortByAtId(
         await workOrderClaimHistoryFor(
             db, STARK_ORGANIZATION, workOrderId,
@@ -369,23 +365,17 @@ test('workOrderLifecycleStatesFor: a standalone unclaim (bare'
     );
     assert.equal(claimHistory.length, 4);
     assert.ok(
-        claimHistory.some((row) => row.id === unclaimEventId),
-        'claim history must include the standalone unclaim',
+        claimHistory.some((row) => row.id === releaseEventId),
+        'claim history must include the release',
     );
 });
 
-// The claim gate's OWN source (Phase 14 Task 4): the SAME
-// standalone unclaim the test above proves EXCLUDED from
-// workOrderLifecycleStatesFor's return is INCLUDED here —
-// workOrderClaimHistoryFor unions that function's replayed
-// events with this entity's own states/:id address pairs.
-// Phase Final Task 1(b): row half stripped — drop the
-// row-plane getAllFor oracle; pin length + unclaim presence
-// + birth event ids against the live write.
-test('workOrderClaimHistoryFor: the SAME standalone unclaim IS'
-+ ' included, unlike workOrderLifecycleStatesFor\'s own return'
-+ ' — pair-plane pin (row-oracle half dropped at Task 1(b)'
-+ ' strip)', async () => {
+// The claim gate's OWN source (Phase 14 Task 4): release rides
+// the replayed half, so claim history includes it; a later
+// reclaim sees the release and appends a fresh claimed.
+test('workOrderClaimHistoryFor: a release op\'s claim_released'
++ ' is included, and a later reclaim sees the release',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const workOrderId = 'wo-task4-unclaim';
@@ -409,32 +399,61 @@ test('workOrderClaimHistoryFor: the SAME standalone unclaim IS'
     ));
     assert.equal(created.status, 204);
 
-    const unclaimEventId = generateCryptoSafeBase62();
-    const unclaim = await handleRequest(db, req(
-        'PUT', '/states/' + unclaimEventId, token, {
-            entity_id: workOrderId,
-            state: 'claim_released',
-            at: nowUtc(),
+    const releaseEventId = generateCryptoSafeBase62();
+    const releaseAt = nowUtc();
+    const release = await handleRequest(db, req(
+        'POST',
+        '/work-orders/' + workOrderId + '/release',
+        token, {
+            releaseEventId,
+            releaseAt,
         },
     ));
-    assert.equal(unclaim.status, 200);
+    assert.equal(release.status, 204);
 
-    const scoped = sortByAtId(
+    const afterRelease = sortByAtId(
         await workOrderClaimHistoryFor(
             db, STARK_ORGANIZATION, workOrderId,
         ),
     );
-    assert.equal(scoped.length, 4);
+    assert.equal(afterRelease.length, 4);
     assert.deepEqual(
-        scoped.map((row) => row.id),
+        afterRelease.map((row) => row.id),
         [
             workOrderId + '-ev1',
             workOrderId + '-ev2',
             workOrderId + '-ev3',
-            unclaimEventId,
+            releaseEventId,
         ],
     );
-    assert.equal(scoped.at(-1)?.state, 'claim_released');
+    assert.equal(afterRelease.at(-1)?.state, 'claim_released');
+    assert.equal(afterRelease.at(-1)?.member_id, 'current');
+    assert.equal(afterRelease.at(-1)?.at, releaseAt);
+
+    const claimAt = nowUtc();
+    const reclaim = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/claim',
+        token, {
+            claimEventId: workOrderId + '-ce1',
+            claimAt,
+            expireEventId: workOrderId + '-ee1',
+            expireAt: claimAt,
+        },
+    ));
+    assert.equal(reclaim.status, 204);
+
+    const afterReclaim = sortByAtId(
+        await workOrderClaimHistoryFor(
+            db, STARK_ORGANIZATION, workOrderId,
+        ),
+    );
+    assert.deepEqual(
+        afterReclaim.map((row) => row.state),
+        [
+            'n-start', 'n-middle', 'claimed',
+            'claim_released', 'claimed',
+        ],
+    );
 });
 
 test('workOrderLifecycleStatesFor: a never-created work-order id'

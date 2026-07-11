@@ -152,9 +152,8 @@ is HTTP-only.
   the `flows/:id/versions[...]` routes (and the zero-caller
   `GET states/:id` / `GET entity-states/:id` /
   `PUT|DELETE states/:id/field-values/:fvid` families) —
-  bare `GET states/:id` is **405** because PUT survives; the
-  other retirements are router 404. Phase Final DELETED the
-  graph/version tables with the rest of the row plane.
+  all states retirements are router 404. Phase Final DELETED
+  the graph/version tables with the rest of the row plane.
   Ownership fences and field-values visibility resolve on
   the pair plane (`resolveOwningOrganization`,
   `stateEventVisibilityFor`). Flow tags
@@ -324,7 +323,7 @@ round-trip, in-browser ZIP, snapshot import-validation /
 quota / atomic-import / v2-reject / v3 round-trip, the
 memory + localStorage transaction backends, the tx runners
 and view, the commit batch route, api routing, navigation,
-mock-data validity (pair count 1514 / bootstrap 14 absolute;
+mock-data validity (pair count 1506 / bootstrap 13 absolute;
 fingerprint file shrunk to the clients sentinel), the
 two-tier hazard predicate (`flow-graph-hazard.test.ts`),
 presenter SafeHtml, flow-stats pure math + adapter +
@@ -334,9 +333,9 @@ Phase 14 cores: `drift-phase14-cores-parity.test.ts`,
 `pin-invitation-write-path-parity.test.ts`,
 `flow-undo-cursor.test.ts`, `api-flow-tags.test.ts`.
 Phase 15 cores: `drift-phase15-cores-parity.test.ts`,
-`api-states-ownership-fence.test.ts`,
-`derive-state-event-collision.test.ts`. Phase Final adds
-the write-ownership fence pin
+`api-states-ownership-fence.test.ts` (re-scoped to
+retirement pins; every verb on `/states/:id` is a router
+404). Phase Final adds the write-ownership fence pin
 (`api-write-ownership-fence.test.ts`); store/decorator unit
 tests and dual-write shadow-ledger row oracles retired with
 their subjects. See `tests/` for the current set.
@@ -417,17 +416,22 @@ apply to it (RED is the audit's first finding).
   its multi-key flush is still not OS-atomic on a mid-write
   quota error — the one gap IndexedDB closes.
 - **Snapshot version gate.** Every export is stamped with
-  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`, currently **3**) at
+  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`, currently **4**) at
   the reserved key `__schema_version__`. Every import REJECTS
   an absent or mismatched version SERVER-side
   (`parseAndValidateSnapshot`, `SnapshotVersionMismatchError`)
   — before the atomicity above ever runs. ASYMMETRIC: it only
   closes "a new build imports an old export"; an old build's
   importer ignores the unknown key and imports anyway. The
-  constant bumps whenever `TABLE_NAMES` shrinks — Phase 13
+  constant bumps whenever `TABLE_NAMES` shrinks or a family's
+  derivation shape would strand an older export — Phase 13
   Task 9 (identity_tokens + authorization_codes) was 1→2;
-  Phase Final Stage B (doomed entity tables deleted) is 2→3.
-  A pre-Final v2 export is rejected by a post-Final import.
+  Phase Final Stage B (doomed entity tables deleted) is 2→3;
+  states-address retirement is 3→4 (address retirement, not a
+  `TABLE_NAMES` shrink — pre-retirement v3 exports still
+  carry `states/:id` pairs no derive source reads). A
+  pre-retirement v3 export is rejected by a post-retirement
+  import.
 - **`file:///` protocol.** Page URLs use relative paths.
   Code supports `file:///` locally but testing is HTTP-only.
 - **View Transition aborts.** rapid programmatic navigation
@@ -440,18 +444,20 @@ apply to it (RED is the audit's first finding).
   entity's current state is the latest derived event on its
   `entity_id` under the `(at, id)` total order. Reversal is
   a *new* event with the new state, not an edit of a prior
-  pair. Surviving HTTP surface: `GET /states` (derived),
-  `PUT /states/:id` (pair-only append +
-  `stateEventCollisionFromPairs` immutability),
+  pair. Surviving HTTP surface (reads only): `GET /states`
+  (five-source derived union),
   `GET /entity-states/:id/history` (derived + pair-plane
   ownership fence), `GET /states/:id/field-values` (derived
-  collection). Retired: bare `GET /states/:id` (405 — PUT
-  still matches), `GET /entity-states/:id` (404), leaf
-  `PUT|DELETE /states/:id/field-values/:fvid` (404). The
-  `states` table, `StateStore`, and `EntityStore` are
-  DELETED (Phase Final). Document DELETE is a marked
-  tombstone pair; the sole physical hard-delete is PII
-  erasure on the message plane.
+  collection, transition-fold single-source). Lifecycle
+  writes are document-trio PUTs
+  (ideas/projects/records/flows/objectives/members) and
+  named ops (work-order create/claim/transition/release,
+  invitations) — every verb on `/states/:id` is router 404;
+  `stateEventCollisionFromPairs` is gone. The `states`
+  table, `StateStore`, and `EntityStore` are DELETED
+  (Phase Final). Document DELETE is a marked tombstone
+  pair; the sole physical hard-delete is PII erasure on the
+  message plane.
 - **Cross-tab writes are safe (lost-update hazard closed).**
   IndexedDB gives each tab its own connection to one shared
   database, and a pair append is an O(1) `objectStore.put`

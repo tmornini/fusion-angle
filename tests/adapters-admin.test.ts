@@ -238,26 +238,31 @@ test(
         assert.equal(stats.ideasCurrent, 1);
         assert.equal(stats.activePeopleCount, 1);
 
-        // Transitions through later state events (latest by
-        // 'at' wins), posted through the SAME wire-reachable
-        // PUT the live route serves — required for the flipped
-        // GET /states route (Task 7), which getProjectStates/
-        // getIdeaStates/getMemberStates read, to derive them. A
-        // raw db.states.postEvent left no message pair here.
-        await ctx.PUT('states/sp1-next', {
-            entity_id: 'p1',
+        // Transitions through later document-trio PUTs
+        // (latest by 'at' wins) — the states/:id address is
+        // retired; project/idea/member lifecycle rides each
+        // family's own document address.
+        const { organization_id: _projectOrganizationId, ...pFields } =
+            buildProject('p1');
+        await putProject(ctx, 'p1', {
+            ...pFields,
             state: 'declined',
-            at: '2026-01-02T00:00:00.000000Z',
+            stateAt: '2026-01-02T00:00:00.000000Z',
+            stateEventId: 'sp1-next',
         });
-        await ctx.PUT('states/si1-next', {
-            entity_id: 'i1',
+        const { organization_id: _ideaOrganizationId, ...iFields } =
+            buildIdea('i1');
+        await putIdea(ctx, 'i1', {
+            ...iFields,
             state: 'archived',
-            at: '2026-01-02T00:00:01.000000Z',
+            stateAt: '2026-01-02T00:00:01.000000Z',
+            stateEventId: 'si1-next',
         });
-        await ctx.PUT('states/sw1-next', {
-            entity_id: 'u1',
+        await ctx.PUT('members/u1', {
+            type: 'human',
             state: 'archived',
-            at: '2026-01-02T00:00:02.000000Z',
+            state_at: '2026-01-02T00:00:02.000000Z',
+            state_event_id: 'sw1-next',
         });
         stats = await getOrganizationStats(ctx);
         assert.equal(stats.projectsCurrent, 0);
@@ -314,15 +319,18 @@ test(
         const before = await getOrganization(ctx);
         assert.equal(before.lastActivityText(), '—');
 
-        // Re-pointed onto the wire-reachable PUT states/:id
-        // (finding 15's fixture budget): getOrganization's
+        // Re-pointed onto a project document trio: the
+        // states/:id address is retired. getOrganization's
         // deriveOrganizationFacts reads ctx.GET('states'),
-        // which is now ledger-derived, so a raw row here would
-        // never surface in lastActivityText().
-        await ctx.PUT('states/ev1', {
-            entity_id: 'p1',
+        // which derives project lifecycle from the document
+        // plane.
+        const { organization_id: _organizationId, ...pFields } =
+            buildProject('p1');
+        await putProject(ctx, 'p1', {
+            ...pFields,
             state: 'approved',
-            at: '2026-01-01T00:00:00.000000Z',
+            stateAt: '2026-01-01T00:00:00.000000Z',
+            stateEventId: 'ev1',
         });
         const after = await getOrganization(ctx);
         assert.notEqual(after.lastActivityText(), '—');

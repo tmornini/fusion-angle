@@ -196,27 +196,32 @@ appends from sibling tabs both survive (CLAUDE.md § Gotchas —
 "Cross-tab writes are safe"). Re-read tolerantly (`≥ N`) for
 timing rather than asserting exact pair counts.
 
-Post-Phase-Final: every states-backed surface (workbox inbox,
-flow-stats, dashboard, members roster, idea/project/record/
-objective state badges + history views) reads the six-source
-union from the message ledger (`deriveStates` /
-`deriveStatesFor`). There is no `states` table. The ownership
-fence (`resolveOwningOrganization`) makes a foreign org's
-`entity_id` 404 on both `PUT /states/:id` and
-`GET /entity-states/:id/history`. Also closed: WP1 and the
-records hard-delete forgery channel. Write-ownership fence
-preserves foreign-id PUT/DELETE 404 bytes on org-scoped
-families.
+Post-Phase-Final + states-address retirement: every
+states-backed surface (workbox inbox, flow-stats, dashboard,
+members roster, idea/project/record/objective state badges +
+history views) reads the five-source union from the message
+ledger (`deriveStates` / `deriveStatesFor`). There is no
+`states` table and no `/states/:id` write address. Lifecycle
+writes are document-trio PUTs
+(ideas/projects/records/flows/objectives/members) and named
+ops (work-order create/claim/transition/release,
+invitations). The ownership fence
+(`resolveOwningOrganization`) makes a foreign org's
+`entity_id` 404 on `GET /entity-states/:id/history`. Also
+closed: WP1 and the records hard-delete forgery channel.
+Write-ownership fence preserves foreign-id PUT/DELETE 404
+bytes on org-scoped families.
 
-**Retired routes (Phase 15 Task 7) — no browser cases.**
-These addresses have zero product callers; a manual pass
-need not open them. Automated pins cover the status bytes:
-- bare `GET /states/:id` → **405** (PUT survives on the
-  pattern — honest, not collapsed with the open-tree 404)
+**Retired routes — no browser cases.** These addresses have
+zero product callers; a manual pass need not open them.
+Automated pins cover the status bytes:
+- every verb on `/states/:id` → router 404 (address deleted;
+  the old 405-because-PUT-survives case is gone)
 - `GET /entity-states/:id` (current) → router 404
 - `PUT|DELETE /states/:id/field-values/:fvid` → router 404
   (collection `GET /states/:id/field-values` SURVIVES,
-  derived; live writes ride the transition fold only)
+  derived single-source transition fold; live writes ride
+  the transition fold only)
 - `GET|POST|PUT|DELETE /flows/:id/versions[...]` → router 404
   (table DELETED at Phase Final; F66 is MOOT — see F66)
 
@@ -556,7 +561,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
-- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly three: `clients`, `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 14; demo seed 1514). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread. Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
+- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly three: `clients`, `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 13; demo seed 1506). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread. Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -1718,9 +1723,24 @@ designer "tag current" action lands.)
   browser navigates to the action screen
   showing the new state's attributes.
 - [ ] **WB13** Click "Release Work Order". PASS:
-  a single click soft-deletes the active claim
-  and the browser navigates to the inbox, where
-  the work order reappears in the Active tab.
+  a single click posts `POST
+  work-orders/:id/release` (204), soft-releases
+  the active claim, and the browser navigates to
+  the inbox, where the work order reappears in the
+  Active tab.
+- [ ] **WB13a — Claim → unclaim → reclaim.** From
+  the Active tab, click the same work order again
+  (claim). PASS: action screen opens under the
+  caller's claim. Click "Release Work Order"
+  (unclaim via the release op). PASS: back on the
+  Active tab unclaimed. Click the row a third time
+  (reclaim). PASS: claim succeeds again; the pair
+  plane carries the sequence
+  `claimed` → `claim_released` → `claimed` under
+  the `(at, id)` order for this work order's
+  `entity_id` (inspect via
+  `GET /entity-states/:id/history` or the matching
+  op pairs). No `/states/:id` write is involved.
 
 ### Workbox — Completion
 
@@ -1737,16 +1757,22 @@ designer "tag current" action lands.)
 ### Workbox — Data Integrity
 
 - [ ] **WB16** After creating and transitioning
-  a work order, check the IndexedDB stores. PASS: the
-  `work_orders` store has 1 row with `display_id`
-  and `flow_graph` JSON. The `states` table has
-  one row per transition with `entity_id` =
-  work-order id, `state` = the target node id (a
-  base62 token), `member_id` = the actor, and
-  `at` = RFC-3339 Zulu. Per-field values written
-  by the transition land in `state_field_values`
-  rows referencing the state event by
-  `state_event_id`.
+  a work order, inspect `requests`/`responses` (or
+  derived `GET /entity-states/:id/history` and
+  `GET /states/:id/field-values`). PASS: the work-
+  order document pair head carries `display_id` and
+  `flow_graph` JSON; each transition is a
+  `work-orders/:id/transition` operation pair whose
+  body names the target node (base62) and folds
+  per-field values into `fieldValues: [{id,
+  fields}]` — no `states` or `state_field_values`
+  tables, and no leaf pairs. Derived history shows
+  one non-claim event per transition with
+  `entity_id` = work-order id, `state` = target
+  node id, `member_id` = the actor, `at` =
+  RFC-3339 Zulu; field-values derive from the
+  transition fold only
+  (`stateFieldValuesForStateEvent`).
 - [ ] **WB17** Navigate away from the action
   screen and return. PASS: all data persists
   correctly across page navigation.
@@ -1769,7 +1795,7 @@ designer "tag current" action lands.)
   non-claim event has the immutable shape `{id, entity_id,
   state, member_id, at}`, with `state` carrying the target
   node's base62 id — field values derive from the
-  transition-fold / leaf pairs (`stateFieldValuesForStateEvent`),
+  transition-fold only (`stateFieldValuesForStateEvent`),
   referencing the parent event by `state_event_id`. Verify no
   app code path mutates an existing pair — the message plane is
   append-only.
@@ -2246,13 +2272,16 @@ restored data.)
   via `postHumanMemberStateChange` /
   `postAIMemberStateChange` — both kinds expose the same
   State select and share the 3-value vocabulary per
-  Commandment III (Uniformity). Verify via
-  `GET /entity-states/:id/history` or the matching pairs
-  in `requests`/`responses`: an event with
-  `entity_id` = the member's id, `state` = the chosen
-  value, `member_id` = the actor appears — lifecycle is
-  not a column on a member row. After reload the member's
-  badge text and styling reflect the persisted state.
+  Commandment III (Uniformity). The write is a
+  `members/:id` document-trio PUT (not a `/states/:id`
+  event-append). Verify via
+  `GET /entity-states/:id/history` or the matching
+  `members/:id` document pairs in `requests`/`responses`:
+  an event with `entity_id` = the member's id,
+  `state` = the chosen value, `member_id` = the actor
+  appears — lifecycle is not a column on a member row.
+  After reload the member's badge text and styling
+  reflect the persisted state.
 - [ ] **G37 — Boot recovery from a missing schema** With the app loaded, open DevTools → Application → IndexedDB and delete the `fusion-ai` database (or clear the `__schema__` store). Reload a schema-requiring page (e.g. `dashboard/index.html`). PASS: boot reopens a fresh empty database, `hasSchema()` is false, and `core.ts` REDIRECTS to `snapshots/index.html` with the "Your database is empty." banner and the four recovery cards (Download Snapshot / Upload Snapshot / Wipe and Load Mock Data / Create Pristine) — never the terminal "Failed to initialize database" dead-end. Afterward, Wipe and Load Mock Data to restore a healthy DB before continuing. (Unlike the old localStorage tier, IndexedDB object stores always exist post-upgrade, so a hand-corrupted "partial table" shape is no longer reproducible; a genuinely missing store arises only on a schema version bump, where boot throws `MissingTableError` and `redirectIfMissingTable` routes to `snapshots/index.html?missing-table=<name>` with the matching "The schema is missing the \"<name>\" table" banner.) Source: `web-app/app/core.ts` (`redirectIfMissingTable` + the `initDatabase()` catch), `web-app/app/adapters/snapshots.ts` (`getHasAnyHumanMembers`), `web-app/snapshots/index.ts` (`mutateMissingTableBanner`).
 
 ### Billing (`billing/`) — STUB
@@ -2682,7 +2711,7 @@ Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fus
 
 - [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 4 object stores (3 tables in `TABLE_NAMES` — `clients`, `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
-- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org (1514 pairs absolute).
+- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org (1506 pairs absolute).
 - [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
 - [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct pairs concurrently (e.g. two lifecycle state changes). PASS: both pairs survive (count grows by 2) — the old localStorage clobber is gone.
 - [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).

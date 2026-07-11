@@ -80,11 +80,9 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-// Phase Final Task 1(b): claim_released via bare PUT
-// /states/:id is pair-plane-only. workOrderClaimHistoryFor
-// is the claim gate's own two-source union (op pairs +
-// states/:id), so it still sees releases after the row
-// half was stripped.
+// workOrderClaimHistoryFor is the claim gate's sole source
+// (create/claim/transition/release op pairs). Releases ride
+// POST work-orders/:id/release (states/:id retired).
 function claimEventsFor(
     db: MemoryDbAdapter,
 ): Promise<{ state: string; member_id: string }[]> {
@@ -204,23 +202,23 @@ test(
     async () => {
         const db = await seededDb();
         // A live claim by 'other', released via the SAME
-        // standalone PUT states/:id address the live
-        // deleteWorkOrderClaim route uses (workbox's "release
-        // claim" action) — never a raw row poke, so the release
-        // is visible to the flipped gate's own pair-plane read
-        // (workOrderClaimHistoryFor). This is the hazard-closure
-        // scenario itself, driven through postWorkOrderClaimOp
-        // end to end, not just at the derive layer.
+        // POST work-orders/:id/release address the live
+        // deleteWorkOrderClaim adapter uses (workbox's
+        // "release claim" action) — never a raw row poke, so
+        // the release is visible to the flipped gate's own
+        // pair-plane read (workOrderClaimHistoryFor). This is
+        // the hazard-closure scenario itself, driven through
+        // postWorkOrderClaimOp end to end, not just at the
+        // derive layer.
         await seedOrganizationMember(db, 'other');
         await POST(
             db, 'work-orders/wo1/claim',
             freshClaimBody(), await devToken('other'),
         );
-        await PUT(
-            db, 'states/' + generateCryptoSafeBase62(), {
-                entity_id: 'wo1',
-                state: 'claim_released',
-                at: nowUtc(),
+        await POST(
+            db, 'work-orders/wo1/release', {
+                releaseEventId: generateCryptoSafeBase62(),
+                releaseAt: nowUtc(),
             },
             await devToken('other'),
         );

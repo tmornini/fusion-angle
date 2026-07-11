@@ -18,6 +18,7 @@ That mechanism will replace the existing ledger's and common states system by mo
   |  └── :id/
   |      └── claim                            • RECONCILED: claim graph head from workOrderDocumentHeadFor (Phase 15 Task 2); contention 409 + nonexistent-WO 404 held — see Phase 15 FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
   |      └── transition                       • RECONCILED: dangling state_event_id on a field value → 400 at the gate (Phase 15 Task 3, wire delta 4; forged clients only)
+  |      └── release                          • RECONCILED: POST work-orders/:id/release — named unclaim op, 204, read-decide-append, replayed at derive (states-address retirement; replaces the old PUT states/:id unclaim path)
 └─|─ /identities/
   |  └── :id                                   • default-organization is an attribute of the identity itself
   |      └─|─ /credentials                     • all of them, single document
@@ -39,7 +40,7 @@ That mechanism will replace the existing ledger's and common states system by mo
 └─|─ /organizations/
   |  └─|─ :id
   |    |  └── /notifications                  • postgres LISTEN/NOTIFY for all changes to organization
-  |    |  └── /objectives                     • RECONCILED: shipped as per-objective documents at objectives/:id (the seventh registered family, 'simple' + lifecycle 'stateless'), collection served by the generic document handler over per-entity heads, revision history as per-objective message history at objectives/:id/revisions/, NOT a single org document — see the objectives FLIPPED 2026-07-05 block, go-to-church-peaceful-castle.md §Phased sequence (Author gates 1/3)
+  |    |  └── /objectives                     • RECONCILED: shipped as per-objective documents at objectives/:id (the seventh registered family, 'simple' + lifecycle 'trio' — genesis at create, archive/reactivate via the document PUT), collection served by the generic document handler over per-entity heads, revision history as per-objective message history at objectives/:id/revisions/, NOT a single org document — see the objectives FLIPPED 2026-07-05 block + states-address retirement, go-to-church-peaceful-castle.md §Phased sequence (Author gates 1/3)
   |    |  └── /flows/
   |    |      └── :id
   |    |          └── /undo                    • RECONCILED: undo-as-replay (Phase 14 Task 8) — body shrinks to {eventId, at}, both still client-minted; the restore target resolves SERVER-SIDE pre-tx by replaying this flow's OWN flows/:id document-pair history against its OWN undo operation-pair history (stack+pointer, cursor keyed by the undo pairs' stored REQUEST at, never the response at); graphDelta/revivals are now SERVER-computed (SIDECAR-KEEP: the wire SHAPE persists, the client is never told the target to diff against); flow_versions consume/publish stopped (Phase 14), routes RETIRED (Phase 15 Task 7, router 404), TABLE DELETED (Phase Final) — see Phase 14/15/Final FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
@@ -58,7 +59,7 @@ That mechanism will replace the existing ledger's and common states system by mo
    \    \- organization membership authz realm
     \- administration authz realm
 
-└─|─ /states/                                  • RECONCILED (Phase Final as-built): GET /states DERIVED (deriveStates six-source union); PUT /states/:id lives (pair-only append + stateEventCollisionFromPairs immutability; ownership via resolveOwningOrganization — WP1 + records hard-delete forgery CLOSED); states TABLE DELETED (Phase Final); GET /states/:id RETIRED → **405** (PUT survives); GET /entity-states/:id RETIRED → router 404; GET /entity-states/:id/history lives (derived + pair-plane fence); GET /states/:id/field-values lives (derived two-source union; visibility via stateEventVisibilityFor 3-tier — always 200; orphan/own → rows; foreign → []); PUT|DELETE /states/:id/field-values/:fvid RETIRED → router 404 (WRITE_RESPONSE_SPECS + seed address formation SURVIVE) — see Phase 15 + Phase Final FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
+└─|─ /states/                                  • RECONCILED (states-address retirement as-built): GET /states DERIVED (deriveStates five-source union — trio families, members, work-order lifecycle, flow graph, invitations); every verb on /states/:id RETIRED → router 404 (address deleted; the old 405-because-PUT-survives case is gone); GET /entity-states/:id RETIRED → router 404; GET /entity-states/:id/history lives (derived + pair-plane fence via resolveOwningOrganization — WP1 + records hard-delete forgery CLOSED); GET /states/:id/field-values lives (derived single-source transition fold; visibility via stateEventVisibilityFor 3-tier — always 200; orphan/own → rows; foreign → []); PUT|DELETE /states/:id/field-values/:fvid RETIRED → router 404 (WRITE_RESPONSE_SPECS + seed address formation SURVIVE); states TABLE DELETED (Phase Final); lifecycle writes ride document-trio PUTs + named ops (work-order create/claim/transition/release, invitations) — see Phase 15 + Phase Final + states-address retirement FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
 └─|─ /clients[/:id]                            • RECONCILED (Phase Final): no public /clients routes; client credentials resolve via rawReadRow on the KEPT clients table (HistoryEntityStore; Phase 15 gate 6 AS-IS → Final re-point). identity_providers TABLE DELETED (Phase Final gate 1). Follow-on: client = kind-'service' identity + registration facet is a server-tier client-registration phase candidate (would retire the standalone clients noun; sub vs acting client moves to token claims)
 └─|─ index.html
 └─|─ /authentication/
@@ -66,8 +67,8 @@ That mechanism will replace the existing ledger's and common states system by mo
   |  └── authorize
 └─|─ /snapshots/
   |  └── export                               • TARGET-STATE: not shipped as a dedicated route today — export is client-side over GET /snapshots/schema (full snapshot body); a first-class /snapshots/export remains a known future addition
-  |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; version gate SNAPSHOT_SCHEMA_VERSION 3 — pre-Final v2 rejected; survivor keys clients+requests+responses)
-  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1514 pairs / bootstrap 14 absolute through Phase Final; SeededCredentials re-pointed off identity rows at Final Task 1(d))
+  |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; version gate SNAPSHOT_SCHEMA_VERSION 4 — pre-retirement v3 rejected; survivor keys clients+requests+responses)
+  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1506 pairs / bootstrap 13 absolute post states-address retirement; SeededCredentials re-pointed off identity rows at Final Task 1(d))
   |  └── schema                               • RECONCILED: GET|DELETE /snapshots/schema (existence + full export, or drop)
   |  └── bootstrap                            • RECONCILED: POST /snapshots/bootstrap (pristine minimal seed)
   |  └── pristine                             • TARGET-STATE: deferred — bootstrap covers the minimal seed today; a dedicated /snapshots/pristine remains a known future addition if the two seed paths must diverge on the wire

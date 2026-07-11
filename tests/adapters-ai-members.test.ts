@@ -34,6 +34,15 @@ function aiDraft(name: string) {
     };
 }
 
+// Seeded AI members pin this trio (member-fixtures
+// seedAIMember) — putAIMember echoes it byte-identically
+// so a plain edit folds by message_hash.
+const SEEDED_AI_TRIO = {
+    state: 'active' as const,
+    stateAt: '2026-01-01T00:00:00.000000Z',
+    stateEventId: 'st-ai1',
+};
+
 test(
     'postAIMemberCreation lands the parent, detail and'
     + ' initial active event in one operation',
@@ -67,8 +76,8 @@ test(
 );
 
 test(
-    'putAIMember re-puts the facets without a new'
-    + ' state event',
+    'putAIMember re-puts the facets with an echoed'
+    + ' trio and without a new state event',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -79,6 +88,7 @@ test(
         await putAIMember(
             ctx, 'ai1',
             { ...aiDraft('Renamed'), skill_focus: 'qa' },
+            SEEDED_AI_TRIO,
         );
 
         const detail = await getAIMemberEntity(ctx, 'ai1');
@@ -89,7 +99,7 @@ test(
             'members/ai1',
         );
         assert.equal(parent.type, 'ai');
-        // The edit wrote no event — the seeded one holds.
+        // The edit echoed the trio — the seeded event holds.
         const events = await deriveStatesFor(db, '1', 'ai1');
         // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
@@ -98,8 +108,8 @@ test(
 );
 
 test(
-    'postAIMemberStateChange records a state event'
-    + ' without touching the AI member row',
+    'postAIMemberStateChange records a state'
+    + ' change via PUT members/:id',
     async () => {
         const db = new MemoryDbAdapter();
         await seedAdminSchema(db);
@@ -112,13 +122,12 @@ test(
             ctx, 'ai1', 'archived',
         );
 
-        // Phase Final Task 2: detail row half stripped —
-        // pair-plane GET is the entity oracle.
+        // Detail facet is untouched; only the members/:id
+        // document trio moves.
         const after = await getAIMemberEntity(ctx, 'ai1');
         assert.deepEqual(after, before);
-        // Phase Final Task 1(b): archive rides pair-plane-only
-        // PUT /states/:id — pin history via the live derived
-        // path, never the retired row half.
+        // Archive rides PUT members/:id with a fresh trio —
+        // pin history via the live derived path.
         const events = await ctx.GET<StateEntity[]>(
             'entity-states/ai1/history',
         );

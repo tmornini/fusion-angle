@@ -5,14 +5,14 @@ import type {
     IdentityPiiEntity,
     MemberPii,
     MemberState,
+    MemberStateDetail,
 } from '../../../api/types.ts';
 import { HumanMember, nowUtc } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import { getMemberPii } from './identities.ts';
 import {
-    postStateEvent,
-    getMemberState,
-    getMemberStates,
+    getMemberStateDetail,
+    getMemberStateDetails,
 } from './state-events.ts';
 import {
     generateCryptoSafeBase62,
@@ -29,6 +29,7 @@ export type {
     MemberId,
     HumanMemberEntity,
     MemberState,
+    MemberStateDetail,
     DimensionKey,
 } from '../../../api/types.ts';
 
@@ -83,7 +84,7 @@ export function buildHumanMemberMap(
     parents: readonly MemberEntity[],
     details: readonly HumanMemberEntity[],
     piiRows: readonly IdentityPiiEntity[],
-    stateMap: ReadonlyMap<MemberId, MemberState>,
+    stateMap: ReadonlyMap<MemberId, MemberStateDetail>,
 ): Map<MemberId, HumanMember> {
     const detailById = new Map(
         details.map(d => [d.id, d]),
@@ -132,7 +133,7 @@ export async function getHumanMemberMap(
             ctx.GET<IdentityPiiEntity[]>(
                 'identity-pii',
             ),
-            getMemberStates(ctx),
+            getMemberStateDetails(ctx),
         ]);
     return buildHumanMemberMap(
         parents, details, piiRows, stateMap,
@@ -175,7 +176,7 @@ export async function getHumanMember(
                 `human-members/${id}`,
             ),
             getMemberPii(ctx, id),
-            getMemberState(ctx, id),
+            getMemberStateDetail(ctx, id),
         ]);
     return new HumanMember(
         parent, detail, pii, state,
@@ -213,21 +214,27 @@ export class HumanMemberPiiIntakeFailedError extends Error {
 // Re-put the human-member detail facet (the parent member type
 // and identity kind are server-supplied facts the composing
 // POST re-pins; the named composing POST /human-members/:id
-// lands them in ONE transaction; no state event — an edit does
-// not move the member's lifecycle). PII changes via a separate
-// PUT identities/:id/pii second hop, fired IFF the caller
-// supplies a `pii` arg — the dirty check (members/detail.ts's
+// lands them in ONE transaction). The edit body ECHOES the
+// current lifecycle trio verbatim so a byte-identical
+// members/:id re-put folds by message_hash rather than minting
+// a phantom transition. PII changes via a separate PUT
+// identities/:id/pii second hop, fired IFF the caller supplies
+// a `pii` arg — the dirty check (members/detail.ts's
 // saveHumanMember) decides, so a detail-only save stays ONE hop
 // (Phase 10 Task 2's intake decomposition).
 export async function putHumanMember(
     ctx: RequestContext,
     id: string,
     detail: Omit<HumanMemberEntity, 'id'>,
+    stateEcho: MemberStateDetail,
     pii?: Omit<IdentityPiiEntity, 'id'>,
 ): Promise<void> {
     await ctx.POST(`human-members/${id}`, {
         detail: detail as unknown as
             Record<string, unknown>,
+        state: stateEcho.state,
+        stateAt: stateEcho.stateAt,
+        stateEventId: stateEcho.stateEventId,
     });
     if (pii !== undefined) {
         await ctx.PUT(`identities/${id}/pii`, { ...pii });
@@ -271,11 +278,21 @@ export async function postHumanMemberCreation(
     humanMemberChanges.notify();
 }
 
+// A state change is an honest document write: PUT members/:id
+// with a FRESH trio — the postIdeaStateChange composition,
+// pointed at the members document address. Save stays
+// decomposed (Phase 10 Task 2): detail, PII, and state remain
+// independent writes.
 export async function postHumanMemberStateChange(
     ctx: RequestContext,
     id: string,
     state: MemberState,
 ): Promise<void> {
-    await postStateEvent(ctx, id, state);
+    await ctx.PUT(`members/${id}`, {
+        type: 'human',
+        state,
+        state_at: nowUtc(),
+        state_event_id: generateCryptoSafeBase62(),
+    });
     humanMemberChanges.notify();
 }

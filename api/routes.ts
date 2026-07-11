@@ -1,6 +1,5 @@
 import {
     EntityNotFoundError,
-    LedgerImmutabilityError,
 } from './db.ts';
 import type {
     DbAdapter,
@@ -40,6 +39,7 @@ import type {
     WorkOrderEntity,
     MemberEntity,
     MemberKind,
+    MemberState,
     OrganizationEntity,
 } from './types.ts';
 import {
@@ -80,11 +80,10 @@ import {
     validateRecordDocumentBody,
     validateRecordWriteBody,
     validateRoleGrantEntity,
-    validateStateBody,
-    validateStateFieldValueEntity,
     validateWorkOrderClaimBody,
     validateWorkOrderCreateBody,
     validateWorkOrderDocumentBody,
+    validateWorkOrderReleaseBody,
     validateWorkOrderTransitionBody,
     validateWorkOrderFlowGraphJson,
     pickString,
@@ -184,7 +183,6 @@ import {
     deriveStatesFor,
     workOrderClaimHistoryFor,
     workOrderDocumentHeadFor,
-    stateEventCollisionFromPairs,
 } from './derive-states.ts';
 import {
     stateFieldValuesForStateEvent,
@@ -438,36 +436,22 @@ function objectiveDocumentEntityOf(
         position: pickNumber(document.body, 'position'),
     };
 }
-// The objectives wiring row — the seventh family, and the
-// THIRD 'stateless' one, with a THIRD distinct rationale (Author
-// gate 3 — the SECOND named partial amendment to Decision 7).
-// Work-orders' 'stateless' is vacuous-in-practice (its lifecycle
-// CAN be authored, just never through the document address);
-// record-attributes' is vacuous BY CONSTRUCTION (no lifecycle
-// concept exists at all). Objectives are neither: the trio COULD
-// represent the objective alphabet, but is FORBIDDEN three ways
-// — the wire body would have to grow it (a zero-delta
-// violation), a minted genesis event would abort the states 911
-// pin at reseed (the genesis dilemma), and absence-as-active is
-// R2's named covenant — so objectives' lifecycle keeps riding
-// the SHARED states log (already pair-wired) while this
-// document address carries entity fields only. This THIRD
-// distinct rationale once read as evidence that 'stateless'
-// would need to become a type-level fork (Commandment IX: three
-// is pattern) — a claim this comment made when objectives WAS
-// the third instance. The roster phase (Phase 8) adjudicated
-// it: no fork. Memberships (MEMBERSHIPS_WIRING below) is a
-// FOURTH 'stateless' family with yet another distinct rationale,
-// and MEMBERS_WIRING (below, Phase 8 Task 3) is a fifth —
-// 'stateless' stays ONE type covering every one of them, never
-// split.
+// The objectives wiring row — the seventh family, now the
+// FIFTH 'trio' one (states-address retirement). Its three
+// old 'stateless' rationales are all RETIRED with the
+// states/:id address that anchored them: the wire body DOES
+// grow the trio (the zero-delta covenant died with the
+// address), genesis IS an explicit minted event (the seed
+// re-baselined its pins — no 911 pin survives), and
+// absence-as-active (R2) is retired — a fresh objective now
+// carries a genesis event like every other trio family.
 // notFoundTable is 'objectives' — its storage table name
 // matches its family name, like ideas/projects/flows/records
 // (work-orders/record-attributes are the two whose names
 // diverge).
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
-    lifecycle: 'stateless',
+    lifecycle: 'trio',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
@@ -505,21 +489,20 @@ function membershipDocumentEntityOf(
 // fork" claim as history, not standing doctrine): work-orders'
 // 'stateless' is vacuous-in-practice (family-scoped event pairs
 // post through the create/claim/transition ops, just never the
-// document address); objectives' rides the states log's own
-// absence-as-active covenant (R2); the member families
-// (MEMBERS_WIRING below, Phase 8 Task 3, and its ai-members/
-// human-members siblings) share that SAME log WITH a genesis
-// event; record-attributes and memberships share neither — a
-// membership carries NO lifecycle concept
-// whatsoever, a pure join relation (Codd's own teaching: the
-// identities of the joined, plus the moment of union). GET stays
-// hand-written old-plane until Task 8; only PUT rides the
-// generic machinery this task — memberships/:id's own DELETE
-// stays hand-written too, the records/:id template (no generic
-// DELETE component exists). notFoundTable is 'memberships' — its
-// storage table name matches its family name, like ideas/
-// projects/flows/records/objectives (work-orders/record-
-// attributes are the two whose names diverge).
+// document address); objectives and the members parent document
+// (MEMBERS_WIRING below) both now carry document trios on their
+// own addresses (states-address retirement); record-attributes
+// and memberships share neither — a membership carries NO
+// lifecycle concept whatsoever, a pure join relation (Codd's
+// own teaching: the identities of the joined, plus the moment
+// of union). GET stays hand-written old-plane until Task 8;
+// only PUT rides the generic machinery this task —
+// memberships/:id's own DELETE stays hand-written too, the
+// records/:id template (no generic DELETE component exists).
+// notFoundTable is 'memberships' — its storage table name
+// matches its family name, like ideas/projects/flows/records/
+// objectives (work-orders/record-attributes are the two whose
+// names diverge).
 const MEMBERSHIPS_WIRING: DocumentFamilyWiring = {
     family: 'memberships',
     lifecycle: 'stateless',
@@ -528,54 +511,41 @@ const MEMBERSHIPS_WIRING: DocumentFamilyWiring = {
     documentOp: postMembershipDocumentOp,
     entityOf: membershipDocumentEntityOf,
 };
-// The wire body carries exactly the member's own fields (no
-// organization_id anywhere, no trio) — a spread is safe for the
-// SAME reason membershipDocumentEntityOf's own comment gives: no
-// per-field picking needed, and 'stateless' rejects a trio at
-// the gate. `_organization` stays unused: the members directory
-// is GLOBAL plane (family-registry.ts: organizationNested:
-// false) — the FIRST family on it — so there is no fence value
-// to stamp at all.
+// The wire body carries the member's own field ({type}) plus
+// the lifecycle trio — entityOf picks type alone, matching
+// derive-members.ts's memberParentOf and MemberEntity (the
+// trio is lifecycle history, not the directory row). Same
+// strip posture as objectiveDocumentEntityOf. `_organization`
+// stays unused: the members directory is GLOBAL plane
+// (family-registry.ts: organizationNested: false) — the FIRST
+// family on it — so there is no fence value to stamp at all.
 function memberDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
 ): unknown {
     return {
         id: document.uriId,
-        ...document.body,
+        type: pickString(document.body, 'type'),
     };
 }
-// The members wiring row — the ninth family, and the FIFTH
-// 'stateless' one, opening a bucket distinct from all four
-// before it (Author gate 3, verification-corrected — no
-// type-level fork; 'stateless' stays ONE type covering all five
-// rationales). Members, ai-members, and human-members
-// (AI_MEMBERS_WIRING/HUMAN_MEMBERS_WIRING below) share ONE
-// shared-log-WITH-genesis rationale: the shared member id
-// receives REAL states events — a genesis event at create,
-// archive/reactivate via PUT states/:id — so a trio-carrying
-// document plane here would FREEZE every member's state at
-// genesis forever the moment a second states event posted — the
-// decisive refutation, distinct from every prior bucket: NOT
-// work-orders' vacuous-in-practice (family-scoped event pairs
-// post through the create/claim/transition ops, just never the
-// document address, §5.6); NOT objectives' absence-as-active
-// covenant, which rides this SAME shared log but with NO genesis
-// event ever minted (§5.8); NOT record-attributes'/memberships'
-// vacuous-BY-CONSTRUCTION pair, which carry no lifecycle concept
-// whatsoever (§5.9). notFoundTable is 'members' — its storage
-// table name matches its family name, like ideas/projects/flows/
-// records/objectives/memberships (work-orders/record-attributes
-// are the two families whose names diverge). This is also the
-// FIRST 'stateless' row served by a LIVE, wired PUT this SAME
-// commit (documentPutHandler/documentWriteResponseSpec below) —
-// documentWriteResponseSpec's own registration-first consult
-// (document-family.ts, this commit) omits the organization_id
-// stamp for exactly the reason above: no such field exists on
-// this entity at all.
+// The members wiring row — the ninth family, a 'trio' one
+// since the states-address retirement. The old FREEZE-at-
+// genesis refutation is RETIRED: its premise — a competing
+// states/:id log receiving archive/reactivate events the
+// document plane could never see — died with the address.
+// Every lifecycle write now rides THIS document address:
+// create folds initialState* into the members/:id pair, a
+// state change PUTs a fresh trio, a detail edit echoes the
+// current trio byte-identically and FOLDS by message_hash
+// (appendMessagePair's dedup skip) instead of appending;
+// documentLifecycleEvents' first-occurrence-wins dedup by
+// state_event_id resolves any echo that does land. Global
+// plane: no organization stamping (the members directory row
+// carries no organization_id) — see documentWriteResponseSpec's
+// registration-first consult (document-family.ts).
 const MEMBERS_WIRING: DocumentFamilyWiring = {
     family: 'members',
-    lifecycle: 'stateless',
+    lifecycle: 'trio',
     notFoundTable: 'members',
     validateDocument: validateMemberDocumentBody,
     documentOp: postMemberDocumentOp,
@@ -1505,16 +1475,25 @@ export interface ObjectiveCreationPairs {
 // (api/mock-data/seed-message-pairs.ts) consume — the
 // recordDocumentBodyOf precedent.
 
-// The wire body a live PUT objectives/:id would carry for this
-// SAME write: organization_id STRIPPED (the live client's PUT
-// body is `{position}` alone; the org rides the address).
+// The wire body a live PUT objectives/:id would carry for
+// this SAME write: the entity field (organization_id
+// STRIPPED — the org rides the address) plus the lifecycle
+// trio mapped from the create body's initialState* — the
+// recordDocumentBodyOf shape, so a synthesized document pair
+// is byte-indistinguishable from what a live PUT would have
+// stored for the identical write.
 export function objectiveDocumentBodyOf(
     createBody: ObjectiveCreateBody,
 ): Record<string, unknown> {
     const {
         organization_id: _organizationId, ...entity
     } = createBody.objective;
-    return entity;
+    return {
+        ...entity,
+        state: createBody.initialState,
+        state_at: createBody.initialStateAt,
+        state_event_id: createBody.initialStateEventId,
+    };
 }
 
 // The wire body a live PUT objectives/:id/revisions/:rid would
@@ -1532,16 +1511,16 @@ export function objectiveRevisionBodyOf(
 // Objective creation: operation + document + first-revision
 // pairs commit as ONE transaction. Phase Final Task 2:
 // objectives + objective_revisions ROW halves stripped —
-// pure pair-plane write. No state event is written (a
-// fresh objective reads as active until a later archival
-// event), so the handler needs no actor. Exported so the
-// seed can drive objective creation through the same gate
-// the route uses (Decision 6's below-facade carve-out).
-// `pairs` is optional so the seed's below-facade shape
-// keeps compiling; the route always supplies the bundle,
-// since 'objectives' is pair-wired and never bearer-
-// exempt. Create appends THREE pairs — operation,
-// document, revision — in that order, LAST.
+// pure pair-plane write. The genesis lifecycle trio folds
+// onto the document pair via objectiveDocumentBodyOf
+// (states-address retirement); no separate states/:id event
+// is written. Exported so the seed can drive objective
+// creation through the same gate the route uses (Decision
+// 6's below-facade carve-out). `pairs` is optional so the
+// seed's below-facade shape keeps compiling; the route
+// always supplies the bundle, since 'objectives' is pair-
+// wired and never bearer-exempt. Create appends THREE pairs
+// — operation, document, revision — in that order, LAST.
 export async function postObjectiveCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
@@ -1562,23 +1541,19 @@ export async function postObjectiveCreationOp(
     );
 }
 
-// Objective document write — the seventh family, and the THIRD
-// 'stateless' one (OBJECTIVES_WIRING's own comment: a third
-// distinct rationale, Author gate 3). Phase Final Task 2: the
+// Objective document write — the fifth lifecycle-trio family
+// (states-address retirement). Phase Final Task 2: the
 // objectives ROW half is stripped — pure pair-plane write
 // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity.
-// validateObjectiveDocumentBody rejects a body carrying the
-// trio at the gate. NEVER a states event (Global Constraints:
-// the states 911 pin is ABSOLUTE) — no genesis, no trio, no
-// lifecycle walk anywhere in this plane. `pair` is optional so
-// a future below-facade caller keeps compiling; the live route
-// always supplies one, since 'objectives/:id' is pair-wired and
-// never bearer-exempt. The actor parameter is spelled `_actor`
-// for the same reason postWorkOrderDocumentOp/
-// postRecordAttributeDocumentOp spell it that way: there is no
-// state event here to author.
+// validateObjectiveDocumentBody admits entity field plus the
+// lifecycle trio; Task 1 widens the gate only — state-event
+// minting lands with later tasks. `pair` is optional so a
+// future below-facade caller keeps compiling; the live route
+// always supplies one, since 'objectives/:id' is pair-wired
+// and never bearer-exempt. The actor parameter is spelled
+// `_actor` while state-event authorship is still pending.
 export async function postObjectiveDocumentOp(
     db: DbAdapter,
     id: Id,
@@ -1655,14 +1630,26 @@ export interface MemberWritePairs {
 
 // The wire body a live PUT members/:id would carry for this SAME
 // write: `type` alone — validateMemberDocumentBody's only field.
-// The member kind is a server-supplied fact the caller pins
-// (never read off a request body), so this takes the kind
-// directly rather than re-deriving it from a body shape — the
-// ONE builder both the ai and human create/edit sites share.
+// The wire body a live PUT members/:id would carry for this
+// SAME write: `type` plus the lifecycle trio. The member kind
+// is a server-supplied fact the caller pins; the trio is the
+// caller's own — initialState* mapped on create, the echoed
+// (or freshly minted) trio on edit/state-change. The ONE
+// builder all ai/human create/edit sites share.
 export function memberDocumentBodyOf(
     type: MemberKind,
+    trio: {
+        readonly state: MemberState;
+        readonly stateAt: string;
+        readonly stateEventId: string;
+    },
 ): Record<string, unknown> {
-    return { type };
+    return {
+        type,
+        state: trio.state,
+        state_at: trio.stateAt,
+        state_event_id: trio.stateEventId,
+    };
 }
 
 // The wire body a live PUT identities/:id would carry for this
@@ -2067,6 +2054,58 @@ export async function postWorkOrderClaimOp(
             // Phase Final Task 2: states ROW half stripped —
             // claim_expired + claimed live on the op pair body
             // (workOrderClaimHistoryFor reads them back).
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+        },
+    );
+}
+
+// Release a work order's claim — the claim op's single-
+// transaction, pair-on-every-exit shape. Unlike claim, no
+// gate decision exists here: release has no 409 branch, and
+// the pair appends whether or not a live claim exists (a
+// wired route must never resolve a pair the transaction
+// never stored), so deciding liveness at the gate would
+// change nothing observable. The decision is made ONCE, at
+// derive time (applyReleasePair): a live unexpired claim as
+// of releaseAt derives the claim_released event; otherwise
+// the pair derives zero events — the idempotent no-op. 204
+// either way. The head read below is the 404 existence and
+// org fence, nothing more. Release stays open to any org
+// member (today's unclaim posture; the UI shows Unclaim only
+// when claimed).
+//
+// NOTE the deliberate shape: unlike claim, release has NO
+// foreign-claim 409 and NO branch that skips the append —
+// the live-or-not decision is REPLAYED at derive time
+// (Task 10's applyReleasePair), deterministically, from the
+// same (at, id)-ordered history the gate would read. The
+// gate itself only guards existence (404) and body validity
+// (400). This keeps the op idempotent (a resend folds by
+// message_hash) and keeps gate and derive from ever
+// disagreeing. The head read stays even though lockTimeout
+// is only consumed at replay: it IS the 404 existence fence.
+export async function postWorkOrderReleaseOp(
+    db: DbAdapter,
+    workOrderId: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    organization: Id,
+    pair?: MessagePair,
+): Promise<void> {
+    return db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            validateWorkOrderReleaseBody(body);
+            const wo = await workOrderDocumentHeadFor(
+                view, organization, workOrderId,
+            );
+            if (wo === null) {
+                throw new EntityNotFoundError(
+                    'work_orders', workOrderId,
+                );
+            }
             if (pair !== undefined) {
                 await appendMessagePair(view, pair);
             }
@@ -2575,14 +2614,6 @@ export const WRITE_RESPONSE_SPECS:
             ),
         }),
     },
-    'states/:id': {
-        status: 200,
-        successBody: (params, body, actor) => ({
-            id: param(params, 0),
-            ...validateStateBody(withoutId(body ?? {})),
-            member_id: actor,
-        }),
-    },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
     // entry above for the shared rationale.
@@ -2613,6 +2644,7 @@ export const WRITE_RESPONSE_SPECS:
     'work-orders/:id':
         documentWriteResponseSpec(WORK_ORDERS_WIRING),
     'work-orders/:id/claim': { status: 204 },
+    'work-orders/:id/release': { status: 204 },
     'work-orders/:id/transition': { status: 204 },
     'flows/:id/work-orders/:woid': {
         status: 200,
@@ -2855,23 +2887,6 @@ export const WRITE_RESPONSE_SPECS:
             ),
         }),
     },
-    // SEED-FORMATION CONSTRAINT (Phase 15 Task 7 / finding 7):
-    // the leaf write routes RETIRE below, but this entry
-    // SURVIVES — formSeedPair re-forms the 7 mock
-    // state_field_values pairs at
-    // states/:id/field-values/:fvid on every reseed
-    // (EXPECTED_PAIR_COUNT 1514 absolute). Live product
-    // writes ride the transition fold only; address-
-    // formation machinery must stay for seed fidelity.
-    'states/:id/field-values/:fvid': {
-        status: 200,
-        successBody: (params, body) => ({
-            id: param(params, 1),
-            ...validateStateFieldValueEntity(
-                withoutId(body ?? {}),
-            ),
-        }),
-    },
 };
 
 // The plain/PerVerb resolution every route-inline document-pair
@@ -3058,7 +3073,11 @@ export const routes: Route[] = [
                 pair !== undefined && organization !== undefined
             ) {
                 const b = validateAIMemberCreateBody(body);
-                const memberBody = memberDocumentBodyOf('ai');
+                const memberBody = memberDocumentBodyOf('ai', {
+                    state: b.initialState,
+                    stateAt: b.initialStateAt,
+                    stateEventId: b.initialStateEventId,
+                });
                 validateMemberDocumentBody(memberBody);
                 const memberDocument = await formDocumentPairFor(
                     db, {
@@ -3120,13 +3139,15 @@ export const routes: Route[] = [
             if (
                 pair !== undefined && organization !== undefined
             ) {
-                // Gate-check only (result discarded): guarantees
-                // body.detail is present and object-shaped before
-                // aiMemberDetailBodyOf reads it below — the SAME
-                // discard-the-result pattern the objectives route
-                // above uses for its OWN synthesized-body checks.
-                validateAIMemberEditBody(body);
-                const memberBody = memberDocumentBodyOf('ai');
+                // Bound (not discarded): detail shape plus the
+                // echoed lifecycle trio, threaded into the
+                // synthesized members/:id document body.
+                const e = validateAIMemberEditBody(body);
+                const memberBody = memberDocumentBodyOf('ai', {
+                    state: e.state,
+                    stateAt: e.stateAt,
+                    stateEventId: e.stateEventId,
+                });
                 validateMemberDocumentBody(memberBody);
                 const memberDocument = await formDocumentPairFor(
                     db, {
@@ -3184,7 +3205,11 @@ export const routes: Route[] = [
                 pair !== undefined && organization !== undefined
             ) {
                 const b = validateHumanMemberCreateBody(body);
-                const memberBody = memberDocumentBodyOf('human');
+                const memberBody = memberDocumentBodyOf('human', {
+                    state: b.initialState,
+                    stateAt: b.initialStateAt,
+                    stateEventId: b.initialStateEventId,
+                });
                 validateMemberDocumentBody(memberBody);
                 const memberDocument = await formDocumentPairFor(
                     db, {
@@ -3261,14 +3286,17 @@ export const routes: Route[] = [
             if (
                 pair !== undefined && organization !== undefined
             ) {
-                // Gate-check only (result discarded): guarantees
-                // body.detail is present and object-shaped before
-                // humanMemberDetailBodyOf reads it below — the
-                // SAME discard-the-result pattern the objectives
-                // route above uses for its OWN synthesized-body
-                // checks.
-                validateHumanMemberEditBody(body);
-                const memberBody = memberDocumentBodyOf('human');
+                // Bound (not discarded): detail shape plus the
+                // echoed lifecycle trio, threaded into the
+                // synthesized members/:id document body.
+                const e = validateHumanMemberEditBody(body);
+                const memberBody = memberDocumentBodyOf(
+                    'human', {
+                        state: e.state,
+                        stateAt: e.stateAt,
+                        stateEventId: e.stateEventId,
+                    },
+                );
                 validateMemberDocumentBody(memberBody);
                 const memberDocument = await formDocumentPairFor(
                     db, {
@@ -4278,6 +4306,16 @@ export const routes: Route[] = [
             ),
     }),
     // Member-tier POST — /work-orders carries POST in
+    // MEMBER_VERBS. See postWorkOrderReleaseOp for the
+    // transaction shape.
+    route('work-orders/:id/release', {
+        post: (db, p, body, actor, pair, organization) =>
+            postWorkOrderReleaseOp(
+                db, param(p, 0), body, actor,
+                requireOrganization(organization), pair,
+            ),
+    }),
+    // Member-tier POST — /work-orders carries POST in
     // MEMBER_VERBS, and isPermitted matches on the segment
     // prefix, so the sub-route is member-permitted like
     // /claim. See postWorkOrderTransitionOp for the
@@ -4905,48 +4943,9 @@ export const routes: Route[] = [
         get: (db, _p, _actor, organization) =>
             deriveStates(db, requireOrganization(organization)),
     }),
-    // GET states/:id RETIRED (Phase 15 Task 7): zero product
-    // callers; bare event-by-id read is dead. PUT survives —
-    // members/ai-members/objectives/work-orders unclaim and
-    // the ownership write fence still ride it.
-    route('states/:id', {
-        // The author is the verified caller (actor), stamped
-        // over any client-supplied member_id — the ledger
-        // records who acted, not who the body claims.
-        //
-        // Phase Final Task 1(b): ROW HALF STRIPPED. Immutability
-        // is pair-plane only (stateEventCollisionFromPairs);
-        // WRITE_RESPONSE_SPECS successBody forms the wire
-        // bytes. Seed still writes states rows until the
-        // states-trace strip commit.
-        put: (db, p, body, actor, pair) => {
-            const id = param(p, 0);
-            return db.transaction(
-                ['requests', 'responses'],
-                async (view) => {
-                    const fields = {
-                        ...validateStateBody(
-                            withoutId(body),
-                        ),
-                        member_id: actor,
-                    };
-                    const pairCollision =
-                        await stateEventCollisionFromPairs(
-                            view, id, fields,
-                        );
-                    if (pairCollision === 'conflict') {
-                        throw new LedgerImmutabilityError(
-                            'states', id,
-                        );
-                    }
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
-                    }
-                    return { id, ...fields };
-                },
-            );
-        },
-    }),
+    // states/:id RETIRED (states-address retirement Task 13):
+    // every verb on the address is a router 404. Collection
+    // GET /states and GET /states/:id/field-values survive.
     // bare GET entity-states/:id RETIRED (Phase 15 Task 7):
     // zero product callers. History below is the LIVE read.
     // GET is FLIPPED (Phase 14 Task 7): derives via
