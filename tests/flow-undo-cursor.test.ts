@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { UniqueConstraintError } from '../api/db.ts';
 import { handleRequest, RequestError } from '../api/api.ts';
 import { deriveFlowGraphStates } from '../api/derive-states.ts';
@@ -74,7 +77,7 @@ function req(
 }
 
 async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }
@@ -379,7 +382,7 @@ test(
     + ' attempt 2 succeeds with no client-side baseline'
     + ' refetch',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const flowId = 'cursor-retry';
         const ctx = createRequestContext(db, DEV_TOKEN);

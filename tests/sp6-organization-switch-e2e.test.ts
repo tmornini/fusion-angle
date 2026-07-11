@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
@@ -21,7 +24,7 @@ import { devToken } from './token-fixtures.ts';
 // hidden from org '2'.
 
 async function seeded(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
     return db;

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { deriveStatesFor } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -33,7 +33,7 @@ test(
     'postRecordChange create writes the row and'
     + ' the initial state event',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
@@ -61,7 +61,7 @@ test(
     'postRecordChange create writes attributes'
     + ' alongside the record',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
@@ -96,7 +96,7 @@ test(
 test(
     'putRecord overwrites an existing row',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
@@ -128,7 +128,7 @@ test(
     'postRecordChange edit replaces removed'
     + ' attributes with new ones',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
@@ -188,7 +188,7 @@ test(
     'getRecords excludes records whose latest'
     + ' state event is deleted',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
@@ -228,7 +228,7 @@ test(
     'postRecordStateChange records a new event'
     + ' without touching the entity row',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());
@@ -259,7 +259,7 @@ test(
     'getRecordState throws when no state event'
     + ' exists for the record',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await assert.rejects(
@@ -273,7 +273,7 @@ test(
     'state events for records land in the unified'
     + ' states log',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await organizationToken());

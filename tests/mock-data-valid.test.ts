@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
@@ -86,7 +89,7 @@ function withoutId(
 type Validator = (b: Record<string, unknown>) => unknown;
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
     return db;
@@ -117,7 +120,6 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
         ...document.body,
     }),
 };
-
 
 // Phase Final Task 2: states ROW half stripped — validate
 // the derived plane (pair-plane truth).

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { deriveStates } from
     '../api/derive-states.ts';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad, postBootstrap } from '../api/mock-data.ts';
 import { sha256Hex } from '../shared/digest.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
@@ -136,7 +136,7 @@ const EXPECTED_PAIR_COUNT = 1506;
 
 test('a mock-data seed populates balanced pairs',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
@@ -146,7 +146,7 @@ async () => {
 
 test('the mock-data seed forms exactly the traced'
 + ' op-invocation count', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     assert.equal(requests.length, EXPECTED_PAIR_COUNT);
@@ -158,7 +158,7 @@ test('the mock-data seed forms exactly the traced'
 
 test('every seed op body carries a unique entity id, so no'
 + ' two request hashes collide', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const distinctHashes = new Set(
@@ -171,7 +171,7 @@ test('every seed op body carries a unique entity id, so no'
 
 test('a seeded idea create pair sits at its entity address',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstIdea = buildIdeas()[0]!;
     const requests = await db.requests.getAll();
@@ -188,7 +188,7 @@ test('a seeded organizations pair sits at the global'
 + ' organization exactly (Phase Final Task 2: organizations'
 + ' ROW half stripped — pair-plane truth)',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const row = requests.find(
@@ -216,7 +216,7 @@ async () => {
 
 test('a seeded human-member create pair sits at the global'
 + ' (non-org-nested) address', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const row = requests.find(r => r.uri_id === 'current');
@@ -227,7 +227,7 @@ test('a seeded human-member create pair sits at the global'
 test('a seeded human member\'s PII intake pair sits at its own'
 + ' identities/:id/pii address, its body carrying the four PII'
 + ' keys (Phase 10 Task 2\'s intake decomposition)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstMember = buildMembers()[0]!;
     const requests = await db.requests.getAll();
@@ -249,7 +249,7 @@ test('a seeded human member\'s PII intake pair sits at its own'
 test('a seeded human member\'s identities-document pair sits at'
 + ' the shared identities/:id address, its body carrying `kind`'
 + ' alone (Phase 10 Task 5)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstMember = buildMembers()[0]!;
     const requests = await db.requests.getAll();
@@ -268,7 +268,7 @@ test('a seeded human member\'s identities-document pair sits at'
 
 test('a seeded flow create pair sits at its org-nested'
 + ' entity address', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const row = requests.find(
@@ -280,7 +280,7 @@ test('a seeded flow create pair sits at its org-nested'
 
 test('a seeded ai-member create pair sits at the global'
 + ' (non-org-nested) address', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstAiMember = buildAiMembers()[0]!;
     const requests = await db.requests.getAll();
@@ -304,7 +304,7 @@ test('a seeded ai-member create pair sits at the global'
 test('a seeded ai-member\'s member-document pair sits at the'
 + ' shared members/:id address, its body carrying type plus'
 + ' the lifecycle trio', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstAiMember = buildAiMembers()[0]!;
     const requests = await db.requests.getAll();
@@ -331,7 +331,7 @@ test('a seeded ai-member\'s member-document pair sits at the'
 test('a seeded ai-member\'s detail-document pair sits at its'
 + ' entity address, its body carrying the four AI detail'
 + ' keys', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstAiMember = buildAiMembers()[0]!;
     const requests = await db.requests.getAll();
@@ -363,7 +363,7 @@ test('a seeded ai-member\'s detail-document pair sits at its'
 test('a seeded system member\'s member-document pair sits at'
 + ' the shared members/:id address, its body carrying type'
 + ' plus the lifecycle trio (genesis folded in)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const memberRow = requests.find(
@@ -389,7 +389,7 @@ test('a seeded system member\'s member-document pair sits at'
 test('a seeded membership document pair sits at its org-nested'
 + ' entity address, its body carrying the three membership'
 + ' keys', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstAiMember = buildAiMembers()[0]!;
     const requests = await db.requests.getAll();
@@ -413,7 +413,7 @@ test('a seeded membership document pair sits at its org-nested'
 test('a seeded default-org pair sits at its identity-keyed'
 + ' address, its body carrying the three default-org keys',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstMember = buildMembers()[0]!;
     const requests = await db.requests.getAll();
@@ -434,7 +434,7 @@ async () => {
 
 test('a seeded record create pair sits at its org-nested'
 + ' entity address', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const row = requests.find(
@@ -447,7 +447,7 @@ test('a seeded record create pair sits at its org-nested'
 test('a seeded record\'s document pair sits at its'
 + ' entity address, its body carrying the entity plus the'
 + ' state trio (no id or organization_id key)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const responseById = new Map(
@@ -484,7 +484,7 @@ test('a seeded record\'s document pair sits at its'
 test('a seeded record attribute\'s document pair sits at'
 + ' its own entity address, its body carrying no id or'
 + ' organization_id key', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstAttribute = buildRecordAttributes()[0]!;
     const requests = await db.requests.getAll();
@@ -512,7 +512,7 @@ test('a seeded record attribute\'s document pair sits at'
 
 test('a seeded objective create pair sits at its org-nested'
 + ' entity address, per org', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const starkSeed = OBJECTIVE_SEEDS[0]!;
@@ -545,7 +545,7 @@ test('a seeded objective create pair sits at its org-nested'
 test('a seeded objective\'s document pair sits at its'
 + ' entity address, body carrying position plus the'
 + ' lifecycle trio and no organization_id key', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const starkSeed = OBJECTIVE_SEEDS[0]!;
     const requests = await db.requests.getAll();
@@ -583,7 +583,7 @@ test('a seeded objective\'s document pair sits at its'
 test('a seeded objective\'s revision pair sits at its own'
 + ' entity address, its body carrying the five revision'
 + ' keys', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const starkSeed = OBJECTIVE_SEEDS[0]!;
     const revisionId = `${starkSeed.id}:${MOCK_SEED_TIMESTAMP}`;
@@ -608,7 +608,7 @@ test('a seeded objective\'s revision pair sits at its own'
 
 test('a seeded work-order document pair sits at its org-nested'
 + ' entity address, its body carrying no id key', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstWorkOrder = buildWorkOrders()[0]!;
     const requests = await db.requests.getAll();
@@ -633,7 +633,7 @@ test('a seeded work-order document pair sits at its org-nested'
 test('a seeded flow-work-order join pair sits at its'
 + ' org-nested join address, its body carrying no id key',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstJoin = buildFlowWorkOrderJoins()[0]!;
     const requests = await db.requests.getAll();
@@ -655,7 +655,7 @@ async () => {
 
 test('a seeded flow-record join pair sits at its org-nested'
 + ' join address, its body carrying no id key', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstJoin = mockFlowRecords[0]!;
     const requests = await db.requests.getAll();
@@ -703,7 +703,7 @@ function transitionRequestForEvent(
 test('a seeded work-order trace event\'s pair sits at its'
 + ' org-nested transition address, its body carrying the'
 + ' transition keys (states/:id retired)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstTrace = buildWorkOrderStateEvents()[0]!;
     const requests = await db.requests.getAll();
@@ -739,7 +739,7 @@ test('a seeded transition pair\'s stored request'
 + ' member_id (the role-grant precedent: fingerprints hash'
 + ' ids only, so a wrong-but-real member_id is otherwise'
 + ' fingerprint-invisible)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstTrace = buildWorkOrderStateEvents()[0]!;
     const requests = await db.requests.getAll();
@@ -778,7 +778,7 @@ test('a seeded transition pair\'s stored request'
 
 test('a seeded state_field_value folds into its parent'
 + ' transition body (no bare leaf pair)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstFieldValue = mockStateFieldValues[0]!;
     const requests = await db.requests.getAll();
@@ -827,7 +827,7 @@ test('a seeded state_field_value folds into its parent'
 test('the mock-data seed\'s system-member genesis rides the'
 + ' members/:id document trio — no bare states/:id pair',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const eventId =
         `seed-member-${SYSTEM_MEMBER_ID}-active`;
@@ -864,7 +864,7 @@ const scoreRows = buildSeedScoreRows(
 
 test('a seeded baseline-score pair sits at its org-nested'
 + ' entity address, its body carrying no id key', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstBaseline = scoreRows.baselines[0]!;
     const requests = await db.requests.getAll();
@@ -887,7 +887,7 @@ test('a seeded baseline-score pair sits at its org-nested'
 
 test('a seeded actual-score pair sits at its org-nested'
 + ' entity address, its body carrying no id key', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const firstActual = scoreRows.actuals[0]!;
     const requests = await db.requests.getAll();
@@ -919,7 +919,7 @@ async () => {
     // human occupies. Phase Final Task 2: objective_revisions
     // ROW half stripped — compare create-op embedded revision
     // author against the revision document pair body.
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const requests = await db.requests.getAll();
     const responseById = new Map(
@@ -964,7 +964,7 @@ test('a seeded credential\'s response body carries the full'
 + ' credential key set (Phase 10 Task 6 — content is'
 + ' nondeterministic per reseed, finding 13, so only the'
 + ' key set is falsifiable here)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const id = 'seed-cred-system-client-secret';
     const requests = await db.requests.getAll();
@@ -988,7 +988,7 @@ test('a seeded role grant\'s response body organization_id'
 + ' matches the derived grant (Phase 10 Task 6 org-stamp'
 + ' regression; Phase Final Task 2 strips role_grants ROW'
 + ' half — oracle is the pair plane)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const id = 'seed-role-current-admin-org2';
     // Phase Final Task 2: role_grants empty after strip.
@@ -1012,7 +1012,7 @@ test('a seeded role grant\'s response body organization_id'
 });
 
 test('seed pairs verify against their hashes', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     for (const row of await db.requests.getAll()) {
         assert.equal(
@@ -1029,7 +1029,7 @@ test('seed pairs verify against their hashes', async () => {
 test('a bootstrap seed populates exactly thirteen balanced,'
 + ' hash-verified pairs for the current member and the system'
 + ' member', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postBootstrap(db);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();

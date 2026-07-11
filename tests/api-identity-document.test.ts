@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { PUT } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
@@ -121,7 +124,7 @@ test('validateIdentityDocumentBody rejects an unknown kind,'
 test('postIdentityDocumentOp writes exactly the pair'
 + ' (Phase Final Task 2: identities ROW half stripped)',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = identityFields();
     const pair = await formWritePair({
@@ -150,7 +153,7 @@ async () => {
 
 test('a byte-identical PUT resend to identities/:id converges'
 + ' to one stored request/response pair', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = identityFields();
     const first = await PUT(
@@ -229,7 +232,7 @@ async function deleteDocumentPair(
 test('a PUT chain Supersedes-chains and the head derives the'
 + ' LATEST body, through the generic document handlers'
 + ' (identities)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('identities')!;
     const first = identityFields();
@@ -262,7 +265,7 @@ test('a PUT chain Supersedes-chains and the head derives the'
 
 test('a DELETE-head derives absent through the generic document'
 + ' handlers, carrying notFoundTable (identities)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('identities')!;
     await putDocumentPair(
@@ -298,7 +301,7 @@ test('a DELETE-head derives absent through the generic document'
 
 test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
 + ' {id, kind} only, no organization_id', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = identityFields();
     const written = await PUT<Record<string, unknown>>(

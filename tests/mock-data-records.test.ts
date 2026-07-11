@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import { deriveStatesFor } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { postMockDataLoad } from
     '../api/mock-data.ts';
 import {
@@ -45,7 +48,7 @@ import {
 // row halves stripped — assertions ride the pair plane.
 
 async function seeded(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
     return db;

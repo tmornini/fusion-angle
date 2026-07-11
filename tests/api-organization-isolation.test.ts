@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import {
@@ -58,7 +61,7 @@ function req(
 // org '1' grant + membership keep the flat-token enumerate
 // test authorized.
 async function twoOrganizations(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     // A real organizations/:id document (Phase 13 Task 3's fixture
     // prerequisite): deriveMembershipsForIdentity enumerates via
@@ -181,7 +184,7 @@ test('the facade requires a bearer token', async () => {
 // not a role; org-owned reads and writes stay admin-gated.
 
 async function rolelessMemberDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     // seedAdminSchema (not bare postSchemaCreation) so `current`
     // can create org A through the live document PUT below —
     // the flipped GET /organizations (Phase 12 Task 5) derives
@@ -590,7 +593,7 @@ async function seedRoleGrantPair(
 }
 
 async function deepDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     // A's and B's own organizations/:id documents, FIRST and
     // below-facade (Phase 13 Task 3's fixture prerequisite): both

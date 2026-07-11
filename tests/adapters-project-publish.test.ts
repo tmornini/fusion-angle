@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
@@ -74,7 +74,7 @@ test('archival validator: not ready when actuals missing',
 
 test('postProjectApproval moves state to approved',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await devToken());
@@ -116,7 +116,7 @@ test('postProjectApproval moves state to approved',
 
 test('postProjectApproval throws when not ready',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await devToken());
@@ -142,7 +142,7 @@ test('postProjectApproval throws when not ready',
 
 test('postProjectArchival moves state to archived',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = createRequestContext(db, await devToken());

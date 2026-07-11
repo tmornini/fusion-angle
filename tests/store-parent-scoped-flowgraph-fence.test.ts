@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
@@ -175,7 +178,7 @@ async function seedRoleGrantPair(
 // edge (the 'deleted' state). `current` is admin+member of A;
 // no membership in B.
 async function seed(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     // A's own organizations/:id document, FIRST and below-facade
     // (Phase 13 Task 3's fixture prerequisite): organizationIds

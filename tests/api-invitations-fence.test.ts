@@ -5,7 +5,10 @@ import {
 import { currentInvitationState } from
     '../api/invitations-domain.ts';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
@@ -160,7 +163,7 @@ function req(
 // deny-by-default policy forbids her on gated routes, which is
 // exactly why the invitation facade must stand outside it.
 async function seed(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     // Real organizations/:id documents (Phase 13 Task 3's fixture
     // prerequisite) — a raw db.organizations.put leaves '1'/'2'

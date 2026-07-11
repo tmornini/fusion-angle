@@ -4,7 +4,8 @@ import { deriveStatesFor } from
 import { strict as assert } from 'node:assert';
 import { GET, POST, PUT } from '../api/api.ts';
 import {
-    MemoryDbAdapter,
+    memoryDbAdapter,
+    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
@@ -62,7 +63,7 @@ function baselineFields(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     // The source idea, already approved — seeded through the
     // wire (Phase 15 Task 7): bare entity-states/:id retired;

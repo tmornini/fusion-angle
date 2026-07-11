@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { PUT, handleRequest } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     DEV_TOKEN,
     organizationToken,
@@ -145,7 +148,7 @@ test('validateObjectiveDocumentBody rejects a state outside'
 
 test('PUT objectives/:id accepts the lifecycle trio and'
 + ' echoes the entity fields', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -168,7 +171,7 @@ test('PUT objectives/:id accepts the lifecycle trio and'
 
 test('PUT objectives/:id without the trio is 400',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -180,7 +183,7 @@ async () => {
 
 test('PUT objectives/:id rejects a state outside the'
 + ' objective alphabet', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -199,7 +202,7 @@ test('PUT objectives/:id rejects a state outside the'
 test('postObjectiveDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped)',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = {
         ...documentFields(),
@@ -240,7 +243,7 @@ async () => {
 
 test('a byte-identical PUT resend to objectives/:id converges'
 + ' to one stored request/response pair', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = documentFields();
     const first = await PUT(
@@ -312,7 +315,7 @@ async function deleteDocumentPair(
 test('a PUT chain at one objective address Supersedes-chains,'
 + ' and documentGetHandler derives the LATEST head',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putDocumentPair(
         db, 'obj-chain-1',
@@ -340,7 +343,7 @@ async () => {
 test('a DELETE-head derives absent through the generic'
 + ' document handlers, carrying notFoundTable, never the'
 + ' family', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putDocumentPair(
         db, 'obj-del-1',

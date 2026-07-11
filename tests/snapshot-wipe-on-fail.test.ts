@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    LocalStorageDbAdapter,
-} from '../api/db-localstorage.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { localStorageDbAdapter } from '../api/db-localstorage.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     SNAPSHOT_SCHEMA_VERSION,
     SNAPSHOT_SCHEMA_VERSION_KEY,
@@ -56,7 +54,7 @@ test(
     'a storage write failure surfaces as a rejection',
     async () => {
         installFailingShim(3);
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.initialize();
         const snapshot = JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
@@ -72,7 +70,7 @@ test(
 test(
     'a rejected import leaves prior data intact',
     async () => {
-        const adapter = new MemoryDbAdapter();
+        const adapter = memoryDbAdapter();
         await adapter.putSnapshot(JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,

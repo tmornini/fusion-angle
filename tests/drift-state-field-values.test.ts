@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { POST, PUT, handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
@@ -51,7 +54,7 @@ function graphJson(): string {
 
 // Seed via REAL PUT so the WO carries a document pair.
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     await PUT(

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     postMockDataLoad,
     postBootstrap,
@@ -13,7 +13,7 @@ import { deriveMembershipsForIdentity } from
 import { buildMembers } from '../api/mock-data/members.ts';
 
 async function mockSeeded() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
     return db;
@@ -48,7 +48,7 @@ async () => {
 
 test("bootstrap seeds 'current' a default-org event for org 1",
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
     const defaults = await deriveDefaultOrganization(

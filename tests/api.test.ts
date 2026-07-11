@@ -5,9 +5,7 @@ import {
     RequestError,
     handleRequest,
 } from '../api/api.ts';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     seedHumanMember,
     seedAIMember,
@@ -18,7 +16,7 @@ import {
 } from './test-fixtures.ts';
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { Id, MembershipEntity } from '../api/types.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
@@ -49,7 +52,7 @@ function sortById<T extends { id: string }>(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     return db;
 }

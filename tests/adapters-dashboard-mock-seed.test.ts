@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
@@ -22,7 +22,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 
 test('mock seed produces portfolio Impact baseline +50',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());
@@ -37,7 +37,7 @@ test('mock seed produces portfolio Impact baseline +50',
 
 test('mock seed produces per-objective baseline means',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await postMockDataLoad(db);
         const ctx = createRequestContext(db, await devToken());

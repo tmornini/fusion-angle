@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    LocalStorageDbAdapter,
-} from '../api/db-localstorage.ts';
+import { localStorageDbAdapter } from '../api/db-localstorage.ts';
 import {
     SNAPSHOT_SCHEMA_VERSION,
     SNAPSHOT_SCHEMA_VERSION_KEY,
@@ -35,7 +33,7 @@ async function rejectsImport(
     json: string, pattern: RegExp,
 ): Promise<void> {
     installShim();
-    const adapter = new LocalStorageDbAdapter();
+    const adapter = localStorageDbAdapter();
     await assert.rejects(
         () => adapter.putSnapshot(json),
         pattern,
@@ -44,7 +42,7 @@ async function rejectsImport(
 
 async function acceptsImport(json: string): Promise<void> {
     installShim();
-    const adapter = new LocalStorageDbAdapter();
+    const adapter = localStorageDbAdapter();
     await adapter.putSnapshot(json);
 }
 

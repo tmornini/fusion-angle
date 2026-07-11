@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     postBootstrap,
     postMockDataLoad,
@@ -15,7 +15,7 @@ import { deriveRoleGrants } from
 // is the pair plane.
 
 test('bootstrap seeds current as admin', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
     const rows = await deriveRoleGrants(db);
@@ -26,7 +26,7 @@ test('bootstrap seeds current as admin', async () => {
 });
 
 test('mock data seeds current as admin', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
     const rows = await deriveRoleGrants(db);

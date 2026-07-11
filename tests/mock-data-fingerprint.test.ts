@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { SNAPSHOT_SCHEMA_VERSION_KEY } from '../api/db.ts';
 
@@ -72,7 +72,7 @@ const EXCLUDED_TABLES = new Set([
 async function seededFingerprint(): Promise<
     Record<string, TableFingerprint>
 > {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
     const snap = JSON.parse(await db.getSnapshot()) as Record<

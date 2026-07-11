@@ -3,7 +3,10 @@ import {
     invitationLifecycleStatesFor,
 } from '../api/derive-states.ts';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
 import { handleRequest } from '../api/api.ts';
@@ -160,7 +163,7 @@ async function seedRows(db: DbAdapter): Promise<void> {
 }
 
 async function seed(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedRows(db);
     return db;
 }

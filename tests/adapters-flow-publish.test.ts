@@ -6,7 +6,7 @@ globalThis.localStorage = {
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -256,7 +256,7 @@ test(
     'getFlowsForCreation partitions ready and'
     + ' notReady flows',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const goodGraph = readyGraph('good-');
@@ -300,7 +300,7 @@ test(
     'getFlowsForCreation filters out locked flows'
     + ' entirely (regardless of readiness)',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await seedFlowWithRelations(

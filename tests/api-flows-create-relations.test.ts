@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    MemoryDbAdapter,
+    memoryDbAdapter,
+    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -39,7 +40,7 @@ async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
     const ctx = createRequestContext(db, await devToken());

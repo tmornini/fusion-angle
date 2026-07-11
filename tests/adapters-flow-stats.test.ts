@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -149,7 +147,7 @@ test(
     'getFlowStats only includes this flow\'s'
     + ' work orders',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
 
@@ -244,7 +242,7 @@ test(
     'getFlowStats lays out an auto-layout flow so the'
     + ' returned graph and stat model are not degenerate',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         // seedFlow saves is_auto_layout true; buildTestGraph

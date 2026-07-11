@@ -4,7 +4,10 @@ import {
     validateIdentityEntity,
     validateIdentityPiiEntity,
 } from '../api/validators.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { PUT, GET, DELETE, handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
@@ -64,7 +67,7 @@ test('validateIdentityPiiEntity rejects missing field', () => {
 });
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }
@@ -149,7 +152,7 @@ async function seedMembershipPair(
 }
 
 async function dbWithMember() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);   // 'current' admin in org '1'
     await seedMembershipPair(
         db, 'm-sarah', '1', 'sarah',

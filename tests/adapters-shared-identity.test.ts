@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -21,7 +21,7 @@ async function tokenFor(sub: string): Promise<string> {
 
 test('identity is resolved once from the token', async () => {
     const ctx = createRequestContext(
-        new MemoryDbAdapter(), await tokenFor('current'));
+        memoryDbAdapter(), await tokenFor('current'));
     assert.equal(ctx.identity.id, 'current');
     assert.equal(ctx.identity, ctx.identity);
 });
@@ -29,6 +29,6 @@ test('identity is resolved once from the token', async () => {
 test('an anonymous token yields the anonymous principal',
 async () => {
     const ctx = createRequestContext(
-        new MemoryDbAdapter(), await tokenFor(ANONYMOUS_ID));
+        memoryDbAdapter(), await tokenFor(ANONYMOUS_ID));
     assert.equal(ctx.identity.id, ANONYMOUS_ID);
 });

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -108,7 +111,7 @@ async function seedRoleGrantPair(
 // either org — which means AUTHZ, not the fence, is what
 // must keep the org-A grant from acting in org B.
 async function memberOfBothAdminInA(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedMembershipPair(db, 'm-a', {
         organization_id: 'A', identity_id: 'current',
@@ -147,7 +150,7 @@ async () => {
 
 test('a flat token authorizes via its resolved membership',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedMembershipPair(db, 'm', {
         organization_id: '1', identity_id: 'current',

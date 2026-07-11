@@ -10,7 +10,10 @@ globalThis.localStorage = {
     setItem: () => {},
 };
 
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -202,7 +205,7 @@ async function setupFlow(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
     const ctx = createRequestContext(db, DEV_TOKEN);
@@ -220,7 +223,7 @@ async function setupFlow(): Promise<{
 // does ctx.GET('flows/flow-1') which 404s, driving the catch
 // → failOp(...).
 async function setupNoFlow(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }

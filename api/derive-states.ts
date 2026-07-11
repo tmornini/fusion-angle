@@ -43,11 +43,11 @@ import {
 // append address is RETIRED — nothing recognizes it; every
 // lifecycle event rides one of these five sources:
 //   (a) the FIVE trio families' OWN embedded lifecycle history —
-//       deriveIdeaStateHistory/deriveProjectStateHistory/
-//       deriveRecordStateHistory/deriveFlowStateHistory/
-//       deriveObjectiveStateHistory, IMPORTED from their own
-//       modules (gate 5b) via deriveTrioFamilyStates below,
-//       never rebuilt here.
+//       documentLifecycleEvents/stateHistoryFrom over each
+//       family's prefix pairs (deriveTrioFamilyStates, one
+//       fetch per family — never N per-id re-fetches). The
+//       per-id derive*StateHistory readers stay IMPORTED for
+//       deriveStatesFor's single-entity path (gate 5b).
 //   (b) deriveMemberStates — the members/:id document trio
 //       (genesis at create + every later change; the
 //       states-address retirement's replacement for the old
@@ -1933,53 +1933,36 @@ export async function invitationLifecycleStatesFor(
 // ---- deriveTrioFamilyStates — the trio families' state history --
 // ---- wiring (gate 5b) --------------------------------------------
 
-// Source (b) of the states-log union. Each trio family's own
-// per-id state-history reader is IMPORTED, never rebuilt — the
-// entity/lifecycle knowledge lives in its OWN module (derive-
-// ideas.ts/derive-projects.ts/derive-records.ts/derive-flows.ts/
-// derive-objectives.ts), each already drift-tested against the
-// real states table. This function's own job is narrower:
-// discover EVERY id that ever had a document pair at the
-// family's own prefix — via documentPairsAt, the shared
-// family-agnostic reduction (derive-documents.ts), NEVER the
-// family's own document derivation — so an id whose CURRENT
-// head is a tombstone pair (document DELETE; post-Final every
-// document family is soft-delete on the pair plane; the sole
-// physical hard-delete is PII erasure) is still walked: its
-// earlier trio-embedded transitions belong on the real states
-// log forever (append-only), even after the document itself is
-// gone.
-interface TrioFamily {
-    readonly prefix: string;
-    readonly stateHistory: (
-        db: DbAdapter, organization: Id, id: Id,
-    ) => Promise<StateEntity[]>;
-}
-
-function trioFamiliesFor(organization: Id): readonly TrioFamily[] {
+// Source (a) of the states-log union. Discover EVERY id that
+// ever had a document pair at the family's own prefix — via
+// documentPairsAt, the shared family-agnostic reduction
+// (derive-documents.ts), NEVER the family's own document
+// derivation — so an id whose CURRENT head is a tombstone
+// pair (document DELETE; post-Final every document family is
+// soft-delete on the pair plane; the sole physical hard-
+// delete is PII erasure) is still walked: its earlier trio-
+// embedded transitions belong on the real states log forever
+// (append-only), even after the document itself is gone.
+//
+// ONE FETCH PER FAMILY (not per document id). Each family's
+// per-id derive*StateHistory re-scans the same uri_prefix;
+// folding documentLifecycleEvents/stateHistoryFrom over the
+// already-loaded pairs is byte-equal to those readers (they
+// are the same shared cores) and costs O(families) getAllWhere
+// pairs, not O(documents). Measured: with N ideas, the ideas
+// prefix was scanned 2 + 2N times (discovery + per-id); after
+// this fold it is scanned exactly twice (requests + responses).
+// Pin: tests/derive-states-union.test.ts "trio family prefix
+// scans stay O(families)".
+function trioFamilyPrefixesFor(
+    organization: Id,
+): readonly string[] {
     return [
-        {
-            prefix: canonicalUriPrefix(organization, '/ideas/'),
-            stateHistory: deriveIdeaStateHistory,
-        },
-        {
-            prefix: canonicalUriPrefix(organization, '/projects/'),
-            stateHistory: deriveProjectStateHistory,
-        },
-        {
-            prefix: canonicalUriPrefix(organization, '/records/'),
-            stateHistory: deriveRecordStateHistory,
-        },
-        {
-            prefix: canonicalUriPrefix(organization, '/flows/'),
-            stateHistory: deriveFlowStateHistory,
-        },
-        {
-            prefix: canonicalUriPrefix(
-                organization, '/objectives/',
-            ),
-            stateHistory: deriveObjectiveStateHistory,
-        },
+        canonicalUriPrefix(organization, '/ideas/'),
+        canonicalUriPrefix(organization, '/projects/'),
+        canonicalUriPrefix(organization, '/records/'),
+        canonicalUriPrefix(organization, '/flows/'),
+        canonicalUriPrefix(organization, '/objectives/'),
     ];
 }
 
@@ -1988,26 +1971,42 @@ async function deriveTrioFamilyStates(
     organization: Id,
 ): Promise<StateEntity[]> {
     const perFamily = await Promise.all(
-        trioFamiliesFor(organization).map(async (family) => {
-            const [requests, responses] = await Promise.all([
-                db.requests.getAllWhere(
-                    'uri_prefix', family.prefix,
-                ),
-                db.responses.getAllWhere(
-                    'uri_prefix', family.prefix,
-                ),
-            ]);
-            const ids = new Set(
-                documentPairsAt(
-                    requests, responses, family.prefix,
-                ).map((pair) => pair.uriId),
-            );
-            const perId = await Promise.all(
-                [...ids].map((id) =>
-                    family.stateHistory(db, organization, id)),
-            );
-            return perId.flat();
-        }),
+        trioFamilyPrefixesFor(organization).map(
+            async (prefix) => {
+                const [requests, responses] =
+                    await Promise.all([
+                        db.requests.getAllWhere(
+                            'uri_prefix', prefix,
+                        ),
+                        db.responses.getAllWhere(
+                            'uri_prefix', prefix,
+                        ),
+                    ]);
+                const pairs = documentPairsAt(
+                    requests, responses, prefix,
+                );
+                // Group once — each pair visited once, not
+                // once per id via repeated filter scans.
+                const byId =
+                    new Map<Id, DocumentPair[]>();
+                for (const pair of pairs) {
+                    const list = byId.get(pair.uriId);
+                    if (list !== undefined) {
+                        list.push(pair);
+                    } else {
+                        byId.set(pair.uriId, [pair]);
+                    }
+                }
+                const rows: StateEntity[] = [];
+                for (const [id, own] of byId) {
+                    rows.push(...stateHistoryFrom(
+                        documentLifecycleEvents(own),
+                        id,
+                    ));
+                }
+                return rows;
+            },
+        ),
     );
     return perFamily.flat();
 }

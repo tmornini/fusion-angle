@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { postBootstrap } from '../api/mock-data.ts';
 import {
     SYSTEM_MEMBER_ID,
@@ -15,7 +18,7 @@ import { deriveOrganization } from
 // pristine leaves the Records tables empty.
 
 async function bootstrappedDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
     return db;

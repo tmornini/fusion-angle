@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     postMockDataLoad,
 } from '../api/mock-data.ts';
@@ -27,7 +25,7 @@ const HOT_NODE_HEAT_MIN = 0.75;
 const COLD_WORKING_NODE_HEAT_MAX = 0.25;
 
 async function seededLeadToClose() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await postMockDataLoad(db);
     // Phase Final Task 2: flows row half stripped — resolve

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
@@ -136,7 +139,7 @@ async function seedRoleGrantPair(
 // ai-members, work-orders, flows, invitations, memberships) rides
 // through ONE identity per org.
 async function seed(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     // Real organizations/:id documents (Phase 13 Task 3's fixture
     // prerequisite) — a raw db.organizations.put leaves A/B
@@ -859,5 +862,75 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
     assert.equal(
         rows.some((row) => row.id === 'ev-redecline-decline-2'),
         false,
+    );
+});
+
+// Task 20 / Commandment XII: deriveTrioFamilyStates must scan
+// each family prefix once (requests + responses = 2), never
+// once per document id. Before the fold, N ideas cost
+// 2 + 2N ideas-prefix getAllWhere calls (discovery + per-id
+// deriveIdeaStateHistory re-fetches); after, exactly 2.
+test('deriveStates: trio family prefix scans stay O(families),'
++ ' not O(documents)', async () => {
+    const db = await seed();
+    const tokenA = await organizationToken('adminA', 'A');
+    const IDEA_COUNT = 5;
+    for (let i = 0; i < IDEA_COUNT; i++) {
+        const id = 'idea-scan-' + i;
+        const res = await handleRequest(db, req(
+            'PUT', '/ideas/' + id, tokenA,
+            ideaDocument(
+                'Scan ' + i,
+                'ev-scan-' + i,
+                AT,
+            ),
+        ));
+        assert.equal(
+            res.status, 200,
+            'idea seed ' + id + ' failed',
+        );
+    }
+
+    const ideasPrefix = '/organizations/A/ideas/';
+    let ideasPrefixScans = 0;
+    const origReq = db.requests.getAllWhere
+        .bind(db.requests);
+    const origRes = db.responses.getAllWhere
+        .bind(db.responses);
+    db.requests.getAllWhere = async (column, key) => {
+        if (
+            column === 'uri_prefix'
+            && key === ideasPrefix
+        ) {
+            ideasPrefixScans += 1;
+        }
+        return origReq(column, key);
+    };
+    db.responses.getAllWhere = async (column, key) => {
+        if (
+            column === 'uri_prefix'
+            && key === ideasPrefix
+        ) {
+            ideasPrefixScans += 1;
+        }
+        return origRes(column, key);
+    };
+
+    const rows = await deriveStates(db, 'A');
+    const ideaRows = rows.filter(
+        (row) => row.entity_id.startsWith('idea-scan-'),
+    );
+    assert.equal(
+        ideaRows.length, IDEA_COUNT,
+        'each seeded idea must contribute one state row',
+    );
+    // Exactly one requests + one responses scan of the
+    // ideas prefix — not 2 + 2N.
+    assert.equal(
+        ideasPrefixScans, 2,
+        'ideas prefix must be scanned once per store'
+        + ' (got ' + ideasPrefixScans
+        + '; N+1 would be '
+        + (2 + 2 * IDEA_COUNT) + ')',
     );
 });

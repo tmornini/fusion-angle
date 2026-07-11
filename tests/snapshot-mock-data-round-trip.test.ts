@@ -6,7 +6,7 @@ globalThis.localStorage = {
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     createRequestContext,
@@ -33,7 +33,7 @@ test(
     'a seeded snapshot re-imports and keeps an AI'
     + ' member name',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await postMockDataLoad(db);
         const ctx = createRequestContext(
@@ -105,7 +105,7 @@ test(
     'the snapshot round trip derives clean: every derived'
     + ' family reads back identical after wipe and reimport',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await postMockDataLoad(db);
         const ctx = createRequestContext(

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     GET, handleRequest, UnauthorizedError,
 } from '../api/api.ts';
@@ -21,7 +24,7 @@ import { nowUtc } from '../api/types.ts';
 const BASE = 'http://localhost';
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }

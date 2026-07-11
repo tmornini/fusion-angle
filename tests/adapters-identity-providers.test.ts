@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     validateIdentityProviderEntity,
 } from '../api/validators.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -15,7 +15,7 @@ import {
 import { seedIdentityProvider } from './identity-fixtures.ts';
 
 async function adminCtx() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return {
         db, ctx: createRequestContext(db, await devToken()),
@@ -54,7 +54,7 @@ test('rejects an extra key', () => {
 
 test('an anonymous principal cannot read providers',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const anon = createRequestContext(
         db, await devToken('anonymous'));

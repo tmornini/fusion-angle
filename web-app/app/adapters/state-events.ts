@@ -264,6 +264,78 @@ export async function getIdeaStates(
     return latestStatesForIds<IdeaState>(events, ids);
 }
 
+// Lifecycle trio (Decision 7): state + head event at/id.
+// Single and bulk readers share one shape across families;
+// named exports keep the Rectification of Names surface.
+type AssertState<S extends string> = (
+    v: string,
+    label: string,
+) => S;
+
+type LifecycleTrio<S extends string> = {
+    readonly state: S;
+    readonly stateAt: string;
+    readonly stateEventId: string;
+};
+
+async function getEntityStateDetail<S extends string>(
+    ctx: RequestContext,
+    entityId: Id,
+    kind: string,
+    assertState: AssertState<S>,
+): Promise<LifecycleTrio<S>> {
+    const events = await ctx.GET<StateEntity[]>(
+        `entity-states/${entityId}/history`,
+    );
+    const latest = latestByKey(events, ev => ev.entity_id)
+        .get(entityId);
+    if (latest === undefined) {
+        throw new Error(
+            'no state event for ' + kind + ' ' + entityId,
+        );
+    }
+    return {
+        state: assertState(
+            latest.state, kind + ' ' + entityId,
+        ),
+        stateAt: latest.at,
+        stateEventId: latest.id,
+    };
+}
+
+async function getEntityStateDetails<
+    E extends { readonly id: Id },
+    S extends string,
+>(
+    ctx: RequestContext,
+    collection: string,
+    kind: string,
+    assertState: AssertState<S>,
+): Promise<Map<Id, LifecycleTrio<S>>> {
+    const [events, rows] = await Promise.all([
+        ctx.GET<StateEntity[]>('states'),
+        ctx.GET<E[]>(collection),
+    ]);
+    const ids = new Set<Id>(rows.map(r => r.id));
+    const inScope = events.filter(
+        ev => ids.has(ev.entity_id),
+    );
+    const latest = latestByKey(
+        inScope, ev => ev.entity_id,
+    );
+    const out = new Map<Id, LifecycleTrio<S>>();
+    for (const [id, ev] of latest) {
+        out.set(id, {
+            state: assertState(
+                ev.state, kind + ' ' + id,
+            ),
+            stateAt: ev.at,
+            stateEventId: ev.id,
+        });
+    }
+    return out;
+}
+
 // Single-idea state read, widened to carry the STORED head
 // event's `at`/`id` alongside the state — the trio Decision 7
 // folds into the idea document (state_at, state_event_id).
@@ -273,23 +345,9 @@ export async function getIdeaStateDetail(
     ctx: RequestContext,
     ideaId: Id,
 ): Promise<IdeaStateDetail> {
-    const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${ideaId}/history`,
+    return getEntityStateDetail(
+        ctx, ideaId, 'idea', assertIdeaState,
     );
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(ideaId);
-    if (latest === undefined) {
-        throw new Error(
-            'no state event for idea ' + ideaId,
-        );
-    }
-    return {
-        state: assertIdeaState(
-            latest.state, 'idea ' + ideaId,
-        ),
-        stateAt: latest.at,
-        stateEventId: latest.id,
-    };
 }
 
 // Bulk sibling of getIdeaStates, widened the same way.
@@ -302,22 +360,11 @@ export async function getIdeaStateDetail(
 export async function getIdeaStateDetails(
     ctx: RequestContext,
 ): Promise<Map<Id, IdeaStateDetail>> {
-    const [events, rows] = await Promise.all([
-        ctx.GET<StateEntity[]>('states'),
-        ctx.GET<IdeaEntity[]>('ideas'),
-    ]);
-    const ids = new Set<Id>(rows.map(r => r.id));
-    const inScope = events.filter(ev => ids.has(ev.entity_id));
-    const latest = latestByKey(inScope, ev => ev.entity_id);
-    const out = new Map<Id, IdeaStateDetail>();
-    for (const [id, ev] of latest) {
-        out.set(id, {
-            state: assertIdeaState(ev.state, 'idea ' + id),
-            stateAt: ev.at,
-            stateEventId: ev.id,
-        });
-    }
-    return out;
+    return getEntityStateDetails<
+        IdeaEntity, IdeaStateDetail['state']
+    >(
+        ctx, 'ideas', 'idea', assertIdeaState,
+    );
 }
 
 // Bulk objective trio read — the getIdeaStateDetails shape.
@@ -327,24 +374,13 @@ export async function getIdeaStateDetails(
 export async function getObjectiveStateDetails(
     ctx: RequestContext,
 ): Promise<Map<Id, ObjectiveStateDetail>> {
-    const [events, rows] = await Promise.all([
-        ctx.GET<StateEntity[]>('states'),
-        ctx.GET<ObjectiveEntity[]>('objectives'),
-    ]);
-    const ids = new Set<Id>(rows.map(r => r.id));
-    const inScope = events.filter(ev => ids.has(ev.entity_id));
-    const latest = latestByKey(inScope, ev => ev.entity_id);
-    const out = new Map<Id, ObjectiveStateDetail>();
-    for (const [id, ev] of latest) {
-        out.set(id, {
-            state: assertObjectiveState(
-                ev.state, 'objective ' + id,
-            ),
-            stateAt: ev.at,
-            stateEventId: ev.id,
-        });
-    }
-    return out;
+    return getEntityStateDetails<
+        ObjectiveEntity,
+        ObjectiveStateDetail['state']
+    >(
+        ctx, 'objectives', 'objective',
+        assertObjectiveState,
+    );
 }
 
 // Read the current state for one project from the
@@ -358,19 +394,10 @@ export async function getProjectState(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<ProjectState> {
-    const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${projectId}/history`,
+    const detail = await getEntityStateDetail(
+        ctx, projectId, 'project', assertProjectState,
     );
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(projectId);
-    if (latest === undefined) {
-        throw new Error(
-            'no state event for project ' + projectId,
-        );
-    }
-    return assertProjectState(
-        latest.state, 'project ' + projectId,
-    );
+    return detail.state;
 }
 
 // Bulk variant for getProjects, which calls this — so it
@@ -395,23 +422,9 @@ export async function getProjectStateDetail(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<ProjectStateDetail> {
-    const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${projectId}/history`,
+    return getEntityStateDetail(
+        ctx, projectId, 'project', assertProjectState,
     );
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(projectId);
-    if (latest === undefined) {
-        throw new Error(
-            'no state event for project ' + projectId,
-        );
-    }
-    return {
-        state: assertProjectState(
-            latest.state, 'project ' + projectId,
-        ),
-        stateAt: latest.at,
-        stateEventId: latest.id,
-    };
 }
 
 // Bulk sibling of getProjectStates, widened the same way.
@@ -425,22 +438,11 @@ export async function getProjectStateDetail(
 export async function getProjectStateDetails(
     ctx: RequestContext,
 ): Promise<Map<Id, ProjectStateDetail>> {
-    const [events, rows] = await Promise.all([
-        ctx.GET<StateEntity[]>('states'),
-        ctx.GET<ProjectEntity[]>('projects'),
-    ]);
-    const ids = new Set<Id>(rows.map(r => r.id));
-    const inScope = events.filter(ev => ids.has(ev.entity_id));
-    const latest = latestByKey(inScope, ev => ev.entity_id);
-    const out = new Map<Id, ProjectStateDetail>();
-    for (const [id, ev] of latest) {
-        out.set(id, {
-            state: assertProjectState(ev.state, 'project ' + id),
-            stateAt: ev.at,
-            stateEventId: ev.id,
-        });
-    }
-    return out;
+    return getEntityStateDetails<
+        ProjectEntity, ProjectStateDetail['state']
+    >(
+        ctx, 'projects', 'project', assertProjectState,
+    );
 }
 
 // Single-record state read, widened to carry the STORED head
@@ -452,23 +454,9 @@ export async function getRecordStateDetail(
     ctx: RequestContext,
     recordId: Id,
 ): Promise<RecordStateDetail> {
-    const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${recordId}/history`,
+    return getEntityStateDetail(
+        ctx, recordId, 'record', assertRecordState,
     );
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(recordId);
-    if (latest === undefined) {
-        throw new Error(
-            'no state event for record ' + recordId,
-        );
-    }
-    return {
-        state: assertRecordState(
-            latest.state, 'record ' + recordId,
-        ),
-        stateAt: latest.at,
-        stateEventId: latest.id,
-    };
 }
 
 // Bulk sibling of getRecordStateDetail, widened the same way.
@@ -478,22 +466,11 @@ export async function getRecordStateDetail(
 export async function getRecordStateDetails(
     ctx: RequestContext,
 ): Promise<Map<Id, RecordStateDetail>> {
-    const [events, rows] = await Promise.all([
-        ctx.GET<StateEntity[]>('states'),
-        ctx.GET<RecordEntity[]>('records'),
-    ]);
-    const ids = new Set<Id>(rows.map(r => r.id));
-    const inScope = events.filter(ev => ids.has(ev.entity_id));
-    const latest = latestByKey(inScope, ev => ev.entity_id);
-    const out = new Map<Id, RecordStateDetail>();
-    for (const [id, ev] of latest) {
-        out.set(id, {
-            state: assertRecordState(ev.state, 'record ' + id),
-            stateAt: ev.at,
-            stateEventId: ev.id,
-        });
-    }
-    return out;
+    return getEntityStateDetails<
+        RecordEntity, RecordStateDetail['state']
+    >(
+        ctx, 'records', 'record', assertRecordState,
+    );
 }
 
 // Single-member state read, widened to carry the STORED
@@ -510,23 +487,9 @@ export async function getMemberStateDetail(
     ctx: RequestContext,
     memberId: Id,
 ): Promise<MemberStateDetail> {
-    const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${memberId}/history`,
+    return getEntityStateDetail(
+        ctx, memberId, 'member', assertMemberState,
     );
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(memberId);
-    if (latest === undefined) {
-        throw new Error(
-            'no state event for member ' + memberId,
-        );
-    }
-    return {
-        state: assertMemberState(
-            latest.state, 'member ' + memberId,
-        ),
-        stateAt: latest.at,
-        stateEventId: latest.id,
-    };
 }
 
 // Bulk sibling of getMemberStateDetail, widened the same
@@ -537,22 +500,9 @@ export async function getMemberStateDetail(
 export async function getMemberStateDetails(
     ctx: RequestContext,
 ): Promise<Map<Id, MemberStateDetail>> {
-    const [events, rows] = await Promise.all([
-        ctx.GET<StateEntity[]>('states'),
-        ctx.GET<MemberEntity[]>('members'),
-    ]);
-    const ids = new Set<Id>(rows.map(r => r.id));
-    const inScope = events.filter(ev => ids.has(ev.entity_id));
-    const latest = latestByKey(inScope, ev => ev.entity_id);
-    const out = new Map<Id, MemberStateDetail>();
-    for (const [id, ev] of latest) {
-        out.set(id, {
-            state: assertMemberState(
-                ev.state, 'member ' + id,
-            ),
-            stateAt: ev.at,
-            stateEventId: ev.id,
-        });
-    }
-    return out;
+    return getEntityStateDetails<
+        MemberEntity, MemberStateDetail['state']
+    >(
+        ctx, 'members', 'member', assertMemberState,
+    );
 }

@@ -21,6 +21,7 @@ import {
     type IdentityCredentialKind,
     type IdentityKind,
 } from '../adapters/index.ts';
+import { buildReadonlyField } from './detail-field.ts';
 
 const KIND_LABEL: Readonly<
     Record<IdentityKind, string>
@@ -112,23 +113,6 @@ function buildTitleSection(
         </p>`;
 }
 
-function buildField(
-    label: string,
-    value: string,
-    icon?: SafeHtml,
-): SafeHtml {
-    return html`
-        <div>
-            <p class="${
-                'label mb-2 flex'
-                + ' items-center gap-2'
-            }">${icon ?? html``} ${label}</p>
-            <p class="text-sm">
-                ${displayText(value)}
-            </p>
-        </div>`;
-}
-
 function buildBio(value: string): SafeHtml {
     return html`
         <div>
@@ -158,16 +142,16 @@ function buildPersonalInfoCard(
             }">
                 ${buildAvatar(initials(name))}
                 <div class="flex-1">
-                    ${buildField('Name', name)}
+                    ${buildReadonlyField('Name', name)}
                 </div>
             </div>
             <div class="${
                 'grid grid-cols-2 gap-4 mb-4'
             }">
-                ${buildField(
+                ${buildReadonlyField(
                     'Email', email, iconMail(ICON_SIZE.base, ''),
                 )}
-                ${buildField(
+                ${buildReadonlyField(
                     'Phone', phone, iconPhone(ICON_SIZE.base, ''),
                 )}
             </div>

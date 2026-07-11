@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    MemoryDbAdapter,
+    memoryDbAdapter,
+    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -275,7 +276,7 @@ test(
     'getOrganization derives seat usage from the'
     + ' memberships ledger',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(
             db, await organizationToken(),
@@ -304,7 +305,7 @@ test(
     'getOrganization renders absent activity as a'
     + ' dash, never a fabricated instant',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(
             db, await organizationToken(),

@@ -5,7 +5,10 @@ import {
     PUT,
     RequestError,
 } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
@@ -26,7 +29,7 @@ import {
 const ROOT_JTI = 'jti-1';
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     // Seeded via the PUT route (not a raw store write): both
     // PRE-TX and IN-TX chain lookups read the message ledger

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -24,7 +27,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 
 test('getBaselineScoresForProject returns project rows',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await ctx.PUT(
@@ -54,7 +57,7 @@ test('getBaselineScoresForProject returns project rows',
 
 test('getActualScoresForProject returns project rows',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await ctx.PUT(
@@ -75,7 +78,7 @@ test('getActualScoresForProject returns project rows',
 
 test('getProjectScoring returns both lists',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await ctx.PUT(
@@ -171,7 +174,7 @@ async function seedTwoApprovedProjects(
 
 test('getPortfolioImpactSummary averages project averages',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await seedTwoApprovedProjects(db, ctx);
@@ -182,7 +185,7 @@ test('getPortfolioImpactSummary averages project averages',
 
 test('buildObjectiveAggregates returns per-objective rows',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await seedTwoApprovedProjects(db, ctx);
@@ -197,7 +200,7 @@ test('buildObjectiveAggregates returns per-objective rows',
 
 test('getProjectsScoreColumn returns per-project rollup',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await seedTwoApprovedProjects(db, ctx);
@@ -212,7 +215,7 @@ test('getProjectsScoreColumn returns per-project rollup',
 test(
     'buildObjectiveTrendlines: baseline + two actuals',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await seedTwoApprovedProjects(db, ctx);
@@ -260,7 +263,7 @@ test(
 test(
     'buildObjectiveTrendlines: baseline + one actual',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await seedTwoApprovedProjects(db, ctx);
@@ -290,7 +293,7 @@ test(
 test(
     'buildObjectiveTrendlines: same-at batch is one point',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await seedTwoApprovedProjects(db, ctx);
@@ -329,7 +332,7 @@ test(
 test(
     'buildObjectiveTrendlines: no baseline returns empty',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         await ctx.PUT('objectives/o1', {
@@ -353,7 +356,7 @@ test(
 
 test('postProjectBaselineScoring appends via GET scores',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());
@@ -374,7 +377,7 @@ test('postProjectBaselineScoring appends via GET scores',
 
 test('postProjectActualMeasurement appends via GET scores',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());

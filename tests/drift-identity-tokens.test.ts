@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest, PUT } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
 import { base64UrlDecode } from '../shared/base64url.ts';
@@ -65,7 +68,7 @@ function req(
 }
 
 async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }
@@ -279,7 +282,7 @@ test('SECURITY: a session minted via a real grant is admitted'
 + ' running against the DERIVED plane (isTokenRevoked treats an'
 + ' unknown jti as NOT revoked, so a derivation miss here would'
 + ' fail OPEN)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
     await seedIdentityPii(db, 'current', {
@@ -343,7 +346,7 @@ const CODE_PASSWORD = 's3cret-gate3';
 const CODE_EMAIL = 'gate3-code@example.com';
 
 async function dbWithCodeLoginUser(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
     await seedIdentityPii(db, 'current', {

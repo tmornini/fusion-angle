@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -209,7 +212,7 @@ test(
     'validateRecordTransition returns an empty'
     + ' array for a flow with no record binding',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
@@ -237,7 +240,7 @@ test(
     + ' violation when the CURRENT node has a'
     + ' required attribute with no stored value',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
@@ -284,7 +287,7 @@ test(
     + ' TARGET-node attributes when the current'
     + ' node is clean',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
@@ -324,7 +327,7 @@ test(
     + ' required CURRENT attribute has a'
     + ' satisfying stored value',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
@@ -390,7 +393,7 @@ test(
     + ' override stored values to satisfy a'
     + ' required check on the CURRENT node',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
@@ -431,7 +434,7 @@ test(
     'validateRecordTransition surfaces a regex'
     + ' constraint violation from the runner',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(
@@ -480,7 +483,7 @@ test(
     + ' current node id does not exist on the'
     + ' work order flow graph',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedSystemMember(db);
         const flowGraph = buildFlowGraph(

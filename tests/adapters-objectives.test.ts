@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -49,7 +52,7 @@ function objectiveDoc(
 }
 
 test('getObjectives returns all', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
     await ctx.PUT(
@@ -81,7 +84,7 @@ function revision(
 test(
     'getObjectiveRevisionsByObjective groups one read',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = ctxFor(db);
         await ctx.PUT(
@@ -127,7 +130,7 @@ test(
     'getCurrentObjectiveDefinitions picks the latest'
     + ' revision per requested id',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = ctxFor(db);
         await ctx.PUT(
@@ -167,7 +170,7 @@ test(
     'getCurrentObjectiveDefinitions throws on an'
     + ' objective with no revisions',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await assert.rejects(
             getCurrentObjectiveDefinitions(
@@ -179,7 +182,7 @@ test(
 );
 
 test('getArchivedObjectiveIds returns a Set', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
     // Seed archived via the document PUT carrying the
@@ -198,7 +201,7 @@ test(
     'postObjectiveCreation writes via GET the objective'
     + ' and its first revision through POST /objectives',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
@@ -236,7 +239,7 @@ test(
     + ' wedge an item into the middle without'
     + ' renumbering anyone',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);
@@ -279,7 +282,7 @@ test(
     + ' fractional values across sequential'
     + ' reorders',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedCurrentMember(db);
         const ctx = ctxFor(db);

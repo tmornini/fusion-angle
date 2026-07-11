@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
@@ -109,7 +112,7 @@ async function seedRoleGrantPair(
 }
 
 async function passwordUserCtx() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRoleGrantPair(db, 'rg', {
         organization_id: '1',

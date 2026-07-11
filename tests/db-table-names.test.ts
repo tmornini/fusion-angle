@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { TABLE_NAMES } from '../api/db.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 
 // Phase Final Stage B Task 4: TABLE_NAMES shrinks as doomed
 // tables delete. Pin permanent survivors and tables this
@@ -65,7 +68,7 @@ test(
 );
 
 test('MemoryDbAdapter exposes message stores', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await db.requests.put('pair-1', {
         uri_prefix: '/organizations/1/ideas/',

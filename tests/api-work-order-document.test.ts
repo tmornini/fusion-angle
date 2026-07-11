@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { PUT, handleRequest } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
@@ -35,7 +38,7 @@ import {
 // event of its own.
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }
@@ -132,7 +135,7 @@ test('validateWorkOrderDocumentBody rejects a trio key at the'
 // returns a reconstructed entity + appends the pair only.
 test('postWorkOrderDocumentOp returns the entity and the'
 + ' pair; work_orders row plane stays empty', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = {
         ...documentFields(),

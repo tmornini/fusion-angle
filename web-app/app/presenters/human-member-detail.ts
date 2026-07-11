@@ -33,6 +33,7 @@ import {
 import {
     WorkingStylesPresenter,
 } from './working-styles.ts';
+import { buildReadonlyField } from './detail-field.ts';
 
 const ALL_STRENGTHS: readonly string[] = [
     'Strategic Planning',
@@ -236,25 +237,6 @@ function buildEditableTitleSection(
             ${draft.title}
             • ${draft.department}
         </p>`;
-}
-
-function buildReadonlyField(
-    label: string,
-    value: string,
-    icon?: SafeHtml,
-): SafeHtml {
-    return html`
-        <div>
-            <p class="${
-                'label mb-2 flex'
-                + ' items-center gap-2'
-            }">${
-                icon ?? html``
-            } ${label}</p>
-            <p class="text-sm">
-                ${displayText(value)}
-            </p>
-        </div>`;
 }
 
 function buildEditableField(

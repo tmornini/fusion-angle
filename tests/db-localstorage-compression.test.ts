@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    LocalStorageDbAdapter,
-} from '../api/db-localstorage.ts';
+import { localStorageDbAdapter } from '../api/db-localstorage.ts';
 import {
     SNAPSHOT_SCHEMA_VERSION,
     SNAPSHOT_SCHEMA_VERSION_KEY,
@@ -44,7 +42,7 @@ test(
     'clients write stores raw JSON',
     async () => {
         const map = installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.clients.put(
             'cli-prefix-test', baseClient,
@@ -65,7 +63,7 @@ test(
     'clients round-trips through put → getById',
     async () => {
         installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.clients.put(
             'cli-rt', baseClient,
@@ -85,7 +83,7 @@ test(
     'status enum round-trips as a string',
     async () => {
         installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.clients.put(
             'cli-status', baseClient,
@@ -102,7 +100,7 @@ test(
     'concurrent puts to same store do not race',
     async () => {
         installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         const ids = Array.from(
             { length: 11 },
@@ -128,12 +126,11 @@ test(
     },
 );
 
-
 test(
     'clients table is not compressed (raw JSON in storage)',
     async () => {
         const map = installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.clients.put('c1', {
             grant_types: '["password"]',
@@ -156,7 +153,7 @@ test(
     'snapshot export emits parsed objects, not gz1: blob',
     async () => {
         installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.clients.put(
             'cli-export', baseClient,
@@ -178,7 +175,7 @@ test(
     'snapshot import stores clients raw',
     async () => {
         const map = installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         const snapshot = JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,
@@ -203,7 +200,7 @@ test(
     'read tolerates gz1: payload on normally-uncompressed table',
     async () => {
         const map = installShim();
-        const adapter = new LocalStorageDbAdapter();
+        const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         const clientRow = {
             id: 'cli-gz1',

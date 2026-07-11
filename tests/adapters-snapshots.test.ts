@@ -7,7 +7,8 @@ globalThis.localStorage = {
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    MemoryDbAdapter,
+    memoryDbAdapter,
+    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -62,7 +63,7 @@ async function setup(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
@@ -493,7 +494,7 @@ test(
     'getHasAnyHumanMembers is false for an anonymous viewer'
     + ' before a schema exists',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         const ctx = createRequestContext(db, await anonToken());
         assert.equal(
             await getHasAnyHumanMembers(ctx), false);
@@ -508,7 +509,7 @@ test(
         // viewer reads the schema directly and counts members
         // honestly: an admin-only schema has no human member,
         // so the answer is false.
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await anonToken());
         assert.equal(
@@ -520,7 +521,7 @@ test(
     'getHasAnyHumanMembers is true for an anonymous viewer'
     + ' when a member exists',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo');
         const ctx = createRequestContext(db, await anonToken());

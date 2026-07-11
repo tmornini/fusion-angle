@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { GET, PUT } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import type { MemberEntity } from '../api/types.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -15,7 +15,7 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 test(
     'a retired states/:id body with forged member_id is 404',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await assert.rejects(
             () => PUT(db, 'states/ev-forge', {
@@ -36,7 +36,7 @@ test(
 test(
     'a member state change is authored by the token',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo');
         await PUT(db, 'members/current', {
@@ -63,7 +63,7 @@ test(
 test(
     'current-member resolves the token member',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await seedHumanMember(db, 'alice', 'Alice');
         await seedOrganizationMember(db, 'alice');

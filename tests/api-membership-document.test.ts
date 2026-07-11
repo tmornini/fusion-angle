@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { PUT } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
@@ -106,7 +109,7 @@ test('validateMembershipDocumentBody rejects each missing key,'
 test('postMembershipDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped)',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = documentFields();
     const pair = await formWritePair({
@@ -137,7 +140,7 @@ async () => {
 
 test('a byte-identical PUT resend to memberships/:id converges'
 + ' to one stored request/response pair', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = documentFields();
     const first = await PUT(
@@ -218,7 +221,7 @@ async function deleteDocumentPair(
 test('a PUT chain Supersedes-chains and the head derives the'
 + ' LATEST body, through the generic document handlers',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('memberships')!;
     const first = documentFields();
@@ -255,7 +258,7 @@ async () => {
 test('a DELETE-head derives absent through the generic'
 + ' document handlers, carrying notFoundTable (never the'
 + ' entity-store table name coincidence)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('memberships')!;
     await putDocumentPair(

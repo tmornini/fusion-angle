@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { handleRequest } from '../api/api.ts';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -34,7 +32,7 @@ function req(
 }
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }

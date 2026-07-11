@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -67,7 +67,7 @@ function recordBody(
 
 test('getProjectStates excludes a same-valued idea',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const { organization_id: _organizationId, ...p1Fields } =
@@ -98,7 +98,7 @@ test('getProjectStates excludes a same-valued idea',
 
 test('getIdeaStates excludes a same-valued project',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const { organization_id: _organizationId, ...i1Fields } =
@@ -127,7 +127,7 @@ test('getIdeaStates excludes a same-valued project',
 
 test('getRecordStateDetails excludes a same-valued idea',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         const { organization_id: _organizationId, ...r1Fields } =
@@ -156,7 +156,7 @@ test('getRecordStateDetails excludes a same-valued idea',
 
 test('getMemberStateDetails spans kinds and excludes an idea',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'wh', 'Human');
         await seedAIMember(db, 'wa', 'Ai');
@@ -180,7 +180,7 @@ test('getMemberStateDetails spans kinds and excludes an idea',
 
 test('getProjectStates keeps the later event on a tie',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         // Genesis then two document-trio PUTs at the SAME

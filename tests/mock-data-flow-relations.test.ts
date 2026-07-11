@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { deriveFlow } from '../api/derive-flows.ts';
@@ -40,7 +40,7 @@ function normalizeGraph(graph: StoredGraph): StoredGraph {
 test('seed pair-plane graph equals each flow\'s'
     + ' authored graph',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
 

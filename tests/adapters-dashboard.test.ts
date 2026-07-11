@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+
 import { adminContext } from './context-fixtures.ts';
 import type { RequestContext } from
     '../web-app/app/adapters/shared.ts';
@@ -313,7 +311,6 @@ test(
         assert.equal(cost?.inner.value, 1000);
     },
 );
-
 
 test(
     'getDashboardGauges Time sums the 10-day span',

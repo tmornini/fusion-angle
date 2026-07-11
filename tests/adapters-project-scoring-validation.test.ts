@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
@@ -141,7 +141,7 @@ test('ctx.PUT rejects out-of-range actual scores',
 
 test('postProjectBaselineScoring rejects bad scores',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());
@@ -162,7 +162,7 @@ test('postProjectBaselineScoring rejects bad scores',
 
 test('postProjectActualMeasurement rejects bad scores',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());
@@ -179,7 +179,7 @@ test('postProjectActualMeasurement rejects bad scores',
 
 test('postProjectBaselineScoring accepts valid scores',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());

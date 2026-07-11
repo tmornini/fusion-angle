@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     jsonArrayField,
 } from '../api/types.ts';
@@ -17,7 +15,7 @@ import {
 } from './test-fixtures.ts';
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     postBootstrap,
     postMockDataLoad,
@@ -24,7 +27,7 @@ async function adminCredential(db: MemoryDbAdapter) {
 
 test('bootstrap surfaces an admin password that verifies',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const reveal = currentReveal(
         await postBootstrap(db));
@@ -45,7 +48,7 @@ async () => {
 
 test('mock data surfaces a verifying admin password',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const reveal = currentReveal(
         await postMockDataLoad(db));
@@ -63,7 +66,7 @@ async () => {
 // surfaced in the reveal list.
 test('mock-data surfaces exactly eleven human credentials',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const creds = await postMockDataLoad(db);
     assert.equal(creds.identities.length, 11);
@@ -74,7 +77,7 @@ async () => {
 
 test('bootstrap surfaces exactly one human credential',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const creds = await postBootstrap(db);
     assert.equal(creds.identities.length, 1);
@@ -83,9 +86,9 @@ async () => {
 
 test('each seed run yields a distinct admin password',
 async () => {
-    const db1 = new MemoryDbAdapter();
+    const db1 = memoryDbAdapter();
     await db1.postSchemaCreation();
-    const db2 = new MemoryDbAdapter();
+    const db2 = memoryDbAdapter();
     await db2.postSchemaCreation();
     const a = currentReveal(
         await postBootstrap(db1));

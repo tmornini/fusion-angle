@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     validateRoleGrantEntity,
 } from '../api/validators.ts';
@@ -76,7 +79,7 @@ test('rejects an unparseable timestamp', () => {
 // append pins live on pair-plane document tests.
 
 async function adminCtx() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);   // current may write grants
     return { db, ctx: createRequestContext(db, await organizationToken()) };
 }

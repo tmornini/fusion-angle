@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
-import {
-    LocalStorageDbAdapter,
-} from '../api/db-localstorage.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
+import { localStorageDbAdapter } from '../api/db-localstorage.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
@@ -64,9 +62,9 @@ async function runReactivationScenario(db: DbAdapter): Promise<{
 test('K5 reactivation parity across memory and localStorage',
     async () => {
         installLocalStorageShim();
-        const memDb = new MemoryDbAdapter();
+        const memDb = memoryDbAdapter();
         await seedAdminSchema(memDb);
-        const lsDb = new LocalStorageDbAdapter();
+        const lsDb = localStorageDbAdapter();
         await seedAdminSchema(lsDb);
 
         const mem = await runReactivationScenario(memDb);

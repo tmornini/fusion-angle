@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
@@ -11,7 +11,7 @@ const BASE = 'http://localhost';
 // returns 401, never a route-topology 404.
 
 test('no token + unknown path → 401', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
@@ -23,7 +23,7 @@ test('no token + unknown path → 401', async () => {
 });
 
 test('no token + retired /states/:id → 401', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
@@ -36,7 +36,7 @@ test('no token + retired /states/:id → 401', async () => {
 
 test('bearer-exempt snapshot route stays auth-free',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     const res = await handleRequest(
         db,
         new Request(`${BASE}/snapshots/schema`),

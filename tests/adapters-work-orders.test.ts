@@ -3,7 +3,8 @@ import { deriveStatesFor } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import {
-    MemoryDbAdapter,
+    memoryDbAdapter,
+    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
     createRequestContext,
@@ -196,7 +197,7 @@ async function setupDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db, await devToken());
@@ -626,7 +627,7 @@ test(
     'getFlowWorkOrderEntities returns the seeded '
     + 'flow-work-order rows for the asked flow only',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await devToken());
         // NAMED re-pin (Task 7, the projects/:id/flows
@@ -665,7 +666,7 @@ test(
     'getWorkOrderActiveClaim treats a stale '
     + 'claimed event as implicitly expired',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
@@ -691,7 +692,7 @@ test(
     'getWorkOrderActiveClaim returns the fresh '
     + 'claim when within the lock window',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
@@ -715,7 +716,7 @@ test(
     + 'order claim in one read, honoring per-order '
     + 'lockTimeout and the work-order set',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',

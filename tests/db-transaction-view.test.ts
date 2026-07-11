@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 
 const aClient = {
     grant_types: '["password"]',
@@ -22,7 +22,7 @@ const aRequest = {
 test(
     'a view commits writes across stores atomically',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
             ['clients', 'requests'],
@@ -41,7 +41,7 @@ test(
 test(
     'a throw inside the view rolls back every store',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
@@ -64,7 +64,7 @@ test(
 test(
     'stores in the view share one uncommitted buffer',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         const seen = await db.transaction(
             ['clients', 'requests'],
@@ -83,7 +83,7 @@ test(
 test(
     'a nested view transaction joins the open tx',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
             ['clients', 'requests'],
@@ -109,7 +109,7 @@ test(
 test(
     'a nested write rolls back with the outer tx',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
@@ -137,7 +137,7 @@ test(
 test(
     'a nested out-of-scope table throws a clear error',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(

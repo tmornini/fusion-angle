@@ -195,17 +195,31 @@ function includes<T extends string>(
 // the opaque 500.
 export class ValidationError extends Error {}
 
-export function assertAttributeType(
+// Alphabet membership assert: one throw shape for every
+// state alphabet (and AttributeType). Named is*/assert*
+// exports stay as the Rectification of Names surface.
+function assertInAlphabet<T extends string>(
+    alphabet: readonly T[],
+    typeName: string,
     v: string,
     label: string,
-): AttributeType {
-    if (!includes(ATTRIBUTE_TYPES, v)) {
+): T {
+    if (!includes(alphabet, v)) {
         throw new ValidationError(
-            'expected AttributeType for '
+            'expected ' + typeName + ' for '
                 + label + ', got ' + v,
         );
     }
     return v;
+}
+
+export function assertAttributeType(
+    v: string,
+    label: string,
+): AttributeType {
+    return assertInAlphabet(
+        ATTRIBUTE_TYPES, 'AttributeType', v, label,
+    );
 }
 
 export function assertConstraintAppliesTo(
@@ -241,77 +255,55 @@ export function assertConstraintAppliesTo(
 export function isProjectState(
     v: string,
 ): v is ProjectState {
-    return includes(
-        PROJECT_STATES, v,
-    );
+    return includes(PROJECT_STATES, v);
 }
 
 export function assertProjectState(
     v: string,
     label: string,
 ): ProjectState {
-    if (!includes(PROJECT_STATES, v)) {
-        throw new ValidationError(
-            'expected ProjectState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
+    return assertInAlphabet(
+        PROJECT_STATES, 'ProjectState', v, label,
+    );
 }
 
 export function isIdeaState(
     v: string,
 ): v is IdeaState {
-    return includes(
-        IDEA_STATES, v,
-    );
+    return includes(IDEA_STATES, v);
 }
 
 export function assertIdeaState(
     v: string,
     label: string,
 ): IdeaState {
-    if (!includes(IDEA_STATES, v)) {
-        throw new ValidationError(
-            'expected IdeaState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
+    return assertInAlphabet(
+        IDEA_STATES, 'IdeaState', v, label,
+    );
 }
 
 export function isMemberState(
     v: string,
 ): v is MemberState {
-    return includes(
-        MEMBER_STATES, v,
-    );
+    return includes(MEMBER_STATES, v);
 }
 
 export function assertMemberState(
     v: string,
     label: string,
 ): MemberState {
-    if (!includes(MEMBER_STATES, v)) {
-        throw new ValidationError(
-            'expected MemberState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
+    return assertInAlphabet(
+        MEMBER_STATES, 'MemberState', v, label,
+    );
 }
 
 export function assertObjectiveState(
     v: string,
     label: string,
 ): ObjectiveState {
-    if (!includes(OBJECTIVE_STATES, v)) {
-        throw new ValidationError(
-            'expected ObjectiveState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
+    return assertInAlphabet(
+        OBJECTIVE_STATES, 'ObjectiveState', v, label,
+    );
 }
 
 // No isFlowState — nothing narrows a bare string against
@@ -323,13 +315,9 @@ export function assertFlowState(
     v: string,
     label: string,
 ): FlowState {
-    if (!includes(FLOW_STATES, v)) {
-        throw new ValidationError(
-            'expected FlowState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
+    return assertInAlphabet(
+        FLOW_STATES, 'FlowState', v, label,
+    );
 }
 
 export function isRecordState(
@@ -342,13 +330,9 @@ export function assertRecordState(
     v: string,
     label: string,
 ): RecordState {
-    if (!includes(RECORD_STATES, v)) {
-        throw new ValidationError(
-            'expected RecordState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
+    return assertInAlphabet(
+        RECORD_STATES, 'RecordState', v, label,
+    );
 }
 
 export function isInvitationState(
@@ -361,13 +345,9 @@ export function assertInvitationState(
     v: string,
     label: string,
 ): InvitationState {
-    if (!includes(INVITATION_STATES, v)) {
-        throw new ValidationError(
-            'expected InvitationState for '
-                + label + ', got ' + v,
-        );
-    }
-    return v;
+    return assertInAlphabet(
+        INVITATION_STATES, 'InvitationState', v, label,
+    );
 }
 
 export const MS_PER_SECOND = 1000;

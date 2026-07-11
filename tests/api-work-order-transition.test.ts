@@ -7,7 +7,10 @@ import {
     PUT,
     RequestError,
 } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
@@ -40,7 +43,7 @@ function graphJson(): string {
 // Seed via REAL PUT so the WO carries a document pair (row
 // half stripped; claim/transition gates read the pair plane).
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     await PUT(

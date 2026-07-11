@@ -11,7 +11,10 @@ globalThis.localStorage = {
     setItem: () => {},
 };
 
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -65,7 +68,7 @@ async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
     ctx: RequestContext;
 }> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
     await seedHumanMember(db, 'm1', 'Member One');

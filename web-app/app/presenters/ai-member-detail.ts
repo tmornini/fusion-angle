@@ -27,6 +27,7 @@ import {
     findProviderModel,
     getModelsByProvider,
 } from '../../../api/provider-models.ts';
+import { buildReadonlyField } from './detail-field.ts';
 
 export interface AIMemberDraftFields {
     name: string;
@@ -188,25 +189,6 @@ function buildEditableTitleSection(
                 draft.model,
             )?.provider ?? DISPLAY_ABSENT}
         </p>`;
-}
-
-function buildReadonlyField(
-    label: string,
-    value: string,
-    icon?: SafeHtml,
-): SafeHtml {
-    return html`
-        <div>
-            <p class="${
-                'label mb-2 flex'
-                + ' items-center gap-2'
-            }">${
-                icon ?? html``
-            } ${label}</p>
-            <p class="text-sm">
-                ${displayText(value)}
-            </p>
-        </div>`;
 }
 
 function buildEditableField(

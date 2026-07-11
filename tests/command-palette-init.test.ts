@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 
 // Integration: initCommandPalette() performs no
 // data reads at init — the index builds lazily on
@@ -30,7 +30,7 @@ test(
                 );
             const hasSchema =
                 await initAdapter(
-                    () => new MemoryDbAdapter(),
+                    () => memoryDbAdapter(),
                 );
             assert.equal(
                 hasSchema, false,

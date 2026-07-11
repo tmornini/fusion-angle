@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { sha256Hex } from '../shared/digest.ts';
 import {
     formWritePair,
@@ -105,7 +105,7 @@ async () => {
 });
 
 test('append then head-read round-trips', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const pair = await formWritePair({ ...INPUT });
     await db.transaction(
@@ -131,7 +131,7 @@ test('append then head-read round-trips', async () => {
 });
 
 test('a same-hash re-append writes nothing', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const pair = await formWritePair({ ...INPUT });
     const replay = { ...pair, id: 'other-uuid' };

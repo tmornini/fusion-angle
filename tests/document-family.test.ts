@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     EntityNotFoundError,
     UniqueConstraintError,
@@ -65,7 +68,7 @@ function req(
 }
 
 async function freshDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }
@@ -124,7 +127,7 @@ test('documentWriteResponseSpec produces the projects'
 
 test('documentEntityRoute (simple arm) PUTs through the'
 + ' wiring documentOp and GETs the derived entity', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('ideas')!;
     const route = documentEntityRoute(wiring);
@@ -442,7 +445,7 @@ test('locked arm: a fresh-keyed replay echoing a superseded'
 
 test('locked arm: two writers racing the SAME echo — the'
 + ' second aborts via the unique follows index', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const genesis = await formWritePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
@@ -665,7 +668,7 @@ async function deleteStatelessDocumentPair(
 
 test('stateless lifecycle: a trio-less document PUT derives'
 + ' through documentGetHandler with no throw', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentPair(db, 'sl-1', { v: 'first' });
     const got = await documentGetHandler(statelessWiring)(
@@ -678,7 +681,7 @@ test('stateless lifecycle: a trio-less document PUT derives'
 
 test('stateless lifecycle: documentCollectionGetHandler skips'
 + ' the per-document history walk too', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentPair(db, 'sl-2', { v: 'listed' });
     const rows = await documentCollectionGetHandler(
@@ -691,7 +694,7 @@ test('stateless lifecycle: documentCollectionGetHandler skips'
 
 test('stateless lifecycle: a DELETE head 404s carrying'
 + ' notFoundTable, never the family', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentPair(db, 'sl-3', { v: 'first' });
     await deleteStatelessDocumentPair(db, 'sl-3');
@@ -712,7 +715,7 @@ test('stateless lifecycle: a DELETE head 404s carrying'
 
 test('stateless lifecycle: a DELETE head is absent from the'
 + ' collection too', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putStatelessDocumentPair(db, 'sl-4', { v: 'first' });
     await deleteStatelessDocumentPair(db, 'sl-4');

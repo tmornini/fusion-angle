@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
 import {
@@ -140,7 +143,7 @@ async function seedRoleGrantPair(
 // is a member of org A only. Roles are per-org since Phase 3,
 // so the org-A grant authorizes the facade write.
 async function oneOrganization(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedRoleGrantPair(db, 'role-current-admin-a', {
         organization_id: 'A', identity_id: 'current',

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     currentRolesForInOrganization,
@@ -129,7 +132,7 @@ const ORGANIZATION_ONE = '1';
 const ORGANIZATION_TWO = '2';
 
 async function seed() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const creds = await postMockDataLoad(db);
     return { db, creds };

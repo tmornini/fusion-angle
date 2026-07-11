@@ -12,6 +12,11 @@ const INDICATOR_MARGIN = '2px 0';
 const DRAGGING_OPACITY = '0.4';
 const DRAG_HANDLE_SELECTOR = '.drag-handle';
 
+type CardRect = {
+    readonly top: number;
+    readonly height: number;
+};
+
 type DragState =
     | { kind: 'idle' }
     | {
@@ -19,6 +24,11 @@ type DragState =
         id: string;
         indicator: HTMLElement | null;
         idx: number | null;
+        // Layout snapshot for the active drag.
+        // Measured once (not per dragover) so
+        // getBoundingClientRect stays off the
+        // hot path after the first read.
+        rects: readonly CardRect[] | null;
     };
 
 export function initDragReorder(
@@ -61,6 +71,7 @@ export function initDragReorder(
             id: drag.id,
             indicator: null,
             idx: null,
+            rects: drag.rects,
         };
     }
 
@@ -82,18 +93,47 @@ export function initDragReorder(
         });
     }
 
+    // Layout cache (Task 20 / Commandment XII):
+    // dragover fires many times per gesture;
+    // re-reading every card's
+    // getBoundingClientRect on each event forced
+    // a sync layout pass per event (O(cards)
+    // forced reflow). Measure once at the first
+    // dropIndex during the active drag; reuse
+    // until idle. Indicator insertion shifts
+    // later cards by ~7px — original list
+    // geometry is the intentional drop-target
+    // space (re-measuring after insert would
+    // chase the indicator).
     function dropIndex(
         y: number,
         lastIdx: number | null,
     ): number {
-        const rects = cards().map((c) => {
-            const r =
-                c.getBoundingClientRect();
-            return {
-                top: r.top,
-                height: r.height,
-            };
-        });
+        let rects: readonly CardRect[];
+        if (
+            drag.kind === 'active'
+            && drag.rects !== null
+        ) {
+            rects = drag.rects;
+        } else {
+            rects = cards().map((c) => {
+                const r =
+                    c.getBoundingClientRect();
+                return {
+                    top: r.top,
+                    height: r.height,
+                };
+            });
+            if (drag.kind === 'active') {
+                drag = {
+                    kind: 'active',
+                    id: drag.id,
+                    indicator: drag.indicator,
+                    idx: drag.idx,
+                    rects,
+                };
+            }
+        }
         return computeDropIndex(
             y, lastIdx, rects,
         );
@@ -140,6 +180,7 @@ export function initDragReorder(
                 id,
                 indicator: null,
                 idx: null,
+                rects: null,
             };
             card.style.opacity =
                 DRAGGING_OPACITY;
@@ -182,6 +223,7 @@ export function initDragReorder(
                 id: drag.id,
                 indicator: ind,
                 idx: newIdx,
+                rects: drag.rects,
             };
         },
     );

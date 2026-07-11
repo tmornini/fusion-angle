@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -51,7 +51,7 @@ test('memberName throws for unknown id', () => {
 test(
     'getHumanMemberMap fetches members via adapter',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'u1', 'Alice Adams');
         const ctx = createRequestContext(db, DEV_TOKEN);
@@ -68,7 +68,7 @@ test(
 );
 
 test('Fresh ctx re-fetches each call', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'u1', 'Alice Adams');
     const m1 = await getHumanMemberMap(
@@ -86,7 +86,7 @@ test('Fresh ctx re-fetches each call', async () => {
 test(
     'getCurrentHumanMember returns the identity',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Alice Adams',
@@ -103,7 +103,7 @@ test(
     'RequestContext requestId is stable'
     + ' and unique',
     () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         const a = createRequestContext(db, DEV_TOKEN);
         const b = createRequestContext(db, DEV_TOKEN);
         assert.equal(
@@ -123,7 +123,7 @@ test(
 test(
     'client requestId rides the wire as x-request-id',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, DEV_TOKEN);
         await ctx.PUT(

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { GET, handleRequest } from '../api/api.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import { hashPassword } from '../shared/password-hash.ts';
@@ -45,7 +48,7 @@ async function noStoredAuthorizeResponse(
 }
 
 async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedIdentityPii(db, 'current', {
         name: 'Demo', email: 'demo@example.com',
@@ -140,7 +143,7 @@ async () => {
 // through.
 test('a revoked password credential is the same 401',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedIdentityPii(db, 'current', {
         name: 'Demo', email: 'demo@example.com',

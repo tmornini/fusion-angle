@@ -2,9 +2,7 @@ import { test } from 'node:test';
 import { deriveStatesFor } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -47,7 +45,7 @@ test(
     'postAIMemberCreation lands the parent, detail and'
     + ' initial active event in one operation',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(db, await devToken());
@@ -79,7 +77,7 @@ test(
     'putAIMember re-puts the facets with an echoed'
     + ' trio and without a new state event',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         await seedAIMember(db, 'ai1', 'Claude');
@@ -111,7 +109,7 @@ test(
     'postAIMemberStateChange records a state'
     + ' change via PUT members/:id',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         await seedAIMember(db, 'ai1', 'Claude');

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -178,7 +181,7 @@ async function setupOneWorkOrder(): Promise<{
     woId: string;
     tables: () => Promise<WoTables>;
 }> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo Test');
     const ctx = createRequestContext(db, await devToken());
@@ -331,7 +334,7 @@ test(
     + ' position with non-monotonic fractional'
     + ' values',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
@@ -404,7 +407,7 @@ test(
     'buildInboxItems carries the current'
     + " node's task instructions",
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',

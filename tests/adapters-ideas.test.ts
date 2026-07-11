@@ -2,9 +2,7 @@ import { test } from 'node:test';
 import { deriveStatesFor } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
@@ -389,7 +387,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
 // co-member of their idea's org, in BOTH orgs.
 test('getIdeas resolves every seeded submitter in'
     + ' both orgs', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
     for (const organization of ['1', '2']) {

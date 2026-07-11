@@ -7,7 +7,10 @@ import {
     PUT,
     RequestError,
 } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { TABLE_NAMES } from '../api/db.ts';
 import {
     jsonObjectField,
@@ -38,7 +41,7 @@ const AT = '2026-06-01T00:00:00.000000Z';
 const AT2 = '2026-06-02T00:00:00.000000Z';
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     // Phase Final Stage B: records family retired — seed

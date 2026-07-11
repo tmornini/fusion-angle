@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { pendingInvitationFor } from
@@ -38,7 +38,7 @@ function req(
 test('Step 0: pendingInvitationFor over live grant/decline/'
 + ' re-grant — declined-reinvite is the drift pin (pair plane)',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const admin = await organizationToken(
         'current', ORGANIZATION_TWO);

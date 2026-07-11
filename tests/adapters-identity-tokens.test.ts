@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
     validateIdentityTokenEntity,
 } from '../api/validators.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -14,7 +14,7 @@ import {
 } from '../web-app/app/adapters/identity-tokens.ts';
 
 async function adminCtx() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return {
         db, ctx: createRequestContext(db, await devToken()),

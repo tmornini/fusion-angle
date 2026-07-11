@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     GET, POST, PUT, handleRequest,
 } from '../api/api.ts';
@@ -19,7 +19,7 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 const BASE = 'http://localhost';
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }
@@ -75,7 +75,7 @@ async () => {
 // handler returns null — proving the route was reached, not
 // gated.
 test('public snapshot routes admit any token', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     const anon = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
         sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
@@ -91,7 +91,7 @@ test('public snapshot routes admit any token', async () => {
 // schema exists. No gate closes behind the first boot.
 test('anonymous may re-seed after a schema exists',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     const anon = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
         sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',

@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { GET, POST, PUT, handleRequest } from '../api/api.ts';
-import {
-    MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -18,7 +16,7 @@ const BASE = 'http://localhost';
 const MEMBER = 'walt';
 
 async function freshDb() {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     return db;
 }
@@ -207,7 +205,7 @@ test(
             }));
         assert.equal(create.status, 204);
 
-        const memberDb = new MemoryDbAdapter();
+        const memberDb = memoryDbAdapter();
         await memberDb.postSchemaCreation();
         await seedOrganizationMember(memberDb, MEMBER);
         const token = await devToken(MEMBER);

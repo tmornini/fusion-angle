@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
@@ -57,7 +60,7 @@ function putDefaultOrganization(
 }
 
 async function adminDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
     return db;

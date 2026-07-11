@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { PUT, handleRequest } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     DEV_TOKEN,
     organizationToken,
@@ -193,7 +196,7 @@ test('validateMemberDocumentBody rejects a state outside'
 
 test('PUT members/:id accepts the lifecycle trio and echoes'
 + ' the entity fields', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -214,7 +217,7 @@ test('PUT members/:id accepts the lifecycle trio and echoes'
 });
 
 test('PUT members/:id with {type} alone is 400', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -226,7 +229,7 @@ test('PUT members/:id with {type} alone is 400', async () => {
 
 test('PUT members/:id rejects a state outside the member'
 + ' alphabet', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
@@ -396,7 +399,7 @@ test('validateHumanMemberDocumentBody rejects each missing'
 test('postMemberDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped)',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = memberFields();
     const pair = await formWritePair({
@@ -428,7 +431,7 @@ async () => {
 test('postAiMemberDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped)',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = aiMemberFields();
     const pair = await formWritePair({
@@ -456,7 +459,7 @@ async () => {
 test('postHumanMemberDocumentOp writes exactly the pair and'
 + ' reconstructs the entity return (row half stripped;'
 + ' below-gate only — no live PUT route)', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = humanMemberFields();
     const pair = await formWritePair({
@@ -488,7 +491,7 @@ test('postHumanMemberDocumentOp writes exactly the pair and'
 
 test('a byte-identical PUT resend to members/:id converges to'
 + ' one stored request/response pair', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = memberFields();
     const first = await PUT(
@@ -504,7 +507,7 @@ test('a byte-identical PUT resend to members/:id converges to'
 
 test('a byte-identical PUT resend to ai-members/:id converges'
 + ' to one stored request/response pair', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = aiMemberFields();
     const first = await PUT(
@@ -612,7 +615,7 @@ for (const {
     test('a PUT chain Supersedes-chains and the head derives'
     + ' the LATEST body, through the generic document handlers'
     + ' (' + family + ')', async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         const wiring = documentFamilyWiring(family)!;
         const first = fields();
@@ -658,7 +661,7 @@ for (const {
     + ' document handlers, carrying notFoundTable (never the'
     + ' entity-store table name coincidence) (' + family + ')',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await db.postSchemaCreation();
         const wiring = documentFamilyWiring(family)!;
         await putDocumentPair(

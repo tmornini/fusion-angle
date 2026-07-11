@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { GET } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import { devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -47,7 +47,7 @@ for (const route of COLLECTION_ROUTES) {
         `GET ${route} returns an array on an empty`
         + ` db`,
         async () => {
-            const db = new MemoryDbAdapter();
+            const db = memoryDbAdapter();
             await seedAdminSchema(db);
             const rows =
                 await GET<unknown[]>(
@@ -74,7 +74,7 @@ for (const route of COLLECTION_ROUTES) {
 test('GET /organizations self-fences to the caller\'s own'
 + ' memberships — the membership-filtered path, never the'
 + ' removed unfenced route table entry', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const singleOrganizationIdentityId = buildMembers()[0]!.id;
     const rows = await GET<OrganizationEntity[]>(

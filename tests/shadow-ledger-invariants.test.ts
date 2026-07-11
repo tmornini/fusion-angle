@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import { deriveStates } from
     '../api/derive-states.ts';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { handleRequest } from '../api/api.ts';
 import { sha256Hex } from '../shared/digest.ts';
@@ -209,7 +212,7 @@ function createRecordBody(
 // additive) — five families beyond the seed's own, spanning
 // both seeded orgs.
 async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const org1Token = await organizationToken(
         'current', STARK_ORGANIZATION);
@@ -452,7 +455,7 @@ test('every pair\'s envelope timestamps are RFC-3339 zulu'
 // present but semantically faithful to what was really written.
 test('a seeded idea\'s create-pair request reproduces its'
 + ' actual genesis row in states', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const idea = buildIdeas()[0]!;
     const requests = await db.requests.getAll();

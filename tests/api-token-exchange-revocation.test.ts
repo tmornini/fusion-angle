@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { PUT } from '../api/api.ts';
 import { postToken } from '../api/authentication.ts';
 import {
@@ -100,7 +103,7 @@ async function seedTokenRevocationPair(
 }
 
 async function revokedDb(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
     await seedMembershipPair(

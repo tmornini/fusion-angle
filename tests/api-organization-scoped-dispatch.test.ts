@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { GET, PUT } from '../api/api.ts';
 import {
     mintAccessToken,
@@ -22,7 +25,7 @@ async function organizationToken(organization: string): Promise<string> {
 }
 
 async function twoOrganizationIdeas(): Promise<MemoryDbAdapter> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);   // current = admin (global)
     // Seeded through the live document PUT so a1's message
     // pair exists — GET ideas derives from the ledger. No

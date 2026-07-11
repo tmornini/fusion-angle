@@ -6,7 +6,10 @@ globalThis.localStorage = {
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -130,7 +133,7 @@ async function humanDetailPair(
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
 }> {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(
         db, 'hw_sarah_chen', 'Sarah Test',
@@ -145,7 +148,7 @@ test(
     'getMembers omits system; getMemberMap'
     + ' resolves it as an author',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'hw_sarah', 'Sarah Chen',
@@ -282,7 +285,7 @@ test(
     'memberName degrades visibly when a human'
     + ' has no identity_pii row (erased)',
     async () => {
-        const db = new MemoryDbAdapter();
+        const db = memoryDbAdapter();
         await seedAdminSchema(db);
         // Lifecycle rides the members/:id document trio —
         // same path as the system-member seed above.

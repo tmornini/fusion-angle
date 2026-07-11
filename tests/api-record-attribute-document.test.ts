@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { PUT } from '../api/api.ts';
-import { MemoryDbAdapter } from '../api/db-memory.ts';
+import {
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { jsonArrayField } from '../api/types.ts';
@@ -103,7 +106,7 @@ test('validateRecordAttributeDocumentBody rejects an'
 
 test('postRecordAttributeDocumentOp writes exactly the'
 + ' record_attributes row and the pair', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = {
         ...documentFields(),
@@ -146,7 +149,7 @@ test('postRecordAttributeDocumentOp writes exactly the'
 test('a byte-identical PUT resend to record-attributes/:id'
 + ' converges to one stored request/response pair',
 async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const body = documentFields();
     const first = await PUT(
@@ -217,7 +220,7 @@ async function deleteDocumentPair(
 test('a DELETE-head derives absent through the generic'
 + ' document handlers, carrying notFoundTable, never the'
 + ' family', async () => {
-    const db = new MemoryDbAdapter();
+    const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await putDocumentPair(db, 'ra-del-1', documentFields());
     await deleteDocumentPair(db, 'ra-del-1');
