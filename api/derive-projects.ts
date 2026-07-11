@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
+import { missedReadError } from './derive-states.ts';
 import type { Id, ProjectEntity, StateEntity } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
@@ -135,8 +135,8 @@ export async function deriveProject(
         await fetchProjectPairs(db, prefix);
     const document = documents.get(projectId);
     if (document === undefined) {
-        throw new EntityNotFoundError(
-            PROJECTS_TABLE, projectId,
+        throw await missedReadError(
+            db, projectId, organization, PROJECTS_TABLE,
         );
     }
     const history = stateHistoryFrom(
@@ -146,8 +146,8 @@ export async function deriveProject(
         projectId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
-        throw new EntityNotFoundError(
-            PROJECTS_TABLE, projectId,
+        throw await missedReadError(
+            db, projectId, organization, PROJECTS_TABLE,
         );
     }
     return projectEntityOf(document, organization);

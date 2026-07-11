@@ -402,7 +402,7 @@ async () => {
     assert.equal(status, 200);
 });
 
-test('entity-states history for a node id is 404 in org B',
+test('entity-states history for a node id is 403 in org B',
 async () => {
     const db = await seed();
     // B's own organizations/:id document (Phase 13 Task 3's
@@ -424,7 +424,7 @@ async () => {
     });
     const status = await entityStatesHistoryStatus(
         db, 'B', 'node-a');
-    assert.equal(status, 404);
+    assert.equal(status, 403);
 });
 
 // ---- Orphan path retired with states/:id --------------------

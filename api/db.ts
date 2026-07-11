@@ -20,6 +20,32 @@ export class EntityNotFoundError {
     }
 }
 
+// Cross-tenant ownership breach: the entity exists, but under
+// a different organization. Mapped once at the domain-boundary
+// catch to HTTP 403. HTTP-agnostic like EntityNotFoundError.
+export function foreignOrganizationMessage(
+    table: string,
+    id: string,
+): string {
+    return `forbidden: ${table}/${id}`
+        + ' belongs to a different organization';
+}
+
+export class ForeignOrganizationError {
+    readonly message: string;
+    readonly table: string;
+    readonly id: string;
+    constructor(
+        table: string,
+        id: string,
+    ) {
+        this.table = table;
+        this.id = id;
+        this.message =
+            foreignOrganizationMessage(table, id);
+    }
+}
+
 export class MissingTableError extends Error {
     readonly table: string;
     constructor(table: string) {

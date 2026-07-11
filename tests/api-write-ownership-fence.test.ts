@@ -154,7 +154,7 @@ async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('foreign-id PUT ideas/:id 404s with Not found body',
+test('foreign-id PUT ideas/:id 403s with forbidden body',
 async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
@@ -169,9 +169,13 @@ async () => {
         'PUT', '/ideas/idea-a', tokenB,
         ideaDocument('stolen', 'ev-steal'),
     ));
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
     const body = await foreign.json() as { error: string };
-    assert.equal(body.error, 'Not found: ideas/idea-a');
+    assert.equal(
+        body.error,
+        'forbidden: ideas/idea-a belongs to a different'
+        + ' organization',
+    );
 });
 
 test('genesis PUT ideas/:id in the caller org is unaffected',
@@ -195,7 +199,7 @@ async () => {
     assert.equal(wire.organization_id, ORGANIZATION_B);
 });
 
-test('foreign-id DELETE records/:id 404s', async () => {
+test('foreign-id DELETE records/:id 403s', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
@@ -220,9 +224,13 @@ test('foreign-id DELETE records/:id 404s', async () => {
     const foreign = await handleRequest(db, req(
         'DELETE', '/records/rec-a', tokenB,
     ));
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
     const body = await foreign.json() as { error: string };
-    assert.equal(body.error, 'Not found: records/rec-a');
+    assert.equal(
+        body.error,
+        'forbidden: records/rec-a belongs to a different'
+        + ' organization',
+    );
     // Phase Final Task 2: pair-plane document still present —
     // nothing tombstoned; A can still GET.
     const still = await handleRequest(db, req(
@@ -234,7 +242,7 @@ test('foreign-id DELETE records/:id 404s', async () => {
     // Phase Final Stage B: records table retired.
 });
 
-test('foreign-id DELETE memberships/:id 404s', async () => {
+test('foreign-id DELETE memberships/:id 403s', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
@@ -251,10 +259,12 @@ test('foreign-id DELETE memberships/:id 404s', async () => {
     const foreign = await handleRequest(db, req(
         'DELETE', '/memberships/m-other-a', tokenB,
     ));
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
     const body = await foreign.json() as { error: string };
     assert.equal(
-        body.error, 'Not found: memberships/m-other-a',
+        body.error,
+        'forbidden: memberships/m-other-a belongs to a'
+        + ' different organization',
     );
     // Phase Final Task 2: memberships ROW half stripped —
     // surviving document is on the pair plane under org A.
@@ -269,7 +279,7 @@ test('foreign-id DELETE memberships/:id 404s', async () => {
     // Phase Final Stage B: roster tables retired.
 });
 
-test('foreign-id PUT role-grants/:id 404s', async () => {
+test('foreign-id PUT role-grants/:id 403s', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
@@ -293,12 +303,16 @@ test('foreign-id PUT role-grants/:id 404s', async () => {
             at: '2026-01-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
     const body = await foreign.json() as { error: string };
-    assert.equal(body.error, 'Not found: role_grants/rg-a');
+    assert.equal(
+        body.error,
+        'forbidden: role_grants/rg-a belongs to a different'
+        + ' organization',
+    );
 });
 
-test('foreign-id PUT projects/:id 404s (second family class)',
+test('foreign-id PUT projects/:id 403s (second family class)',
 async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
@@ -328,7 +342,11 @@ async () => {
             state_event_id: 'ev-steal-proj',
         },
     ));
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
     const body = await foreign.json() as { error: string };
-    assert.equal(body.error, 'Not found: projects/proj-a');
+    assert.equal(
+        body.error,
+        'forbidden: projects/proj-a belongs to a different'
+        + ' organization',
+    );
 });

@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { EntityNotFoundError } from '../api/db.ts';
+import {
+    EntityNotFoundError,
+    ForeignOrganizationError,
+} from '../api/db.ts';
 import type {
     Id,
     ObjectiveEntity,
@@ -219,7 +222,7 @@ async () => {
 // -- 2. per-objective GET wire equals derive; foreign 404 ----
 
 test('per-objective GET wire equals derive (all 5); a'
-+ ' foreign-org GET 404s on wire and on derive',
++ ' foreign-org GET 403s on wire and on derive',
 async () => {
     const db = await seededDb();
     const targets = [
@@ -260,20 +263,22 @@ async () => {
     }
 
     const foreignId = OBJECTIVE_SEEDS[0]!.id;
-    const expectedMessage = 'Not found: objectives/' + foreignId;
+    const expectedMessage =
+        'forbidden: objectives/' + foreignId
+        + ' belongs to a different organization';
     const tokenTwo = await organizationToken(
         'current', ORGANIZATION_TWO,
     );
     const foreignRes = await handleRequest(
         db, req('GET', '/objectives/' + foreignId, tokenTwo),
     );
-    assert.equal(foreignRes.status, 404);
+    assert.equal(foreignRes.status, 403);
     const body = await foreignRes.json() as { error: string };
     assert.equal(body.error, expectedMessage);
     await assert.rejects(
         () => derivedObjective(db, ORGANIZATION_TWO, foreignId),
         (err: unknown) =>
-            err instanceof EntityNotFoundError
+            err instanceof ForeignOrganizationError
             && err.message === expectedMessage,
     );
 });

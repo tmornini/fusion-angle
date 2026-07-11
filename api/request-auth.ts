@@ -27,18 +27,17 @@ import { deriveMembershipsForIdentity } from
     './derive-memberships.ts';
 import { deriveRoleGrants } from './derive-identity-spine.ts';
 
-// Authenticate in-tree requests at the one chokepoint. The
-// gate runs AFTER matchRoute (which already 404'd anything
-// OUTSIDE our URL tree — honest: no resource, nothing to
-// authenticate to) and BEFORE the handler — so an
-// unauthenticated caller never reaches an instance lookup,
-// and resource-instance existence is never disclosed to it.
-// A 401 states only "no valid credentials," never that a
-// resource exists. The authentication grant surface is
-// permanently exempt — a caller cannot hold a token before
-// minting one. Exempt-from-the-gate is NOT the same as
-// unauthenticated — it is a single audited surface; any
-// addition here is security-sensitive.
+// Authenticate at the one chokepoint. Match is pure and
+// first, but authentication runs BEFORE the no-match 404 —
+// an unauthenticated caller to ANY non-exempt path
+// (including unknown and retired) gets 401, never a route-
+// topology oracle. A 401 states only "no valid credentials."
+// Resource existence (404) is shown only to an authenticated
+// caller (or on a bearer-exempt route). The authentication
+// grant surface is permanently exempt — a caller cannot hold
+// a token before minting one. Exempt-from-the-gate is NOT
+// the same as unauthenticated — it is a single audited
+// surface; any addition here is security-sensitive.
 export const AUTHENTICATION_ROUTES: ReadonlySet<string> =
     new Set([
         'authentication/token',

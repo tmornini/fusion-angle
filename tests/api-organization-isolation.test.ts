@@ -818,7 +818,7 @@ for (const c of NESTED_FLOW_CASES) {
 // an entirely different '/organizations/A/...' prefix — the
 // same structural fence every org-nested address rides, with no
 // tag-specific code of its own.
-test('nested flows/:id/tags 404s a foreign-org flow', async () => {
+test('nested flows/:id/tags 403s a foreign-org flow', async () => {
     const db = await deepDb();
     const tagged = await handleRequest(db, req(
         'PUT', '/flows/fB/tags/v1',
@@ -831,7 +831,13 @@ test('nested flows/:id/tags 404s a foreign-org flow', async () => {
         'GET', '/flows/fB/tags/v1',
         await organizationToken('current', 'A'),
     ));
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 403);
+    const body = await res.json() as { error: string };
+    assert.equal(
+        body.error,
+        'forbidden: flow_tags/v1 belongs to a different'
+        + ' organization',
+    );
 });
 
 // The three project-subordinate resources nest under
@@ -947,17 +953,20 @@ async () => {
     assert.deepEqual(rows.map(r => r.id), ['sfvA']);
 });
 
-test('nested states/:id/field-values hides a foreign event',
+test('nested states/:id/field-values 403s a foreign event',
 async () => {
     const db = await deepDb();
     // seB is a B-org event; its field values, read through the
-    // A facade, are fenced empty (the multi-hop resolver lands
-    // org B for sfvB).
+    // A facade, 403 (honest foreign ownership).
     const res = await facadeGet(
         db, '/states/seB/field-values');
-    assert.equal(res.status, 200);
-    const rows = await res.json() as { id: string }[];
-    assert.deepEqual(rows.map(r => r.id), []);
+    assert.equal(res.status, 403);
+    const body = await res.json() as { error: string };
+    assert.equal(
+        body.error,
+        'forbidden: state_field_values/seB belongs to a'
+        + ' different organization',
+    );
 });
 
 // bare entity-states/:id RETIRED (Phase 15 Task 7); fence
@@ -982,7 +991,13 @@ async () => {
     assert.equal(bOwns.status, 200);
     const foreign = await facadeGet(
         db, '/entity-states/iB/history');
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
+    const body = await foreign.json() as { error: string };
+    assert.equal(
+        body.error,
+        'forbidden: entity_states/iB belongs to a different'
+        + ' organization',
+    );
 });
 
 test('identity-pii lists only co-members', async () => {
@@ -1022,20 +1037,23 @@ async () => {
     for (const r of rows) {
         assert.equal(r.secret, undefined);
     }
-    // pb is a B-only member — its nested collection is fenced
-    // empty through the A facade.
+    // pb is a B-only member — its nested collection 403s
+    // through the A facade (honest foreign ownership).
     // Phase Final Task 2: pair plane proves pb's credential
-    // exists while fence empties the collection under A.
+    // exists while fence 403s under A.
     assert.equal(
         (await deriveCredential(db, 'pb', 'cred-pb')).id,
         'cred-pb');
     // Phase Final Stage B: identity spine tables retired.
     const other = await facadeGet(
         db, '/identities/pb/credentials');
-    assert.equal(other.status, 200);
-    assert.deepEqual(
-        (await other.json() as { id: string }[]).map(r => r.id),
-        []);
+    assert.equal(other.status, 403);
+    const otherBody = await other.json() as { error: string };
+    assert.equal(
+        otherBody.error,
+        'forbidden: identity_credentials/pb belongs to a'
+        + ' different organization',
+    );
     // a single read projects secret out too
     const one = await facadeGet(
         db, '/identities/pa/credentials/cred-pa');
@@ -1043,10 +1061,17 @@ async () => {
     assert.equal(
         (await one.json() as { secret?: string }).secret,
         undefined);
-    // a non-member credential 404s
+    // a non-member credential 403s
     const foreign = await facadeGet(
         db, '/identities/pb/credentials/cred-pb');
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
+    const foreignBody =
+        await foreign.json() as { error: string };
+    assert.equal(
+        foreignBody.error,
+        'forbidden: identity_credentials/cred-pb belongs to'
+        + ' a different organization',
+    );
 });
 
 // identity-credentials stays ADMIN-ONLY after nesting: the
@@ -1072,7 +1097,7 @@ async () => {
     assert.equal(asMember.status, 403);
 });
 
-test('organizations/:id 404s a non-member org', async () => {
+test('organizations/:id 403s a non-member org', async () => {
     const db = await deepDb();
     const mine = await handleRequest(db, req(
         'GET', '/organizations/A',
@@ -1080,13 +1105,32 @@ test('organizations/:id 404s a non-member org', async () => {
     assert.equal(mine.status, 200);
     // Phase Final Task 2: organizations ROW half stripped —
     // B still has a pair (seedOrganizationDocument), so
-    // derive finds it; the membership fence still 404s.
+    // derive finds it; the membership fence 403s.
     assert.equal(
         (await deriveOrganization(db, 'B')).id, 'B');
     const foreign = await handleRequest(db, req(
         'GET', '/organizations/B',
         await organizationToken('current', 'A')));
-    assert.equal(foreign.status, 404);
+    assert.equal(foreign.status, 403);
+    const body = await foreign.json() as { error: string };
+    assert.equal(
+        body.error,
+        'forbidden: organizations/B belongs to a different'
+        + ' organization',
+    );
+});
+
+test('organizations/:id 404s a genuinely absent org',
+async () => {
+    const db = await deepDb();
+    const res = await handleRequest(db, req(
+        'GET', '/organizations/no-such-org',
+        await organizationToken('current', 'A')));
+    assert.equal(res.status, 404);
+    const body = await res.json() as { error: string };
+    assert.equal(
+        body.error, 'Not found: /organizations/no-such-org',
+    );
 });
 
 // ---- Orphan visibility (null owner → visible to all orgs) ----

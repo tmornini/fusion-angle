@@ -12,6 +12,7 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { nowUtc } from '../api/types.ts';
+import { EntityNotFoundError } from '../api/db.ts';
 import {
     stateFieldValuesForStateEvent,
 } from '../api/derive-state-field-values.ts';
@@ -248,11 +249,14 @@ test(
         );
         const events = await eventsFor(db);
         assert.equal(events.length, 0);
-        // Phase Final Stage B: state_field_values retired.
-        const fvs = await stateFieldValuesForStateEvent(
-            db, STARK_ORGANIZATION, 'te1',
+        // Orphan parent event → EntityNotFoundError (404),
+        // not an empty array.
+        await assert.rejects(
+            () => stateFieldValuesForStateEvent(
+                db, STARK_ORGANIZATION, 'te1',
+            ),
+            EntityNotFoundError,
         );
-        assert.equal(fvs.length, 0);
     },
 );
 

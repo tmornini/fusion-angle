@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
-    EntityNotFoundError, type DbAdapter,
+    EntityNotFoundError,
+    ForeignOrganizationError,
+    type DbAdapter,
     TABLE_NAMES,
 } from '../api/db.ts';
 import { jsonObjectField, nowUtc } from '../api/types.ts';
@@ -1356,11 +1358,11 @@ async function transitionWithFieldValue(
     assert.equal(transitioned.status, 204);
 }
 
-// Wire-shape pin: GET states/:id/field-values is ALWAYS 200
-// with a three-way filtered array (own → rows; foreign → [];
-// nowhere → []). Never 404. Pair-plane visibility successor
-// (stateEventVisibilityFor) must hold these bytes exactly.
-test('field-values GET: always-200 three-way array for'
+// Wire-shape pin: GET states/:id/field-values is 200 / 403 /
+// 404 by visibility (own → rows; foreign → 403; nowhere →
+// 404). Pair-plane visibility successor
+// (stateEventVisibilityFor) drives the three statuses.
+test('field-values GET: 200/403/404 three-way for'
 + ' own / foreign / orphan parent events', async () => {
     const db = await seededDb();
     const starkToken = await organizationToken(
@@ -1392,7 +1394,7 @@ test('field-values GET: always-200 three-way array for'
         ownRows.map((r) => r.id), [fieldValueId],
     );
 
-    // (foreign) Org two sees [] — never 404.
+    // (foreign) Org two 403s with the forbidden body.
     const foreign = await handleRequest(
         db,
         req(
@@ -1401,12 +1403,16 @@ test('field-values GET: always-200 three-way array for'
             twoToken,
         ),
     );
-    assert.equal(foreign.status, 200);
-    const foreignRows =
-        await foreign.json() as { id: string }[];
-    assert.deepEqual(foreignRows, []);
+    assert.equal(foreign.status, 403);
+    const foreignBody =
+        await foreign.json() as { error: string };
+    assert.equal(
+        foreignBody.error,
+        'forbidden: state_field_values/' + transitionEventId
+        + ' belongs to a different organization',
+    );
 
-    // (orphan / nowhere) Ghost event id → [] / 200.
+    // (orphan / nowhere) Ghost event id → 404.
     const orphan = await handleRequest(
         db,
         req(
@@ -1415,17 +1421,19 @@ test('field-values GET: always-200 three-way array for'
             starkToken,
         ),
     );
-    assert.equal(orphan.status, 200);
-    const orphanRows =
-        await orphan.json() as { id: string }[];
-    assert.deepEqual(orphanRows, []);
+    assert.equal(orphan.status, 404);
+    const orphanBody =
+        await orphan.json() as { error: string };
+    assert.equal(
+        orphanBody.error,
+        'Not found: state_field_values/ghost-p15-nowhere',
+    );
 });
 
-// Derive-path parity: stateFieldValuesForStateEvent's
-// visibility gate matches the row-plane three-way oracle
-// (rawHasRow + fenced getById) for own / foreign / orphan.
-test('stateFieldValuesForStateEvent visibility matches'
-+ ' the row-plane three-way (own / foreign / orphan)',
+// Derive-path: stateFieldValuesForStateEvent throws on
+// foreign (403) and orphan (404); own still returns rows.
+test('stateFieldValuesForStateEvent visibility: own rows,'
++ ' foreign rejects, orphan rejects',
 async () => {
     const db = await seededDb();
     const workOrderId = 'wo-p15-fv-derive';
@@ -1454,7 +1462,7 @@ async () => {
     assert.equal(ownDerived.length, 1);
     assert.equal(ownDerived[0]!.id, fieldValueId);
 
-    // Foreign → hidden on both planes; derive returns [].
+    // Foreign → hidden; derive rejects ForeignOrganizationError.
     assert.equal(
         await pairPlaneVisibility(db, ORGANIZATION_TWO, transitionEventId,
         ),
@@ -1466,14 +1474,14 @@ async () => {
         ),
         'hidden',
     );
-    const foreignDerived =
-        await stateFieldValuesForStateEvent(
+    await assert.rejects(
+        () => stateFieldValuesForStateEvent(
             db, ORGANIZATION_TWO, transitionEventId,
-        );
-    assert.deepEqual(foreignDerived, []);
+        ),
+        ForeignOrganizationError,
+    );
 
-    // Orphan → orphan on both planes; derive returns []
-    // (no field-value pairs name the ghost id).
+    // Orphan → orphan; derive rejects EntityNotFoundError.
     assert.equal(
         await pairPlaneVisibility(db, STARK_ORGANIZATION, 'ghost-p15-vis',
         ),
@@ -1485,11 +1493,12 @@ async () => {
         ),
         'orphan',
     );
-    const orphanDerived =
-        await stateFieldValuesForStateEvent(
+    await assert.rejects(
+        () => stateFieldValuesForStateEvent(
             db, STARK_ORGANIZATION, 'ghost-p15-vis',
-        );
-    assert.deepEqual(orphanDerived, []);
+        ),
+        EntityNotFoundError,
+    );
 });
 
 // -- RESTRICT graph-leg re-anchor (Phase 15 Task 4) ------------

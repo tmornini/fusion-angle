@@ -4,6 +4,8 @@ import type {
 } from './db.ts';
 import {
     EntityNotFoundError,
+    ForeignOrganizationError,
+    foreignOrganizationMessage,
     MissingTableError,
     UniqueConstraintError,
 } from './db.ts';
@@ -40,7 +42,10 @@ import {
 import {
     identityTargetsFor,
 } from './notifications.ts';
-import { resolveOwningOrganization } from './derive-states.ts';
+import {
+    resolveOwningOrganization,
+    resolveGlobalOwner,
+} from './derive-states.ts';
 import {
     writeOwnershipFenceFor,
     assertWritableInOrganization,
@@ -278,21 +283,13 @@ export async function handleRequest(
         && method === 'GET') {
         return organizationsEnumerationRequest(ctx, request);
     }
+    // Match first (pure, no I/O). Authentication runs before
+    // the no-match 404 so an unauthenticated caller never maps
+    // route topology (unknown path and real route both 401).
     const match = matchRoute(routeTable, pathSegments);
-
-    if (!match) {
-        return Response.json(
-            {
-                error:
-                    'Not found: ' + pathname,
-            },
-            { status: HTTP_NOT_FOUND },
-        );
-    }
-
-    const { route: matched, params } = match;
-
-    const routePattern = matched.segments.join('/');
+    const matchedRoutePattern = match !== null
+        ? match.route.segments.join('/')
+        : undefined;
     // Every authenticated request is fenced — see
     // fenceRequest, which completes the vessel: the
     // organization, the live memberships, and the roles.
@@ -321,10 +318,11 @@ export async function handleRequest(
     let callerIsAdmin = false;
     // BOOTSTRAP_ROUTES: the accepted dev-tier auth-free
     // snapshot plane (removed at the Postgres server tier) —
-    // see api/request-auth.ts.
-    const bearerExempt =
-        AUTHENTICATION_ROUTES.has(routePattern)
-        || BOOTSTRAP_ROUTES.has(routePattern);
+    // see api/request-auth.ts. An unmatched path can never be
+    // exempt — bearerExempt requires a defined route pattern.
+    const bearerExempt = matchedRoutePattern !== undefined
+        && (AUTHENTICATION_ROUTES.has(matchedRoutePattern)
+            || BOOTSTRAP_ROUTES.has(matchedRoutePattern));
     if (!bearerExempt) {
         const authed =
             await authenticateRequest(ctx, request);
@@ -334,6 +332,19 @@ export async function handleRequest(
                 { status: HTTP_UNAUTHORIZED },
             );
         }
+        // Auth first; only then admit an unmatched path as
+        // 404 (bytes unchanged for authenticated callers).
+        if (match === null) {
+            return Response.json(
+                {
+                    error:
+                        'Not found: ' + pathname,
+                },
+                { status: HTTP_NOT_FOUND },
+            );
+        }
+        const { params: fenceParams } = match;
+        const fencePattern = matchedRoutePattern!;
         // Region A of the pre-dispatch ownership fence (Phase 12
         // Task 1): every read below — fenceRequest's own
         // memberships/roleGrants/requests/responses reads, and
@@ -352,9 +363,9 @@ export async function handleRequest(
             }
             const fenced = fence.ctx;
             const authzFailure =
-                routePattern === 'identities/:id/pii'
+                fencePattern === 'identities/:id/pii'
                     ? authorizeIdentityPii(
-                        fenced, param(params, 0))
+                        fenced, param(fenceParams, 0))
                     : authorizeRequest(fenced);
             if (authzFailure !== null) {
                 return Response.json(
@@ -363,14 +374,37 @@ export async function handleRequest(
                 );
             }
             // organizations/:id is global passthrough; fence
-            // READS to the caller's memberships so a non-member
-            // id 404s like any foreign row. PUT is not gated
+            // READS to the caller's memberships. A real org the
+            // caller is not a member of is 403 (honest); a
+            // genuinely absent id stays 404. PUT is not gated
             // here — a new org is created before its first
             // membership exists.
             if (method === 'GET'
-                && routePattern === 'organizations/:id'
+                && fencePattern === 'organizations/:id'
                 && !fenced.memberOrganizations
-                    .has(param(params, 0))) {
+                    .has(param(fenceParams, 0))) {
+                const organizationId =
+                    param(fenceParams, 0);
+                // Orgs self-own (resolveGlobalOwner →
+                // resolveOwningOrganization returns the org
+                // id when the document exists).
+                const owner = await resolveGlobalOwner(
+                    adapter,
+                    organizationId,
+                    fenced.organization,
+                );
+                if (owner !== null) {
+                    return Response.json(
+                        {
+                            error:
+                                foreignOrganizationMessage(
+                                    'organizations',
+                                    organizationId,
+                                ),
+                        },
+                        { status: HTTP_FORBIDDEN },
+                    );
+                }
                 return Response.json(
                     { error: 'Not found: ' + pathname },
                     { status: HTTP_NOT_FOUND },
@@ -378,12 +412,12 @@ export async function handleRequest(
             }
             // entity-states/:id/history reads derived state
             // the store fence cannot cover; gate on PARENT
-            // ownership — a DIFFERENT org's entity 404s, an
+            // ownership — a DIFFERENT org's entity 403s, an
             // orphan or own entity passes. The history-leak
             // bug gated on entity_id alone. Bare
             // entity-states/:id RETIRED (Phase 15 Task 7).
             if (method === 'GET'
-                && routePattern
+                && fencePattern
                     === 'entity-states/:id/history') {
                 // PAIR-PLANE (Phase 15 Task 5): ownership
                 // resolves through resolveOwningOrganization
@@ -393,16 +427,23 @@ export async function handleRequest(
                 // probes. Soft-deleted and hard-spliced parents
                 // still report their true owner via the
                 // append-only pair plane.
+                const entityId = param(fenceParams, 0);
                 const owner = await resolveOwningOrganization(
                     adapter,
-                    param(params, 0),
+                    entityId,
                     fenced.organization,
                 );
                 if (owner !== null
                     && owner !== fenced.organization) {
                     return Response.json(
-                        { error: 'Not found: ' + pathname },
-                        { status: HTTP_NOT_FOUND },
+                        {
+                            error:
+                                foreignOrganizationMessage(
+                                    'entity_states',
+                                    entityId,
+                                ),
+                        },
+                        { status: HTTP_FORBIDDEN },
                     );
                 }
             }
@@ -413,6 +454,21 @@ export async function handleRequest(
             return redactedFenceFailure(ctx, error);
         }
     }
+
+    // Unmatched non-exempt paths already 404'd above after
+    // auth. Unmatched paths are never bearer-exempt. Match is
+    // therefore non-null from here.
+    if (match === null) {
+        return Response.json(
+            {
+                error:
+                    'Not found: ' + pathname,
+            },
+            { status: HTTP_NOT_FOUND },
+        );
+    }
+    const { route: matched, params } = match;
+    const routePattern = matched.segments.join('/');
 
     // Parse the request body when the method
     // has one. A malformed or non-object JSON
@@ -499,13 +555,12 @@ export async function handleRequest(
             && matched.delete !== undefined);
 
     try {
-        // Phase Final Task 1(e): pre-write ownership gate for
-        // the 9 org-scoped families' existing-id PUT/DELETE.
-        // Pair-plane owner-null → genesis proceeds; foreign →
-        // EntityNotFoundError (today's #assertMine 404 bytes).
-        // Runs BEFORE formWritePair so a forged foreign id
-        // never pays crypto or stores a pair. Row-plane
-        // #assertMine still dual-runs until Stage A strips.
+        // Pre-write ownership gate for the 9 org-scoped
+        // families' existing-id PUT/DELETE. Pair-plane
+        // owner-null → genesis proceeds; foreign →
+        // ForeignOrganizationError (HTTP 403). Runs BEFORE
+        // formWritePair so a forged foreign id never pays
+        // crypto or stores a pair.
         if (
             isWrite
             && hasWriteHandler
@@ -1028,6 +1083,14 @@ export async function handleRequest(
             return Response.json(
                 { error: error.message },
                 { status: HTTP_NOT_FOUND },
+            );
+        }
+        if (
+            error instanceof ForeignOrganizationError
+        ) {
+            return Response.json(
+                { error: error.message },
+                { status: HTTP_FORBIDDEN },
             );
         }
         if (

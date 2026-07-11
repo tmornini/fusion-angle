@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
+import { missedReadError } from './derive-states.ts';
 import type {
     Id, FlowWithGraph, StateEntity,
     FlowNodeAttributeEntity, FlowNodeMemberEntity,
@@ -176,7 +176,9 @@ export async function deriveFlow(
     const { documents, pairs } = await fetchFlowPairs(db, prefix);
     const document = documents.get(flowId);
     if (document === undefined) {
-        throw new EntityNotFoundError(FLOWS_TABLE, flowId);
+        throw await missedReadError(
+            db, flowId, organization, FLOWS_TABLE,
+        );
     }
     const ownPairs = pairs.filter(
         (pair) => pair.uriId === flowId,
@@ -186,7 +188,9 @@ export async function deriveFlow(
         flowId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
-        throw new EntityNotFoundError(FLOWS_TABLE, flowId);
+        throw await missedReadError(
+            db, flowId, organization, FLOWS_TABLE,
+        );
     }
     return flowEntityOf(document, organization, ownPairs.length);
 }

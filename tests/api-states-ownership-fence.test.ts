@@ -211,7 +211,7 @@ test('GET /entity-states/:id/history is 200', async () => {
 });
 
 test('surviving GET entity-states/:id/history still fences'
-+ ' foreign ownership (404 with Not found body)',
++ ' foreign ownership (403 with forbidden body)',
 async () => {
     const { db, token } = await seed();
     await seedOrganizationDocument(db, 'B', 'Beta');
@@ -247,12 +247,13 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/entity-states/idea-b/history', token,
     ));
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 403);
     assert.deepEqual(
         await res.json(),
         {
             error:
-                'Not found: /entity-states/idea-b/history',
+                'forbidden: entity_states/idea-b belongs to'
+                + ' a different organization',
         },
     );
 });

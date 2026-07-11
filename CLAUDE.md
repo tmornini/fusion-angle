@@ -129,9 +129,13 @@ is HTTP-only.
   `deriveMembershipsForIdentity`; `deriveRoleGrants`), so a
   revoked grant loses access on the very next request.
   Org-scoped PUT/DELETE hit the write-ownership fence
-  (`writeOwnershipFenceFor` → `resolveOwningOrganization`)
-  so a foreign id 404s rather than genesis-ing in the
-  caller's namespace. `organizations` is the tenant root;
+  (`writeOwnershipFenceFor` → `resolveGlobalOwner`) so a
+  foreign id 403s rather than genesis-ing in the caller's
+  namespace; genuine absence still 404s (or genesis on
+  PUT). Authentication runs before the no-match 404 —
+  unauthenticated callers get 401 on any non-exempt path
+  (including unknown and retired routes), never a route-
+  topology oracle. `organizations` is the tenant root;
   `memberships` joins identity↔org; the members roster is
   derived. A membership pair is created when an invitee
   ACCEPTS an invitation (the only live membership write;
@@ -335,10 +339,15 @@ Phase 14 cores: `drift-phase14-cores-parity.test.ts`,
 Phase 15 cores: `drift-phase15-cores-parity.test.ts`,
 `api-states-ownership-fence.test.ts` (re-scoped to
 retirement pins; every verb on `/states/:id` is a router
-404). Phase Final adds the write-ownership fence pin
+404 for authenticated callers). Phase Final adds the
+write-ownership fence pin
 (`api-write-ownership-fence.test.ts`); store/decorator unit
 tests and dual-write shadow-ledger row oracles retired with
-their subjects. See `tests/` for the current set.
+their subjects. Honest HTTP status covenant pins:
+`api-unauthenticated-route-ordering.test.ts` (401 before
+404), foreign-org 403 body pins across fence/isolation/
+drift suites, field-values 200/403/404 three-way. See
+`tests/` for the current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so
 adapter and api-layer tests run without `localStorage`.
 

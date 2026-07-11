@@ -178,7 +178,7 @@ test('leg 2b: the bootstrap singleton organization — a'
     // Phase Final Stage B: organizations table retired.
 });
 
-// ---- leg 3: non-member 404 shapes -----------------------------
+// ---- leg 3: non-member 403 / absent 404 shapes ----------------
 
 test('leg 3a: deriveOrganization throws the store-shaped'
 + ' EntityNotFoundError "Not found: organizations/<id>" for'
@@ -195,10 +195,10 @@ test('leg 3a: deriveOrganization throws the store-shaped'
     );
 });
 
-test('leg 3b: the pre-dispatch membership-fence 404 — a'
+test('leg 3b: the pre-dispatch membership-fence 403 — a'
 + ' SINGLE-organization caller (STARK) requesting an EXISTING'
 + ' but foreign organization (ORGANIZATION_TWO) gets the'
-+ ' pathname-shaped "Not found: /organizations/<id>"',
++ ' forbidden body',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -207,9 +207,10 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/organizations/' + ORGANIZATION_TWO, token,
     ));
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 403);
     assert.deepEqual(await res.json(), {
-        error: 'Not found: /organizations/' + ORGANIZATION_TWO,
+        error: 'forbidden: organizations/' + ORGANIZATION_TWO
+            + ' belongs to a different organization',
     });
 });
 

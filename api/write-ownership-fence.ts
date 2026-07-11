@@ -1,37 +1,20 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
+import { ForeignOrganizationError } from './db.ts';
 import type { Id } from './types.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
-import { resolveOwningOrganization } from './derive-states.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
-import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
+import { resolveGlobalOwner } from './derive-states.ts';
 
-// Phase Final Task 1(e): the pre-write ownership gate that
-// preserves today's foreign-id 404 bytes once dual-write row
-// halves die. OrganizationScopedEntityStore#assertMine (PUT)
-// and #ownsRow (DELETE) today fence against the ROW keyspace;
-// after strip the pair plane is per-org namespaced, so a
-// naive strip would flip foreign-id PUT from 404 to genesis
-// 2xx in the caller's own namespace. This gate resolves the
-// document's owner on the pair plane BEFORE the handler runs:
-// owner-null → genesis proceeds; foreign → EntityNotFoundError
-// (the same 404 bytes #assertMine throws today).
+// Pre-write ownership gate on the pair plane. Without it, a
+// foreign-id PUT would genesis in the caller's own namespace
+// (pair plane is per-org namespaced). Resolves the document's
+// owner BEFORE the handler runs:
+// owner-null → genesis proceeds; foreign →
+// ForeignOrganizationError (HTTP 403 — the honest covenant;
+// existence of opaque high-entropy ids is accepted).
 //
 // Designed ONCE at the gate/op seam (api.ts consults
 // writeOwnershipFenceFor; assertWritableInOrganization is the
 // single throw site). Cost class matches
 // resolveOwningOrganization (hit ~19µs / miss ~1.9ms).
-
-const ROLE_GRANTS_PREFIX =
-    canonicalUriPrefix(undefined, '/role-grants/');
-
-// Organization-nested document prefixes:
-// /organizations/{id}/...
-const ORGANIZATION_NESTED_PREFIX =
-    /^\/organizations\/([^/]+)\//;
 
 export interface WriteOwnershipFence {
     readonly table: string;
@@ -82,59 +65,16 @@ export function writeOwnershipFenceFor(
     return WRITE_OWNERSHIP_FENCE.get(routePattern);
 }
 
-function responseBodyOf(
-    message: string,
-): Record<string, unknown> {
-    const model = parseJson(message, defaultBodyRegistry());
-    const body = HttpMessage.fromModel(model).body();
-    return body.exists()
-        ? JSON.parse(body.toText()) as Record<string, unknown>
-        : {};
-}
-
-// Resolve the document's owning organization for a write fence.
-// Prefers a direct uri_id hit (covers memberships + record-
-// attributes, which resolveOwningOrganization's states.entity_id
-// alphabet does not list, and role-grants' flat prefix whose org
-// lives in the response body). Falls back to
-// resolveOwningOrganization for the nested document families
-// already in that alphabet (ideas/projects/flows/...).
-export async function resolveWriteOwner(
-    db: DbAdapter,
-    entityId: Id,
-    boundOrganization: Id,
-): Promise<Id | null> {
-    const hits = await db.responses.getAllWhere(
-        'uri_id', entityId,
-    );
-    for (const response of hits) {
-        const nested = ORGANIZATION_NESTED_PREFIX.exec(
-            response.uri_prefix,
-        );
-        if (nested !== null) return nested[1]!;
-        if (response.uri_prefix === ROLE_GRANTS_PREFIX) {
-            const body = responseBodyOf(response.message);
-            const organizationId = body['organization_id'];
-            if (typeof organizationId === 'string') {
-                return organizationId;
-            }
-        }
-    }
-    return resolveOwningOrganization(
-        db, entityId, boundOrganization,
-    );
-}
-
 export async function assertWritableInOrganization(
     db: DbAdapter,
     entityId: Id,
     organization: Id,
     table: string,
 ): Promise<void> {
-    const owner = await resolveWriteOwner(
+    const owner = await resolveGlobalOwner(
         db, entityId, organization,
     );
     if (owner !== null && owner !== organization) {
-        throw new EntityNotFoundError(table, entityId);
+        throw new ForeignOrganizationError(table, entityId);
     }
 }

@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { EntityNotFoundError } from '../api/db.ts';
+import {
+    EntityNotFoundError,
+    ForeignOrganizationError,
+} from '../api/db.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildProjects } from '../api/mock-data/projects.ts';
 import {
@@ -156,7 +159,7 @@ test('per-project GET wire equals deriveProject for'
     }
 });
 
-test('a foreign-org project id 404s on GET and on derive',
+test('a foreign-org project id 403s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_PROJECTS.find(
@@ -166,14 +169,16 @@ async () => {
     const res = await handleRequest(
         db, req('GET', '/projects/' + foreign.id, token),
     );
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 403);
     const body = await res.json() as { error: string };
     assert.equal(
-        body.error, 'Not found: projects/' + foreign.id,
+        body.error,
+        'forbidden: projects/' + foreign.id
+        + ' belongs to a different organization',
     );
     await assert.rejects(
         () => deriveProject(db, '2', foreign.id),
-        EntityNotFoundError,
+        ForeignOrganizationError,
     );
 });
 

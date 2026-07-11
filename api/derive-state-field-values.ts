@@ -1,4 +1,8 @@
 import type { DbAdapter } from './db.ts';
+import {
+    EntityNotFoundError,
+    ForeignOrganizationError,
+} from './db.ts';
 import type {
     Id, RequestEntity, ResponseEntity, StateFieldValueEntity,
 } from './types.ts';
@@ -221,30 +225,34 @@ export async function deriveStateFieldValueReferrers(
     return byAttribute;
 }
 
-// The GET-facing reader (states/:id/field-values, flipped by
-// DEFAULT — Task 6, Author gate 5). The visibility check runs
-// FIRST via stateEventVisibilityFor (pair plane): an absent OR
-// foreign event returns [] without ever deriving anything —
-// byte-identical to the retired table read's own empty-array
-// outcome for both cases (db.stateFieldValues.getAllWhere
-// trivially found no rows for an absent event, and the SFV
-// parentScope resolver fenced a foreign event's rows to
-// invisible — this route never 404s). Once visible, ONE shared
-// readonly tx over requests+responses (torn-read closure)
-// derives the WHOLE plane: the GET path may scan wider than the
-// RESTRICT write gate (Author gate 5's own hard constraint),
-// and the transition fold has no address of its own keyed by
-// state_event_id, so a narrower read is not available
-// regardless — see this module's header.
+// The GET-facing reader (states/:id/field-values). Visibility
+// via stateEventVisibilityFor (pair plane) is honest:
+//   visible → derive rows (200)
+//   hidden  → ForeignOrganizationError (403)
+//   orphan  → EntityNotFoundError (404)
+// Once visible, ONE shared readonly tx over requests+responses
+// (torn-read closure) derives the WHOLE plane: the GET path may
+// scan wider than the RESTRICT write gate (Author gate 5's own
+// hard constraint), and the transition fold has no address of
+// its own keyed by state_event_id, so a narrower read is not
+// available regardless — see this module's header.
 export async function stateFieldValuesForStateEvent(
     db: DbAdapter,
     boundOrganization: Id,
     stateEventId: Id,
 ): Promise<StateFieldValueEntity[]> {
-    if (!(await isVisibleStateEvent(
+    const visibility = await stateEventVisibilityFor(
         db, boundOrganization, stateEventId,
-    ))) {
-        return [];
+    );
+    if (visibility === 'hidden') {
+        throw new ForeignOrganizationError(
+            'state_field_values', stateEventId,
+        );
+    }
+    if (visibility === 'orphan') {
+        throw new EntityNotFoundError(
+            'state_field_values', stateEventId,
+        );
     }
     return db.transaction(
         ['requests', 'responses'],

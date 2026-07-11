@@ -4,6 +4,7 @@ import type { Id } from './types.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
 import { familyRegistration } from './family-registry.ts';
+import { missedReadError } from './derive-states.ts';
 import {
     deriveDocumentsAt,
     documentPairsAt,
@@ -161,17 +162,39 @@ export function documentFamilyWiring(
     return DOCUMENT_FAMILY_WIRINGS[family];
 }
 
+// Organization-nested miss path: probe global existence so a
+// foreign id 403s and a genuine absence 404s. Global-plane
+// families (members, identities, …) stay EntityNotFoundError
+// only — they must not probe.
+async function throwDocumentMiss(
+    wiring: DocumentFamilyWiring,
+    db: DbAdapter,
+    organization: Id,
+    id: Id,
+): Promise<never> {
+    const nested =
+        familyRegistration(wiring.family)?.organizationNested
+            !== false;
+    if (!nested) {
+        throw new EntityNotFoundError(wiring.notFoundTable, id);
+    }
+    throw await missedReadError(
+        db, id, organization, wiring.notFoundTable,
+    );
+}
+
 // The generic per-id derivation: fetch the family's prefix ONCE,
 // reduce to the head document (deriveDocumentsAt), and — for a
 // 'trio' family ONLY — walk the lifecycle history
 // (documentLifecycleEvents/stateHistoryFrom/currentDocumentState)
 // over the SAME pairs to 404 a lifecycle-deleted document too,
-// byte-identical to what deriveIdea/deriveProject already
-// compute. A 'stateless' family's document body carries no trio
+// matching what deriveIdea/deriveProject compute. A 'stateless'
+// family's document body carries no trio
 // (documentLifecycleEvents' pickString would throw on its
 // absence), so its ONLY tombstone signal is a DELETE-method head
 // — already 404-absent via deriveDocumentsAt above, needing no
-// further walk.
+// further walk. Soft-deleted foreign docs miss the caller
+// prefix and 403 via the global probe.
 async function derivedDocumentEntity(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
@@ -189,7 +212,9 @@ async function derivedDocumentEntity(
         requests, responses, prefix,
     ).get(id);
     if (document === undefined) {
-        throw new EntityNotFoundError(wiring.notFoundTable, id);
+        throw await throwDocumentMiss(
+            wiring, db, organization, id,
+        );
     }
     if (wiring.lifecycle === 'trio') {
         const pairs = documentPairsAt(requests, responses, prefix)
@@ -198,8 +223,8 @@ async function derivedDocumentEntity(
             documentLifecycleEvents(pairs), id,
         );
         if (currentDocumentState(history) === DELETED_STATE) {
-            throw new EntityNotFoundError(
-                wiring.notFoundTable, id,
+            throw await throwDocumentMiss(
+                wiring, db, organization, id,
             );
         }
     }

@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
 import type { Id, FlowTagEntity } from './types.ts';
 import { pickString } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
@@ -7,6 +6,7 @@ import {
     deriveDocumentsAt,
     type DerivedDocument,
 } from './derive-documents.ts';
+import { missedReadError } from './derive-states.ts';
 
 // Flow tags: the codebase's FIRST pair-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
@@ -65,7 +65,11 @@ export async function deriveFlowTag(
         requests, responses, prefix,
     ).get(name);
     if (document === undefined) {
-        throw new EntityNotFoundError(FLOW_TAGS_TABLE, name);
+        // Probe the parent flow: a foreign flow's tag 403s;
+        // a genuine miss on an own/absent flow stays 404.
+        throw await missedReadError(
+            db, name, organization, FLOW_TAGS_TABLE, flowId,
+        );
     }
     return flowTagEntityOf(flowId, document);
 }

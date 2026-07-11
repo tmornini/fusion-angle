@@ -1,5 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
 import type { Id, FlowRecordEntity } from './types.ts';
 import { pickString } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
@@ -8,6 +7,7 @@ import {
     byIdAscending,
     type DerivedDocument,
 } from './derive-documents.ts';
+import { missedReadError } from './derive-states.ts';
 
 // The flow<->record join's own reshaping of the generic
 // message-plane reduction (derive-documents.ts) — the
@@ -108,8 +108,11 @@ export async function deriveFlowRecord(
     );
     const document = documents.get(joinId);
     if (document === undefined) {
-        throw new EntityNotFoundError(
-            FLOW_RECORDS_TABLE, joinId,
+        // Probe the parent flow: a foreign flow's join 403s;
+        // a genuine miss on an own/absent flow stays 404.
+        throw await missedReadError(
+            db, joinId, organization, FLOW_RECORDS_TABLE,
+            flowId,
         );
     }
     return flowRecordEntityOf(document);

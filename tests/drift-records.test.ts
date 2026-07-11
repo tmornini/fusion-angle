@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { EntityNotFoundError } from '../api/db.ts';
+import {
+    EntityNotFoundError,
+    ForeignOrganizationError,
+} from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
@@ -272,9 +275,9 @@ test('seeded GET /records wire equals derived collection,'
     // Phase Final Stage B: records table retired.
 });
 
-// -- 2. foreign-org GET 404 on wire + derive ---------------------
+// -- 2. foreign-org GET 403 on wire + derive ---------------------
 
-test('a foreign-org GET 404s on wire and on derive, for'
+test('a foreign-org GET 403s on wire and on derive, for'
 + ' records, record-attributes, and flow_records',
 async () => {
     const db = await seededDb();
@@ -283,7 +286,8 @@ async () => {
     );
 
     const expectedRecordMessage =
-        'Not found: records/' + customerProfileRecordId;
+        'forbidden: records/' + customerProfileRecordId
+        + ' belongs to a different organization';
     const recRes = await handleRequest(
         db,
         req(
@@ -292,7 +296,7 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(recRes.status, 404);
+    assert.equal(recRes.status, 403);
     const recBody = await recRes.json() as { error: string };
     assert.equal(recBody.error, expectedRecordMessage);
     await assert.rejects(
@@ -300,13 +304,14 @@ async () => {
             db, ORGANIZATION_TWO, customerProfileRecordId,
         ),
         (err: unknown) =>
-            err instanceof EntityNotFoundError
+            err instanceof ForeignOrganizationError
             && err.message === expectedRecordMessage,
     );
 
     const attributeId = '5JZ0LeKdPCa4QMtg1RsF1M';
     const expectedAttributeMessage =
-        'Not found: record_attributes/' + attributeId;
+        'forbidden: record_attributes/' + attributeId
+        + ' belongs to a different organization';
     const attrRes = await handleRequest(
         db,
         req(
@@ -315,7 +320,7 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(attrRes.status, 404);
+    assert.equal(attrRes.status, 403);
     const attrBody = await attrRes.json() as { error: string };
     assert.equal(attrBody.error, expectedAttributeMessage);
     await assert.rejects(
@@ -323,14 +328,15 @@ async () => {
             db, ORGANIZATION_TWO, attributeId,
         ),
         (err: unknown) =>
-            err instanceof EntityNotFoundError
+            err instanceof ForeignOrganizationError
             && err.message === expectedAttributeMessage,
     );
 
     const joinId = 'frb01CustOnbCustProfA1';
     const flowId = 'h5mErVBQhwdMKwi1co30jB';
     const expectedJoinMessage =
-        'Not found: flow_records/' + joinId;
+        'forbidden: flow_records/' + joinId
+        + ' belongs to a different organization';
     const joinRes = await handleRequest(
         db,
         req(
@@ -339,7 +345,7 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(joinRes.status, 404);
+    assert.equal(joinRes.status, 403);
     const joinBody = await joinRes.json() as { error: string };
     assert.equal(joinBody.error, expectedJoinMessage);
     await assert.rejects(
@@ -347,7 +353,7 @@ async () => {
             db, ORGANIZATION_TWO, flowId, joinId,
         ),
         (err: unknown) =>
-            err instanceof EntityNotFoundError
+            err instanceof ForeignOrganizationError
             && err.message === expectedJoinMessage,
     );
 });

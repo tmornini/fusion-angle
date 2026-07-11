@@ -207,14 +207,17 @@ writes are document-trio PUTs
 ops (work-order create/claim/transition/release,
 invitations). The ownership fence
 (`resolveOwningOrganization`) makes a foreign org's
-`entity_id` 404 on `GET /entity-states/:id/history`. Also
+`entity_id` 403 on `GET /entity-states/:id/history`. Also
 closed: WP1 and the records hard-delete forgery channel.
-Write-ownership fence preserves foreign-id PUT/DELETE 404
-bytes on org-scoped families.
+Write-ownership fence returns foreign-id PUT/DELETE 403
+on org-scoped families. Unauthenticated callers to any
+non-bearer-exempt path (including retired/unknown routes)
+get 401 before a topology 404.
 
 **Retired routes — no browser cases.** These addresses have
 zero product callers; a manual pass need not open them.
-Automated pins cover the status bytes:
+Automated pins cover the status bytes (authenticated 404;
+unauthenticated 401):
 - every verb on `/states/:id` → router 404 (address deleted;
   the old 405-because-PUT-survives case is gone)
 - `GET /entity-states/:id` (current) → router 404

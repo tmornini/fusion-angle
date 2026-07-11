@@ -1,9 +1,11 @@
 import {
     EntityNotFoundError,
+    ForeignOrganizationError,
 } from './db.ts';
 import type {
     DbAdapter,
 } from './db.ts';
+import { missedReadError } from './derive-states.ts';
 import type {
     FlowCreateBody,
     FlowUndoBody,
@@ -2016,8 +2018,9 @@ export async function postWorkOrderClaimOp(
                 view, organization, workOrderId,
             );
             if (wo === null) {
-                throw new EntityNotFoundError(
-                    'work_orders', workOrderId,
+                throw await missedReadError(
+                    view, workOrderId, organization,
+                    'work_orders',
                 );
             }
             const graph =
@@ -2102,8 +2105,9 @@ export async function postWorkOrderReleaseOp(
                 view, organization, workOrderId,
             );
             if (wo === null) {
-                throw new EntityNotFoundError(
-                    'work_orders', workOrderId,
+                throw await missedReadError(
+                    view, workOrderId, organization,
+                    'work_orders',
                 );
             }
             if (pair !== undefined) {
@@ -3542,28 +3546,29 @@ export const routes: Route[] = [
                 memberships, identityId, organizationId,
             );
             if (owner !== null && owner !== organizationId) {
-                return [];
+                throw new ForeignOrganizationError(
+                    'identity_credentials', identityId,
+                );
             }
             return rows.map(withoutSecret);
         },
     }),
     // GET is FLIPPED (Phase 10 Task 8): derived via
-    // deriveCredential, fenced the SAME way (gate 15) — a hidden
-    // identity's credential 404s BYTE-IDENTICALLY to a genuinely
-    // absent one (EntityNotFoundError('identity_credentials', cid),
-    // the SAME table/id parentScope.getById throws — no existence
-    // is confirmed either way). FENCE-INPUT FIX (post-session
-    // review): the path :id only ADDRESSES the scan
-    // (deriveCredential reads the row at /identities/{path id}/
-    // credentials/{cid} — that is where the pair lives); the
-    // pre-flip fence read the ROW's OWN identity_id field — the
-    // hand-written route this flip replaced ignored the path
-    // entirely, fetching by cid alone via parentScope.getById,
-    // which then fenced via viaMembership on the ROW's stored
-    // identity_id. So the fence input below is
-    // `credential.identity_id`, never the path — a below-facade
-    // write whose body.identity_id disagrees with its own address
-    // now fences EXACTLY as the row plane did.
+    // deriveCredential, fenced the SAME way (gate 15) — a
+    // foreign identity's credential 403s; a genuinely absent
+    // one still 404s via EntityNotFoundError. FENCE-INPUT FIX
+    // (post-session review): the path :id only ADDRESSES the
+    // scan (deriveCredential reads the row at
+    // /identities/{path id}/credentials/{cid} — that is where
+    // the pair lives); the pre-flip fence read the ROW's OWN
+    // identity_id field — the hand-written route this flip
+    // replaced ignored the path entirely, fetching by cid
+    // alone via parentScope.getById, which then fenced via
+    // viaMembership on the ROW's stored identity_id. So the
+    // fence input below is `credential.identity_id`, never the
+    // path — a below-facade write whose body.identity_id
+    // disagrees with its own address now fences EXACTLY as the
+    // row plane did.
     route('identities/:id/credentials/:cid', {
         get: async (db, p, actor, organization) => {
             const organizationId = requireOrganization(
@@ -3582,7 +3587,7 @@ export const routes: Route[] = [
                 memberships, credential.identity_id, organizationId,
             );
             if (owner !== null && owner !== organizationId) {
-                throw new EntityNotFoundError(
+                throw new ForeignOrganizationError(
                     'identity_credentials', cid,
                 );
             }
@@ -3655,11 +3660,9 @@ export const routes: Route[] = [
     // EVENT-APPEND: no head-read, no Supersedes. Verbs stay
     // {get, put}. GET is FLIPPED (Phase 10 Task 8): derived via
     // deriveRoleGrant, then fenced the SAME way the collection
-    // above is — a foreign-org grant 404s BYTE-IDENTICALLY to a
-    // genuinely absent one (EntityNotFoundError('role_grants',
-    // id), the SAME table/id OrganizationScopedEntityStore#getById
-    // throws — Step 0 confirmed this exact byte shape before the
-    // flip).
+    // above is — a foreign-org grant 403s
+    // (ForeignOrganizationError); a genuinely absent one 404s
+    // via deriveRoleGrant's EntityNotFoundError.
     route('role-grants/:id', {
         get: async (db, p, _actor, organization) => {
             const organizationId = requireOrganization(
@@ -3668,7 +3671,9 @@ export const routes: Route[] = [
             const id = param(p, 0);
             const grant = await deriveRoleGrant(db, id);
             if (grant.organization_id !== organizationId) {
-                throw new EntityNotFoundError('role_grants', id);
+                throw new ForeignOrganizationError(
+                    'role_grants', id,
+                );
             }
             return grant;
         },
@@ -4139,7 +4144,9 @@ export const routes: Route[] = [
                 db, organization, id, pair.uriPrefix,
             );
             if (resolution === undefined) {
-                throw new EntityNotFoundError('flows', id);
+                throw await missedReadError(
+                    db, id, organization, 'flows',
+                );
             }
             return postFlowUndoOp(
                 db, id, actor, organization, pair, resolution, b,

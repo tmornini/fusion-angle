@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
+import { missedReadError } from './derive-states.ts';
 import type {
     Id,
     IdeaEntity,
@@ -141,7 +141,9 @@ export async function deriveIdea(
     const { documents, pairs } = await fetchIdeaPairs(db, prefix);
     const document = documents.get(ideaId);
     if (document === undefined) {
-        throw new EntityNotFoundError(IDEAS_TABLE, ideaId);
+        throw await missedReadError(
+            db, ideaId, organization, IDEAS_TABLE,
+        );
     }
     const history = stateHistoryFrom(
         documentLifecycleEvents(
@@ -150,7 +152,9 @@ export async function deriveIdea(
         ideaId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
-        throw new EntityNotFoundError(IDEAS_TABLE, ideaId);
+        throw await missedReadError(
+            db, ideaId, organization, IDEAS_TABLE,
+        );
     }
     return ideaEntityOf(document, organization);
 }

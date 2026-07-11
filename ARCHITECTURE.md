@@ -175,18 +175,16 @@ the handler, keeping handlers transport-free.
 **Write-time cross-tenant fence.** Pair addresses are
 per-org namespaced (`canonicalUriPrefix` from the VERIFIED
 claim). A foreign-id PUT/DELETE on an org-scoped family
-must still 404 (never invent a genesis in the caller's own
+must 403 (never invent a genesis in the caller's own
 namespace). `writeOwnershipFenceFor` /
 `assertWritableInOrganization`
 (`api/write-ownership-fence.ts`) resolve ownership via
-`resolveOwningOrganization` before the handler runs:
-owner-null → genesis proceeds; foreign →
-`EntityNotFoundError` (the same 404 bytes the retired
-`OrganizationScopedEntityStore#assertMine` threw). Read
-isolation is derivation: every derive filters by the
-caller's org prefix / membership set. The HMAC signing key
-is client-shipped, so this is demo-grade isolation until
-the server tier.
+`resolveGlobalOwner` before the handler runs: owner-null →
+genesis proceeds; foreign → `ForeignOrganizationError`
+(HTTP 403). Read isolation is derivation plus a miss-path
+global probe: foreign → 403, absent → 404. The HMAC signing
+key is client-shipped, so this is demo-grade isolation
+until the server tier.
 
 #### History — the decorator era (retired Phase Final)
 
@@ -445,9 +443,10 @@ message ledger: `GET states` →
 `deriveStatesFor(db, organization, entityId)`, and
 `GET states/:id/field-values` →
 `stateFieldValuesForStateEvent` (transition-fold
-single-source, visibility via `stateEventVisibilityFor`).
-Every verb on `/states/:id` is router 404 (the address
-itself is retired). Phase 15 Task 7 also retired
+single-source; visibility via `stateEventVisibilityFor`
+is honest: visible → 200 rows, foreign → 403, orphan →
+404). Every verb on `/states/:id` is router 404 (the
+address itself is retired). Phase 15 Task 7 also retired
 `GET entity-states/:id` (current),
 `PUT|DELETE states/:id/field-values/:fvid`, and
 `GET|POST|PUT|DELETE flows/:id/versions[...]` — all
@@ -646,9 +645,10 @@ EXPECTED_PAIR_COUNT 1506 / bootstrap 13;
 1. **Route retirements** → router 404 (including every
    verb on `/states/:id`; the old 405 exception is gone
    with the address).
-2. **Fence strengthenings** (same 404 body shape):
-   (2a) WP1 organizations self-as-owner; (2b) records
-   hard-delete forgery closed.
+2. **Fence strengthenings** (foreign → 403 via
+   `ForeignOrganizationError`; absent → 404): (2a) WP1
+   organizations self-as-owner; (2b) records hard-delete
+   forgery closed.
 3. **Write-path re-anchors** (claim graph, RESTRICT legs,
    invitation discovery, identity_pii, clients):
    pair-plane only post-Final.
@@ -662,10 +662,12 @@ address family allows, opening no nested transaction:
 
 - `workOrderDocumentHeadFor` — claim-gate `flow_graph` head
 - `stateEventVisibilityFor` — 3-tier field-values fence
-  (orphan | visible | hidden)
+  (orphan | visible | hidden); consumers throw 403/404
+  rather than folding to empty
+- `resolveGlobalOwner` — global-existence probe for
+  403-vs-404 decisions (write fence + read miss paths)
 - `resolveOwningOrganization` — pre-dispatch ownership for
-  `GET entity-states/:id/history`, plus the write-
-  ownership fence for org-scoped families
+  `GET entity-states/:id/history` (narrower allowlist)
 - `flowGraphBindingsFromPairs` — RESTRICT graph legs from
   graphDelta
 

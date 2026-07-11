@@ -4,7 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { EntityNotFoundError } from '../api/db.ts';
+import {
+    EntityNotFoundError,
+    ForeignOrganizationError,
+} from '../api/db.ts';
 import type {
     FlowWithGraph,
 } from '../api/types.ts';
@@ -368,9 +371,9 @@ async () => {
     }
 });
 
-// -- 3. foreign-org id 404 on GET and derive --------------------
+// -- 3. foreign-org id 403 on GET and derive --------------------
 
-test('a foreign-org flow id 404s on GET and on derive',
+test('a foreign-org flow id 403s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_FLOWS.find(
@@ -379,7 +382,7 @@ async () => {
     const otherOrganization = '2';
     await assert.rejects(
         () => deriveFlow(db, otherOrganization, foreign.id),
-        EntityNotFoundError,
+        ForeignOrganizationError,
     );
     const token = await organizationToken(
         'current', otherOrganization,
@@ -387,7 +390,13 @@ async () => {
     const res = await handleRequest(
         db, req('GET', '/flows/' + foreign.id, token),
     );
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 403);
+    const body = await res.json() as { error: string };
+    assert.equal(
+        body.error,
+        'forbidden: flows/' + foreign.id
+        + ' belongs to a different organization',
+    );
 });
 
 // -- 4. state-history parity, every seeded flow ----------------
