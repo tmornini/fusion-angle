@@ -99,3 +99,23 @@ test(
         assert.deepEqual(ran, ['a', 'b']);
     },
 );
+
+test(
+    'isPending tracks a scheduled save until fire'
+    + ' or flush',
+    (t) => {
+        t.mock.timers.enable({
+            apis: ['setTimeout'],
+        });
+        const d = new Debouncer(800);
+        assert.equal(d.isPending(), false);
+        d.schedule(() => {});
+        assert.equal(d.isPending(), true);
+        t.mock.timers.tick(800);
+        assert.equal(d.isPending(), false);
+        d.schedule(() => {});
+        assert.equal(d.isPending(), true);
+        d.flush();
+        assert.equal(d.isPending(), false);
+    },
+);

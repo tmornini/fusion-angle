@@ -31,6 +31,7 @@ import {
 } from '../app/core.ts';
 import {
     RequestError,
+    HTTP_NOT_FOUND,
 } from '../../api/api.ts';
 import {
     sessionContext,
@@ -126,7 +127,7 @@ function rerender(): void {
 // into the silent redirect that absence uses.
 function isNotFound(err: unknown): boolean {
     return err instanceof RequestError
-        && err.status === 404;
+        && err.status === HTTP_NOT_FOUND;
 }
 
 async function loadMemberByEitherKind(

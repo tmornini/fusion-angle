@@ -124,6 +124,8 @@ import {
 } from './authentication.ts';
 import {
     ApiError,
+    HTTP_OK,
+    HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_CONFLICT,
 } from './http-errors.ts';
@@ -2608,9 +2610,9 @@ export const WRITE_RESPONSE_SPECS:
     // OWN validator and discards the trio — the same GET/PUT
     // symmetry Decision 7's wire-parity rule holds for reads.
     'ideas/:id': documentWriteResponseSpec(IDEAS_WIRING),
-    'ideas/:id/conversion': { status: 204 },
+    'ideas/:id/conversion': { status: HTTP_NO_CONTENT },
     'ideas/:id/submissions/:sid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateIdeaSubmissionEntity(
@@ -2623,7 +2625,7 @@ export const WRITE_RESPONSE_SPECS:
     // entry above for the shared rationale.
     'projects/:id': documentWriteResponseSpec(PROJECTS_WIRING),
     'projects/:id/flows/:pfid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateProjectFlowEntity(
@@ -2631,7 +2633,7 @@ export const WRITE_RESPONSE_SPECS:
             ),
         }),
     },
-    'flows': { status: 204 },
+    'flows': { status: HTTP_NO_CONTENT },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
     // entry above for the shared rationale. flows/:id is the
@@ -2641,17 +2643,17 @@ export const WRITE_RESPONSE_SPECS:
     // table (api.ts) differs for a locked family, never this
     // successBody.
     'flows/:id': documentWriteResponseSpec(FLOWS_WIRING),
-    'flows/:id/undo': { status: 204 },
+    'flows/:id/undo': { status: HTTP_NO_CONTENT },
     // flows/:id/versions[+/:vid] WRITE_RESPONSE_SPECS RETIRED
     // (Phase 15 Task 7): ZERO seed pairs at those addresses.
-    'work-orders': { status: 204 },
+    'work-orders': { status: HTTP_NO_CONTENT },
     'work-orders/:id':
         documentWriteResponseSpec(WORK_ORDERS_WIRING),
-    'work-orders/:id/claim': { status: 204 },
-    'work-orders/:id/release': { status: 204 },
-    'work-orders/:id/transition': { status: 204 },
+    'work-orders/:id/claim': { status: HTTP_NO_CONTENT },
+    'work-orders/:id/release': { status: HTTP_NO_CONTENT },
+    'work-orders/:id/transition': { status: HTTP_NO_CONTENT },
     'flows/:id/work-orders/:woid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateFlowWorkOrderEntity(
@@ -2659,7 +2661,7 @@ export const WRITE_RESPONSE_SPECS:
             ),
         }),
     },
-    'records': { status: 204 },
+    'records': { status: HTTP_NO_CONTENT },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
     // entry above for the shared rationale. records/:id emits the
@@ -2680,7 +2682,7 @@ export const WRITE_RESPONSE_SPECS:
     'record-attributes/:id':
         documentWriteResponseSpec(RECORD_ATTRIBUTES_WIRING),
     'flows/:id/records/:frid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateFlowRecordEntity(
@@ -2697,7 +2699,7 @@ export const WRITE_RESPONSE_SPECS:
     // never re-validate the name (route comment); `flow_id` is
     // stamped from the address here, never a client body key.
     'flows/:id/tags/:name': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: validateFlowTagName(param(params, 1)),
             flow_id: param(params, 0),
@@ -2706,7 +2708,7 @@ export const WRITE_RESPONSE_SPECS:
             ),
         }),
     },
-    'objectives': { status: 204 },
+    'objectives': { status: HTTP_NO_CONTENT },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the ideas/:id
     // entry above for the shared rationale. objectives/:id emits
@@ -2716,7 +2718,7 @@ export const WRITE_RESPONSE_SPECS:
     // byte-identical to today's hand-built body.
     'objectives/:id': documentWriteResponseSpec(OBJECTIVES_WIRING),
     'objectives/:id/revisions/:rid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateObjectiveRevisionEntity(
@@ -2725,7 +2727,7 @@ export const WRITE_RESPONSE_SPECS:
         }),
     },
     'projects/:id/objective-baseline-scores/:sid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateBaselineScoreEntity(
@@ -2734,7 +2736,7 @@ export const WRITE_RESPONSE_SPECS:
         }),
     },
     'projects/:id/objective-actual-scores/:sid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateActualScoreEntity(
@@ -2756,7 +2758,7 @@ export const WRITE_RESPONSE_SPECS:
     // value equality re-confirmed at Step 0(a) of the task that
     // wired this row.
     'members/:id': documentWriteResponseSpec(MEMBERS_WIRING),
-    'ai-members': { status: 204 },
+    'ai-members': { status: HTTP_NO_CONTENT },
     // Per-verb: PUT rides the generic document-form builder (see
     // the ideas/:id entry above for the shared rationale) — the
     // SAME registration-first consult that keeps members/:id
@@ -2766,9 +2768,9 @@ export const WRITE_RESPONSE_SPECS:
     // is the composed edit (204, no body), untouched this task.
     'ai-members/:id': {
         put: documentWriteResponseSpec(AI_MEMBERS_WIRING),
-        post: { status: 204 },
+        post: { status: HTTP_NO_CONTENT },
     },
-    'human-members': { status: 204 },
+    'human-members': { status: HTTP_NO_CONTENT },
     // Per-verb (Task 4): the synthesized detail document pair a
     // create/edit bundle forms at this address needs a PUT-shaped
     // spec (the ai-members/:id precedent) even though NO live PUT
@@ -2780,9 +2782,9 @@ export const WRITE_RESPONSE_SPECS:
     // unchanged.
     'human-members/:id': {
         put: documentWriteResponseSpec(HUMAN_MEMBERS_WIRING),
-        post: { status: 204 },
+        post: { status: HTTP_NO_CONTENT },
     },
-    'identities': { status: 204 },
+    'identities': { status: HTTP_NO_CONTENT },
     // The generic document-form builder (api/document-family.ts)
     // absorbs the hand-written successBody — see the members/:id
     // entry above for the shared rationale. identities is ALSO
@@ -2797,7 +2799,7 @@ export const WRITE_RESPONSE_SPECS:
     // wired this row.
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
     'identities/:id/pii': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 0),
             ...validateIdentityPiiEntity(withoutId(body ?? {})),
@@ -2808,7 +2810,7 @@ export const WRITE_RESPONSE_SPECS:
     // above 'identities/:id/credentials/:cid' in the routes
     // array).
     'identities/:id/credentials/:cid': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateIdentityCredentialEntity(
@@ -2830,14 +2832,14 @@ export const WRITE_RESPONSE_SPECS:
     // at Step 0(a) of the task that wired this row.
     'memberships/:id': documentWriteResponseSpec(MEMBERSHIPS_WIRING),
     'identity-tokens/:id': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 0),
             ...validateIdentityTokenEntity(withoutId(body ?? {})),
         }),
     },
     'identity-token-revocations/:id': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 0),
             ...validateIdentityTokenRevocationEntity(
@@ -2853,14 +2855,14 @@ export const WRITE_RESPONSE_SPECS:
     // exact value back off the formed pair (pairResponseBody)
     // rather than minting a second one.
     'identity-tokens/:jti/rotation': {
-        status: 200,
+        status: HTTP_OK,
         successBody: () => ({
             jti: generateCryptoSafeBase62(),
         }),
     },
-    'identity-tokens/:jti/revocation': { status: 204 },
+    'identity-tokens/:jti/revocation': { status: HTTP_NO_CONTENT },
     'organizations/:id': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 0),
             ...validateOrganizationEntity(withoutId(body ?? {})),
@@ -2873,7 +2875,7 @@ export const WRITE_RESPONSE_SPECS:
     // access to that scoped store, so it re-derives the same
     // stamp here, mirroring 'projects/:id' et al.
     'role-grants/:id': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body, _actor, organization) => ({
             id: param(params, 0),
             ...validateRoleGrantEntity({
@@ -2883,7 +2885,7 @@ export const WRITE_RESPONSE_SPECS:
         }),
     },
     'identity-providers/:id': {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body) => ({
             id: param(params, 0),
             ...validateIdentityProviderEntity(
@@ -4469,7 +4471,8 @@ export const routes: Route[] = [
                             organization,
                             method: 'DELETE',
                             response: {
-                                status: 204, body: undefined,
+                                status: HTTP_NO_CONTENT,
+                                body: undefined,
                             },
                         });
                     }),

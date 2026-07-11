@@ -141,6 +141,7 @@ import {
     formWritePair,
 } from '../message-pair.ts';
 import type { MessagePair } from '../message-pair.ts';
+import { HTTP_NO_CONTENT } from '../http-errors.ts';
 import {
     WRITE_RESPONSE_SPECS,
     flowCreateDocumentBody,
@@ -1987,7 +1988,7 @@ async function formSeedPair(
     // for the identical request.
     const response =
         inv.op === true || idParams === undefined
-            ? { status: 204, body: undefined }
+            ? { status: HTTP_NO_CONTENT, body: undefined }
             : documentSeedResponse(
                 inv, routeSegments, pathSegments,
             );
@@ -2091,7 +2092,7 @@ async function formDefaultOrganizationSeedPair(
         requesterIdentityId: identityId,
         requestAt,
         organization: undefined,
-        responseStatus: 204,
+        responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
         headPairId: undefined,
     });

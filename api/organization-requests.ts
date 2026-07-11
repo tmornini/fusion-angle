@@ -7,9 +7,11 @@ import {
 } from './authentication.ts';
 import {
     errorJson,
+    HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
+    HTTP_METHOD_NOT_ALLOWED,
 } from './http-errors.ts';
 import {
     authenticateRequest,
@@ -170,7 +172,8 @@ export async function identityDefaultOrganizationRequest(
             headerFields: hoistedHeaderFields(request),
             body, requesterIdentityId: authed.principal.id,
             requestAt: ctx.requestAt, organization: undefined,
-            responseStatus: 204, responseBody: undefined,
+            responseStatus: HTTP_NO_CONTENT,
+            responseBody: undefined,
             headPairId: undefined,
         });
         const replay = await storedResponseFor(
@@ -234,7 +237,7 @@ export async function identityDefaultOrganizationRequest(
             error: 'Method ' + ctx.method
                 + ' not allowed',
         },
-        { status: 405 },
+        { status: HTTP_METHOD_NOT_ALLOWED },
     );
 }
 

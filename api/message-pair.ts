@@ -30,6 +30,7 @@ import {
 } from '../shared/http-message/media-registry.ts';
 import { REQUEST_ID_HEADER } from './request-context.ts';
 import { familyRegistration } from './family-registry.ts';
+import { HTTP_OK } from './http-errors.ts';
 
 // The shadow-ledger message pair: one row in `requests`, one
 // in `responses`, sharing `id`. Formed pre-tx (all crypto and
@@ -298,7 +299,7 @@ export async function formTokenEventPair(
         requesterIdentityId: event.identity_id,
         requestAt: event.at,
         organization: undefined,
-        responseStatus: 200,
+        responseStatus: HTTP_OK,
         responseBody: {
             id,
             ...validateIdentityTokenEntity(body),

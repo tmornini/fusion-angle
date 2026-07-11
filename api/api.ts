@@ -60,8 +60,10 @@ import {
     ApiError,
     UnauthorizedError,
     RequestError,
+    HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
+    HTTP_METHOD_NOT_ALLOWED,
     HTTP_INTERNAL_ERROR,
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
@@ -101,7 +103,19 @@ export {
     ApiError,
     UnauthorizedError,
     RequestError,
+    HTTP_OK,
+    HTTP_CREATED,
+    HTTP_NO_CONTENT,
+    HTTP_BAD_REQUEST,
+    HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
+    HTTP_NOT_FOUND,
+    HTTP_METHOD_NOT_ALLOWED,
+    HTTP_CONFLICT,
+    HTTP_PRECONDITION_FAILED,
+    HTTP_UNPROCESSABLE_ENTITY,
+    HTTP_INTERNAL_ERROR,
+    HTTP_NOT_IMPLEMENTED,
 } from './http-errors.ts';
 
 const routeTable: readonly Route[] = routes;
@@ -671,7 +685,7 @@ export async function handleRequest(
             // PerVerbWriteResponseSpec instead — see
             // writeResponseSpecFor.
             const spec = method === 'DELETE'
-                ? { status: 204 }
+                ? { status: HTTP_NO_CONTENT }
                 : writeResponseSpecFor(routePattern, method);
             if (spec === undefined) {
                 throw new Error(
@@ -761,7 +775,7 @@ export async function handleRequest(
                                 + ' allowed on '
                                 + pathname,
                         },
-                        { status: 405 },
+                        { status: HTTP_METHOD_NOT_ALLOWED },
                     );
                 }
                 const result = await matched.get(
@@ -827,7 +841,7 @@ export async function handleRequest(
                                 + ' allowed on '
                                 + pathname,
                         },
-                        { status: 405 },
+                        { status: HTTP_METHOD_NOT_ALLOWED },
                     );
                 }
                 const result =
@@ -860,7 +874,7 @@ export async function handleRequest(
                 );
                 if (result === undefined) {
                     return new Response(null, {
-                        status: 204,
+                        status: HTTP_NO_CONTENT,
                     });
                 }
                 return Response.json(result);
@@ -875,7 +889,7 @@ export async function handleRequest(
                                 + ' on '
                                 + pathname,
                         },
-                        { status: 405 },
+                        { status: HTTP_METHOD_NOT_ALLOWED },
                     );
                 }
                 await matched.delete(
@@ -905,7 +919,7 @@ export async function handleRequest(
                     body, organization, actor,
                 );
                 return new Response(null, {
-                    status: 204,
+                    status: HTTP_NO_CONTENT,
                 });
             }
             case 'POST': {
@@ -990,7 +1004,7 @@ export async function handleRequest(
                                     + ' on '
                                     + pathname,
                             },
-                            { status: 405 },
+                            { status: HTTP_METHOD_NOT_ALLOWED },
                         );
                     }
                     result = await matched.post(
@@ -1048,7 +1062,7 @@ export async function handleRequest(
                 }
                 if (result === undefined) {
                     return new Response(null, {
-                        status: 204,
+                        status: HTTP_NO_CONTENT,
                     });
                 }
                 return authWireHeaders === undefined
@@ -1065,7 +1079,7 @@ export async function handleRequest(
                             + method
                             + ' not allowed',
                     },
-                    { status: 405 },
+                    { status: HTTP_METHOD_NOT_ALLOWED },
                 );
         }
     } catch (error) {
@@ -1140,7 +1154,7 @@ async function unwrapResponse<T>(
     response: Response,
 ): Promise<T> {
     if (response.ok) {
-        return (response.status === 204
+        return (response.status === HTTP_NO_CONTENT
             ? undefined
             : await response.json()) as T;
     }

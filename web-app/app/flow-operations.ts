@@ -12,7 +12,10 @@ import {
     DEFAULT_NEW_STATE_NAME,
     DEFAULT_TRANSITION_NAME,
 } from '../../api/types.ts';
-import { RequestError } from '../../api/api.ts';
+import {
+    RequestError,
+    HTTP_PRECONDITION_FAILED,
+} from '../../api/api.ts';
 import {
     putFlow,
     enqueueFlowSave,
@@ -699,7 +702,7 @@ async function postFlowUndo(
         } catch (err) {
             if (
                 err instanceof RequestError
-                && err.status === 412
+                && err.status === HTTP_PRECONDITION_FAILED
                 && attempt < MAX_UNDO_ATTEMPTS
             ) {
                 await jitteredBackoff(attempt);

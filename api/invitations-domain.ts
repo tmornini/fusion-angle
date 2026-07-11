@@ -12,6 +12,8 @@ import { latestByKey } from '../shared/ledger-reduction.ts';
 import { identityDefaultOrganization } from './authentication.ts';
 import {
     errorJson,
+    HTTP_OK,
+    HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
     HTTP_UNAUTHORIZED,
@@ -480,7 +482,7 @@ async function grantInvitation(
         headerFields: hoistedHeaderFields(request),
         body: storedBody, requesterIdentityId: ctx.principal.id,
         requestAt: ctx.requestAt, organization: undefined,
-        responseStatus: 200, responseBody,
+        responseStatus: HTTP_OK, responseBody,
         headPairId,
     });
     const replay = await storedResponseFor(
@@ -520,7 +522,7 @@ async function grantInvitation(
             requesterIdentityId: ctx.principal.id,
             requestAt: ctx.requestAt,
             organization: undefined,
-            responseStatus: 200,
+            responseStatus: HTTP_OK,
             responseBody: { id: invitationId, ...documentBody },
             headPairId,
         })
@@ -662,7 +664,8 @@ async function formInvitationOpPair(
         headerFields: hoistedHeaderFields(request),
         body, requesterIdentityId: ctx.principal.id,
         requestAt: ctx.requestAt, organization: undefined,
-        responseStatus: 204, responseBody: undefined,
+        responseStatus: HTTP_NO_CONTENT,
+        responseBody: undefined,
         headPairId: undefined,
     });
 }

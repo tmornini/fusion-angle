@@ -22,6 +22,7 @@ import type {
     PutHandler,
     WriteResponseSpec,
 } from './routes.ts';
+import { HTTP_OK } from './http-errors.ts';
 
 // param/requireOrganization/withoutId live HERE, not in
 // routes.ts, so this module has NO runtime (value) dependency on
@@ -396,7 +397,7 @@ export function documentWriteResponseSpec(
         familyRegistration(wiring.family)?.organizationNested
             !== false;
     return {
-        status: 200,
+        status: HTTP_OK,
         successBody: (params, body, _actor, organization) => {
             const doc = wiring.validateDocument(
                 withoutId(body ?? {}),

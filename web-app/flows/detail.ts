@@ -27,9 +27,12 @@ import {
     deleteFlowRecordForFlow,
     postClipboardCopy,
     subscribeResize,
+    subscribeFlowChanges,
     type RequestContext,
 } from '../app/adapters/index.ts';
 import type {
+    GraphEdge,
+    GraphNode,
     MemberId,
     RecordAttributeId,
     RecordEntity,
@@ -42,6 +45,7 @@ import {
     bindInteractions,
     type FlowGestureContext,
     type InteractionState,
+    type Selection,
 } from '../app/flow-interactions.ts';
 import {
     isGestureActive,
@@ -93,6 +97,8 @@ class PageState {
         new AbortController();
     readonly #saveDebouncer =
         new Debouncer(SAVE_DELAY_MS);
+    readonly #panelStateRef: PanelStateRef =
+        { open: false };
     #pushGestureContext:
         | ((next: FlowGestureContext) => void)
         | null = null;
@@ -100,6 +106,10 @@ class PageState {
 
     saveDebouncer(): Debouncer {
         return this.#saveDebouncer;
+    }
+
+    panelStateRef(): PanelStateRef {
+        return this.#panelStateRef;
     }
 
     projectId(): string | undefined {
@@ -1548,8 +1558,9 @@ function onFlowLoaded(
             true,
         );
     pageState.setPresenter(presenter);
-    const panelStateRef: PanelStateRef =
-        { open: false };
+    const panelStateRef =
+        pageState.panelStateRef();
+    panelStateRef.open = false;
     const signal = pageState.signal();
     presenter.renderShell(container);
     renderBindingSlot(
@@ -1619,6 +1630,154 @@ function onFlowLoaded(
             );
             reconcileFitFromDom();
         }
+    });
+
+    // Cross-tab / external graph edits ring the same
+    // flowChanges bell the list page already trusts.
+    // Own putFlow notifies too — early-return when the
+    // server graph already matches kills the echo. Full
+    // <a href> navigation is the teardown seam.
+    subscribeFlowChanges(() => {
+        void refreshFlowFromServer(flowId);
+    });
+}
+
+// True when the server graph + flags already match the
+// live snapshot — own putFlow echo, or a no-op notify.
+function serverGraphMatchesLive(
+    graph: Awaited<
+        ReturnType<typeof getFlowGraph>
+    >,
+    live: FlowSnapshot,
+): boolean {
+    return graph.name === live.flowName
+        && graph.isLocked === live.isLocked
+        && graph.isAutoLayout
+            === live.isAutoLayout
+        && graph.isAutoFit === live.isAutoFit
+        && graph.lockTimeout
+            === live.lockTimeout
+        && JSON.stringify(graph.nodes)
+            === JSON.stringify(live.nodes)
+        && JSON.stringify(graph.edges)
+            === JSON.stringify(live.edges);
+}
+
+// Drop selection only when the selected node/edge is
+// gone; keep multi-select survivors that still exist.
+function selectionStillPresent(
+    selection: Selection,
+    nodes: readonly GraphNode[],
+    edges: readonly GraphEdge[],
+): Selection {
+    if (selection.kind === 'none') {
+        return selection;
+    }
+    if (selection.kind === 'edge') {
+        const exists = edges.some(
+            e => e.id === selection.edgeId,
+        );
+        return exists
+            ? selection
+            : { kind: 'none' };
+    }
+    const alive = new Set(
+        nodes.map(n => n.id),
+    );
+    const kept = new Set<string>();
+    for (const id of selection.nodeIds) {
+        if (alive.has(id)) {
+            kept.add(id);
+        }
+    }
+    if (kept.size === 0) {
+        return { kind: 'none' };
+    }
+    return { kind: 'nodes', nodeIds: kept };
+}
+
+// Re-apply the server graph onto the live snapshot.
+// Skips mid-gesture and pending property edits so a
+// notify cannot stomp a drag or an unflushed input.
+// Preserves selection/panel when entities still exist.
+async function refreshFlowFromServer(
+    flowId: string,
+): Promise<void> {
+    if (
+        isGestureActive(
+            pageState.presenter()
+                .interactionState(),
+        )
+    ) {
+        return;
+    }
+    // A debounced prop edit is still only in the DOM;
+    // re-render would wipe it. The flush that follows
+    // putFlow will ring this bell again with the save.
+    if (pageState.saveDebouncer().isPending()) {
+        return;
+    }
+    const ctx = sessionContext();
+    let graph: Awaited<
+        ReturnType<typeof getFlowGraph>
+    >;
+    try {
+        graph = await getFlowGraph(ctx, flowId);
+    } catch (err) {
+        log.error(
+            'flow detail refresh failed',
+            'flow-detail',
+            err,
+        );
+        return;
+    }
+    // Await yielded — re-check live hazards.
+    if (
+        isGestureActive(
+            pageState.presenter()
+                .interactionState(),
+        )
+    ) {
+        return;
+    }
+    if (pageState.saveDebouncer().isPending()) {
+        return;
+    }
+    const current =
+        pageState.presenter().snapshot();
+    if (serverGraphMatchesLive(graph, current)) {
+        return;
+    }
+    const nextSelection = selectionStillPresent(
+        current.interaction.selection,
+        graph.nodes,
+        graph.edges,
+    );
+    // Panel only meaningful while something is still
+    // selected; drop it when the selection vanished.
+    const isPanelOpen =
+        current.isPanelOpen
+        && nextSelection.kind !== 'none';
+    pageState.panelStateRef().open = isPanelOpen;
+    pageState.setHistory(
+        buildFlowHistorySnapshot(
+            graph.hasUndoHistory,
+        ),
+    );
+    commit({
+        ...current,
+        flowName: graph.name,
+        isLocked: graph.isLocked,
+        isAutoLayout: graph.isAutoLayout,
+        isAutoFit: graph.isAutoFit,
+        lockTimeout: graph.lockTimeout,
+        nodes: graph.nodes,
+        edges: graph.edges,
+        isPanelOpen,
+        interaction: {
+            ...current.interaction,
+            selection: nextSelection,
+        },
     });
 }
 

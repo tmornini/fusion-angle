@@ -40,7 +40,10 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
-import { RequestError } from '../../../api/api.ts';
+import {
+    RequestError,
+    HTTP_PRECONDITION_FAILED,
+} from '../../../api/api.ts';
 import type {
     RequestContext,
 } from './shared.ts';
@@ -524,7 +527,7 @@ export async function putFlow(
         } catch (err) {
             if (
                 err instanceof RequestError
-                && err.status === 412
+                && err.status === HTTP_PRECONDITION_FAILED
                 && attempt < MAX_PUT_ATTEMPTS
             ) {
                 await jitteredBackoff(attempt);

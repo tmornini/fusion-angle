@@ -65,6 +65,10 @@ export class Debouncer {
         );
     }
 
+    isPending(): boolean {
+        return this.#pending !== undefined;
+    }
+
     flush(): void {
         if (this.#timer !== undefined) {
             clearTimeout(this.#timer);

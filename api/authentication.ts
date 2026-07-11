@@ -76,6 +76,13 @@ import {
     deriveIdentityTokens,
     deriveIdentityTokenEventsForJti,
 } from './derive-identity-tokens.ts';
+import {
+    HTTP_OK,
+    HTTP_BAD_REQUEST,
+    HTTP_UNAUTHORIZED,
+    HTTP_FORBIDDEN,
+    HTTP_NOT_IMPLEMENTED,
+} from './http-errors.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an
@@ -282,7 +289,7 @@ async function issueTokenPair(
     });
     const pair = seed === undefined
         ? undefined
-        : await formAuthPair(seed, body, identityId, 200, response);
+        : await formAuthPair(seed, body, identityId, HTTP_OK, response);
     const eventPair = await formTokenEventPair(rootId, {
         jti: refreshJti, identity_id: identityId,
         action: 'issued', chain_id: chainId, at,
@@ -655,7 +662,7 @@ async function grantRefresh(
     const verified = await verifyAccessToken(token, now);
     if (!verified.valid) {
         return failure(
-            401, 'invalid refresh token: ' + verified.reason,
+            HTTP_UNAUTHORIZED, 'invalid refresh token: ' + verified.reason,
         );
     }
     const refreshRev = await tokenRevocationReason(
@@ -663,7 +670,7 @@ async function grantRefresh(
         verified.claims.iat, verified.claims.jti,
     );
     if (refreshRev !== null) {
-        return failure(401, refreshRev);
+        return failure(HTTP_UNAUTHORIZED, refreshRev);
     }
     const newJti = generateCryptoSafeBase62();
     const name = await nameFor(adapter, verified.claims.sub);
@@ -674,7 +681,7 @@ async function grantRefresh(
         undefined, { organizations },
     );
     const pair = await formAuthPair(
-        seed, body, verified.claims.sub, 200, response,
+        seed, body, verified.claims.sub, HTTP_OK, response,
     );
     const outcome = await rotateRefreshJti(
         adapter, verified.claims.jti, newJti, pair,
@@ -682,7 +689,7 @@ async function grantRefresh(
     if (outcome.kind === 'rotate') {
         return { ok: true, response, requestHash: pair.requestHash };
     }
-    return failure(401, 'refresh token reuse or unknown');
+    return failure(HTTP_UNAUTHORIZED, 'refresh token reuse or unknown');
 }
 
 // token-exchange (RFC 8693): mint a delegated token where sub =
@@ -714,7 +721,7 @@ async function grantTokenExchange(
     const actorV = await verifyAccessToken(actorToken, now);
     if (!subjectV.valid || !actorV.valid) {
         return failure(
-            401,
+            HTTP_UNAUTHORIZED,
             'token-exchange needs valid subject/actor tokens',
         );
     }
@@ -723,20 +730,20 @@ async function grantTokenExchange(
         subjectV.claims.iat, subjectV.claims.jti,
     );
     if (subjectRev !== null) {
-        return failure(401, subjectRev);
+        return failure(HTTP_UNAUTHORIZED, subjectRev);
     }
     const actorRev = await tokenRevocationReason(
         adapter, actorV.claims.sub,
         actorV.claims.iat, actorV.claims.jti,
     );
     if (actorRev !== null) {
-        return failure(401, actorRev);
+        return failure(HTTP_UNAUTHORIZED, actorRev);
     }
     const subject = subjectV.claims.sub;
     const actor = actorV.claims.sub;
     if (subject !== actor) {
         return failure(
-            403,
+            HTTP_FORBIDDEN,
             'token-exchange is limited to self-delegation'
                 + ' (subject must equal actor)',
         );
@@ -749,7 +756,7 @@ async function grantTokenExchange(
         const organizations = await subjectOrganizations(adapter, subject);
         if (!organizations.includes(organization)) {
             return failure(
-                403,
+                HTTP_FORBIDDEN,
                 'subject is not a member of'
                 + ' the organization',
             );
@@ -818,15 +825,15 @@ async function grantClientCredentials(
     const client = await (adapter as GuardedDbAdapter)
         .rawReadRow<ClientEntity>('clients', clientId);
     if (client === null) {
-        return failure(401, 'unknown client');
+        return failure(HTTP_UNAUTHORIZED, 'unknown client');
     }
     if (client.status !== 'active') {
-        return failure(401, 'client is disabled');
+        return failure(HTTP_UNAUTHORIZED, 'client is disabled');
     }
     if (!client.grant_types.split(' ')
         .includes('client_credentials')) {
         return failure(
-            400, 'client may not use client_credentials',
+            HTTP_BAD_REQUEST, 'client may not use client_credentials',
         );
     }
     const verdict = await verifyClientAssertion(
@@ -835,7 +842,7 @@ async function grantClientCredentials(
     );
     if (!verdict.valid) {
         return failure(
-            401,
+            HTTP_UNAUTHORIZED,
             'invalid client_assertion: ' + verdict.reason,
         );
     }
@@ -990,7 +997,7 @@ async function grantAuthorizationCode(
         ? body.code
         : '';
     const invalid: TokenResult = failure(
-        401, 'invalid or used authorization code',
+        HTTP_UNAUTHORIZED, 'invalid or used authorization code',
     );
     const derivedId = await deriveAuthorizationCodeId(code);
     const issuer = await authorizeCodeIssuer(
@@ -1051,7 +1058,7 @@ async function grantAuthorizationCode(
         undefined, { organizations },
     );
     const pair = await formAuthPair(
-        seed, body, issuer.identityId, 200, response,
+        seed, body, issuer.identityId, HTTP_OK, response,
     );
     // The root's OWN event pair (Phase 13 Task 5): formed pre-tx
     // against `issuer.identityId` — a code's issuer cannot change
@@ -1102,7 +1109,7 @@ export async function postToken(
             return grantClientCredentials(adapter, body, seed);
         default:
             return failure(
-                400, 'unsupported grant_type: ' + grantType,
+                HTTP_BAD_REQUEST, 'unsupported grant_type: ' + grantType,
             );
     }
 }
@@ -1196,7 +1203,7 @@ async function authorizePassword(
         ? body.password
         : '';
     const denied: AuthorizeResult = {
-        ok: false, status: 401, error: 'invalid credentials',
+        ok: false, status: HTTP_UNAUTHORIZED, error: 'invalid credentials',
     };
     // FLIPPED (Phase 13 Task 8): deriveIdentityPiiRows is the E13
     // full-scan derive (derive-identity-spine.ts) — a whole-
@@ -1230,7 +1237,7 @@ async function authorizePassword(
     const code = generateCryptoSafeBase62();
     const response: AuthorizeResponse = { code };
     const pair = await formAuthPair(
-        seed, body, identityId, 200, response,
+        seed, body, identityId, HTTP_OK, response,
     );
     await adapter.transaction(
         ['requests', 'responses'],
@@ -1259,12 +1266,12 @@ export async function postAuthorize(
         case 'provider':
         case 'oidc':
             return {
-                ok: false, status: 501,
+                ok: false, status: HTTP_NOT_IMPLEMENTED,
                 error: method + ' auth is a server-tier seam',
             };
         default:
             return {
-                ok: false, status: 400,
+                ok: false, status: HTTP_BAD_REQUEST,
                 error: 'unsupported method: ' + method,
             };
     }

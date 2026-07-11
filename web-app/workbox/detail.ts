@@ -30,6 +30,7 @@ import {
     generateCryptoSafeBase62,
     getRecordForWorkOrder,
     getRecordAttributesByRecord,
+    subscribeWorkOrderChanges,
     RecordTransitionViolations,
 } from '../app/adapters/index.ts';
 import type {
@@ -279,6 +280,61 @@ async function loadPresenter(
     );
 }
 
+/* ── Render ──────────────── */
+
+function renderDetail(
+    container: HTMLElement,
+    detail: WorkboxDetailPresenter,
+    ctx: ReturnType<typeof createRequestContext>,
+): void {
+    setHtml(container, detail.buildPage());
+
+    const backBtn = $(
+        '#work-order-back-btn',
+        container,
+    );
+    if (backBtn) {
+        backBtn.addEventListener(
+            'click',
+            () => navigateTo('workbox'),
+        );
+    }
+
+    if (!detail.isArchive()) {
+        initTransitionButtons(
+            container, detail, ctx,
+        );
+        initUnclaimButton(
+            container, detail, ctx,
+        );
+    }
+}
+
+// Reload the action screen from the pair plane —
+// claim is NOT re-attempted (init owns that once).
+// Cross-tab release/transition rings the same bell.
+async function refreshDetail(
+    container: HTMLElement,
+    workOrderId: string,
+    memberId: string,
+): Promise<void> {
+    const ctx = sessionContext();
+    let detail: WorkboxDetailPresenter;
+    try {
+        detail = await loadPresenter(
+            workOrderId, memberId, ctx,
+        );
+    } catch (err) {
+        log.error(
+            'work order detail refresh failed',
+            'workbox',
+            err,
+        );
+        return;
+    }
+    renderDetail(container, detail, ctx);
+}
+
 /* ── Init ────────────────── */
 
 export async function init(
@@ -332,32 +388,17 @@ export async function init(
         },
         retry: () => init(params),
         onData: detail => {
-            setHtml(
-                container,
-                detail.buildPage(),
-            );
+            renderDetail(container, detail, ctx);
 
-            const backBtn = $(
-                '#work-order-back-btn',
-                container,
-            );
-            if (backBtn) {
-                backBtn.addEventListener(
-                    'click',
-                    () => navigateTo('workbox'),
+            // Subscribe after the claim-on-load path so
+            // the initial notify does not double-render.
+            // Full <a href> navigation tears the page
+            // down; the channel entry dies with it.
+            subscribeWorkOrderChanges(() => {
+                void refreshDetail(
+                    container, id, memberId,
                 );
-            }
-
-            if (
-                !detail.isArchive()
-            ) {
-                initTransitionButtons(
-                    container, detail, ctx,
-                );
-                initUnclaimButton(
-                    container, detail, ctx,
-                );
-            }
+            });
         },
     });
 }

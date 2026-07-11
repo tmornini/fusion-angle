@@ -6,7 +6,11 @@ import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
 import type { RequestContext } from './shared.ts';
-import { RequestError } from '../../../api/api.ts';
+import {
+    RequestError,
+    HTTP_NOT_FOUND,
+    HTTP_CONFLICT,
+} from '../../../api/api.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -134,10 +138,16 @@ export async function postInvitationGrant(
             email, invitationId, grantEventId, grantAt,
         });
     } catch (err) {
-        if (err instanceof RequestError && err.status === 404) {
+        if (
+            err instanceof RequestError
+            && err.status === HTTP_NOT_FOUND
+        ) {
             return 'no-identity';
         }
-        if (err instanceof RequestError && err.status === 409) {
+        if (
+            err instanceof RequestError
+            && err.status === HTTP_CONFLICT
+        ) {
             return 'already-member';
         }
         throw err;
