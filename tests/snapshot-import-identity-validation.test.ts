@@ -9,9 +9,8 @@ import {
 // Snapshot import is a second validation edge: the
 // per-request write path is fenced at store
 // construction, but importing a snapshot routes each
-// row through validateSnapshotRow. Phase Final Stage B
-// retired the identity spine tables — only clients
-// remains from this family on TABLE_NAMES.
+// row through validateSnapshotRow. Pins value-level
+// validation on two message-plane survivors.
 // Mirrors snapshot-import-validation.test.ts.
 
 function installShim(): void {
@@ -50,10 +49,24 @@ async function acceptsImport(json: string): Promise<void> {
 const VALID_ROWS: Record<
     string, Record<string, unknown>
 > = {
-    clients: {
-        id: 'cl1', grant_types: 'authorization_code',
-        redirect_uris: 'https://example.com/cb',
-        jwks: '{}', aud: 'aud', status: 'active',
+    requests: {
+        id: 'rq1',
+        uri_prefix: '/organizations/1/ideas/',
+        uri_id: '42',
+        at: '2026-01-01T00:00:00.000000Z',
+        requester_identity_id: 'current',
+        message_hash: 'a'.repeat(64),
+        message: '{"kind":"request"}',
+    },
+    responses: {
+        id: 'rs1',
+        uri_prefix: '/organizations/1/ideas/',
+        uri_id: '42',
+        at: '2026-01-01T00:00:00.000000Z',
+        status: 200,
+        etag: 'e'.repeat(64),
+        message_hash: 'b'.repeat(64),
+        message: '{"kind":"response"}',
     },
 };
 
@@ -63,7 +76,8 @@ const VALID_ROWS: Record<
 const BAD_OVERRIDE: Record<
     string, Record<string, unknown>
 > = {
-    clients: { status: 'paused' },
+    requests: { at: 'not-a-timestamp' },
+    responses: { status: 9999 },
 };
 
 for (const [table, valid] of Object.entries(VALID_ROWS)) {

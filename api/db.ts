@@ -1,5 +1,4 @@
 import type {
-    ClientEntity,
     RequestEntity,
     ResponseEntity,
 } from './types.ts';
@@ -203,14 +202,12 @@ export const backendRunner = (
 export const ambientRunner = (tx: Tx): TxRunner =>
     (_tables, _mode, fn) => fn(tx);
 
-// The 3 stores an adapter exposes, factored out of
+// The 2 stores an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
 // place (`#buildStores`) and a transaction can rebuild it
-// bound to an open tx (A9). Phase Final Stage B: states
-// table retired; clients rides HistoryEntityStore.
+// bound to an open tx (A9). Both surviving stores ride
+// HistoryEntityStore (message plane only).
 export interface DbStores {
-    clients:
-        EntityStore<ClientEntity>;
     requests:
         EntityStore<RequestEntity>;
     responses:
@@ -253,10 +250,11 @@ export interface DbAdapter extends DbLifecycle, DbStores {
     ): Promise<R>;
 }
 
-// The unfenced tier: same stores as DbAdapter, plus a raw
-// primary-key probe. Phase Final Task 5 retired the guarded
-// write capability (putGuarded family) with the store
-// decorator shell — surviving tables never soft-delete.
+// The unfenced tier: same stores as DbAdapter. Phase Final
+// Task 5 retired the guarded write capability (putGuarded
+// family) with the store decorator shell — surviving tables
+// never soft-delete. clients-table elimination retired the
+// rawReadRow primary-key probe with the clients store.
 export interface GuardedDbAdapter
     extends DbLifecycle, DbStores
 {
@@ -264,15 +262,6 @@ export interface GuardedDbAdapter
         tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;
-    // Raw single-row read by primary key — no store-layer
-    // semantics. Surviving tables never soft-delete, so this
-    // is byte-identical to EntityStore.getById for present
-    // rows and returns null for absence (getById throws).
-    // Kept for the client-lookup path and residual probes.
-    rawReadRow<T extends { id: string }>(
-        table: string,
-        id: string,
-    ): Promise<T | null>;
 }
 
 // Phase Final Stage B shrank this list (ideas +
@@ -286,7 +275,6 @@ export interface GuardedDbAdapter
 // orphans. deleteSchema (a full database delete) is the only
 // cleanup; nothing else needs to reconcile them.
 export const TABLE_NAMES = [
-    'clients',
     'requests',
     'responses',
 ];
@@ -311,7 +299,9 @@ export const TABLE_NAMES = [
 // Phase Final Stage B's doomed-table deletions bump 2→3;
 // states-address retirement bumps 3→4 (pre-retirement v3
 // exports still carry states/:id pairs no derive source
-// reads — blanket version reject).
+// reads — blanket version reject); clients-table elimination
+// bumps 4→5 (pre-elimination v4 exports still carry a
+// clients array no store reads — blanket version reject).
 //
 // THE ASYMMETRY: this closes only "a new build imports an old
 // export." A new build's OWN marked export is silently accepted
@@ -328,7 +318,7 @@ export const TABLE_NAMES = [
 // tables' keys. Intra-phase exports are NOT a supported
 // contract — do not export/import across deletion commits
 // except in tests that control both ends.
-export const SNAPSHOT_SCHEMA_VERSION = 4;
+export const SNAPSHOT_SCHEMA_VERSION = 5;
 export const SNAPSHOT_SCHEMA_VERSION_KEY = '__schema_version__';
 
 // A secondary index is either a plain column name (the

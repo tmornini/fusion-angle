@@ -89,6 +89,7 @@ export const RETIRED_KEYS_PER_TABLE:
 // table key is read. This list fails fast on known dead keys
 // when a file still carries them alongside a current marker.
 export const RETIRED_TABLES: readonly string[] = [
+    'clients',
     'activities',
     'activity_actors',
     'identity_default_orgs',

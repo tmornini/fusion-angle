@@ -14,7 +14,6 @@ import type {
     TxRunner,
 } from './db.ts';
 import type {
-    ClientEntity,
     RequestEntity,
     ResponseEntity,
 } from './types.ts';
@@ -29,7 +28,6 @@ import {
     parseAndValidateSnapshot,
 } from './snapshot-validator.ts';
 import {
-    validateClientEntity,
     validateRequestEntity,
     validateResponseEntity,
 } from './validators.ts';
@@ -43,8 +41,8 @@ import {
 // before any store op. Schema lifecycle delegates to the
 // backend, which signals "schema exists" its own way.
 //
-// Phase Final Stage B: states table retired. All three
-// surviving stores ride HistoryEntityStore.
+// Both surviving stores ride HistoryEntityStore (message
+// plane only — clients table eliminated).
 export class BackedDbAdapter
     implements GuardedDbAdapter, LatencySimulation
 {
@@ -53,7 +51,6 @@ export class BackedDbAdapter
     readonly #open: () => Promise<void>;
     readonly #notify: NotificationPost;
 
-    readonly clients!: EntityStore<ClientEntity>;
     readonly requests!: EntityStore<RequestEntity>;
     readonly responses!: EntityStore<ResponseEntity>;
 
@@ -165,18 +162,6 @@ export class BackedDbAdapter
         );
     }
 
-    // Raw single-row read by primary key — see
-    // GuardedDbAdapter.rawReadRow.
-    rawReadRow<T extends { id: string }>(
-        table: string,
-        id: string,
-    ): Promise<T | null> {
-        return this.#backend.transaction(
-            [table], 'readonly',
-            tx => tx.get<T>(table, id),
-        );
-    }
-
     #viewForTx(
         tx: Tx,
         declaredTables: readonly string[],
@@ -198,10 +183,6 @@ export class BackedDbAdapter
                 this.#assertSubset(tables, declaredTables);
                 return fn(view);
             },
-            rawReadRow: <T extends { id: string }>(
-                table: string,
-                id: string,
-            ) => tx.get<T>(table, id),
         };
         return view;
     }
@@ -223,9 +204,6 @@ export class BackedDbAdapter
 
     #buildStores(run: TxRunner): DbStores {
         return {
-            clients: new HistoryEntityStore(
-                'clients', run, validateClientEntity,
-            ),
             requests: new HistoryEntityStore(
                 'requests', run, validateRequestEntity,
             ),

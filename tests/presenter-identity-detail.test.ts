@@ -94,6 +94,7 @@ function personPresenter() {
         },
         service: { named: false },
         activeCredentialKinds: [],
+        registration: { registered: false as const },
     });
 }
 
@@ -133,6 +134,7 @@ test(
             pii: { erased: true },
             service: { named: false },
             activeCredentialKinds: [],
+            registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
         // The call site supplies the named-constant
@@ -157,6 +159,7 @@ test(
                 detail: 'Fast reasoning model',
             },
             activeCredentialKinds: ['client_secret'],
+            registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
         assert.match(out, /Grok 4\.3/);
@@ -189,6 +192,7 @@ test(
             pii: { erased: true },
             service: { named: false },
             activeCredentialKinds: ['client_secret'],
+            registration: { registered: false as const },
         }).renderShell(rec.container);
         const out = rec.allHtml();
         assert.match(out, new RegExp(UNNAMED_SERVICE_NAME));
@@ -196,5 +200,55 @@ test(
         assert.doesNotMatch(
             out, /<h1[^>]*>\s*42vHYDCvtkaO3sTnoqg7aJ/,
         );
+    },
+);
+
+test(
+    'a service identity renders an unregistered'
+    + ' registration card',
+    () => {
+        const { container, allHtml } =
+            makeRecordingContainer();
+        new IdentityDetailPresenter({
+            identity: new Identity({
+                id: 's1', kind: 'service',
+            }),
+            pii: { erased: true },
+            service: { named: true, name: 'Robo',
+                detail: 'bot' },
+            activeCredentialKinds: [],
+            registration: { registered: false },
+        }).renderShell(container);
+        assert.match(allHtml(), /Client registration/);
+        assert.match(allHtml(), /Not registered\./);
+        assert.match(allHtml(), /Register client/);
+    },
+);
+
+test(
+    'a registered service renders status tone and fields',
+    () => {
+        const { container, allHtml } =
+            makeRecordingContainer();
+        new IdentityDetailPresenter({
+            identity: new Identity({
+                id: 's1', kind: 'service',
+            }),
+            pii: { erased: true },
+            service: { named: true, name: 'Robo',
+                detail: 'bot' },
+            activeCredentialKinds: [],
+            registration: {
+                registered: true,
+                grantTypes: 'client_credentials',
+                redirectUris: '',
+                jwks: '{"keys":[]}',
+                aud: 'fusion-ai-web',
+                status: 'active',
+            },
+        }).renderShell(container);
+        assert.match(allHtml(), /data-tone="success"/);
+        assert.match(allHtml(), /client_credentials/);
+        assert.match(allHtml(), /Manage registration/);
     },
 );

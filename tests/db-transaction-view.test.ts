@@ -2,12 +2,14 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 
-const aClient = {
-    grant_types: '["password"]',
-    redirect_uris: '[]',
-    jwks: '{}',
-    aud: 'fusion-ai',
-    status: 'active' as const,
+const aResponse = {
+    uri_prefix: '/organizations/1/flows/',
+    uri_id: '7',
+    at: '2026-01-01T00:00:00.000000Z',
+    status: 204,
+    etag: 'e'.repeat(64),
+    message_hash: 'b'.repeat(64),
+    message: '{"kind":"response"}',
 };
 
 const aRequest = {
@@ -25,15 +27,15 @@ test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
-            ['clients', 'requests'],
+            ['responses', 'requests'],
             async (view) => {
-                await view.clients.put('c1', aClient);
+                await view.responses.put('s1', aResponse);
                 await view.requests.put('r1', aRequest);
             },
         );
-        const client = await db.clients.getById('c1');
+        const response = await db.responses.getById('s1');
         const request = await db.requests.getById('r1');
-        assert.equal(client.id, 'c1');
+        assert.equal(response.id, 's1');
         assert.equal(request.id, 'r1');
     },
 );
@@ -45,18 +47,18 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['clients', 'requests'],
+                ['responses', 'requests'],
                 async (view) => {
-                    await view.clients.put('c1', aClient);
+                    await view.responses.put('s1', aResponse);
                     await view.requests.put('r1', aRequest);
                     throw new Error('boom');
                 },
             ),
             /boom/,
         );
-        const clients = await db.clients.getAll();
+        const responses = await db.responses.getAll();
         const requests = await db.requests.getAll();
-        assert.deepEqual(clients, []);
+        assert.deepEqual(responses, []);
         assert.deepEqual(requests, []);
     },
 );
@@ -67,16 +69,16 @@ test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         const seen = await db.transaction(
-            ['clients', 'requests'],
+            ['responses', 'requests'],
             async (view) => {
-                await view.clients.put('c1', aClient);
+                await view.responses.put('s1', aResponse);
                 // Read back inside the same tx — the put is
                 // visible before commit.
-                return view.clients.getAll();
+                return view.responses.getAll();
             },
         );
         assert.equal(seen.length, 1);
-        assert.equal(seen[0]!.id, 'c1');
+        assert.equal(seen[0]!.id, 's1');
     },
 );
 
@@ -86,22 +88,22 @@ test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
-            ['clients', 'requests'],
+            ['responses', 'requests'],
             async (view) => {
                 await view.transaction(
-                    ['clients'],
+                    ['responses'],
                     async (inner) => {
-                        await inner.clients.put(
-                            'c1', aClient,
+                        await inner.responses.put(
+                            's1', aResponse,
                         );
                     },
                 );
                 await view.requests.put('r1', aRequest);
             },
         );
-        const client = await db.clients.getById('c1');
+        const response = await db.responses.getById('s1');
         const request = await db.requests.getById('r1');
-        assert.equal(client.id, 'c1');
+        assert.equal(response.id, 's1');
         assert.equal(request.id, 'r1');
     },
 );
@@ -113,13 +115,13 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['clients', 'requests'],
+                ['responses', 'requests'],
                 async (view) => {
                     await view.transaction(
-                        ['clients'],
+                        ['responses'],
                         async (inner) => {
-                            await inner.clients.put(
-                                'c1', aClient,
+                            await inner.responses.put(
+                                's1', aResponse,
                             );
                         },
                     );
@@ -129,7 +131,7 @@ test(
             /boom/,
         );
         assert.deepEqual(
-            await db.clients.getAll(), [],
+            await db.responses.getAll(), [],
         );
     },
 );
@@ -141,7 +143,7 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['clients'],
+                ['responses'],
                 async (view) => {
                     await view.transaction(
                         ['requests'],

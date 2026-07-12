@@ -310,7 +310,7 @@ export async function handleRequest(
     // Every authenticated request is fenced — see
     // fenceRequest, which completes the vessel: the
     // organization, the live memberships, and the roles.
-    // Surviving stores are global (clients + message plane);
+    // Surviving stores are global (message plane);
     // pair-plane tenancy rides uri_prefix. effective stays
     // the unfenced base adapter.
     let effective: DbAdapter = adapter;

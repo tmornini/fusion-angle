@@ -27,15 +27,16 @@ export interface Principal {
 // The JWT claim contract. `aud` names the origin the token is
 // for — verifyAccessToken now ENFORCES the single audience
 // (TOKEN_AUDIENCE); per-client multi-audience validation via
-// the clients registry is SP-5. `cnf` is the DPoP confirmation
-// (SP-5 binds the key — present in the contract, unenforced
-// now); `jti` is the unique token id (reuse-detection: SP-5);
-// `act` is the RFC 8693 delegation actor (token-exchange shapes
-// sub = the subject and act.sub = the acting party). `org` is
-// the SP-2 tenant scope, present only on an org-exchanged token;
-// its absence is an unscoped single-org caller. `orgs` is the
-// reachable set — every org the subject is a member of, from
-// the membership ledger at mint time.
+// the registration facet is SP-5. `cnf` is the DPoP
+// confirmation (SP-5 binds the key — present in the contract,
+// unenforced now); `jti` is the unique token id
+// (reuse-detection: SP-5); `act` is the RFC 8693 delegation
+// actor (token-exchange shapes sub = the subject and act.sub
+// = the acting party). `org` is the SP-2 tenant scope, present
+// only on an org-exchanged token; its absence is an unscoped
+// single-org caller. `orgs` is the reachable set — every org
+// the subject is a member of, from the membership ledger at
+// mint time.
 export interface AccessTokenClaims {
     readonly sub: Id;
     readonly roles: readonly string[];

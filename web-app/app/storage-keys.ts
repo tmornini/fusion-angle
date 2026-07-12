@@ -1,8 +1,8 @@
 // Client-side localStorage keys. All share the fusion-ai:
 // prefix voice with the localStorage table backend
-// (fusion-ai:clients|requests|responses). deleteSchema only
-// removes TABLE_NAMES keys, so these UI/session keys survive
-// a schema wipe.
+// (fusion-ai:requests|responses). deleteSchema only removes
+// TABLE_NAMES keys, so these UI/session keys survive a
+// schema wipe.
 
 // OAuth access + refresh token pair. The access token is
 // sent as Authorization: Bearer on authenticated requests.

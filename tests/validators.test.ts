@@ -6,7 +6,6 @@ import {
     validateIdeaEntity,
     validateProjectEntity,
     validateFlowEntity,
-    validateFlowVersionEntity,
     validateWorkOrderEntity,
     validateFlowWorkOrderEntity,
     validateStateFieldValueEntity,
@@ -404,40 +403,6 @@ test(
     );
 });
 
-
-// --- FlowVersionEntity ---
-
-const validFlowVersion = {
-    flow_id: 'f-1',
-    name: 'v1',
-    is_locked: false,
-    is_auto_layout: true,
-    is_auto_fit: true,
-    lock_timeout: DEFAULT_LOCK_TIMEOUT,
-    graph: '{"nodes":[],"edges":[]}',
-    at: '2024-01-01T00:00:00.000000Z',
-};
-
-test(
-    'validateFlowVersionEntity accepts valid payload',
-    () => {
-    const result =
-        validateFlowVersionEntity(validFlowVersion);
-    assert.equal(result.flow_id, 'f-1');
-});
-
-test(
-    'validateFlowVersionEntity rejects missing flow_id',
-    () => {
-    const body = { ...validFlowVersion };
-    delete (
-        body as Record<string, unknown>
-    )['flow_id'];
-    assert.throws(
-        () => validateFlowVersionEntity(body),
-        /missing required key "flow_id"/,
-    );
-});
 
 // --- WorkOrderEntity ---
 

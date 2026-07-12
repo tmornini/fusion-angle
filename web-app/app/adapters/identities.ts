@@ -2,12 +2,18 @@ import {
     Identity,
     nowUtc,
     type AIMemberEntity,
+    type ClientRegistrationEntity,
+    type ClientStatus,
     type Id,
     type IdentityEntity,
     type IdentityKind,
     type IdentityPiiEntity,
     type MemberPii,
 } from '../../../api/types.ts';
+import {
+    RequestError,
+    HTTP_NOT_FOUND,
+} from '../../../api/api.ts';
 import { hashPassword } from '../../../shared/password-hash.ts';
 import type { RequestContext } from './shared.ts';
 import {
@@ -23,6 +29,7 @@ export type {
     IdentityKind,
     IdentityPiiEntity,
     MemberPii,
+    ClientStatus,
 };
 
 // The identity surfaces derive from these stores: roster
@@ -194,6 +201,81 @@ export async function deleteIdentityPii(
     id: Id,
 ): Promise<void> {
     await ctx.DELETE(`identities/${id}/pii`);
+    identityChanges.notify();
+}
+
+// The client-registration facet as a tagged union: absence
+// (never registered, or deregistered) is a branch, never a
+// null — the CALLER renders the unregistered state. Wire
+// snake_case crosses to domain camelCase HERE (the adapter
+// is the divorce point of vocabulary).
+export type ClientRegistration =
+    | {
+        readonly registered: true;
+        readonly grantTypes: string;
+        readonly redirectUris: string;
+        readonly jwks: string;
+        readonly aud: string;
+        readonly status: ClientStatus;
+    }
+    | { readonly registered: false };
+
+export interface ClientRegistrationFields {
+    readonly grantTypes: string;
+    readonly redirectUris: string;
+    readonly jwks: string;
+    readonly aud: string;
+    readonly status: ClientStatus;
+}
+
+export async function getClientRegistration(
+    ctx: RequestContext,
+    id: Id,
+): Promise<ClientRegistration> {
+    try {
+        const row =
+            await ctx.GET<ClientRegistrationEntity>(
+                `identities/${id}/registration`,
+            );
+        return {
+            registered: true,
+            grantTypes: row.grant_types,
+            redirectUris: row.redirect_uris,
+            jwks: row.jwks,
+            aud: row.aud,
+            status: row.status,
+        };
+    } catch (err) {
+        if (
+            err instanceof RequestError
+            && err.status === HTTP_NOT_FOUND
+        ) {
+            return { registered: false };
+        }
+        throw err;
+    }
+}
+
+export async function putClientRegistration(
+    ctx: RequestContext,
+    id: Id,
+    fields: ClientRegistrationFields,
+): Promise<void> {
+    await ctx.PUT(`identities/${id}/registration`, {
+        grant_types: fields.grantTypes,
+        redirect_uris: fields.redirectUris,
+        jwks: fields.jwks,
+        aud: fields.aud,
+        status: fields.status,
+    });
+    identityChanges.notify();
+}
+
+export async function deleteClientRegistration(
+    ctx: RequestContext,
+    id: Id,
+): Promise<void> {
+    await ctx.DELETE(`identities/${id}/registration`);
     identityChanges.notify();
 }
 

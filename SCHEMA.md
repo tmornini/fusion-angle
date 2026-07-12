@@ -11,16 +11,16 @@
 
 Phase Final deleted the entity row plane. The schema of
 record is the **message plane** — the append-only
-`requests` / `responses` pair tables — plus one survivor
-registry row store, `clients`. The tables are listed in
-`api/db.ts` as `TABLE_NAMES` (the authoritative count: three).
-Each table is an IndexedDB object store (`keyPath: 'id'`) in
-the `fusion-ai` database; the simulated backends key the same
-tables as `fusion-ai:tableName`. All rows have a text `id`
-primary key. Column types: TEXT (string), INTEGER (number),
-REAL (float), BOOLEAN (see below). JSON columns store
-stringified arrays or objects. All columns are NOT NULL —
-entity validation on creation ensures every field is present.
+`requests` / `responses` pair tables. The tables are listed
+in `api/db.ts` as `TABLE_NAMES` (the authoritative count:
+two). Each table is an IndexedDB object store
+(`keyPath: 'id'`) in the `fusion-ai` database; the simulated
+backends key the same tables as `fusion-ai:tableName`. All
+rows have a text `id` primary key. Column types: TEXT
+(string), INTEGER (number), REAL (float), BOOLEAN (see
+below). JSON columns store stringified arrays or objects.
+All columns are NOT NULL — entity validation on creation
+ensures every field is present.
 
 Every domain family (ideas, projects, flows, work orders,
 records, objectives, roster, identity spine, organizations,
@@ -31,15 +31,16 @@ lifecycle state from the pair plane (`api/derive-*.ts`);
 writes append pairs only (`tx` lists
 `['requests','responses']` on every pair-wired path).
 
-`SNAPSHOT_SCHEMA_VERSION` is **4** (states-address
-retirement). A pre-retirement (v3) export is rejected by a
-post-retirement import (`SnapshotVersionMismatchError`).
-Phase 13's 1→2 bump retired `identity_tokens` +
-`authorization_codes`; Phase Final's 2→3 bump retires every
-remaining doomed entity table; the 3→4 bump retires the
-`states/:id` address (not a `TABLE_NAMES` shrink —
-pre-retirement v3 exports still carry pairs no derive source
-reads).
+`SNAPSHOT_SCHEMA_VERSION` is **5** (clients elimination). A
+pre-retirement (v3) export is rejected by a post-retirement
+import (`SnapshotVersionMismatchError`). Phase 13's 1→2 bump
+retired `identity_tokens` + `authorization_codes`; Phase
+Final's 2→3 bump retires every remaining doomed entity table;
+the 3→4 bump retires the `states/:id` address (not a
+`TABLE_NAMES` shrink — pre-retirement v3 exports still carry
+pairs no derive source reads); the clients elimination
+deletes the last entity table and bumps 4→5 — a v4 export is
+rejected by a v5 import.
 
 **Orphan stores (gate 6) — CANONICAL residual statement.**
 Author gate 6 elected leave-inert (no sweep). IndexedDB opens
@@ -105,44 +106,6 @@ actor reference it. It is a pure event-author:
 `getMemberMap` resolves it for authorship display, but the
 `getMembers` roster — and every list, picker, and detail
 view — omits it.
-
-## Survivor tables
-
-### clients
-
-OAuth client registry — the websites built by us and others.
-Backed by `HistoryEntityStore` (Phase Final re-pointed it off
-the deleted `EntityStore` class). Mutable config of record:
-redirect URIs change, JWKS rotate, a client is disabled.
-`status` (`active` | `disabled`) is the schema's one mutable
-lifecycle column on a survivor row — a named deviation from
-the pair-plane lifecycle discipline. Zero public `/clients`
-routes today; production reads use
-`rawReadRow('clients', …)` (authentication client-assertion
-path). No seed rows, no pair companion, never soft-deleted.
-
-`grant_types` and `redirect_uris` are space-delimited (OAuth
-convention); `jwks` is the client's JSON Web Key Set as a
-JSON string — JWS verification of `private_key_jwt`
-assertions runs for real against it (RS256/ES256,
-`api/client-assertion.ts`; jti replay tracking is the
-remaining server-tier seam); `aud` is the audience the
-client's assertions must claim and the origin a token is
-minted for.
-
-| Column | Type |
-|--------|------|
-| id | TEXT |
-| grant_types | TEXT |
-| redirect_uris | TEXT |
-| jwks | TEXT |
-| aud | TEXT |
-| status | TEXT (`active` \| `disabled`) |
-
-Follow-on (not this phase): client = kind-`'service'`
-identity + registration facet is a server-tier
-client-registration candidate (would retire the standalone
-clients noun).
 
 ## Messages (schema of record)
 
@@ -235,6 +198,27 @@ records, objectives, memberships, invitations, identities,
 organizations, role grants, and the rest share this
 no-table posture: each is a URI-addressed pair family with
 a derive module (`api/derive-*.ts`) and no row store.
+
+### Client registration (pair-plane only, no table)
+
+`identities/:id/registration` (clients elimination) is the
+client-config facet of a kind-`'service'` identity — the
+family that replaced the `clients` table. A singleton
+document at the identity's own nested address (uriId `''`,
+the `/pii` address shape) that Supersedes-chains like
+`/credentials` — NOT a hard-delete zone. Body:
+`{ grant_types, redirect_uris, jwks, aud, status }`;
+`status` (`active` | `disabled`) rides the document, so the
+schema's last mutable lifecycle column is gone with the
+table. Register, rotate-JWKS, and disable are all the same
+PUT-overwrite; every revision is an appended pair —
+registration history for free. DELETE is a marked tombstone
+= deregistration. Admin-realm writes; kind-`'service'` gate
+(absent identity 404 / person 400 / non-admin 403 / unauth
+401-before-404). `grantClientCredentials` derives it
+pre-token via `deriveClientRegistration`
+(`api/derive-identity-spine.ts`); `act.sub` carries the
+acting client on authorization_code redemption.
 
 ## State alphabets (derive layer)
 

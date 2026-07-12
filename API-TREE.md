@@ -22,8 +22,9 @@ That mechanism will replace the existing ledger's and common states system by mo
 └─|─ /identities/
   |  └── :id                                   • default-organization is an attribute of the identity itself
   |      └─|─ /credentials                     • all of them, single document
-  |      └─|─ /notifications                   • postgres LISTEN/NOTIFY for all changes to identity
+  |      └─|─ /notifications                   • TARGET-STATE: postgres LISTEN/NOTIFY for all changes to identity
   |      └─|─ /pii                             • full physical removal from the DB required, i.e. physical delete, all others: Delete-At: header
+  |      └─|─ /registration                    • RECONCILED (clients retirement): client registration facet — single-slot PUT-overwrite document (grant_types, redirect_uris, jwks, aud, status), admin-realm writes, kind-'service' gate; grantClientCredentials derives it pre-token (bearer-exempt precedent); DELETE tombstone = deregistration
   |      └─|─ /role-grants                     • all of them, single document
   |      └─|─ /third-party-identity-providers  • all of them, single document
   |      └─|─ /token-revocations               • RECONCILED: shipped FLAT, not nested here — GET|PUT /identity-token-revocations/:id (GLOBAL-plane, no organization_id), the answer WAS "PUT/GET"; GET stays admin-only, PUT widened to member-tier SELF-target only at WP8 (Phase 13 Task 8) — a member may revoke its own chain, naming another identity still requires admin — see the Auth RECONCILED 2026-07-06 block, go-to-church-peaceful-castle.md §Phases 3…N
@@ -39,7 +40,7 @@ That mechanism will replace the existing ledger's and common states system by mo
   |         \- identity authz realm
 └─|─ /organizations/
   |  └─|─ :id
-  |    |  └── /notifications                  • postgres LISTEN/NOTIFY for all changes to organization
+  |    |  └── /notifications                  • TARGET-STATE: postgres LISTEN/NOTIFY for all changes to organization
   |    |  └── /objectives                     • RECONCILED: shipped as per-objective documents at objectives/:id (the seventh registered family, 'simple' + lifecycle 'trio' — genesis at create, archive/reactivate via the document PUT), collection served by the generic document handler over per-entity heads, revision history as per-objective message history at objectives/:id/revisions/, NOT a single org document — see the objectives FLIPPED 2026-07-05 block + states-address retirement, go-to-church-peaceful-castle.md §Phased sequence (Author gates 1/3)
   |    |  └── /flows/
   |    |      └── :id
@@ -60,14 +61,14 @@ That mechanism will replace the existing ledger's and common states system by mo
     \- administration authz realm
 
 └─|─ /states/                                  • RECONCILED (states-address retirement as-built): GET /states DERIVED (deriveStates five-source union — trio families, members, work-order lifecycle, flow graph, invitations); every verb on /states/:id RETIRED → router 404 for authenticated callers (unauthenticated → 401 first); GET /entity-states/:id RETIRED → router 404; GET /entity-states/:id/history lives (derived + pair-plane fence — foreign → 403, orphan/own pass); GET /states/:id/field-values lives (derived single-source transition fold; visibility via stateEventVisibilityFor 3-tier — own → 200 rows; foreign → 403; orphan → 404); PUT|DELETE /states/:id/field-values/:fvid RETIRED → router 404 (WRITE_RESPONSE_SPECS + seed address formation SURVIVE); states TABLE DELETED (Phase Final); lifecycle writes ride document-trio PUTs + named ops (work-order create/claim/transition/release, invitations) — see Phase 15 + Phase Final + honest HTTP status covenant
-└─|─ /clients[/:id]                            • RECONCILED (Phase Final): no public /clients routes; client credentials resolve via rawReadRow on the KEPT clients table (HistoryEntityStore; Phase 15 gate 6 AS-IS → Final re-point). identity_providers TABLE DELETED (Phase Final gate 1). Follow-on: client = kind-'service' identity + registration facet is a server-tier client-registration phase candidate (would retire the standalone clients noun; sub vs acting client moves to token claims)
+└─|─ /clients[/:id]                            • RETIRED (clients retirement): noun retired — client = kind-'service' identity + /identities/:id/registration facet; act.sub carries the acting client on authorization_code redemption; clients TABLE DELETED (TABLE_NAMES 2 — pure message plane; SNAPSHOT_SCHEMA_VERSION 4→5); rawReadRow retired with it
 └─|─ index.html
 └─|─ /authentication/
   |  ├── token
   |  └── authorize
 └─|─ /snapshots/
   |  └── export                               • TARGET-STATE: not shipped as a dedicated route today — export is client-side over GET /snapshots/schema (full snapshot body); a first-class /snapshots/export remains a known future addition
-  |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; version gate SNAPSHOT_SCHEMA_VERSION 4 — pre-retirement v3 rejected; survivor keys clients+requests+responses)
+  |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; version gate SNAPSHOT_SCHEMA_VERSION 5 — pre-clients-elimination v4 rejected; pure message-plane keys requests+responses)
   |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1506 pairs / bootstrap 13 absolute post states-address retirement; SeededCredentials re-pointed off identity rows at Final Task 1(d))
   |  └── schema                               • RECONCILED: GET|DELETE /snapshots/schema (existence + full export, or drop)
   |  └── bootstrap                            • RECONCILED: POST /snapshots/bootstrap (pristine minimal seed)

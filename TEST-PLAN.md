@@ -69,7 +69,7 @@ flow-edit business logic and the connection-validation rules
 `performRedo`, including no-edge-to-a-start-node, none-from-an-
 end-node, no-duplicate-edge, start-node-single-outgoing, and the
 lock/noop/commit-error branches); the flow version and query
-adapters (`tests/adapters-flow-versions.test.ts`,
+adapters (`tests/adapters-flow-publish.test.ts`,
 `tests/adapters-flow-queries.test.ts`); the workbox inbox
 aggregation (`tests/workbox-inbox.test.ts`); the mermaid round-trip
 (`tests/mermaid.test.ts`); the in-browser ZIP (`tests/zip-guards.test.ts`);
@@ -150,7 +150,7 @@ time budgets while keeping per-entity mutation domains disjoint:
 #### Entity mutation domain scoping
 
 Phase 2 agents share one IndexedDB database. Post-Phase-
-Final there are only three tables (`clients`, `requests`,
+Final there are only two tables (`requests`,
 `responses`); every product write appends pairs only. Agents
 own **disjoint pair-address families** (URI prefixes), not
 entity tables — the historical table names below name the
@@ -163,7 +163,7 @@ ADDRESS family each agent mutates:
 | Agent-E | `projects` document pairs (plus one flow via the project-detail New Flow path) |
 | Agent-F | `flows` document + undo operation pairs (graphDelta/revivals live in the flow document body) |
 | Agent-F2 | `work-orders` (claim/transition ops), work-order state pairs, field-values folded into transitions, plus its own private flow document pairs |
-| Agent-G | roster + identity spine + tenancy addresses: `members` / `human-members` / `ai-members`, `memberships`, `invitations`, `role-grants`, `organizations`, `identities` (+ credentials / pii / token-revocations / default-organization). All GETs derive from the message ledger; invitation grant membership-dedup via `membershipExistsFor`; WP8 self-revoke still inside this agent |
+| Agent-G | roster + identity spine + tenancy addresses: `members` / `human-members` / `ai-members`, `memberships`, `invitations`, `role-grants`, `organizations`, `identities` (+ credentials / pii / registration / token-revocations / default-organization). All GETs derive from the message ledger; invitation grant membership-dedup via `membershipExistsFor`; WP8 self-revoke still inside this agent |
 | Agent-CH | none (read-only) |
 
 `identity_tokens` addresses stay un-domained: grant,
@@ -484,17 +484,17 @@ last (they wipe the database). See `CLAUDE.md` section
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 38 |
 | E. Core: Projects | 12 |
-| F. Tools | 75 |
+| F. Tools | 77 |
 | F2. Workbox | 26 |
 | FS. Flow Statistics | 9 |
-| G. Admin Pages | 44 |
+| G. Admin Pages | 45 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 30 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 19 |
 | L. IndexedDB Persistence Tier | 9 |
-| **Total** | **390** |
+| **Total** | **393** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -503,15 +503,16 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |     1660 |
-| Browser regression     |      390 |
-| **Combined TOTAL**     | **2050** |
+| CLI automated tests    |     2656 |
+| Browser regression     |      393 |
+| **Combined TOTAL**     | **3049** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
-suite; the number grows as tests land in either glob. Browser
-count = the per-section table above. Update both numbers when
-either side changes.
+suite (2648 main + 8 tz after flow-version residue delete);
+the number grows as tests land in either glob. Browser count =
+the per-section table above. Update both numbers when either
+side changes.
 
 Outcome categories used by run summaries (see `## Summary
 Format` at the bottom of this file):
@@ -526,8 +527,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 2050, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (2050).
+`PASS = 3048, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (3048).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -550,7 +551,7 @@ run before A1's build. The single canonical invocation is
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
 - [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`) with 29 HTML page files (including `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`.
 - [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
-- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: redirects to `snapshots/index.html` when no data exists, or `landing/index.html` (which auto-redirects to `dashboard/index.html` after ~2 seconds) when data has been loaded.
+- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: root `index.html` runs `root-redirect.ts` — redirects to `snapshots/index.html` when no schema/data exists (first run or post-wipe), or `auth/index.html` when a schema is present (signed-in sessions reach gated pages from auth; landing is a separate public marketing page, not the root target).
 - [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
 
 ---
@@ -564,7 +565,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
-- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly three: `clients`, `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 13; demo seed 1506). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread. Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
+- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly two: `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 13; demo seed 1506). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread (now also covers the dead clients store). Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -1028,7 +1029,7 @@ on. Run these in order.
 
 - [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 4 required fields: Project Name, Time (days), Cost, Success Criteria (it maps to the project description). There is no Impact field. A Scores box renders one required baseline slider per active objective. Sticky sidebar shows the idea summary (Title, Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics). Source of truth: `REQUIRED_FIELDS` in `web-app/app/presenters/idea-conversion.ts`.
 - [ ] **D23** With required fields empty, "Create Project" is disabled and the progress bar shows 0/N where N = 4 + one per active objective (e.g. 0/8 with 4 objectives). Fill fields and drag baseline sliders one at a time. PASS: the bar increments with each required field AND each baseline, checkmarks appear next to completed items, and the button enables only when all required fields AND all baselines are set. Success Criteria is required — filling it advances the bar.
-- [ ] **D24** Fill every required field and baseline (the progress bar reaches its max, e.g. 8/8), click "Create Project". PASS: navigates to project detail page for the newly created project.
+- [ ] **D24** Fill every required field and baseline (the progress bar reaches its max, e.g. 8/8), click "Create Project". PASS: navigates to project detail page for the newly created project. The source idea's lifecycle state becomes `promoted` (list badge label **Promoted**, not "Approved") — convert is a promotion, not a re-approve.
 
 ### Idea Status Filtering (`ideas/index.html`)
 
@@ -1122,11 +1123,10 @@ on. Run these in order.
 - [ ] **F1** Navigate to `flows/`. PASS: page shows
   flow cards with name, project name badge, and
   state/transition counts.
-- [ ] **F2** Type in the flow-list search input. PASS:
-  filters flow cards by name in real-time. NOTE:
-  `flows/index.html` currently renders no flow-list filter
-  input — this case is vacuously satisfied (N/A) until one
-  is added.
+- [ ] **F2** Flow-list search. RETIRED / N/A: `flows/` has
+  no search input (never shipped on the list page). Do not
+  assert a filter control. PASS vacuously; re-open only if
+  a flow-list search UI is added later.
 - [ ] **F3** Click a flow card. PASS: navigates
   to `flows/detail.html?flowId=<id>`.
 
@@ -1140,7 +1140,7 @@ opens and renders.)
 
 - [ ] **F4** Click "Import Flow" button on the flows list page. PASS: import dialog opens with a project selector dropdown and a "Choose File" button (the file input is hidden and triggered by that button).
 - [ ] **F5** Choose a project from the dropdown, click "Choose File", and select a `.mmd` file — selecting the file imports it directly (no separate confirm button). PASS: flow is created, toast confirms import, and browser navigates to the flow designer for the imported flow.
-- [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow renders with nodes, edges, and attributes visible (round-trip fidelity is covered by `tests/mermaid.test.ts` + `tests/zip-guards.test.ts`).
+- [ ] **F6** Repeat with a `.zip` file exported from a previous flow. PASS: imported flow renders with nodes, edges, and attributes visible (round-trip fidelity is covered by `tests/mermaid.test.ts` + `tests/zip-guards.test.ts`). NOTE: export ZIP carries graph + positions (`flow.mmd` / `flow.json` / `sidecar.json`) only — it does **not** rebind `flow_records`. After import the designer Record control may show **(none)** until the operator rebinds a record; that is scope, not a failed import.
 
 ### Flow Designer (`flows/detail.html?flowId=...`)
 
@@ -1974,6 +1974,19 @@ the claude-in-chrome MCP.
 
 ### Members list (`members/index.html`)
 
+> **Session role.** G11–G14 and V* Invite cases run as an
+> **org admin** (Tony Stark after mock seed). The roster
+> adapter (`getMembers`) always `GET`s `identity-pii`, and
+> that collection is admin-tier (`MEMBER_VERBS` omits it;
+> `tests/api-member-tier.test.ts` pins member 403). A
+> non-admin (e.g. Emily) therefore fails the Members list
+> load with `forbidden` on `identity-pii` while still
+> holding member-tier GETs on `/members` /
+> `/human-members`. Invite **grant** is also admin-gated
+> in `grantInvitation`. Known authz posture, not a
+> residual FAIL — do not re-litigate as product drift
+> without an intentional member-tier roster design.
+
 - [ ] **G11** Navigate to `members/index.html` (reachable
   via the "Members" sidebar entry). PASS: page header reads
   "Members" with a static subtitle "Manage humans and AIs
@@ -2119,7 +2132,8 @@ the claude-in-chrome MCP.
   membership). Only after Accept (V4) does the membership
   appear and the org become reachable. PASS: pending ⇒ not in
   roster, not reachable; accepted ⇒ both. Source: the org
-  fence (`db-org-scoped`/`store-org-scoped`), `acceptInvitation`.
+  fence (`resolveOwningOrganization` via
+  `writeOwnershipFenceFor`), `acceptInvitation`.
 - [ ] **V7 — Authz: non-admin grant/revoke rejected; invitee
   may still read & accept** Sign in as a NON-admin member of
   an org (a seeded human with no admin role). PASS: any
@@ -2195,6 +2209,7 @@ the claude-in-chrome MCP.
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
 - [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `requests`/`responses` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the localStorage session-credentials JWT's name claim, and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
+- [ ] **G47** On a kind-'service' identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-ai-web`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
@@ -2235,21 +2250,20 @@ restored data.)
   Dashboard renders with zeroed-out metrics (empty
   database except for the required bootstrap seed). Empty
   bootstrap seeds only org `'1'` (Stark Industries) as
-  **14 message pairs** (absolute) covering System + Tony
+  **13 message pairs** (absolute) covering System + Tony
   Stark identity/PII/credentials/membership/role-grant/
   organization/state events — derived reads, not entity
-  tables. `clients` is empty (sentinel). NOTE: pristine
-  seeds NO Records. Source of truth: `postBootstrap` in
-  `api/mock-data.ts`. IndexedDB stores each row as an
-  object — no `gz1` compression — and the `__schema__`
-  marker store holds one row. The full table set is
-  `TABLE_NAMES` in `api/db.ts` (three survivors); no
-  object stores outside that list (plus `__schema__`)
-  appear on a post-Final origin (pre-Final orphans may
-  linger inert — gate 6).
+  tables. NOTE: pristine seeds NO Records. Source of
+  truth: `postBootstrap` in `api/mock-data.ts`. IndexedDB
+  stores each row as an object — no `gz1` compression —
+  and the `__schema__` marker store holds one row. The
+  full table set is `TABLE_NAMES` in `api/db.ts` (two
+  survivors); no object stores outside that list (plus
+  `__schema__`) appear on a post-Final origin (pre-Final
+  orphans may linger inert — gate 6).
 - [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — Stark's 6 ideas are back (the seed plants 11 ideas total, split across both orgs via `assignOrg`; the org fence shows only the active org's).
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
-- [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/org-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/org-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrg`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
+- [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
 
 ### Snapshot & User Lifecycle — Error/Edge Cases
 
@@ -2318,12 +2332,15 @@ feature is implemented.
   "Organization saved" fires at top-center,
   card returns to read mode showing the new
   values. Reload the page. PASS: new values
-  persist (round-tripped through `PUT
-  /api/organizations/<id>`). Inspect the `organizations`
-  store (IndexedDB): the org row has the updated
-  `name` and `domain` fields alongside the unchanged
-  `seats`, `projects_limit`, `ideas_limit`, and
-  `next_billing` fields.
+  persist (round-tripped through
+  `PUT /organizations/<id>`). Inspect the
+  `organizations/:id` document pairs on the message
+  plane (`requests`/`responses`): the latest head
+  body carries the updated `name` and `domain`
+  alongside the unchanged `seats`,
+  `projects_limit`, `ideas_limit`, and
+  `next_billing` fields (no `organizations` entity
+  store remains after Phase Final).
 
 ---
 
@@ -2410,9 +2427,10 @@ Owner agents: Agent-G (K1–K6 in Phase 2, K8 in Phase 4),
 Agent-E (K7, K9–K23, K30), Agent-CH (K27–K29). Mutation
 domain delta:
 
-- Agent-G adds: `objectives`, `objective_revisions`
-  (archive/reactivate append a `state` event to the shared
-  `states` log — no separate `archived` table)
+- Agent-G adds: `objectives/:id` document-trio PUTs
+  (archive/reactivate ride the document body lifecycle
+  trio — no shared `states` log; revision history is
+  message-plane pairs at `objectives/:id/revisions/`)
 - Agent-E adds: `project_objective_baseline_scores`,
   `project_objective_actual_scores`
 - Agent-CH stays read-only
@@ -2616,14 +2634,15 @@ PASS if:
   collapsed)
 
 **K7.** After K30 has run AND Agent-G's K3 has executed
-(verify the `objective_revisions` store in IndexedDB holds
-≥1 row with a `name` change, confirming K3 ran), reopen the
-project's history modal. PASS if events that predate the
-K3 edit display the OLD objective name, not the new one
-(temporal name resolution). If after 10 minutes
-`objective_revisions` shows no rename, mark K7 BLOCKED
-with reason "no K3 rename to verify against — Agent-G did
-not produce the prerequisite in time".
+(verify via `objectives/:id/revisions/` document pairs on
+the message plane — or the history UI — that ≥1 revision
+with a `name` change exists, confirming K3 ran), reopen
+the project's history modal. PASS if events that predate
+the K3 edit display the OLD objective name, not the new
+one (temporal name resolution). If after 10 minutes no
+rename revision appears, mark K7 BLOCKED with reason
+"no K3 rename to verify against — Agent-G did not produce
+the prerequisite in time".
 
 ---
 
@@ -2712,15 +2731,15 @@ Backend: `api/backend-indexeddb.ts`. No Node test (no fake-IDB, zero devDeps) �
 
 Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fusion-ai` database, so they need exclusive DB access alongside G30–G35 — never concurrently with the seven Phase 2 agents.
 
-- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 4 object stores (3 tables in `TABLE_NAMES` — `clients`, `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
+- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 3 object stores (2 tables in `TABLE_NAMES` — `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
-- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org (1506 pairs absolute).
+- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org. Absolute pair pin is **1506** balanced request/response pairs — single source of truth `EXPECTED_PAIR_COUNT` in `tests/mock-data-pairs.test.ts` (count `requests` length after seed; do not confuse with historical intermediate accounting notes that mention 1513).
 - [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
 - [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct pairs concurrently (e.g. two lifecycle state changes). PASS: both pairs survive (count grows by 2) — the old localStorage clobber is gone.
 - [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).
 - [ ] **L7** Atomic import. The clear+put import runs in one `IDBTransaction`. PASS: a rejected import leaves prior data intact (no corruption). A real pre-Final v2 snapshot REJECTS with `SnapshotVersionMismatchError`.
 - [ ] **L8** Quota pre-flight. PASS: an oversize snapshot rejects with `SnapshotTooLargeError` before any write (also `tests/snapshot-quota.test.ts`).
-- [ ] **L9** Bare-DB self-heal. On a 404 path (no app connection), run `indexedDB.deleteDatabase('fusion-ai')` then `indexedDB.open('fusion-ai', 1)` with NO `onupgradeneeded` handler — forging a v1 DB with 0 object stores and no `__schema__` — then load a real page. PASS: `open()` (`api/backend-indexeddb.ts`) sees the missing `__schema__` store, deletes and reopens so the upgrade rebuilds all 4 stores (3 tables + `__schema__`), and the app boots to the graceful empty-state (Snapshots route + working "Wipe and Load Mock Data"), NOT a "Failed to initialize database" dead-end.
+- [ ] **L9** Bare-DB self-heal. On a 404 path (no app connection), run `indexedDB.deleteDatabase('fusion-ai')` then `indexedDB.open('fusion-ai', 1)` with NO `onupgradeneeded` handler — forging a v1 DB with 0 object stores and no `__schema__` — then load a real page. PASS: `open()` (`api/backend-indexeddb.ts`) sees the missing `__schema__` store, deletes and reopens so the upgrade rebuilds all 3 stores (2 tables + `__schema__`), and the app boots to the graceful empty-state (Snapshots route + working "Wipe and Load Mock Data"), NOT a "Failed to initialize database" dead-end.
 
 ## J. Teardown
 
@@ -2757,8 +2776,8 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Agent-B       | B1–B29 (less B23–B24) | 27 |       0 |    0 |
 | Agent-CH      | C1–C7 + H1–H2     |    9 |       0 |    0 |
 | Agent-D       | D1–D37            |    X |       Y |    Z |
-| Agent-E       | E1–E11            |   11 |       0 |    0 |
-| Agent-F       | F1–F75 + FS1–FS9  |    X |       Y |    Z |
+| Agent-E       | E1–E11 + E10a     |   12 |       0 |    0 |
+| Agent-F       | F1–F77 + FS1–FS9  |    X |       Y |    Z |
 | Agent-F2      | WB1–WB22 + subs, R1–R15 | X |    0 |    0 |
 | Agent-G       | G9–14,19–26,36–46 |    X |       0 |    0 |
 | Phase-3       | I1–I30            |    X |       Y |    Z |

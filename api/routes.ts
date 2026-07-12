@@ -24,6 +24,7 @@ import type {
     IdentityKind,
     IdentityPiiEntity,
     IdentityCredentialEntity,
+    ClientRegistrationEntity,
     IdentityTokenRevocationEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
@@ -63,6 +64,7 @@ import {
     validateIdentityDocumentBody,
     validateIdentityPiiEntity,
     validateIdentityCredentialEntity,
+    validateClientRegistrationEntity,
     validateIdentityProviderEntity,
     validateIdentityTokenEntity,
     validateIdentityTokenRevocationEntity,
@@ -176,6 +178,8 @@ import {
     deriveIdentityPii,
     deriveCredentialsFor,
     deriveCredential,
+    deriveClientRegistration,
+    deriveIdentityKind,
     deriveRoleGrants,
     deriveRoleGrant,
     deriveIdentityProviders,
@@ -2512,6 +2516,56 @@ export async function postIdentityCredentialDocumentOp(
     );
 }
 
+// Client-registration document write (clients elimination) —
+// pure pair-plane write, the postIdentityCredentialDocumentOp
+// shape: Supersedes-chained appendMessagePair, never the pii
+// hard-delete zone. `pair` is optional so a below-facade
+// caller keeps compiling; the live route always supplies one.
+// WRITE_RESPONSE_SPECS successBody forms the wire bytes.
+export async function postClientRegistrationDocumentOp(
+    db: DbAdapter,
+    _id: Id,
+    body: Record<string, unknown>,
+    _actor: Id,
+    pair?: MessagePair,
+): Promise<Omit<ClientRegistrationEntity, 'id'>> {
+    const entity = withoutId(body) as unknown as
+        Omit<ClientRegistrationEntity, 'id'>;
+    return db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            if (pair !== undefined) {
+                await appendMessagePair(view, pair);
+            }
+            return entity;
+        },
+    );
+}
+
+// The registration facet's kind gate (validators at the
+// gate, never downstream): the facet exists only under a
+// kind-'service' identity. Absent identity -> 404; person
+// -> 400. Runs before every verb on
+// identities/:id/registration.
+async function requireServiceIdentity(
+    db: DbAdapter,
+    identityId: Id,
+): Promise<void> {
+    const kind = await deriveIdentityKind(db, identityId);
+    if (kind === undefined) {
+        throw new EntityNotFoundError(
+            'identities', identityId,
+        );
+    }
+    if (kind !== 'service') {
+        throw new ApiError(
+            'client registration requires a'
+            + " kind-'service' identity",
+            HTTP_BAD_REQUEST,
+        );
+    }
+}
+
 // Role grant document write — Phase Final Task 2: the
 // role_grants ROW half is stripped — pure pair-plane write.
 // organization_id is stamped by WRITE_RESPONSE_SPECS from the
@@ -2814,6 +2868,15 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) => ({
             id: param(params, 1),
             ...validateIdentityCredentialEntity(
+                withoutId(body ?? {}),
+            ),
+        }),
+    },
+    'identities/:id/registration': {
+        status: HTTP_OK,
+        successBody: (params, body) => ({
+            id: param(params, 0),
+            ...validateClientRegistrationEntity(
                 withoutId(body ?? {}),
             ),
         }),
@@ -3599,6 +3662,41 @@ export const routes: Route[] = [
             postIdentityCredentialDocumentOp(
                 db, param(p, 1), body, actor, pair,
             ),
+    }),
+    // The client-registration facet (clients elimination):
+    // client = kind-'service' identity + this single-slot
+    // PUT-overwrite document. Hand-written closure — the
+    // pii/credentials precedent; documentGet/PutHandler only
+    // serve 2-segment family/:id patterns. ADMIN-ONLY via
+    // deny-by-default (/identities has no MEMBER_VERBS
+    // entry); GLOBAL plane (no org nesting, no
+    // write-ownership fence). DELETE is a marked tombstone =
+    // deregistration; the gate forms the 204 pair, the
+    // handler appends it — idempotent by construction.
+    route('identities/:id/registration', {
+        get: async (db, p) => {
+            const identityId = param(p, 0);
+            await requireServiceIdentity(db, identityId);
+            return deriveClientRegistration(db, identityId);
+        },
+        put: async (db, p, body, actor, pair) => {
+            const identityId = param(p, 0);
+            await requireServiceIdentity(db, identityId);
+            return postClientRegistrationDocumentOp(
+                db, identityId, body, actor, pair,
+            );
+        },
+        delete: async (db, p, _actor, pair) => {
+            await requireServiceIdentity(db, param(p, 0));
+            return db.transaction(
+                ['requests', 'responses'],
+                async (view) => {
+                    if (pair !== undefined) {
+                        await appendMessagePair(view, pair);
+                    }
+                },
+            );
+        },
     }),
     // Hand-written in place of makeIdRoute<
     // IdentityTokenRevocationEntity> so PUT can append its
@@ -4945,7 +5043,7 @@ export const routes: Route[] = [
     }),
     // GET is FLIPPED (Task 7): the collection derives from the
     // message ledger via deriveStates (api/derive-states.ts's
-    // six-source union), not the raw states table — the
+    // five-source union), not the raw states table — the
     // client's own GET consumer (deriveOrganizationFacts and
     // every get*States/get*StateDetails reader in
     // state-events.ts) rides transitively, no web-app change.

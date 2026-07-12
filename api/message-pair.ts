@@ -606,6 +606,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'identities/:id',
     'identities/:id/pii',
     'identities/:id/credentials/:cid',
+    'identities/:id/registration',
     'memberships/:id',
     'identity-tokens/:id',
     'identity-token-revocations/:id',
@@ -695,6 +696,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'identities',
         'identities/:id',
         'identities/:id/credentials/:cid',
+        'identities/:id/registration',
         'memberships/:id',
         'organizations/:id',
         // states/:id/field-values/:fvid RETIRED from live wire

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 632" width="288" height="632">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 468" width="288" height="468">
   <defs>
     <style>
       text { font-family: ui-sans-serif, system-ui,
@@ -19,66 +19,49 @@
         stroke-width: 1.5; }
     </style>
   </defs>
-  <rect x="0" y="0" width="288" height="632" fill="hsl(217 30% 97%)" />
+  <rect x="0" y="0" width="288" height="468" fill="hsl(217 30% 97%)" />
   <g class="table">
-    <rect class="box" x="40" y="40" width="208" height="134" rx="6" />
+    <rect class="box" x="40" y="40" width="208" height="152" rx="6" />
     <rect class="head" x="40" y="40" width="208" height="26" rx="6" />
-    <text class="thead" x="50" y="58">clients</text>
+    <text class="thead" x="50" y="58">requests</text>
     <text class="pk" x="50" y="79">id</text>
     <text class="type" x="238" y="79">id</text>
-    <text class="col" x="50" y="97">grant_types</text>
+    <text class="col" x="50" y="97">uri_prefix</text>
     <text class="type" x="238" y="97">text</text>
-    <text class="col" x="50" y="115">redirect_uris</text>
+    <text class="col" x="50" y="115">uri_id</text>
     <text class="type" x="238" y="115">text</text>
-    <text class="col" x="50" y="133">jwks</text>
+    <text class="col" x="50" y="133">at</text>
     <text class="type" x="238" y="133">text</text>
-    <text class="col" x="50" y="151">aud</text>
-    <text class="type" x="238" y="151">text</text>
-    <text class="col" x="50" y="169">status</text>
-    <text class="type" x="238" y="169">ClientStatus</text>
+    <text class="col" x="50" y="151">requester_identity_id</text>
+    <text class="type" x="238" y="151">id</text>
+    <text class="col" x="50" y="169">message_hash</text>
+    <text class="type" x="238" y="169">text</text>
+    <text class="col" x="50" y="187">message</text>
+    <text class="type" x="238" y="187">text</text>
   </g>
   <g class="table">
-    <rect class="box" x="40" y="204" width="208" height="152" rx="6" />
-    <rect class="head" x="40" y="204" width="208" height="26" rx="6" />
-    <text class="thead" x="50" y="222">requests</text>
-    <text class="pk" x="50" y="243">id</text>
-    <text class="type" x="238" y="243">id</text>
-    <text class="col" x="50" y="261">uri_prefix</text>
-    <text class="type" x="238" y="261">text</text>
-    <text class="col" x="50" y="279">uri_id</text>
+    <rect class="box" x="40" y="222" width="208" height="206" rx="6" />
+    <rect class="head" x="40" y="222" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="240">responses</text>
+    <text class="pk" x="50" y="261">id</text>
+    <text class="type" x="238" y="261">id</text>
+    <text class="col" x="50" y="279">uri_prefix</text>
     <text class="type" x="238" y="279">text</text>
-    <text class="col" x="50" y="297">at</text>
+    <text class="col" x="50" y="297">uri_id</text>
     <text class="type" x="238" y="297">text</text>
-    <text class="col" x="50" y="315">requester_identity_id</text>
-    <text class="type" x="238" y="315">id</text>
-    <text class="col" x="50" y="333">message_hash</text>
-    <text class="type" x="238" y="333">text</text>
-    <text class="col" x="50" y="351">message</text>
+    <text class="col" x="50" y="315">at</text>
+    <text class="type" x="238" y="315">text</text>
+    <text class="col" x="50" y="333">status</text>
+    <text class="type" x="238" y="333">num</text>
+    <text class="col" x="50" y="351">etag</text>
     <text class="type" x="238" y="351">text</text>
-  </g>
-  <g class="table">
-    <rect class="box" x="40" y="386" width="208" height="206" rx="6" />
-    <rect class="head" x="40" y="386" width="208" height="26" rx="6" />
-    <text class="thead" x="50" y="404">responses</text>
-    <text class="pk" x="50" y="425">id</text>
-    <text class="type" x="238" y="425">id</text>
-    <text class="col" x="50" y="443">uri_prefix</text>
-    <text class="type" x="238" y="443">text</text>
-    <text class="col" x="50" y="461">uri_id</text>
-    <text class="type" x="238" y="461">text</text>
-    <text class="col" x="50" y="479">at</text>
-    <text class="type" x="238" y="479">text</text>
-    <text class="col" x="50" y="497">status</text>
-    <text class="type" x="238" y="497">num</text>
-    <text class="col" x="50" y="515">etag</text>
-    <text class="type" x="238" y="515">text</text>
-    <text class="col" x="50" y="533">message_hash</text>
-    <text class="type" x="238" y="533">text</text>
-    <text class="col" x="50" y="551">message</text>
-    <text class="type" x="238" y="551">text</text>
-    <text class="col" x="50" y="569">follows</text>
-    <text class="type" x="238" y="569">text</text>
-    <text class="col" x="50" y="587">supersedes</text>
-    <text class="type" x="238" y="587">text</text>
+    <text class="col" x="50" y="369">message_hash</text>
+    <text class="type" x="238" y="369">text</text>
+    <text class="col" x="50" y="387">message</text>
+    <text class="type" x="238" y="387">text</text>
+    <text class="col" x="50" y="405">follows</text>
+    <text class="type" x="238" y="405">text</text>
+    <text class="col" x="50" y="423">supersedes</text>
+    <text class="type" x="238" y="423">text</text>
   </g>
 </svg>

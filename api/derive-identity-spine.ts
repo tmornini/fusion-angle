@@ -12,6 +12,9 @@ import type {
     IdentityProviderEntity,
     IdentityProviderAction,
     IdentityTokenRevocationEntity,
+    ClientRegistrationEntity,
+    ClientStatus,
+    IdentityKind,
 } from './types.ts';
 import { pickString } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
@@ -28,7 +31,8 @@ import {
 
 // The identity spine's own reduction over the message ledger —
 // Phase 10 Task 7, the roster phase's LAST derivation before the
-// readers flip (Task 8). Five facets, four shapes:
+// readers flip (Task 8). Facets (registration joined at the
+// clients elimination):
 //
 // E13 FULL-SCAN NAMED CLASS (derive-invitations.ts's own named
 // class): '/pii' forms ONE distinct prefix PER IDENTITY
@@ -81,9 +85,9 @@ import {
 //
 // Every function below reads db.requests/db.responses (+
 // pickString over their decoded bodies) ONLY, mirroring api/
-// derive-members.ts and api/derive-invitations.ts. NOTHING reads
-// this module in production yet; tests/drift-identities.test.ts
-// alone gates the flip Task 8 performs.
+// derive-members.ts and api/derive-invitations.ts. Production
+// reads this module today: the identity facet routes
+// (api/routes.ts) and api/authentication.ts.
 //
 // Measured costs (the E13 full scan; the per-identity/per-event
 // prefix reads) are recorded at Task 9's CLI leg, not here.
@@ -491,4 +495,84 @@ export async function deriveTokenRevocation(
         );
     }
     return tokenRevocationEntityOf(document);
+}
+
+// ---- client_registration — the clients-table replacement: a ----
+// ---- singleton document at the identity's own nested address ---
+// ---- (the /pii single-slot shape: literal last segment, ------
+// ---- uriId ''), Supersedes-chained like /credentials. NOT a ---
+// ---- delete zone — a DELETE head is a deregistration ----------
+// ---- tombstone, not an erasure — so the plain Promise.all ----
+// ---- read shape suffices (the module header's torn-read -------
+// ---- closure stays pii-only) -------------------------------------
+
+function registrationPrefixFor(identityId: Id): string {
+    return canonicalUriPrefix(
+        undefined,
+        '/identities/' + identityId + '/registration/',
+    );
+}
+
+function registrationEntityOf(
+    identityId: Id,
+    document: DerivedDocument,
+): ClientRegistrationEntity {
+    const body = document.body;
+    return {
+        id: identityId,
+        grant_types: pickString(body, 'grant_types'),
+        redirect_uris: pickString(body, 'redirect_uris'),
+        jwks: pickString(body, 'jwks'),
+        aud: pickString(body, 'aud'),
+        status: pickString(body, 'status') as ClientStatus,
+    };
+}
+
+// The single-slot read at the identity's exact registration
+// prefix. Throws EntityNotFoundError('client_registration',
+// id) on absence OR a DELETE-head slot (deregistration
+// tombstone) — grantClientCredentials maps both to the same
+// 401 'unknown client'.
+export async function deriveClientRegistration(
+    db: DbAdapter,
+    identityId: Id,
+): Promise<ClientRegistrationEntity> {
+    const prefix = registrationPrefixFor(identityId);
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', prefix),
+        db.responses.getAllWhere('uri_prefix', prefix),
+    ]);
+    const document = deriveDocumentsAt(
+        requests, responses, prefix,
+    ).get('');
+    if (document === undefined) {
+        throw new EntityNotFoundError(
+            'client_registration', identityId,
+        );
+    }
+    return registrationEntityOf(identityId, document);
+}
+
+// One identity's document kind, or undefined when no identity
+// document exists — the registration route's kind gate reads
+// this (absent -> 404, person -> 400) before every verb. The
+// whole-family prefix read matches the demo tier's E13
+// posture (deriveIdentityPiiRows reads more).
+export async function deriveIdentityKind(
+    db: DbAdapter,
+    identityId: Id,
+): Promise<IdentityKind | undefined> {
+    const prefix = canonicalUriPrefix(
+        undefined, '/identities/',
+    );
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', prefix),
+        db.responses.getAllWhere('uri_prefix', prefix),
+    ]);
+    const document = deriveDocumentsAt(
+        requests, responses, prefix,
+    ).get(identityId);
+    return document === undefined
+        ? undefined
+        : pickString(document.body, 'kind') as IdentityKind;
 }

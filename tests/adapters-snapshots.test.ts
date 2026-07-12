@@ -43,20 +43,21 @@ import {
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
 
-// Phase Final Stage B: clients retired — pin the
-// snapshot round-trip on clients (surviving store).
-// Snapshot rows carry id; put() bodies omit it.
-function clientFields() {
+// Pin the snapshot round-trip on requests
+// (message-plane survivor). Snapshot rows carry id;
+// put() bodies omit it.
+function requestFields() {
     return {
-        grant_types: 'authorization_code',
-        redirect_uris: 'https://example.com/cb',
-        jwks: '{}',
-        aud: 'aud',
-        status: 'active' as const,
+        uri_prefix: '/organizations/1/ideas/',
+        uri_id: '42',
+        at: '2026-01-01T00:00:00.000000Z',
+        requester_identity_id: 'current',
+        message_hash: 'a'.repeat(64),
+        message: '{"kind":"request"}',
     };
 }
-function buildClient(id: string) {
-    return { id, ...clientFields() };
+function buildRequest(id: string) {
+    return { id, ...requestFields() };
 }
 
 async function setup(): Promise<{
@@ -97,8 +98,8 @@ test('getSnapshot returns a JSON object of tables', async () => {
     const { ctx } = await setup();
     const json = await getSnapshot(ctx);
     const parsed = JSON.parse(json);
-    assert.ok(Array.isArray(parsed.clients));
     assert.ok(Array.isArray(parsed.requests));
+    assert.ok(Array.isArray(parsed.responses));
 });
 
 test(
@@ -106,17 +107,17 @@ test(
     + ' export',
     async () => {
         const { db, ctx } = await setup();
-        // Phase Final Stage B: roster retired — pin export
-        // on clients.
-        await db.clients.put(
-            'cli-snap', clientFields(),
+        // Pin export on requests. Admin seed pairs may
+        // already exist — membership, not exact length.
+        await db.requests.put(
+            'req-snap', requestFields(),
         );
         const parsed =
             JSON.parse(await getSnapshot(ctx));
         assert.ok(
-            parsed.clients.some(
+            parsed.requests.some(
                 (o: { id: string }) =>
-                    o.id === 'cli-snap',
+                    o.id === 'req-snap',
             ),
         );
     },
@@ -127,12 +128,13 @@ test(
     + ' into the database',
     async () => {
         const { db, ctx } = await setup();
+        // withVersion replaces every table — exact length.
         await putSnapshot(ctx, JSON.stringify(withVersion({
-            clients: [
-                buildClient('u1'),
+            requests: [
+                buildRequest('u1'),
             ],
         })));
-        const rows = await db.clients.getAll();
+        const rows = await db.requests.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u1');
     },
@@ -143,15 +145,15 @@ test(
     async () => {
         const { ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify(withAdminRows({
-            clients: [
-                buildClient('u1'),
+            requests: [
+                buildRequest('u1'),
             ],
         })));
         const parsed =
             JSON.parse(await getSnapshot(ctx));
-        assert.equal(parsed.clients.length, 1);
+        assert.equal(parsed.requests.length, 1);
         assert.equal(
-            parsed.clients[0].id, 'u1',
+            parsed.requests[0].id, 'u1',
         );
     },
 );
@@ -162,20 +164,20 @@ test(
     async () => {
         const { db, ctx } = await setup();
         await putSnapshot(ctx, JSON.stringify(withAdminRows({
-            clients: [
-                buildClient('u1'),
+            requests: [
+                buildRequest('u1'),
             ],
         })));
         await putSnapshot(ctx, JSON.stringify(withVersion({
-            clients: [
-                buildClient('u2'),
+            requests: [
+                buildRequest('u2'),
             ],
         })));
-        const rows = await db.clients.getAll();
+        const rows = await db.requests.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
         assert.equal(
-            rows[0]?.status, 'active',
+            rows[0]?.message, '{"kind":"request"}',
         );
     },
 );
@@ -187,15 +189,15 @@ test(
         const { db, ctx } = await setup();
         const file = new File(
             [JSON.stringify(withVersion({
-                clients: [
-                    buildClient('u1'),
+                requests: [
+                    buildRequest('u1'),
                 ],
             }))],
             'snapshot.json',
             { type: 'application/json' },
         );
         await putSnapshotFromFile(ctx, file);
-        const rows = await db.clients.getAll();
+        const rows = await db.requests.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u1');
     },
@@ -242,17 +244,17 @@ test(
 
 test('a snapshot import stamps the schema marker', async () => {
     const { db, ctx } = await setup();
-    await db.clients.put(
-        'cli-marker', clientFields(),
+    await db.requests.put(
+        'req-marker', requestFields(),
     );
     const json = await getSnapshot(ctx);
     await db.deleteSchema();
     assert.equal(await db.hasSchema(), false);
     await putSnapshot(ctx, json);
     assert.equal(await db.hasSchema(), true);
-    const rows = await db.clients.getAll();
+    const rows = await db.requests.getAll();
     assert.ok(
-        rows.some((r) => r.id === 'cli-marker'),
+        rows.some((r) => r.id === 'req-marker'),
     );
 });
 
@@ -376,16 +378,16 @@ test(
     async () => {
         const { db, ctx } = await setup();
         const json = JSON.stringify(
-            withVersion({ clients: [] }),
+            withVersion({ requests: [] }),
         );
         await putSnapshot(ctx, json);
         // import REPLACES: the seeded admin rows are
         // gone, proving the snapshot actually landed
         assert.deepEqual(
-            await db.clients.getAll(), [],
+            await db.requests.getAll(), [],
         );
         assert.deepEqual(
-            await db.clients.getAll(), [],
+            await db.responses.getAll(), [],
         );
     },
 );
@@ -624,7 +626,7 @@ test(
             GET: async (resource: string) => {
                 if (resource === 'snapshots/schema') {
                     throw new MissingTableError(
-                        'clients',
+                        'requests',
                     );
                 }
                 return null;

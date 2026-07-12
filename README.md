@@ -10,6 +10,10 @@ and execution.
 - **Flow** — process documentation, flow management, and per-node
   throughput heat map (`flows/stats`)
 - **Projects** — track approved ideas through execution
+- **Records** — named data shapes bound to flows and work
+  orders
+- **Workbox** — claim and transition work orders through
+  a flow
 - **Identities** — people and service identities, their external
   provider links, and access tokens
 - **Account** — organization settings, users, and billing;

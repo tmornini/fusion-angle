@@ -234,6 +234,26 @@ test(
     },
 );
 
+// Clients-table elimination (4→5): a genuine pre-elimination
+// export stamped v4 is rejected by the version gate before
+// any table key is read.
+test(
+    'rejects a genuine v4 (pre-clients-elimination) export',
+    async () => {
+        installShim();
+        const adapter = localStorageDbAdapter();
+        const json = JSON.stringify({
+            '__schema_version__': 4,
+            requests: [],
+        });
+        await assert.rejects(
+            () => adapter.putSnapshot(json),
+            (err: Error) =>
+                err instanceof SnapshotVersionMismatchError,
+        );
+    },
+);
+
 test(
     'accepts a snapshot carrying the current schema version',
     async () => {
@@ -241,12 +261,12 @@ test(
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: [],
+            requests: [],
         }));
         await adapter.putSnapshot(json);
-        const clients =
-            await adapter.clients.getAll();
-        assert.deepStrictEqual(clients, []);
+        const requests =
+            await adapter.requests.getAll();
+        assert.deepStrictEqual(requests, []);
     },
 );
 
@@ -257,11 +277,11 @@ test(
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: { not: 'an array' },
+            requests: { not: 'an array' },
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /table "clients" is not an array/,
+            /table "requests" is not an array/,
         );
     },
 );
@@ -273,11 +293,11 @@ test(
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: ['not an object'],
+            requests: ['not an object'],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /row 0 in table "clients" is not an object/,
+            /row 0 in table "requests" is not an object/,
         );
     },
 );
@@ -289,11 +309,11 @@ test(
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: [null],
+            requests: [null],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /row 0 in table "clients" is not an object/,
+            /row 0 in table "requests" is not an object/,
         );
     },
 );
@@ -305,11 +325,11 @@ test(
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: [['not', 'an', 'object']],
+            requests: [['not', 'an', 'object']],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /row 0 in table "clients" is not an object/,
+            /row 0 in table "requests" is not an object/,
         );
     },
 );
@@ -321,71 +341,75 @@ test(
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: [
+            requests: [
                 {
                     id: 'u1',
-                    grant_types: 'authorization_code',
-                    redirect_uris:
-                        'https://example.com/cb',
-                    jwks: '{}',
-                    aud: 'aud',
-                    status: 'active',
+                    uri_prefix:
+                        '/organizations/1/ideas/',
+                    uri_id: '42',
+                    at: '2026-01-01T00:00:00.000000Z',
+                    requester_identity_id: 'current',
+                    message_hash: 'a'.repeat(64),
+                    message: '{"kind":"request"}',
                     rogue_field: 'invalid',
                 },
             ],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /snapshot\.clients\[0\]/,
+            /snapshot\.requests\[0\]/,
         );
     },
 );
 
 test(
-    'rejects client row with unknown key',
+    'rejects response row with unknown key',
     async () => {
         installShim();
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: [{
+            responses: [{
                 id: 'o1',
-                grant_types: 'authorization_code',
-                redirect_uris: 'https://example.com/cb',
-                jwks: '{}',
-                aud: 'aud',
-                status: 'active',
+                uri_prefix: '/organizations/1/ideas/',
+                uri_id: '42',
+                at: '2026-01-01T00:00:00.000000Z',
+                status: 200,
+                etag: 'e'.repeat(64),
+                message_hash: 'b'.repeat(64),
+                message: '{"kind":"response"}',
                 rogue_field: 'invalid',
             }],
         }));
         await assert.rejects(
             () => adapter.putSnapshot(json),
-            /snapshot\.clients\[0\]/,
+            /snapshot\.responses\[0\]/,
         );
     },
 );
 
 test(
-    'accepts valid client row through the'
+    'accepts valid request row through the'
     + ' snapshot-validation gate',
     async () => {
         const map = installShim();
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: [{
+            requests: [{
                 id: 'o1',
-                grant_types: 'authorization_code',
-                redirect_uris: 'https://example.com/cb',
-                jwks: '{}',
-                aud: 'aud',
-                status: 'active',
+                uri_prefix: '/organizations/1/ideas/',
+                uri_id: '42',
+                at: '2026-01-01T00:00:00.000000Z',
+                requester_identity_id: 'current',
+                message_hash: 'a'.repeat(64),
+                message: '{"kind":"request"}',
             }],
         }));
         await adapter.putSnapshot(json);
         assert.ok(
-            map.get(KEY_PREFIX + 'clients'),
-            'client row should persist',
+            map.get(KEY_PREFIX + 'requests'),
+            'request row should persist',
         );
     },
 );
@@ -397,22 +421,24 @@ test(
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify(withVersion({
-            clients: [
+            requests: [
                 {
                     id: 'u1',
-                    grant_types: 'authorization_code',
-                    redirect_uris: 'https://example.com/cb',
-                    jwks: '{}',
-                    aud: 'aud',
-                    status: 'active',
+                    uri_prefix:
+                        '/organizations/1/ideas/',
+                    uri_id: '42',
+                    at: '2026-01-01T00:00:00.000000Z',
+                    requester_identity_id: 'current',
+                    message_hash: 'a'.repeat(64),
+                    message: '{"kind":"request"}',
                 },
             ],
         }));
         await adapter.putSnapshot(json);
         const stored = map.get(
-            KEY_PREFIX + 'clients',
+            KEY_PREFIX + 'requests',
         );
-        assert.ok(stored, 'clients should persist');
+        assert.ok(stored, 'requests should persist');
     },
 );
 
@@ -468,22 +494,23 @@ test(
         const adapter =
             localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.clients.put('u1', {
-            grant_types: 'authorization_code',
-            redirect_uris: 'https://example.com/cb',
-            jwks: '{}',
-            aud: 'aud',
-            status: 'active',
+        await adapter.requests.put('u1', {
+            uri_prefix: '/organizations/1/ideas/',
+            uri_id: '42',
+            at: '2026-01-01T00:00:00.000000Z',
+            requester_identity_id: 'current',
+            message_hash: 'a'.repeat(64),
+            message: '{"kind":"request"}',
         });
         await adapter.postSchemaCreation();
-        const clients =
-            await adapter.clients.getAll();
+        const requests =
+            await adapter.requests.getAll();
         assert.equal(
-            clients.length, 1,
+            requests.length, 1,
             'second postSchemaCreation preserves data',
         );
         assert.ok(
-            map.get(KEY_PREFIX + 'clients'),
+            map.get(KEY_PREFIX + 'requests'),
         );
     },
 );
@@ -495,19 +522,20 @@ test(
         const adapter =
             localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        // Phase Final Stage B: roster retired — pin export
-        // surface on clients.
-        await adapter.clients.put('m1', {
-            grant_types: 'authorization_code',
-            redirect_uris: 'https://example.com/cb',
-            jwks: '{}',
-            aud: 'aud',
-            status: 'active',
+        // Pin export surface on requests
+        // (message-plane survivor).
+        await adapter.requests.put('m1', {
+            uri_prefix: '/organizations/1/ideas/',
+            uri_id: '42',
+            at: '2026-01-01T00:00:00.000000Z',
+            requester_identity_id: 'current',
+            message_hash: 'a'.repeat(64),
+            message: '{"kind":"request"}',
         });
         const json =
             await adapter.getSnapshot();
         const parsed = JSON.parse(json);
-        assert.equal(parsed.clients.length, 1);
+        assert.equal(parsed.requests.length, 1);
         for (const table of TABLE_NAMES) {
             assert.ok(
                 Array.isArray(parsed[table]),

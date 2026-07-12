@@ -104,11 +104,15 @@ is HTTP-only.
   `authorization_code` grant is TTL-bound, client-bound, and
   PKCE-verified when authorize carries a `code_challenge`
   (soft-optional when omitted — password-loop demo residual;
-  hard PKCE is a server-tier residual). Token lifecycle
-  (issue/rotate/revoke) lives only as message-pair events
-  now — `identity_tokens` and `authorization_codes` are
-  RETIRED tables (Phase 13 Task 9); the
-  `identity_token_revocations` ledger and PBKDF2 password
+  hard PKCE is a server-tier residual). A client is a
+  kind-'service' identity + a registration facet
+  (`identities/:id/registration`, admin-realm, kind-gated);
+  `grantClientCredentials` derives it pre-token, and
+  authorization_code redemption stamps `act.sub` with the
+  acting client. Token lifecycle (issue/rotate/revoke) lives
+  only as message-pair events now — `identity_tokens` and
+  `authorization_codes` are RETIRED tables (Phase 13 Task 9);
+  the `identity_token_revocations` ledger and PBKDF2 password
   hashing back the gate too. Every per-request check —
   revocation, the tenancy fence, roles — derives fresh from
   the pair plane, never a snapshot the token claim itself
@@ -172,8 +176,8 @@ is HTTP-only.
   `SafeHtml`.
 - **Database.** IndexedDB (`api/backend-indexeddb.ts`): one
   object store per table (`keyPath: 'id'`) plus a `__schema__`
-  marker store, at version 1. `TABLE_NAMES` is three:
-  `clients`, `requests`, `responses` — all on
+  marker store, at version 1. `TABLE_NAMES` is two:
+  `requests`, `responses` — the pure message plane, both on
   `HistoryEntityStore`. Every store op crosses the
   `StorageBackend` transaction seam (`api/db.ts`) — a real
   `IDBTransaction` that commits on `oncomplete` and aborts on a
@@ -332,10 +336,11 @@ quota / atomic-import / v2-reject / v3 round-trip, the
 memory + localStorage transaction backends, the tx runners
 and view, the commit batch route, api routing, navigation,
 mock-data validity (pair count 1506 / bootstrap 13 absolute;
-fingerprint file shrunk to the clients sentinel), the
-two-tier hazard predicate (`flow-graph-hazard.test.ts`),
-presenter SafeHtml, flow-stats pure math + adapter +
-presenter, `duration-units`, and the invitation lifecycle.
+the mock-data fingerprint file retired with the clients
+table), client registration facet + derive, the two-tier
+hazard predicate (`flow-graph-hazard.test.ts`), presenter
+SafeHtml, flow-stats pure math + adapter + presenter,
+`duration-units`, and the invitation lifecycle.
 Phase 14 cores: `drift-phase14-cores-parity.test.ts`,
 `drift-state-field-values.test.ts`,
 `pin-invitation-write-path-parity.test.ts`,
@@ -429,7 +434,7 @@ apply to it (RED is the audit's first finding).
   its multi-key flush is still not OS-atomic on a mid-write
   quota error — the one gap IndexedDB closes.
 - **Snapshot version gate.** Every export is stamped with
-  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`, currently **4**) at
+  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`, currently **5**) at
   the reserved key `__schema_version__`. Every import REJECTS
   an absent or mismatched version SERVER-side
   (`parseAndValidateSnapshot`, `SnapshotVersionMismatchError`)
@@ -442,7 +447,8 @@ apply to it (RED is the audit's first finding).
   Phase Final Stage B (doomed entity tables deleted) is 2→3;
   states-address retirement is 3→4 (address retirement, not a
   `TABLE_NAMES` shrink — pre-retirement v3 exports still
-  carry `states/:id` pairs no derive source reads). A
+  carry `states/:id` pairs no derive source reads); the
+  clients elimination (last entity table) is 4→5. A
   pre-retirement v3 export is rejected by a post-retirement
   import.
 - **`file:///` protocol.** Page URLs use relative paths.

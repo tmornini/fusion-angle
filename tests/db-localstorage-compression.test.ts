@@ -24,31 +24,31 @@ function installShim(): Map<string, string> {
     return map;
 }
 
-// Phase Final Stage B: clients retired — pin the
-// localStorage write surface on clients (surviving
-// store with string fields + status enum).
-const baseClient = {
-    grant_types: '["password"]',
-    redirect_uris: '[]',
-    jwks: '{}',
-    aud: 'fusion-ai',
-    status: 'active' as const,
+// Pin the localStorage write surface on requests
+// (message-plane survivor with string fields).
+const baseRequest = {
+    uri_prefix: '/organizations/1/ideas/',
+    uri_id: '42',
+    at: '2026-01-01T00:00:00.000000Z',
+    requester_identity_id: 'current',
+    message_hash: 'a'.repeat(64),
+    message: '{"kind":"request"}',
 };
 
 // Writes are plain JSON since the F-080 measurement
 // retired compression; the gz1: decoder survives for
 // READS of legacy payloads only (pinned below).
 test(
-    'clients write stores raw JSON',
+    'requests write stores raw JSON',
     async () => {
         const map = installShim();
         const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.clients.put(
-            'cli-prefix-test', baseClient,
+        await adapter.requests.put(
+            'req-prefix-test', baseRequest,
         );
         const stored = map.get(
-            KEY_PREFIX + 'clients',
+            KEY_PREFIX + 'requests',
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
@@ -60,39 +60,43 @@ test(
 );
 
 test(
-    'clients round-trips through put → getById',
+    'requests round-trips through put → getById',
     async () => {
         installShim();
         const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.clients.put(
-            'cli-rt', baseClient,
+        await adapter.requests.put(
+            'req-rt', baseRequest,
         );
-        const got = await adapter.clients.getById(
-            'cli-rt',
+        const got = await adapter.requests.getById(
+            'req-rt',
         );
-        assert.equal(got.id, 'cli-rt');
+        assert.equal(got.id, 'req-rt');
         assert.equal(
-            got.name,
-            baseClient.name,
+            got.message,
+            baseRequest.message,
         );
     },
 );
 
 test(
-    'status enum round-trips as a string',
+    'message field round-trips as a string',
     async () => {
         installShim();
         const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.clients.put(
-            'cli-status', baseClient,
+        await adapter.requests.put(
+            'req-msg', baseRequest,
         );
-        const got = await adapter.clients.getById(
-            'cli-status',
+        const got = await adapter.requests.getById(
+            'req-msg',
         );
-        assert.strictEqual(got.status, 'active');
-        assert.strictEqual(typeof got.status, 'string');
+        assert.strictEqual(
+            got.message, baseRequest.message,
+        );
+        assert.strictEqual(
+            typeof got.message, 'string',
+        );
     },
 );
 
@@ -104,14 +108,14 @@ test(
         await adapter.postSchemaCreation();
         const ids = Array.from(
             { length: 11 },
-            (_, i) => `cli-${i}`,
+            (_, i) => `req-${i}`,
         );
         await Promise.all(
-            ids.map(id => adapter.clients.put(
-                id, baseClient,
+            ids.map(id => adapter.requests.put(
+                id, baseRequest,
             )),
         );
-        const all = await adapter.clients.getAll();
+        const all = await adapter.requests.getAll();
         assert.equal(
             all.length, 11,
             'all 11 concurrent puts must persist',
@@ -127,20 +131,21 @@ test(
 );
 
 test(
-    'clients table is not compressed (raw JSON in storage)',
+    'requests table is not compressed (raw JSON in storage)',
     async () => {
         const map = installShim();
         const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.clients.put('c1', {
-            grant_types: '["password"]',
-            redirect_uris: '[]',
-            jwks: '{}',
-            aud: 'fusion-ai',
-            status: 'active',
+        await adapter.requests.put('r1', {
+            uri_prefix: '/organizations/1/ideas/',
+            uri_id: '42',
+            at: '2026-01-01T00:00:00.000000Z',
+            requester_identity_id: 'current',
+            message_hash: 'a'.repeat(64),
+            message: '{"kind":"request"}',
         });
-        const stored = map.get(KEY_PREFIX + 'clients');
-        assert.ok(stored, 'expected stored clients value');
+        const stored = map.get(KEY_PREFIX + 'requests');
+        assert.ok(stored, 'expected stored requests value');
         assert.ok(
             stored.startsWith('['),
             'expected raw JSON array, got '
@@ -155,37 +160,37 @@ test(
         installShim();
         const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.clients.put(
-            'cli-export', baseClient,
+        await adapter.requests.put(
+            'req-export', baseRequest,
         );
         const json = await adapter.getSnapshot();
         const parsed = JSON.parse(json);
         assert.ok(
-            Array.isArray(parsed.clients),
-            'clients should be an array in snapshot',
+            Array.isArray(parsed.requests),
+            'requests should be an array in snapshot',
         );
-        assert.equal(parsed.clients.length, 1);
+        assert.equal(parsed.requests.length, 1);
         assert.equal(
-            parsed.clients[0].id, 'cli-export',
+            parsed.requests[0].id, 'req-export',
         );
     },
 );
 
 test(
-    'snapshot import stores clients raw',
+    'snapshot import stores requests raw',
     async () => {
         const map = installShim();
         const adapter = localStorageDbAdapter();
         const snapshot = JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,
-            clients: [
-                { id: 'cli-imp', ...baseClient },
+            requests: [
+                { id: 'req-imp', ...baseRequest },
             ],
         });
         await adapter.putSnapshot(snapshot);
         const stored = map.get(
-            KEY_PREFIX + 'clients',
+            KEY_PREFIX + 'requests',
         );
         assert.ok(stored, 'expected stored value');
         assert.ok(
@@ -202,11 +207,11 @@ test(
         const map = installShim();
         const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
-        const clientRow = {
-            id: 'cli-gz1',
-            ...baseClient,
+        const requestRow = {
+            id: 'req-gz1',
+            ...baseRequest,
         };
-        const rawJson = JSON.stringify([clientRow]);
+        const rawJson = JSON.stringify([requestRow]);
         const stream = new Blob([rawJson]).stream()
             .pipeThrough(new CompressionStream('gzip'));
         const buffer = await new Response(stream)
@@ -217,11 +222,13 @@ test(
             binary += String.fromCharCode(b);
         }
         map.set(
-            KEY_PREFIX + 'clients',
+            KEY_PREFIX + 'requests',
             'gz1:' + btoa(binary),
         );
-        const result = await adapter.clients.getAll();
+        const result = await adapter.requests.getAll();
         assert.equal(result.length, 1);
-        assert.equal(result[0]!.status, 'active');
+        assert.equal(
+            result[0]!.message, baseRequest.message,
+        );
     },
 );

@@ -149,10 +149,10 @@ enriches it to `AuthenticatedContext` (principal), and
 `fenceRequest` (`api/request-auth.ts`) completes the
 `RequestContext` — organization, live
 `memberOrganizations`, and roles — each field set exactly
-once. There is **no org-scoped adapter wrapper**: surviving
-stores (`clients`, `requests`, `responses`) are global;
-tenancy rides `uri_prefix` on the pair plane. Handlers
-receive `ctx.base`. The org rides the VERIFIED token claim,
+once. There is **no org-scoped adapter wrapper**: the
+message plane (`requests`, `responses`) is global; tenancy
+rides `uri_prefix` on the pair plane. Handlers receive
+`ctx.base`. The org rides the VERIFIED token claim,
 never the path; a flat (un-exchanged) token has none and
 resolves via `identityDefaultOrganization`: the identity's
 SET default org (`identity_default_organizations` ledger,
@@ -415,12 +415,12 @@ its own `types.ts`) plus pure cross-chasm utilities
 `GraphNode.attributes: NodeAttribute[]`, record/constraint
 shapes, `StateEntity` as the **derived** event DTO, the
 state alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
-(`DbAdapter` + `TABLE_NAMES` = `clients`, `requests`,
+(`DbAdapter` + `TABLE_NAMES` = `requests`,
 `responses` only — [SCHEMA.md](SCHEMA.md) is the
 authoritative list and per-column reference),
 `api/store-history-entity.ts` (`HistoryEntityStore` — the
-sole store class; backs all three tables; no tombstone
-filter, no lifecycle log), `api/db-indexeddb.ts`
+sole store class; backs both message-plane tables; no
+tombstone filter, no lifecycle log), `api/db-indexeddb.ts`
 (production persistence tier), `api/db-localstorage.ts`
 (demo tier), `api/db-memory.ts` (test impl), `api/api.ts`
 (the HTTP gate — `handleRequest` plus the
@@ -637,9 +637,11 @@ halves stripped (Stage A); doomed tables +
 decorators deleted (Stage B); `clients` re-pointed to
 `HistoryEntityStore`; `SNAPSHOT_SCHEMA_VERSION` 2→3;
 states-address retirement bumps 3→4 and deletes every
-verb on `/states/:id`; seed absolute at
-EXPECTED_PAIR_COUNT 1506 / bootstrap 13;
-`simulateLatency` 4.
+verb on `/states/:id`; the clients elimination re-homes
+client config to the identities/:id/registration pair
+facet, deletes the last entity table, retires rawReadRow,
+and bumps 4→5; seed absolute at EXPECTED_PAIR_COUNT 1506 /
+bootstrap 13; `simulateLatency` 4.
 
 ### Two claims (never collapse)
 
@@ -653,10 +655,10 @@ EXPECTED_PAIR_COUNT 1506 / bootstrap 13;
    seed routes' `SeededCredentials` bodies stay shape- and
    count-stable.
 2. **Snapshot file-format contract** —
-   `SNAPSHOT_SCHEMA_VERSION` 2→3 plus the table-key set
-   shrinking to `clients` + `requests` + `responses`. A
-   pre-Final export is rejected by a post-Final import
-   (`SnapshotVersionMismatchError`).
+   `SNAPSHOT_SCHEMA_VERSION` 4→5 plus the table-key set
+   shrinking to `requests` + `responses`. A pre-clients-
+   elimination (v4) export is rejected by a post-elimination
+   import (`SnapshotVersionMismatchError`).
 
 ### Wire covenant (Phase 15 deltas still hold)
 
@@ -694,13 +696,13 @@ address family allows, opening no nested transaction:
 - Invitation grant email → `deriveIdentityPiiRows`
 - `pendingInvitationFor` / `loadInvitation` →
   `deriveInvitations`
-- Client credentials → `rawReadRow('clients', …)` on the
-  KEPT `clients` table (`HistoryEntityStore`)
+- Client credentials → `deriveClientRegistration`
+  (identities/:id/registration pair facet — clients TABLE
+  DELETED)
 - **`identity_providers` table DELETED** (Phase Final gate
   1 default) — derivation only
-- Follow-on note: client = kind-`'service'` identity +
-  registration facet is a server-tier client-registration
-  phase candidate
+- Follow-on DISCHARGED: client = kind-`'service'` identity +
+  registration facet SHIPPED (clients elimination)
 
 ### Addressability election
 
@@ -728,7 +730,7 @@ tombstones; hard splice only where a path still needs it —
 PII erasure on the message plane); backends own persistence
 and encoding. `BackedDbAdapter` (`api/db-backed.ts`)
 composes one backend into the full `DbStores` bundle
-(three stores).
+(two stores).
 
 Three backends implement the seam:
 

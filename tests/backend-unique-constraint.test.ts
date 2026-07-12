@@ -89,9 +89,12 @@ async () => {
 test('a failed unique put aborts the whole transaction',
 async () => {
     const backend = new MemoryStorageBackend();
-    // Phase Final Stage B: ideas retired — second table is
-    // clients (a permanent survivor).
-    await backend.ensureTables(['responses', 'clients']);
+    // Second table is requests (message-plane survivor)
+    // — proves a unique-constraint abort rolls back every
+    // store in the open multi-table transaction.
+    await backend.ensureTables(
+        ['responses', 'requests'],
+    );
     await backend.transaction(
         ['responses'], 'readwrite', async (tx) => {
             await tx.put('responses', {
@@ -101,15 +104,17 @@ async () => {
     );
     await assert.rejects(
         backend.transaction(
-            ['responses', 'clients'], 'readwrite',
+            ['responses', 'requests'], 'readwrite',
             async (tx) => {
-                await tx.put('clients', {
-                    id: 'c1',
-                    grant_types: '[]',
-                    redirect_uris: '[]',
-                    jwks: '{}',
-                    aud: 'fusion-ai',
-                    status: 'active',
+                await tx.put('requests', {
+                    id: 'q1',
+                    uri_prefix:
+                        '/organizations/1/ideas/',
+                    uri_id: '42',
+                    at: '2026-01-01T00:00:00.000000Z',
+                    requester_identity_id: 'current',
+                    message_hash: 'a'.repeat(64),
+                    message: '{"kind":"request"}',
                 });
                 await tx.put('responses', {
                     id: 'r3', ...RESPONSE_ROW,
@@ -118,11 +123,11 @@ async () => {
             },
         ),
     );
-    const clients = await backend.transaction(
-        ['clients'], 'readonly',
-        (tx) => tx.getAll('clients'),
+    const requests = await backend.transaction(
+        ['requests'], 'readonly',
+        (tx) => tx.getAll('requests'),
     );
-    assert.equal(clients.length, 0); // never a half-write
+    assert.equal(requests.length, 0); // never a half-write
 });
 
 test(

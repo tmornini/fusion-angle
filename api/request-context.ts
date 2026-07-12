@@ -48,7 +48,7 @@ export interface AuthenticatedContext extends IncomingContext {
 // Completed by the fence step (request-auth.ts) — the one
 // place the organization, the live memberships, and the
 // roles are resolved. No scoped adapter: surviving stores
-// are global (clients + message plane).
+// are global (message plane).
 export interface RequestContext extends AuthenticatedContext {
     readonly organization: Id;
     // The caller's live membership orgs, derived from the

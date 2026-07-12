@@ -1,7 +1,6 @@
 import { EntityNotFoundError } from './db.ts';
 import type {
     DbAdapter,
-    GuardedDbAdapter,
 } from './db.ts';
 import {
     verifyClientAssertion,
@@ -24,7 +23,7 @@ import {
     MS_PER_SECOND,
     type Id,
     type IdentityTokenEntity,
-    type ClientEntity,
+    type ClientRegistrationEntity,
     type IdentityCredentialEntity,
     type IdentityPiiEntity,
 } from './types.ts';
@@ -68,6 +67,7 @@ import { deriveMembershipsForIdentity } from
     './derive-memberships.ts';
 import {
     deriveCredentialsFor,
+    deriveClientRegistration,
     deriveIdentityPii,
     deriveIdentityPiiRows,
     deriveTokenRevocationsFor,
@@ -816,16 +816,22 @@ async function grantClientCredentials(
         typeof body.client_assertion === 'string'
             ? body.client_assertion
             : '';
-    // FLIPPED (Phase 15 gate 6): raw keyed client row — clients
-    // never soft-delete, so rawReadRow is byte-identical to the
-    // EntityStore.getById it replaces (null ≡ EntityNotFoundError
-    // → same 401 'unknown client' path). No EntityStore/states
-    // transaction. handleRequest always supplies a GuardedDbAdapter
-    // (the unfenced base); cast is the type-narrowing seam only.
-    const client = await (adapter as GuardedDbAdapter)
-        .rawReadRow<ClientEntity>('clients', clientId);
-    if (client === null) {
-        return failure(HTTP_UNAUTHORIZED, 'unknown client');
+    // FLIPPED (clients elimination): the registration facet
+    // derive replaces the raw clients row read. An absent OR
+    // tombstoned facet ≡ the old null row -> the same 401
+    // 'unknown client'; any other fault surfaces (500).
+    let client: ClientRegistrationEntity;
+    try {
+        client = await deriveClientRegistration(
+            adapter, clientId,
+        );
+    } catch (e) {
+        if (e instanceof EntityNotFoundError) {
+            return failure(
+                HTTP_UNAUTHORIZED, 'unknown client',
+            );
+        }
+        throw e;
     }
     if (client.status !== 'active') {
         return failure(HTTP_UNAUTHORIZED, 'client is disabled');
@@ -1053,9 +1059,13 @@ async function grantAuthorizationCode(
     const name = await nameFor(adapter, issuer.identityId);
     const organizations =
         await subjectOrganizations(adapter, issuer.identityId);
+    // act.sub = the acting client (RFC 8693), mirroring
+    // grantTokenExchange's own act:{sub: actor}. sub stays
+    // the user; issuer.clientId is already verified equal to
+    // the redeeming client_id above.
     const response = await mintPair(
         issuer.identityId, name, refreshJti,
-        undefined, { organizations },
+        { sub: issuer.clientId }, { organizations },
     );
     const pair = await formAuthPair(
         seed, body, issuer.identityId, HTTP_OK, response,

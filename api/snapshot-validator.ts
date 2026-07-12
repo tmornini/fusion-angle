@@ -5,7 +5,6 @@ import {
 } from './db.ts';
 import { extractErrorMessage } from '../shared/error-helpers.ts';
 import {
-    validateClientEntity,
     validateRequestEntity,
     validateResponseEntity,
 } from './validators.ts';
@@ -25,9 +24,6 @@ function validateSnapshotRow(
     const { id: _id, ...body } = row;
     try {
         switch (table) {
-            case 'clients':
-                validateClientEntity(body);
-                break;
             case 'requests':
                 validateRequestEntity(body);
                 break;

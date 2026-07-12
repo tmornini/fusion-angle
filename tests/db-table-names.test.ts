@@ -11,7 +11,7 @@ import {
 // commit just dropped.
 test('TABLE_NAMES keeps the permanent survivors', () => {
     for (const name of [
-        'requests', 'responses', 'clients',
+        'requests', 'responses',
     ] as const) {
         assert.ok(
             TABLE_NAMES.includes(name),
@@ -21,9 +21,11 @@ test('TABLE_NAMES keeps the permanent survivors', () => {
 });
 
 test(
-    'TABLE_NAMES drops ideas..objectives and roster',
+    'TABLE_NAMES drops clients and ideas..objectives'
+    + ' and roster',
     () => {
         for (const name of [
+            'clients',
             'ideas',
             'idea_submissions',
             'projects',

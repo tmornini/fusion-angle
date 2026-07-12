@@ -12,7 +12,9 @@ import {
     base64UrlDecode,
     base64UrlToBytes,
 } from '../shared/base64url.ts';
-import type { ClientEntity } from './types.ts';
+import type {
+    ClientRegistrationEntity,
+} from './types.ts';
 
 export type ClientAssertionResult =
     | { valid: true }
@@ -86,7 +88,7 @@ function parseJsonSegment(
 // present, must have arrived.
 function claimsFault(
     claims: Record<string, unknown>,
-    client: ClientEntity,
+    client: ClientRegistrationEntity,
     nowSeconds: number,
 ): string | null {
     if (claims['iss'] !== client.id) {
@@ -179,7 +181,7 @@ async function signatureVerifies(
 
 export async function verifyClientAssertion(
     assertion: string,
-    client: ClientEntity,
+    client: ClientRegistrationEntity,
     nowSeconds: number,
 ): Promise<ClientAssertionResult> {
     const segments = assertion.split('.');

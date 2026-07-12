@@ -9,6 +9,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
+    appendMessagePair,
     formWritePair,
     type MessagePair,
 } from '../api/message-pair.ts';
@@ -225,4 +226,98 @@ export async function seedPersonIdentity(
         await identityDocumentPair(id, 'person', requestAt),
     );
     await seedIdentityPii(db, id, pii);
+}
+
+export async function seedServiceIdentity(
+    db: DbAdapter,
+    id: string,
+): Promise<void> {
+    const requestAt = nowUtc();
+    await postIdentityDocumentOp(
+        db, id, identityDocumentBodyOf('service'),
+        SYSTEM_MEMBER_ID,
+        await identityDocumentPair(id, 'service', requestAt),
+    );
+}
+
+// One identities/:id/registration document pair — the
+// clients-elimination facet. Chainless below-facade append
+// (headPairId undefined): deriveDocumentsAt's (at, id)
+// reduction decides currency; Supersedes is provenance-only.
+async function clientRegistrationDocumentPair(
+    id: Id,
+    fields: Record<string, unknown>,
+    requestAt: string,
+): Promise<MessagePair> {
+    const spec =
+        WRITE_RESPONSE_SPECS['identities/:id/registration'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for'
+            + ' identities/:id/registration',
+        );
+    }
+    return formWritePair({
+        method: 'PUT',
+        pathname: `/identities/${id}/registration`,
+        routePattern: 'identities/:id/registration',
+        routeSegments: ['identities', ':id', 'registration'],
+        pathSegments: ['identities', id, 'registration'],
+        headerFields: [],
+        body: fields,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt,
+        organization: undefined,
+        responseStatus: spec.status,
+        responseBody: spec.successBody?.(
+            [id], fields, SYSTEM_MEMBER_ID, undefined,
+        ),
+        headPairId: undefined,
+    });
+}
+
+export async function seedClientRegistration(
+    db: DbAdapter,
+    id: string,
+    fields: Record<string, unknown>,
+): Promise<void> {
+    const pair = await clientRegistrationDocumentPair(
+        id, fields, nowUtc(),
+    );
+    await db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            await appendMessagePair(view, pair);
+        },
+    );
+}
+
+// A deregistration tombstone: a DELETE-method pair at the
+// slot — deriveDocumentsAt excludes a DELETE head, so the
+// facet reads as absent afterward.
+export async function seedClientRegistrationTombstone(
+    db: DbAdapter,
+    id: string,
+): Promise<void> {
+    const pair = await formWritePair({
+        method: 'DELETE',
+        pathname: `/identities/${id}/registration`,
+        routePattern: 'identities/:id/registration',
+        routeSegments: ['identities', ':id', 'registration'],
+        pathSegments: ['identities', id, 'registration'],
+        headerFields: [],
+        body: undefined,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseStatus: 204,
+        responseBody: undefined,
+        headPairId: undefined,
+    });
+    await db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            await appendMessagePair(view, pair);
+        },
+    );
 }

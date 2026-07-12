@@ -25,6 +25,7 @@ import {
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import {
+    seedClientRegistration,
     seedIdentityCredential,
     seedIdentityPii,
 } from './identity-fixtures.ts';
@@ -510,7 +511,7 @@ test('a client_credentials grant stores its own redacted pair'
         aud: 'fusion-ai-web',
         exp: now + 300, iat: now, jti: 'assert-shadow-1',
     });
-    await db.clients.put('svc-client', {
+    await seedClientRegistration(db, 'svc-client', {
         grant_types: 'client_credentials',
         redirect_uris: '', jwks: signer.jwks,
         aud: 'fusion-ai-web', status: 'active',
@@ -528,13 +529,14 @@ test('a client_credentials grant stores its own redacted pair'
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
-    // 6: dbWithPasswordUser's own pii + credential pairs (2,
+    // 7: dbWithPasswordUser's own pii + credential pairs (2,
     // Phase 13 Task 8) + the fixture's own role-grant +
-    // membership pair (Phase 13 Task 1) precede the token grant's
-    // own event pair (Phase 13 Task 5: issueTokenPair's root
-    // gains its own pair at the row's address) plus its operation
-    // pair.
-    assert.equal(requests.length, 6);
+    // membership pair (Phase 13 Task 1) + the registration-
+    // facet pair the fixture seeds (clients elimination)
+    // precede the token grant's own event pair (Phase 13
+    // Task 5: issueTokenPair's root gains its own pair at
+    // the row's address) plus its operation pair.
+    assert.equal(requests.length, 7);
     const liveSecrets = [
         assertion, body.access_token, body.refresh_token,
     ];

@@ -4,8 +4,6 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { EntityNotFoundError } from '../api/db.ts';
-import type { ClientEntity } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
@@ -20,16 +18,16 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 
-// Phase 15 gate 6 parity pins: the three re-homes that close
+// Phase 15 gate 6 parity pins: the re-homes that close
 // Author gate 6 for the exit census.
 //
 // 1. grantInvitation email resolution —
 //    deriveIdentityPiiRows email match ≡ identityPii.getAll
 // 2. pendingInvitationFor discovery —
 //    deriveInvitations pending ≡ row-plane pending
-// 3. grantClientCredentials client lookup —
-//    rawReadRow('clients', id) ≡ getById for active clients;
-//    null for missing ≡ EntityNotFoundError
+// 3. grantClientCredentials client lookup — RETIRED with
+//    the clients table (rawReadRow + clients store gone;
+//    registration facet is the sole oracle).
 
 const BASE = 'http://localhost';
 
@@ -182,38 +180,4 @@ test('loadInvitation shape: deriveInvitations find-by-id'
         undefined,
     );
     // Phase Final Stage B: roster tables retired.
-});
-
-test('rawReadRow clients ≡ getById for an active client;'
-+ ' null for a missing client',
-async () => {
-    const db = await seededDb();
-    const fields = {
-        grant_types: 'client_credentials',
-        redirect_uris: '',
-        jwks: '{"keys":[]}',
-        aud: 'fusion-ai-web',
-        status: 'active' as const,
-    };
-    await db.clients.put('svc-rehome-parity', fields);
-
-    const fromStore = await db.clients.getById(
-        'svc-rehome-parity');
-    const fromRaw = await db.rawReadRow<ClientEntity>(
-        'clients', 'svc-rehome-parity',
-    );
-    assert.ok(fromRaw !== null);
-    assert.deepEqual(fromRaw, fromStore);
-
-    // Missing: raw null ≡ EntityNotFoundError.
-    assert.equal(
-        await db.rawReadRow<ClientEntity>(
-            'clients', 'ghost-client',
-        ),
-        null,
-    );
-    await assert.rejects(
-        () => db.clients.getById('ghost-client'),
-        EntityNotFoundError,
-    );
 });

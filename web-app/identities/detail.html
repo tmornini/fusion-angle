@@ -26,3 +26,69 @@
         </button>
     </div>
 </dialog>
+
+<dialog id="client-registration-dialog"
+    class="dialog dialog-xwide"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="client-registration-title">
+    <div class="dialog-header">
+        <h3 id="client-registration-title"
+            class="dialog-title">
+            Client registration</h3>
+        <p class="dialog-description">
+            OAuth client configuration for this
+            service identity.
+        </p>
+    </div>
+    <div class="flex flex-col gap-3 py-4">
+        <div>
+            <label class="label mb-1 block"
+                for="reg-grant-types">Grant types</label>
+            <input class="input" id="reg-grant-types"
+                placeholder="client_credentials" />
+        </div>
+        <div>
+            <label class="label mb-1 block"
+                for="reg-redirect-uris">
+                Redirect URIs</label>
+            <input class="input" id="reg-redirect-uris"
+                placeholder="https://app.example.com/cb" />
+        </div>
+        <div>
+            <label class="label mb-1 block"
+                for="reg-aud">Audience</label>
+            <input class="input" id="reg-aud"
+                placeholder="fusion-ai-web" />
+        </div>
+        <div>
+            <label class="label mb-1 block"
+                for="reg-jwks">JWKS</label>
+            <textarea class="textarea" rows="4"
+                id="reg-jwks"
+                placeholder='{"keys":[]}'></textarea>
+        </div>
+        <div>
+            <label class="label mb-1 block"
+                for="reg-status">Status</label>
+            <select class="input" id="reg-status">
+                <option value="active">Active</option>
+                <option value="disabled">Disabled</option>
+            </select>
+        </div>
+    </div>
+    <div class="dialog-footer">
+        <button class="btn btn-destructive hidden"
+            id="client-registration-deregister">
+            Deregister
+        </button>
+        <button class="btn btn-outline"
+            data-dialog-cancel="client-registration">
+            Cancel
+        </button>
+        <button class="btn btn-primary"
+            id="client-registration-submit">
+            Save
+        </button>
+    </div>
+</dialog>

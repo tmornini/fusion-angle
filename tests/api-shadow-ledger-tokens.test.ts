@@ -32,6 +32,9 @@ import {
 } from '../api/derive-identity-tokens.ts';
 import { deriveTokenRevocation } from
     '../api/derive-identity-spine.ts';
+import {
+    seedClientRegistration,
+} from './identity-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -518,7 +521,7 @@ test('a client_credentials grant appends its root\'s own'
         exp: now + 300, iat: now,
         jti: 'assert-shadow-tokens-1',
     });
-    await db.clients.put('svc-shadow', {
+    await seedClientRegistration(db, 'svc-shadow', {
         grant_types: 'client_credentials',
         redirect_uris: '', jwks: signer.jwks,
         aud: 'fusion-ai-web', status: 'active',

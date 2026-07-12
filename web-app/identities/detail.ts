@@ -16,11 +16,15 @@ import {
     getServiceFacet,
     deleteIdentityPii,
     getIdentityCredentialState,
+    getClientRegistration,
+    putClientRegistration,
+    deleteClientRegistration,
     subscribeIdentityChanges,
     Identity,
     type MemberPii,
     type ServiceFacet,
     type IdentityCredentialKind,
+    type ClientRegistration,
 } from '../app/adapters/index.ts';
 import {
     IdentityDetailPresenter,
@@ -31,6 +35,7 @@ const { signal } = createPageAbort();
 
 let pageContainer: HTMLElement | null = null;
 let currentId: string | null = null;
+let lastLoaded: LoadedIdentity | null = null;
 
 interface LoadedIdentity {
     identity: Identity;
@@ -38,6 +43,7 @@ interface LoadedIdentity {
     service: ServiceFacet;
     activeCredentialKinds:
         readonly IdentityCredentialKind[];
+    registration: ClientRegistration;
 }
 
 async function loadIdentity(
@@ -55,8 +61,13 @@ async function loadIdentity(
             ctx, identityId,
         )).active
         : [];
+    const registration: ClientRegistration =
+        identity.isService()
+            ? await getClientRegistration(ctx, identityId)
+            : { registered: false };
     return {
         identity, pii, service, activeCredentialKinds,
+        registration,
     };
 }
 
@@ -69,6 +80,7 @@ function buildView(
         service: loaded.service,
         activeCredentialKinds:
             loaded.activeCredentialKinds,
+        registration: loaded.registration,
     };
 }
 
@@ -93,6 +105,7 @@ export async function init(
         fetch: () => loadIdentity(identityId),
         retry: () => init(params),
         onData: loaded => {
+            lastLoaded = loaded;
             new IdentityDetailPresenter(
                 buildView(loaded),
             ).renderShell(container);
@@ -107,6 +120,7 @@ export async function init(
 async function refresh(): Promise<void> {
     if (!currentId || !pageContainer) return;
     const loaded = await loadIdentity(currentId);
+    lastLoaded = loaded;
     new IdentityDetailPresenter(buildView(loaded))
         .renderUpdate(pageContainer);
 }
@@ -139,6 +153,16 @@ function bindListeners(container: HTMLElement): void {
             void performErase();
         },
         { signal },
+    );
+    $required(
+        '#client-registration-submit', document,
+    ).addEventListener(
+        'click', () => void saveRegistration(), { signal },
+    );
+    $required(
+        '#client-registration-deregister', document,
+    ).addEventListener(
+        'click', () => void deregisterClient(), { signal },
     );
 }
 
@@ -175,6 +199,11 @@ async function onClick(e: MouseEvent): Promise<void> {
     }
     if (action === 'erase') {
         openDialog('confirm-erase');
+        return;
+    }
+    if (action === 'registration') {
+        prefillRegistrationDialog();
+        openDialog('client-registration');
     }
 }
 
@@ -193,5 +222,91 @@ async function performErase(): Promise<void> {
         return;
     }
     showToast('Personal information erased', 'success');
+    await refresh();
+}
+
+function registrationField(
+    selector: string,
+): HTMLInputElement {
+    return $required(
+        selector, document,
+    ) as HTMLInputElement;
+}
+
+function prefillRegistrationDialog(): void {
+    const registration = lastLoaded?.registration;
+    const filled = registration?.registered === true
+        ? registration
+        : undefined;
+    registrationField('#reg-grant-types').value =
+        filled?.grantTypes ?? '';
+    registrationField('#reg-redirect-uris').value =
+        filled?.redirectUris ?? '';
+    registrationField('#reg-aud').value =
+        filled?.aud ?? '';
+    registrationField('#reg-jwks').value =
+        filled?.jwks ?? '';
+    registrationField('#reg-status').value =
+        filled?.status ?? 'active';
+    $required(
+        '#client-registration-deregister', document,
+    ).classList.toggle('hidden', filled === undefined);
+}
+
+async function saveRegistration(): Promise<void> {
+    if (!currentId) return;
+    const grantTypes =
+        registrationField('#reg-grant-types').value.trim();
+    const aud = registrationField('#reg-aud').value.trim();
+    const jwks = registrationField('#reg-jwks').value.trim();
+    if (grantTypes === '' || aud === '' || jwks === '') {
+        showToast(
+            'Grant types, audience, and JWKS are required',
+            'error',
+        );
+        return;
+    }
+    try {
+        await putClientRegistration(
+            sessionContext(), currentId, {
+                grantTypes,
+                redirectUris: registrationField(
+                    '#reg-redirect-uris',
+                ).value.trim(),
+                jwks,
+                aud,
+                status: registrationField('#reg-status')
+                    .value as 'active' | 'disabled',
+            },
+        );
+    } catch (err) {
+        log.error(
+            'putClientRegistration failed',
+            'identities', err,
+        );
+        showToast('Failed to save registration', 'error');
+        return;
+    }
+    showToast('Client registration saved', 'success');
+    closeDialog('client-registration');
+    await refresh();
+}
+
+async function deregisterClient(): Promise<void> {
+    if (!currentId) return;
+    try {
+        await deleteClientRegistration(
+            sessionContext(), currentId,
+        );
+    } catch (err) {
+        log.error(
+            'deleteClientRegistration failed',
+            'identities', err,
+        );
+        showToast('Failed to deregister client', 'error');
+        return;
+    }
+    showToast('Client registration removed', 'success');
+    closeDialog('client-registration');
     await refresh();
 }

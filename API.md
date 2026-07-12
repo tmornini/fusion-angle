@@ -37,8 +37,8 @@ disagreement, the code wins.
 
 ### 1.1 Request flow
 
-`handleRequest(adapter, request)` (`api/api.ts:121`) resolves a request
-in this order:
+`handleRequest(adapter, request)` (`api/api.ts` `handleRequest`)
+resolves a request in this order:
 
 1. **Four pre-table special routes**, matched before the table:
    - `/organizations/:org/:entity[/:id]` (≥3 segments) →
@@ -49,15 +49,21 @@ in this order:
      `invitationsRequest` (its own sub-router; see §2.12).
    - bare `GET /organizations` →
      `organizationsEnumerationRequest`.
-2. **`matchRoute(routeTable, segments)`** (`api/routes.ts:1443`) — a
-   linear scan over the flat `routes[]` array. A route matches when
-   segment counts are equal and every literal segment matches; a `:`
-   segment captures a positional param. First match wins. No match is
-   a `404`.
-3. **The gate** (skipped for bearer-exempt routes): `authenticateRequest`
-   (verify the Bearer JWT, reject anonymous/revoked) → `fenceRequest`
-   (resolve the org once, derive live memberships + roles, build the
-   org-scoped adapter) → `authorizeRequest` (per-org role check).
+2. **`matchRoute(routeTable, segments)`** (`api/routes.ts`
+   `matchRoute`) — a linear scan over the flat `routes[]`
+   array. A route matches when segment counts are equal and
+   every literal segment matches; a `:` segment captures a
+   positional param. First match wins. Match failure is not
+   yet a response: authentication runs first (step 3).
+3. **The gate** (skipped for bearer-exempt routes):
+   `authenticateRequest` (verify the Bearer JWT, reject
+   anonymous/revoked) → on auth failure, **401** even for
+   unknown paths (never a route-topology oracle) →
+   `fenceRequest` (resolve the org once, derive live
+   memberships + roles onto the request vessel; the base
+   adapter is unchanged — tenancy rides `uri_prefix`, not an
+   org-scoped decorator) → `authorizeRequest` (per-org role
+   check). After a successful auth, no route match is **404**.
 4. **Body parse** (`PUT`/`POST` only): `parseObjectBody` — a
    malformed or non-object JSON body is a `400` here, before either
    the pair or the handler ever sees it.
@@ -67,14 +73,17 @@ in this order:
    has no handler for): `formWritePair` builds the canonical,
    redacted request/response message pair pre-tx — address
    resolution, a pre-tx head-read (`headPairIdAt`) for a
-   document-class route's `Supersedes` chain, and the hashing that
-   feeds idempotency, all before any transaction opens. Unless the
-   route pattern is in `REPLAY_EXEMPT_ROUTE_PATTERNS`, a
-   byte-identical resend is served straight from the STORED response
+   document-class route (simple class: `Supersedes` chain;
+   locked class / flows: `follows` / `If-Response-ID` four-
+   outcome table), and the hashing that feeds idempotency,
+   all before any transaction opens. Unless the route pattern
+   is in `REPLAY_EXEMPT_ROUTE_PATTERNS`, a byte-identical
+   resend is served straight from the STORED response
    (`storedResponseFor`) here — the handler never runs twice for the
    same request. See §5 for what this step produces on the wire.
-6. Only then does the matched handler run, receiving the org-scoped
-   adapter, the verified `actor` id, and — for a pair-wired write —
+6. Only then does the matched handler run, receiving the base
+   adapter (`effective` / `ctx.base`), the verified `actor`
+   id, the fenced organization, and — for a pair-wired write —
    the formed pair, appended as the LAST act of the handler's own
    transaction.
 
@@ -159,6 +168,9 @@ Legend for classification:
   closure is extracted to `postIdentityCredentialDocumentOp`
   (§5.13) but stays hand-dispatched, never family-registered
   (§5.13's nested-plane rationale).
+- `GET|PUT|DELETE /identities/:id/registration` — client
+  registration facet (admin-realm, kind-`'service'` gate);
+  `grantClientCredentials` derives it pre-token.
 
 ### 2.3 Auth spine — tokens, providers, grants
 
@@ -222,11 +234,10 @@ Legend for classification:
   `PUT /flows/:id` (§3.13).
 - `GET|POST /flows/:id/versions` ·
   `GET|PUT|DELETE /flows/:id/versions/:vid` — retired
-  (Phase 15 Task 7): zero product callers after
-  undo-as-replay stopped consuming/publishing
-  `flow_versions`. Router 404 (no pattern match). The
-  table remains until Phase Final; historical prose for
-  the dead surface lives at §3.16 / §3.31.
+  (Phase 15 Task 7): router 404 (no pattern match).
+  Phase Final DELETED the `flow_versions` table with the
+  rest of the row plane. Historical prose for the dead
+  surface lives at §3.16 / §3.31.
 - `GET /flows/:id/work-orders` ·
   `PUT /flows/:id/work-orders/:woid` — nested.
 - `GET /flows/:id/records` ·
@@ -251,6 +262,8 @@ Legend for classification:
 - `POST /work-orders` — operation (§3.17). Member-tier.
 - `POST /work-orders/:id/claim` — operation (§3.18).
 - `POST /work-orders/:id/transition` — operation (§3.19).
+- `POST /work-orders/:id/release` — operation (named
+  unclaim; 204; foreign-WO 403; nonexistent-WO 404).
 
 ### 2.8 Records & attributes
 
@@ -274,94 +287,66 @@ Legend for classification:
 
 - `GET /objectives` · `GET|PUT /objectives/:id` — primitive
   (§3.29). `PUT` is a document write (§5.8) — the seventh
-  family, and the THIRD `'stateless'` one (§5.8): Author gate
-  3's second Decision 7 amendment, a distinct rationale from
-  work-orders'/record-attributes' own. Both `GET`s now DERIVE
-  from the ledger (§3.29): the collection via
+  family, lifecycle **`'trio'`** (genesis at create;
+  archive/reactivate via the document PUT — not
+  `'stateless'`). Both `GET`s DERIVE from the ledger
+  (§3.29): the collection via
   `documentCollectionGetHandler(OBJECTIVES_WIRING)`, the entity
-  via `documentEntityRoute(OBJECTIVES_WIRING)` — flipped below
-  the wire, key-set/value-identical to the old plane save the
-  named id-first sub-cosmetic order.
+  via `documentEntityRoute(OBJECTIVES_WIRING)`.
 - `POST /objectives` — operation (§3.21).
 - `GET /objectives/:id/revisions` ·
   `PUT /objectives/:id/revisions/:rid` — nested.
 
 ### 2.10 States — the derived event log
 
+Lifecycle is pair-plane only. The `states` table and every
+verb on `/states/:id` are RETIRED (states-address
+retirement + Phase Final). Surviving surface:
+
 - `GET /states` — primitive, DERIVED: the collection reads
-  `deriveStates(db, organization)` (`api/derive-states.ts`),
-  a six-source union over the message ledger reduced by
-  `(at, id)`, returned `byIdAscending`. The `states` table
-  is DELETED (Phase Final); this route never read a row
-  store post-flip.
-- `PUT /states/:id` — append/stamp a state event as a pair
-  only; the author is the verified caller, stamped over any
-  client-supplied `member_id`. Gated by the OWNERSHIP FENCE
-  below — a foreign org's entity_id 404s. Immutability is
-  pair-plane only: `stateEventCollisionFromPairs` reduces
-  over 2xx pairs at the event-append address; 409 bytes stay
-  `LedgerImmutabilityError`. The dual-write row half is
-  GONE (Phase Final).
-- `GET /states/:id` — retired (Phase 15 Task 7): zero product
-  callers. The pattern STILL matches for PUT, so a bare GET
-  is **405** (method-absent), not the router's open-tree
-  404. Document this honestly — do not collapse it with the
-  other retirements.
-- `GET /entity-states/:id` — retired (Phase 15 Task 7): zero
-  product callers; router 404 (no pattern match). History
-  below is the LIVE current-state surface.
-- `GET /entity-states/:id/history` — the full event history
-  for an entity, DERIVED: reads
-  `deriveStatesFor(db, organization, entityId)` in
-  `(at, id)` order. The GATE fences parent ownership via
-  `resolveOwningOrganization`; the derived handler does NOT
-  re-fence.
+  `deriveStates(db, organization)` (`api/derive-states.ts`
+  `deriveStates`), a **five-source** union over the message
+  ledger reduced by `(at, id)`, returned `byIdAscending`.
+  The five sources: trio document families, members,
+  work-order lifecycle, flow graph, invitations.
+- Every verb on `/states/:id` — router **404** for
+  authenticated callers (unauthenticated → **401** first;
+  never a 405 method-absent gap). No PUT append surface;
+  immutability collision helpers for that address are gone.
+- `GET /entity-states/:id` — retired (Phase 15 Task 7):
+  router 404 (no pattern match).
+- `GET /entity-states/:id/history` — full event history for
+  an entity, DERIVED via `deriveStatesFor` in `(at, id)`
+  order. The GATE fences parent ownership via
+  `resolveOwningOrganization`; foreign → 403; orphan/own
+  pass. The derived handler does NOT re-fence.
 - `GET /states/:id/field-values` — nested collection,
-  DERIVED: `stateFieldValuesForStateEvent` two-source
-  union; visibility via `stateEventVisibilityFor` (3-tier).
-  Wire shape held: ALWAYS 200; orphan/own → rows; foreign →
-  `[]`.
+  DERIVED: `stateFieldValuesForStateEvent` (transition-fold
+  single-source). Visibility via `stateEventVisibilityFor`
+  (3-tier): own → 200 rows; foreign → 403; orphan → 404.
 - `PUT|DELETE /states/:id/field-values/:fvid` — retired
-  (Phase 15 Task 7): zero product callers; live writes ride
-  the transition fold only. Router 404. The
-  `WRITE_RESPONSE_SPECS` entry and seed address formation
-  SURVIVE (§5.16) so reseeds still form the seven nested
-  leaf pairs.
+  (Phase 15 Task 7): router 404. Live field-value writes
+  ride the work-order transition fold only. No
+  `WRITE_RESPONSE_SPECS` leaf entry; seed no longer forms
+  bare leaf pairs at that address (§5.16).
 
-**The state ownership fence** (`api/api.ts`): `MEMBER_VERBS`
-permits member-tier PUT on `/states/:id`
-(`api/authorization.ts`), and the body names its target
-`entity_id` directly. `PutHandler` carries no organization
-argument (`routes.ts`). Surviving stores are global (no
-org-scoped adapter); the check runs at the GATE via
-`resolveOwningOrganization` (`api/derive-states.ts`) —
-org-nested document legs, invitations, memberships, the
-flow-graph history walk, and the organizations
-self-as-owner leg. Outcomes: OWN-org (or owner-null)
-passes; foreign — LIVE, soft-deleted, OR hard-spliced —
-404s, byte-identical to
-`{error: 'Not found: ' + pathname}` (never an
-`EntityNotFoundError`, which keys on the wrong id). Org-
-scoped document PUT/DELETE also hit the write-ownership
-fence (`api/write-ownership-fence.ts`) so a foreign id
-cannot genesis in the caller's namespace. The leaf
-field-values write fence retired WITH the leaf routes.
+Lifecycle **writes** ride document-trio PUTs
+(ideas / projects / records / flows / objectives /
+members) and named ops (work-order create / claim /
+transition / release, invitations) — never a shared
+event-append address.
 
-Two named strengthenings closed at the same re-anchor:
-(2a) WP1 — a forged PUT naming an organization id as
-`entity_id` now 404s (self-as-owner); (2b) a hard-deleted
-record's orphaned genesis event no longer admits a foreign
-forge as an "orphan."
+Org-scoped document PUT/DELETE hit the write-ownership
+fence (`api/write-ownership-fence.ts` →
+`resolveOwningOrganization`) so a foreign id 403s rather
+than genesis-ing in the caller's namespace; genuine absence
+still 404s (or genesis on PUT). Surviving stores are
+global (`requests` / `responses`); tenancy rides
+`uri_prefix`. There is no org-scoped adapter.
 
-Named residual: within ONE org, a member-tier PUT
-`/states/:id` can still post a `'deleted'` event naming a
-fellow member/membership/ai-member/human-member id
-(MEMBER_VERBS allows it; those roster kinds resolve via the
-membership ledger). This intra-org reachability is
-unchanged — the user elected the ORG boundary, not a
-kind/alphabet gate — and is tracked as a named acceptance
-(see `tests/drift-roster.test.ts`'s "states/:id escape
-hatch"), not a bug this phase closes.
+The intra-org `/states/:id` escape hatch is RETIRED with
+the address itself (see `tests/drift-roster.test.ts`
+"THE STATES/:ID ESCAPE HATCH RETIRED").
 
 ### 2.11 Organizations & memberships
 
@@ -379,19 +364,19 @@ hatch"), not a bug this phase closes.
   family rides. `PUT` stays hand-written old-plane.
 - `GET /memberships` · `GET|PUT|DELETE /memberships/:id` —
   primitive. `PUT` is a document write (§5.9) — the eighth
-  family, and the FOURTH `'stateless'` one (§5.9): a pure join
-  relation with no lifecycle concept at all — record-attributes'
-  actual sibling, not work-orders'/objectives' own distinct
-  rationale. `GET` and `DELETE` stay hand-written, old-plane,
-  until Task 8.
+  family, `'stateless'` (a pure join with no lifecycle
+  concept). Collection and entity `GET` ride the generic
+  document handlers over `MEMBERSHIPS_WIRING`. `DELETE` is
+  hand-written: a pure pair-plane tombstone append on
+  `['requests','responses']`.
 - `GET|PUT /identities/:id/default-org` — the read/write face of the
   default-org ledger. Self-only. `GET` (and every other caller of
-  `identityDefaultOrganization`, api/authentication.ts) reads via
-  `deriveDefaultOrganization` (api/derive-default-organization.ts,
-  Phase 11 Task 8): a TARGETED `requests`/`responses` read at the
-  identity-keyed `/identities/:id/default-org/` prefix, never the
-  `identity_default_organizations` table directly. `PUT` still
-  writes that table (Path A — unchanged) beside its own pair.
+  `identityDefaultOrganization`, `api/authentication.ts`) reads via
+  `deriveDefaultOrganization`
+  (`api/derive-default-organization.ts`): a TARGETED
+  `requests`/`responses` read at the identity-keyed
+  `/identities/:id/default-org/` prefix. `PUT` is pair-plane
+  only (Phase Final) — no row table remains.
 
 ### 2.12 Invitations (sub-router)
 
@@ -412,8 +397,8 @@ runs on the base adapter with explicit guards:
 - `GET /snapshots/schema` — schema existence + full export, else null.
   The export (`getSnapshot`, `api/db-backed.ts`) stamps one reserved
   top-level key, `__schema_version__` (`SNAPSHOT_SCHEMA_VERSION`
-  = 3 post-Phase-Final, `api/db.ts`), beside the survivor
-  `TABLE_NAMES` arrays (`clients`, `requests`, `responses`).
+  = 5 post-clients-elimination, `api/db.ts`), beside the pure
+  message-plane `TABLE_NAMES` arrays (`requests`, `responses`).
 - `DELETE /snapshots/schema` — drop the schema and reopen clean.
 - `POST /snapshots/mock-data` — seed the full demo dataset (§3.26).
 - `POST /snapshots/bootstrap` — seed the pristine minimal state
@@ -441,30 +426,40 @@ matching what the now-derived `GET /members` (§2.1) actually sees.
 
 ## 3. POST Composition Catalog
 
-Each entry gives: the **transaction** table-set (or "no tx"); the
-**actual** ordered store-operation sequence; the **doctrinal** mapping
-(each store op as a single-noun primitive — `put_noun`,
-`post_state_event`, `delete_noun` — and the whole as a composed
+Each entry gives: the **transaction** table-set (or "no tx");
+the **actual** ordered operation sequence; the **doctrinal**
+mapping (single-noun HTTP primitives composed as a
 `post_operation`); and **properties** (atomicity, idempotency,
 TOCTOU-safety, validator, actor source).
 
-Notation in the doctrinal lines: `put_x` ≈ `PUT /x/:id`;
-`post_state_event` ≈ append to the `states` ledger (cf. `PUT
-/states/:id`); `delete_x` ≈ `DELETE /x/:id`.
+**Pair-plane only (Phase Final).** Surviving stores are
+exactly `requests` and `responses`. Every write composition
+below opens `db.transaction(['requests','responses'], …)`
+and appends message pairs — there is no entity-table put
+and no `states.postEvent`. Lifecycle rides document-pair
+bodies (trio families fold `state` / `state_at` /
+`state_event_id` into the document body) or named-op pairs
+(work-order claim / transition / release, invitations).
+
+Notation in the doctrinal lines: `put_x` ≈ the document
+pair a live `PUT /x/:id` would form; `post_op` ≈ the
+operation pair at the POST address; `delete_x` ≈ a
+marked tombstone pair at `DELETE /x/:id`. The retired
+`post_state_event` ≈ `PUT /states/:id` mapping is GONE
+with the address.
 
 ### 3.1 `POST /ai-members` — create AI member
 
 `postAiMemberCreationOp` (`api/routes.ts`).
 
-- tx: `[members, ai_members, states, requests, responses]`
-- actual:
-  1. `members.put(id, {type:'ai'})`
-  2. `aiMembers.put(id, detail)`
-  3. `states.postEvent(initialStateEventId, id, initialState, actor)`
-  4. three `appendMessagePair` calls — operation, member document,
-     detail document (the bundle, below)
-- doctrinal: `put_member` + `put_ai_member` + `post_state_event`
-  composed as `post_create_ai_member`.
+- tx: `['requests','responses']`
+- actual: three `appendMessagePair` calls when the gate
+  supplied the bundle — operation, member document (body
+  via `memberDocumentBodyOf` with the initial lifecycle
+  trio), detail document.
+- doctrinal: `post_op` + `put_member` + `put_ai_member`
+  composed as `post_create_ai_member` (lifecycle on the
+  member document body, not a separate states append).
 - props: atomic; admin-only; `validateAIMemberCreateBody` at the gate;
   actor server-stamped.
 
@@ -473,13 +468,13 @@ Notation in the doctrinal lines: `put_x` ≈ `PUT /x/:id`;
 `postAiMemberEditOp` (`api/routes.ts`) — extracted from an anonymous
 closure this same task, the FIRST composed-EDIT synthesis (below).
 
-- tx: `[members, ai_members, requests, responses]`
-- actual: `members.put(id, {type:'ai'})` then
-  `aiMembers.put(id, detail)`, then three `appendMessagePair` calls —
-  operation, member document, detail document (the bundle, below).
-- doctrinal: `put_member` + `put_ai_member` as `post_edit_ai_member`.
-- props: atomic; **no state event** (an edit does not move lifecycle);
-  admin-only; `validateAIMemberEditBody`.
+- tx: `['requests','responses']`
+- actual: three `appendMessagePair` calls — operation,
+  member document (echoed trio), detail document.
+- doctrinal: `post_op` + `put_member` + `put_ai_member` as
+  `post_edit_ai_member`.
+- props: atomic; **no lifecycle move** (edit echoes the
+  current trio); admin-only; `validateAIMemberEditBody`.
 
 ### 3.3 `POST /human-members` — create human member
 
@@ -487,18 +482,13 @@ closure this same task, the FIRST composed-EDIT synthesis (below).
 lands here (Phase 10 Task 2's intake decomposition, prose
 below) — it enters via a second, separate hop.
 
-- tx: `[members, identities, human_members, states, requests,
-  responses]`
-- actual:
-  1. `members.put(id, {type:'human'})`
-  2. `identities.put(id, {kind:'person'})`
-  3. `humanMembers.put(id, detail)`
-  4. `states.postEvent(initialStateEventId, id, initialState, actor)`
-  5. FOUR `appendMessagePair` calls — operation, member document,
-     detail document, identities document (the bundle, below;
-     Phase 10 Task 5 widens the triple to a quadruple, human-only)
-- doctrinal: three `put_*` primitives + `post_state_event` as
-  `post_create_human_member`.
+- tx: `['requests','responses']`
+- actual: FOUR `appendMessagePair` calls when the gate
+  supplied the bundle — operation, member document (initial
+  trio folded in), detail document, identities document.
+- doctrinal: `post_op` + `put_member` + `put_human_member` +
+  `put_identity` as `post_create_human_member` (lifecycle
+  on the member document body).
 - props: atomic; admin-only; `validateHumanMemberCreateBody`
   (`['id', 'detail', 'initialState', 'initialStateEventId',
   'initialStateAt']` — `pii` retired from this key set).
@@ -510,15 +500,15 @@ precedent above, for the sibling facet. PII no longer lands here
 either — it changes ONLY via the separate hop, fired IFF the
 client's dirty check finds it changed.
 
-- tx: `[members, identities, human_members, requests, responses]`
-- actual: the three facet `put`s (member, identity, detail), then
-  FOUR `appendMessagePair` calls — operation, member document,
-  detail document, identities document (the bundle, below) — the
-  LAST of which FOLDS (§5.14): its `{kind:'person'}` body is
-  byte-identical to the create's own, at the SAME address.
-- doctrinal: three `put_*` primitives as `post_edit_human_member`.
-- props: atomic; **no state event**; admin-only;
-  `validateHumanMemberEditBody` (`['detail']` alone — `pii`
+- tx: `['requests','responses']`
+- actual: FOUR `appendMessagePair` calls — operation, member
+  document (echoed trio), detail document, identities document
+  (the last FOLDS by message_hash when byte-identical to create).
+- doctrinal: `post_op` + three document puts as
+  `post_edit_human_member`.
+- props: atomic; **no lifecycle move**; admin-only;
+  `validateHumanMemberEditBody` (`['detail', 'state',
+  'stateAt', 'stateEventId']` — trio echo required; `pii`
   retired from this key set).
 
 **The member write-pair bundle (Phase 8 Task 4), the
@@ -722,20 +712,17 @@ sub-object can no longer roll a person identity back; the
 service branch is untouched (its credential facet was never
 PII, so it stays one atomic write).
 
-- tx (branches by kind):
-  - person → `[identities, requests, responses]`
-  - service → `[identities, identity_credentials, requests,
-    responses]`
-- actual: `identities.put(id, {kind})`; then, service only,
-  `identityCredentials.put(credId, fields)`; then the bundle
-  (Phase 10 Task 5, §5.14): `appendMessagePair(operation)`, then
+- tx: `['requests','responses']` (both kinds)
+- actual: the bundle (Phase 10 Task 5, §5.14):
+  `appendMessagePair(operation)`, then
   `appendMessagePair(identityDocument)`, then — service only —
-  `appendMessagePair(credentialDocument)`.
-- doctrinal: `put_identity` (+ `put_identity_credential` for
-  service) as `post_create_identity`.
-- props: atomic; **no state event** (an identity has no creation
-  lifecycle event); admin-only; secret hashed client-side (the route
-  touches no crypto); `validateIdentityCreateBody`
+  `appendMessagePair(credentialDocument)`. Pair-plane only.
+- doctrinal: `post_op` + `put_identity` (+
+  `put_identity_credential` for service) as
+  `post_create_identity`.
+- props: atomic; **no lifecycle event** (an identity has no
+  creation lifecycle); admin-only; secret hashed client-side
+  (the route touches no crypto); `validateIdentityCreateBody`
   (`['id', 'kind']` for person — `pii` retired from this key set;
   `['id', 'kind', 'credential']` for service, unchanged); the
   bundle is pairs-or-nothing IFF the gate supplied a pair and a
@@ -744,9 +731,9 @@ PII, so it stays one atomic write).
 
 ### 3.6 `POST /identity-tokens/:jti/rotation` — rotate refresh jti
 
-Delegates to `rotateRefreshJti` (`api/authentication.ts:480`).
+Delegates to `rotateRefreshJti` (`api/authentication.ts`).
 
-- tx: `[requests, responses]`
+- tx: `['requests','responses']`
 - actual: PRE-TX — `deriveIdentityTokenEventsForJti(presented)`
   → `chainIdForJti(...)` → `deriveIdentityTokens` filtered to
   the chain → `planRotation(...)` (pure) → `formTokenEventWrites`
@@ -767,9 +754,9 @@ Delegates to `rotateRefreshJti` (`api/authentication.ts:480`).
 
 ### 3.7 `POST /identity-tokens/:jti/revocation` — revoke chain
 
-Delegates to `revokeTokenChain` (`api/authentication.ts:576`).
+Delegates to `revokeTokenChain` (`api/authentication.ts`).
 
-- tx: `[requests, responses]`
+- tx: `['requests','responses']`
 - actual: PRE-TX — `deriveIdentityTokenEventsForJti(jti)` →
   `chainIdForJti` / `identityForJti` → `deriveIdentityTokens`
   filtered to the chain → `revocationAppends(...)` (pure) →
@@ -788,7 +775,7 @@ Delegates to `revokeTokenChain` (`api/authentication.ts:576`).
 
 ### 3.8 `POST /authentication/token` — grant dispatch
 
-`postToken` (`api/authentication.ts:1022`) dispatches on
+`postToken` (`api/authentication.ts`) dispatches on
 `grant_type`. Every grant is **grant-first**: it authenticates
 the presented grant before any side effect, so a failed grant
 appends nothing and mints nothing. `mintPair` is pure crypto (no
@@ -807,7 +794,10 @@ redaction the stored pair carries.
     `identity-tokens/` prefix — a hit IS the spend marker,
     KEY-BY-ANCHOR: the issued root's row id equals the code's
     own digest) → `mintPair` → `formAuthPair` →
-    `formTokenEventPair` (the root's own event).
+    `formTokenEventPair` (the root's own event). Mints
+    `act: {sub: clientId}` — the acting client — on the
+    access token (RFC 8693 shape, the token-exchange
+    precedent).
   - tx `[requests, responses]`: re-run `authorizationCodeSpent`
     on the open view — a race loser aborts, appending nothing
     further — then `appendMessagePair` the root's event pair,
@@ -841,7 +831,9 @@ redaction the stored pair carries.
     appending nothing.
 - **`client_credentials`** → `grantClientCredentials`
   (private_key_jwt):
-  - `clients.getById` → status/grant-type checks →
+  - `deriveClientRegistration`
+    (identities/:id/registration facet; absent/tombstoned →
+    401 `unknown client`) → status/grant-type checks →
     `verifyClientAssertion` (JWS, crypto) → `nameFor` →
     `issueTokenPair` (as above, same tx shape).
   - props: the same atomic single-tx shape as token-exchange. Bad
@@ -849,7 +841,7 @@ redaction the stored pair carries.
 
 ### 3.9 `POST /authentication/authorize` — interactive front door
 
-`postAuthorize` (`api/authentication.ts:1183`) dispatches on
+`postAuthorize` (`api/authentication.ts`) dispatches on
 `method`.
 
 - **`password`** → `authorizePassword`:
@@ -883,38 +875,31 @@ Phase 2 Task 3 (R1) retired the separate composed `POST /ideas`
 create that used to carry this; the PUT above was already the
 genesis write.
 
-- tx: `[ideas, states, requests, responses]`
-- actual: read the current head event
-  (`states.getCurrentFor(id)`) → `ideas.put(id, entity)` (the
-  org-scoped store stamps `organization_id`, so the body omits
-  it) → `states.postEvent(state_event_id, id, state, memberId,
-  state_at)` → `appendMessagePair(pair)`.
-- doctrinal: `put_idea` + `post_state_event` as
-  `put_idea_document`.
+- tx: `['requests','responses']`
+- actual: `appendMessagePair(pair)` — the document body
+  carries entity fields plus the lifecycle trio; head /
+  Supersedes decided pre-tx; a byte-identical echo folds
+  by message_hash.
+- doctrinal: `put_idea_document` (lifecycle on the body;
+  no separate states append).
 - props: atomic; member-tier; `validateIdeaDocumentBody`;
-  idempotent (a byte-identical resend converges: one row, one
-  event, one pair); MEMBER_ID CAVEAT — a state-unchanged edit
+  idempotent; MEMBER_ID CAVEAT — a state-unchanged edit
   (the resent trio matches the current head byte-for-byte)
   replays the STORED head event's `member_id`, never the
-  editing actor, so a different member editing a field after
-  someone else's transition does not 409.
+  editing actor.
 
 ### 3.11 `POST /ideas/:id/conversion` — promote idea → project
 
 The lone cross-aggregate write.
 
-- tx: `[projects, ideas, states,
-  project_objective_baseline_scores, requests, responses]`
-- actual:
-  1. `projects.put(projectId, project)` (org-scoped stamps org)
-  2. `ideas.put(ideaId, idea)` (promote)
-  3. `states.postEvent(ideaStateEventId, ideaId, ideaState, actor)`
-  4. `states.postEvent(projectStateEventId, projectId, projectState,
-     actor)`
-  5. for each baseline: `projectObjectiveBaselineScores.put(...)`
-  6. 3+N `appendMessagePair` calls (below).
-- doctrinal: `put_project` + `put_idea` + two `post_state_event` + N
-  `put_baseline_score` as `post_convert_idea`.
+- tx: `['requests','responses']`
+- actual: 3+N `appendMessagePair` calls (operation + project
+  document with genesis trio + idea document with
+  `promoted` trio + N baseline documents) when the gate
+  supplied the bundle — pair-plane only.
+- doctrinal: `post_op` + `put_project` + `put_idea` + N
+  `put_baseline_score` as `post_convert_idea` (lifecycle on
+  document bodies).
 - props: atomic (project never lands without its baselines, nor an
   idea promoted without its project); member-tier (segment-prefix
   match on `/ideas`); `validateIdeaConversionBody`.
@@ -963,13 +948,13 @@ atomic write in this catalog.
 
 ### 3.12 `POST /flows` — create flow
 
-- tx: `[flows, project_flows, states, requests, responses]`
-- actual: `flows.put(id, flow)` (org-scoped stamps org) →
-  `projectFlows.put(projectFlowId, projectFlow)` →
-  `states.postEvent(initialStateEventId, id, initialState, actor)` →
-  three `appendMessagePair` calls (below).
-- doctrinal: `put_flow` + `put_project_flow` + `post_state_event` as
-  `post_create_flow`.
+- tx: `['requests','responses']`
+- actual: three `appendMessagePair` calls (operation, flow
+  document with initial trio + graphDelta/revivals, project-
+  flow join) when the gate supplied the bundle — pair-plane
+  only.
+- doctrinal: `post_op` + `put_flow` + `put_project_flow` as
+  `post_create_flow` (lifecycle on the flow document body).
 - props: atomic; member-tier; `validateFlowCreateBody`.
 
 **Three pairs, one tx (Phase 4 Task 5), mirrored by work-orders'
@@ -1044,26 +1029,20 @@ undo now resolves its own restore target from THIS route's own
 document-pair history (§3.14), so nothing archives a snapshot
 before a save any more.
 
-- tx: `[flows, states, flow_nodes, flow_edges,
-  flow_node_members, flow_node_attributes, requests, responses]`
+- tx: `['requests','responses']`
   — NO `flow_versions`.
-- actual: `flows.put(id, entity)` (the org-scoped store stamps
-  `organization_id`, so the body omits it) →
-  `states.postEvent(state_event_id, id, state, actor, state_at)`
-  → the graph delta's node/edge upserts, member/attribute
-  events, and deletion events (`writeFlowGraphDelta`, the SAME
-  helper `POST /flows` and undo use — redo's document half
-  IS this very PUT, Phase 4 Task 4) → for each revival:
-  `states.postEvent(eventId, entityId, 'restored', actor, at)`
-  (the undo route's own loop, reused) → `appendMessagePair(pair)`
-  LAST.
-- doctrinal: `put_flow` + `post_state_event` + graph-relation
-  writes + N `post_restored_event` as `put_flow_document`.
+- actual: `appendMessagePair(pair)` LAST — document body
+  carries entity fields, lifecycle trio, and
+  graphDelta/revivals sidecars (SIDECAR-KEEP). Graph truth
+  derives from those sidecars (`deriveFlowGraphStates`);
+  no row-plane graph writes and no separate states append.
+- doctrinal: `put_flow_document` (lifecycle + graph delta on
+  the body).
 - props: atomic; member-tier; `validateFlowDocumentBody`;
   idempotent (a byte-identical resend — SAME body, SAME echo —
-  converges at the gate's pre-tx fast path: one row, one event,
-  one pair) — a same-id, genuinely different-content collision
-  still 409s via `LedgerImmutabilityError`, today's covenant.
+  converges at the gate's pre-tx fast path) — a same-id,
+  genuinely different-content collision still 409s via
+  `LedgerImmutabilityError`, today's covenant.
 - **Response-ID on GET.** `GET /flows/:id` carries a
   `Response-ID` header — the current head pair id, the exact
   value a save's `If-Response-ID` echoes back — attached
@@ -1113,21 +1092,13 @@ below.
   field the pre-Task-8 body carried (`flow`, `consumedVersionId`,
   `graph`, `graphDelta`, `revivals`) is now resolved or computed
   by the route itself.
-- tx (target resolved): `[flows, states, flow_nodes, flow_edges,
-  flow_node_members, flow_node_attributes, requests,
-  responses]` — NO `flow_versions`.
-- actual (target resolved): `flows.put(id, targetFields)` (the
-  RESOLVED target's own scalar fields) →
-  `states.postEvent(eventId, id, 'updated', actor, at)` → the
-  graph delta's node/edge upserts, member/attribute events, and
-  deletion events (`writeFlowGraphDelta`, the SAME helper
-  `PUT /flows/:id` and create use) — the delta itself computed
-  by `api/flow-graph-diff.ts` from CURRENT (this flow's own
-  head document pair's `graph` field) vs TARGET (the resolved
-  pair's own `graph` field), both already in hand from the SAME
-  pre-tx pair-plane read — for each revival:
-  `states.postEvent(eventId, entityId, 'restored', actor, at)`
-  → `appendMessagePair(pair)` → `appendMessagePair(documentPair)`.
+- tx (target resolved): `['requests','responses']` — NO
+  `flow_versions` (table DELETED Phase Final).
+- actual (target resolved): server computes graphDelta /
+  revivals from CURRENT vs TARGET document-pair graphs
+  (`api/flow-graph-diff.ts`); then `appendMessagePair(pair)`
+  + `appendMessagePair(documentPair)` with the restore body
+  (SIDECAR-KEEP). Pair-plane only.
 - **Exhaustion is a graceful no-op, not an error.** When
   resolution finds no target, the route still appends its OWN
   operation pair alone — no document pair, no domain writes —
@@ -1155,8 +1126,9 @@ below.
   VALUES are now server-computed rather than client-supplied
   (the client cannot diff against a target it is never told,
   since no new GET route is sanctioned for this).
-- doctrinal: `put_flow` + `post_state_event` + graph-relation
-  writes + N `post_restored_event` as `post_undo_flow`.
+- doctrinal: `post_op` + `put_flow_document` as
+  `post_undo_flow` (lifecycle + graph delta on the restore
+  document body).
 - **Two pairs, one tx (or one pair, zero domain writes, on
   exhaustion).** Undo synthesizes a second pair — a PUT-shaped
   document pair at `flows/:id`'s own address
@@ -1195,7 +1167,7 @@ had no other verb left to survive it.
 match. Historical shape (kept for the dual-write-era
 record; do not re-implement):
 
-- tx: `[flow_versions, requests, responses]`
+- tx: `['requests','responses']`
 - actual: `flowVersions.put(id, version)`; for each
   `trimId`: `flowVersions.delete(trimId)`;
   `appendMessagePair(pair)`.
@@ -1203,21 +1175,20 @@ record; do not re-implement):
   (undo-as-replay).** Versioned edits and redo used to
   archive through this route before `PUT /flows/:id`;
   undo-as-replay stopped both. Phase 15 Task 7 removed the
-  routes and adapters; the `flow_versions` TABLE remains
-  until Phase Final.
+  routes and adapters; Phase Final DELETED the
+  `flow_versions` table with the rest of the row plane.
 
 ### 3.17 `POST /work-orders` — create work order
 
-- tx: `[work_orders, flow_work_orders, states, requests, responses]`
-- actual: `workOrders.put(id, workOrder)` (org-scoped stamps org) →
-  `flowWorkOrders.put(flowWorkOrderId, flowWorkOrder)` → loop i in
-  0..2: `states.postEvent(stateEventIds[i], id, states[i], actor)` →
-  three `appendMessagePair` calls (below).
-- doctrinal: `put_work_order` + `put_flow_work_order` + three
-  `post_state_event` (start transition, post-start transition,
-  creation-time `claimed`) as `post_create_work_order`.
-- props: atomic; the three events are applied in order; member-tier;
-  `validateWorkOrderCreateBody`.
+- tx: `['requests','responses']`
+- actual: three `appendMessagePair` calls (operation,
+  work-order document, flow-work-order join) when the gate
+  supplied the bundle. Lifecycle (start / post-start /
+  creation-time claimed) is derived from those pairs, not a
+  separate states append.
+- doctrinal: `post_op` + `put_work_order` + `put_flow_work_order`
+  as `post_create_work_order`.
+- props: atomic; member-tier; `validateWorkOrderCreateBody`.
 
 **The create-triple (Phase 5 Task 3), mirroring flows' own create
 (§3.12).** The route (not `postWorkOrderCreationOp`) pre-forms two
@@ -1257,17 +1228,13 @@ like every other atomic write in this catalog.
 
 ### 3.18 `POST /work-orders/:id/claim` — claim
 
-- tx: `[work_orders, states, requests, responses]`
-- actual:
-  1. `workOrders.getById(id)`
-  2. `validateWorkOrderFlowGraphJson(...)` (pure parse)
-  3. `states.getAllFor(id)` → `latestClaimEvent(...)`
-  4. if a live claim by another member → 409; by the caller → no-op.
-  5. if the prior claim is expired:
-     `states.postEvent(..., 'claim_expired', prior.member_id)`.
-  6. `states.postEvent(..., 'claimed', actor)`.
-  7. `appendMessagePair(pair)`.
-- doctrinal: read the claim history + up to two `post_state_event` as
+- tx: `['requests','responses']`
+- actual: pair-plane claim history
+  (`workOrderClaimHistoryFor` / derive) → if a live claim by
+  another member → 409; by the caller → no-op; else
+  `appendMessagePair(pair)` for the claim op (expiry + claim
+  derive from op pairs at read time).
+- doctrinal: claim-history read + claim op pair as
   `post_claim_work_order`.
 - props: atomic; **TOCTOU-safe** (read + check + append ride one tx, so
   two concurrent claims cannot both see "no live claim"); idempotent
@@ -1276,15 +1243,13 @@ like every other atomic write in this catalog.
 
 ### 3.19 `POST /work-orders/:id/transition` — transition along an edge
 
-- tx: `[states, state_field_values, requests, responses]`
-- actual:
-  1. `states.postEvent(transitionEventId, id, targetState, actor)`
-  2. for each field value: `stateFieldValues.put(row.id, fields)`
-  3. if `release !== null`:
-     `states.postEvent(release.id, id, release.state, actor)`
-  4. `appendMessagePair(pair)`
-- doctrinal: `post_state_event` + N `put_state_field_value` + optional
-  `post_state_event` (claim release) as `post_transition_work_order`.
+- tx: `['requests','responses']`
+- actual: `appendMessagePair(pair)` for the transition op —
+  target state, field values, and optional claim release all
+  ride the op body (transition-fold); no separate states or
+  state_field_values row writes.
+- doctrinal: transition op pair (field values folded;
+  optional claim release) as `post_transition_work_order`.
 - props: atomic; the web-app computes the target node, field values,
   and whether a claim release is needed; member-tier;
   `validateWorkOrderTransitionBody`.
@@ -1298,29 +1263,14 @@ like every other atomic write in this catalog.
 
 `postRecordWriteOp` (`api/routes.ts`).
 
-- tx (dynamic): `[records, record_attributes, states,
-  ...ATTRIBUTE_RESTRICT_TABLES, requests, responses]`
-- actual:
-  1. `validateRecordWriteBody(body)` (create vs edit, entries,
-     removals)
-  2. `records.put(id, record)`
-  3. if `create`: `states.postEvent(initialStateEventId, id,
-     initialState, actor)` — genesis, actor-authored, exactly
-     ONE event
-  4. if `edit`: the SAME sameEvent decompose `PUT /records/:id`
-     (§3.33) runs — read the current head, replay its
-     `member_id` on a byte-identical echo, else `actor` — then
-     `states.postEvent(state_event_id, id, state, memberId,
-     state_at)`; a genuine echo converges to a no-op write
-     (`states.put`'s own idempotency by id)
-  5. if removals: `collectAttributeReferrers(...)` → if any referrer,
-     `throw 409` (rolls back the whole batch)
-  6. if entries or removals:
-     `recordAttributes.putMany(entries, removedIds)`
-  7. the bundle's pairs (below), appended LAST, in order:
-     operation, document, N attribute-PUTs, M attribute-DELETEs
-- doctrinal: `put_record` + optional `post_state_event` + a
-  put/delete batch over `record_attributes` as `post_write_record`.
+- tx: `['requests','responses']`
+- actual: `validateRecordWriteBody(body)`; if removals,
+  RESTRICT referrer check (pair-plane) → 409 rolls back; then
+  the bundle's pairs appended LAST: operation, document
+  (lifecycle trio on body), N attribute-PUTs, M
+  attribute-DELETEs.
+- doctrinal: `post_op` + `put_record` + attribute put/delete
+  pairs as `post_write_record`.
 - props: atomic; **RESTRICT** (a removed attribute still referenced
   409s and rolls back the whole write, so no pair lands for it
   either); member-tier.
@@ -1410,14 +1360,14 @@ UNCHANGED (`initialState`/`initialStateEventId`/
 
 `postObjectiveCreationOp` (`api/routes.ts`).
 
-- tx: `[objectives, objective_revisions, requests, responses]`
-- actual: `objectives.put(id, objective)` (org-scoped stamps org) →
-  `objectiveRevisions.put(revisionId, revision)` → three
-  `appendMessagePair` calls (below).
-- doctrinal: `put_objective` + `put_objective_revision` as
-  `post_create_objective`.
-- props: atomic; **no state event** (a fresh objective reads as active
-  until a later archival event); `validateObjectiveCreateBody`.
+- tx: `['requests','responses']`
+- actual: three `appendMessagePair` calls (operation,
+  objective document with lifecycle trio, revision document)
+  when the gate supplied the bundle — pair-plane only.
+- doctrinal: `post_op` + `put_objective` +
+  `put_objective_revision` as `post_create_objective`.
+- props: atomic; lifecycle on the document body (trio family);
+  `validateObjectiveCreateBody`.
 
 **Three pairs, one tx (Phase 7 Task 3), the flows/work-orders
 fixed-triple precedent (§3.12/§3.17).** The route pre-forms two
@@ -1475,27 +1425,21 @@ three, exactly like every other atomic write in this catalog.
 
 ### 3.22 `POST /invitations` — grant an invitation
 
-`grantInvitation` (`api/invitations-domain.ts:238`).
+`grantInvitation` (`api/invitations-domain.ts`).
 
 - before tx (base-adapter reads): `callerActiveOrg` → `callerIsOrgAdmin`
   (`roleGrants.getAllWhere`) → parse `email` → `identityPii.getAll`
   find the matching identity (404 if none) → `formWritePair` (a
   pre-tx head-read via `headPairIdAt` feeds the `Supersedes` chain)
   → the pre-tx idempotency point-read (`storedResponseFor`).
-- tx: `[invitations, states, memberships, requests, responses]`
-- actual:
-  1. `memberships.getAll` — already-member check (→ 409)
-  2. `pendingInvitationFor(...)` (`invitations.getAll` +
-     `states.getAll`) — idempotency (→ return existing pending)
-  3. `invitations.put(id, {organization_id, identity_id, at})`
-  4. `states.postEvent(eventId, id, 'pending', principal.id)`
-  5. `appendMessagePair(pair)` — the operation pair
-  6. on the SAME 'fresh' outcome only: `appendMessagePair(document)`
-     — the invitation DOCUMENT pair (Phase 8 Task 6), PUT-shaped, at
-     the SAME address as the operation pair; a duplicate echo forms
-     and appends no document (§5.11)
-- doctrinal: member/pending guards + `put_invitation` +
-  `post_state_event` as `post_grant_invitation`.
+- tx: `['requests','responses']`
+- actual: pair-plane guards (already-member; pending
+  invitation derive) → on fresh: `appendMessagePair(pair)`
+  (operation) + `appendMessagePair(document)` (invitation
+  document with pending lifecycle); duplicate echo appends
+  operation only (§5.11).
+- doctrinal: member/pending guards + invitation document
+  pair as `post_grant_invitation`.
 - props: atomic; admin-only; idempotent on an outstanding pending
   invite (the duplicate-echo branch still appends its own pair);
   TOCTOU-safe (the guards ride the write tx, re-verified against the
@@ -1504,29 +1448,21 @@ three, exactly like every other atomic write in this catalog.
 
 ### 3.23 `POST /invitations/:id/acceptance` — accept
 
-`acceptInvitation` (`api/invitations-domain.ts:364`). The only live
+`acceptInvitation` (`api/invitations-domain.ts`). The only live
 membership write.
 
 - before tx: `loadInvitation` (`invitations.getById`; 404 if absent);
   assert `identity_id === caller` (else 403); `formInvitationOpPair`
   (operation-addressed, no head-read) → the pre-tx idempotency
   point-read.
-- tx: `[memberships, states, requests, responses]`
-- actual:
-  1. `currentInvitationState` (`states.getCurrentFor`); `accepted` →
-     no-op (append the pair, below, then return); not `pending` →
-     409, appending nothing.
-  2. `memberships.getAll` — already-member guard.
-  3. if not already: `memberships.put(membershipId,
-     {organization_id: INVITATION's org, identity_id: caller, at})`,
-     THEN `appendMessagePair(membershipDocument)` — the memberships
-     DOCUMENT pair (Phase 8 Task 6, the B2 closure), beside the row
-     write; the no-op and 409 branches append no document (§5.11).
-  4. `states.postEvent(eventId, id, 'accepted', principal.id)`.
-  5. `appendMessagePair(pair)` — both the no-op and the pending
-     branches reach this step; the 409 branch never does.
-- doctrinal: state guard + `put_membership` + `post_state_event` as
-  `post_accept_invitation`.
+- tx: `['requests','responses']`
+- actual: pair-plane invitation state guard (`accepted` →
+  no-op pair; not `pending` → 409, nothing); already-member
+  guard; if new member: `appendMessagePair(membershipDocument)`
+  (invitation's org, not caller's active org); always
+  `appendMessagePair(pair)` on no-op/pending paths.
+- doctrinal: state guard + membership document pair +
+  accept op pair as `post_accept_invitation`.
 - props: atomic; invitee-only; idempotent (re-accept is a no-op,
   still its own genesis pair — never a `Supersedes` chain);
   membership is written in the **invitation's** org, never the
@@ -1534,53 +1470,50 @@ membership write.
 
 ### 3.24 `POST /invitations/:id/decline` — decline
 
-`declineInvitation` (`api/invitations-domain.ts:417`).
+`declineInvitation` (`api/invitations-domain.ts`).
 
 - before tx: `loadInvitation`; assert invitee (403 otherwise);
   `formInvitationOpPair` → the pre-tx idempotency point-read.
-- tx: `[states, requests, responses]`
-- actual: `currentInvitationState`; `declined` → no-op,
-  `appendMessagePair(pair)`, return; not `pending` → 409, appending
-  nothing; else `states.postEvent(eventId, id, 'declined',
-  principal.id)` → `appendMessagePair(pair)`.
-- doctrinal: state guard + `post_state_event` as
+- tx: `['requests','responses']`
+- actual: pair-plane invitation state guard; `declined` →
+  no-op pair; not `pending` → 409; else accept-style op
+  pair with declined lifecycle.
+- doctrinal: state guard + decline op pair as
   `post_decline_invitation`.
 - props: atomic; invitee-only; idempotent, its own genesis pair; the
   invitation row persists as audit (no membership written).
 
 ### 3.25 `POST /invitations/:id/revocation` — revoke
 
-`revokeInvitation` (`api/invitations-domain.ts:451`).
+`revokeInvitation` (`api/invitations-domain.ts`).
 
 - before tx: `loadInvitation`; `callerIsOrgAdmin(inv.organization_id)`
   (403 otherwise); `formInvitationOpPair` → the pre-tx idempotency
   point-read.
-- tx: `[states, requests, responses]`
-- actual: `currentInvitationState`; `revoked` → no-op,
-  `appendMessagePair(pair)`, return; not `pending` → 409, appending
-  nothing; else `states.postEvent(eventId, id, 'revoked',
-  principal.id)` → `appendMessagePair(pair)`.
-- doctrinal: state guard + `post_state_event` as
+- tx: `['requests','responses']`
+- actual: pair-plane invitation state guard; `revoked` →
+  no-op pair; not `pending` → 409; else revoke op pair.
+- doctrinal: state guard + revoke op pair as
   `post_revoke_invitation`.
 - props: atomic; admin-only; idempotent, its own genesis pair; the
   invitation row persists as audit.
 
 ### 3.26 `POST /snapshots/mock-data` — seed the demo dataset
 
-`postMockDataLoad` (`api/mock-data.ts:217`). Bearer-exempt, demo-only,
+`postMockDataLoad` (`api/mock-data.ts`). Bearer-exempt, demo-only,
 and — as a `BOOTSTRAP_ROUTES` member — below the shadow ledger
 entirely: this call forms and appends no pair for ITSELF (none of
 §5.1's headers appear on its own response). What it seeds, though,
-includes 603 of its OWN pre-formed message pairs, one per pair-capable
-seed write — see §5.3.
+includes **1506** of its OWN pre-formed message pairs
+(EXPECTED_PAIR_COUNT) — see §5.3.
 
 - **Three sequential steps, not one atomic op:**
   1. `ensureTables(TABLE_NAMES)`
   2. `transaction(TABLE_NAMES, postMockDataLoadIn)` — builds the whole
-     dataset, including the 603 seed pairs, in one tx (a mid-seed
+     dataset, including the 1506 seed pairs, in one tx (a mid-seed
      failure leaves no half-populated schema).
-  3. `seedHumanCredentials(adapter)` — its **own** tx
-     `[identity_credentials]`; the PBKDF2 hashing runs outside the tx
+  3. `seedHumanCredentials(adapter)` — its **own** tx over
+     `['requests','responses']`; the PBKDF2 hashing runs outside the tx
      (async crypto cannot run inside an IDB transaction).
   4. `postSchemaCreation()` — the schema marker stamps **last**, so a
      failed seed reads as empty and retries cleanly.
@@ -1589,7 +1522,7 @@ seed write — see §5.3.
 
 ### 3.27 `POST /snapshots/bootstrap` — seed the pristine minimal state
 
-`postBootstrap` (`api/mock-data.ts:990`). Same four-step shape as
+`postBootstrap` (`api/mock-data.ts`). Same four-step shape as
 §3.26 — no pair for itself, below the ledger — with `postBootstrapIn`
 planting only the shell essentials (system actor, current user, the
 singleton org — no Records) and its own single pre-formed pair for
@@ -1598,7 +1531,7 @@ the current-user create (§5.3). Returns `SeededCredentials`.
 ### 3.28 `PUT /snapshots/import` — restore a snapshot (not a POST)
 
 Included for completeness: it is the textbook gate-then-atomic write.
-`putSnapshot` (`api/db-backed.ts:219`). Also a `BOOTSTRAP_ROUTES`
+`putSnapshot` (`api/db-backed.ts`). Also a `BOOTSTRAP_ROUTES`
 member — no pair for this call itself; a restored snapshot's own
 `requests`/`responses` rows, if it had any, ride in with the rest of
 the imported data.
@@ -1626,21 +1559,21 @@ the earlier-retired `makeIdRoute` factory) — the wire is
 UNCHANGED: the body stays `{ position }` (today's only caller
 remains the web-app's `putObjectivePosition`, drag-reorder), never
 a lifecycle trio. The trio COULD represent the objective alphabet,
-but the states 911 pin forbids ever minting an objective genesis
-event, so the lifecycle stays on the shared `states` log instead
-(§5.8).
+but objectives are a **trio** family on the document body
+(`OBJECTIVES_WIRING`); there is no shared `states` log
+(§2.10 / §5.8).
 
-- tx: `[objectives, requests, responses]`
-- actual: `validateObjectiveDocumentBody(body)` → `objectives.put(
-  id, entity)` (the org-scoped store stamps `organization_id`, so
-  the body omits it) → `appendMessagePair(pair)`.
+- tx: `['requests','responses']`
+- actual: `validateObjectiveDocumentBody(body)` →
+  `appendMessagePair(pair)` (pair-plane only; lifecycle trio
+  on the document body).
 - props: atomic; document-class (a repeat PUT records
   `Supersedes`, §5.1); `validateObjectiveDocumentBody`'s
   `assertOnlyKeys` label is `'Objective'` — matching
   `validateObjectiveEntity`'s own label byte-for-byte (a NAMED
   divergence from the `*DocumentBody` naming convention every
   other document validator uses), so the 400 body text this route
-  raises is unchanged; no lifecycle event is ever posted here.
+  raises is unchanged.
 
 ### 3.30 `PUT /members/:id` — edit a member directory row (not a POST)
 
@@ -1657,9 +1590,9 @@ any web-app adapter: member edits go through the composed
 (§3.2, §3.4) instead, which already touch this same `members` row
 as one of their own facet puts.
 
-- tx: `[members, requests, responses]`
-- actual: `validateMemberDocumentBody(body)` → `members.put(
-  id, entity)` → `appendMessagePair(pair)`.
+- tx: `['requests','responses']`
+- actual: `validateMemberDocumentBody(body)` →
+  `appendMessagePair(pair)` (pair-plane only).
 - props: atomic; document-class (a repeat PUT records
   `Supersedes`, §5.1); `validateMemberDocumentBody`'s
   `assertOnlyKeys` label is `'MemberEntity'` — matching
@@ -1678,7 +1611,7 @@ as one of their own facet puts.
 leaf shape: DOCUMENT-class PUT/DELETE over
 `flow_versions` with `appendMessagePair`. Cap-trim splices
 that once lived inside the publish op are gone with the
-route; the table itself remains until Phase Final.
+route; Phase Final DELETED the table with the row plane.
 
 ### 3.32 `PUT /projects/:id` — project document write (not a POST)
 
@@ -1687,25 +1620,17 @@ body is the entity's own eight writable fields plus the
 lifecycle trio (`state`, `state_at`, `state_event_id`). Genesis
 is head-presence-defined — the first PUT at an id IS the birth.
 `postProjectStateChange` (the adapter's transition op) now
-mints a fresh trio and fires this SAME document PUT; projects
-no longer ride the generic `PUT /states/:id` (§2.10) — that
-route stays for every other family.
+mints a fresh trio and fires this SAME document PUT;
+`/states/:id` is retired (§2.10).
 
-- tx: `[projects, states, requests, responses]`
-- actual: read the current head event
-  (`states.getCurrentFor(id)`) → `projects.put(id, entity)` (the
-  org-scoped store stamps `organization_id`, so the body omits
-  it) → `states.postEvent(state_event_id, id, state, memberId,
-  state_at)` → `appendMessagePair(pair)`.
-- doctrinal: `put_project` + `post_state_event` as
-  `put_project_document`.
+- tx: `['requests','responses']`
+- actual: `appendMessagePair(pair)` — entity fields plus
+  lifecycle trio on the document body; pair-plane only.
+- doctrinal: `put_project_document` (lifecycle on the body).
 - props: atomic; member-tier; `validateProjectDocumentBody`;
-  idempotent (a byte-identical resend converges: one row, one
-  event, one pair); MEMBER_ID CAVEAT — a state-unchanged edit
-  (the resent trio matches the current head byte-for-byte)
+  idempotent; MEMBER_ID CAVEAT — a state-unchanged edit
   replays the STORED head event's `member_id`, never the
-  editing actor, so a different member editing a field after
-  someone else's transition does not 409.
+  editing actor.
 
 ### 3.33 `PUT /records/:id` — record document write (not a POST)
 
@@ -1719,29 +1644,19 @@ genesis normally arrives through the composed `POST /records`
 PUT-first flow and mirrors ideas/projects exactly rather than
 special-casing records as PUT-only-for-edits.
 `postRecordStateChange` (the adapter's transition op) now mints
-a fresh trio and fires this SAME document PUT; records no
-longer ride the generic `PUT /states/:id` (§2.10) for a
-transition — that route stays for every family without its own
-document PUT. `GET /records/:id` now rides the SAME wiring row
-through `documentGetHandler` (Task 7, Phase 6) — the flip that
-retired records' last hand-written GET; `DELETE /records/:id`
-stays hand-written, unchanged.
+a fresh trio and fires this SAME document PUT;
+`/states/:id` is retired (§2.10). `GET /records/:id` rides
+`documentGetHandler`; `DELETE /records/:id` stays hand-written
+(pair-plane tombstone).
 
-- tx: `[records, states, requests, responses]`
-- actual: read the current head event
-  (`states.getCurrentFor(id)`) → `records.put(id, entity)` (the
-  org-scoped store stamps `organization_id`, so the body omits
-  it) → `states.postEvent(state_event_id, id, state, memberId,
-  state_at)` → `appendMessagePair(pair)`.
-- doctrinal: `put_record` + `post_state_event` as
-  `put_record_document`.
+- tx: `['requests','responses']`
+- actual: `appendMessagePair(pair)` — entity fields plus
+  lifecycle trio on the document body; pair-plane only.
+- doctrinal: `put_record_document` (lifecycle on the body).
 - props: atomic; member-tier; `validateRecordDocumentBody`;
-  idempotent (a byte-identical resend converges: one row, one
-  event, one pair); MEMBER_ID CAVEAT — a state-unchanged edit
-  (the resent trio matches the current head byte-for-byte)
+  idempotent; MEMBER_ID CAVEAT — a state-unchanged edit
   replays the STORED head event's `member_id`, never the
-  editing actor, so a different member editing a field after
-  someone else's transition does not 409.
+  editing actor.
 
 ---
 
@@ -1765,7 +1680,7 @@ This is forced, not stylistic:
 
 ### The one genuine internal HTTP sub-request: `facadeRequest`
 
-`facadeRequest` (`api/api.ts:77`) is the sole place a request
+`facadeRequest` (`api/api.ts`) is the sole place a request
 re-enters `handleRequest`. For `/organizations/:org/:entity/...` it:
 
 1. takes the caller's Bearer token,
@@ -1895,7 +1810,7 @@ two, so they stand outside the FIFTEEN
 so the seed forms each family's pair the SAME way a live request
 would, then writes it alongside the seeded row:
 
-- The mock-data seed pre-forms **1511** message pairs — one pair per seeded
+- The mock-data seed pre-forms **1506** message pairs — one pair per seeded
   row for most families, but each seeded human/AI member folds in an
   operation/member-document/detail-document triple (11 human-members +
   4 ai-members, each × 3 = 45 member-family pairs: 15 ops + 15 member
@@ -1944,44 +1859,22 @@ would, then writes it alongside the seeded row:
   PLUS every seeded role grant folds in its OWN `role-grants/:id`
   document pair (12 more — the 2 admin grants for `current` plus
   one member grant per non-admin human), PLUS every work-order
-  historical trace event forms its OWN `states/:id` pair (860 —
-  211 hand-authored + 649 generated, Phase 11 Task 3, §5.16: no
-  dedicated op wraps it, a bare `adapter.states.put` untouched
-  beside its own new pair), PLUS every seeded `state_field_value`
-  forms its OWN nested `states/:id/field-values/:fvid` pair (7
-  more, same §5.16), PLUS the system member's OWN genesis event
-  forms its OWN pair (1 more, same §5.16 — bootstrap's own mirror
-  event is counted in the bootstrap count below, never here), PLUS
-  every seeded human member's OWN default-org event forms its OWN
-  identity-keyed `identities/:id/default-org/` pair (11 more, Phase
-  11 Task 8, §5.17: no dedicated op wraps it either, a bare
-  `adapter.identityDefaultOrganizations.put` untouched beside its
-  own new pair) —
-  in a first pass, BEFORE the
-  seed's own big transaction opens (`formWritePair`'s hashing is async
-  crypto, which would auto-commit an IndexedDB transaction early if awaited
-  inside one); a second pass then writes the seeded rows and appends each
-  pre-formed pair in the SAME transaction the row lands in. The bootstrap
-  seed forms exactly thirteen such pairs (the SAME member-family bundle —
-  now a quadruple, Phase 10 Task 5 — its
-  OWN membership and system-member document pairs, its own
-  `identities/:id/pii` document pair, PLUS Phase 10 Task 6's OWN
-  system-identity document pair, role-grant pair, and the two
-  credential pairs — current's password + the system client
-  secret, PLUS Phase 11 Task 3's OWN system-member genesis-event
-  pair (§5.16), PLUS Phase 11 Task 8's OWN default-org event pair
-  (§5.17)), for its lone `current` human-member create.
-- Memberships closed the LAST whole-slice seed deferral (Phase 8 Task
-  5): every seeded membership row and the system member's own
-  `members/:id` document now form a message pair too, closed through
-  `postMembershipDocumentOp` / `postMemberDocumentOp`. NO whole-slice
-  seed deferral remains; the work-order historical traces (states
-  events + state_field_values) stayed the one NAMED direct-write
-  carve-out, bound to the states-consumers flip, not "the work-orders
-  phase" (§5.6) — until Phase 11 Task 3 (§5.16) closed it: every
-  trace event and field value now ALSO forms its own message pair,
-  Path A (the states / state_field_values ROWS themselves stay the
-  SAME direct writes mock-data.ts already made).
+  historical trace reseeds as a `work-orders/:id/transition`
+  op-shaped pair (**861** — states-address retirement reshape;
+  field values fold into those transition bodies; no bare
+  `states/:id` or field-values leaf seed pairs remain), PLUS
+  every seeded human member's OWN default-org event forms its
+  OWN identity-keyed `identities/:id/default-org/` pair (11
+  more) —
+  in a first pass, BEFORE the seed's own big transaction opens
+  (`formWritePair`'s hashing is async crypto, which would
+  auto-commit an IndexedDB transaction early if awaited inside
+  one); a second pass then appends each pre-formed pair in one
+  `['requests','responses']` transaction (pair-plane only —
+  Phase Final deleted every entity table). The bootstrap seed
+  forms exactly **thirteen** such pairs (absolute; see
+  `tests/mock-data-pairs.test.ts`). Total mock seed:
+  **EXPECTED_PAIR_COUNT = 1506**.
 - The scores deferral now closes WHOLE — baselines AND actuals, the
   SAME `buildSeedScoreRows` output (`api/mock-data/scores.ts`) driving
   both the pair formation above and the seeded row writes.
@@ -3021,14 +2914,13 @@ the system member's OWN genesis event (2 — one per seed path)
 ALSO form their own message pair, beside rows that stay the SAME
 direct writes mock-data.ts already made. Unlike every other
 family §5.3 names, none of these three slices rides a dedicated
-op — `adapter.states.put` / `adapter.stateFieldValues.put` /
-`adapter.states.postEvent` stay bare, and the new pair is appended
-alongside via `appendMessagePair` directly, in the SAME
-transaction the row lands in. `states` 911/`679a7541`,
-`state_field_values` 7/`95d00f3a`, `work_orders` 145/`b57d1e25`,
-`members` 16/`0c164977` — every fingerprint pin the row-write
-side of this task touches — HOLD unchanged (`tests/mock-data-
-fingerprint.test.ts`, re-run, UNCHANGED file).
+op — pre-retirement dual-write used bare states/SFV
+adapters; post-retirement those tables are GONE and
+traces reseed as transition op pairs — historically the
+new pair was appended alongside via `appendMessagePair`
+directly. The fingerprint oracle
+(`tests/mock-data-fingerprint.test.ts`) later RETIRED
+with the entity-table era.
 
 **The three slices (+869).** Every work-order trace event
 (`buildWorkOrderStateEvents()` + `leadToCloseWorkload.stateEvents`,
@@ -3084,13 +2976,13 @@ bootstrap count 11 → 12; THREE new address/body-shape spot-checks
 (a trace event, a field value, the mock-data seed's OWN
 system-genesis pair at the GLOBAL, non-org-nested `/states/`
 address) + the member_id content spot-check above.
-`tests/mock-data-fingerprint.test.ts` is UNCHANGED — re-ran green.
+`tests/mock-data-fingerprint.test.ts` later RETIRED with
+the entity-table / clients era (file absent).
 
-**Contract.** `states` 911/`679a7541`, `work_orders` 145/
-`b57d1e25`, `state_field_values` 7/`95d00f3a`, `members` 16/
-`0c164977` HOLD (`tests/mock-data-fingerprint.test.ts`, file
-byte-unchanged) — Path A: `appendMessagePair` writes ONLY
-`requests`/`responses`, proven disjoint from every row-write side
+**Contract (as of Phase Final).** Absolute pair count is
+`EXPECTED_PAIR_COUNT = 1506` with bootstrap 13. Historical
+Path A dual-write (`appendMessagePair` beside row puts) is
+gone — only `requests`/`responses` remain; formerly
 this task touches. Reseed marginal cost measured ~125 ms for the
 +868 `postMockDataLoad`-side pairs (baseline ~351 ms → ~478 ms,
 5 runs each; ≈0.144 ms/pair, consistent with §5.15's own baseline)
@@ -3160,16 +3052,16 @@ the SAME reason the invitations side channel forms its own pairs
 directly. 11 mock-data pairs (one per seeded human member, actor =
 the member's OWN id — the route's self-authorship rule, never
 `SYSTEM_MEMBER_ID`) + bootstrap's OWN mirror pair (actor =
-`'current'`) — `EXPECTED_PAIR_COUNT` 1500 → 1511; the bootstrap
+`'current'`) — `EXPECTED_PAIR_COUNT` 1500 → 1506; the bootstrap
 count 12 → 13.
 
 **The re-pins (`tests/mock-data-pairs.test.ts`).**
-`EXPECTED_PAIR_COUNT` 1500 → 1511 (+11) + the breakdown prose; the
+`EXPECTED_PAIR_COUNT` 1500 → 1506 (+11) + the breakdown prose; the
 bootstrap count 12 → 13 + a new assertion for its default-org pair
 address; ONE new address/body-shape spot-check (a seeded default-
 org pair's identity-keyed address, its body carrying the three
 `{organization_id, eventId, at}` keys).
-`tests/mock-data-fingerprint.test.ts` is UNCHANGED — re-ran green;
+`tests/mock-data-fingerprint.test.ts` later RETIRED (file absent);
 `identity_default_organizations` 11/`ab3efde4` HOLDS, along with
 every other pin.
 
@@ -3196,7 +3088,7 @@ now ALSO reads `db.requests` — an unrelated widened dependency
 surface, not a weakened assertion.
 
 **Contract.** `identity_default_organizations` 11/`ab3efde4` HOLDS
-(`tests/mock-data-fingerprint.test.ts`, file byte-unchanged) — Path
+(fingerprint oracle later RETIRED) — Path
 A: the new pair writes ONLY `requests`/`responses`, disjoint from
 the row-write side this task touches. Reseed marginal cost measured
 ~4 ms for the +11 pairs (baseline ~479 ms → ~483 ms, 10 runs each)
@@ -3231,15 +3123,13 @@ Registration alone is byte-inert for the canonical address; it
 does not flip a read by itself.
 
 **The seed pairs (Task 3).** Both seeded organizations (Stark
-Industries, Wayne Enterprises) form their OWN `organizations/:id`
-document pair beside the SAME direct
-`adapter.organizations.put` row write — Path A, the row itself
-untouched. `EXPECTED_PAIR_COUNT` 1511 → 1513 (+2); the bootstrap
-count 13 → 14 (+1, its own lone Stark row).
-`tests/mock-data-fingerprint.test.ts`'s `organizations` pin —
-2/`e13d8f06` — HOLDS byte-identical: Path A, the pair write
-touches only `requests`/`responses`, disjoint from the row-write
-side.
+Industries, Wayne Enterprises) form their OWN
+`organizations/:id` document pairs on the message plane.
+Phase Final deleted the organizations row store; the live
+absolute is **EXPECTED_PAIR_COUNT = 1506** with bootstrap
+**13** (see `tests/mock-data-pairs.test.ts`). The retired
+`tests/mock-data-fingerprint.test.ts` file is gone with the
+clients / entity-table era.
 
 **The drift suite (Task 4, `tests/drift-organizations.test.ts`,
 8 legs).** OLD-vs-DERIVED parity: the caller-filtered collection
@@ -3289,9 +3179,10 @@ removed:**
   1 && GET` guard, §1.1) — the route-table row never dispatched.
 
 **What stayed old-plane (at Task 5's own close).** The
-`organizations` row store is fully intact — every write above
-is STILL Path A, dual-writing the row beside its pair. `PUT
-/organizations/:id` is untouched, hand-written.
+`organizations` is pair-plane only after Phase Final —
+writes append document pairs at `organizations/:id`; there
+is no dual-write row half. `PUT /organizations/:id` remains
+hand-written on the message plane.
 `callerOrganizationIds`'s membership filter and
 `derive-states.ts`'s ALL-orgs shape were both UNCHANGED — this
 task flips the row SOURCE only, never a fence or a filter.
@@ -3301,29 +3192,26 @@ ALL-orgs) stays exactly as this task left it.
 
 ### 5.19 Phase 15 route retirements and seed-address survival
 
-Phase 15 Task 7 retired four zero-caller route families
-(wire delta 1). The router 404s every retired address except
-bare `GET /states/:id`, which is **405** because
-`PUT /states/:id` still matches that pattern. Product
-callers were already zero; the only surviving live surfaces
-from those families are:
+Phase 15 Task 7 retired zero-caller route families; states-
+address retirement made **every verb** on `/states/:id` a
+router **404** (unauthenticated → 401 first). Product
+callers were already zero. Surviving live surfaces:
 
-- `PUT /states/:id` (unclaim / ownership write fence /
-  pair-plane immutability)
-- `GET /entity-states/:id/history` (derived)
-- `GET /states/:id/field-values` (derived collection)
+- `GET /states` (five-source derived union)
+- `GET /entity-states/:id/history` (derived + pair-plane fence)
+- `GET /states/:id/field-values` (derived; 200/403/404)
 
 `flow_versions` routes and table are GONE (Phase 15
 retired routes; Phase Final deleted the table).
 
-**Seed constraint (finding 7).** The
-`WRITE_RESPONSE_SPECS['states/:id/field-values/:fvid']`
-entry SURVIVES the leaf-route retirement: reseeds still form
-the seven nested leaf pairs at that address (§5.16). Pair-
-plane derivation of the collection does not require the
-write route to live — historical leaf pairs remain
-addressable. `flows/:id/versions*` specs and handlers are
-gone with the routes.
+**Seed reshape (states-address retirement).** The 861
+historical work-order traces reseed as
+`work-orders/:id/transition` op-shaped pairs; field values
+fold into those transition bodies. No bare `states/:id` or
+`states/:id/field-values/:fvid` seed pairs remain. No
+`WRITE_RESPONSE_SPECS` leaf entry for the retired field-
+values write address. `flows/:id/versions*` specs and
+handlers are gone with the routes.
 
 **§5 chronological gap (named) — DEFERRED.** Tasks 1–6 of
 Phase 14, the Phase 15 re-anchors, and the Phase Final

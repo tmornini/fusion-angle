@@ -20,6 +20,8 @@ import {
     type ServiceFacet,
     type IdentityCredentialKind,
     type IdentityKind,
+    type ClientRegistration,
+    type ClientStatus,
 } from '../adapters/index.ts';
 import { buildReadonlyField } from './detail-field.ts';
 
@@ -36,6 +38,7 @@ export interface IdentityDetailView {
     readonly service: ServiceFacet;
     readonly activeCredentialKinds:
         readonly IdentityCredentialKind[];
+    readonly registration: ClientRegistration;
 }
 
 function buildShell(container: HTMLElement): void {
@@ -159,6 +162,69 @@ function buildPersonalInfoCard(
         </div>`;
 }
 
+const REGISTRATION_TONE: Readonly<
+    Record<ClientStatus, string>
+> = {
+    active: 'success',
+    disabled: 'warning',
+};
+
+function buildRegistrationFields(
+    registration: Extract<
+        ClientRegistration, { registered: true }
+    >,
+): SafeHtml {
+    return html`
+        <div class="flex items-center gap-2 mb-4">
+            <span class="pill" data-tone="${
+                REGISTRATION_TONE[registration.status]
+            }">${registration.status}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            ${buildReadonlyField(
+                'Grant types', registration.grantTypes,
+            )}
+            ${buildReadonlyField(
+                'Redirect URIs',
+                registration.redirectUris,
+            )}
+            ${buildReadonlyField(
+                'Audience', registration.aud,
+            )}
+            ${buildReadonlyField(
+                'JWKS', registration.jwks,
+            )}
+        </div>`;
+}
+
+function buildRegistrationCard(
+    view: IdentityDetailView,
+): SafeHtml {
+    const registration = view.registration;
+    return html`
+        <div class="card p-6">
+            <h3 class="${
+                'font-display font-semibold mb-4'
+            }">Client registration</h3>
+            ${
+                registration.registered
+                    ? buildRegistrationFields(registration)
+                    : html`<p class="${
+                        'text-sm text-muted mb-4'
+                    }">Not registered.</p>`
+            }
+            <button
+                class="btn btn-outline"
+                data-identity-action="registration">
+                ${
+                    registration.registered
+                        ? 'Manage registration'
+                        : 'Register client'
+                }
+            </button>
+        </div>`;
+}
+
 function buildCredentialsCard(
     view: IdentityDetailView,
 ): SafeHtml {
@@ -262,6 +328,7 @@ export class IdentityDetailPresenter {
                     ${buildPersonalInfoCard(this.#view)}
                     ${buildLinksCard(this.#view)}`
                 : html`
+                    ${buildRegistrationCard(this.#view)}
                     ${buildCredentialsCard(this.#view)}
                     ${buildLinksCard(this.#view)}`,
         );

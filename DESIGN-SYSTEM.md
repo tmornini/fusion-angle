@@ -148,13 +148,12 @@ inline-style strings.
 #### Variants
 | Variant | Usage | Example |
 |---------|-------|---------|
-| `default` | Primary actions | "Create Project" |
+| `primary` | Primary actions (`btn-primary`) | "Create Project" |
 | `secondary` | Secondary actions | "Cancel", "Back" |
 | `outline` | Tertiary actions | "View Details" |
 | `ghost` | Minimal UI, icons | Icon buttons |
 | `destructive` | Dangerous actions | "Delete" |
 | `success` | Positive actions | "Approve" |
-| `soft-*` | Subtle emphasis | Status filters |
 
 #### Sizes
 | Size | Height | Usage |
@@ -298,13 +297,14 @@ references a pre-colored arrowhead marker chosen by type:
 fill), so each head matches its own line.
 
 Edge classification at render time uses DFS
-back-edge detection in `removeCycles`: during a
-depth-first traversal from the start node, any edge
-whose target is currently on the DFS stack is a
-back-edge and renders as a cycle. During a shift-drag
-to create a new edge, the separate `wouldBeCycle`
-helper uses reachability (`isReachable`) to preview
-whether the prospective edge would close a loop.
+back-edge detection in `findCycleEdgeIds`
+(`flow-cycle-edges.ts`): during a depth-first
+traversal from the start node, any edge whose target
+is currently on the DFS stack is a back-edge and
+renders as a cycle. During a shift-drag to create a
+new edge, the separate `wouldBeCycle` helper uses
+reachability (`isReachable`) to preview whether the
+prospective edge would close a loop.
 
 Labels render at the bezier midpoint in a pill with
 `--color-card-bg` background. Bidirectional pairs
@@ -355,7 +355,7 @@ group labels) is fine; no override needed.
 The sidebar org-switcher `<select>` is the documented
 exception to the `.input` select standard: it is a
 compact control styled by `.org-switcher`
-(`components-org-switcher.css`), not `.input`. It was
+(`components-organization-switcher.css`), not `.input`. It was
 re-homed from the old top-bar greeting into the sidebar
 footer.
 
@@ -365,7 +365,7 @@ The native `<select>` (`.org-switcher`) by which a member
 chooses the active org, paired with a quiet "Set as
 default" button (`.org-set-default`). The two sit in an
 `.org-switcher-group` cluster. CSS in
-`components-org-switcher.css`.
+`components-organization-switcher.css`.
 
 The switcher renders **only** when the member can reach two
 or more orgs; a single-org member sees plain org text
@@ -525,7 +525,10 @@ passing an off-scale pixel value fails the type-check.
 ## 12. CSS Architecture
 
 Source lives in `web-app/app/styles/`. Single source of truth —
-no inline styles (CSP forbids `unsafe-inline`).
+no raw style strings except dynamic CSS custom properties
+(`style="--…"`). CSP allows `style-src-attr 'unsafe-inline'`
+for those data-driven attributes; colors stay in the design
+system.
 
 ### Cascade order
 
@@ -541,7 +544,7 @@ applies:
 6. `components-*.css` — reusable component families
    (avatar, badges, brand, buttons, cards, controls,
    dialog, feedback, inputs, layout-helpers, menus,
-   metrics, org-switcher, page-placeholder, tables, tabs,
+   metrics, organization-switcher, page-placeholder, tables, tabs,
    toast)
 7. `layout.css` — sidebar, header, main-content shell
 8. `utilities.css` — single-property primitives plus

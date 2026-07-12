@@ -36,12 +36,13 @@ function installFailingShim(
     return map;
 }
 
-const clientRow = {
-    grant_types: 'authorization_code',
-    redirect_uris: 'https://example.com/cb',
-    jwks: '{}',
-    aud: 'aud',
-    status: 'active' as const,
+const aRequest = {
+    uri_prefix: '/organizations/1/ideas/',
+    uri_id: '42',
+    at: '2026-01-01T00:00:00.000000Z',
+    requester_identity_id: 'current',
+    message_hash: 'a'.repeat(64),
+    message: '{"kind":"request"}',
 };
 
 // Wipe-on-fail is retired: the import now runs in one
@@ -59,7 +60,7 @@ test(
         const snapshot = JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,
-            clients: [],
+            requests: [],
         });
         await assert.rejects(
             () => adapter.putSnapshot(snapshot),
@@ -74,18 +75,18 @@ test(
         await adapter.putSnapshot(JSON.stringify({
             [SNAPSHOT_SCHEMA_VERSION_KEY]:
                 SNAPSHOT_SCHEMA_VERSION,
-            clients: [
-                { id: 'm1', ...clientRow },
+            requests: [
+                { id: 'm1', ...aRequest },
             ],
         }));
         // An invalid row rejects at the validation gate,
         // before any storage touch — so the prior import
-        // survives whole.
+        // survives whole. `status` is unknown on requests.
         await assert.rejects(
             () => adapter.putSnapshot(JSON.stringify({
                 [SNAPSHOT_SCHEMA_VERSION_KEY]:
                     SNAPSHOT_SCHEMA_VERSION,
-                clients: [
+                requests: [
                     {
                         id: 'm2',
                         status: 'paused',
@@ -93,9 +94,9 @@ test(
                 ],
             })),
         );
-        const clients =
-            await adapter.clients.getAll();
-        assert.equal(clients.length, 1);
-        assert.equal(clients[0]!.id, 'm1');
+        const requests =
+            await adapter.requests.getAll();
+        assert.equal(requests.length, 1);
+        assert.equal(requests[0]!.id, 'm1');
     },
 );

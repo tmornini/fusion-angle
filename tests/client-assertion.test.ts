@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
     verifyClientAssertion,
 } from '../api/client-assertion.ts';
-import type { ClientEntity } from '../api/types.ts';
+import type {
+    ClientRegistrationEntity,
+} from '../api/types.ts';
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
@@ -12,7 +14,9 @@ const NOW = 1_700_000_000;
 const CLIENT_ID = 'svc-client';
 const AUDIENCE = 'fusion-ai-web';
 
-function clientWith(jwks: string): ClientEntity {
+function clientWith(
+    jwks: string,
+): ClientRegistrationEntity {
     return {
         id: CLIENT_ID,
         grant_types: 'client_credentials',
