@@ -1,0 +1,89 @@
+{
+    "auth": {
+        "readyMs": 367
+    },
+    "billing": {
+        "readyMs": 798
+    },
+    "dashboard": {
+        "readyMs": 1850
+    },
+    "design-system": {
+        "readyMs": 791
+    },
+    "flow-detail": {
+        "readyMs": 1271
+    },
+    "flow-stats": {
+        "readyMs": 1472
+    },
+    "flows": {
+        "readyMs": 1196
+    },
+    "idea-convert": {
+        "readyMs": 1870
+    },
+    "idea-create": {
+        "readyMs": 1003
+    },
+    "idea-detail": {
+        "readyMs": 1487
+    },
+    "ideas": {
+        "readyMs": 1677
+    },
+    "identities": {
+        "readyMs": 1164
+    },
+    "identity-detail": {
+        "readyMs": 1477
+    },
+    "identity-providers": {
+        "readyMs": 1138
+    },
+    "identity-tokens": {
+        "readyMs": 1160
+    },
+    "invitations": {
+        "readyMs": 1195
+    },
+    "landing": {
+        "readyMs": 392
+    },
+    "member-detail": {
+        "readyMs": 1326
+    },
+    "members": {
+        "readyMs": 1384
+    },
+    "not-found": {
+        "readyMs": 411
+    },
+    "organization": {
+        "readyMs": 3472
+    },
+    "project-detail": {
+        "readyMs": 1902
+    },
+    "projects": {
+        "readyMs": 2254
+    },
+    "record-create": {
+        "readyMs": 1138
+    },
+    "record-detail": {
+        "readyMs": 1652
+    },
+    "records": {
+        "readyMs": 1668
+    },
+    "snapshots": {
+        "readyMs": 1335
+    },
+    "workbox": {
+        "readyMs": 3392
+    },
+    "workbox-detail": {
+        "readyMs": 3651
+    }
+}

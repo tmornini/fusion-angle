@@ -4,6 +4,12 @@ import {
     extractErrorMessage,
 } from './error-helpers.ts';
 import {
+    fetchMeasureName,
+    markEnd,
+    markStart,
+    renderMeasureName,
+} from './page-performance.ts';
+import {
     SafeHtml,
     html,
     setHtml,
@@ -205,9 +211,14 @@ export async function loadInto<T>(
     cfg: LoadIntoConfig<T>,
 ): Promise<void> {
     setHtml(cfg.container, cfg.skeleton);
+    const fetchName = fetchMeasureName(
+        cfg.container.id,
+    );
     let data: T;
     try {
+        markStart(fetchName);
         data = await cfg.fetch();
+        markEnd(fetchName);
     } catch (e) {
         setHtml(
             cfg.container,
@@ -252,5 +263,10 @@ export async function loadInto<T>(
         cfg.emptyState.onEmpty?.();
         return;
     }
+    const renderName = renderMeasureName(
+        cfg.container.id,
+    );
+    markStart(renderName);
     await cfg.onData(data);
+    markEnd(renderName);
 }

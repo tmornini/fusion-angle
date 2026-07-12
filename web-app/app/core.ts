@@ -67,6 +67,17 @@ import {
 import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
+import {
+    markStart,
+    markEnd,
+    recordPageReady,
+    MEASURE_BOOT_DB_OPEN,
+    MEASURE_BOOT_SCHEMA_GATE,
+    MEASURE_BOOT_AUTH_GATE,
+    MEASURE_BOOT_ORGANIZATION_SCOPE,
+    MEASURE_BOOT_SIDEBAR_CHROME,
+    MEASURE_BOOT_COMMAND_PALETTE,
+} from './page-performance.ts';
 
 export { navigateTo } from './navigation.ts';
 export {
@@ -285,9 +296,11 @@ document.addEventListener(
         initListeners();
 
         let hasSchema: boolean;
+        markStart(MEASURE_BOOT_DB_OPEN);
         try {
             hasSchema =
                 await initDatabase();
+            markEnd(MEASURE_BOOT_DB_OPEN);
         } catch (err) {
             // A missing/incompatible table routes to the
             // snapshots recovery page; when boot already
@@ -303,15 +316,17 @@ document.addEventListener(
             }
         }
 
+        markStart(MEASURE_BOOT_SCHEMA_GATE);
         putSchemaPresent(hasSchema);
 
         const pageName = getPageName();
 
-        if (
+        const needsSchemaRedirect =
             !hasSchema
             && PAGE_REGISTRY[pageName]?.requiresSchema
-                !== false
-        ) {
+                !== false;
+        markEnd(MEASURE_BOOT_SCHEMA_GATE);
+        if (needsSchemaRedirect) {
             navigateTo('snapshots');
             return;
         }
@@ -321,14 +336,31 @@ document.addEventListener(
                 PAGE_REGISTRY[pageName]?.requiresAuth
                     !== false
             ) {
-                if (!(await bootAuthGate())) {
+                markStart(MEASURE_BOOT_AUTH_GATE);
+                const authOk = await bootAuthGate();
+                markEnd(MEASURE_BOOT_AUTH_GATE);
+                if (!authOk) {
                     return;   // bounced to login
                 }
-                if (!(await bootOrganizationGate())) {
+                markStart(
+                    MEASURE_BOOT_ORGANIZATION_SCOPE,
+                );
+                const organizationOk =
+                    await bootOrganizationGate();
+                markEnd(
+                    MEASURE_BOOT_ORGANIZATION_SCOPE,
+                );
+                if (!organizationOk) {
                     return;   // bounced to invitations
                 }
             } else {
+                markStart(
+                    MEASURE_BOOT_ORGANIZATION_SCOPE,
+                );
                 await scopeBootIfCredentialed();
+                markEnd(
+                    MEASURE_BOOT_ORGANIZATION_SCOPE,
+                );
             }
         }
 
@@ -336,10 +368,12 @@ document.addEventListener(
             PAGE_REGISTRY[pageName]?.layout
                 === 'sidebar'
         ) {
+            markStart(MEASURE_BOOT_SIDEBAR_CHROME);
             try {
                 await initSidebarLayout(
                     hasSchema,
                 );
+                markEnd(MEASURE_BOOT_SIDEBAR_CHROME);
             } catch (err) {
                 if (
                     redirectIfMissingTable(err)
@@ -352,8 +386,10 @@ document.addEventListener(
             }
         }
 
+        markStart(MEASURE_BOOT_COMMAND_PALETTE);
         try {
             await loadAndInitCommandPalette();
+            markEnd(MEASURE_BOOT_COMMAND_PALETTE);
         } catch (err) {
             if (
                 redirectIfMissingTable(err)
@@ -367,6 +403,7 @@ document.addEventListener(
 
         try {
             await initPageModule(pageName);
+            recordPageReady(pageName);
         } catch (err) {
             if (
                 redirectIfMissingTable(err)

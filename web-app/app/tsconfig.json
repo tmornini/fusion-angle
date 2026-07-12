@@ -20,5 +20,9 @@
         "lib": ["ES2024", "DOM", "DOM.Iterable"]
     },
     "include": ["./**/*.ts", "../**/*.ts", "../../api/**/*.ts", "../../shared/**/*.ts"],
-    "exclude": ["./compose.ts", "./generate-schema-svg.ts"]
+    "exclude": [
+        "./compose.ts",
+        "./generate-schema-svg.ts",
+        "./measure.ts"
+    ]
 }

@@ -15,6 +15,13 @@ when working with code in this repository.
 ./build dir/           # ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
 ./serve [port]         # Build + start HTTP server (default 8080)
+./measure              # Page-load benchmark (needs Chrome)
+./measure --check      # Fail if medians exceed budgets
+./measure --record     # Append one line to measure-history.jsonl
+./measure --write-budgets  # mean+1.5σ budgets (full sweep)
+./measure --budget-sigmas N  # σ multiplier (default 1.5)
+./measure --pages a,b  # Subset of PAGE_REGISTRY keys
+./measure --runs N     # Runs per page (default 5)
 ```
 
 **Commit before building.** `./build` requires a clean
@@ -61,6 +68,42 @@ it runs the
 `api/types.ts`).
 
 For what each test layer covers, see `## Testing`.
+
+### Measurement
+
+`./measure` is a headless-Chrome page-load benchmark. It is
+**not** part of `./validate` — it needs Chrome and takes
+minutes (a full 29-page × 5-run sweep is several minutes).
+
+Run deliberately: before builds/releases; after adapter,
+derive, or presenter changes; at migration milestones with
+`--record`.
+
+Budgets live in `measure-budgets.json` (repo root) — per
+`PAGE_REGISTRY` page `readyMs` ceiling. Calibrate with
+`--write-budgets` (full registry only): each budget is
+`ceil(mean + k×sampleσ)` of that page's run samples
+(`k` defaults to 1.5 via `--budget-sigmas`). `--check`
+gates **median** readyMs against those ceilings. Budgets
+are a **per-machine-class local dev gate**, not a CI
+absolute. Use enough `--runs` (e.g. 30) for a stable σ.
+
+History lives in `measure-history.jsonl` — appended only by
+`--record`. Longitudinal record across the Postgres
+migration.
+
+In-app instrumentation always ships: `page-performance.ts`
+marks boot/fetch/render phases; one `page-performance` info
+log fires after ready (default log level `warn` keeps
+consoles quiet).
+
+Clean tree required (same as `./build` — measures committed
+bytes). Sandbox: `TMPDIR=/tmp/claude ./measure ...`. Chrome
+binary: `$CHROME`, or the macOS default Google Chrome path.
+
+Design:
+`docs/superpowers/specs/2026-07-12-page-
+performance-measurement-design.md`.
 
 ## TypeScript
 
