@@ -16,12 +16,14 @@ when working with code in this repository.
 ./build --help         # Show usage
 ./serve [port]         # Build + start HTTP server (default 8080)
 ./measure              # Page-load benchmark (needs Chrome)
+./measure --help       # Show usage
 ./measure --check      # Fail if medians exceed budgets
 ./measure --record     # Append history under measurements/
 ./measure --write-budgets  # mean+1.5σ budgets (full sweep)
 ./measure --budget-sigmas N  # σ multiplier (default 1.5)
 ./measure --pages a,b  # Subset of PAGE_REGISTRY keys
 ./measure --runs N     # Runs per page (default 5)
+./measure --visualize  # History HTML from disk (no Chrome)
 ```
 
 **Commit before building.** `./build` requires a clean
@@ -79,18 +81,41 @@ Run deliberately: before builds/releases; after adapter,
 derive, or presenter changes; at migration milestones with
 `--record`.
 
+Stats (median/min/max readyMs, phase medians, and
+`--write-budgets` mean+σ) drop the top and bottom 5% of
+samples (`floor(n×0.05)` per tail). Default `--runs 5`
+is too small to trim; use enough runs (e.g. 30) so the
+tails actually drop and σ stabilizes.
+
 Budgets live in `measurements/budgets.json` — per
 `PAGE_REGISTRY` page `readyMs` ceiling. Calibrate with
 `--write-budgets` (full registry only): each budget is
-`ceil(mean + k×sampleσ)` of that page's run samples
-(`k` defaults to 1.5 via `--budget-sigmas`). `--check`
-gates **median** readyMs against those ceilings. Budgets
-are a **per-machine-class local dev gate**, not a CI
-absolute. Use enough `--runs` (e.g. 30) for a stable σ.
+`ceil(mean + k×sampleσ)` of that page's **trimmed**
+samples (`k` defaults to 1.5 via `--budget-sigmas`).
+`--check` gates **median** readyMs against those
+ceilings. Budgets are a **per-machine-class local dev
+gate**, not a CI absolute.
 
 History lives in `measurements/history.jsonl` —
 appended only by `--record`. Longitudinal record across
 the Postgres migration.
+
+`--visualize` regenerates `measurements/index.html` from
+committed history + budgets (self-contained HTML, gitignored).
+Bare `./measure --visualize` skips the clean-tree gate and
+Chrome. With a measure run, pass `--visualize` to regenerate
+after success; without `--record`, a note says that this run
+is not in history. Missing history or budgets is a hard fail.
+Not part of `./validate`. Phase rollup treats
+`boot:page-init` as **residual** wall time after nested
+`fetch:*` / `render:*` (no double-count in the stacked bar).
+
+`--profile` prints per-ready API request counts (method +
+resource, id segments collapsed to `:id`) plus page-init
+residual attribution. Default pages:
+organization, workbox, workbox-detail, projects; default
+`--runs 1`. Override with `--pages` / `--runs`. Browser-only
+hit log in `page-request-profile.ts` (no-op under Node).
 
 In-app instrumentation always ships: `page-performance.ts`
 marks boot/fetch/render phases; one `page-performance` info
@@ -103,7 +128,9 @@ binary: `$CHROME`, or the macOS default Google Chrome path.
 
 Design:
 `docs/superpowers/specs/2026-07-12-page-
-performance-measurement-design.md`.
+performance-measurement-design.md`,
+`docs/superpowers/specs/2026-07-12-measure-
+visualize-design.md`.
 
 ## TypeScript
 

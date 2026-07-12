@@ -2,9 +2,11 @@
 // Run via ./measure from the repo root (see that wrapper).
 // Excluded from browser tsc; uses Node APIs + global WebSocket.
 //
-// Flow: clean-tree gate → build → serve → Chrome → seed →
-// login → detail-URL discovery → N-run sweep → report
-// → optional --check / --record. Cleanup always in finally.
+// Flow: optional bare --visualize (disk only) → clean-tree
+// gate → build → serve → Chrome → seed → login →
+// detail-URL discovery → N-run sweep → report → optional
+// --check / --record / --visualize. Cleanup always in
+// finally.
 
 import {
     appendFileSync,
@@ -40,6 +42,12 @@ import {
     type PageStats,
     type Budgets,
 } from './measure-core.ts';
+import { generateMeasureViz } from './measure-viz.ts';
+import {
+    DEFAULT_PROFILE_PAGES,
+    formatRequestProfileReport,
+    type ApiRequestHit,
+} from './measure-profile-core.ts';
 
 const execFile = promisify(execFileCb);
 
@@ -75,17 +83,80 @@ type Cli = {
     budgetSigmas: number;
     pages: string[] | null;
     runs: number;
+    visualize: boolean;
+    /** API request-count profile after each ready. */
+    profile: boolean;
+    /** True when --runs was present on argv. */
+    runsExplicit: boolean;
 };
 
-function parseArgs(argv: string[]): Cli {
+type ParseResult =
+    | { kind: 'ok'; cli: Cli }
+    | { kind: 'help' }
+    | { kind: 'error'; message: string };
+
+function usageText(): string {
+    return [
+        'Usage: ./measure [options]',
+        '',
+        'Page-load benchmark via headless Chrome + CDP.',
+        'Stats drop the top and bottom 5% of samples',
+        '(floor(n×0.05) per tail; n < 20 keeps all).',
+        '',
+        'Options:',
+        '  --check              Fail if medians exceed',
+        '                       budgets',
+        '  --record             Append a history line',
+        '                       under measurements/',
+        '  --write-budgets      Write mean+kσ budgets',
+        '                       (full registry only)',
+        '  --budget-sigmas N    σ multiplier for',
+        '                       --write-budgets',
+        `                       (default ${DEFAULT_BUDGET_SIGMAS})`,
+        '  --pages a,b,c        Subset of PAGE_REGISTRY',
+        '                       keys',
+        '  --runs N             Runs per page',
+        `                       (default ${DEFAULT_RUNS})`,
+        '  --visualize          Write measurements/',
+        '                       index.html from disk',
+        '                       history (bare = no',
+        '                       Chrome; with a run,',
+        '                       regenerate after)',
+        '  --profile            Print API request counts',
+        '                       + page-init residual per',
+        '                       ready (default pages:',
+        '                       organization, workbox,',
+        '                       workbox-detail, projects;',
+        '                       default --runs 1)',
+        '  --help, -h           Show this help',
+        '',
+        'Examples:',
+        '  ./measure',
+        '  ./measure --pages dashboard,ideas --runs 30',
+        '  ./measure --check --record --visualize',
+        '  ./measure --write-budgets --runs 30',
+        '  ./measure --visualize',
+        '  ./measure --profile',
+        '  ./measure --profile --pages ideas,dashboard',
+        '',
+    ].join('\n');
+}
+
+function parseArgs(argv: string[]): ParseResult {
     let check = false;
     let record = false;
     let writeBudgets = false;
     let budgetSigmas = DEFAULT_BUDGET_SIGMAS;
     let pages: string[] | null = null;
     let runs = DEFAULT_RUNS;
+    let visualize = false;
+    let profile = false;
+    let runsExplicit = false;
     for (let i = 0; i < argv.length; i++) {
         const a = argv[i]!;
+        if (a === '--help' || a === '-h') {
+            return { kind: 'help' };
+        }
         if (a === '--check') {
             check = true;
             continue;
@@ -98,6 +169,14 @@ function parseArgs(argv: string[]): Cli {
             writeBudgets = true;
             continue;
         }
+        if (a === '--visualize') {
+            visualize = true;
+            continue;
+        }
+        if (a === '--profile') {
+            profile = true;
+            continue;
+        }
         if (a === '--budget-sigmas') {
             const v = argv[++i];
             if (
@@ -105,10 +184,12 @@ function parseArgs(argv: string[]): Cli {
                 || !Number.isFinite(Number(v))
                 || Number(v) < 0
             ) {
-                throw new Error(
-                    '--budget-sigmas requires a'
-                    + ' non-negative number',
-                );
+                return {
+                    kind: 'error',
+                    message:
+                        '--budget-sigmas requires a'
+                        + ' non-negative number',
+                };
             }
             budgetSigmas = Number(v);
             continue;
@@ -116,18 +197,22 @@ function parseArgs(argv: string[]): Cli {
         if (a === '--pages') {
             const v = argv[++i];
             if (v === undefined || v.length === 0) {
-                throw new Error(
-                    '--pages requires a comma-separated'
-                    + ' list of registry keys',
-                );
+                return {
+                    kind: 'error',
+                    message:
+                        '--pages requires a'
+                        + ' comma-separated list of'
+                        + ' registry keys',
+                };
             }
             pages = v.split(',')
                 .map((s) => s.trim())
                 .filter((s) => s.length > 0);
             if (pages.length === 0) {
-                throw new Error(
-                    '--pages list is empty',
-                );
+                return {
+                    kind: 'error',
+                    message: '--pages list is empty',
+                };
             }
             continue;
         }
@@ -137,28 +222,51 @@ function parseArgs(argv: string[]): Cli {
                 v === undefined
                 || !/^[1-9]\d*$/.test(v)
             ) {
-                throw new Error(
-                    '--runs requires a positive integer',
-                );
+                return {
+                    kind: 'error',
+                    message:
+                        '--runs requires a positive'
+                        + ' integer',
+                };
             }
             runs = Number(v);
+            runsExplicit = true;
             continue;
         }
-        throw new Error(`Unknown flag: ${a}`);
+        return {
+            kind: 'error',
+            message: `Unknown flag: ${a}`,
+        };
     }
     if (writeBudgets && pages !== null) {
-        throw new Error(
-            '--write-budgets requires a full registry'
-            + ' sweep (omit --pages)',
-        );
+        return {
+            kind: 'error',
+            message:
+                '--write-budgets requires a full'
+                + ' registry sweep (omit --pages)',
+        };
+    }
+    // Profile defaults: heaviest page-init pages, one
+    // run (call counts are deterministic for a seed).
+    if (profile && pages === null) {
+        pages = [...DEFAULT_PROFILE_PAGES];
+    }
+    if (profile && !runsExplicit) {
+        runs = 1;
     }
     return {
-        check,
-        record,
-        writeBudgets,
-        budgetSigmas,
-        pages,
-        runs,
+        kind: 'ok',
+        cli: {
+            check,
+            record,
+            writeBudgets,
+            budgetSigmas,
+            pages,
+            runs,
+            visualize,
+            profile,
+            runsExplicit,
+        },
     };
 }
 
@@ -480,10 +588,14 @@ async function waitForSelector(
     );
 }
 
+type ReadyHarvest = PageRun & {
+    apiHits: ApiRequestHit[];
+};
+
 async function harvestReady(
     cdp: CdpClient,
-): Promise<PageRun | null> {
-    return evaluateJson<PageRun | null>(
+): Promise<ReadyHarvest | null> {
+    return evaluateJson<ReadyHarvest | null>(
         cdp,
         `(() => {
             const measures =
@@ -504,9 +616,16 @@ async function harvestReady(
                     phases[e.name] = e.duration;
                 }
             }
+            const g = globalThis;
+            const apiHits =
+                typeof g.__fusionApiRequestHits
+                    === 'function'
+                    ? g.__fusionApiRequestHits()
+                    : [];
             return {
                 readyMs: m.duration,
                 phases,
+                apiHits,
             };
         })()`,
     );
@@ -516,7 +635,7 @@ async function waitPageReady(
     cdp: CdpClient,
     pageLabel: string,
     timeoutMs: number,
-): Promise<PageRun> {
+): Promise<ReadyHarvest> {
     return pollUntil(
         `page:ready on ${pageLabel}`,
         timeoutMs,
@@ -929,13 +1048,17 @@ function resolvePageUrl(
 
 // ── Sweep ──────
 
+type PageRunWithHits = PageRun & {
+    apiHits: ApiRequestHit[];
+};
+
 async function measurePage(
     cdp: CdpClient,
     key: string,
     url: string,
     runs: number,
-): Promise<PageRun[]> {
-    const out: PageRun[] = [];
+): Promise<PageRunWithHits[]> {
+    const out: PageRunWithHits[] = [];
     for (let i = 1; i <= runs; i++) {
         await pageNavigate(cdp, url);
         const run = await waitPageReady(
@@ -946,6 +1069,7 @@ async function measurePage(
         out.push({
             readyMs: run.readyMs,
             phases: { ...run.phases },
+            apiHits: run.apiHits.slice(),
         });
     }
     return out;
@@ -954,8 +1078,38 @@ async function measurePage(
 // ── Main ──────
 
 async function main(): Promise<void> {
-    const cli = parseArgs(process.argv.slice(2));
+    const parsed = parseArgs(process.argv.slice(2));
+    if (parsed.kind === 'help') {
+        process.stdout.write(usageText());
+        return;
+    }
+    if (parsed.kind === 'error') {
+        process.stderr.write(
+            `measure: ${parsed.message}\n\n`,
+        );
+        process.stderr.write(usageText());
+        process.exitCode = 1;
+        return;
+    }
+    const cli = parsed.cli;
     const repoRoot = process.cwd();
+
+    const visualizeOnly =
+        cli.visualize
+        && !cli.check
+        && !cli.record
+        && !cli.writeBudgets
+        && !cli.profile
+        && cli.pages === null
+        && !cli.runsExplicit;
+
+    if (visualizeOnly) {
+        const out = generateMeasureViz(repoRoot);
+        process.stderr.write(
+            `Wrote visualizer → ${out}\n`,
+        );
+        return;
+    }
 
     // Clean tree: measure committed bytes only.
     {
@@ -1148,6 +1302,15 @@ async function main(): Promise<void> {
         const stats: Record<string, PageStats> = {};
         // Per-page readyMs samples (for --write-budgets).
         const readySamples: Record<string, number[]> = {};
+        // First-run hits for --profile (seed is fixed).
+        const profileHits: Record<
+            string,
+            {
+                readyMs: number;
+                phases: Record<string, number>;
+                apiHits: ApiRequestHit[];
+            }
+        > = {};
         for (const key of pageKeys) {
             const url = resolvePageUrl(
                 baseUrl, key, discovered,
@@ -1162,11 +1325,35 @@ async function main(): Promise<void> {
             readySamples[key] = runs.map(
                 (r) => r.readyMs,
             );
+            if (cli.profile && runs[0] !== undefined) {
+                const first = runs[0];
+                profileHits[key] = {
+                    readyMs: first.readyMs,
+                    phases: { ...first.phases },
+                    apiHits: first.apiHits.slice(),
+                };
+            }
         }
 
         // 8. Report
         const report = formatReport(stats);
         process.stdout.write(report + '\n');
+
+        // 8a. --profile: API route counts + residual
+        if (cli.profile) {
+            for (const key of pageKeys) {
+                const row = profileHits[key];
+                if (row === undefined) continue;
+                process.stdout.write(
+                    formatRequestProfileReport(
+                        key,
+                        row.readyMs,
+                        row.phases,
+                        row.apiHits,
+                    ),
+                );
+            }
+        }
 
         // 8b. --write-budgets (mean + sigmas×sample σ)
         if (cli.writeBudgets) {
@@ -1328,6 +1515,21 @@ async function main(): Promise<void> {
             );
             process.stderr.write(
                 `Recorded history → ${historyFile}\n`,
+            );
+        }
+
+        // 11. --visualize (always from disk after run)
+        if (cli.visualize) {
+            if (!cli.record) {
+                process.stderr.write(
+                    'Note: this run is not in history; '
+                    + 'visualizer regenerated from disk '
+                    + 'only.\n',
+                );
+            }
+            const out = generateMeasureViz(repoRoot);
+            process.stderr.write(
+                `Wrote visualizer → ${out}\n`,
             );
         }
     } finally {

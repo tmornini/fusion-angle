@@ -4,6 +4,7 @@ import {
     median,
     mean,
     sampleStandardDeviation,
+    trimExtremes,
     budgetReadyMsFromSamples,
     statsForPage,
     compareBudgets,
@@ -12,6 +13,63 @@ import {
     type PageRun,
     type PageStats,
 } from '../web-app/app/measure-core.ts';
+
+// --- trimExtremes ---
+
+test('trimExtremes empty throws', () => {
+    assert.throws(
+        () => trimExtremes([]),
+        /empty/i,
+    );
+});
+
+test('trimExtremes rejects bad fraction', () => {
+    assert.throws(
+        () => trimExtremes([1], -0.1),
+        /fraction/i,
+    );
+    assert.throws(
+        () => trimExtremes([1], 0.5),
+        /fraction/i,
+    );
+    assert.throws(
+        () => trimExtremes([1], NaN),
+        /fraction/i,
+    );
+});
+
+test('trimExtremes n<20 at 5% keeps all', () => {
+    // floor(5 × 0.05) = 0 → no drop
+    const input = [5, 1, 4, 2, 3];
+    assert.deepEqual(
+        trimExtremes(input),
+        [1, 2, 3, 4, 5],
+    );
+    // Input not mutated.
+    assert.deepEqual(input, [5, 1, 4, 2, 3]);
+});
+
+test('trimExtremes drops 5% each tail', () => {
+    // n=20 → floor(20×0.05)=1 each side
+    const values = [];
+    for (let i = 1; i <= 20; i++) {
+        values.push(i);
+    }
+    assert.deepEqual(
+        trimExtremes(values),
+        [
+            2, 3, 4, 5, 6, 7, 8, 9, 10,
+            11, 12, 13, 14, 15, 16, 17, 18, 19,
+        ],
+    );
+});
+
+test('trimExtremes fraction 0 is identity sorted', () => {
+    assert.deepEqual(
+        trimExtremes([3, 1, 2], 0),
+        [1, 2, 3],
+    );
+});
 
 // --- median ---
 
@@ -79,7 +137,7 @@ test(
     'budgetReadyMsFromSamples is mean + sigmas×σ'
     + ' ceiled',
     () => {
-        // mean=5, sample σ=√(32/7)
+        // n=8 < 20 → no trim; mean=5, sample σ=√(32/7)
         // 5 + 1.5×√(32/7) ≈ 8.207 → ceil 9
         const values = [2, 4, 4, 4, 5, 5, 7, 9];
         assert.equal(
@@ -96,6 +154,22 @@ test(
         assert.equal(
             budgetReadyMsFromSamples([1.1, 1.1], 0),
             2,
+        );
+    },
+);
+
+test(
+    'budgetReadyMsFromSamples trims 5% each tail',
+    () => {
+        // n=20: drop 1 and 100; mean of 2..19 = 10.5
+        // sample σ of 2..19; 10.5 + 0×σ → ceil 11
+        const values = [];
+        for (let i = 1; i <= 20; i++) {
+            values.push(i);
+        }
+        assert.equal(
+            budgetReadyMsFromSamples(values, 0),
+            11,
         );
     },
 );
@@ -152,6 +226,20 @@ test('statsForPage empty runs throws', () => {
         () => statsForPage([]),
         /empty/i,
     );
+});
+
+test('statsForPage trims extremes on readyMs', () => {
+    // n=20 → drop lowest (1) and highest (1000)
+    const runs: PageRun[] = [];
+    for (let i = 1; i <= 19; i++) {
+        runs.push({ readyMs: i, phases: {} });
+    }
+    runs.push({ readyMs: 1000, phases: {} });
+    const s = statsForPage(runs);
+    assert.equal(s.readyMs.min, 2);
+    assert.equal(s.readyMs.max, 19);
+    // Middle of 2..19 (18 values, even): (10+11)/2 = 10.5
+    assert.equal(s.readyMs.median, 10.5);
 });
 
 // --- compareBudgets ---

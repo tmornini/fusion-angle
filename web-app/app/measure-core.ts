@@ -44,6 +44,44 @@ export type HistoryLine = {
 };
 
 /**
+ * Drop the lowest and highest `fraction` of samples
+ * (default 5% each tail) to mute environment noise.
+ * Sorts a copy; never mutates input. Empty → throws.
+ * `fraction` must be finite and in [0, 0.5). Drop count
+ * is `floor(n × fraction)` per tail; n < 20 keeps all
+ * at the default fraction. Always leaves ≥ 1 value.
+ */
+export function trimExtremes(
+    values: number[],
+    fraction: number = 0.05,
+): number[] {
+    if (values.length === 0) {
+        throw new Error('trimExtremes: empty values');
+    }
+    if (
+        !Number.isFinite(fraction)
+        || fraction < 0
+        || fraction >= 0.5
+    ) {
+        throw new Error(
+            'trimExtremes: fraction must be a finite'
+            + ' number in [0, 0.5)',
+        );
+    }
+    const sorted = values.slice().sort((a, b) => a - b);
+    const drop = Math.floor(sorted.length * fraction);
+    if (drop === 0) {
+        return sorted;
+    }
+    // Cap so at least one sample remains.
+    const maxDrop = Math.floor(
+        (sorted.length - 1) / 2,
+    );
+    const d = Math.min(drop, maxDrop);
+    return sorted.slice(d, sorted.length - d);
+}
+
+/**
  * Median of a number array. Sorts a copy; never mutates
  * input. Odd length → middle value. Even length → average
  * of the two middle values. Empty → throws.
@@ -100,8 +138,9 @@ export function sampleStandardDeviation(
 
 /**
  * Upper budget for readyMs: mean + sigmas × sample σ,
- * ceiled to a whole millisecond. Empty → throws.
- * sigmas must be finite and ≥ 0.
+ * ceiled to a whole millisecond. Samples are first
+ * trimmed (default 5% each tail) to mute environment
+ * noise. Empty → throws. sigmas must be finite and ≥ 0.
  */
 export function budgetReadyMsFromSamples(
     values: number[],
@@ -121,21 +160,26 @@ export function budgetReadyMsFromSamples(
             + ' be a finite number ≥ 0',
         );
     }
+    const trimmed = trimExtremes(values);
     const upper =
-        mean(values)
-        + sigmas * sampleStandardDeviation(values);
+        mean(trimmed)
+        + sigmas * sampleStandardDeviation(trimmed);
     return Math.ceil(upper);
 }
 
 /**
  * Aggregate min/median/max readyMs and per-phase medians
- * across runs. Empty runs → throws.
+ * across runs. Each series is first trimmed (default 5%
+ * each tail) so min/max/median ignore environment
+ * extremes. Empty runs → throws.
  */
 export function statsForPage(runs: PageRun[]): PageStats {
     if (runs.length === 0) {
         throw new Error('statsForPage: empty runs');
     }
-    const readyValues = runs.map((r) => r.readyMs);
+    const readyValues = trimExtremes(
+        runs.map((r) => r.readyMs),
+    );
     const phaseValues = new Map<string, number[]>();
     for (const run of runs) {
         for (const [name, ms] of Object.entries(
@@ -151,7 +195,7 @@ export function statsForPage(runs: PageRun[]): PageStats {
     }
     const phases: Record<string, number> = {};
     for (const [name, values] of phaseValues) {
-        phases[name] = median(values);
+        phases[name] = median(trimExtremes(values));
     }
     return {
         readyMs: {

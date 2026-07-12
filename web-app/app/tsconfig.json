@@ -23,6 +23,7 @@
     "exclude": [
         "./compose.ts",
         "./generate-schema-svg.ts",
-        "./measure.ts"
+        "./measure.ts",
+        "./measure-viz.ts"
     ]
 }

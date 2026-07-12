@@ -43,6 +43,9 @@ import {
     resolveActiveOrganization,
     postOrganizationSessionExchange,
 } from './organization-session.ts';
+import {
+    recordApiRequest,
+} from '../page-request-profile.ts';
 
 // Rows whose `field` equals `value` — the single-field
 // equality filter the adapters repeat. Type-safe: `field`
@@ -122,38 +125,54 @@ function makeRequestContext(
     const ctx: RequestContext = {
         requestId,
         identity,
-        GET: <T>(resource: string) =>
-            run<T>(tok => httpGet<T>(
+        GET: <T>(resource: string) => {
+            recordApiRequest('GET', resource);
+            return run<T>(tok => httpGet<T>(
                 adapter, resource, tok, requestId,
-            )),
-        GETWithResponseId: <T>(resource: string) =>
-            run<{ body: T; responseId: string | undefined }>(
+            ));
+        },
+        GETWithResponseId: <T>(resource: string) => {
+            recordApiRequest('GET', resource);
+            return run<{
+                body: T;
+                responseId: string | undefined;
+            }>(
                 tok => httpGetWithResponseId<T>(
                     adapter, resource, tok, requestId,
                 ),
-            ),
+            );
+        },
         PUT: <T>(
             resource: string,
             body: Record<string, unknown>,
             headerFields?:
                 readonly (readonly [string, string])[],
-        ) => run<T>(
-            tok => httpPut<T>(
-                adapter, resource, body, tok,
-                headerFields, requestId,
-            )),
-        DELETE: (resource: string) =>
-            run<void>(
+        ) => {
+            recordApiRequest('PUT', resource);
+            return run<T>(
+                tok => httpPut<T>(
+                    adapter, resource, body, tok,
+                    headerFields, requestId,
+                ));
+        },
+        DELETE: (resource: string) => {
+            recordApiRequest('DELETE', resource);
+            return run<void>(
                 tok => httpDelete(
                     adapter, resource, tok, requestId,
-                )),
+                ));
+        },
         POST: <T>(
             resource: string,
             body: Record<string, unknown>,
-        ) => run<T>(
-            tok => httpPost<T>(
-                adapter, resource, body, tok, requestId,
-            )),
+        ) => {
+            recordApiRequest('POST', resource);
+            return run<T>(
+                tok => httpPost<T>(
+                    adapter, resource, body, tok,
+                    requestId,
+                ));
+        },
     };
     return ctx;
 }
