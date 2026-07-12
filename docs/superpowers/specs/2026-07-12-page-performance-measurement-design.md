@@ -170,7 +170,7 @@ Bare `./measure` = measure + report only.
 Cleanup in `finally`: kill Chrome + http.server, rm temp dirs.
 Every failure is named; nothing is swallowed.
 
-### C. Budget gate — `measure-budgets.json` (repo root)
+### C. Budget gate — `measurements/budgets.json`
 
 Shape:
 
@@ -192,7 +192,7 @@ rounded up to clean values. Budgets are per-machine-class
 (local dev gate); docs say so honestly. They are not a
 cross-machine SLA.
 
-### D. History — `measure-history.jsonl` (repo root)
+### D. History — `measurements/history.jsonl`
 
 Appended ONLY by `--record`. One line per recorded sweep:
 
@@ -249,7 +249,8 @@ harness lands.
    shape, report).
 3. `./measure` wrapper + `measure.ts` CDP driver + seed/login/
    discovery/sweep.
-4. Initial `measure-budgets.json` from first accepted run × 2.0
+4. Initial `measurements/budgets.json` from first
+   accepted run (mean + k×sampleσ; k defaults to 1.5)
    slack; wire `--check` / `--record`.
 5. CLAUDE.md `./measure` section.
 

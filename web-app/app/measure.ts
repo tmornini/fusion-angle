@@ -52,8 +52,8 @@ const LOGIN_TIMEOUT_MS = 60_000;
 const PAGE_READY_MS = 120_000;
 const ELEMENT_TIMEOUT_MS = 30_000;
 const POLL_MS = 200;
-const BUDGETS_PATH = 'measure-budgets.json';
-const HISTORY_PATH = 'measure-history.jsonl';
+const BUDGETS_PATH = 'measurements/budgets.json';
+const HISTORY_PATH = 'measurements/history.jsonl';
 
 // Detail pages whose URL must be scraped from a list page.
 const DETAIL_FROM_LIST: Record<string, string> = {

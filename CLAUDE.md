@@ -17,7 +17,7 @@ when working with code in this repository.
 ./serve [port]         # Build + start HTTP server (default 8080)
 ./measure              # Page-load benchmark (needs Chrome)
 ./measure --check      # Fail if medians exceed budgets
-./measure --record     # Append one line to measure-history.jsonl
+./measure --record     # Append history under measurements/
 ./measure --write-budgets  # mean+1.5σ budgets (full sweep)
 ./measure --budget-sigmas N  # σ multiplier (default 1.5)
 ./measure --pages a,b  # Subset of PAGE_REGISTRY keys
@@ -79,7 +79,7 @@ Run deliberately: before builds/releases; after adapter,
 derive, or presenter changes; at migration milestones with
 `--record`.
 
-Budgets live in `measure-budgets.json` (repo root) — per
+Budgets live in `measurements/budgets.json` — per
 `PAGE_REGISTRY` page `readyMs` ceiling. Calibrate with
 `--write-budgets` (full registry only): each budget is
 `ceil(mean + k×sampleσ)` of that page's run samples
@@ -88,9 +88,9 @@ gates **median** readyMs against those ceilings. Budgets
 are a **per-machine-class local dev gate**, not a CI
 absolute. Use enough `--runs` (e.g. 30) for a stable σ.
 
-History lives in `measure-history.jsonl` — appended only by
-`--record`. Longitudinal record across the Postgres
-migration.
+History lives in `measurements/history.jsonl` —
+appended only by `--record`. Longitudinal record across
+the Postgres migration.
 
 In-app instrumentation always ships: `page-performance.ts`
 marks boot/fetch/render phases; one `page-performance` info
