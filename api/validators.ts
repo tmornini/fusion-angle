@@ -7,8 +7,6 @@ import type {
     AttributeType,
     Constraint,
     MemberId,
-    JsonArrayField,
-    JsonObjectField,
     IdentityEntity,
     IdentityPiiEntity,
     IdentityCredentialEntity,
@@ -202,52 +200,6 @@ function typeName(value: unknown): string {
     if (value === null) return 'null';
     if (Array.isArray(value)) return 'array';
     return typeof value;
-}
-
-export function validateStringArrayJson(
-    raw: string,
-    label: string,
-): string[] {
-    const parsed = parseOrThrow(raw, label);
-    const arr = asArray(parsed, label);
-    return arr.map((item, i) =>
-        asString(
-            item,
-            label + '[' + i + ']',
-        ),
-    );
-}
-
-export function validateConstraintArrayJson(
-    raw: string,
-    label: string,
-): Constraint[] {
-    const parsed = parseOrThrow(raw, label);
-    const arr = asArray(parsed, label);
-    return arr.map((item, i) =>
-        asConstraint(
-            item,
-            label + '[' + i + ']',
-        ),
-    );
-}
-
-export function
-validateStringNumberRecordJson(
-    raw: string,
-    label: string,
-): Record<string, number> {
-    const parsed = parseOrThrow(raw, label);
-    const obj = asObject(parsed, label);
-    const out: Record<string, number> = {};
-    for (
-        const [k, v] of Object.entries(obj)
-    ) {
-        out[k] = asNumber(
-            v, label + '.' + k,
-        );
-    }
-    return out;
 }
 
 const NODE_ATTRIBUTE_MODES:
@@ -493,21 +445,11 @@ export function asStoredGraph(
     };
 }
 
-export function validateStoredGraphJson(
-    raw: string,
-    label: string,
-): StoredGraph {
-    const parsed = parseOrThrow(raw, label);
-    return asStoredGraph(parsed, label);
-}
-
-export function
-validateWorkOrderFlowGraphJson(
-    raw: string,
+export function asWorkOrderFlowGraph(
+    value: unknown,
     label: string,
 ): WorkOrderFlowGraph {
-    const parsed = parseOrThrow(raw, label);
-    const obj = asObject(parsed, label);
+    const obj = asObject(value, label);
     const nodesArr = asArray(
         obj['nodes'],
         label + '.nodes',
@@ -542,28 +484,6 @@ validateWorkOrderFlowGraphJson(
 }
 
 
-// ── JSON field helpers ────────────────
-
-function asJsonArrayField(
-    value: unknown,
-    label: string,
-): JsonArrayField {
-    const raw = asString(value, label);
-    const parsed = parseOrThrow(raw, label);
-    asArray(parsed, label);
-    return raw as JsonArrayField;
-}
-
-function asJsonObjectField(
-    value: unknown,
-    label: string,
-): JsonObjectField {
-    const raw = asString(value, label);
-    const parsed = parseOrThrow(raw, label);
-    asObject(parsed, label);
-    return raw as JsonObjectField;
-}
-
 // ── Pick-from-body helpers ───────────
 //
 // pick*(body, key) is the no-stutter form
@@ -593,18 +513,28 @@ export function pickBoolean(
     return asBoolean(body[key], key);
 }
 
-export function pickJsonArrayField(
+export function pickStringArray(
     body: Record<string, unknown>,
     key: string,
-): JsonArrayField {
-    return asJsonArrayField(body[key], key);
+): string[] {
+    const arr = asArray(body[key], key);
+    return arr.map((item, i) =>
+        asString(item, key + '[' + i + ']'),
+    );
 }
 
-export function pickJsonObjectField(
+export function pickStringNumberRecord(
     body: Record<string, unknown>,
     key: string,
-): JsonObjectField {
-    return asJsonObjectField(body[key], key);
+): Record<string, number> {
+    const obj = asObject(body[key], key);
+    const out: Record<string, number> = {};
+    for (
+        const [k, v] of Object.entries(obj)
+    ) {
+        out[k] = asNumber(v, key + '.' + k);
+    }
+    return out;
 }
 
 // A string field that may be ABSENT from the body — never
@@ -733,17 +663,14 @@ export function validateEnumField<E extends string>(
 // ("trust within the walls" doctrine).
 //
 // Follow-on: extend this same discipline
-// into JSON-encoded fields (graph,
-// flow_graph, values, strengths,
-// team_dimensions, etc.) — each
-// JSON column's inner schema needs its own
+// into remaining nested object fields
+// that still lack full key-set gates —
+// each shape's inner schema needs its own
 // enumerated key list. That is the
 // "recursive check" that closes the
 // remaining edges. Intentionally deferred
-// here because each column's shape must be
-// enumerated case-by-case. Bringing those
-// columns under key-count discipline is
-// the next iteration.
+// here because each shape must be
+// enumerated case-by-case.
 
 // `optional` names keys that MAY appear but need not — the
 // follows/supersedes shape (absent is the only valid "none",
@@ -1150,23 +1077,13 @@ export function validateHumanMemberEntity(
         HUMAN_MEMBER_BODY_KEYS,
         'HumanMemberEntity',
     );
-    // Structural gate: the columns store raw JSON strings,
-    // but their shapes are enforced at instantiation — the
-    // same validators the domain accessors run downstream
-    // as their transform.
-    const strengths = pickJsonArrayField(
+    const strengths = pickStringArray(
         body, 'strengths',
     );
-    validateStringArrayJson(
-        strengths, 'HumanMemberEntity.strengths',
-    );
-    const teamDimensions = pickJsonObjectField(
-        body, 'team_dimensions',
-    );
-    validateStringNumberRecordJson(
-        teamDimensions,
-        'HumanMemberEntity.team_dimensions',
-    );
+    const teamDimensions =
+        pickStringNumberRecord(
+            body, 'team_dimensions',
+        );
     return {
         title: pickString(
             body, 'title',
@@ -1201,8 +1118,8 @@ export interface HumanMemberDocumentBody {
 // matching TODAY'S store validator (validateHumanMemberEntity)
 // byte-for-byte, NOT the 'HumanMemberDocumentBody' naming
 // convention every other *DocumentBody validator uses. The
-// strengths/team_dimensions structural gates (validateStringArrayJson/
-// validateStringNumberRecordJson) are the SAME calls
+// strengths/team_dimensions structural gates (pickStringArray/
+// pickStringNumberRecord) are the SAME calls
 // validateHumanMemberEntity makes, so every 400 this validator
 // can raise stays byte-identical to its store counterpart. Global
 // plane (family-registry.ts: organizationNested:false) — no
@@ -1216,19 +1133,13 @@ export function validateHumanMemberDocumentBody(
         HUMAN_MEMBER_DOCUMENT_BODY_KEYS,
         'HumanMemberEntity',
     );
-    const strengths = pickJsonArrayField(
+    const strengths = pickStringArray(
         body, 'strengths',
     );
-    validateStringArrayJson(
-        strengths, 'HumanMemberEntity.strengths',
-    );
-    const teamDimensions = pickJsonObjectField(
-        body, 'team_dimensions',
-    );
-    validateStringNumberRecordJson(
-        teamDimensions,
-        'HumanMemberEntity.team_dimensions',
-    );
+    const teamDimensions =
+        pickStringNumberRecord(
+            body, 'team_dimensions',
+        );
     return {
         entity: {
             title: pickString(
@@ -1583,11 +1494,10 @@ export function validateProjectDocumentBody(
     };
 }
 
-// The graph is NOT a flow column — it lives in the four
-// relation tables. The storage row carries only the flow's own
-// scalar fields; the relation rows are validated by their own
-// entity validators (validateFlowNodeEntity et al.) as the
-// graph delta lands.
+// The graph is NOT a FlowEntity key — it rides the flow
+// document body as a native nested object (`graph`, plus
+// write-side `graphDelta` / `revivals`). validateFlowEntity
+// accepts only the flow's own scalar fields.
 const FLOW_BODY_KEYS: readonly string[] = [
     'organization_id', 'name', 'is_locked',
     'is_auto_layout', 'is_auto_fit',
@@ -1638,12 +1548,11 @@ export interface FlowDocumentBody {
     readonly state_at: string;
     readonly state_event_id: string;
     // The FULL reduced graph in EXACTLY the wire form GET
-    // /flows/:id emits today (JsonObjectField is a branded
-    // JSON-ENCODED STRING — the same covenant
-    // flow_versions.graph already carries); validated via
-    // validateStoredGraphJson but stored as the SAME encoded
-    // string — the op never re-serializes it.
-    readonly graph: JsonObjectField;
+    // /flows/:id emits — a NATIVE nested object (the stored
+    // tongue: storedGraph()'s shape); validated via
+    // asStoredGraph and carried verbatim — the op never
+    // re-serializes it.
+    readonly graph: Record<string, unknown>;
     // SIDECAR-KEEP: graphDelta/revivals stay on the document
     // pair body permanently — deriveFlowGraphStates is the
     // sole ledger source of flow-node/edge deleted/restored
@@ -1690,8 +1599,10 @@ export function validateFlowDocumentBody(
             + ' non-empty',
         );
     }
-    const graph = pickJsonObjectField(body, 'graph');
-    validateStoredGraphJson(graph, 'FlowDocumentBody.graph');
+    const graph = asObject(
+        body['graph'], 'FlowDocumentBody.graph',
+    );
+    asStoredGraph(graph, 'FlowDocumentBody.graph');
     const graphDelta = validateFlowGraphDelta(
         asObject(
             body['graphDelta'], 'FlowDocumentBody.graphDelta',
@@ -1855,9 +1766,10 @@ export function validateWorkOrderEntity(
         WORK_ORDER_BODY_KEYS,
         'WorkOrderEntity',
     );
-    const flowGraph =
-        pickJsonObjectField(body, 'flow_graph');
-    validateWorkOrderFlowGraphJson(
+    const flowGraph = asObject(
+        body['flow_graph'], 'flow_graph',
+    );
+    asWorkOrderFlowGraph(
         flowGraph, 'WorkOrderEntity.flow_graph',
     );
     return {
@@ -1907,8 +1819,10 @@ export function validateWorkOrderDocumentBody(
         body, WORK_ORDER_DOCUMENT_BODY_KEYS,
         'WorkOrderDocumentBody', ['organization_id'],
     );
-    const flowGraph = pickJsonObjectField(body, 'flow_graph');
-    validateWorkOrderFlowGraphJson(
+    const flowGraph = asObject(
+        body['flow_graph'], 'flow_graph',
+    );
+    asWorkOrderFlowGraph(
         flowGraph, 'WorkOrderDocumentBody.flow_graph',
     );
     return {
@@ -2622,44 +2536,30 @@ export function validateRecordAttributeEntity(
         body['attribute_type'],
         'RecordAttributeEntity.attribute_type',
     );
-    const constraintsField =
-        pickJsonArrayField(
-            body, 'constraints',
-        );
-    const parsedConstraints = parseOrThrow(
-        constraintsField,
-        'RecordAttributeEntity.constraints',
-    );
     const constraintsArr = asArray(
-        parsedConstraints,
-        'RecordAttributeEntity.constraints',
+        body['constraints'], 'constraints',
     );
-    for (let i = 0; i < constraintsArr.length; i++) {
-        const constraint = asConstraint(
-            constraintsArr[i],
-            'RecordAttributeEntity.constraints['
-            + i + ']',
-        );
-        assertConstraintAppliesTo(
-            constraint.kind,
-            attributeType,
-            'RecordAttributeEntity.constraints['
-            + i + ']',
-        );
-    }
-    const optionsField = pickJsonArrayField(
+    const constraints = constraintsArr.map(
+        (item, i) => {
+            const constraint = asConstraint(
+                item,
+                'constraints[' + i + ']',
+            );
+            assertConstraintAppliesTo(
+                constraint.kind,
+                attributeType,
+                'constraints[' + i + ']',
+            );
+            return constraint;
+        },
+    );
+    const options = pickStringArray(
         body, 'options',
-    );
-    // Options are a string array for EVERY attribute type —
-    // the same shape the read adapter derives downstream.
-    const parsedOptions = validateStringArrayJson(
-        optionsField,
-        'RecordAttributeEntity.options',
     );
     if (
         (attributeType === 'select'
             || attributeType === 'radio')
-        && parsedOptions.length === 0
+        && options.length === 0
     ) {
         throw new ValidationError(
             'RecordAttributeEntity.options'
@@ -2678,8 +2578,8 @@ export function validateRecordAttributeEntity(
         sort_order: pickNumber(
             body, 'sort_order',
         ),
-        options: optionsField,
-        constraints: constraintsField,
+        options,
+        constraints,
     };
 }
 
@@ -2736,40 +2636,30 @@ export function validateRecordAttributeDocumentBody(
         body['attribute_type'],
         'RecordAttributeDocumentBody.attribute_type',
     );
-    const constraintsField =
-        pickJsonArrayField(body, 'constraints');
-    const parsedConstraints = parseOrThrow(
-        constraintsField,
-        'RecordAttributeDocumentBody.constraints',
-    );
     const constraintsArr = asArray(
-        parsedConstraints,
-        'RecordAttributeDocumentBody.constraints',
+        body['constraints'], 'constraints',
     );
-    for (let i = 0; i < constraintsArr.length; i++) {
-        const constraint = asConstraint(
-            constraintsArr[i],
-            'RecordAttributeDocumentBody.constraints['
-            + i + ']',
-        );
-        assertConstraintAppliesTo(
-            constraint.kind,
-            attributeType,
-            'RecordAttributeDocumentBody.constraints['
-            + i + ']',
-        );
-    }
-    const optionsField = pickJsonArrayField(
+    const constraints = constraintsArr.map(
+        (item, i) => {
+            const constraint = asConstraint(
+                item,
+                'constraints[' + i + ']',
+            );
+            assertConstraintAppliesTo(
+                constraint.kind,
+                attributeType,
+                'constraints[' + i + ']',
+            );
+            return constraint;
+        },
+    );
+    const options = pickStringArray(
         body, 'options',
-    );
-    const parsedOptions = validateStringArrayJson(
-        optionsField,
-        'RecordAttributeDocumentBody.options',
     );
     if (
         (attributeType === 'select'
             || attributeType === 'radio')
-        && parsedOptions.length === 0
+        && options.length === 0
     ) {
         throw new ValidationError(
             'RecordAttributeDocumentBody.options'
@@ -2784,8 +2674,8 @@ export function validateRecordAttributeDocumentBody(
             name,
             attribute_type: attributeType,
             sort_order: pickNumber(body, 'sort_order'),
-            options: optionsField,
-            constraints: constraintsField,
+            options,
+            constraints,
         },
     };
 }
@@ -3270,24 +3160,24 @@ const FLOW_CREATE_KEYS: readonly string[] = [
     'initialStateAt', 'graphDelta',
 ];
 
-// The HTTP-body gate for POST /flows: the flow row, its
-// project_flows join row, the initial state event, and the
-// initial graph delta (seeding the four relation tables),
-// written atomically. The facet fields are NOT fully
-// validated here — the org-scoped flows store stamps
-// organization_id from the verified token and re-validates
-// through validateFlowEntity AFTER the stamp (so the body
-// OMITS organization_id), and the project_flows store
-// re-validates the join through validateProjectFlowEntity
-// when the composing POST puts it. Authorship of the
-// initial event is stamped from the verified caller in the
-// route, never the body; initialState is carried for
-// symmetry with the other create endpoints (the flow
-// creation paths pin it to 'active') and validated
-// non-empty. graphDelta is the pre-built relation delta for
-// the default graph (2 nodes, 0 edges, 0 member/attribute
-// events) — validated here at the HTTP gate via
-// validateFlowGraphDelta; the route writes the rows.
+// The HTTP-body gate for POST /flows: the flow scalars, its
+// project_flows join, the initial state event, and the
+// initial graphDelta (native write-side sidecar for the
+// default graph), written atomically as message pairs. The
+// facet fields are NOT fully validated here — the org-
+// scoped flows path stamps organization_id from the
+// verified token and re-validates through
+// validateFlowEntity AFTER the stamp (so the body OMITS
+// organization_id), and the project_flows path re-validates
+// the join through validateProjectFlowEntity when the
+// composing POST puts it. Authorship of the initial event
+// is stamped from the verified caller in the route, never
+// the body; initialState is carried for symmetry with the
+// other create endpoints (the flow creation paths pin it to
+// 'active') and validated non-empty. graphDelta is the
+// pre-built native delta for the default graph (2 nodes, 0
+// edges, 0 member/attribute events) — validated here at the
+// HTTP gate via validateFlowGraphDelta.
 export function validateFlowCreateBody(
     body: Record<string, unknown>,
 ): FlowCreateBody {

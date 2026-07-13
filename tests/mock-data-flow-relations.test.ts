@@ -4,7 +4,7 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { deriveFlow } from '../api/derive-flows.ts';
-import { validateStoredGraphJson } from '../api/validators.ts';
+import { asStoredGraph } from '../api/validators.ts';
 import type { StoredGraph } from '../api/types.ts';
 
 // buildFlows() seeds land on Stark (flowSeedBody stamps
@@ -45,13 +45,13 @@ async () => {
     await postMockDataLoad(db);
 
     for (const flow of buildFlows()) {
-        const expected = validateStoredGraphJson(
+        const expected = asStoredGraph(
             flow.graph, 'seed flow ' + flow.id,
         );
         const derived = await deriveFlow(
             db, STARK_ORGANIZATION, flow.id,
         );
-        const actual = validateStoredGraphJson(
+        const actual = asStoredGraph(
             derived.graph, 'derived flow ' + flow.id,
         );
         assert.deepEqual(

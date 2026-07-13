@@ -29,8 +29,8 @@ function buildHumanMember(
             `${name}@example.com`.toLowerCase(),
         title: 'Engineer',
         department: 'Product',
-        strengths: '[]' as never,
-        team_dimensions: '{}' as never,
+        strengths: [],
+        team_dimensions: {},
         phone: '',
         bio: '',
     };

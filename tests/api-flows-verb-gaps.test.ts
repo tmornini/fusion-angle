@@ -107,9 +107,9 @@ test('POST flows/:id/redo 404s (route retired; redo now'
                     is_auto_layout: false,
                     is_auto_fit: false,
                     lock_timeout: DEFAULT_LOCK_TIMEOUT,
-                    graph: JSON.stringify({
+                    graph: {
                         nodes: [], edges: [],
-                    }),
+                    },
                     at: '2026-01-01T00:00:00.000000Z',
                 },
                 trimIds: [],

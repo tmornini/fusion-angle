@@ -9,7 +9,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import type { StateEntity } from '../api/types.ts';
 import {
-    jsonObjectField, MS_PER_SECOND, nowUtc, SYSTEM_MEMBER_ID,
+    MS_PER_SECOND, nowUtc, SYSTEM_MEMBER_ID,
     setClockForTest, resetClock,
 } from '../api/types.ts';
 import {
@@ -149,19 +149,21 @@ async function seed(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-function workOrderFlowGraph(lockTimeoutSeconds: number): string {
-    return jsonObjectField({
+function workOrderFlowGraph(
+    lockTimeoutSeconds: number,
+): Record<string, unknown> {
+    return {
         name: 'Lifecycle Fixture Flow',
         lockTimeout: lockTimeoutSeconds,
         nodes: [], edges: [],
-    });
+    };
 }
 
 function createWorkOrderBody(
     id: string,
     flowWorkOrderId: string,
     flowId: string,
-    graph: string,
+    graph: Record<string, unknown>,
     events: {
         readonly ids: readonly [string, string, string];
         readonly ats: readonly [string, string, string];

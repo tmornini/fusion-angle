@@ -2,10 +2,6 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { localStorageDbAdapter } from '../api/db-localstorage.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    SNAPSHOT_SCHEMA_VERSION,
-    SNAPSHOT_SCHEMA_VERSION_KEY,
-} from '../api/db.ts';
 
 function installFailingShim(
     failOnSetCall: number,
@@ -58,8 +54,6 @@ test(
         const adapter = localStorageDbAdapter();
         await adapter.initialize();
         const snapshot = JSON.stringify({
-            [SNAPSHOT_SCHEMA_VERSION_KEY]:
-                SNAPSHOT_SCHEMA_VERSION,
             requests: [],
         });
         await assert.rejects(
@@ -73,8 +67,6 @@ test(
     async () => {
         const adapter = memoryDbAdapter();
         await adapter.putSnapshot(JSON.stringify({
-            [SNAPSHOT_SCHEMA_VERSION_KEY]:
-                SNAPSHOT_SCHEMA_VERSION,
             requests: [
                 { id: 'm1', ...aRequest },
             ],
@@ -84,8 +76,6 @@ test(
         // survives whole. `status` is unknown on requests.
         await assert.rejects(
             () => adapter.putSnapshot(JSON.stringify({
-                [SNAPSHOT_SCHEMA_VERSION_KEY]:
-                    SNAPSHOT_SCHEMA_VERSION,
                 requests: [
                     {
                         id: 'm2',

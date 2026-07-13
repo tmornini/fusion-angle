@@ -5,7 +5,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { jsonObjectField, nowUtc } from '../api/types.ts';
+import { nowUtc } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { invitationOpStateFor } from '../api/derive-invitations.ts';
 import {
@@ -171,8 +171,10 @@ test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
 
 // -- workOrderLifecycleStatesFor ---------------------------------
 
-function workOrderFlowGraph(lockTimeoutSeconds: number): string {
-    return jsonObjectField({
+function workOrderFlowGraph(
+    lockTimeoutSeconds: number,
+): Record<string, unknown> {
+    return {
         name: 'Parity Fixture Flow',
         lockTimeout: lockTimeoutSeconds,
         nodes: [
@@ -208,7 +210,7 @@ function workOrderFlowGraph(lockTimeoutSeconds: number): string {
                 fromNodeId: 'n-middle', toNodeId: 'n-finish',
             },
         ],
-    });
+    };
 }
 
 const EMPTY_FLOW_ID = 'E2BnBlZyrriqsQYkmS4usb';

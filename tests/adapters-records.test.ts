@@ -16,9 +16,6 @@ import {
     postRecordStateChange,
 } from '../web-app/app/adapters/records.ts';
 import {
-    jsonArrayField,
-} from '../api/types.ts';
-import {
     seedCurrentMember,
 } from './member-fixtures.ts';
 import {
@@ -73,8 +70,8 @@ test(
                     name: 'Fee',
                     attribute_type: 'number',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField([]),
+                    options: [],
+                    constraints: [],
                 },
             ],
             initialState: 'active',
@@ -139,8 +136,8 @@ test(
                     name: 'Old',
                     attribute_type: 'text',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField([]),
+                    options: [],
+                    constraints: [],
                 },
             ],
             initialState: 'active',
@@ -161,8 +158,8 @@ test(
                     name: 'New',
                     attribute_type: 'text',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField([]),
+                    options: [],
+                    constraints: [],
                 },
             ],
             state: head.stateValue(),

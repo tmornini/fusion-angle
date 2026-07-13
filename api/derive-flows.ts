@@ -5,12 +5,12 @@ import type {
     FlowNodeAttributeEntity, FlowNodeMemberEntity,
 } from './types.ts';
 import {
-    pickString, pickNumber, pickBoolean, pickJsonObjectField,
+    pickString, pickNumber, pickBoolean,
     validateFlowNodeAttributeEntity,
     validateFlowNodeMemberEntity,
 } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
-import { normalizedStoredGraphField } from
+import { normalizedStoredGraph } from
     './flow-graph-relations.ts';
 import {
     deriveDocumentsAt,
@@ -33,7 +33,7 @@ import {
 // equality against the old plane. Structurally mirrors
 // derive-ideas.ts/derive-projects.ts (same private helper
 // shapes, renamed for flows) through the shared Task 2 helpers;
-// the graph re-sort (normalizedStoredGraphField, flow-graph-
+// the graph re-sort (normalizedStoredGraph, flow-graph-
 // relations.ts) is the ONE flows-novel piece a flat document
 // family never needed.
 //
@@ -103,9 +103,7 @@ export function flowEntityOf(
         is_auto_layout: pickBoolean(body, 'is_auto_layout'),
         is_auto_fit: pickBoolean(body, 'is_auto_fit'),
         lock_timeout: pickNumber(body, 'lock_timeout'),
-        graph: normalizedStoredGraphField(
-            pickJsonObjectField(body, 'graph'),
-        ),
+        graph: normalizedStoredGraph(body['graph']),
         hasUndoHistory: (pairCount ?? 0) > 1,
     };
 }

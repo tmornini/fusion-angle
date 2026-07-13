@@ -2,8 +2,6 @@ import type { RequestContext } from './shared.ts';
 import type { SeededCredentials } from '../../../api/mock-data.ts';
 import {
     MissingTableError,
-    SNAPSHOT_SCHEMA_VERSION,
-    SNAPSHOT_SCHEMA_VERSION_KEY,
 } from '../../../api/db.ts';
 
 // Fallback when navigator.storage.estimate() is
@@ -83,11 +81,9 @@ export const RETIRED_KEYS_PER_TABLE:
 };
 
 // Client-side diagnostics only (scanForRetiredKeys on the
-// file-upload path). The UNIVERSAL server gate is
-// SNAPSHOT_SCHEMA_VERSION equality in parseAndValidateSnapshot
-// — a pre-Final export fails the version check before any
-// table key is read. This list fails fast on known dead keys
-// when a file still carries them alongside a current marker.
+// file-upload path). Fails fast on known dead keys when a
+// file still carries them. Row shape is re-checked server-
+// side in parseAndValidateSnapshot.
 export const RETIRED_TABLES: readonly string[] = [
     'clients',
     'activities',
@@ -175,15 +171,7 @@ function scanForRetiredKeys(
     // upload path before a network round trip. The UNIVERSAL
     // guarantee is server-side (parseAndValidateSnapshot, api/
     // snapshot-validator.ts): every DbAdapter.putSnapshot
-    // caller crosses that gate, not only this one. Same no-
-    // default rule here: an absent or mismatched marker is a
-    // finding, never silently accepted.
-    if (
-        snap[SNAPSHOT_SCHEMA_VERSION_KEY]
-            !== SNAPSHOT_SCHEMA_VERSION
-    ) {
-        findings.push(SNAPSHOT_SCHEMA_VERSION_KEY);
-    }
+    // caller re-checks row shape, not only this path.
     for (const table of RETIRED_TABLES) {
         if (table in snap) {
             findings.push(table);

@@ -4,7 +4,7 @@ import type {
 } from '../../../api/types.ts';
 import {
     asBoolean,
-    validateStoredGraphJson,
+    asStoredGraph,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
 import { shouldShowMemberHazard } from '../flow-graph.ts';
@@ -19,7 +19,7 @@ export type FlowReadiness = ValidationResult<FlowProblem>;
 export function validateFlowForCreation(
     flow: FlowWithGraph,
 ): FlowReadiness {
-    const graph = validateStoredGraphJson(
+    const graph = asStoredGraph(
         flow.graph, 'flow.graph',
     );
     const problems: FlowProblem[] = [];

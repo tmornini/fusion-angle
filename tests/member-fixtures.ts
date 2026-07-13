@@ -42,8 +42,8 @@ function humanDetail() {
     return {
         title: 'product_manager',
         department: 'Product',
-        strengths: '[]',
-        team_dimensions: '{}',
+        strengths: [],
+        team_dimensions: {},
     };
 }
 

@@ -451,26 +451,23 @@ runs on the base adapter with explicit guards:
 ### 2.13 Snapshots (bootstrap plane, bearer-exempt)
 
 - `GET /snapshots/schema` — schema existence + full export, else null.
-  The export (`getSnapshot`, `api/db-backed.ts`) stamps one reserved
-  top-level key, `__schema_version__` (`SNAPSHOT_SCHEMA_VERSION`
-  = 5 post-clients-elimination, `api/db.ts`), beside the pure
-  message-plane `TABLE_NAMES` arrays (`requests`, `responses`).
+  The export (`getSnapshot`, `api/db-backed.ts`) is the pure
+  message-plane `TABLE_NAMES` arrays (`requests`, `responses`)
+  with no version marker.
 - `DELETE /snapshots/schema` — drop the schema and reopen clean.
 - `POST /snapshots/mock-data` — seed the full demo dataset (§3.26).
 - `POST /snapshots/bootstrap` — seed the pristine minimal state
   (§3.27).
 - `PUT /snapshots/import` — validate then atomically restore a snapshot
-  (§3.28). `parseAndValidateSnapshot` (`api/snapshot-validator.ts`)
-  REJECTS an absent or mismatched `__schema_version__` with
-  `SnapshotVersionMismatchError`, before any table is read — the
-  universal gate, covering every `DbAdapter.putSnapshot` caller.
-  ASYMMETRIC by design: it closes "a new build imports an old
-  export" only — an old build's importer has no way to know the
-  marker exists, so it silently ignores the key and imports
-  anyway. The client-side `scanForRetiredKeys` pre-flight
-  (`web-app/app/adapters/snapshots.ts`) checks the same key
-  before upload, as a convenience only; the server gate is the
-  guarantee.
+  (§3.28). A snapshot is the table-keyed row export with no schema
+  version: `parseAndValidateSnapshot` (`api/snapshot-validator.ts`)
+  validates object shape and per-row bodies, ignores unknown
+  top-level keys (including a legacy `__schema_version__`), and
+  does not version-check. An incompatible body shape fails at use
+  (derive/read), never at an import-time version check. The
+  client-side `scanForRetiredKeys` pre-flight
+  (`web-app/app/adapters/snapshots.ts`) fails fast on known dead
+  keys before upload, as a convenience only.
 
 `getHasAnyHumanMembers` (`web-app/app/adapters/snapshots.ts`) — the
 first-run check gating the pristine-vs-seeded boot choice —
@@ -639,9 +636,11 @@ later write; the detail document shares the operation pair's own
 address and becomes THAT address's new head, appended after it;
 the identities document (human-only) sits at its OWN address and
 becomes THAT address's new head, appended last. A mid-write
-failure (an invalid AI model id or a malformed human `strengths`
-JSON string, caught by the pre-tx document-body check or by the
-op's own re-validating store put) leaves zero of the bundle,
+failure (an invalid AI model id or a malformed human
+`strengths` array / `team_dimensions` object — composites
+are native nested JSON, never JSON-encoded strings —
+caught by the pre-tx document-body check or by the op's
+own re-validating store put) leaves zero of the bundle,
 exactly like every other atomic write in this catalog.
 
 **The PII facet is NEVER synthesized.** `identity_pii` stays

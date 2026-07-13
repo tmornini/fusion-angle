@@ -5,7 +5,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { jsonObjectField, nowUtc } from '../api/types.ts';
+import { nowUtc } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     deriveWorkOrderLifecycle,
@@ -76,8 +76,10 @@ function sortByAtId<T extends { at: string; id: string }>(
                         : 0);
 }
 
-function workOrderFlowGraph(lockTimeoutSeconds: number): string {
-    return jsonObjectField({
+function workOrderFlowGraph(
+    lockTimeoutSeconds: number,
+): Record<string, unknown> {
+    return {
         name: 'Task 1 Fixture Flow',
         lockTimeout: lockTimeoutSeconds,
         nodes: [
@@ -113,13 +115,13 @@ function workOrderFlowGraph(lockTimeoutSeconds: number): string {
                 fromNodeId: 'n-middle', toNodeId: 'n-finish',
             },
         ],
-    });
+    };
 }
 
 function createWorkOrderBody(
     id: string,
     flowWorkOrderId: string,
-    graph: string,
+    graph: Record<string, unknown>,
     events: {
         readonly ids: readonly [string, string, string];
         readonly ats: readonly [string, string, string];

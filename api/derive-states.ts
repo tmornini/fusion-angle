@@ -11,8 +11,8 @@ import type {
 } from './types.ts';
 import { MS_PER_SECOND } from './types.ts';
 import {
-    pickString, pickNumber, pickJsonObjectField,
-    validateWorkOrderFlowGraphJson,
+    pickString, pickNumber, asObject,
+    asWorkOrderFlowGraph,
 } from './validators.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
 import {
@@ -966,8 +966,8 @@ function lockTimeoutAsOf(
             'no document head before ' + momentAt,
         );
     }
-    return validateWorkOrderFlowGraphJson(
-        pickString(head.body, 'flow_graph'),
+    return asWorkOrderFlowGraph(
+        head.body['flow_graph'],
         'work-order lifecycle document head flow_graph',
     ).lockTimeout;
 }
@@ -1683,8 +1683,8 @@ export async function workOrderDocumentHeadFor(
         id: workOrderId,
         organization_id: organization,
         display_id: pickString(head.body, 'display_id'),
-        flow_graph: pickJsonObjectField(
-            head.body, 'flow_graph',
+        flow_graph: asObject(
+            head.body['flow_graph'], 'flow_graph',
         ),
         position: pickNumber(head.body, 'position'),
     };

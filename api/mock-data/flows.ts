@@ -6,11 +6,10 @@ import type {
     FlowNodeAttributeEntity,
 } from '../types.ts';
 import {
-    jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../types.ts';
 import {
-    validateStoredGraphJson,
+    asStoredGraph,
 } from '../validators.ts';
 import {
     l2cFlowId,
@@ -49,7 +48,7 @@ export function buildFlows(): FlowSeed[] {
             is_auto_fit: true,
             lock_timeout:
                 DEFAULT_LOCK_TIMEOUT,
-            graph: jsonObjectField({
+            graph: {
                 nodes: [
                     {
                         id: 'lzkYvFNCEHARBQmZ4YHAn4',
@@ -233,7 +232,7 @@ export function buildFlows(): FlowSeed[] {
                             '8jSnGiQ4Hedb2G75Y5aT7O',
                     },
                 ],
-            }),
+            },
         },
         {
             id: 'E2BnBlZyrriqsQYkmS4usb',
@@ -243,7 +242,7 @@ export function buildFlows(): FlowSeed[] {
             is_auto_fit: true,
             lock_timeout:
                 DEFAULT_LOCK_TIMEOUT,
-            graph: jsonObjectField({
+            graph: {
                 nodes: [
                     {
                         id: 'N8iGVHrr3iv0OCqICw2oWo',
@@ -635,7 +634,7 @@ export function buildFlows(): FlowSeed[] {
                             'nKbwVydJZixw20nvP2XqfF',
                     },
                 ],
-            }),
+            },
         },
         {
             id: '7COt7Kf4OaOBg6AjaNO04s',
@@ -645,7 +644,7 @@ export function buildFlows(): FlowSeed[] {
             is_auto_layout: true,
             is_auto_fit: true,
             lock_timeout: DEFAULT_LOCK_TIMEOUT,
-            graph: jsonObjectField({
+            graph: {
                 nodes: [
                     {
                         id: 'qfuFbfKwwlpKAewu3Uujb7',
@@ -1021,7 +1020,7 @@ export function buildFlows(): FlowSeed[] {
                             'M3HcytVGj8JNjrFS0AyVfA',
                     },
                 ],
-            }),
+            },
         },
         {
             id: l2cFlowId,
@@ -1031,17 +1030,17 @@ export function buildFlows(): FlowSeed[] {
             is_auto_fit: true,
             lock_timeout:
                 DEFAULT_LOCK_TIMEOUT,
-            graph: jsonObjectField({
+            graph: {
                 nodes: leadToCloseNodes,
                 edges: leadToCloseEdges,
-            }),
+            },
         },
     ];
 }
 
 // The four relation row-sets a flow's authored graph literal
 // decomposes into — the normalized graph truth (F-131). Derived
-// FROM the build-time literal through validateStoredGraphJson;
+// FROM the build-time literal through asStoredGraph;
 // reassembleStoredGraph is the inverse at the read seam.
 export interface FlowGraphRelations {
     nodes: FlowNodeEntity[];
@@ -1064,7 +1063,7 @@ export function buildFlowGraphRelations(
     const members: FlowNodeMemberEntity[] = [];
     const attributes: FlowNodeAttributeEntity[] = [];
     for (const flow of flows) {
-        const graph = validateStoredGraphJson(
+        const graph = asStoredGraph(
             flow.graph, 'seed flow ' + flow.id + ' graph',
         );
         for (const node of graph.nodes) {

@@ -408,7 +408,7 @@ Tests cover pure modules, flow-edit business logic
 (including `adapters-members-union.test.ts` and
 `adapters-flow-publish.test.ts`), workbox inbox, mermaid
 round-trip, in-browser ZIP, snapshot import-validation /
-quota / atomic-import / v2-reject / v3 round-trip, the
+quota / atomic-import, the
 memory + localStorage transaction backends, the tx runners
 and view, the commit batch route, api routing, navigation,
 mock-data validity (pair count 1506 / bootstrap 13 absolute;
@@ -514,24 +514,6 @@ apply to it (RED is the audit's first finding).
   localStorage tier rolls back logic errors the same way, but
   its multi-key flush is still not OS-atomic on a mid-write
   quota error — the one gap IndexedDB closes.
-- **Snapshot version gate.** Every export is stamped with
-  `SNAPSHOT_SCHEMA_VERSION` (`api/db.ts`, currently **5**) at
-  the reserved key `__schema_version__`. Every import REJECTS
-  an absent or mismatched version SERVER-side
-  (`parseAndValidateSnapshot`, `SnapshotVersionMismatchError`)
-  — before the atomicity above ever runs. ASYMMETRIC: it only
-  closes "a new build imports an old export"; an old build's
-  importer ignores the unknown key and imports anyway. The
-  constant bumps whenever `TABLE_NAMES` shrinks or a family's
-  derivation shape would strand an older export — Phase 13
-  Task 9 (identity_tokens + authorization_codes) was 1→2;
-  Phase Final Stage B (doomed entity tables deleted) is 2→3;
-  states-address retirement is 3→4 (address retirement, not a
-  `TABLE_NAMES` shrink — pre-retirement v3 exports still
-  carry `states/:id` pairs no derive source reads); the
-  clients elimination (last entity table) is 4→5. A
-  pre-retirement v3 export is rejected by a post-retirement
-  import.
 - **`file:///` protocol.** Page URLs use relative paths.
   Code supports `file:///` locally but testing is HTTP-only.
 - **View Transition aborts.** rapid programmatic navigation

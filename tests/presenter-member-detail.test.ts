@@ -22,7 +22,6 @@ import { strict as assert } from 'node:assert';
 
 const {
     HumanMember, AIMember,
-    jsonArrayField, jsonObjectField,
 } = await import('../api/types.ts');
 
 const {
@@ -107,11 +106,11 @@ function makeHumanMember() {
             id: 'hw_1',
             title: 'Engineer',
             department: 'Engineering',
-            strengths: jsonArrayField(['Leadership']),
-            team_dimensions: jsonObjectField({
+            strengths: ['Leadership'],
+            team_dimensions: {
                 driver: 60, analytical: 40,
                 expressive: 30, amiable: 50,
-            }),
+            },
         },
         {
             erased: false,

@@ -11,10 +11,7 @@ import {
 import { postMockDataLoad } from
     '../api/mock-data.ts';
 import {
-    parseOrThrow,
-} from '../api/validators.ts';
-import {
-    validateWorkOrderFlowGraphJson,
+    asWorkOrderFlowGraph,
 } from '../api/validators.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -181,23 +178,8 @@ test(
         const attrs = await allAttributes(db);
         const allKinds = new Set<string>();
         for (const attr of attrs) {
-            const parsed = parseOrThrow(
-                attr.constraints,
-                'attr.constraints',
-            );
-            if (!Array.isArray(parsed)) continue;
-            for (const c of parsed) {
-                if (
-                    typeof c === 'object'
-                    && c !== null
-                    && 'kind' in c
-                    && typeof (c as { kind: unknown })
-                        .kind === 'string'
-                ) {
-                    allKinds.add(
-                        (c as { kind: string }).kind,
-                    );
-                }
+            for (const c of attr.constraints) {
+                allKinds.add(c.kind);
             }
         }
         assert.ok(
@@ -270,10 +252,10 @@ test(
         );
         assert.equal(woRes.status, 200);
         const wo = await woRes.json() as {
-            flow_graph: string;
+            flow_graph: Record<string, unknown>;
         };
         const flowGraph =
-            validateWorkOrderFlowGraphJson(
+            asWorkOrderFlowGraph(
                 wo.flow_graph,
                 'wo.flow_graph',
             );
@@ -353,8 +335,8 @@ test(
     + ' (no fields[]) via pair-plane derive',
     async () => {
         const db = await seeded();
-        // Wire GET /flows/:id carries graph as a JSON string
-        // (flow_graph relation reassembly on the pair plane).
+        // Wire GET /flows carries graph as native nested
+        // JSON on each FlowWithGraph row (pair-plane head).
         async function assertGraphShape(
             token: string,
         ): Promise<void> {
@@ -386,16 +368,16 @@ test(
                 );
                 assert.equal(detail.status, 200);
                 const body = await detail.json() as {
-                    graph: string;
+                    graph: {
+                        nodes: {
+                            id: string;
+                            attributes?: unknown;
+                            fields?: unknown;
+                        }[];
+                    };
                 };
-                assert.equal(typeof body.graph, 'string');
-                const graph = JSON.parse(body.graph) as {
-                    nodes: {
-                        id: string;
-                        attributes?: unknown;
-                        fields?: unknown;
-                    }[];
-                };
+                assert.equal(typeof body.graph, 'object');
+                const graph = body.graph;
                 for (const node of graph.nodes) {
                     assert.ok(
                         Array.isArray(node.attributes),

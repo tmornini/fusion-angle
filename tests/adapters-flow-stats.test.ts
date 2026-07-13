@@ -15,7 +15,6 @@ import {
     putFlow,
 } from '../web-app/app/adapters/flow-mutations.ts';
 import {
-    jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import type {
@@ -164,18 +163,18 @@ test(
         // seed through the live document PUT.
         await ctx.PUT('work-orders/wo1', {
             display_id: 'WO-1',
-            flow_graph: jsonObjectField({
+            flow_graph: {
                 name: 'Onboarding',
                 lockTimeout: 0, nodes: [], edges: [],
-            }),
+            },
             position: 1,
         });
         await ctx.PUT('work-orders/wo2', {
             display_id: 'WO-2',
-            flow_graph: jsonObjectField({
+            flow_graph: {
                 name: 'Onboarding',
                 lockTimeout: 0, nodes: [], edges: [],
-            }),
+            },
             position: 2,
         });
 
@@ -252,10 +251,10 @@ test(
         // Phase Final Stage B: work_orders table retired.
         await ctx.PUT('work-orders/wo1', {
             display_id: 'WO-1',
-            flow_graph: jsonObjectField({
+            flow_graph: {
                 name: 'AutoLayout',
                 lockTimeout: 0, nodes: [], edges: [],
-            }),
+            },
             position: 1,
         });
         // NAMED re-pin (Task 7): same reason as above.

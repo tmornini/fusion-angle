@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 
 import {
-    storedGraphField,
-    storedWorkOrderFlowGraphField,
+    storedGraph,
+    storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import {
-    validateStoredGraphJson,
-    validateWorkOrderFlowGraphJson,
+    asStoredGraph,
+    asWorkOrderFlowGraph,
 } from '../api/validators.ts';
 
 // The graph storage seam, pinned: stored JSON that crosses
@@ -18,7 +18,7 @@ import {
 // shape; existing rows and exported backups carry it, so
 // a domain-type change must never leak into storage keys.
 
-const STORED_FLOW_GRAPH = JSON.stringify({
+const STORED_FLOW_GRAPH = {
     nodes: [
         {
             id: 'n-create',
@@ -62,25 +62,23 @@ const STORED_FLOW_GRAPH = JSON.stringify({
             toNodeId: 'n-step',
         },
     ],
-});
+};
 
-const STORED_WO_GRAPH = JSON.stringify({
+const STORED_WO_GRAPH = {
     name: 'Flow',
     lockTimeout: DEFAULT_LOCK_TIMEOUT,
-    ...JSON.parse(STORED_FLOW_GRAPH),
-});
+    ...STORED_FLOW_GRAPH,
+};
 
 test(
     'stored flow graph survives parse then serialize',
     () => {
-        const parsed = validateStoredGraphJson(
+        const parsed = asStoredGraph(
             STORED_FLOW_GRAPH, 'graph',
         );
-        const out = JSON.parse(
-            storedGraphField(parsed),
-        );
+        const out = storedGraph(parsed);
         assert.deepEqual(
-            out, JSON.parse(STORED_FLOW_GRAPH),
+            out, STORED_FLOW_GRAPH,
         );
     },
 );
@@ -88,15 +86,14 @@ test(
 test(
     'serialized node attributes keep storage keys',
     () => {
-        const parsed = validateStoredGraphJson(
+        const parsed = asStoredGraph(
             STORED_FLOW_GRAPH, 'graph',
         );
-        const out = JSON.parse(
-            storedGraphField(parsed),
-        );
+        const out = storedGraph(parsed);
         assert.deepEqual(
             Object.keys(
-                out.nodes[1].attributes[0],
+                (out.nodes as { attributes: object[] }[])[1]!
+                    .attributes[0]!,
             ).sort(),
             ['attribute_id', 'isRequired', 'mode'],
         );
@@ -106,7 +103,7 @@ test(
 test(
     'parsed node attributes speak the domain tongue',
     () => {
-        const parsed = validateStoredGraphJson(
+        const parsed = asStoredGraph(
             STORED_FLOW_GRAPH, 'graph',
         );
         const ref = parsed.nodes[1]!.attributes[0]!;
@@ -120,14 +117,10 @@ test(
     + ' serialize',
     () => {
         const parsed =
-            validateWorkOrderFlowGraphJson(
+            asWorkOrderFlowGraph(
                 STORED_WO_GRAPH, 'flow_graph',
             );
-        const out = JSON.parse(
-            storedWorkOrderFlowGraphField(parsed),
-        );
-        assert.deepEqual(
-            out, JSON.parse(STORED_WO_GRAPH),
-        );
+        const out = storedWorkOrderFlowGraph(parsed);
+        assert.deepEqual(out, STORED_WO_GRAPH);
     },
 );

@@ -3,7 +3,6 @@ import type {
     RecordAttributeEntity,
     Constraint,
 } from '../types.ts';
-import { jsonArrayField } from '../types.ts';
 
 // The seeded Records and their stable ids. The id consts are
 // shared with the record attributes, flow-record bindings, and
@@ -71,8 +70,8 @@ export function buildRecordAttributes():
             name: 'Company Name',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'nplTIh0qXNtAyoWSwRaBYe',
@@ -80,10 +79,8 @@ export function buildRecordAttributes():
             name: 'Contact Email',
             attribute_type: 'text',
             sort_order: 2,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField(
-                emailRegexConstraint,
-            ),
+            options: [],
+            constraints: emailRegexConstraint,
         },
         {
             id: 'kzHpMw9f1thq79VoBYeIX3',
@@ -91,8 +88,8 @@ export function buildRecordAttributes():
             name: 'Contact Phone',
             attribute_type: 'text',
             sort_order: 3,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'QsmqiOmPtoMLGpSjHOqdHA',
@@ -100,14 +97,14 @@ export function buildRecordAttributes():
             name: 'Industry',
             attribute_type: 'select',
             sort_order: 4,
-            options: jsonArrayField([
+            options: [
                 'Technology',
                 'Finance',
                 'Healthcare',
                 'Retail',
                 'Manufacturing',
-            ]),
-            constraints: jsonArrayField([]),
+            ],
+            constraints: [],
         },
         {
             id: '0TyjQRcygn3DIyXTe6x1F6',
@@ -115,10 +112,8 @@ export function buildRecordAttributes():
             name: 'Annual Revenue',
             attribute_type: 'number',
             sort_order: 5,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField(
-                revenueRangeMinConstraint,
-            ),
+            options: [],
+            constraints: revenueRangeMinConstraint,
         },
         {
             id: '8Z62tcRHBpwCRH1kBffx0G',
@@ -126,8 +121,8 @@ export function buildRecordAttributes():
             name: 'Number of Employees',
             attribute_type: 'number',
             sort_order: 6,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'aR8nKpQ9wEzVxL3CmBdYTf',
@@ -135,10 +130,8 @@ export function buildRecordAttributes():
             name: 'Founded On',
             attribute_type: 'date',
             sort_order: 7,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField(
-                foundedOnRangeMaxConstraint,
-            ),
+            options: [],
+            constraints: foundedOnRangeMaxConstraint,
         },
         {
             id: 'mBrOOvQtZTTKb5TTnXvzXo',
@@ -146,8 +139,8 @@ export function buildRecordAttributes():
             name: 'Company Logo',
             attribute_type: 'text',
             sort_order: 8,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'y9DiJ5QHNB5ho3K1n9myMc',
@@ -155,8 +148,8 @@ export function buildRecordAttributes():
             name: 'Supporting Documents',
             attribute_type: 'text',
             sort_order: 9,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'AdQlKf43JV6yrhQbyskDkR',
@@ -164,8 +157,8 @@ export function buildRecordAttributes():
             name: 'Reviewer Notes',
             attribute_type: 'text',
             sort_order: 10,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'pBA01Pr0j3ctBr13fNm3T1',
@@ -173,8 +166,8 @@ export function buildRecordAttributes():
             name: 'Project Name',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'pBA02Pr0j3ctBr13fDsc02',
@@ -182,8 +175,8 @@ export function buildRecordAttributes():
             name: 'Description',
             attribute_type: 'text',
             sort_order: 2,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
         {
             id: 'pBA03Pr0j3ctBr13fPry03',
@@ -191,13 +184,13 @@ export function buildRecordAttributes():
             name: 'Priority',
             attribute_type: 'select',
             sort_order: 3,
-            options: jsonArrayField([
+            options: [
                 'Low',
                 'Medium',
                 'High',
                 'Critical',
-            ]),
-            constraints: jsonArrayField([]),
+            ],
+            constraints: [],
         },
         {
             id: 'pBA04Pr0j3ctBr13fApr04',
@@ -205,8 +198,8 @@ export function buildRecordAttributes():
             name: 'Approved',
             attribute_type: 'checkbox',
             sort_order: 4,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         },
     ];
 }

@@ -18,7 +18,7 @@ import type {
     StateEntity,
 } from '../api/types.ts';
 import {
-    jsonObjectField, MS_PER_SECOND, nowUtc,
+    MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
@@ -35,7 +35,7 @@ import {
 import {
     pickString,
     validateWorkOrderDocumentBody,
-    validateWorkOrderFlowGraphJson,
+    asWorkOrderFlowGraph,
 } from '../api/validators.ts';
 import { postWorkOrderDocumentOp } from '../api/routes.ts';
 import {
@@ -116,8 +116,10 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 // with a caller-chosen lockTimeout (seconds). Independent of any
 // seeded flow's own live graph — a work order's flow_graph is a
 // point-in-time capture, never a foreign key.
-function workOrderFlowGraph(lockTimeoutSeconds: number): string {
-    return jsonObjectField({
+function workOrderFlowGraph(
+    lockTimeoutSeconds: number,
+): Record<string, unknown> {
+    return {
         name: 'Drift Fixture Flow',
         lockTimeout: lockTimeoutSeconds,
         nodes: [
@@ -153,7 +155,7 @@ function workOrderFlowGraph(lockTimeoutSeconds: number): string {
                 fromNodeId: 'n-middle', toNodeId: 'n-finish',
             },
         ],
-    });
+    };
 }
 
 // Mirrors routes.ts's private WORK_ORDERS_WIRING by content —
@@ -292,8 +294,9 @@ test('per-work-order GET wire equals derive for every seed,'
         );
         assert.equal(wireText, JSON.stringify(derived));
         assert.ok(
-            typeof derived.flow_graph === 'string'
-            && derived.flow_graph.length > 0,
+            typeof derived.flow_graph === 'object'
+            && derived.flow_graph !== null
+            && !Array.isArray(derived.flow_graph),
         );
     }
 });
@@ -356,7 +359,7 @@ function createWorkOrderBody(
     id: string,
     flowWorkOrderId: string,
     flowId: string,
-    graph: string,
+    graph: Record<string, unknown>,
     events: {
         readonly ids: readonly [string, string, string];
         readonly ats: readonly [string, string, string];
@@ -535,7 +538,7 @@ async () => {
     )!;
     const storedCreateFlowGraph = (
         decodeRequestMessage(storedCreatePostRow.message)
-            .body['workOrder'] as { flow_graph: string }
+            .body['workOrder'] as { flow_graph: Record<string, unknown> }
     ).flow_graph;
     const entityPut = await handleRequest(db, req(
         'PUT', '/work-orders/' + workOrderId, tokenA, {
@@ -546,7 +549,7 @@ async () => {
     ));
     assert.equal(entityPut.status, 200);
     const putBody = await entityPut.json() as {
-        flow_graph: string;
+        flow_graph: Record<string, unknown>;
     };
     assert.deepEqual(putBody.flow_graph, storedCreateFlowGraph);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
@@ -983,8 +986,8 @@ function lockTimeoutAsOf(
             'no document head before ' + momentAt,
         );
     }
-    return validateWorkOrderFlowGraphJson(
-        pickString(head.body, 'flow_graph'),
+    return asWorkOrderFlowGraph(
+        head.body['flow_graph'],
         'trace-replay document head flow_graph',
     ).lockTimeout;
 }
@@ -1346,7 +1349,7 @@ async () => {
     )!;
     const storedCreateFlowGraph = (
         decodeRequestMessage(storedCreatePostRow.message)
-            .body['workOrder'] as { flow_graph: string }
+            .body['workOrder'] as { flow_graph: Record<string, unknown> }
     ).flow_graph;
     const entityPut = await handleRequest(db, req(
         'PUT', '/work-orders/' + workOrderId, tokenA, {
@@ -1357,7 +1360,7 @@ async () => {
     ));
     assert.equal(entityPut.status, 200);
     const putBody = await entityPut.json() as {
-        flow_graph: string;
+        flow_graph: Record<string, unknown>;
     };
     assert.deepEqual(putBody.flow_graph, storedCreateFlowGraph);
 

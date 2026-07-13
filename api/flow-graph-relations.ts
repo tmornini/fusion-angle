@@ -11,12 +11,11 @@ import type {
     StoredGraph,
     MemberId,
     NodeAttribute,
-    JsonObjectField,
 } from './types.ts';
-import { storedGraphField } from './types.ts';
+import { storedGraph } from './types.ts';
 import {
     type FlowGraphDelta,
-    validateStoredGraphJson,
+    asStoredGraph,
 } from './validators.ts';
 import { byIdAscending } from './derive-documents.ts';
 
@@ -149,7 +148,7 @@ export function reduceCreateGraphDelta(
 
 // The message-plane flows derivation's ONE flows-novel
 // reduction (Task 7, design decision 1): a document PUT's
-// `graph` field is the client-authored working snapshot,
+// graph value is the client-authored working snapshot,
 // carried verbatim by postFlowDocumentOp — its nodes[]/edges[]
 // arrive in whatever order the client happened to serialize.
 // The OLD plane's own GET reassembles nodes[]/edges[] from
@@ -166,13 +165,13 @@ export function reduceCreateGraphDelta(
 // currentNodeAttributes above already return them in THEIR OWN
 // reduction order (a Map's insertion order), which neither
 // plane could re-derive from the other's array order alone.
-export function normalizedStoredGraphField(
-    graph: JsonObjectField,
-): JsonObjectField {
-    const parsed = validateStoredGraphJson(
-        graph, 'normalizedStoredGraphField.graph',
+export function normalizedStoredGraph(
+    value: unknown,
+): Record<string, unknown> {
+    const parsed = asStoredGraph(
+        value, 'normalizedStoredGraph.graph',
     );
-    return storedGraphField({
+    return storedGraph({
         nodes: [...parsed.nodes].sort(byIdAscending),
         edges: [...parsed.edges].sort(byIdAscending),
     });

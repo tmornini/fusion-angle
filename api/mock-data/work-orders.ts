@@ -2,10 +2,8 @@ import type {
     WorkOrderEntity,
     FlowWorkOrderEntity,
     StateEntity,
-    JsonObjectField,
 } from '../types.ts';
 import {
-    jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
 } from '../types.ts';
 import { daysFromNow } from './seed-kit.ts';
@@ -48,32 +46,32 @@ const woPersonEmily =
 const woPersonMarcus =
     'WxQn4LVWb76YkmqK5B0EPp';
 const woPersonCurrent = 'current';
-// Parsed once so every seeded WO snapshot
-// matches the live flow_graph shape without
-// 36 redundant JSON.parse calls.
-const woGraphParsed = JSON.parse(
-    woFlowGraph,
-) as { nodes: unknown; edges: unknown };
-function woGraph(): JsonObjectField {
-    return jsonObjectField({
+// Read once so every seeded WO snapshot matches
+// the live flow_graph shape without redundant
+// walks of the native flow graph object.
+const woGraphParsed = woFlowGraph as {
+    nodes: unknown; edges: unknown;
+};
+function woGraph(): Record<string, unknown> {
+    return {
         name:
             'Customer Onboarding',
         lockTimeout:
             DEFAULT_LOCK_TIMEOUT,
         nodes: woGraphParsed.nodes,
         edges: woGraphParsed.edges,
-    });
+    };
 }
 
-// Parsed once so all prc WO snapshots
-// match the live flow_graph shape.
+// Read once so all prc WO snapshots match the
+// live flow_graph shape.
 const prcFlowGraph =
     mockFlows[2]!.graph;
-const prcGraphParsed = JSON.parse(
-    prcFlowGraph,
-) as { nodes: unknown; edges: unknown };
-function prcGraph(): JsonObjectField {
-    return jsonObjectField({
+const prcGraphParsed = prcFlowGraph as {
+    nodes: unknown; edges: unknown;
+};
+function prcGraph(): Record<string, unknown> {
+    return {
         name:
             'Layout Test: Proposal'
             + ' Review Cycle',
@@ -81,7 +79,7 @@ function prcGraph(): JsonObjectField {
             DEFAULT_LOCK_TIMEOUT,
         nodes: prcGraphParsed.nodes,
         edges: prcGraphParsed.edges,
-    });
+    };
 }
 
 const prcNodeStart =
@@ -109,18 +107,14 @@ export function buildWorkOrders():
         {
             id: woId,
             display_id: 'a7c3e1f9',
-            flow_graph: jsonObjectField({
+            flow_graph: {
                 name:
                     'Customer Onboarding',
                 lockTimeout:
                     DEFAULT_LOCK_TIMEOUT,
-                nodes: JSON.parse(
-                    woFlowGraph,
-                ).nodes,
-                edges: JSON.parse(
-                    woFlowGraph,
-                ).edges,
-            }),
+                nodes: woGraphParsed.nodes,
+                edges: woGraphParsed.edges,
+            },
             position: 1,
         },
         // ── happy-path runs (WO02-WO23) ──────────

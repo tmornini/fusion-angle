@@ -12,10 +12,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { TABLE_NAMES } from '../api/db.ts';
-import {
-    jsonObjectField,
-    type GraphEdge,
-} from '../api/types.ts';
+import type { GraphEdge } from '../api/types.ts';
 import type { AttributeReferrers } from
     '../api/record-attribute-refs.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
@@ -58,8 +55,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         name: 'Priority',
         attribute_type: 'text',
         sort_order: 0,
-        options: '[]',
-        constraints: '[]',
+        options: [],
+        constraints: [],
     }, DEV_TOKEN);
     return db;
 }
@@ -245,8 +242,8 @@ test(
             name: 'PairAttr',
             attribute_type: 'text',
             sort_order: 1,
-            options: '[]',
-            constraints: '[]',
+            options: [],
+            constraints: [],
         }, DEV_TOKEN);
         const before = await GET<{
             organization_id: string;
@@ -279,12 +276,12 @@ async function seedFieldValueReferrer(
     await PUT(
         db, 'work-orders/wo-restrict-fv', {
             display_id: 'rfv1',
-            flow_graph: jsonObjectField({
+            flow_graph: {
                 name: 'Restrict FV',
                 lockTimeout: 0,
                 nodes: [],
                 edges: [],
-            }),
+            },
             position: 1,
         },
         DEV_TOKEN,
@@ -482,14 +479,14 @@ test(
             id: 'wo1',
             workOrder: {
                 display_id: 'WO',
-                flow_graph: jsonObjectField({
+                flow_graph: {
                     name: 'Intake',
                     lockTimeout: 0,
                     nodes: [
                         workOrderNodeBinding('attr1'),
                     ],
                     edges: [],
-                }),
+                },
                 position: 1,
             },
             flowWorkOrderId: 'wo1-fwo',

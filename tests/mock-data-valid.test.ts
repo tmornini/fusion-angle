@@ -471,8 +471,9 @@ async () => {
                 'flow ' + flow.id,
             );
             assert.ok(
-                typeof flow.graph === 'string'
-                && flow.graph.length > 0,
+                typeof flow.graph === 'object'
+                && flow.graph !== null
+                && !Array.isArray(flow.graph),
                 'flow ' + flow.id + ' missing graph',
             );
         }

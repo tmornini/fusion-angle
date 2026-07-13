@@ -75,8 +75,8 @@ function emptyDelta() {
     };
 }
 
-function emptyGraph(): string {
-    return JSON.stringify({ nodes: [], edges: [] });
+function emptyGraph() {
+    return { nodes: [], edges: [] };
 }
 
 // The full wire document PUT /flows/:id now takes (Decision 7):
@@ -747,7 +747,7 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
     const firstSave = await handleRequest(db, req(
         'PUT', '/flows/flow-undo-pairs-1', token,
         documentBody('One Node', 'flow-undo-pairs-1-ev-1', {
-            graph: JSON.stringify(undoneGraph),
+            graph: undoneGraph,
             graphDelta: {
                 nodes: [{
                     id: 'n-undo',
@@ -827,7 +827,7 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
         decodeRequestMessage(undoDocumentRequest!.message);
     assert.equal(decoded.method, 'PUT');
     assert.deepEqual(
-        JSON.parse(decoded.body['graph'] as string),
+        decoded.body['graph'],
         undoneGraph,
         'the restore write carries the ORIGINAL one-node'
         + ' graph, resolved from the pair plane — never a'
@@ -837,10 +837,12 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
     const after = await handleRequest(
         db, req('GET', '/flows/flow-undo-pairs-1', token),
     );
-    const afterBody = await after.json() as { graph: string };
+    const afterBody = await after.json() as {
+        graph: Record<string, unknown>;
+    };
     assert.deepEqual(
-        JSON.parse(decoded.body['graph'] as string),
-        JSON.parse(afterBody.graph),
+        decoded.body['graph'],
+        afterBody.graph,
     );
 });
 

@@ -9,7 +9,6 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    jsonObjectField,
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
@@ -25,9 +24,9 @@ async function freshDb() {
 }
 
 // The frozen flow graph a work order captures at creation. A
-// linear start → middle → finish, stored as the raw JSON string
-// the work_orders.flow_graph column holds.
-function flowGraph(): string {
+// linear start → middle → finish, stored as a native object on
+// the work_orders.flow_graph document field.
+function flowGraph(): Record<string, unknown> {
     const graph: WorkOrderFlowGraph = {
         name: 'Test flow',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
@@ -65,9 +64,7 @@ function flowGraph(): string {
             },
         ],
     };
-    return jsonObjectField(
-        graph as unknown as Record<string, unknown>,
-    );
+    return graph as unknown as Record<string, unknown>;
 }
 
 // The work-order body OMITS organization_id — the org fence

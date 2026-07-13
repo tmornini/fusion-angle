@@ -16,8 +16,7 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
-    storedWorkOrderFlowGraphField,
-    jsonArrayField,
+    storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 
@@ -116,7 +115,7 @@ function flowDocumentBody(name: string, stateEventId: string) {
         state: 'active',
         state_at: AT,
         state_event_id: stateEventId,
-        graph: JSON.stringify({ nodes: [], edges: [] }),
+        graph: { nodes: [], edges: [] },
         graphDelta: {
             nodes: [], edges: [], deletions: [],
             memberEvents: [], attributeEvents: [],
@@ -129,7 +128,7 @@ function workOrderFields(displayId: string, organization: string) {
     return {
         organization_id: organization,
         display_id: displayId,
-        flow_graph: storedWorkOrderFlowGraphField({
+        flow_graph: storedWorkOrderFlowGraph({
             name: 'Invariant Flow',
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
             nodes: [],
@@ -263,8 +262,8 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
                 name: 'Field',
                 attribute_type: 'text',
                 sort_order: 0,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([]),
+                options: [],
+                constraints: [],
             }],
         ),
     ));

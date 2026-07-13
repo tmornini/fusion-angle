@@ -235,8 +235,8 @@ function nodeRowBody(id: string, flowId: string) {
     };
 }
 
-function emptyGraph(): string {
-    return JSON.stringify({ nodes: [], edges: [] });
+function emptyGraph() {
+    return { nodes: [], edges: [] };
 }
 
 async function createFlowWithNodes(
@@ -317,11 +317,11 @@ function workOrderBody(
         id,
         workOrder: {
             display_id: 'union-' + id,
-            flow_graph: JSON.stringify({
+            flow_graph: {
                 name: 'Union Fixture Flow',
                 lockTimeout: 8 * 60 * 60,
                 nodes: [], edges: [],
-            }),
+            },
             position: 1,
         },
         flowWorkOrderId,

@@ -20,7 +20,6 @@ import {
     postRecordChange,
     subscribeRecordChanges,
     generateCryptoSafeBase62,
-    jsonArrayField,
 } from '../app/adapters/index.ts';
 import {
     RecordDetailPresenter,
@@ -654,12 +653,14 @@ function draftToEntities(
             name: a.name.trim(),
             attribute_type: a.attributeType,
             sort_order: i,
-            options: jsonArrayField(a.options),
-            constraints: jsonArrayField(
-                a.constraints
-                    .filter(isValidConstraint),
-            ),
+            options: a.options,
+            constraints: a.constraints
+                .filter(isValidConstraint),
         }));
+}
+
+function sameJson(a: unknown, b: unknown): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function draftAttributesDifferFromOriginal(
@@ -680,9 +681,8 @@ function draftAttributesDifferFromOriginal(
             || o.name !== d.name
             || o.attributeType !== d.attribute_type
             || o.sortOrder !== d.sort_order
-            || jsonArrayField(o.options) !== d.options
-            || jsonArrayField(o.constraints)
-                !== d.constraints
+            || !sameJson(o.options, d.options)
+            || !sameJson(o.constraints, d.constraints)
         ) {
             return true;
         }

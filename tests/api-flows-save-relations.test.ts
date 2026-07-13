@@ -116,7 +116,7 @@ async function pairPlaneGraph(
         'flows/' + flowId,
     );
     return asStoredGraph(
-        JSON.parse(flow.graph), 'flow.graph',
+        flow.graph, 'flow.graph',
     );
 }
 
@@ -490,7 +490,7 @@ test(
             'flows/' + flowId,
         );
         const blob = asStoredGraph(
-            JSON.parse(flow.graph), 'flow.graph',
+            flow.graph, 'flow.graph',
         );
         const intended: StoredGraph = {
             nodes: working.nodes,

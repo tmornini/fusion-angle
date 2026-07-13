@@ -33,8 +33,6 @@ import {
     getCurrentHumanMember,
     postInvitationGrant,
     type InvitationGrantOutcome,
-    jsonArrayField,
-    jsonObjectField,
     generateCryptoSafeBase62,
     subscribeHumanMemberChanges,
     subscribeAIMemberChanges,
@@ -450,17 +448,13 @@ async function submitHumanForm(): Promise<void> {
                 email,
                 title,
                 department: dept,
-                strengths:
-                    jsonArrayField([]),
-                team_dimensions:
-                    jsonObjectField({
-                        driver: DEFAULT_DIM,
-                        analytical:
-                            DEFAULT_DIM,
-                        expressive:
-                            DEFAULT_DIM,
-                        amiable: DEFAULT_DIM,
-                    }),
+                strengths: [],
+                team_dimensions: {
+                    driver: DEFAULT_DIM,
+                    analytical: DEFAULT_DIM,
+                    expressive: DEFAULT_DIM,
+                    amiable: DEFAULT_DIM,
+                },
                 phone,
                 bio,
             }),

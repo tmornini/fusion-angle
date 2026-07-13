@@ -10,7 +10,7 @@ import {
     MS_PER_SECOND,
 } from '../../../api/types.ts';
 import {
-    validateWorkOrderFlowGraphJson,
+    asWorkOrderFlowGraph,
 } from '../../../api/validators.ts';
 import {
     isClaimState,
@@ -85,9 +85,9 @@ export type TransitionEvent =
 /* ── Helpers ─────────────── */
 
 export function validateWorkOrderFlowGraph(
-    raw: string,
+    raw: unknown,
 ): WorkOrderFlowGraph {
-    return validateWorkOrderFlowGraphJson(
+    return asWorkOrderFlowGraph(
         raw, 'workOrder.flowGraph',
     );
 }
@@ -95,8 +95,8 @@ export function validateWorkOrderFlowGraph(
 // The parsed domain twin of WorkOrderEntity: the
 // adapter is the divorce point, so above the storage
 // seam the flow graph is a real WorkOrderFlowGraph,
-// never the JsonObjectField string the datastore
-// persists, and the fields speak camelCase.
+// never the raw body value the datastore persists,
+// and the fields speak camelCase.
 export interface WorkOrder {
     id: Id;
     organizationId: Id;

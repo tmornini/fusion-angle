@@ -1,7 +1,5 @@
 import {
     TABLE_NAMES,
-    SNAPSHOT_SCHEMA_VERSION,
-    SNAPSHOT_SCHEMA_VERSION_KEY,
     backendRunner,
     ambientRunner,
 } from './db.ts';
@@ -104,23 +102,13 @@ export class BackedDbAdapter
         const obj = await this.#backend.transaction(
             TABLE_NAMES, 'readonly',
             async (tx) => {
-                // Widened to admit the ONE reserved scalar
-                // marker beside the TABLE_NAMES-keyed arrays —
-                // see SNAPSHOT_SCHEMA_VERSION_KEY (api/db.ts)
-                // for why a wrapper shape was rejected.
-                const out:
-                    Record<string, unknown[] | number> = {};
+                const out: Record<string, unknown[]> = {};
                 for (const table of TABLE_NAMES) {
                     out[table] = await tx.getAll(table);
                 }
                 return out;
             },
         );
-        // Stamped OUTSIDE the tx (a synchronous assignment
-        // needs no row op): every export carries the marker
-        // an import will re-check at the gate.
-        obj[SNAPSHOT_SCHEMA_VERSION_KEY] =
-            SNAPSHOT_SCHEMA_VERSION;
         return JSON.stringify(obj, null, 2);
     }
 

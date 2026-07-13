@@ -30,13 +30,13 @@ import { STARK_ORGANIZATION } from
 
 const LOCK_TIMEOUT_SECONDS = 300;
 
-function graphJson(): string {
-    return JSON.stringify({
+function graphJson(): Record<string, unknown> {
+    return {
         name: 'Flow One',
         lockTimeout: LOCK_TIMEOUT_SECONDS,
         nodes: [],
         edges: [],
-    });
+    };
 }
 
 // Seed via REAL PUT so the WO carries a document pair (row
@@ -99,8 +99,8 @@ test(
                 name: 'Severity',
                 attribute_type: 'text',
                 sort_order: 0,
-                options: '[]',
-                constraints: '[]',
+                options: [],
+                constraints: [],
             },
             DEV_TOKEN,
         );
@@ -308,8 +308,8 @@ test(
                 name: 'Severity',
                 attribute_type: 'text',
                 sort_order: 0,
-                options: '[]',
-                constraints: '[]',
+                options: [],
+                constraints: [],
             },
             DEV_TOKEN,
         );

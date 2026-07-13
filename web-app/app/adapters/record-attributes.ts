@@ -7,10 +7,6 @@ import type {
     RecordId,
 } from '../../../api/types.ts';
 import {
-    validateConstraintArrayJson,
-    validateStringArrayJson,
-} from '../../../api/validators.ts';
-import {
     filterByField,
     type RequestContext,
 } from './shared.ts';
@@ -19,11 +15,9 @@ export type {
     RecordAttributeId,
 } from '../../../api/types.ts';
 
-// The parsed domain twin of RecordAttributeEntity: the
-// adapter is the divorce point, so above the storage seam
-// `options` and `constraints` are real arrays (never the
-// JsonArrayField strings the datastore persists) and the
-// fields speak camelCase — snake_case stays below the seam.
+// Domain twin of RecordAttributeEntity: above the storage
+// seam the fields speak camelCase — snake_case stays
+// below. options/constraints arrive native from the gate.
 export interface RecordAttribute {
     id: RecordAttributeId;
     organizationId: Id;
@@ -45,14 +39,8 @@ function toRecordAttribute(
         name: entity.name,
         attributeType: entity.attribute_type,
         sortOrder: entity.sort_order,
-        options: validateStringArrayJson(
-            entity.options,
-            'recordAttribute.options',
-        ),
-        constraints: validateConstraintArrayJson(
-            entity.constraints,
-            'recordAttribute.constraints',
-        ),
+        options: entity.options,
+        constraints: entity.constraints,
     };
 }
 

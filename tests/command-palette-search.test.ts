@@ -11,8 +11,6 @@ import type {
 } from '../web-app/app/command-palette.ts';
 import {
     Idea, Project, HumanMember,
-    jsonArrayField,
-    jsonObjectField,
     type IdeaState,
 } from '../api/types.ts';
 
@@ -75,8 +73,8 @@ function buildHumanMember(
             id,
             title,
             department,
-            strengths: jsonArrayField([]),
-            team_dimensions: jsonObjectField({}),
+            strengths: [],
+            team_dimensions: {},
         },
         {
             erased: false,

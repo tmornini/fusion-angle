@@ -3,12 +3,7 @@ import { strict as assert } from 'node:assert';
 import { localStorageDbAdapter } from '../api/db-localstorage.ts';
 import {
     TABLE_NAMES,
-    SNAPSHOT_SCHEMA_VERSION,
-    SNAPSHOT_SCHEMA_VERSION_KEY,
 } from '../api/db.ts';
-import {
-    SnapshotVersionMismatchError,
-} from '../api/snapshot-validator.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
@@ -32,21 +27,6 @@ function installShim(): Map<string, string> {
         },
     };
     return map;
-}
-
-// Every fixture below this line that expects putSnapshot to
-// reach the TABLE_NAMES loop (i.e. every test past the raw-
-// JSON-shape checks) must carry the reserved schema-version
-// marker — parseAndValidateSnapshot rejects its absence before
-// any table is read (Phase 12 Task 6). withVersion is the one
-// place that truth lives for this file.
-function withVersion(
-    tables: Record<string, unknown>,
-): Record<string, unknown> {
-    return {
-        [SNAPSHOT_SCHEMA_VERSION_KEY]: SNAPSHOT_SCHEMA_VERSION,
-        ...tables,
-    };
 }
 
 test(
@@ -109,160 +89,15 @@ test(
     },
 );
 
-// The version gate sits between the object-shape check above
-// and the TABLE_NAMES loop below (parseAndValidateSnapshot) —
-// the UNIVERSAL guarantee: every DbAdapter.putSnapshot caller
-// crosses it, not only the web-app file-upload path.
 test(
-    'rejects a snapshot missing the schema version marker',
-    async () => {
-        installShim();
-        const adapter =
-            localStorageDbAdapter();
-        const json = JSON.stringify({ members: [] });
-        await assert.rejects(
-            () => adapter.putSnapshot(json),
-            /schema version/i,
-        );
-    },
-);
-
-test(
-    'rejects a snapshot with a mismatched schema version',
+    'accepts a version-free snapshot',
     async () => {
         installShim();
         const adapter =
             localStorageDbAdapter();
         const json = JSON.stringify({
-            [SNAPSHOT_SCHEMA_VERSION_KEY]:
-                SNAPSHOT_SCHEMA_VERSION + 1,
-            members: [],
-        });
-        await assert.rejects(
-            () => adapter.putSnapshot(json),
-            /schema version/i,
-        );
-    },
-);
-
-test(
-    'never defaults an absent version to the current one',
-    async () => {
-        // A non-numeric marker must reject exactly like an
-        // absent one — no coercion, no best-effort accept.
-        installShim();
-        const adapter =
-            localStorageDbAdapter();
-        const json = JSON.stringify({
-            [SNAPSHOT_SCHEMA_VERSION_KEY]: '1',
-            members: [],
-        });
-        await assert.rejects(
-            () => adapter.putSnapshot(json),
-            /schema version/i,
-        );
-    },
-);
-
-// Phase 13 Task 9's version bump (1→2, identity_tokens +
-// authorization_codes retire): a genuine PRE-BUMP export — the
-// literal historical version this build no longer accepts — is
-// exactly what SNAPSHOT_SCHEMA_VERSION's ASYMMETRIC guarantee
-// exists to reject (api/db.ts). Pinned as a concrete regression
-// guard naming the real value, distinct from the generic
-// mismatch legs above.
-test(
-    'rejects a genuine pre-Task-9 (v1) export with'
-    + ' SnapshotVersionMismatchError',
-    async () => {
-        installShim();
-        const adapter = localStorageDbAdapter();
-        const json = JSON.stringify({
-            [SNAPSHOT_SCHEMA_VERSION_KEY]: 1,
-            members: [],
-            identity_tokens: [],
-            authorization_codes: [],
-        });
-        await assert.rejects(
-            () => adapter.putSnapshot(json),
-            (err: unknown) =>
-                err instanceof SnapshotVersionMismatchError
-                && err.found === 1,
-        );
-    },
-);
-
-// Phase Final Stage B Task 4's version bump (2→3): a genuine
-// PRE-FINAL export — version 2 with REAL pre-Final table
-// content (ideas + idea_submissions rows, not a bare version
-// mismatch) — is rejected by SnapshotVersionMismatchError
-// before any table key is read. Intra-phase mid-sequence v3
-// exports are NOT a supported contract (api/db.ts).
-test(
-    'rejects a genuine pre-Final (v2) export with'
-    + ' SnapshotVersionMismatchError',
-    async () => {
-        installShim();
-        const adapter = localStorageDbAdapter();
-        const json = JSON.stringify({
-            [SNAPSHOT_SCHEMA_VERSION_KEY]: 2,
-            members: [],
-            ideas: [{
-                id: 'i1',
-                organization_id: '1',
-                title: 'pre-Final idea',
-                position: 1,
-                problem_statement: 'p',
-                target_users: 't',
-                proposed_solution: 's',
-                expected_outcome: 'o',
-                success_metrics: 'm',
-            }],
-            idea_submissions: [{
-                id: 'is1',
-                idea_id: 'i1',
-                member_id: 'system',
-                at: '2020-01-01T00:00:00.000000Z',
-            }],
-        });
-        await assert.rejects(
-            () => adapter.putSnapshot(json),
-            (err: unknown) =>
-                err instanceof SnapshotVersionMismatchError
-                && err.found === 2,
-        );
-    },
-);
-
-// Clients-table elimination (4→5): a genuine pre-elimination
-// export stamped v4 is rejected by the version gate before
-// any table key is read.
-test(
-    'rejects a genuine v4 (pre-clients-elimination) export',
-    async () => {
-        installShim();
-        const adapter = localStorageDbAdapter();
-        const json = JSON.stringify({
-            '__schema_version__': 4,
             requests: [],
         });
-        await assert.rejects(
-            () => adapter.putSnapshot(json),
-            (err: Error) =>
-                err instanceof SnapshotVersionMismatchError,
-        );
-    },
-);
-
-test(
-    'accepts a snapshot carrying the current schema version',
-    async () => {
-        installShim();
-        const adapter =
-            localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
-            requests: [],
-        }));
         await adapter.putSnapshot(json);
         const requests =
             await adapter.requests.getAll();
@@ -276,9 +111,9 @@ test(
         installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             requests: { not: 'an array' },
-        }));
+        });
         await assert.rejects(
             () => adapter.putSnapshot(json),
             /table "requests" is not an array/,
@@ -292,9 +127,9 @@ test(
         installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             requests: ['not an object'],
-        }));
+        });
         await assert.rejects(
             () => adapter.putSnapshot(json),
             /row 0 in table "requests" is not an object/,
@@ -308,9 +143,9 @@ test(
         installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             requests: [null],
-        }));
+        });
         await assert.rejects(
             () => adapter.putSnapshot(json),
             /row 0 in table "requests" is not an object/,
@@ -324,9 +159,9 @@ test(
         installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             requests: [['not', 'an', 'object']],
-        }));
+        });
         await assert.rejects(
             () => adapter.putSnapshot(json),
             /row 0 in table "requests" is not an object/,
@@ -340,7 +175,7 @@ test(
         installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             requests: [
                 {
                     id: 'u1',
@@ -354,7 +189,7 @@ test(
                     rogue_field: 'invalid',
                 },
             ],
-        }));
+        });
         await assert.rejects(
             () => adapter.putSnapshot(json),
             /snapshot\.requests\[0\]/,
@@ -368,7 +203,7 @@ test(
         installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             responses: [{
                 id: 'o1',
                 uri_prefix: '/organizations/1/ideas/',
@@ -380,7 +215,7 @@ test(
                 message: '{"kind":"response"}',
                 rogue_field: 'invalid',
             }],
-        }));
+        });
         await assert.rejects(
             () => adapter.putSnapshot(json),
             /snapshot\.responses\[0\]/,
@@ -395,7 +230,7 @@ test(
         const map = installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             requests: [{
                 id: 'o1',
                 uri_prefix: '/organizations/1/ideas/',
@@ -405,7 +240,7 @@ test(
                 message_hash: 'a'.repeat(64),
                 message: '{"kind":"request"}',
             }],
-        }));
+        });
         await adapter.putSnapshot(json);
         assert.ok(
             map.get(KEY_PREFIX + 'requests'),
@@ -420,7 +255,7 @@ test(
         const map = installShim();
         const adapter =
             localStorageDbAdapter();
-        const json = JSON.stringify(withVersion({
+        const json = JSON.stringify({
             requests: [
                 {
                     id: 'u1',
@@ -433,7 +268,7 @@ test(
                     message: '{"kind":"request"}',
                 },
             ],
-        }));
+        });
         await adapter.putSnapshot(json);
         const stored = map.get(
             KEY_PREFIX + 'requests',
@@ -449,7 +284,7 @@ test(
         const adapter =
             localStorageDbAdapter();
         await adapter.putSnapshot(
-            JSON.stringify(withVersion({})),
+            JSON.stringify({}),
         );
         const reExported = JSON.parse(
             await adapter.getSnapshot(),
@@ -547,30 +382,12 @@ test(
             TABLE_NAMES.length,
             'TABLE_NAMES contains duplicates',
         );
-        // TABLE_NAMES entries plus the ONE reserved schema-
-        // version marker key (SNAPSHOT_SCHEMA_VERSION_KEY) —
-        // never a second table, never a wrapper.
+        // TABLE_NAMES entries only — no reserved version
+        // marker on the export.
         assert.strictEqual(
             Object.keys(parsed).length,
-            TABLE_NAMES.length + 1,
-            'export key count !== TABLE_NAMES length + 1'
-            + ' (the schema-version marker)',
-        );
-    },
-);
-
-test(
-    'getSnapshot stamps the schema version marker',
-    async () => {
-        installShim();
-        const adapter =
-            localStorageDbAdapter();
-        await adapter.postSchemaCreation();
-        const json = await adapter.getSnapshot();
-        const parsed = JSON.parse(json);
-        assert.strictEqual(
-            parsed[SNAPSHOT_SCHEMA_VERSION_KEY],
-            SNAPSHOT_SCHEMA_VERSION,
+            TABLE_NAMES.length,
+            'export key count !== TABLE_NAMES length',
         );
     },
 );

@@ -18,9 +18,13 @@ two). Each table is an IndexedDB object store
 backends key the same tables as `fusion-ai:tableName`. All
 rows have a text `id` primary key. Column types: TEXT
 (string), INTEGER (number), REAL (float), BOOLEAN (see
-below). JSON columns store stringified arrays or objects.
-All columns are NOT NULL — entity validation on creation
-ensures every field is present.
+below). Document-body composites (arrays and objects —
+`strengths`, `team_dimensions`, `options`, `constraints`,
+`graph`, `graphDelta`, `revivals`, `flow_graph`) store as
+native nested JSON on the wire and in the pair body, never
+as JSON-encoded strings. All columns are NOT NULL —
+entity validation on creation ensures every field is
+present.
 
 Every domain family (ideas, projects, flows, work orders,
 records, objectives, roster, identity spine, organizations,
@@ -30,17 +34,6 @@ and no dual-write half. Reads reassemble documents and
 lifecycle state from the pair plane (`api/derive-*.ts`);
 writes append pairs only (`tx` lists
 `['requests','responses']` on every pair-wired path).
-
-`SNAPSHOT_SCHEMA_VERSION` is **5** (clients elimination). A
-pre-retirement (v3) export is rejected by a post-retirement
-import (`SnapshotVersionMismatchError`). Phase 13's 1→2 bump
-retired `identity_tokens` + `authorization_codes`; Phase
-Final's 2→3 bump retires every remaining doomed entity table;
-the 3→4 bump retires the `states/:id` address (not a
-`TABLE_NAMES` shrink — pre-retirement v3 exports still carry
-pairs no derive source reads); the clients elimination
-deletes the last entity table and bumps 4→5 — a v4 export is
-rejected by a v5 import.
 
 **Orphan stores (gate 6) — CANONICAL residual statement.**
 Author gate 6 elected leave-inert (no sweep). IndexedDB opens
@@ -295,10 +288,15 @@ Domain notes (vocabulary, not storage):
   claim alphabet (`'claimed'`, `'claim_released'`,
   `'claim_expired'`)
 - **Flow graph** — live graph rides the flow document
-  body's `graph` field; `graphDelta` / `revivals` are
-  write-side sidecars (RESTRICT bindings via
-  `flowGraphBindingsFromPairs`). A fresh node/edge is
-  born live on the next document head.
+  body's `graph` field as a native nested object
+  (nodes/edges in the stored tongue: `positionX`,
+  `fromNodeId`, `attribute_id`, `isRequired`, …);
+  `graphDelta` / `revivals` are native write-side
+  sidecars (RESTRICT bindings via
+  `flowGraphBindingsFromPairs`). A work order freezes
+  `flow_graph` as the same native shape plus
+  `name` / `lockTimeout`. A fresh node/edge is born
+  live on the next document head.
 
 Client history reads live in
 `adapters/work-orders-queries.ts`

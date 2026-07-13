@@ -233,10 +233,10 @@ async function persistedGraph(
     db: MemoryDbAdapter,
 ): Promise<StoredGraph> {
     const flow = await createRequestContext(db, DEV_TOKEN)
-        .GET<{ graph: string }>(
+        .GET<{ graph: Record<string, unknown> }>(
             'flows/' + FLOW_ID,
         );
-    return JSON.parse(flow.graph) as StoredGraph;
+    return flow.graph as unknown as StoredGraph;
 }
 
 // Phase Final Stage B: flow_versions table retired with flows.

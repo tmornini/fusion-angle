@@ -1,7 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import {
-    validateWorkOrderFlowGraphJson,
-    pickJsonObjectField,
+    asWorkOrderFlowGraph,
 } from './validators.ts';
 import {
     ApiError,
@@ -121,10 +120,8 @@ export async function collectAttributeReferrers(
     const workOrderGraphs = [...woHeads.entries()].map(
         ([id, doc]) => ({
             id,
-            graph: validateWorkOrderFlowGraphJson(
-                pickJsonObjectField(
-                    doc.body, 'flow_graph',
-                ),
+            graph: asWorkOrderFlowGraph(
+                doc.body['flow_graph'],
                 'work_orders.flow_graph',
             ),
         }),

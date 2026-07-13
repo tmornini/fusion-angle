@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { adminContext } from './context-fixtures.ts';
-import { jsonArrayField } from '../api/types.ts';
 import {
     getRecordAttributesByRecord,
 } from
@@ -18,8 +17,8 @@ function attributeRow(
         name,
         attribute_type: 'text' as const,
         sort_order: sortOrder,
-        options: jsonArrayField([]),
-        constraints: jsonArrayField([]),
+        options: [],
+        constraints: [],
     };
 }
 

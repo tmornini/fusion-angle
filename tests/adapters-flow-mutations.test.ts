@@ -218,7 +218,7 @@ test(
         assert.equal(flow.is_auto_fit, true);
         assert.equal(flow.lock_timeout, 600);
         const graph =
-            JSON.parse(flow.graph) as StoredGraph;
+            flow.graph as unknown as StoredGraph;
         assert.equal(graph.nodes.length, 3);
         assert.equal(graph.edges.length, 1);
         assert.equal(
@@ -258,7 +258,7 @@ test(
             'flows/flow-1',
         );
         const graph =
-            JSON.parse(flow.graph) as StoredGraph;
+            flow.graph as unknown as StoredGraph;
         assert.equal(graph.nodes.length, 1);
         assert.equal(graph.nodes[0]!.id, 'a');
         assert.equal(graph.edges.length, 0);
@@ -301,7 +301,7 @@ test(
         );
         assert.equal(flow.name, 'caller-B');
         const graph =
-            JSON.parse(flow.graph) as StoredGraph;
+            flow.graph as unknown as StoredGraph;
         assert.equal(graph.nodes.length, 2);
         assert.ok(
             graph.nodes.some(
@@ -341,7 +341,7 @@ test(
             state: 'updated',
             state_at: '2026-01-01T00:00:00.000000Z',
             state_event_id: 'fixed-ev',
-            graph: JSON.stringify({ nodes: [], edges: [] }),
+            graph: { nodes: [], edges: [] },
             graphDelta: EMPTY_GRAPH_DELTA,
             revivals: [],
         };
@@ -421,7 +421,7 @@ test(
                 state: 'updated',
                 state_at: '2099-01-03T00:00:00.000000Z',
                 state_event_id: 'redo-ev',
-                graph: JSON.stringify({ nodes: [], edges: [] }),
+                graph: { nodes: [], edges: [] },
                 graphDelta: EMPTY_GRAPH_DELTA,
                 revivals: [],
             },
@@ -469,7 +469,7 @@ test(
             'flows/flow-1',
         );
         const baseline0 =
-            JSON.parse(flow0.graph) as StoredGraph;
+            flow0.graph as unknown as StoredGraph;
         const start = baseline0.nodes.find(
             n => n.isCreate,
         )!;
@@ -564,7 +564,7 @@ test(
             'flows/flow-1',
         );
         const graph =
-            JSON.parse(flow.graph) as StoredGraph;
+            flow.graph as unknown as StoredGraph;
         assert.ok(
             graph.nodes.some(n => n.id === 'mid'),
             'mid reappears once its restore rides the'

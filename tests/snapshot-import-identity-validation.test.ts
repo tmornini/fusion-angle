@@ -1,10 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { localStorageDbAdapter } from '../api/db-localstorage.ts';
-import {
-    SNAPSHOT_SCHEMA_VERSION,
-    SNAPSHOT_SCHEMA_VERSION_KEY,
-} from '../api/db.ts';
 
 // Snapshot import is a second validation edge: the
 // per-request write path is fenced at store
@@ -87,8 +83,6 @@ for (const [table, valid] of Object.entries(VALID_ROWS)) {
         + table + ' row',
         () => rejectsImport(
             JSON.stringify({
-                [SNAPSHOT_SCHEMA_VERSION_KEY]:
-                    SNAPSHOT_SCHEMA_VERSION,
                 [table]: [{ ...valid, ...bad }],
             }),
             new RegExp('snapshot\\.' + table + '\\[0\\]'),
@@ -98,8 +92,6 @@ for (const [table, valid] of Object.entries(VALID_ROWS)) {
         'snapshot gate accepts valid ' + table + ' row',
         () => acceptsImport(
             JSON.stringify({
-                [SNAPSHOT_SCHEMA_VERSION_KEY]:
-                    SNAPSHOT_SCHEMA_VERSION,
                 [table]: [valid],
             }),
         ),

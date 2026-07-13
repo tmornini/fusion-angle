@@ -11,7 +11,7 @@ import {
     type DbAdapter,
     TABLE_NAMES,
 } from '../api/db.ts';
-import { jsonObjectField, nowUtc } from '../api/types.ts';
+import { nowUtc } from '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     workOrderDocumentHeadFor,
@@ -43,7 +43,7 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
-    validateWorkOrderFlowGraphJson,
+    asWorkOrderFlowGraph,
 } from '../api/validators.ts';
 import {
     deriveIdeas,
@@ -94,8 +94,8 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 function workOrderFlowGraph(
     lockTimeoutSeconds: number,
-): string {
-    return jsonObjectField({
+): Record<string, unknown> {
+    return {
         name: 'Phase15 Head Fixture Flow',
         lockTimeout: lockTimeoutSeconds,
         nodes: [
@@ -121,7 +121,7 @@ function workOrderFlowGraph(
                 toNodeId: 'n-finish',
             },
         ],
-    });
+    };
 }
 
 // The claim gate's write-tx table list
@@ -284,9 +284,9 @@ async () => {
         ),
     );
     assert.deepEqual(preTx, inTx);
-    assert.equal(preTx!.flow_graph, graph);
+    assert.deepEqual(preTx!.flow_graph, graph);
 
-    const headGraph = validateWorkOrderFlowGraphJson(
+    const headGraph = asWorkOrderFlowGraph(
         preTx!.flow_graph, 'work_orders.flow_graph',
     );
     assert.equal(headGraph.lockTimeout, lockTimeoutSeconds);
@@ -536,8 +536,8 @@ test('stateEventVisibilityFor: member-genesis op-born'
             detail: {
                 title: 'Engineer',
                 department: 'Product',
-                strengths: '[]',
-                team_dimensions: '{}',
+                strengths: [],
+                team_dimensions: {},
             },
             initialState: 'active',
             initialStateEventId: unownedEventId,
@@ -594,8 +594,8 @@ test('stateEventVisibilityFor: member-genesis op-born'
             detail: {
                 title: 'Engineer',
                 department: 'Product',
-                strengths: '[]',
-                team_dimensions: '{}',
+                strengths: [],
+                team_dimensions: {},
             },
             initialState: 'active',
             initialStateEventId: ownedEventId,
@@ -1007,8 +1007,8 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
             name: 'P15 Bind',
             attribute_type: 'text',
             sort_order: 99,
-            options: '[]',
-            constraints: '[]',
+            options: [],
+            constraints: [],
         },
     ));
     assert.equal(attrPut.status, 200);
@@ -1089,7 +1089,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
             state: 'active',
             state_at: at2,
             state_event_id: flowId + '-ev-rm',
-            graph: jsonObjectField({
+            graph: {
                 nodes: [{
                     id: nodeId, name: 'Bind',
                     positionX: 0, positionY: 0,
@@ -1099,7 +1099,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
                     taskInstructions: '',
                 }],
                 edges: [],
-            }),
+            },
             graphDelta: {
                 nodes: [{
                     id: nodeId, flow_id: flowId,
@@ -1168,8 +1168,8 @@ test('residual pin: soft-deleted node drops from'
             name: 'P15 SoftDel',
             attribute_type: 'text',
             sort_order: 99,
-            options: '[]',
-            constraints: '[]',
+            options: [],
+            constraints: [],
         },
     ));
     assert.equal(attrPut.status, 200);
@@ -1245,10 +1245,10 @@ test('residual pin: soft-deleted node drops from'
             state: 'active',
             state_at: at2,
             state_event_id: flowId + '-ev-del',
-            graph: jsonObjectField({
+            graph: {
                 nodes: [],
                 edges: [],
-            }),
+            },
             graphDelta: {
                 nodes: [],
                 edges: [],
@@ -1350,8 +1350,8 @@ async function transitionWithFieldValue(
             name: 'Note',
             attribute_type: 'text',
             sort_order: 0,
-            options: '[]',
-            constraints: '[]',
+            options: [],
+            constraints: [],
         },
     ));
     assert.equal(attrWrite.status, 200);
@@ -1599,10 +1599,10 @@ async () => {
     );
     assert.equal(woListRes.status, 200);
     const workOrders = await woListRes.json() as {
-        flow_graph: string;
+        flow_graph: Record<string, unknown>;
     }[];
     for (const wo of workOrders) {
-        const graph = validateWorkOrderFlowGraphJson(
+        const graph = asWorkOrderFlowGraph(
             wo.flow_graph, 'work_orders.flow_graph',
         );
         for (const node of graph.nodes) {
@@ -1663,8 +1663,8 @@ async () => {
             name: 'P15 Restrict',
             attribute_type: 'text',
             sort_order: 99,
-            options: '[]',
-            constraints: '[]',
+            options: [],
+            constraints: [],
         },
     ));
     assert.equal(attrPut.status, 200);
@@ -1713,7 +1713,7 @@ async () => {
     ));
     assert.equal(created.status, 204);
 
-    const woGraph = jsonObjectField({
+    const woGraph = {
         name: 'P15 Restrict WO',
         lockTimeout: 8 * 60 * 60,
         nodes: [{
@@ -1729,7 +1729,7 @@ async () => {
             taskInstructions: '',
         }],
         edges: [],
-    });
+    };
     const woCreated = await handleRequest(db, req(
         'POST', '/work-orders', token, {
             id: woId,

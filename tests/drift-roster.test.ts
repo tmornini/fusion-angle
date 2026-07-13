@@ -14,7 +14,7 @@ import type {
     AIMemberEntity,
     HumanMemberEntity,
 } from '../api/types.ts';
-import { jsonArrayField, jsonObjectField, nowUtc } from
+import { nowUtc } from
     '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
@@ -326,8 +326,8 @@ function humanMemberCreateBody(
         id,
         detail: {
             title: 't', department: 'd',
-            strengths: jsonArrayField([]),
-            team_dimensions: jsonObjectField({}),
+            strengths: [],
+            team_dimensions: {},
         },
         initialState: 'active',
         initialStateEventId: stateEventId,
@@ -345,8 +345,8 @@ function humanMemberEditBody(
     return {
         detail: {
             title: 't2', department: 'd2',
-            strengths: jsonArrayField([]),
-            team_dimensions: jsonObjectField({}),
+            strengths: [],
+            team_dimensions: {},
         },
         state: 'active',
         stateAt,

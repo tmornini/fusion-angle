@@ -6,9 +6,6 @@ import {
     validateFlowRecordEntity,
     validateRecordWriteBody,
 } from '../api/validators.ts';
-import {
-    jsonArrayField,
-} from '../api/types.ts';
 
 // validateRecordEntity
 
@@ -125,8 +122,8 @@ test(
             name: 'Email',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         });
         assert.equal(out.record_id, 'rec-1');
         assert.equal(out.name, 'Email');
@@ -145,8 +142,8 @@ test(
                 name: '',
                 attribute_type: 'text',
                 sort_order: 1,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([]),
+                options: [],
+                constraints: [],
             }),
             /name/i,
         );
@@ -164,8 +161,8 @@ test(
                 name: 'X',
                 attribute_type: 'multi_select',
                 sort_order: 1,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([]),
+                options: [],
+                constraints: [],
             }),
             /AttributeType/,
         );
@@ -182,7 +179,7 @@ test(
                 name: 'X',
                 attribute_type: 'text',
                 sort_order: 1,
-                options: jsonArrayField([]),
+                options: [],
             } as never),
             /missing required key/,
         );
@@ -199,8 +196,8 @@ test(
                 name: 'X',
                 attribute_type: 'text',
                 sort_order: 1,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([]),
+                options: [],
+                constraints: [],
                 extra: 'no',
             } as never),
             /unexpected key/,
@@ -219,11 +216,11 @@ test(
                 name: 'Count',
                 attribute_type: 'number',
                 sort_order: 1,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([
+                options: [],
+                constraints: [
                     { kind: 'regex',
                         pattern: '^\\d+$' },
-                ]),
+                ],
             }),
             /regex/,
         );
@@ -242,10 +239,10 @@ test(
                 name: 'X',
                 attribute_type: 'text',
                 sort_order: 1,
-                options: jsonArrayField([]),
-                constraints: jsonArrayField([
+                options: [],
+                constraints: [
                     { kind: 'range_min', min: '0' },
-                ]),
+                ],
             }),
         );
     },
@@ -262,11 +259,11 @@ test(
             name: 'When',
             attribute_type: 'date',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([
+            options: [],
+            constraints: [
                 { kind: 'range_max',
                     max: '2099-12-31' },
-            ]),
+            ],
         });
         assert.equal(out.attribute_type, 'date');
     },
@@ -354,10 +351,8 @@ test(
                     name: 'X',
                     attribute_type: 'text',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField(
-                        [],
-                    ),
+                    options: [],
+                    constraints: [],
                 },
             ],
             initialState: 'active',
@@ -404,12 +399,8 @@ test(
                         name: 'X',
                         attribute_type: 'text',
                         sort_order: 0,
-                        options: jsonArrayField(
-                            [],
-                        ),
-                        constraints: jsonArrayField(
-                            [],
-                        ),
+                        options: [],
+                        constraints: [],
                     },
                 ],
                 initialState: 'active',
@@ -563,6 +554,46 @@ test(
                 },
                 attributes: [],
             } as never),
+        );
+    },
+);
+
+test(
+    'validateRecordAttributeEntity accepts native'
+    + ' options and constraints',
+    () => {
+        const entity =
+            validateRecordAttributeEntity({
+                organization_id: 'org-1',
+                record_id: 'rec-1',
+                name: 'Severity',
+                attribute_type: 'select',
+                sort_order: 0,
+                options: ['low', 'high'],
+                constraints: [],
+            });
+        assert.deepEqual(
+            entity.options, ['low', 'high'],
+        );
+        assert.deepEqual(entity.constraints, []);
+    },
+);
+
+test(
+    'validateRecordAttributeEntity rejects'
+    + ' JSON-encoded options',
+    () => {
+        assert.throws(
+            () => validateRecordAttributeEntity({
+                organization_id: 'org-1',
+                record_id: 'rec-1',
+                name: 'Severity',
+                attribute_type: 'select',
+                sort_order: 0,
+                options: '["low"]',
+                constraints: [],
+            }),
+            /expected array for options/,
         );
     },
 );

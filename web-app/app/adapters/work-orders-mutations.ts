@@ -6,10 +6,10 @@ import type {
 } from '../../../api/types.ts';
 import {
     nowUtc,
-    storedWorkOrderFlowGraphField,
+    storedWorkOrderFlowGraph,
 } from '../../../api/types.ts';
 import {
-    validateStoredGraphJson,
+    asStoredGraph,
 } from '../../../api/validators.ts';
 import {
     latestClaimEvent,
@@ -95,7 +95,7 @@ export async function postWorkOrderCreation(
         );
     }
     const graph: StoredGraph =
-        validateStoredGraphJson(
+        asStoredGraph(
             flow.graph, 'flow.graph',
         );
 
@@ -143,7 +143,7 @@ export async function postWorkOrderCreation(
         };
 
     const flowGraphField =
-        storedWorkOrderFlowGraphField(flowGraph);
+        storedWorkOrderFlowGraph(flowGraph);
     // The work-order row, its flow-link join row, and the three
     // initial state events (start, post-start, claimed) write as
     // ONE named operation. The work-order body OMITS
@@ -307,7 +307,7 @@ export async function putWorkOrder(
 ): Promise<void> {
     await ctx.PUT(`work-orders/${id}`, {
         display_id: workOrder.displayId,
-        flow_graph: storedWorkOrderFlowGraphField(
+        flow_graph: storedWorkOrderFlowGraph(
             workOrder.flowGraph,
         ),
         position: workOrder.position,

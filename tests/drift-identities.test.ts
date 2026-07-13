@@ -13,7 +13,7 @@ import type {
     IdentityPiiEntity,
     MembershipEntity,
 } from '../api/types.ts';
-import { jsonArrayField, jsonObjectField, nowUtc } from
+import { nowUtc } from
     '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
@@ -128,8 +128,8 @@ function humanCreateBody(id: string): Record<string, unknown> {
         id,
         detail: {
             title: 't', department: 'd',
-            strengths: jsonArrayField([]),
-            team_dimensions: jsonObjectField({}),
+            strengths: [],
+            team_dimensions: {},
         },
         initialState: 'active',
         initialStateEventId: id + '-genesis',
@@ -921,8 +921,8 @@ test('live-write chain: create person identity + pii (bundle 2)'
             id: humanId,
             detail: {
                 title: 't', department: 'd',
-                strengths: jsonArrayField([]),
-                team_dimensions: jsonObjectField({}),
+                strengths: [],
+                team_dimensions: {},
             },
             initialState: 'active',
             initialStateEventId: humanGenesisEventId,
@@ -944,8 +944,8 @@ test('live-write chain: create person identity + pii (bundle 2)'
         {
             detail: {
                 title: 't2', department: 'd2',
-                strengths: jsonArrayField([]),
-                team_dimensions: jsonObjectField({}),
+                strengths: [],
+                team_dimensions: {},
             },
             state: 'active',
             stateAt: humanGenesisAt,

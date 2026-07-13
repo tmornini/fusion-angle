@@ -43,13 +43,13 @@ function req(
 
 const LOCK_TIMEOUT_SECONDS = 300;
 
-function graphJson(): string {
-    return JSON.stringify({
+function graphJson(): Record<string, unknown> {
+    return {
         name: 'Flow One',
         lockTimeout: LOCK_TIMEOUT_SECONDS,
         nodes: [],
         edges: [],
-    });
+    };
 }
 
 // wo1 is seeded via a REAL PUT (never a raw db.workOrders.put)

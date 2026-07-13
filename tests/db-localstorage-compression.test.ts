@@ -1,10 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { localStorageDbAdapter } from '../api/db-localstorage.ts';
-import {
-    SNAPSHOT_SCHEMA_VERSION,
-    SNAPSHOT_SCHEMA_VERSION_KEY,
-} from '../api/db.ts';
 
 const KEY_PREFIX = 'fusion-ai:';
 
@@ -182,8 +178,6 @@ test(
         const map = installShim();
         const adapter = localStorageDbAdapter();
         const snapshot = JSON.stringify({
-            [SNAPSHOT_SCHEMA_VERSION_KEY]:
-                SNAPSHOT_SCHEMA_VERSION,
             requests: [
                 { id: 'req-imp', ...baseRequest },
             ],

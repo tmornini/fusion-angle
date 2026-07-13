@@ -27,7 +27,6 @@ import {
     type MemberState,
     type HumanMemberDraft,
     isMemberState,
-    jsonArrayField,
     MEMBER_WITHOUT_PII_NAME,
 } from '../adapters/index.ts';
 import {
@@ -100,7 +99,7 @@ export function humanMemberDraftFromMember(
         department: member.departmentLabel(),
         state: member.stateValue(),
         bio: pii.erased ? '' : pii.bio,
-        strengths: member.parsedStrengths(),
+        strengths: [...member.strengths()],
     };
 }
 
@@ -114,9 +113,7 @@ export function humanMemberPatchFromDraft(
         title: draft.title,
         department: draft.department,
         bio: draft.bio,
-        strengths: jsonArrayField(
-            [...draft.strengths],
-        ),
+        strengths: [...draft.strengths],
     };
 }
 
@@ -578,7 +575,7 @@ function buildTeamDimensionsCard(
     member: HumanMember,
 ): SafeHtml {
     return new WorkingStylesPresenter(
-        member.parsedTeamDimensions(),
+        member.teamDimensions(),
     ).buildCard();
 }
 
@@ -630,7 +627,7 @@ export class HumanMemberDetailPresenter {
                 ${buildStrengthsCard(
                     buildSelectedStrengthChips(
                         this.#member
-                            .parsedStrengths(),
+                            .strengths(),
                     ),
                 )}`,
         );

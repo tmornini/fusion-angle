@@ -68,12 +68,12 @@ function emptyDelta() {
     };
 }
 
-function emptyGraph(): string {
-    return JSON.stringify({ nodes: [], edges: [] });
+function emptyGraph() {
+    return { nodes: [], edges: [] };
 }
 
-function graphWithNode(nodeId: string, name: string): string {
-    return JSON.stringify({
+function graphWithNode(nodeId: string, name: string) {
+    return {
         nodes: [{
             id: nodeId, name,
             positionX: 0, positionY: 0,
@@ -82,7 +82,7 @@ function graphWithNode(nodeId: string, name: string): string {
             taskInstructions: '',
         }],
         edges: [],
-    });
+    };
 }
 
 function flowDocument(
@@ -90,7 +90,7 @@ function flowDocument(
     state: string,
     stateAt: string,
     stateEventId: string,
-    graph: string,
+    graph: Record<string, unknown>,
 ): Record<string, unknown> {
     return {
         ...flowFields(name),
@@ -109,7 +109,7 @@ function putFlow(
     state: string,
     stateAt: string,
     stateEventId: string,
-    graph: string,
+    graph: Record<string, unknown>,
     headers?: Record<string, string>,
 ): Promise<Response> {
     return handleRequest(db, req(
@@ -183,8 +183,8 @@ test(
         // PUT) — never the lifecycle-current pair (genesis),
         // even though genesis wins the lifecycle reduction.
         assert.deepEqual(
-            JSON.parse(derived.graph),
-            JSON.parse(skewedGraph),
+            derived.graph,
+            skewedGraph,
         );
 
         const flows = await deriveFlows(

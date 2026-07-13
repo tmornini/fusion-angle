@@ -142,13 +142,13 @@ async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-function graphJson(): string {
-    return JSON.stringify({
+function graphJson(): Record<string, unknown> {
+    return {
         name: 'Flow One',
         lockTimeout: 300,
         nodes: [],
         edges: [],
-    });
+    };
 }
 
 test('foreign-org work-order claim is 403', async () => {

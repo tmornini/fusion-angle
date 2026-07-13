@@ -17,8 +17,6 @@ import {
 import { devToken } from './token-fixtures.ts';
 import {
     MissingTableError,
-    SNAPSHOT_SCHEMA_VERSION,
-    SNAPSHOT_SCHEMA_VERSION_KEY,
 } from '../api/db.ts';
 import {
     mintAccessToken,
@@ -69,18 +67,6 @@ async function setup(): Promise<{
     return { db, ctx: createRequestContext(db, await devToken()) };
 }
 
-// Every putSnapshot fixture below needs the reserved schema-
-// version marker — parseAndValidateSnapshot rejects its
-// absence before any table is read (Phase 12 Task 6).
-function withVersion(
-    tables: Record<string, unknown>,
-): Record<string, unknown> {
-    return {
-        [SNAPSHOT_SCHEMA_VERSION_KEY]: SNAPSHOT_SCHEMA_VERSION,
-        ...tables,
-    };
-}
-
 // Import REPLACES every table — a snapshot that omits the
 // importer's own admin grant locks the session out of the
 // authenticated surfaces. Tests that keep using the ctx
@@ -89,9 +75,9 @@ function withVersion(
 function withAdminRows(
     tables: Record<string, unknown[]>,
 ): Record<string, unknown> {
-    return withVersion({
+    return {
         ...tables,
-    });
+    };
 }
 
 test('getSnapshot returns a JSON object of tables', async () => {
@@ -128,12 +114,12 @@ test(
     + ' into the database',
     async () => {
         const { db, ctx } = await setup();
-        // withVersion replaces every table — exact length.
-        await putSnapshot(ctx, JSON.stringify(withVersion({
+        // Import replaces every table — exact length.
+        await putSnapshot(ctx, JSON.stringify({
             requests: [
                 buildRequest('u1'),
             ],
-        })));
+        }));
         const rows = await db.requests.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u1');
@@ -168,11 +154,11 @@ test(
                 buildRequest('u1'),
             ],
         })));
-        await putSnapshot(ctx, JSON.stringify(withVersion({
+        await putSnapshot(ctx, JSON.stringify({
             requests: [
                 buildRequest('u2'),
             ],
-        })));
+        }));
         const rows = await db.requests.getAll();
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
@@ -188,11 +174,11 @@ test(
     async () => {
         const { db, ctx } = await setup();
         const file = new File(
-            [JSON.stringify(withVersion({
+            [JSON.stringify({
                 requests: [
                     buildRequest('u1'),
                 ],
-            }))],
+            })],
             'snapshot.json',
             { type: 'application/json' },
         );
@@ -298,27 +284,6 @@ test(
     },
 );
 
-// The client-side pre-flight CONVENIENCE (scanForRetiredKeys):
-// a missing/mismatched marker never reaches the network — the
-// SERVER-side gate in api/snapshot-validator.ts is the real
-// guarantee, pinned in tests/snapshot-import-validation.test.ts.
-test(
-    'putSnapshot rejects a snapshot missing the schema'
-    + ' version marker before any network round trip',
-    async () => {
-        const { ctx } = await setup();
-        const json = JSON.stringify({ members: [] });
-        await assert.rejects(
-            () => putSnapshot(ctx, json),
-            (err: Error) =>
-                err instanceof SnapshotIncompatibleError
-                && err.retired.includes(
-                    SNAPSHOT_SCHEMA_VERSION_KEY,
-                ),
-        );
-    },
-);
-
 test(
     'putSnapshot rejects retired projects fields',
     async () => {
@@ -377,9 +342,9 @@ test(
     'putSnapshot accepts current-shape snapshot',
     async () => {
         const { db, ctx } = await setup();
-        const json = JSON.stringify(
-            withVersion({ requests: [] }),
-        );
+        const json = JSON.stringify({
+            requests: [],
+        });
         await putSnapshot(ctx, json);
         // import REPLACES: the seeded admin rows are
         // gone, proving the snapshot actually landed

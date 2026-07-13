@@ -7,7 +7,6 @@ import type {
     Id,
 } from '../types.ts';
 import {
-    jsonObjectField,
     DEFAULT_LOCK_TIMEOUT,
     MS_PER_DAY,
     SECONDS_PER_HOUR,
@@ -91,12 +90,12 @@ export function generateFlowWorkload(args: {
     const creatorId = flow.creator.id;
     const archiveId = flow.archive.id;
 
-    const frozenFlowGraph = jsonObjectField({
+    const frozenFlowGraph = {
         name: flow.name,
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
         nodes: flow.nodes,
         edges: flow.edges,
-    });
+    };
 
     const workOrders: WorkOrderEntity[] = [];
     const flowWorkOrders:

@@ -8,7 +8,7 @@ import type {
 import {
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
-    storedGraphField,
+    storedGraph,
 } from '../../../api/types.ts';
 import type {
     FlowGraphDelta,
@@ -20,7 +20,7 @@ import type {
     GraphRevival,
 } from '../../../api/validators.ts';
 import {
-    validateStoredGraphJson,
+    asStoredGraph,
 } from '../../../api/validators.ts';
 export type {
     FlowGraphDelta,
@@ -399,7 +399,7 @@ async function buildFlowPutBody(
         await ctx.GETWithResponseId<FlowWithGraph>(
             'flows/' + id,
         );
-    const baseline = validateStoredGraphJson(
+    const baseline = asStoredGraph(
         current.graph, 'flow.graph',
     );
     const delta = buildSaveEvents(
@@ -418,7 +418,7 @@ async function buildFlowPutBody(
             state: 'updated',
             state_at: now,
             state_event_id: generateCryptoSafeBase62(),
-            graph: storedGraphField({
+            graph: storedGraph({
                 nodes: save.nodes,
                 edges: save.edges,
             }),

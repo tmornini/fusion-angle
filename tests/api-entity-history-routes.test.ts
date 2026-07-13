@@ -541,7 +541,7 @@ function flowDocBody(
         state,
         state_at: stateAt,
         state_event_id: stateEventId,
-        graph: JSON.stringify({ nodes: [], edges: [] }),
+        graph: { nodes: [], edges: [] },
         revivals: [],
         graphDelta: {
             nodes: [],

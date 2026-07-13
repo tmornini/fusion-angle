@@ -37,8 +37,8 @@ function detail() {
     return {
         title: 'Engineer',
         department: 'Product',
-        strengths: '[]',
-        team_dimensions: '{}',
+        strengths: [],
+        team_dimensions: {},
     };
 }
 

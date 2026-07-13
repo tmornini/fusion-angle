@@ -89,8 +89,8 @@ function emptyDelta() {
     };
 }
 
-function emptyGraph(): string {
-    return JSON.stringify({ nodes: [], edges: [] });
+function emptyGraph() {
+    return { nodes: [], edges: [] };
 }
 
 interface WireNode {
@@ -133,8 +133,8 @@ function wireEdge(
 function graphJson(
     nodes: readonly WireNode[],
     edges: readonly ReturnType<typeof wireEdge>[],
-): string {
-    return JSON.stringify({ nodes, edges });
+) {
+    return { nodes, edges };
 }
 
 function deltaNode(
@@ -265,8 +265,8 @@ async function wireFlowsText(
     return res.text();
 }
 
-function normalizedGraph(graph: string): unknown {
-    const parsed = JSON.parse(graph) as {
+function normalizedGraph(graph: unknown): unknown {
+    const parsed = graph as {
         nodes: {
             id: string;
             memberIds: string[];
@@ -585,7 +585,7 @@ test('live-write chain: create, save, node delete, undo, '
     headId = deletedSave.headers.get('Response-ID')!;
     derived = await assertStep();
     assert.equal(
-        (JSON.parse(derived.graph) as { nodes: { id: string }[] })
+        (derived.graph as { nodes: { id: string }[] })
             .nodes.length,
         1,
     );
@@ -602,7 +602,7 @@ test('live-write chain: create, save, node delete, undo, '
     headId = await headResponseId(db, token, flowId);
     derived = await assertStep();
     assert.equal(
-        (JSON.parse(derived.graph) as { nodes: { id: string }[] })
+        (derived.graph as { nodes: { id: string }[] })
             .nodes.some((n) => n.id === n2),
         true,
         'the revived node must be visible on the pair plane',
@@ -889,7 +889,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
     );
-    const derivedNodes = (JSON.parse(derived.graph) as {
+    const derivedNodes = (derived.graph as {
         nodes: { id: string }[];
     }).nodes;
     assert.deepEqual(
@@ -1037,7 +1037,7 @@ async () => {
     // Graph content preserves both members/attrs regardless
     // of insertion order (normalizedGraph order-independence
     // still applies on the pair plane).
-    const nodes = (JSON.parse(derived.graph) as {
+    const nodes = (derived.graph as {
         nodes: {
             id: string;
             memberIds: string[];

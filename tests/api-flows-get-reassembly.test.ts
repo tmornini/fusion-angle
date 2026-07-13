@@ -32,7 +32,6 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
-    storedGraphField,
 } from '../api/types.ts';
 import {
     asStoredGraph,
@@ -172,7 +171,7 @@ test(
         const fetched =
             await ctx.GET<FlowWithGraph>('flows/' + flowId);
         const got = asStoredGraph(
-            JSON.parse(fetched.graph), 'flow.graph',
+            fetched.graph, 'flow.graph',
         );
         assert.deepEqual(
             norm(got),
@@ -292,7 +291,7 @@ test(
         const fetched =
             await ctx.GET<FlowWithGraph>('flows/' + flowId);
         const got = asStoredGraph(
-            JSON.parse(fetched.graph), 'flow.graph',
+            fetched.graph, 'flow.graph',
         );
         assert.deepEqual(
             norm(got),

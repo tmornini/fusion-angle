@@ -22,7 +22,6 @@ import {
     buildSaveEvents,
 } from './flow-mutations.ts';
 import {
-    validateStoredGraphJson,
     parseOrThrow,
     asObject,
     asArray,
@@ -259,7 +258,7 @@ function buildBackupJson(
     flow: FlowWithGraph,
     projectId: string | undefined,
 ): string {
-    const graph = validateStoredGraphJson(
+    const graph = asStoredGraph(
         flow.graph, 'flow.graph',
     );
     const backup: Backup = {
@@ -308,7 +307,7 @@ export async function getFlowZip(
     const { flow, projectId } =
         await getFlowBackupData(ctx, flowId);
 
-    const graph = validateStoredGraphJson(
+    const graph = asStoredGraph(
         flow.graph, 'flow.graph',
     );
 

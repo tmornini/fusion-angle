@@ -90,12 +90,12 @@ import {
     validateWorkOrderDocumentBody,
     validateWorkOrderReleaseBody,
     validateWorkOrderTransitionBody,
-    validateWorkOrderFlowGraphJson,
+    asWorkOrderFlowGraph,
     pickString,
     pickBoolean,
     pickNumber,
-    pickJsonObjectField,
-    validateStoredGraphJson,
+    asStoredGraph,
+    asObject,
 } from './validators.ts';
 import {
     appendMessagePair,
@@ -136,7 +136,7 @@ import {
     reduceCreateGraphDelta,
 } from './flow-graph-relations.ts';
 import {
-    storedGraphField,
+    storedGraph,
 } from './types.ts';
 import {
     deriveIdeaSubmissions,
@@ -1308,7 +1308,7 @@ export function flowCreateDocumentBody(
         state: b.initialState,
         state_at: b.initialStateAt,
         state_event_id: b.initialStateEventId,
-        graph: storedGraphField(
+        graph: storedGraph(
             reduceCreateGraphDelta(b.graphDelta),
         ),
         graphDelta: b.graphDelta,
@@ -1444,12 +1444,12 @@ export async function postFlowUndoOp(
             },
         );
     }
-    const currentGraph = validateStoredGraphJson(
-        pickJsonObjectField(current.body, 'graph'),
+    const currentGraph = asStoredGraph(
+        current.body['graph'],
         'flows/:id/undo current.graph',
     );
-    const targetGraph = validateStoredGraphJson(
-        pickJsonObjectField(target.body, 'graph'),
+    const targetGraph = asStoredGraph(
+        target.body['graph'],
         'flows/:id/undo target.graph',
     );
     // graphDelta/revivals still computed for the document-pair
@@ -1478,7 +1478,10 @@ export async function postFlowUndoOp(
         state: 'updated',
         state_at: b.at,
         state_event_id: b.eventId,
-        graph: pickJsonObjectField(target.body, 'graph'),
+        graph: asObject(
+            target.body['graph'],
+            'flows/:id/undo target.graph',
+        ),
         graphDelta: delta,
         revivals,
     };
@@ -1964,7 +1967,9 @@ function workOrderCreateDocumentBody(
 ): Record<string, unknown> {
     return {
         display_id: pickString(b.workOrder, 'display_id'),
-        flow_graph: pickString(b.workOrder, 'flow_graph'),
+        flow_graph: asObject(
+            b.workOrder['flow_graph'], 'flow_graph',
+        ),
         position: pickNumber(b.workOrder, 'position'),
     };
 }
@@ -2077,7 +2082,7 @@ export async function postWorkOrderClaimOp(
                 );
             }
             const graph =
-                validateWorkOrderFlowGraphJson(
+                asWorkOrderFlowGraph(
                     wo.flow_graph,
                     'work_orders.flow_graph',
                 );

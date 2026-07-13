@@ -1,8 +1,3 @@
-import {
-    validateStringArrayJson,
-    validateStringNumberRecordJson,
-} from './validators.ts';
-
 export type Id = string;
 
 export type MemberId = Id;
@@ -156,30 +151,6 @@ export type InvitationState =
     typeof INVITATION_STATES[number];
 
 export type StoredBoolean = 0 | 1;
-
-export type JsonArrayField = string & {
-    readonly __brand: 'JsonArrayField';
-};
-
-export type JsonObjectField = string & {
-    readonly __brand: 'JsonObjectField';
-};
-
-export function jsonArrayField(
-    value: unknown[],
-): JsonArrayField {
-    return JSON.stringify(
-        value,
-    ) as JsonArrayField;
-}
-
-export function jsonObjectField(
-    value: Record<string, unknown>,
-): JsonObjectField {
-    return JSON.stringify(
-        value,
-    ) as JsonObjectField;
-}
 
 function includes<T extends string>(
     values: readonly T[],
@@ -698,8 +669,8 @@ export interface HumanMemberEntity {
     id: MemberId;
     title: string;
     department: string;
-    strengths: JsonArrayField;
-    team_dimensions: JsonObjectField;
+    strengths: string[];
+    team_dimensions: Record<string, number>;
 }
 
 export class HumanMember {
@@ -711,8 +682,9 @@ export class HumanMember {
     readonly #state: MemberState;
     readonly #stateAt: string;
     readonly #stateEventId: string;
-    readonly #strengths: string;
-    readonly #teamDimensions: string;
+    readonly #strengths: readonly string[];
+    readonly #teamDimensions:
+        Readonly<Record<string, number>>;
 
     constructor(
         parent: MemberEntity,
@@ -783,21 +755,13 @@ export class HumanMember {
         return this.#stateEventId;
     }
 
-    parsedStrengths(): string[] {
-        return validateStringArrayJson(
-            this.#strengths,
-            'humanMember.strengths',
-        );
+    strengths(): readonly string[] {
+        return this.#strengths;
     }
 
-    parsedTeamDimensions():
-        Record<string, number> {
-        return (
-            validateStringNumberRecordJson(
-                this.#teamDimensions,
-                'humanMember.teamDimensions',
-            )
-        );
+    teamDimensions():
+        Readonly<Record<string, number>> {
+        return this.#teamDimensions;
     }
 
     matchesSearch(term: string): boolean {
@@ -1126,11 +1090,11 @@ export const DEFAULT_NODE_MEMBER_IDS:
     readonly MemberId[] = [];
 export const DEFAULT_NODE_TASK_INSTRUCTIONS = '';
 
-// The stored flow row. The graph is NOT a column: it lives in
-// the four relation tables (flow_nodes, flow_edges,
-// flow_node_members, flow_node_attributes) and the GET handlers
-// reassemble it on read. The frozen plane (flow_versions.graph,
-// work_orders.flow_graph) keeps its own blob.
+// The stored flow scalars. The live graph is NOT on this
+// type: it rides the flow document body's `graph` field as
+// native nested JSON (FlowWithGraph / FlowDocumentBody). The
+// frozen plane (`work_orders.flow_graph`) keeps its own
+// native copy (same shape plus name / lockTimeout).
 export interface FlowEntity {
     id: Id;
     organization_id: Id;
@@ -1142,20 +1106,22 @@ export interface FlowEntity {
 }
 
 // The GET-response shape for a flow: the stored row plus the
-// `graph` field (the head document pair's OWN `graph` field,
-// carried verbatim — api/derive-flows.ts's flowEntityOf; single
-// GET /flows/:id and the list GET /flows both serve this
-// shape). `hasUndoHistory` (Phase 14 Task 8) is a CHEAP,
-// approximate signal — this flow's own flows/:id document-pair
-// count exceeds 1 (i.e. it has been edited past genesis) —
-// reusing whatever GET already fetched the flow (page load,
-// the post-undo refresh) rather than a new wire read; a rare
-// false positive (undo has already reached genesis, but a
-// save/undo cycle since kept the pair count above 1) degrades
-// to a silent server-side no-op on the next undo, never a
-// crash or wrong restore.
+// `graph` field (the head document pair's OWN `graph` field as
+// native nested JSON — api/derive-flows.ts's flowEntityOf;
+// single GET /flows/:id and the list GET /flows both serve this
+// shape). The live graph rides the flow document body; the
+// frozen plane (`work_orders.flow_graph`) keeps its own copy.
+// `hasUndoHistory` (Phase 14 Task 8) is a CHEAP, approximate
+// signal — this flow's own flows/:id document-pair count exceeds
+// 1 (i.e. it has been edited past genesis) — reusing whatever
+// GET already fetched the flow (page load, the post-undo
+// refresh) rather than a new wire read; a rare false positive
+// (undo has already reached genesis, but a save/undo cycle
+// since kept the pair count above 1) degrades to a silent
+// server-side no-op on the next undo, never a crash or wrong
+// restore.
 export type FlowWithGraph = FlowEntity & {
-    graph: JsonObjectField;
+    graph: Record<string, unknown>;
     hasUndoHistory: boolean;
 };
 
@@ -1236,16 +1202,15 @@ export interface WorkOrderFlowGraph {
     edges: GraphEdge[];
 }
 
-// The graph storage seam, serialize half — the parse half
-// is asStoredGraph in validators.ts. The live flows.graph blob
-// is retired; this seam now serves the frozen plane
-// (flow_versions.graph, work_orders.flow_graph) plus the
-// GET-derived read DTO (the graph the GET handlers reassemble
-// from relations and return as FlowWithGraph.graph). The stored
-// JSON shape is a pinned contract (SCHEMA.md documents it; old
-// rows and exported backups carry it), so domain graphs cross
-// into rows ONLY through these mappers — a domain-type change
-// cannot silently rewrite storage.
+// The graph storage seam, serialize half — the parse half is
+// asStoredGraph in validators.ts. The live flow document body's
+// `graph` field carries this native nested object; the frozen
+// plane (`work_orders.flow_graph`) keeps its own native copy.
+// The stored JSON shape is a pinned
+// contract (SCHEMA.md documents it; old rows and exported
+// backups carry it), so domain graphs cross into rows ONLY
+// through these mappers — a domain-type change cannot silently
+// rewrite storage.
 function storedNodeAttribute(
     ref: NodeAttribute,
 ): Record<string, unknown> {
@@ -1293,28 +1258,22 @@ export function storedGraph(
     };
 }
 
-export function storedGraphField(
-    graph: StoredGraph,
-): JsonObjectField {
-    return jsonObjectField(storedGraph(graph));
-}
-
-export function storedWorkOrderFlowGraphField(
+export function storedWorkOrderFlowGraph(
     graph: WorkOrderFlowGraph,
-): JsonObjectField {
-    return jsonObjectField({
+): Record<string, unknown> {
+    return {
         name: graph.name,
         lockTimeout: graph.lockTimeout,
         nodes: graph.nodes.map(storedGraphNode),
         edges: graph.edges.map(storedGraphEdge),
-    });
+    };
 }
 
 export interface WorkOrderEntity {
     id: Id;
     organization_id: Id;
     display_id: string;
-    flow_graph: JsonObjectField;
+    flow_graph: Record<string, unknown>;
     position: number;
 }
 
@@ -1346,8 +1305,8 @@ export interface RecordAttributeEntity {
     name: string;
     attribute_type: AttributeType;
     sort_order: number;
-    options: JsonArrayField;
-    constraints: JsonArrayField;
+    options: string[];
+    constraints: Constraint[];
 }
 
 export interface FlowRecordEntity {

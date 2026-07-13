@@ -4,9 +4,6 @@ import {
     GET, PUT, DELETE,
 } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    jsonArrayField,
-} from '../api/types.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -112,8 +109,8 @@ test(
             name: 'Email',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         }, DEV_TOKEN);
         const stored = await GET<{
             id: string;
@@ -139,8 +136,8 @@ test(
             name: 'X',
             attribute_type: 'text',
             sort_order: 1,
-            options: jsonArrayField([]),
-            constraints: jsonArrayField([]),
+            options: [],
+            constraints: [],
         }, DEV_TOKEN);
         await DELETE(
             db, 'record-attributes/a-1', DEV_TOKEN,

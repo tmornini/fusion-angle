@@ -55,7 +55,7 @@ async function getFlowGraph(
         'flows/' + flowId,
     );
     return asStoredGraph(
-        JSON.parse(flow.graph), 'flow.graph',
+        flow.graph, 'flow.graph',
     );
 }
 

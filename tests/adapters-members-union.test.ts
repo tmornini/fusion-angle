@@ -338,8 +338,8 @@ test(
         const detail = {
             title: 'product_manager',
             department: 'Product',
-            strengths: '[]' as never,
-            team_dimensions: '{}' as never,
+            strengths: [],
+            team_dimensions: {},
         };
         await postHumanMemberDocumentOp(
             db, 'member_without_pii', detail, SYSTEM_MEMBER_ID,

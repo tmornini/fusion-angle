@@ -22,7 +22,6 @@ import {
     putWorkOrder,
 } from '../web-app/app/adapters/work-orders-mutations.ts';
 import {
-    jsonArrayField,
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
     type GraphNode,
@@ -201,10 +200,8 @@ async function seedAttribute(
         attribute_type:
             options.attribute_type ?? 'text',
         sort_order: 1,
-        options: jsonArrayField([]),
-        constraints: jsonArrayField(
-            options.constraints ?? [],
-        ),
+        options: [],
+        constraints: options.constraints ?? [],
     });
 }
 

@@ -10,7 +10,7 @@ import type {
 } from '../../../api/types.ts';
 import {
     asBoolean,
-    validateStoredGraphJson,
+    asStoredGraph,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
 import { getProjectEntities } from './projects.ts';
@@ -39,11 +39,9 @@ export interface FlowGraph {
 }
 
 function parseGraph(
-    raw: string,
+    value: unknown,
 ): StoredGraph {
-    return validateStoredGraphJson(
-        raw, 'flow.graph',
-    );
+    return asStoredGraph(value, 'flow.graph');
 }
 
 export interface FlowSummary {

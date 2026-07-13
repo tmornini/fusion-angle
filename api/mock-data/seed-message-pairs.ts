@@ -131,8 +131,6 @@ import type {
     OrganizationEntity,
 } from '../types.ts';
 import {
-    jsonArrayField,
-    jsonObjectField,
     nowUtc,
     DEFAULT_LOCK_TIMEOUT,
     SYSTEM_MEMBER_ID,
@@ -650,9 +648,8 @@ export function humanMemberSeedBody(
         id: member.id,
         detail: {
             ...detail,
-            strengths: jsonArrayField(strengths),
-            team_dimensions:
-                jsonObjectField(team_dimensions),
+            strengths,
+            team_dimensions,
         },
         initialState: state,
         initialStateEventId:
@@ -885,7 +882,7 @@ export function flowOrg2SeedBody(): Record<string, unknown> {
         state: 'active',
         state_at: MOCK_SEED_TIMESTAMP,
         state_event_id: 'seed-state-flow-org2',
-        graph: jsonObjectField({ nodes: [], edges: [] }),
+        graph: { nodes: [], edges: [] },
         graphDelta: {
             nodes: [],
             edges: [],
@@ -1225,17 +1222,17 @@ export function bootstrapCurrentMemberBody(
         detail: {
             title: 'Admin',
             department: 'Product',
-            strengths: jsonArrayField([
+            strengths: [
                 'Strategic Planning',
                 'Data Analysis',
                 'Stakeholder Management',
-            ]),
-            team_dimensions: jsonObjectField({
+            ],
+            team_dimensions: {
                 driver: 80,
                 analytical: 80,
                 expressive: 80,
                 amiable: 80,
-            }),
+            },
         },
         initialState: 'active',
         initialStateEventId: 'bootstrap-current-active',

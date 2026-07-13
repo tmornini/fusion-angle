@@ -3,9 +3,6 @@ import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    jsonArrayField,
-} from '../api/types.ts';
-import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
@@ -46,10 +43,8 @@ test(
                     name: 'Monthly Fee',
                     attribute_type: 'number',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField(
-                        [],
-                    ),
+                    options: [],
+                    constraints: [],
                 },
             ],
             initialState: 'active',
@@ -200,10 +195,8 @@ test(
                     name: 'Old',
                     attribute_type: 'text',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField(
-                        [],
-                    ),
+                    options: [],
+                    constraints: [],
                 },
             ],
             initialState: 'active',
@@ -228,10 +221,8 @@ test(
                     name: 'New',
                     attribute_type: 'text',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField(
-                        [],
-                    ),
+                    options: [],
+                    constraints: [],
                 },
             ],
             // Echoed from the create's own known head above.
@@ -272,10 +263,8 @@ test(
                     name: 'Initial',
                     attribute_type: 'text',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField(
-                        [],
-                    ),
+                    options: [],
+                    constraints: [],
                 },
             ],
             initialState: 'active',
@@ -299,10 +288,8 @@ test(
                     name: 'Renamed',
                     attribute_type: 'number',
                     sort_order: 0,
-                    options: jsonArrayField([]),
-                    constraints: jsonArrayField(
-                        [],
-                    ),
+                    options: [],
+                    constraints: [],
                 },
             ],
             // Echoed from the create's own known head above.
@@ -347,12 +334,8 @@ test(
                         name: '',
                         attribute_type: 'text',
                         sort_order: 0,
-                        options: jsonArrayField(
-                            [],
-                        ),
-                        constraints: jsonArrayField(
-                            [],
-                        ),
+                        options: [],
+                        constraints: [],
                     },
                 ],
                 initialState: 'active',
@@ -389,12 +372,8 @@ test(
                         name: 'X',
                         attribute_type: 'text',
                         sort_order: 0,
-                        options: jsonArrayField(
-                            [],
-                        ),
-                        constraints: jsonArrayField(
-                            [],
-                        ),
+                        options: [],
+                        constraints: [],
                     },
                 ],
                 initialState: 'active',

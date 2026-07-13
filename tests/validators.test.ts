@@ -13,6 +13,7 @@ import {
     validateIdeaSubmissionEntity,
     validateProjectFlowEntity,
     validateRecordAttributeEntity,
+    validateFlowDocumentBody,
     asStoredGraph,
     asConstraint,
 } from '../api/validators.ts';
@@ -28,8 +29,8 @@ import {
 const validHumanMember = {
     title: 'Engineer',
     department: 'R&D',
-    strengths: '["analytical"]',
-    team_dimensions: '{"driver":0.5}',
+    strengths: ['analytical'],
+    team_dimensions: { driver: 0.5 },
 };
 
 test(
@@ -105,9 +106,9 @@ test(
         assert.throws(
             () => validateHumanMemberEntity({
                 ...validHumanMember,
-                strengths: '[1, 2]',
+                strengths: [1, 2],
             }),
-            /HumanMemberEntity.strengths\[0\]/,
+            /expected string for strengths\[0\]/,
         );
     },
 );
@@ -119,9 +120,62 @@ test(
         assert.throws(
             () => validateHumanMemberEntity({
                 ...validHumanMember,
-                team_dimensions: '{"driver":"high"}',
+                team_dimensions: { driver: 'high' },
             }),
-            /HumanMemberEntity.team_dimensions/,
+            /expected finite number for team_dimensions\.driver/,
+        );
+    },
+);
+
+test(
+    'validateHumanMemberEntity accepts native'
+    + ' strengths and team_dimensions',
+    () => {
+        const entity = validateHumanMemberEntity({
+            title: 'Engineer',
+            department: 'R&D',
+            strengths: ['systems', 'mentoring'],
+            team_dimensions: { driver: 60, amiable: 40 },
+        });
+        assert.deepEqual(
+            entity.strengths,
+            ['systems', 'mentoring'],
+        );
+        assert.deepEqual(
+            entity.team_dimensions,
+            { driver: 60, amiable: 40 },
+        );
+    },
+);
+
+test(
+    'validateHumanMemberEntity rejects a'
+    + ' JSON-encoded strengths string',
+    () => {
+        assert.throws(
+            () => validateHumanMemberEntity({
+                title: 'Engineer',
+                department: 'R&D',
+                strengths: '["systems"]',
+                team_dimensions: { driver: 60 },
+            }),
+            /expected array for strengths/,
+        );
+    },
+);
+
+test(
+    'validateHumanMemberEntity rejects a'
+    + ' JSON-encoded team_dimensions string',
+    () => {
+        assert.throws(
+            () => validateHumanMemberEntity({
+                title: 'Engineer',
+                department: 'R&D',
+                strengths: [],
+                team_dimensions: '{"driver":60}',
+            }),
+            /expected object for team_dimensions/,
         );
     },
 );
@@ -345,12 +399,9 @@ test(
 
 // --- FlowEntity ---
 
-// The graph is NOT a flow column — flows.graph is retired. The
-// stored flow row carries only its scalar fields; the graph
-// lives in the four relation tables and the relation validators
-// (validateFlowEdgeEntity et al.) own the node-id alphabet
-// fence. So validateFlowEntity neither requires nor accepts a
-// graph key.
+// The graph is NOT a FlowEntity key — it rides the flow
+// document body as native nested JSON (validateFlowDocumentBody
+// / asStoredGraph). validateFlowEntity accepts only scalars.
 const validFlow = {
     organization_id: '1',
     name: 'Flow A',
@@ -406,12 +457,12 @@ test(
 
 // --- WorkOrderEntity ---
 
-const minimalWoGraph = JSON.stringify({
+const minimalWoGraph = {
     name: 'WO Flow',
     lockTimeout: DEFAULT_LOCK_TIMEOUT,
     nodes: [],
     edges: [],
-});
+};
 
 const validWorkOrder = {
     organization_id: '1',
@@ -447,12 +498,12 @@ test(
     () => {
     const result = validateWorkOrderEntity({
         ...validWorkOrder,
-        flow_graph: JSON.stringify({
+        flow_graph: {
             flowId: 'f-legacy',
             name: 'WO Flow',
             lockTimeout: DEFAULT_LOCK_TIMEOUT,
             nodes: [], edges: [],
-        }),
+        },
     });
     assert.equal(result.display_id, 'WO-001');
 });
@@ -869,8 +920,8 @@ const validSelectAttribute = {
     name: 'Priority',
     attribute_type: 'select',
     sort_order: 0,
-    options: '["High","Low"]',
-    constraints: '[]',
+    options: ['High', 'Low'],
+    constraints: [] as const,
 };
 
 test(
@@ -880,7 +931,7 @@ test(
     assert.throws(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
-            options: '[]',
+            options: [],
         }),
         /at least one option/,
     );
@@ -905,7 +956,7 @@ test(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'radio',
-            options: '[]',
+            options: [],
         }),
         /at least one option/,
     );
@@ -919,9 +970,9 @@ test(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'text',
-            options: '[3]',
+            options: [3],
         }),
-        /RecordAttributeEntity.options\[0\]/,
+        /expected string for options\[0\]/,
     );
 });
 
@@ -933,9 +984,10 @@ test(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'number',
-            options: '[]',
-            constraints:
-                '[{"kind":"regex","pattern":"^\\\\d+$"}]',
+            options: [],
+            constraints: [
+                { kind: 'regex', pattern: '^\\d+$' },
+            ],
         }),
         /regex/,
     );
@@ -949,9 +1001,10 @@ test(
         () => validateRecordAttributeEntity({
             ...validSelectAttribute,
             attribute_type: 'text',
-            options: '[]',
-            constraints:
-                '[{"kind":"range_min","min":"0"}]',
+            options: [],
+            constraints: [
+                { kind: 'range_min', min: '0' },
+            ],
         }),
     );
 });
@@ -963,9 +1016,13 @@ test(
     const result = validateRecordAttributeEntity({
         ...validSelectAttribute,
         attribute_type: 'date',
-        options: '[]',
-        constraints:
-            '[{"kind":"range_min","min":"2000-01-01"}]',
+        options: [],
+        constraints: [
+            {
+                kind: 'range_min',
+                min: '2000-01-01',
+            },
+        ],
     });
     assert.equal(result.attribute_type, 'date');
 });
@@ -977,10 +1034,13 @@ test(
     const result = validateRecordAttributeEntity({
         ...validSelectAttribute,
         attribute_type: 'text',
-        options: '[]',
-        constraints:
-            '[{"kind":"regex",'
-            + '"pattern":"^[^@]+@[^@]+\\\\.[^@]+$"}]',
+        options: [],
+        constraints: [
+            {
+                kind: 'regex',
+                pattern: '^[^@]+@[^@]+\\.[^@]+$',
+            },
+        ],
     });
     assert.equal(result.name, 'Priority');
 });
@@ -1013,3 +1073,105 @@ test('asConstraint accepts a safe pattern', () => {
         'regex',
     );
 });
+
+test(
+    'validateFlowDocumentBody accepts a native'
+    + ' graph object',
+    () => {
+        const body = validateFlowDocumentBody({
+            name: 'Onboarding',
+            is_locked: false,
+            is_auto_layout: true,
+            is_auto_fit: true,
+            lock_timeout: 28800,
+            state: 'active',
+            state_at: '2026-07-12T00:00:00.000000Z',
+            state_event_id: 'evt-1',
+            graph: { nodes: [], edges: [] },
+            graphDelta: {
+                nodes: [], edges: [],
+                deletions: [],
+                memberEvents: [],
+                attributeEvents: [],
+            },
+            revivals: [],
+        });
+        assert.deepEqual(
+            body.graph, { nodes: [], edges: [] },
+        );
+    },
+);
+
+test(
+    'validateFlowDocumentBody rejects a'
+    + ' JSON-encoded graph string',
+    () => {
+        assert.throws(
+            () => validateFlowDocumentBody({
+                name: 'Onboarding',
+                is_locked: false,
+                is_auto_layout: true,
+                is_auto_fit: true,
+                lock_timeout: 28800,
+                state: 'active',
+                state_at:
+                    '2026-07-12T00:00:00.000000Z',
+                state_event_id: 'evt-1',
+                graph: '{"nodes":[],"edges":[]}',
+                graphDelta: {
+                    nodes: [], edges: [],
+                    deletions: [],
+                    memberEvents: [],
+                    attributeEvents: [],
+                },
+                revivals: [],
+            }),
+            /expected object for FlowDocumentBody\.graph/,
+        );
+    },
+);
+
+test(
+    'validateWorkOrderEntity accepts a native'
+    + ' flow_graph object',
+    () => {
+        const entity = validateWorkOrderEntity({
+            organization_id: 'org-1',
+            display_id: 'a7c3e1f9',
+            flow_graph: {
+                name: 'Onboarding',
+                lockTimeout: 28800,
+                nodes: [],
+                edges: [],
+            },
+            position: 1,
+        });
+        assert.deepEqual(
+            entity.flow_graph,
+            {
+                name: 'Onboarding',
+                lockTimeout: 28800,
+                nodes: [],
+                edges: [],
+            },
+        );
+    },
+);
+
+test(
+    'validateWorkOrderEntity rejects a'
+    + ' JSON-encoded flow_graph string',
+    () => {
+        assert.throws(
+            () => validateWorkOrderEntity({
+                organization_id: 'org-1',
+                display_id: 'a7c3e1f9',
+                flow_graph:
+                    '{"name":"x","lockTimeout":1,'
+                    + '"nodes":[],"edges":[]}',
+                position: 1,
+            }),
+            /expected object for flow_graph/,
+        );
+    },
+);

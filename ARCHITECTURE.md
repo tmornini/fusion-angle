@@ -52,15 +52,18 @@ The live flow graph is **pair-plane only**. The retired
 four-relation row plane (`flow_nodes`, `flow_edges`,
 `flow_node_members`, `flow_node_attributes`) and the
 `flow_versions` table are GONE (Phase Final). Graph truth
-rides the flow document pair body: `graphDelta` (node/edge
-upserts by stable id, node/edge `'deleted'` events,
+rides the flow document pair body as native nested JSON:
+the head `graph` object (nodes/edges in the stored
+tongue), plus write-side `graphDelta` (node/edge upserts
+by stable id, node/edge `'deleted'` events,
 member/attribute `'added'`/`'removed'` ledger events) and
-`revivals` (undo restore). Live GET reassembles
+`revivals` (undo restore). Live GET serves
 `FlowWithGraph.graph` from the document body's `graph`
 field; `graphDelta` / `revivals` remain write-side
 sidecars (SIDECAR-KEEP) for undo restore and RESTRICT
 bindings (`flowGraphBindingsFromPairs`). A work order
-freezes its own `flow_graph` blob inside the work-order
+freezes its own `flow_graph` as the same native shape
+plus `name` / `lockTimeout` inside the work-order
 document pair at creation — a frozen value, not a live
 relationship.
 
@@ -659,14 +662,13 @@ route families (DELETE NOTHING held through Phase 15).
 halves stripped (Stage A); doomed tables +
 `EntityStore` / `StateStore` + the three scoping
 decorators deleted (Stage B); `clients` re-pointed to
-`HistoryEntityStore`; `SNAPSHOT_SCHEMA_VERSION` 2→3;
-states-address retirement bumps 3→4 and deletes every
-verb on the shared event-append address; the clients
-elimination re-homes
-client config to the identities/:id/registration pair
-facet, deletes the last entity table, retires rawReadRow,
-and bumps 4→5; seed absolute at EXPECTED_PAIR_COUNT 1506 /
-bootstrap 13; `simulateLatency` 4.
+`HistoryEntityStore`; states-address retirement deletes
+every verb on the shared event-append address; the
+clients elimination re-homes client config to the
+identities/:id/registration pair facet, deletes the last
+entity table, and retires rawReadRow; seed absolute at
+EXPECTED_PAIR_COUNT 1506 / bootstrap 13;
+`simulateLatency` 4.
 
 ### Two claims (never collapse)
 
@@ -679,11 +681,11 @@ bootstrap 13; `simulateLatency` 4.
    fact over HTTP, not an additional violation. The two
    seed routes' `SeededCredentials` bodies stay shape- and
    count-stable.
-2. **Snapshot file-format contract** —
-   `SNAPSHOT_SCHEMA_VERSION` 4→5 plus the table-key set
-   shrinking to `requests` + `responses`. A pre-clients-
-   elimination (v4) export is rejected by a post-elimination
-   import (`SnapshotVersionMismatchError`).
+2. **Snapshot file-format contract** — the table-key set
+   shrinks to `requests` + `responses`. A snapshot is the
+   table-keyed row export with no version marker; an
+   incompatible body shape fails at use (derive/read),
+   never at an import-time version check.
 
 ### Wire covenant (Phase 15 deltas still hold)
 

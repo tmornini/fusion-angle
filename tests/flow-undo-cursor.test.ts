@@ -104,8 +104,8 @@ function emptyDelta() {
     };
 }
 
-function graphOf(name: string): string {
-    return JSON.stringify({
+function graphOf(name: string) {
+    return {
         nodes: [{
             id: 'n-' + name,
             name,
@@ -115,7 +115,7 @@ function graphOf(name: string): string {
             taskInstructions: '',
         }],
         edges: [],
-    });
+    };
 }
 
 // One document PUT body naming its own graph — each call's
@@ -610,9 +610,7 @@ test(
             documentBody(
                 'Sidecar Trimmed', flowId + '-del', {
                     state_at: deleteAt,
-                    graph: JSON.stringify(
-                        { nodes: [], edges: [] },
-                    ),
+                    graph: { nodes: [], edges: [] },
                     graphDelta: {
                         ...emptyDelta(),
                         deletions: [{

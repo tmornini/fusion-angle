@@ -7,7 +7,6 @@ import {
 } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { jsonArrayField } from '../api/types.ts';
 import { ValidationError } from '../api/types.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import {
@@ -38,8 +37,8 @@ function documentFields() {
         name: 'Priority',
         attribute_type: 'text',
         sort_order: 1,
-        options: jsonArrayField([]),
-        constraints: jsonArrayField([]),
+        options: [],
+        constraints: [],
     };
 }
 
@@ -95,7 +94,7 @@ test('validateRecordAttributeDocumentBody rejects an'
         () => validateRecordAttributeDocumentBody({
             ...documentFields(),
             attribute_type: 'select',
-            options: jsonArrayField([]),
+            options: [],
         }),
         ValidationError,
     );

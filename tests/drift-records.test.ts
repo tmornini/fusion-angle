@@ -15,7 +15,7 @@ import type {
     RecordEntity,
     RecordAttributeEntity,
 } from '../api/types.ts';
-import { jsonArrayField, jsonObjectField, nowUtc } from
+import { nowUtc } from
     '../api/types.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
@@ -179,8 +179,8 @@ function attributeBody(
         name,
         attribute_type: 'text',
         sort_order: 1,
-        options: jsonArrayField([]),
-        constraints: jsonArrayField([]),
+        options: [],
+        constraints: [],
     };
 }
 
@@ -1177,8 +1177,10 @@ async function transitionFieldValueCounts(
     return counts;
 }
 
-function workOrderFlowGraph(lockTimeoutSeconds: number): string {
-    return jsonObjectField({
+function workOrderFlowGraph(
+    lockTimeoutSeconds: number,
+): Record<string, unknown> {
+    return {
         name: 'Value-Count Fixture Flow',
         lockTimeout: lockTimeoutSeconds,
         nodes: [
@@ -1198,7 +1200,7 @@ function workOrderFlowGraph(lockTimeoutSeconds: number): string {
             },
         ],
         edges: [],
-    });
+    };
 }
 
 test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'

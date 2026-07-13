@@ -12,7 +12,7 @@ import {
     seedAdminSchema,
     seedOrganizationDocument,
 } from './test-fixtures.ts';
-import { jsonObjectField, nowUtc, SYSTEM_MEMBER_ID } from
+import { nowUtc, SYSTEM_MEMBER_ID } from
     '../api/types.ts';
 import {
     seedIdentityCredential,
@@ -256,10 +256,10 @@ function flowBody(organization: string) {
 function workOrderBody(organization: string) {
     return {
         organization_id: organization, display_id: 'WO',
-        flow_graph: jsonObjectField({
+        flow_graph: {
             flowId: 'f', name: 'f', lockTimeout: 0,
             nodes: [], edges: [],
-        }),
+        },
         position: 0,
     };
 }
@@ -326,7 +326,7 @@ async function seedChain(
             state: 'active',
             state_at: T8_AT,
             state_event_id: 'f' + s + '-genesis',
-            graph: JSON.stringify({ nodes: [], edges: [] }),
+            graph: { nodes: [], edges: [] },
             revivals: [],
             graphDelta: {
                 nodes: [],

@@ -21,7 +21,7 @@ import {
     putFlow,
 } from '../web-app/app/adapters/flow-mutations.ts';
 import {
-    jsonObjectField,
+    storedGraph,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import { asStoredGraph } from '../api/validators.ts';
@@ -80,11 +80,7 @@ function buildFlowEntity(
         is_auto_layout: true,
         is_auto_fit: true,
         lock_timeout: DEFAULT_LOCK_TIMEOUT,
-        graph: jsonObjectField(
-            graph as unknown as Record<
-                string, unknown
-            >,
-        ),
+        graph: storedGraph(graph),
         ...overrides,
     };
 }
@@ -102,7 +98,7 @@ async function seedFlowWithRelations(
     flow: FlowWithGraph,
 ): Promise<void> {
     const graph = asStoredGraph(
-        JSON.parse(flow.graph), 'flow.graph',
+        flow.graph, 'flow.graph',
     );
     await postFlowCreation(ctx, {
         flowId: flow.id,
