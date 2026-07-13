@@ -120,7 +120,7 @@ export interface IdeaWithSubmitter {
 
 // Lifecycle-current trio is stamped on the IdeaEntity GET
 // row (Phase A). Map snake_case wire → IdeaStateDetail;
-// no second hop to the states log / entity-states history.
+// no second hop to a lifecycle log or history alias.
 function ideaStateDetailFromRow(
     row: IdeaEntity,
 ): IdeaStateDetail {

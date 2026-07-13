@@ -25,6 +25,7 @@ import {
     getPreference,
     putPreference,
 } from '../web-app/app/adapters/preferences.ts';
+import { captureConsole } from './console-capture.ts';
 
 test(
     'getPreference returns null for an unset key',
@@ -108,7 +109,7 @@ test(
 test(
     'putPreference returns false on a'
     + ' QuotaExceededError without throwing',
-    () => {
+    async () => {
         const original = globalThis.localStorage;
         try {
             // @ts-expect-error — Node global stub
@@ -122,9 +123,19 @@ test(
                     throw err;
                 },
             };
-            assert.equal(
-                putPreference('k', 'v'),
-                false,
+            const { result, calls } =
+                await captureConsole(
+                    'warn',
+                    () => putPreference('k', 'v'),
+                );
+            assert.equal(result, false);
+            assert.ok(
+                calls.some(args => args.includes(
+                    'preference write skipped'
+                    + ' due to quota',
+                )),
+                'quota skip must warn, never'
+                + ' pass silently',
             );
         } finally {
             globalThis.localStorage = original;

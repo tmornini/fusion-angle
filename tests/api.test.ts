@@ -11,6 +11,7 @@ import {
     seedAIMember,
 } from './member-fixtures.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
+import { captureConsole } from './console-capture.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -68,30 +69,18 @@ test('PUT then GET round-trips an entity', async () => {
     assert.equal(fetched.title, 'Test');
 });
 
-// States-address retirement: PUT /states/:id is a router
-// 404 on every attempt. The immutability contract
-// (stateEventCollisionFromPairs / LedgerImmutabilityError)
-// retired with the route; document-plane
-// idempotency/collision is pinned by family tests.
+// Unknown-route write is a router 404 and writes nothing.
+// Document-plane idempotency/collision is pinned by family
+// tests; this pin is the generic writes-nothing force.
 test(
-    'PUT states/:id is a router 404 (twice)',
+    'PUT on an unknown route is a router 404',
     async () => {
         const db = await freshDb();
-        const event = {
-            entity_id: 'e1',
-            state: 'active',
-            at: '2026-01-01T00:00:00.000000Z',
-        };
         await assert.rejects(
-            () => PUT(db, 'states/s1', event, DEV_TOKEN),
-            (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 404,
-        );
-        await assert.rejects(
-            () => PUT(db, 'states/s1', {
-                ...event,
-                state: 'deleted',
+            () => PUT(db, 'no-such-route/x1', {
+                entity_id: 'e1',
+                state: 'active',
+                at: '2026-01-01T00:00:00.000000Z',
             }, DEV_TOKEN),
             (err: unknown) =>
                 err instanceof RequestError
@@ -281,21 +270,31 @@ test(
             }
             return original(column, key);
         };
-        const response = await handleRequest(
-            db,
-            new Request('http://localhost/ideas', {
-                headers: {
-                    'Authorization':
-                        'Bearer ' + DEV_TOKEN,
-                },
-            }),
-        );
+        const { result: response, calls } =
+            await captureConsole(
+                'error',
+                () => handleRequest(
+                    db,
+                    new Request('http://localhost/ideas', {
+                        headers: {
+                            'Authorization':
+                                'Bearer ' + DEV_TOKEN,
+                        },
+                    }),
+                ),
+            );
         assert.equal(response.status, 500);
         const { error } =
             (await response.json()) as {
                 error: string;
             };
         assert.equal(error, 'internal error');
+        assert.ok(
+            calls.some(args =>
+                args.includes('request failed')),
+            'the domain-boundary catch must keep'
+            + ' console evidence',
+        );
     },
 );
 

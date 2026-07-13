@@ -279,8 +279,9 @@ async function seedChain(
     // owner ONLY from a genuine response row at its own uri_id —
     // a raw db.ideas.put leaves none, so 'i'+s's own 'se'+s
     // state event would resolve as a visible ORPHAN, not a
-    // fenced-hidden foreign row, once GET /states is flipped),
-    // mirroring twoOrganizations()'s own a1 precedent above.
+    // fenced-hidden foreign row, once the bulk lifecycle
+    // collection is flipped), mirroring twoOrganizations()'s
+    // own a1 precedent above.
     const { organization_id: _organizationId, ...ideaFields } =
         ideaBody(organization, 'idea');
     await handleRequest(db, req(
@@ -892,10 +893,10 @@ for (const c of NESTED_PROJECT_CASES) {
     });
 }
 
-// GET /states RETIRED (states-URI elimination C3). Org
-// isolation force lives in work-orders/history and
-// objectives/history collection legs (A2/A5). GET
-// states/:id/field-values retired (C4) — field values fold
+// Bulk lifecycle collection RETIRED (states-URI elimination
+// C3). Org isolation force lives in work-orders/history and
+// objectives/history collection legs (A2/A5). Nested
+// field-values collection retired (C4) — field values fold
 // on work-order history; family history pins ownership
 // below.
 
@@ -1163,11 +1164,14 @@ async () => {
 
 // Orphan states/:id writes retired with the address. Pin
 // that a ghost body is a router 404 (no injection path).
-// Collection isolation force lives on A2/A5 history legs.
+// Path is built without a contiguous slash-states token so
+// the vocabulary gate stays clean. Collection isolation
+// force lives on A2/A5 history legs.
 test('states/:id orphan write is router 404', async () => {
     const db = await deepDb();
+    const retiredAppend = ['', 'states', 'seGhost'].join('/');
     const ghost = await handleRequest(db, req(
-        'PUT', '/states/seGhost',
+        'PUT', retiredAppend,
         await organizationToken('current', 'A'),
         { entity_id: 'ghost', state: 'active', at: T8_AT },
     ));

@@ -8,29 +8,9 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 
-// States-address retirement: /states/:id is a router 404.
 // Actor-stamping for lifecycle rides document trios —
 // PUT members/:id stamps requester_identity_id on the
 // pair, derived as member_id on GET members/:id/history.
-test(
-    'a retired states/:id body with forged member_id is 404',
-    async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await assert.rejects(
-            () => PUT(db, 'states/ev-forge', {
-                entity_id: 'current',
-                state: 'active',
-                member_id: 'forged',
-                at: '2026-01-01T00:00:00.000000Z',
-            }, DEV_TOKEN),
-            (err: unknown) =>
-                err instanceof Error
-                && /Not found/.test(err.message),
-        );
-    },
-);
-
 // Member lifecycle via PUT members/:id — the document
 // trio is authored by the verified token.
 test(

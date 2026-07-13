@@ -91,8 +91,9 @@ test(
         assert.equal(idea.title, 'Fresh Idea');
         // The fence stamped the bound org — never the body.
         assert.equal(idea.organization_id, '1');
-        // bare entity-states/:id RETIRED (Phase 15 Task 7);
-        // post-write check rides surviving /history.
+        // bare per-entity current-state alias RETIRED
+        // (Phase 15 Task 7); post-write check rides
+        // surviving /history.
         const stateRes = await handleRequest(db, req(
             'GET', '/ideas/idea-1/history',
             DEV_TOKEN,

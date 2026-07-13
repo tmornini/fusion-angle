@@ -348,10 +348,11 @@ test('accept makes the invitation org reachable', async () => {
     assert.deepEqual(sarahOrganizations, ['1', '2']);
 });
 
-// GET /states RETIRED (C3). Pin invitation ownership via
-// resolveOwningOrganization — inviting org owns the
-// invitation; foreign askers still resolve that owner (and
-// would fence it out of a bulk union that no longer exists).
+// Bulk lifecycle collection RETIRED (C3). Pin invitation
+// ownership via resolveOwningOrganization — inviting org
+// owns the invitation; foreign askers still resolve that
+// owner (and would fence it out of a bulk union that no
+// longer exists).
 test('an invitation event is owned by the inviting org',
 async () => {
     const db = await seed();

@@ -33,10 +33,11 @@ import {
 } from '../shared/http-message/media-registry.ts';
 
 // Pair-plane lifecycle derives and ownership fences (Phase 11
-// onward; bulk GET /states retired — states-URI elimination C3).
-// Per-entity history rides GET <family>/:id/history; work-order
-// and objective bulk history ride GET work-orders/history and
-// GET objectives/history. Surviving derives in this module:
+// onward; bulk lifecycle collection retired — states-URI
+// elimination C3). Per-entity history rides GET
+// <family>/:id/history; work-order and objective bulk history
+// ride GET work-orders/history and GET objectives/history.
+// Surviving derives in this module:
 //   (a) trio families — per-id derive*StateHistory readers live
 //       in their own family modules (ideas/projects/records/
 //       flows/objectives); write paths use family
@@ -51,9 +52,9 @@ import {
 //       No bulk derive remains (C3).
 //   (e) deriveInvitationStates / invitationLifecycleStatesFor —
 //       invitation grant + three answering ops (gate 5f).
-// bare GET /states/:id, GET /entity-states/*, GET /states bulk,
-// the five-source union (deriveStates), and GET
-// /states/:id/field-values are RETIRED (C3/C4).
+// bare states/:id, the per-entity history alias, the bulk
+// lifecycle collection, the five-source union (deriveStates),
+// and nested field-values collection are RETIRED (C3/C4).
 //
 // THE GATE-15 PRECEDENT (Phase 10): an org fence can be
 // reproduced from the MEMBERSHIP PAIR PLANE. This module's
@@ -429,10 +430,11 @@ export async function missedReadError(
     return new EntityNotFoundError(table, id);
 }
 
-// fenceStatesByOwner RETIRED with GET /states (states-URI
-// elimination C3). Per-entity and collection history routes
-// fence via resolveOwningOrganization / missedReadError
-// directly; stateEventVisibilityFor covers event-id reads.
+// fenceStatesByOwner RETIRED with the bulk lifecycle
+// collection (states-URI elimination C3). Per-entity and
+// collection history routes fence via
+// resolveOwningOrganization / missedReadError directly;
+// stateEventVisibilityFor covers event-id reads.
 
 // ---- stateEventVisibilityFor — the field-values fence --------
 // ---- successor (Phase 15 Task 1, Author gate 2) --------------
@@ -1737,11 +1739,12 @@ export async function deriveMemberStates(
     );
 }
 
-// deriveFlowGraphStates RETIRED with GET /states (states-URI
-// elimination C3). Graph node/edge deleted/restored sidecars
-// still live on the flow document-pair body (graphDelta.deletions
-// / revivals — SIDECAR-KEEP); resolveFlowGraphOwner above still
-// resolves their owners for fences. Visibility of named sidecar
+// deriveFlowGraphStates RETIRED with the bulk lifecycle
+// collection (states-URI elimination C3). Graph node/edge
+// deleted/restored sidecars still live on the flow
+// document-pair body (graphDelta.deletions / revivals —
+// SIDECAR-KEEP); resolveFlowGraphOwner above still resolves
+// their owners for fences. Visibility of named sidecar
 // event ids rides stateEventVisibilityFor.
 
 // ---- deriveInvitationStates — the invitation lifecycle reader ---
@@ -1959,9 +1962,9 @@ export async function invitationLifecycleStatesFor(
 }
 
 // deriveTrioFamilyStates / deriveStates / fenceStatesByOwner /
-// unionById / sameStateEntity RETIRED with GET /states
-// (states-URI elimination C3). documentStateHeadFor RETIRED
-// with C5 (write paths use family currentDocumentState).
+// unionById / sameStateEntity RETIRED with the bulk lifecycle
+// collection (states-URI elimination C3). documentStateHeadFor
+// RETIRED with C5 (write paths use family currentDocumentState).
 // Per-entity history lives on GET <family>/:id/history and
 // family-scoped derives (derive*StateHistory,
 // workOrderLifecycleStatesFor, deriveMemberStates filter,

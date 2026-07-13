@@ -19,6 +19,7 @@ import {
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
+import { captureConsole } from './console-capture.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -269,18 +270,6 @@ async function seedCurrentGraph(
     });
 }
 
-async function silenceConsoleError<T>(
-    fn: () => Promise<T>,
-): Promise<T> {
-    const original = console.error;
-    console.error = () => {};
-    try {
-        return await fn();
-    } finally {
-        console.error = original;
-    }
-}
-
 // -- performAddEdge ---------------------------
 
 test(
@@ -459,7 +448,8 @@ test(
         const snap = snapFrom(buildGraph([
             buildNode('a'), buildNode('b'),
         ]));
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performAddEdge(
                 createRequestContext(db, DEV_TOKEN),
                 snap, 'a', 'b',
@@ -588,7 +578,8 @@ test(
         const snap = snapFrom(buildGraph([
             buildNode('a'),
         ]));
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performAddNodeAtPosition(
                 createRequestContext(db, DEV_TOKEN), snap, 'a', 0, 0,
             ),
@@ -719,7 +710,8 @@ test(
         const base = snapFrom(buildGraph([
             buildNode('a'),
         ]));
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performDeleteSelectedNodes(
                 createRequestContext(db, DEV_TOKEN),
                 withNodeSelection(base, 'a'),
@@ -805,7 +797,8 @@ test(
             [buildNode('a'), buildNode('b')],
             [buildEdge('e1', 'a', 'b')],
         ));
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performDeleteSelectedEdge(
                 createRequestContext(db, DEV_TOKEN),
                 withEdgeSelection(base, 'e1'),
@@ -911,7 +904,8 @@ test(
         const base = snapFrom(buildGraph([
             buildNode('a'),
         ]));
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performAddAttributeRef(
                 createRequestContext(db, DEV_TOKEN),
                 withNodeSelection(base, 'a'),
@@ -1007,7 +1001,8 @@ test(
                 ],
             }),
         ]));
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performRemoveAttributeRef(
                 createRequestContext(db, DEV_TOKEN),
                 withNodeSelection(base, 'a'),
@@ -1383,7 +1378,8 @@ test(
             buildFlowHistorySnapshot(false),
             buildFlowVersion(),
         );
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performRedo(
                 createRequestContext(db, DEV_TOKEN),
                 snap, history,
@@ -1489,7 +1485,8 @@ test(
         const faulting = faultingPostCtx(
             ctx, 'flows/' + FLOW_ID + '/undo',
         );
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performUndo(
                 faulting.ctx, snap,
                 buildFlowHistorySnapshot(true),
@@ -1551,7 +1548,8 @@ test(
         const faulting = faultingPutCtx(
             ctx, 'flows/' + FLOW_ID,
         );
-        const op = await silenceConsoleError(
+        const { result: op } = await captureConsole(
+            'error',
             () => performRedo(
                 faulting.ctx, snap, history,
             ),

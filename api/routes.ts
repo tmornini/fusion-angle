@@ -5175,15 +5175,15 @@ export const routes: Route[] = [
                 db, param(p, 1), body, actor, pair,
             ),
     }),
-    // GET /states RETIRED (states-URI elimination C3): the
-    // bulk five-source union is gone. Per-entity history lives
-    // on GET <family>/:id/history; work-order and objective
-    // bulk history live on GET work-orders/history and
-    // GET objectives/history. GET /states/:id/field-values
-    // retired with C4 (inline fold on WO history). bare
-    // states/:id is already a router 404 (states-address
-    // retirement Task 13). entity-states history retired
-    // with C2.
+    // Bulk lifecycle collection RETIRED (states-URI
+    // elimination C3): the five-source union is gone.
+    // Per-entity history lives on GET <family>/:id/history;
+    // work-order and objective bulk history live on GET
+    // work-orders/history and GET objectives/history.
+    // Nested field-values collection retired with C4
+    // (inline fold on WO history). bare states/:id is
+    // already a router 404 (states-address retirement
+    // Task 13). Per-entity history alias retired with C2.
 
     route('snapshots/schema', {
         get: async (db) =>

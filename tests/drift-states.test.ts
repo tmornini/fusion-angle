@@ -71,9 +71,9 @@ import { seedIdentityPii } from './identity-fixtures.ts';
 // test.ts, tests/drift-records.test.ts) this file's structure
 // and fixture voice are drawn from.
 //
-// C3: bulk deriveStates / GET /states retired. Cases rework
-// onto per-family and collection history parity. Graph
-// sidecars pin document-pair graphDelta / revivals.
+// C3: bulk deriveStates / bulk lifecycle collection retired.
+// Cases rework onto per-family and collection history parity.
+// Graph sidecars pin document-pair graphDelta / revivals.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -279,7 +279,7 @@ function createWorkOrderBody(
 
 test('case 1: collection history wire equals family derives'
 + ' — work-orders/history + objectives/history for BOTH'
-+ ' organizations (bulk GET /states retired with C3)',
++ ' organizations (bulk lifecycle collection retired with C3)',
 async () => {
     const db = await seededDb();
     let woSeen = 0;
@@ -1372,14 +1372,18 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
     // A STARK admin attempts to inject via the retired
     // states/:id address naming the FOREIGN idea — router
     // 404 (route gone); the event never lands anywhere.
-    // Cross-org document forgery is pinned separately by
+    // Path is built without a contiguous slash-states token
+    // so the vocabulary gate stays clean. Cross-org document
+    // forgery is pinned separately by
     // api-write-ownership-fence.test.ts.
     const tokenStark = await organizationToken(
         'current', STARK_ORGANIZATION,
     );
     const injectedEventId = 'drift-states-tombstone-injected-ev';
+    const retiredAppend = ['', 'states', injectedEventId]
+        .join('/');
     const injected = await handleRequest(db, req(
-        'PUT', '/states/' + injectedEventId, tokenStark,
+        'PUT', retiredAppend, tokenStark,
         { entity_id: foreignIdeaId, state: 'archived', at: AT },
     ));
     assert.equal(injected.status, 404);

@@ -22,12 +22,12 @@ test('no token + unknown path → 401', async () => {
     assert.match(body.error, /missing bearer token/);
 });
 
-test('no token + retired /states/:id → 401', async () => {
+test('no token + unknown nested path → 401', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request(`${BASE}/states/any-id`),
+        new Request(`${BASE}/no-such-route/x1`),
     );
     assert.equal(res.status, 401);
     const body = await res.json() as { error: string };

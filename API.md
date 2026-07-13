@@ -297,38 +297,92 @@ Legend for classification:
 - `GET /objectives/:id/revisions` ·
   `PUT /objectives/:id/revisions/:rid` — nested.
 
-### 2.10 States — the derived event log
+### 2.10 Lifecycle history — the per-URI event log
 
 Lifecycle is pair-plane only. The `states` table and every
-verb on `/states/:id` are RETIRED (states-address
-retirement + Phase Final). Surviving surface:
+verb on the shared event-append address are RETIRED
+(states-address retirement + Phase Final). Nine GET
+registrations replace the retired bulk collection,
+per-entity history alias, and field-values read surface.
+Wire order is `(at, id)`
+**DESC** on every registration (index 0 = current). No
+new authorization entries —
+`matchesOnSegmentBoundary` extends existing family GET
+grants under `/history`. Route order is load-bearing:
+literal `work-orders/history` and `objectives/history`
+register **before** the `:id` document routes so
+`matchRoute` does not treat `history` as an id.
 
-- `GET /states` — primitive, DERIVED: the collection reads
-  `deriveStates(db, organization)` (`api/derive-states.ts`
-  `deriveStates`), a **five-source** union over the message
-  ledger reduced by `(at, id)`, returned `byIdAscending`.
-  The five sources: trio document families, members,
-  work-order lifecycle, flow graph, invitations.
-- Every verb on `/states/:id` — router **404** for
-  authenticated callers (unauthenticated → **401** first;
-  never a 405 method-absent gap). No PUT append surface;
-  immutability collision helpers for that address are gone.
-- `GET /entity-states/:id` — retired (Phase 15 Task 7):
-  router 404 (no pattern match).
-- `GET /entity-states/:id/history` — full event history for
-  an entity, DERIVED via `deriveStatesFor` in `(at, id)`
-  order. The GATE fences parent ownership via
-  `resolveOwningOrganization`; foreign → 403; orphan/own
-  pass. The derived handler does NOT re-fence.
-- `GET /states/:id/field-values` — nested collection,
-  DERIVED: `stateFieldValuesForStateEvent` (transition-fold
-  single-source). Visibility via `stateEventVisibilityFor`
-  (3-tier): own → 200 rows; foreign → 403; orphan → 404.
-- `PUT|DELETE /states/:id/field-values/:fvid` — retired
-  (Phase 15 Task 7): router 404. Live field-value writes
-  ride the work-order transition fold only. No
-  `WRITE_RESPONSE_SPECS` leaf entry; seed no longer forms
-  bare leaf pairs at that address (§5.16).
+**Nine registrations**
+
+1. `GET ideas/:id/history` —
+   `documentStateHistoryHandler(deriveIdeaStateHistory,
+   'ideas')`. Wire: `StateEntity[]`
+   `{id, entity_id, state, member_id, at}` DESC.
+   Empty → `missedReadError` → foreign **403** /
+   absent **404** (honest family body).
+2. `GET projects/:id/history` — same builder over
+   `deriveProjectStateHistory` / `'projects'`.
+3. `GET records/:id/history` — same builder over
+   `deriveRecordStateHistory` / `'records'`.
+4. `GET flows/:id/history` — same builder over
+   `deriveFlowStateHistory` / `'flows'`.
+5. `GET objectives/:id/history` — same builder over
+   `deriveObjectiveStateHistory` / `'objectives'`.
+6. `GET members/:id/history` — `deriveMemberStates`
+   filtered to `entity_id`, sorted DESC. Global-family
+   miss: empty → `EntityNotFoundError('members', id)`
+   → **404** only (no org ownership fence).
+7. `GET work-orders/:id/history` —
+   `workOrderHistoryFor` (entity-scoped op-pair replay
+   + transition fold). Wire:
+   `WorkOrderHistoryEventEntity extends StateEntity
+   { field_values: TransitionFieldValueEntity[] }`
+   with `{id, attribute_id, value}` (no
+   `state_event_id` on the wire — the parent event
+   already carries `id`). Transition rows fold values;
+   claim / birth / release rows carry
+   `field_values: []`. Empty → `missedReadError(...,
+   'work_orders')` → foreign **403** / absent **404**.
+8. `GET work-orders/history` —
+   `deriveWorkOrderHistories(db, org)`. Org-prefix
+   bulk of (7), same
+   `WorkOrderHistoryEventEntity` shape, DESC overall.
+   **Always 200** array (empty when the org has no
+   work-order lifecycle).
+9. `GET objectives/history` —
+   `deriveObjectiveHistories(db, org)`. Org-prefix
+   bulk of objective document-trio events,
+   `StateEntity` only (no `field_values`), DESC
+   overall. **Always 200** array.
+
+**Head-state on entity GETs (lifecycle trio).** Ideas,
+projects, records, objectives, and members GET rows
+embed `state`, `state_at`, `state_event_id` stamped
+from the lifecycle-current event (genesis-wins-under-
+skew), never the head PUT body alone. Flows skip the
+embed (no consumer). Work-orders stay `'stateless'` —
+lifecycle lives only on create / claim / transition /
+release ops and the history routes above.
+
+**Field values have no successor route.** Product
+reads fold them inline on work-order history (7)/(8).
+`stateFieldValuesFrom` /
+`deriveStateFieldValueReferrers` remain for the
+record-attributes RESTRICT gate only;
+`stateEventVisibilityFor` (3-tier: orphan | visible |
+hidden) still fences RESTRICT and related ownership
+probes — not a public field-values collection.
+
+**Retired (router 404 for authenticated callers;
+unauthenticated → 401 first):** every verb on the
+shared event-append address; the bulk five-source
+lifecycle collection; the per-entity current-state
+alias; nested field-values write (and the retired
+field-values GET). Live field-value writes ride the
+work-order transition fold only. No
+`WRITE_RESPONSE_SPECS` leaf; seed forms transition
+op pairs, not bare leaf pairs (§5.16 / §5.19).
 
 Lifecycle **writes** ride document-trio PUTs
 (ideas / projects / records / flows / objectives /
@@ -338,14 +392,16 @@ event-append address.
 
 Org-scoped document PUT/DELETE hit the write-ownership
 fence (`api/write-ownership-fence.ts` →
-`resolveOwningOrganization`) so a foreign id 403s rather
-than genesis-ing in the caller's namespace; genuine absence
-still 404s (or genesis on PUT). Surviving stores are
-global (`requests` / `responses`); tenancy rides
-`uri_prefix`. There is no org-scoped adapter.
+`resolveOwningOrganization`) so a foreign id 403s
+rather than genesis-ing in the caller's namespace;
+genuine absence still 404s (or genesis on PUT).
+Surviving stores are global (`requests` /
+`responses`); tenancy rides `uri_prefix`. There is no
+org-scoped adapter.
 
-The intra-org `/states/:id` escape hatch is RETIRED with
-the address itself (see `tests/drift-roster.test.ts`
+The intra-org shared event-append escape hatch is
+RETIRED with the address itself (see
+`tests/drift-roster.test.ts`
 "THE STATES/:ID ESCAPE HATCH RETIRED").
 
 ### 2.11 Organizations & memberships
@@ -445,7 +501,7 @@ Notation in the doctrinal lines: `put_x` ≈ the document
 pair a live `PUT /x/:id` would form; `post_op` ≈ the
 operation pair at the POST address; `delete_x` ≈ a
 marked tombstone pair at `DELETE /x/:id`. The retired
-`post_state_event` ≈ `PUT /states/:id` mapping is GONE
+`post_state_event` ≈ shared event-append mapping is GONE
 with the address.
 
 ### 3.1 `POST /ai-members` — create AI member
@@ -1004,7 +1060,7 @@ plus the lifecycle trio (`state`, `state_at`, `state_event_id`),
 the client-authored post-save `graph` (byte-identical to the GET
 wire form, no transform), and two TRANSITIONAL decomposition
 sidecars (`graphDelta`, `revivals` — consumed by the old-plane
-relation writer below AND by `deriveFlowGraphStates`
+relation writer below AND by the live graph fold
 (`api/derive-states.ts`), the sole ledger source of flow-node/
 edge deleted/restored history; retirement at Phase Final is now
 GATED on that lifecycle source being re-anchored elsewhere
@@ -1034,7 +1090,7 @@ before a save any more.
 - actual: `appendMessagePair(pair)` LAST — document body
   carries entity fields, lifecycle trio, and
   graphDelta/revivals sidecars (SIDECAR-KEEP). Graph truth
-  derives from those sidecars (`deriveFlowGraphStates`);
+  derives from the document body's `graph` field;
   no row-plane graph writes and no separate states append.
 - doctrinal: `put_flow_document` (lifecycle + graph delta on
   the body).
@@ -1121,7 +1177,7 @@ below.
   new wire reads.
 - **SIDECAR-KEEP.** `graphDelta`/`revivals` still land in the
   restore's own document pair body, feeding
-  `deriveFlowGraphStates` (`api/derive-states.ts`) exactly like
+  the live graph reassembly on the next GET exactly like
   any other save's — the MECHANISM persists even though the
   VALUES are now server-computed rather than client-supplied
   (the client cannot diff against a target it is never told,
@@ -1621,7 +1677,7 @@ lifecycle trio (`state`, `state_at`, `state_event_id`). Genesis
 is head-presence-defined — the first PUT at an id IS the birth.
 `postProjectStateChange` (the adapter's transition op) now
 mints a fresh trio and fires this SAME document PUT;
-`/states/:id` is retired (§2.10).
+the shared event-append address is retired (§2.10).
 
 - tx: `['requests','responses']`
 - actual: `appendMessagePair(pair)` — entity fields plus
@@ -1645,7 +1701,8 @@ PUT-first flow and mirrors ideas/projects exactly rather than
 special-casing records as PUT-only-for-edits.
 `postRecordStateChange` (the adapter's transition op) now mints
 a fresh trio and fires this SAME document PUT;
-`/states/:id` is retired (§2.10). `GET /records/:id` rides
+the shared event-append address is retired (§2.10).
+`GET /records/:id` rides
 `documentGetHandler`; `DELETE /records/:id` stays hand-written
 (pair-plane tombstone).
 
@@ -1997,14 +2054,18 @@ now declares:
   too. `work-orders` is the FIRST `'stateless'` family: a work
   order's lifecycle is written ONLY by `POST /work-orders`
   (§3.17), `POST /work-orders/:id/claim` (§3.18), `POST
-  /work-orders/:id/transition` (§3.19), and the `states/:id`
-  unclaim path — never by a document PUT — so
-  `validateWorkOrderDocumentBody` 400s a body carrying any trio
-  key (the stateless covenant is validator-enforced, not caller
-  discipline), and the generic GET-side lifecycle walk is
-  skipped entirely for a `'stateless'` wiring (its only
-  tombstone signal is a DELETE-method head, already absent via
-  `deriveDocumentsAt` — the SAME reduction every family shares).
+  /work-orders/:id/transition` (§3.19), and `POST
+  /work-orders/:id/release` (named unclaim) — never by a
+  document PUT — so `validateWorkOrderDocumentBody` 400s a
+  body carrying any trio key (the stateless covenant is
+  validator-enforced, not caller discipline), and the generic
+  GET-side lifecycle walk is skipped entirely for a
+  `'stateless'` wiring (its only tombstone signal is a
+  DELETE-method head, already absent via `deriveDocumentsAt`
+  — the SAME reduction every family shares). History reads
+  live on `GET work-orders/:id/history` and
+  `GET work-orders/history` (§2.10) with inline
+  `field_values`.
 - **`notFoundTable`: the identifier the wire 404 body speaks**
   (`EntityNotFoundError`'s table, rendered `Not found:
   <table>/<id>`). Family name for ideas/projects/flows;
@@ -2277,15 +2338,19 @@ Task 3 (Phase 8) registers `members`, `ai-members`, and
 — the FIRST `organizationNested:false` ("global-plane")
 registrations of any wiring row, and the FIFTH `'stateless'`
 rationale (Author gate 3, verification-corrected — still no
-type-level fork). All three share ONE shared-log-WITH-genesis
-bucket, distinct from every prior one: the shared member id
-receives REAL `states` events (a genesis event at create,
-archive/reactivate via `PUT states/:id`), so a trio-carrying
-document plane here would FREEZE every member's state at
-genesis forever the moment a second `states` event posted — the
-decisive refutation, unlike work-orders' vacuous-in-practice
-(§5.6), objectives' absence-as-active (§5.8), or record-
-attributes'/memberships' vacuous-by-construction pair (§5.9).
+type-level fork). All three share ONE document-plane WITH
+genesis bucket, distinct from every prior one: the shared
+member id receives REAL lifecycle events on the
+`members/:id` document-trio PUT (genesis at create;
+archive/reactivate via a later PUT carrying a new trio), so
+a second, independent trio-carrying plane here would FREEZE
+every member's state at genesis forever the moment a second
+event posted — the decisive refutation of a dual plane,
+unlike work-orders' vacuous-in-practice (§5.6), objectives'
+absence-as-active (§5.8), or record-attributes'/
+memberships' vacuous-by-construction pair (§5.9). History
+reads live on `GET members/:id/history` (§2.10); the
+members GET row embeds the lifecycle trio for head state.
 
 **The blocking fix (`api/document-family.ts`).**
 `documentWriteResponseSpec` unconditionally stamped
@@ -2588,14 +2653,15 @@ Phase 10 Task 4 registers `identities` as the TWELFTH
 'id'`. It joins `MEMBERS_WIRING`'s shared-log-with-genesis
 `'stateless'` bucket as the FOURTH member (§5.10): the shared id
 (`member.id === identity.id`, always) already receives a genesis
-`states` event at create and archive/reactivate via `PUT
-states/:id`, so the identities document plane carries NO
-lifecycle of its own — a trio here would FREEZE that lifecycle
-at genesis forever. The stateless arm's ONLY tombstone signal is
-a DELETE-method head, already 404-absent via `deriveDocumentsAt`
-with no further walk needed (`document-family.ts`'s
-`derivedDocumentEntity`) — the SAME deleted-filter escape hatch
-every `'stateless'` family before it accepted.
+lifecycle event at create and archive/reactivate via the
+`members/:id` document-trio PUT, so the identities document
+plane carries NO lifecycle of its own — a trio here would
+FREEZE that lifecycle at genesis forever. The stateless arm's
+ONLY tombstone signal is a DELETE-method head, already
+404-absent via `deriveDocumentsAt` with no further walk needed
+(`document-family.ts`'s `derivedDocumentEntity`) — the SAME
+deleted-filter escape hatch every `'stateless'` family before
+it accepted.
 
 **The slot is LIVE, not inert.** Unlike the projects/members-
 family inert-`createBodyIdField` precedent, `POST /identities` IS
@@ -2808,9 +2874,9 @@ rather than the shadow-ledger suite.
 
 **Contract.** The synthesized identities document is
 byte-indistinguishable from a live `PUT /identities/:id` pair's
-shape at the same address; old-plane rows/states are untouched
-(fingerprints + the states-911 pin hold); the wire is unchanged
-— the bundles are storage-only.
+shape at the same address; old-plane row and lifecycle
+surfaces are untouched (fingerprints + the states-911 pin
+hold); the wire is unchanged — the bundles are storage-only.
 
 ### 5.15 Gate-seeding the remaining spine slices: AI/system
 identities, credentials, role grants (Phase 10 Task 6)
@@ -2905,45 +2971,61 @@ fingerprint) grew. Reseed marginal cost measured ~2 ms for the
 baseline; within this harness's run-to-run noise floor).
 
 ### 5.16 Gate-seeding the historical-trace carve-out (Phase 11
-Task 3)
+Task 3; reshaped at states-address retirement)
 
-Path A throughout, the migration's most FINGERPRINT-CRITICAL
-task: the 860 work-order historical trace events (211 hand-
-authored + 649 generated), the 7 `state_field_values` rows, and
-the system member's OWN genesis event (2 — one per seed path)
-ALSO form their own message pair, beside rows that stay the SAME
-direct writes mock-data.ts already made. Unlike every other
-family §5.3 names, none of these three slices rides a dedicated
-op — pre-retirement dual-write used bare states/SFV
-adapters; post-retirement those tables are GONE and
-traces reseed as transition op pairs — historically the
-new pair was appended alongside via `appendMessagePair`
-directly. The fingerprint oracle
-(`tests/mock-data-fingerprint.test.ts`) later RETIRED
-with the entity-table era.
+**Historical dual-write era (Phase 11).** Path A throughout,
+the migration's most FINGERPRINT-CRITICAL task: the 860
+work-order historical trace events (211 hand-authored + 649
+generated), the 7 `state_field_values` rows, and the system
+member's OWN genesis event (2 — one per seed path) ALSO formed
+their own message pairs beside rows that stayed the SAME
+direct writes mock-data.ts already made. Pre-retirement those
+slices rode bare states/SFV adapters; pairs were appended via
+`appendMessagePair` directly. The fingerprint oracle
+(`tests/mock-data-fingerprint.test.ts`) later RETIRED with the
+entity-table era.
 
-**The three slices (+869).** Every work-order trace event
-(`buildWorkOrderStateEvents()` + `leadToCloseWorkload.stateEvents`,
-860) forms its OWN `states/:id` pair — idParams `[event.id]`,
-byte-identical to the id the row already carries, so the derived
-plane's future ids can never drift. `requesterIdentityId` is the
-EVENT'S OWN `member_id` — never `workOrderFirstEventMemberId`, the
-sibling map ~30 lines away that answers a DIFFERENT question (a
-work order DOCUMENT's own authorship, not one of its many trace
-events). Every seeded work order is Stark (§3.17's own finding),
-so every trace event nests under `STARK_ORGANIZATION`. The 7
-`state_field_values` rows (`mockStateFieldValues`) each form their
-OWN pair at `states/:id/field-values/:fvid` — idParams
-`[stateEventId, fvId]`, matching `WRITE_RESPONSE_SPECS`'s own
-`param(params, 1)` leaf-id read — authored by the PARENT event's
-OWN `member_id`, looked up off the SAME trace-event map, never a
+**As-built seed (post states-address retirement).** Those
+slices no longer form bare event-append or field-values leaf
+pairs. Work-order historical traces reseed as
+`work-orders/:id/transition` op-shaped pairs (**861** absolute
+with the system-member genesis path accounted in the member
+document plane); field values fold into those transition
+bodies as `fieldValues: [{id, fields}]`. Product reads expose
+them inline on `GET work-orders/:id/history` and
+`GET work-orders/history` as `field_values: [{id,
+attribute_id, value}]` (§2.10). No
+`WRITE_RESPONSE_SPECS` leaf entry remains for a field-values
+write address. See §5.19 for the full surviving-route list
+and seed reshape pin.
+
+**The three slices as they stood at Phase 11 (+869).** Every
+work-order trace event
+(`buildWorkOrderStateEvents()` +
+`leadToCloseWorkloadStateEvents`, 860) formed its OWN
+event-append pair — idParams `[event.id]`, byte-identical to
+the id the dual-write row already carried, so the derived
+plane's future ids could never drift. `requesterIdentityId`
+was the EVENT'S OWN `member_id` — never
+`workOrderFirstEventMemberId`, the sibling map ~30 lines away
+that answers a DIFFERENT question (a work order DOCUMENT's
+own authorship, not one of its many trace events). Every
+seeded work order is Stark (§3.17's own finding), so every
+trace nested under `STARK_ORGANIZATION`. The 7 field-value
+rows (`mockStateFieldValues`) each formed their OWN leaf pair
+at a nested field-values address — idParams
+`[stateEventId, fvId]` — authored by the PARENT event's OWN
+`member_id`, looked up off the SAME trace-event map, never a
 second, independently-picked author. The system member's OWN
-genesis event forms its OWN pair too (2 — `memberStateEvents` in
-the mock-data seed, `bootstrapSystemStateEventId` in
-`formBootstrapMessagePair`'s own SEPARATE mirror for bootstrap),
-organization `undefined` — the system member is the org-less
-global actor, the SAME choice its `members/:id` and
-`identities/:id` pairs already make.
+genesis event formed its OWN pair too (2 —
+`memberStateEvents` in the mock-data seed,
+`bootstrapSystemStateEventId` in `formBootstrapMessagePair`'s
+own SEPARATE mirror for bootstrap), organization `undefined`
+— the system member is the org-less global actor, the SAME
+choice its `members/:id` and `identities/:id` pairs already
+make. Post-retirement the work-order slice is transition ops
+and the member genesis rides the members document trio
+(§2.10 / §5.10).
 
 **The body shape (a sharp edge the task brief named).** Every
 trace/genesis pair's body is `{entity_id, state, at}` —
@@ -2974,8 +3056,9 @@ system-genesis pair is counted in the bootstrap total below, a
 SEPARATE seed path with its OWN test) + the breakdown prose; the
 bootstrap count 11 → 12; THREE new address/body-shape spot-checks
 (a trace event, a field value, the mock-data seed's OWN
-system-genesis pair at the GLOBAL, non-org-nested `/states/`
-address) + the member_id content spot-check above.
+system-genesis pair at the GLOBAL, non-org-nested shared
+event-append address) + the member_id content spot-check
+above.
 `tests/mock-data-fingerprint.test.ts` later RETIRED with
 the entity-table / clients era (file absent).
 
@@ -3193,25 +3276,51 @@ ALL-orgs) stays exactly as this task left it.
 ### 5.19 Phase 15 route retirements and seed-address survival
 
 Phase 15 Task 7 retired zero-caller route families; states-
-address retirement made **every verb** on `/states/:id` a
-router **404** (unauthenticated → 401 first). Product
-callers were already zero. Surviving live surfaces:
+address retirement made **every verb** on the shared
+event-append address a router **404** (unauthenticated →
+401 first). Product callers were already zero. Surviving
+live history surfaces (§2.10 — nine registrations, wire
+`(at, id)` DESC, index 0 = current):
 
-- `GET /states` (five-source derived union)
-- `GET /entity-states/:id/history` (derived + pair-plane fence)
-- `GET /states/:id/field-values` (derived; 200/403/404)
+1. `GET ideas/:id/history`
+2. `GET projects/:id/history`
+3. `GET records/:id/history`
+4. `GET flows/:id/history`
+5. `GET objectives/:id/history`
+6. `GET members/:id/history` (global; absent → 404)
+7. `GET work-orders/:id/history` (inline `field_values`)
+8. `GET work-orders/history` (bulk; always 200; inline
+   `field_values`)
+9. `GET objectives/history` (bulk; always 200;
+   `StateEntity` only)
+
+Per-entity org-nested legs (1–5, 7) empty →
+`missedReadError` → foreign **403** / absent **404**.
+Bulk legs (8–9) always return an array. Field values have
+no successor GET route — product reads fold them on (7)
+and (8). `stateEventVisibilityFor` remains the RESTRICT /
+ownership 3-tier probe, not a public collection.
+
+Head-state trio (`state`, `state_at`, `state_event_id`)
+embeds on GET rows for ideas / projects / records /
+objectives / members (not flows; work-orders stay
+stateless).
 
 `flow_versions` routes and table are GONE (Phase 15
-retired routes; Phase Final deleted the table).
+retired routes; Phase Final deleted the table). Also
+router-404: per-entity current-state alias; nested
+field-values write address; bulk five-source lifecycle
+collection.
 
 **Seed reshape (states-address retirement).** The 861
 historical work-order traces reseed as
 `work-orders/:id/transition` op-shaped pairs; field values
-fold into those transition bodies. No bare `states/:id` or
-`states/:id/field-values/:fvid` seed pairs remain. No
+fold into those transition bodies. No bare event-append or
+nested field-values leaf seed pairs remain. No
 `WRITE_RESPONSE_SPECS` leaf entry for the retired field-
 values write address. `flows/:id/versions*` specs and
-handlers are gone with the routes.
+handlers are gone with the routes. Mock seed absolute:
+**EXPECTED_PAIR_COUNT = 1506** / bootstrap 13.
 
 **§5 chronological gap (named) — DEFERRED.** Tasks 1–6 of
 Phase 14, the Phase 15 re-anchors, and the Phase Final

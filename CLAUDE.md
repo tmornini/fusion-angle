@@ -224,24 +224,30 @@ is HTTP-only.
   [SCHEMA.md](SCHEMA.md) / [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over IndexedDB. Adapters
   in `web-app/app/adapters/` shape pages from pair-plane
-  derives. The live flow graph is pair-plane only:
-  `graphDelta` / `revivals` in the flow document body feed
-  `deriveFlowGraphStates`; GET reassemblies
-  `FlowWithGraph`. A work order freezes its own
-  `flow_graph` inside the work-order document pair. Flow
-  undo resolves its restore target from the flow's own
-  document-pair history (Phase 14 Task 8). Phase 15 retired
-  the `flows/:id/versions[...]` routes (and the zero-caller
-  `GET states/:id` / `GET entity-states/:id` /
-  `PUT|DELETE states/:id/field-values/:fvid` families) —
-  all states retirements are router 404. Phase Final DELETED
-  the graph/version tables with the rest of the row plane.
-  Ownership fences and field-values visibility resolve on
-  the pair plane (`resolveOwningOrganization`,
-  `stateEventVisibilityFor`). Flow tags
-  (`flows/:id/tags/:name`) are the first document family that
-  never had a backing table; post-Final every family shares
-  that posture.
+  derives. The live flow graph is pair-plane only: GET
+  reassembles `FlowWithGraph` from the document body's
+  `graph` field; `graphDelta` / `revivals` are write-side
+  sidecars. A work order freezes its own `flow_graph`
+  inside the work-order document pair. Flow undo resolves
+  its restore target from the flow's own document-pair
+  history (Phase 14 Task 8). Lifecycle history is nine GET
+  registrations (`GET <family>/:id/history` for ideas /
+  projects / records / flows / objectives / members /
+  work-orders, plus bulk `GET work-orders/history` and
+  `GET objectives/history`) — wire `(at, id)` DESC; work-
+  order routes fold `field_values` inline. Ideas /
+  projects / records / objectives / members GET rows embed
+  the lifecycle trio. Phase 15 retired
+  `flows/:id/versions[...]` and the zero-caller shared
+  event-append / current-state-alias / nested field-values
+  families — all router 404. Phase Final DELETED the
+  graph/version tables with the rest of the row plane.
+  Ownership fences resolve on the pair plane
+  (`resolveOwningOrganization`,
+  `stateEventVisibilityFor` for RESTRICT). Flow tags
+  (`flows/:id/tags/:name`) are the first document family
+  that never had a backing table; post-Final every family
+  shares that posture.
 - **Presentation.** Presenters in `web-app/app/presenters/` emit
   `SafeHtml`.
 - **Database.** IndexedDB (`api/backend-indexeddb.ts`): one
@@ -412,21 +418,26 @@ hazard predicate (`flow-graph-hazard.test.ts`), presenter
 SafeHtml, flow-stats pure math + adapter + presenter,
 `duration-units`, and the invitation lifecycle.
 Phase 14 cores: `drift-phase14-cores-parity.test.ts`,
-`drift-state-field-values.test.ts`,
+`drift-state-field-values.test.ts` (RESTRICT fold parity),
 `pin-invitation-write-path-parity.test.ts`,
 `flow-undo-cursor.test.ts`, `api-flow-tags.test.ts`.
 Phase 15 cores: `drift-phase15-cores-parity.test.ts`,
-`api-states-ownership-fence.test.ts` (re-scoped to
-retirement pins; every verb on `/states/:id` is a router
-404 for authenticated callers). Phase Final adds the
-write-ownership fence pin
-(`api-write-ownership-fence.test.ts`); store/decorator unit
-tests and dual-write shadow-ledger row oracles retired with
-their subjects. Honest HTTP status covenant pins:
-`api-unauthenticated-route-ordering.test.ts` (401 before
-404), foreign-org 403 body pins across fence/isolation/
-drift suites, field-values 200/403/404 three-way. See
-`tests/` for the current set.
+`api-history-ownership-fence.test.ts` (family-history
+ownership fence; own-org 200 / foreign 403). States-URI
+elimination pins: `api-work-order-history.test.ts` (per-id
++ bulk DESC, inline `field_values`),
+`api-entity-history-routes.test.ts` (trio-family per-id),
+`api-members-history.test.ts`,
+`api-objective-history.test.ts` (bulk). Phase Final adds
+the write-ownership fence pin
+(`api-write-ownership-fence.test.ts`); store/decorator
+unit tests and dual-write shadow-ledger row oracles
+retired with their subjects. Honest HTTP status covenant
+pins: `api-unauthenticated-route-ordering.test.ts` (401
+before 404), foreign-org 403 body pins across
+fence/isolation/drift suites, work-order history
+foreign/absent miss postures. See `tests/` for the
+current set.
 `api/db-memory.ts` provides an in-memory `DbAdapter` so
 adapter and api-layer tests run without `localStorage`.
 
@@ -533,20 +544,27 @@ apply to it (RED is the audit's first finding).
   entity's current state is the latest derived event on its
   `entity_id` under the `(at, id)` total order. Reversal is
   a *new* event with the new state, not an edit of a prior
-  pair. Surviving HTTP surface (reads only): `GET /states`
-  (five-source derived union),
-  `GET /entity-states/:id/history` (derived + pair-plane
-  ownership fence), `GET /states/:id/field-values` (derived
-  collection, transition-fold single-source). Lifecycle
-  writes are document-trio PUTs
+  pair. Surviving HTTP surface (reads only, nine
+  registrations, wire DESC): per-entity
+  `GET <family>/:id/history` for ideas / projects /
+  records / flows / objectives / members / work-orders
+  (org-nested empty → foreign 403 / absent 404; members
+  global 404), bulk `GET work-orders/history` and
+  `GET objectives/history` (always 200 arrays), and
+  work-order `field_values` folded **inline** on the WO
+  history routes (no successor field-values GET). Entity
+  GET rows for ideas / projects / records / objectives /
+  members embed the lifecycle trio. Lifecycle writes are
+  document-trio PUTs
   (ideas/projects/records/flows/objectives/members) and
   named ops (work-order create/claim/transition/release,
-  invitations) — every verb on `/states/:id` is router 404;
+  invitations) — every verb on the retired shared event-
+  append address is router 404;
   `stateEventCollisionFromPairs` is gone. The `states`
   table, `StateStore`, and `EntityStore` are DELETED
   (Phase Final). Document DELETE is a marked tombstone
-  pair; the sole physical hard-delete is PII erasure on the
-  message plane.
+  pair; the sole physical hard-delete is PII erasure on
+  the message plane.
 - **Cross-tab writes are safe (lost-update hazard closed).**
   IndexedDB gives each tab its own connection to one shared
   database, and a pair append is an O(1) `objectStore.put`

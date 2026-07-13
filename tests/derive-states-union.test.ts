@@ -818,4 +818,5 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
 });
 
 // deriveTrioFamilyStates / O(families) scan pin retired with
-// GET /states (C3). Per-id family history derives remain.
+// the bulk lifecycle collection (C3). Per-id family history
+// derives remain.

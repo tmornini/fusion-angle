@@ -96,8 +96,9 @@ test(
         const piiRow = await deriveIdentityPii(db, 'w1');
         assert.equal(piiRow.name, 'Alice');
         // Phase Final Stage B: identity spine tables retired.
-        // bare entity-states/:id RETIRED (Phase 15 Task 7);
-        // post-write check rides surviving /history.
+        // bare per-entity current-state alias RETIRED
+        // (Phase 15 Task 7); post-write check rides
+        // surviving /history.
         const history = await GET<{
             state: string;
             member_id: string;

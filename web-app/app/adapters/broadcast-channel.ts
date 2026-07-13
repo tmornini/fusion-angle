@@ -19,6 +19,23 @@ const CHANNEL_NAME = 'fusion-ai:data';
 
 let channel: BroadcastChannel | undefined;
 
+// Handlers fan out from ONE native listener on the singleton
+// channel: the platform sees a single listener however many
+// module-level subscription channels the app wires (Node's
+// EventTarget warns past ten), and the wire decode runs once
+// per message instead of once per subscriber.
+const handlers = new Set<
+    (event: NotificationEvent) => void
+>();
+
+function dispatch(event: MessageEvent): void {
+    const decoded =
+        notificationEventFromWire(event.data);
+    for (const handler of handlers) {
+        handler(decoded);
+    }
+}
+
 function getChannel(): BroadcastChannel | undefined {
     if (typeof window === 'undefined') return undefined;
     if (channel === undefined) {
@@ -31,6 +48,9 @@ function getChannel(): BroadcastChannel | undefined {
         (channel as unknown as {
             unref?: () => void;
         }).unref?.();
+        subscribeEventListener(
+            channel, 'message', dispatch,
+        );
     }
     return channel;
 }
@@ -49,10 +69,9 @@ export function postNotificationEvent(
 export function subscribeNotificationEvents(
     handler: (event: NotificationEvent) => void,
 ): () => void {
-    const ch = getChannel();
-    if (ch === undefined) return () => {};
-    const listener = (event: MessageEvent): void => {
-        handler(notificationEventFromWire(event.data));
+    if (getChannel() === undefined) return () => {};
+    handlers.add(handler);
+    return () => {
+        handlers.delete(handler);
     };
-    return subscribeEventListener(ch, 'message', listener);
 }

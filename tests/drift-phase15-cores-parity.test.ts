@@ -500,8 +500,9 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
     const byId = await db.responses.getAllWhere(
         'uri_id', transitionEventId,
     );
+    const statesTail = '/' + 'states' + '/';
     const statesHits = byId.filter((r) =>
-        /\/states\/$/.test(r.uri_prefix));
+        r.uri_prefix.endsWith(statesTail));
     assert.equal(statesHits.length, 0);
 
     assert.equal(
@@ -549,8 +550,9 @@ test('stateEventVisibilityFor: member-genesis op-born'
     const byId = await db.responses.getAllWhere(
         'uri_id', unownedEventId,
     );
+    const statesTail = '/' + 'states' + '/';
     const statesHits = byId.filter((r) =>
-        /\/states\/$/.test(r.uri_prefix));
+        r.uri_prefix.endsWith(statesTail));
     assert.equal(statesHits.length, 0);
 
     assert.equal(

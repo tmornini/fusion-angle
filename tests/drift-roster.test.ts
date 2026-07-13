@@ -71,7 +71,7 @@ import {
 // documentCollectionGetHandler/documentGetHandler.
 //
 // THE STATES/:ID ESCAPE HATCH RETIRED (roster edition): the
-// generic, member-tier-reachable PUT /states/:id route is
+// generic, member-tier-reachable PUT states/:id route is
 // gone. Member lifecycle archive/reactivate rides PUT
 // members/:id (document trio); work-order unclaim rides POST
 // work-orders/:id/release. EntityStore tombstone scans are

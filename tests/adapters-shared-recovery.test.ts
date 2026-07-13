@@ -38,6 +38,7 @@ import { handleRequest, UnauthorizedError } from '../api/api.ts';
 import {
     createRecoveringRequestContext,
 } from '../web-app/app/adapters/shared.ts';
+import { captureConsole } from './console-capture.ts';
 import { putSessionToken } from '../web-app/app/adapters/init.ts';
 import {
     getSessionCredentials,
@@ -379,19 +380,15 @@ async () => {
         STORAGE_KEY_AUTHORIZATION, 'not json at all');
     const dead = await expiredToken();
     putSessionToken(dead);
-    const warns: unknown[][] = [];
-    const originalWarn = console.warn;
-    console.warn = (...args: unknown[]) => {
-        warns.push(args);
-    };
-    try {
-        const ctx = createRecoveringRequestContext(
-            db, dead);
-        await assert.rejects(
-            () => ctx.GET('members'), UnauthorizedError);
-    } finally {
-        console.warn = originalWarn;
-    }
+    const { calls: warns } = await captureConsole(
+        'warn',
+        async () => {
+            const ctx = createRecoveringRequestContext(
+                db, dead);
+            await assert.rejects(
+                () => ctx.GET('members'), UnauthorizedError);
+        },
+    );
     assert.equal(
         localStorage.getItem(STORAGE_KEY_AUTHORIZATION),
         null);

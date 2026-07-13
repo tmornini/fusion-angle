@@ -7,6 +7,7 @@ import {
 import { GET, handleRequest } from '../api/api.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { devToken } from './token-fixtures.ts';
+import { captureConsole } from './console-capture.ts';
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
@@ -743,12 +744,21 @@ async () => {
     }).getAllWhere = async () => {
         throw new Error('store exploded');
     };
-    const res = await handleRequest(db, tokenRequest({
-        grant_type: 'client_credentials',
-        client_id: 'svc-client',
-        client_assertion: 'a.b.c',
-    }));
+    const { result: res, calls } = await captureConsole(
+        'error',
+        () => handleRequest(db, tokenRequest({
+            grant_type: 'client_credentials',
+            client_id: 'svc-client',
+            client_assertion: 'a.b.c',
+        })),
+    );
     assert.equal(res.status, 500);
+    assert.ok(
+        calls.some(args =>
+            args.includes('request failed')),
+        'the domain-boundary catch must keep'
+        + ' console evidence',
+    );
 });
 
 test('client_credentials for a disabled registration is 401',

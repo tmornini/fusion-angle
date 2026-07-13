@@ -66,8 +66,9 @@ test(
             name: string; description: string;
         }>(db, 'ai-members/a1', DEV_TOKEN);
         assert.equal(facet.name, 'Claude');
-        // bare entity-states/:id RETIRED (Phase 15 Task 7);
-        // post-write check rides surviving /history.
+        // bare per-entity current-state alias RETIRED
+        // (Phase 15 Task 7); post-write check rides
+        // surviving /history.
         const history = await GET<{
             state: string;
             member_id: string;

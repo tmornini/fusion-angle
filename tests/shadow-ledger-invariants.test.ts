@@ -334,13 +334,12 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     ));
     assert.equal(workOrderCreated.status, 204);
 
-    // A FAILED write: 404 on the retired states/:id address
-    // — must add nothing to either table. (The prior
-    // LedgerImmutabilityError 409 retired with the route;
-    // a claim conflict 409 still exists on the claim op but
-    // needs a second member with a live prior claim.)
+    // A FAILED write: 404 on an unknown route — must add
+    // nothing to either table. (A claim conflict 409 still
+    // exists on the claim op but needs a second member with
+    // a live prior claim.)
     const failed = await handleRequest(db, req(
-        'PUT', '/states/inv-ev-conflict', org1Token, {
+        'PUT', '/no-such-route/x1', org1Token, {
             entity_id: 'inv-idea-1',
             state: 'promoted',
             at: '2026-02-01T00:00:01.000000Z',

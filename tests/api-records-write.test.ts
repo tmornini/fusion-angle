@@ -62,8 +62,9 @@ test(
             name: string;
         }>(db, 'records/rec-1', DEV_TOKEN);
         assert.equal(record.name, 'Quarterly Renewals');
-        // bare entity-states/:id RETIRED (Phase 15 Task 7);
-        // post-write check rides surviving /history.
+        // bare per-entity current-state alias RETIRED
+        // (Phase 15 Task 7); post-write check rides
+        // surviving /history.
         const history = await GET<{
             state: string;
         }[]>(db, 'records/rec-1/history', DEV_TOKEN);
@@ -102,7 +103,8 @@ test(
             db, 'records/rec-2', DEV_TOKEN,
         );
         assert.equal(record.name, 'Empty');
-        // bare entity-states/:id RETIRED (Phase 15 Task 7).
+        // bare per-entity current-state alias RETIRED
+        // (Phase 15 Task 7).
         const history = await GET<{
             state: string;
             member_id: string;
@@ -526,7 +528,8 @@ test(
             initialStateAt:
                 '2099-07-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        // bare entity-states/:id RETIRED (Phase 15 Task 7).
+        // bare per-entity current-state alias RETIRED
+        // (Phase 15 Task 7).
         const history = await GET<{
             state: string;
             member_id: string;

@@ -15,20 +15,12 @@ import {
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 
-// States-address retirement: every verb on /states/:id is a
-// ROUTER 404 — the route entry is deleted, so the old
-// 405-because-PUT-survives case is gone. These pins are
-// against a VALID token and an OWN-ORG entity id in the body,
-// so a passing 404 can only be the router's (the ownership
-// fence that once produced look-alike 404s is deleted).
-//
-// Surviving reads still match. Write-intent coverage re-homed
-// in stages 1-3: member archive → PUT members/:id, objective
-// archive → PUT objectives/:id, unclaim → POST release.
-// Cross-org WRITE forgery is impossible by construction —
-// no address accepts a body naming a foreign entity_id; the
-// per-family write-ownership fence pins live in
-// api-write-ownership-fence.test.ts.
+// Family-history ownership fence. Own-org history is 200 with
+// the document-trio genesis; foreign ownership is 403 with an
+// honest body. Full per-family fence coverage lives in
+// api-entity-history-routes.test.ts. Per-family write-
+// ownership fence pins live in api-write-ownership-fence.
+// Unknown-route 404 (writes-nothing) lives in api.test.ts.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -137,9 +129,7 @@ async function seed(): Promise<{
         by_member_id: SYSTEM_MEMBER_ID,
         at: AT,
     });
-    // Own-org idea document — the entity_id a retired PUT
-    // would have named. Lands through the document address
-    // so surviving family-history reads have a target.
+    // Own-org idea document — family-history reads target it.
     const token = await organizationToken('memberA', 'A');
     const idea = await handleRequest(db, req(
         'PUT', '/ideas/idea-a', token, {
@@ -159,35 +149,6 @@ async function seed(): Promise<{
     return { db, token };
 }
 
-for (const method of ['GET', 'PUT', 'POST', 'DELETE'] as
-    const) {
-    test(`${method} /states/:id is a router 404`,
-    async () => {
-        const { db, token } = await seed();
-        const res = await handleRequest(db, req(
-            method, '/states/idea-a-genesis', token,
-            method === 'PUT' || method === 'POST'
-                ? {
-                    entity_id: 'idea-a',
-                    state: 'active',
-                    at: AT,
-                }
-                : undefined,
-        ));
-        assert.equal(res.status, 404);
-    });
-}
-
-// GET /states RETIRED (states-URI elimination C3). Own-org
-// genesis force lives on GET ideas/:id/history below and
-// collection history isolation on work-orders/history +
-// objectives/history. GET states/:id/field-values retired
-// (C4) — field values fold on work-order history (A1/A2).
-
-// Family-history fence (states-URI elimination C2): the old
-// entity-states/:id/history pins fold onto ideas/:id/history.
-// Full per-family fence coverage lives in
-// api-entity-history-routes.test.ts.
 test('GET /ideas/:id/history is 200', async () => {
     const { db, token } = await seed();
     const res = await handleRequest(db, req(

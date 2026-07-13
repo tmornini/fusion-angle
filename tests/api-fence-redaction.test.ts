@@ -5,6 +5,7 @@ import { MissingTableError } from '../api/db.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { captureConsole } from './console-capture.ts';
 
 // Phase 12 Task 1: the pre-dispatch fence reads (handleRequest's
 // two ownership-fence regions, api/api.ts) redact a thrown fault
@@ -43,18 +44,28 @@ test(
             }
             return original(column, key);
         };
-        const response = await handleRequest(
-            db,
-            new Request('http://localhost/ideas', {
-                headers: {
-                    'Authorization': 'Bearer ' + DEV_TOKEN,
-                },
-            }),
-        );
+        const { result: response, calls } =
+            await captureConsole(
+                'error',
+                () => handleRequest(
+                    db,
+                    new Request('http://localhost/ideas', {
+                        headers: {
+                            'Authorization':
+                                'Bearer ' + DEV_TOKEN,
+                        },
+                    }),
+                ),
+            );
         assert.equal(response.status, 500);
         const { error } =
             (await response.json()) as { error: string };
         assert.equal(error, 'internal error');
+        assert.ok(
+            calls.some(args =>
+                args.includes('fence read failed')),
+            'the fence catch must keep console evidence',
+        );
     },
 );
 

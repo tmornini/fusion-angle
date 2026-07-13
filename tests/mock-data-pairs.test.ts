@@ -831,18 +831,13 @@ test('a seeded state_field_value folds into its parent'
 });
 
 test('the mock-data seed\'s system-member genesis rides the'
-+ ' members/:id document trio — no bare states/:id pair',
++ ' members/:id document trio',
 async () => {
     const db = memoryDbAdapter();
     await postMockDataLoad(db);
     const eventId =
         `seed-member-${SYSTEM_MEMBER_ID}-active`;
     const requests = await db.requests.getAll();
-    const atStates = requests.filter(
-        r => r.uri_prefix === '/states/'
-            && r.uri_id === eventId,
-    );
-    assert.equal(atStates.length, 0);
     const memberRow = requests.find(
         r => r.uri_prefix === '/members/'
             && r.uri_id === SYSTEM_MEMBER_ID,

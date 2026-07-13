@@ -498,9 +498,9 @@ test(
         ).render().toString();
         assert.match(out, /1 state\b/);
         assert.match(out, /1 transition\b/);
-        assert.equal(/states/.test(out), false);
+        assert.equal(out.includes('states'), false);
         assert.equal(
-            /transitions/.test(out), false,
+            out.includes('transitions'), false,
         );
     },
 );

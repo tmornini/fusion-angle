@@ -51,7 +51,7 @@ export async function getObjective(
 
 // Lifecycle-current trio is stamped on the ObjectiveEntity
 // GET row (Phase A). Map snake_case wire → ObjectiveStateDetail;
-// no second hop to the states log / entity-states history.
+// no second hop to a lifecycle log or history alias.
 export function objectiveStateDetailFromRow(
     row: ObjectiveEntity,
 ): ObjectiveStateDetail {

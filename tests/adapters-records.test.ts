@@ -265,7 +265,7 @@ test(
     },
 );
 
-// getRecordState (the entity-states history reader) is
+// getRecordState (the retired per-entity history reader) is
 // deleted — production-dead. Its throws-on-absence force
 // re-homes onto getRecordModel: a missing record is a GET
 // miss (Not found), not a dual-plane "no state event".

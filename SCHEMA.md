@@ -226,18 +226,59 @@ Lifecycle vocabularies live on the **derive layer**, not a
 `states` table (retired at Phase Final Stage B). The
 conceptual alphabets remain in `api/types.ts`
 (`MEMBER_STATES`, `IDEA_STATES`, `PROJECT_STATES`, …) and
-are asserted by validators and derive cores. Reads:
+are asserted by validators and derive cores.
 
-- `GET /states` → `deriveStates` (five-source union:
-  trio families, members, work-order lifecycle, flow
-  graph, invitations)
-- `GET /entity-states/:id/history` → `deriveStatesFor`
-- `GET /states/:id/field-values` →
-  `stateFieldValuesForStateEvent` (transition-fold
-  single-source)
+### History read map (nine GET registrations)
 
-Every verb on `/states/:id` is router 404. Lifecycle
-writes ride document-trio PUTs
+Wire order is `(at, id)` **DESC** (index 0 = current) on
+every history route. See API.md §2.10 for full fence and
+wire detail.
+
+1. `GET ideas/:id/history` —
+   `deriveIdeaStateHistory` → `StateEntity[]`; empty →
+   403 foreign / 404 absent
+2. `GET projects/:id/history` —
+   `deriveProjectStateHistory` → same
+3. `GET records/:id/history` —
+   `deriveRecordStateHistory` → same
+4. `GET flows/:id/history` —
+   `deriveFlowStateHistory` → same
+5. `GET objectives/:id/history` —
+   `deriveObjectiveStateHistory` → same
+6. `GET members/:id/history` —
+   `deriveMemberStates` filter → `StateEntity[]`;
+   global miss → 404
+7. `GET work-orders/:id/history` —
+   `workOrderHistoryFor` → WO history + inline
+   `field_values`; empty → 403 / 404
+8. `GET work-orders/history` —
+   `deriveWorkOrderHistories` → same WO shape;
+   always 200
+9. `GET objectives/history` —
+   `deriveObjectiveHistories` → `StateEntity[]`;
+   always 200
+
+Org-nested per-id empty → `missedReadError` (foreign
+403 / absent 404 via `resolveOwningOrganization`).
+Members are global (`EntityNotFoundError` → 404).
+Work-order `field_values` fold inline from transition
+pair bodies (`TransitionFieldValueEntity {id,
+attribute_id, value}`); claim/birth/release rows carry
+`[]`. No separate field-values GET — RESTRICT still
+uses `stateFieldValuesFrom` /
+`deriveStateFieldValueReferrers` and
+`stateEventVisibilityFor`.
+
+**Head-state trio.** Ideas / projects / records /
+objectives / members GET rows embed `state`,
+`state_at`, `state_event_id` from the lifecycle-current
+event. Flows skip the embed; work-orders stay
+`'stateless'`.
+
+The bulk lifecycle collection, bare event-append
+address, per-entity current-state alias, and nested
+field-values collection/write are RETIRED (router
+404). Lifecycle writes ride document-trio PUTs
 (ideas/projects/records/flows/objectives/members) and
 named ops (work-order create/claim/transition/release,
 invitations).
@@ -247,20 +288,24 @@ Domain notes (vocabulary, not storage):
 - **Members** — `'active' | 'pending' | 'archived'`
 - **Ideas** — `'active' | 'in_review' | 'approved' |
   'promoted' | 'sent_back' | 'archived' | 'deleted'`
-- **Projects** — the project alphabet in `PROJECT_STATES`
-- **Work orders** — open-ended transitions (state = any
-  graph node id, a base62 token) plus the closed claim
-  alphabet (`'claimed'`, `'claim_released'`,
+- **Projects** — the project alphabet in
+  `PROJECT_STATES`
+- **Work orders** — open-ended transitions (state =
+  any graph node id, a base62 token) plus the closed
+  claim alphabet (`'claimed'`, `'claim_released'`,
   `'claim_expired'`)
-- **Flow graph** — node/edge removal and revival ride
-  graphDelta / revivals in the flow document pair body
-  (`deriveFlowGraphStates`); `'deleted'` removes,
-  `'restored'` revives under the `(at, id)` total order.
-  A fresh node/edge is born live and event-free.
+- **Flow graph** — live graph rides the flow document
+  body's `graph` field; `graphDelta` / `revivals` are
+  write-side sidecars (RESTRICT bindings via
+  `flowGraphBindingsFromPairs`). A fresh node/edge is
+  born live on the next document head.
 
-`adapters/state-events.ts` holds the READ helpers only
-(latest-per-id reduction, claim/transition projections,
-per-family state-detail getters). Lifecycle writes no
-longer funnel through a shared state-event op — each
-family's document PUT or named op owns its own pair
-formation.
+Client history reads live in
+`adapters/work-orders-queries.ts`
+(`getWorkOrderHistory` / `getWorkOrderHistories`) and
+`adapters/objectives.ts` (`getObjectiveHistories`).
+Trio-family head state rides the entity row fields —
+there is no `state-events` adapter. Lifecycle writes
+no longer funnel through a shared event-append op —
+each family's document PUT or named op owns its own
+pair formation.

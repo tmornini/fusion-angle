@@ -90,9 +90,9 @@ function buildFlowGraph(
 // the live route serves — a raw db.workOrders.put leaves no
 // message pair at this address. The genesis transition ALSO
 // re-pins here (finding 15's fixture budget): getWorkOrder
-// TransitionEvents reads entity-states/:id/history, which is
-// flipped too — a raw db.states.put left no pair at that
-// address either.
+// TransitionEvents reads family /history, which is flipped
+// too — a raw db.states.put left no pair at that address
+// either.
 async function seedWorkOrder(
     db: MemoryDbAdapter,
     id: string,

@@ -12,10 +12,11 @@ import { ORGANIZATION_TWO } from
 import { organizationToken } from './token-fixtures.ts';
 
 // Phase Final Task 2: invitations ROW half stripped — the
-// row/states dual-write oracle is retired. pendingInvitationFor
-// is the sole pending discovery path (pair plane). Declined-
-// reinvite is the drift pin: a stale DECLINED invitation must
-// never be mistaken for the outstanding pending one.
+// row-plus-lifecycle dual-write oracle is retired.
+// pendingInvitationFor is the sole pending discovery path
+// (pair plane). Declined-reinvite is the drift pin: a stale
+// DECLINED invitation must never be mistaken for the
+// outstanding pending one.
 
 const BASE = 'http://localhost';
 
