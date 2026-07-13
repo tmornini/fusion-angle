@@ -4,7 +4,7 @@ import type {
     RecordEntity,
     RecordId,
     RecordState,
-    StateEntity,
+    RecordStateDetail,
 } from '../../../api/types.ts';
 import {
     RecordModel,
@@ -14,13 +14,6 @@ import {
     activeOrganization,
     type RequestContext,
 } from './shared.ts';
-import {
-    latestByKey,
-} from '../../../shared/ledger-reduction.ts';
-import {
-    getRecordStateDetail,
-    getRecordStateDetails,
-} from './state-events.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -94,57 +87,48 @@ export async function getRecord(
     );
 }
 
-export async function getRecordState(
-    ctx: RequestContext,
-    id: RecordId,
-): Promise<RecordState> {
-    const events = await ctx.GET<StateEntity[]>(
-        `entity-states/${id}/history`,
-    );
-    const latest = latestByKey(events, ev => ev.entity_id)
-        .get(id);
-    if (latest === undefined) {
-        throw new Error(
-            'no state event for record ' + id,
-        );
-    }
-    return assertRecordState(
-        latest.state, 'record ' + id,
-    );
+// Lifecycle-current trio is stamped on the RecordEntity GET
+// row (Phase A). Map snake_case wire → RecordStateDetail;
+// no second hop to the states log / entity-states history.
+function recordStateDetailFromRow(
+    row: RecordEntity,
+): RecordStateDetail {
+    return {
+        state: assertRecordState(
+            row.state, 'record ' + row.id,
+        ),
+        stateAt: row.state_at,
+        stateEventId: row.state_event_id,
+    };
 }
 
 // The record detail page's read: one domain facet
 // carrying identity, content, and lifecycle state —
 // the raw row and its separate state never cross the
-// seam. Widened to the state DETAIL (Decision 7's trio)
+// seam. Trio is the GET-stamped row fields (Decision 7)
 // so a plain field edit (the detail page's no-attribute-
-// change save) can echo it without minting a fresh event;
-// getRecordState (singular, above) remains for its own
-// test-pinned throws-on-absence covenant even though this
-// caller no longer reaches it.
+// change save) can echo it without minting a fresh event.
 export async function getRecordModel(
     ctx: RequestContext,
     id: RecordId,
 ): Promise<RecordModel> {
-    const [row, detail] = await Promise.all([
-        getRecord(ctx, id),
-        getRecordStateDetail(ctx, id),
-    ]);
-    return new RecordModel(row, detail);
+    const row = await getRecord(ctx, id);
+    return new RecordModel(
+        row, recordStateDetailFromRow(row),
+    );
 }
 
 export async function getRecords(
     ctx: RequestContext,
 ): Promise<RecordWithCounts[]> {
     const [
-        rows, attributes, flowRecords, stateMap,
+        rows, attributes, flowRecords,
     ] = await Promise.all([
         getRecordEntities(ctx),
         ctx.GET<RecordAttributeEntity[]>(
             'record-attributes',
         ),
         getAllFlowRecords(ctx),
-        getRecordStateDetails(ctx),
     ]);
     const attrCountByRecord = new Map<
         string, number
@@ -166,24 +150,17 @@ export async function getRecords(
                 .get(fr.record_id) ?? 0) + 1,
         );
     }
-    return rows.map(row => {
-        const detail = stateMap.get(row.id);
-        if (detail === undefined) {
-            throw new Error(
-                'Record has no state event: '
-                + row.id,
-            );
-        }
-        return {
-            record: new RecordModel(row, detail),
-            attributeCount:
-                attrCountByRecord.get(row.id)
-                ?? 0,
-            boundFlowCount:
-                flowCountByRecord.get(row.id)
-                ?? 0,
-        };
-    });
+    return rows.map(row => ({
+        record: new RecordModel(
+            row, recordStateDetailFromRow(row),
+        ),
+        attributeCount:
+            attrCountByRecord.get(row.id)
+            ?? 0,
+        boundFlowCount:
+            flowCountByRecord.get(row.id)
+            ?? 0,
+    }));
 }
 
 // The wire document PUT /records/:id now takes (Decision 7):
@@ -193,9 +170,19 @@ export async function getRecords(
 // downstream). A state-UNCHANGED save (name/description/
 // position edited, trio echoed back unchanged) converges to a
 // no-op event write at the op; a genuine transition
-// (postRecordStateChange below) mints a fresh trio.
+// (postRecordStateChange below) mints a fresh trio. GET
+// RecordEntity also carries snake_case lifecycle stamp fields
+// — omit them here so the PUT body is not double-keyed
+// (snake + camel).
 export type RecordDocumentFields =
-    Omit<RecordEntity, 'id' | 'organization_id'> & {
+    Omit<
+        RecordEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    > & {
         readonly state: RecordState;
         readonly stateAt: string;
         readonly stateEventId: string;
@@ -220,8 +207,14 @@ export async function putRecord(
 
 export interface RecordChangeCreate {
     readonly kind: 'create';
-    readonly record:
-        Omit<RecordEntity, 'id' | 'organization_id'>;
+    readonly record: Omit<
+        RecordEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >;
     readonly attributes: readonly Omit<
         RecordAttributeEntity, 'organization_id'
     >[];
@@ -230,8 +223,14 @@ export interface RecordChangeCreate {
 
 export interface RecordChangeEdit {
     readonly kind: 'edit';
-    readonly record:
-        Omit<RecordEntity, 'id' | 'organization_id'>;
+    readonly record: Omit<
+        RecordEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >;
     readonly attributes: readonly Omit<
         RecordAttributeEntity, 'organization_id'
     >[];
@@ -296,13 +295,23 @@ export async function postRecordChange(
 // (mint-once-reuse — a retry of the SAME transition resends
 // this same pinned pair, converging at the op) over the
 // record's CURRENT entity fields — hop count 1 -> 1 (one
-// ctx.PUT, via putRecord).
+// ctx.PUT, via putRecord). Strip GET-stamped snake_case trio
+// so putRecord's camelCase mint is the only lifecycle payload.
 export async function postRecordStateChange(
     ctx: RequestContext,
     record: RecordEntity,
     state: RecordState,
 ): Promise<void> {
-    const { id, ...entity } = record;
+    const {
+        id,
+        state: _priorState,
+        state_at: _priorAt,
+        state_event_id: _priorEventId,
+        ...entity
+    } = record;
+    void _priorState;
+    void _priorAt;
+    void _priorEventId;
     await putRecord(ctx, id, {
         ...entity,
         state,

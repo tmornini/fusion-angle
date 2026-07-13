@@ -206,6 +206,39 @@ test(
     },
 );
 
+// Former adapters-state-events pin: bulk member lifecycle
+// is the GET-stamped members collection — spans kinds and
+// never admits a foreign entity id (idea) as a member.
+test(
+    'getMembers spans kinds and excludes an idea',
+    async () => {
+        const { db } = await setupSeeded();
+        const ctx = createRequestContext(
+            db, await devToken(),
+        );
+        await ctx.PUT('ideas/i1', {
+            title: 'I',
+            position: 1,
+            problem_statement: 'p',
+            target_users: 't',
+            proposed_solution: 's',
+            expected_outcome: 'o',
+            success_metrics: 'm',
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'ev-i1',
+        });
+        const members = await getMembers(ctx);
+        const ids = members.map(m => m.idForLink());
+        assert.ok(ids.includes('hw_sarah_chen'));
+        assert.ok(ids.includes('ai_claude_opus'));
+        assert.ok(
+            !ids.includes('i1'),
+            'idea must not leak into members',
+        );
+    },
+);
+
 test(
     'getMemberMap keys by id with both kinds'
     + ' present',

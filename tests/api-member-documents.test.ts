@@ -626,12 +626,17 @@ for (const {
         const headAfterFirst = await documentGetHandler(wiring)(
             db, [family + '-chain-1'], 'current', 'ignored',
         );
-        // members entityOf strips the lifecycle trio (MemberEntity
-        // is id+type only); facet families surface the full body.
+        // members entityOf stamps lifecycle-current trio
+        // (state ← event.state, state_at ← event.at,
+        // state_event_id ← event.id); facet families surface
+        // the full body as-is.
         const expectedFirst = family === 'members'
             ? {
                 id: family + '-chain-1',
                 type: first['type'],
+                state: first['state'],
+                state_at: first['state_at'],
+                state_event_id: first['state_event_id'],
             }
             : { id: family + '-chain-1', ...first };
         assert.deepEqual(headAfterFirst, expectedFirst);
@@ -652,6 +657,9 @@ for (const {
             ? {
                 id: family + '-chain-1',
                 type: second['type'],
+                state: second['state'],
+                state_at: second['state_at'],
+                state_event_id: second['state_event_id'],
             }
             : { id: family + '-chain-1', ...second };
         assert.deepEqual(headAfterSecond, expectedSecond);

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import { deriveFlowStateHistory } from
+    '../api/derive-flows.ts';
+import {
+    documentPairsAt,
+} from '../api/derive-documents.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -218,7 +221,7 @@ test('postFlowDocumentOp returns the entity, exactly one'
     assert.equal(update.status, 200);
     const wire = await update.json() as { name: string };
     assert.equal(wire.name, 'Renamed');
-    const events = await deriveStatesFor(db, '1', 'flow-op-1');
+    const events = await deriveFlowStateHistory(db, '1', 'flow-op-1');
     assert.deepEqual(
         events.map(e => e.state), ['active', 'updated'],
     );
@@ -280,11 +283,54 @@ test('postFlowDocumentOp with revivals posts the restored'
         { 'If-Response-ID': headId },
     ));
     assert.equal(update.status, 200);
-    const nodeEvents = await deriveStatesFor(db, '1', 'node-x');
-    assert.deepEqual(
-        nodeEvents.map(e => e.state),
-        ['deleted', 'restored'],
-    );
+    // SIDECAR-KEEP (C3): pin graphDelta.deletions / revivals
+    // on the flow document pairs — no bulk states derive.
+    const prefix = canonicalUriPrefix('1', '/flows/');
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', prefix),
+        db.responses.getAllWhere('uri_prefix', prefix),
+    ]);
+    const pairs = documentPairsAt(
+        requests, responses, prefix,
+    ).filter((p) => p.uriId === 'flow-op-2');
+    const states: string[] = [];
+    for (const pair of pairs) {
+        const delta = pair.body['graphDelta'];
+        const deletions =
+            typeof delta === 'object' && delta !== null
+                ? (delta as Record<string, unknown>)[
+                    'deletions'
+                ]
+                : undefined;
+        if (Array.isArray(deletions)) {
+            for (const entry of deletions) {
+                if (
+                    typeof entry === 'object'
+                    && entry !== null
+                    && (entry as Record<string, unknown>)[
+                        'entityId'
+                    ] === 'node-x'
+                ) {
+                    states.push('deleted');
+                }
+            }
+        }
+        const revivals = pair.body['revivals'];
+        if (Array.isArray(revivals)) {
+            for (const entry of revivals) {
+                if (
+                    typeof entry === 'object'
+                    && entry !== null
+                    && (entry as Record<string, unknown>)[
+                        'entityId'
+                    ] === 'node-x'
+                ) {
+                    states.push('restored');
+                }
+            }
+        }
+    }
+    assert.deepEqual(states, ['deleted', 'restored']);
 });
 
 test('the document body carries state/state_at/graph while'
@@ -330,7 +376,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     assert.equal(first.status, 200);
     const firstId = first.headers.get('Response-ID');
     const eventsAfterFirst =
-        await deriveStatesFor(db, '1', 'flow-locked-3');
+        await deriveFlowStateHistory(db, '1', 'flow-locked-3');
     const requestsAfterFirst = await db.requests.getAll();
 
     const second = await handleRequest(db, req(
@@ -339,7 +385,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('Response-ID'), firstId);
     const eventsAfterSecond =
-        await deriveStatesFor(db, '1', 'flow-locked-3');
+        await deriveFlowStateHistory(db, '1', 'flow-locked-3');
     assert.equal(
         eventsAfterSecond.length, eventsAfterFirst.length,
     );
@@ -468,7 +514,7 @@ async () => {
 
     const requestsBefore = await db.requests.getAll();
     const responsesBefore = await db.responses.getAll();
-    const eventsBefore = await deriveStatesFor(db, '1',
+    const eventsBefore = await deriveFlowStateHistory(db, '1',
         'flow-undo-old-shape',
     );
 
@@ -486,7 +532,7 @@ async () => {
 
     const requestsAfter = await db.requests.getAll();
     const responsesAfter = await db.responses.getAll();
-    const eventsAfter = await deriveStatesFor(db, '1',
+    const eventsAfter = await deriveFlowStateHistory(db, '1',
         'flow-undo-old-shape',
     );
     assert.equal(requestsAfter.length, requestsBefore.length);
@@ -867,7 +913,7 @@ async () => {
         assert.equal(flow.name, 'Saved');
         assert.equal(save.status, 200);
         assert.equal(undo.status, 412);
-        const events = await deriveStatesFor(db, '1', 'flow-race-1');
+        const events = await deriveFlowStateHistory(db, '1', 'flow-race-1');
         assert.ok(
             !events.some(
                 e => e.id === 'flow-race-1-undo-ev',

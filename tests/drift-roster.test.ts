@@ -124,11 +124,14 @@ const MEMBERS_TEST_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'members',
     validateDocument: validateMemberDocumentBody,
     documentOp: postMemberDocumentOp,
-    // Mirror routes.ts memberDocumentEntityOf: type alone —
-    // the lifecycle trio is history, not the directory row.
-    entityOf: (document, _organization) => ({
+    // Mirror routes.ts memberDocumentEntityOf: stamp trio
+    // from lifecycle-current (required on trio path).
+    entityOf: (document, _organization, current) => ({
         id: document.uriId,
         type: document.body['type'],
+        state: current!.state,
+        state_at: current!.at,
+        state_event_id: current!.id,
     }),
 };
 
@@ -611,6 +614,11 @@ test('members wire equals deriveMemberParents (16 incl.'
 
     const derivedCurrent = await deriveMemberParent(db, 'current');
     assert.equal(derivedCurrent.type, 'human');
+    assert.equal(derivedCurrent.state, 'active');
+    assert.equal(
+        derivedCurrent.state_event_id,
+        'seed-member-current-active',
+    );
     const resCurrent = await handleRequest(
         db, req('GET', '/current-member', token),
     );
@@ -658,6 +666,9 @@ async () => {
     );
     const parentAi = await deriveMemberParent(db, aiId);
     assert.equal(parentAi.type, 'ai');
+    assert.equal(parentAi.state, 'active');
+    assert.equal(parentAi.state_at, aiGenesisAt);
+    assert.equal(parentAi.state_event_id, aiGenesisEventId);
     const derivedAiDetail1 = await derivedAiMember(
         db, GLOBAL_PLANE_PLACEHOLDER, aiId,
     );
@@ -1079,6 +1090,90 @@ test('resend idempotency: a byte-identical ai-members/:id PUT'
     );
     assert.equal(derived.name, 'Resend AI Facet');
     // Phase Final Stage B: roster tables retired.
+});
+
+// -- 8b. genesis-wins-under-skew on members GET ---------------
+// case-7d mirror for members GET: a clock-skewed later
+// arrival whose state_at sorts BELOW genesis does NOT
+// displace genesis as lifecycle-current. Head body fields
+// (`type`) may reflect the later arrival; the GET trio must
+// stay genesis (state ← event.state, state_at ← event.at,
+// state_event_id ← event.id). Members are GLOBAL plane —
+// no organization stamp.
+
+test('GET member trio is lifecycle-current under clock skew'
++ ' (genesis-wins-under-skew, case 7d)', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const memberId = 'mem-drift-skew-1';
+    const genesisAt = '2026-06-01T00:00:00.000000Z';
+    const genesisEv = 'mem-drift-skew-1-genesis';
+    const skewedAt = '2020-01-01T00:00:00.000000Z';
+    const skewedEv = 'mem-drift-skew-1-skewed';
+
+    const genesis = await handleRequest(db, req(
+        'PUT', '/members/' + memberId, token, {
+            type: 'human',
+            state: 'active',
+            state_at: genesisAt,
+            state_event_id: genesisEv,
+        },
+    ));
+    assert.equal(genesis.status, 200);
+    // PUT successBody is entity fields only — no trio.
+    assert.deepEqual(await genesis.json(), {
+        id: memberId,
+        type: 'human',
+    });
+
+    // Later arrival, earlier state_at, different state +
+    // type. 'archived' is a live member state — if it won
+    // as current the GET trio would flip; genesis-wins
+    // keeps the member active. Type may flip to 'ai' from
+    // the head body (arrival order).
+    const skewed = await handleRequest(db, req(
+        'PUT', '/members/' + memberId, token, {
+            type: 'ai',
+            state: 'archived',
+            state_at: skewedAt,
+            state_event_id: skewedEv,
+        },
+    ));
+    assert.equal(skewed.status, 200);
+
+    const expected: MemberEntity = {
+        id: memberId,
+        type: 'ai',
+        state: 'active',
+        state_at: genesisAt,
+        state_event_id: genesisEv,
+    };
+
+    const res = await handleRequest(
+        db, req('GET', '/members/' + memberId, token),
+    );
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), JSON.stringify(expected));
+
+    const derived = await deriveMemberParent(db, memberId);
+    assert.equal(
+        JSON.stringify(derived), JSON.stringify(expected),
+    );
+    assert.equal(derived.type, 'ai');
+    assert.equal(derived.state, 'active');
+    assert.equal(derived.state_at, genesisAt);
+    assert.equal(derived.state_event_id, genesisEv);
+
+    const parents = await deriveMemberParents(db);
+    const row = parents.find((m) => m.id === memberId);
+    assert.deepEqual(row, expected);
+
+    const viaGeneric = await documentGetHandler(
+        MEMBERS_TEST_WIRING,
+    )(
+        db, [memberId], READER_ACTOR, GLOBAL_PLANE_PLACEHOLDER,
+    );
+    assert.deepEqual(viaGeneric, expected);
 });
 
 // -- 9. plain PUT-supersession at a membership address (NAMED --

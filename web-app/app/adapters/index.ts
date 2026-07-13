@@ -16,11 +16,6 @@ export * from './shared.ts';
 export * from './dashboard.ts';
 export * from './ideas.ts';
 export * from './projects.ts';
-export {
-    getProjectState,
-    getProjectStateDetail,
-    getObjectiveStateDetails,
-} from './state-events.ts';
 export * from './project-scoring.ts';
 export * from './validation.ts';
 export * from './objectives.ts';

@@ -1,6 +1,8 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import { deriveIdeaStateHistory } from
+    '../api/derive-ideas.ts';
+import { deriveProjectStateHistory } from
+    '../api/derive-projects.ts';
 import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
@@ -29,9 +31,15 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 
+// PUT/create body: no lifecycle trio — postIdeaCreation mints
+// state/stateAt/stateEventId. GET IdeaEntity carries the
+// stamped trio (Phase A); list/detail read it from the row.
 function buildIdea(
     id: string, title: string,
-): Omit<IdeaEntity, 'id'> {
+): Omit<
+    IdeaEntity,
+    'id' | 'state' | 'state_at' | 'state_event_id'
+> {
     return {
         organization_id: '1',
         title,
@@ -202,7 +210,7 @@ test(
         const row = await getIdeaEntity(ctx, 'i1');
         assert.equal(row.title, 'Fresh');
         const events =
-            await deriveStatesFor(db, '1', 'i1');
+            await deriveIdeaStateHistory(db, '1', 'i1');
         assert.equal(events.length, 1);
         assert.equal(
             events[0]?.state,
@@ -213,7 +221,8 @@ test(
 
 test(
     'postIdeaStateChange records a state event'
-    + ' without changing entity fields on GET',
+    + ' without changing non-lifecycle entity fields'
+    + ' on GET',
     async () => {
         const { db, ctx } = await adminContext();
         await seedHumanMember(
@@ -227,13 +236,30 @@ test(
         );
 
         const after = await getIdeaEntity(ctx, 'i1');
-        assert.deepEqual(after, before);
+        // Entity content fields unchanged; GET trio advances
+        // to the transition event (lifecycle-current stamp).
+        assert.equal(after.title, before.title);
+        assert.equal(after.position, before.position);
+        assert.equal(
+            after.problem_statement,
+            before.problem_statement,
+        );
+        assert.equal(after.state, 'approved');
+        assert.notEqual(
+            after.state_event_id, before.state_event_id,
+        );
         const events =
-            await deriveStatesFor(db, '1', 'i1');
+            await deriveIdeaStateHistory(db, '1', 'i1');
         // genesis + transition
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'approved',
+        );
+        assert.equal(
+            after.state_event_id, events.at(-1)?.id,
+        );
+        assert.equal(
+            after.state_at, events.at(-1)?.at,
         );
     },
 );
@@ -286,13 +312,13 @@ test(
         assert.equal(project.title, 'P1');
 
         const ideaEvents =
-            await deriveStatesFor(db, '1', 'i1');
+            await deriveIdeaStateHistory(db, '1', 'i1');
         assert.equal(
             ideaEvents.at(-1)?.state, 'promoted',
         );
 
         const projectEvents =
-            await deriveStatesFor(db, '1', 'p1');
+            await deriveProjectStateHistory(db, '1', 'p1');
         assert.equal(projectEvents.length, 1);
         assert.equal(
             projectEvents[0]?.state, 'submitted',

@@ -28,6 +28,7 @@ import type {
     IdentityTokenRevocationEntity,
     IdeaEntity,
     IdeaSubmissionEntity,
+    StateEntity,
     ObjectiveEntity,
     ObjectiveRevisionEntity,
     ProjectEntity,
@@ -139,13 +140,18 @@ import {
 } from './types.ts';
 import {
     deriveIdeaSubmissions,
+    deriveIdeaStateHistory,
     ideaEntityOf,
 } from './derive-ideas.ts';
-import { projectEntityOf } from './derive-projects.ts';
+import {
+    deriveProjectStateHistory,
+    projectEntityOf,
+} from './derive-projects.ts';
 import {
     flowEntityOf,
     deriveFlow,
     deriveFlows,
+    deriveFlowStateHistory,
     resolveFlowUndoTarget,
     type FlowUndoResolution,
 } from './derive-flows.ts';
@@ -165,6 +171,11 @@ import { deriveFlowTag } from './derive-flow-tags.ts';
 import {
     deriveObjectiveRevisions,
 } from './derive-objective-revisions.ts';
+import { deriveRecordStateHistory } from './derive-records.ts';
+import {
+    deriveObjectiveStateHistory,
+    deriveObjectiveHistories,
+} from './derive-objectives.ts';
 import {
     deriveBaselineScores,
     deriveActualScores,
@@ -172,6 +183,7 @@ import {
 import {
     deriveMembers,
     deriveMemberParent,
+    memberParentOf,
 } from './derive-members.ts';
 import {
     deriveIdentityPiiRows,
@@ -187,14 +199,12 @@ import {
     deriveTokenRevocation,
 } from './derive-identity-spine.ts';
 import {
-    deriveStates,
-    deriveStatesFor,
+    deriveMemberStates,
+    deriveWorkOrderHistories,
     workOrderClaimHistoryFor,
     workOrderDocumentHeadFor,
+    workOrderHistoryFor,
 } from './derive-states.ts';
-import {
-    stateFieldValuesForStateEvent,
-} from './derive-state-field-values.ts';
 import {
     deriveOrganization,
     deriveOrganizations,
@@ -212,6 +222,7 @@ import {
     documentEntityRoute,
     documentGetHandler,
     documentPutHandler,
+    documentStateHistoryHandler,
     documentHeadPairId,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
@@ -272,7 +283,10 @@ const IDEAS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'ideas',
     validateDocument: validateIdeaDocumentBody,
     documentOp: postIdeaDocumentOp,
-    entityOf: ideaEntityOf,
+    // ideaEntityOf requires the lifecycle-current event; the
+    // generic trio path always supplies it after DELETED filter.
+    entityOf: (document, organization, current) =>
+        ideaEntityOf(document, organization, current!),
 };
 const PROJECTS_WIRING: DocumentFamilyWiring = {
     family: 'projects',
@@ -280,26 +294,29 @@ const PROJECTS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'projects',
     validateDocument: validateProjectDocumentBody,
     documentOp: postProjectDocumentOp,
-    entityOf: projectEntityOf,
+    // projectEntityOf requires the lifecycle-current event;
+    // the generic trio path always supplies it after DELETED
+    // filter.
+    entityOf: (document, organization, current) =>
+        projectEntityOf(document, organization, current!),
 };
 // The flows wiring row — Task 3's flip commit, GET-wired at
 // Task 8. entityOf is derive-flows.ts's OWN flowEntityOf, not a
 // routes.ts-local mapper: it returns FlowWithGraph (the entity
-// plus the document's own `graph` field), the shape both
-// documentGetHandler (flows/:id) and documentCollectionRoute
-// (flows) now serve verbatim — no flows-special branch inside
-// either generic constructor. ideas/projects' own entityOf
-// mappers return their bare entity shape (no such extra field),
-// so this is the ONE per-family divergence document-family.ts's
-// `entityOf: (document, organization) => unknown` slot already
-// tolerates by design, not a widened interface.
+// plus the document's own `graph` field). Live flows GET is
+// hand-written (deriveFlow/deriveFlows) so this slot is unused
+// for reads; the wrapper ignores `current` and omits pairCount
+// (hasUndoHistory false) — same as the prior 2-arg assignability
+// shim. flowEntityOf's third param is pairCount (number), not
+// StateEntity, so it cannot sit in the entityOf slot directly.
 const FLOWS_WIRING: DocumentFamilyWiring = {
     family: 'flows',
     lifecycle: 'trio',
     notFoundTable: 'flows',
     validateDocument: validateFlowDocumentBody,
     documentOp: postFlowDocumentOp,
-    entityOf: flowEntityOf,
+    entityOf: (document, organization, _current?) =>
+        flowEntityOf(document, organization),
 };
 // The work-orders wiring row — the fourth family, and the
 // FIRST 'stateless' one (Decision 7's lifecycle trio does not
@@ -318,6 +335,7 @@ const FLOWS_WIRING: DocumentFamilyWiring = {
 function workOrderDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
+    _current?: StateEntity,
 ): unknown {
     return {
         id: document.uriId,
@@ -333,19 +351,16 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
     documentOp: postWorkOrderDocumentOp,
     entityOf: workOrderDocumentEntityOf,
 };
-// The generic GET machinery (documentGetHandler/
-// documentCollectionGetHandler) this entityOf serves flips onto
-// records at Task 7 (this commit): GET records/:id and GET
-// records now ride it, exactly as ideaEntityOf/projectEntityOf/
-// flowEntityOf/workOrderDocumentEntityOf each serve their OWN
-// family's GET path. It still picks fields explicitly (never a
-// body spread) rather than standing in as a placeholder, the
-// SAME shape ideaEntityOf/projectEntityOf already use, so the
-// Task 7 flip finds it already correct instead of inheriting a
-// trio-leaking stand-in.
+// Head document → wire RecordEntity. Entity fields come from
+// the head body; the lifecycle trio is stamped from the
+// lifecycle-current StateEntity (never re-copied from the
+// head body — genesis-wins-under-skew). `current` is required
+// on the live trio path (document-family always supplies it
+// after the DELETED filter).
 function recordDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
+    current: StateEntity,
 ): RecordEntity {
     const body = document.body;
     return {
@@ -354,6 +369,9 @@ function recordDocumentEntityOf(
         name: pickString(body, 'name'),
         description: pickString(body, 'description'),
         position: pickNumber(body, 'position'),
+        state: current.state,
+        state_at: current.at,
+        state_event_id: current.id,
     };
 }
 // The records wiring row — the fifth family, and the first
@@ -362,13 +380,19 @@ function recordDocumentEntityOf(
 // DELETE-method pair — see its own comment in derive-
 // documents.ts). notFoundTable is 'records' (its storage table
 // name matches its family name, like ideas/projects/flows).
+// recordDocumentEntityOf requires the lifecycle-current event;
+// the generic trio path always supplies it after DELETED
+// filter.
 const RECORDS_WIRING: DocumentFamilyWiring = {
     family: 'records',
     lifecycle: 'trio',
     notFoundTable: 'records',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    entityOf: recordDocumentEntityOf,
+    entityOf: (document, organization, current) =>
+        recordDocumentEntityOf(
+            document, organization, current!,
+        ),
 };
 // The generic GET machinery this entityOf serves flips onto
 // record-attributes at Task 7 too (this commit, the SAME
@@ -385,6 +409,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
 function recordAttributeDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
+    _current?: StateEntity,
 ): unknown {
     return {
         id: document.uriId,
@@ -433,15 +458,24 @@ const RECORD_ATTRIBUTES_WIRING: DocumentFamilyWiring = {
 // alongside position, and a spread would let that raw, unstamped
 // key leak into the read path ahead of the fenced `organization`
 // argument — picking only `position` closes that off by
-// construction.
+// construction. Head document → wire ObjectiveEntity. Entity
+// fields come from the head body; the lifecycle trio is stamped
+// from the lifecycle-current StateEntity (never re-copied from
+// the head body — genesis-wins-under-skew). `current` is required
+// on the live trio path (document-family always supplies it
+// after the DELETED filter).
 function objectiveDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
-): unknown {
+    current: StateEntity,
+): ObjectiveEntity {
     return {
         id: document.uriId,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
+        state: current.state,
+        state_at: current.at,
+        state_event_id: current.id,
     };
 }
 // The objectives wiring row — the seventh family, now the
@@ -456,14 +490,19 @@ function objectiveDocumentEntityOf(
 // notFoundTable is 'objectives' — its storage table name
 // matches its family name, like ideas/projects/flows/records
 // (work-orders/record-attributes are the two whose names
-// diverge).
+// diverge). objectiveDocumentEntityOf requires the lifecycle-
+// current event; the generic trio path always supplies it
+// after DELETED filter.
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
     lifecycle: 'trio',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
-    entityOf: objectiveDocumentEntityOf,
+    entityOf: (document, organization, current) =>
+        objectiveDocumentEntityOf(
+            document, organization, current!,
+        ),
 };
 // The generic GET machinery (not yet flipped for memberships —
 // Task 8) this entityOf will serve: the head pair's body already
@@ -481,6 +520,7 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
 function membershipDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
+    _current?: StateEntity,
 ): unknown {
     return {
         id: document.uriId,
@@ -519,22 +559,22 @@ const MEMBERSHIPS_WIRING: DocumentFamilyWiring = {
     documentOp: postMembershipDocumentOp,
     entityOf: membershipDocumentEntityOf,
 };
-// The wire body carries the member's own field ({type}) plus
-// the lifecycle trio — entityOf picks type alone, matching
-// derive-members.ts's memberParentOf and MemberEntity (the
-// trio is lifecycle history, not the directory row). Same
-// strip posture as objectiveDocumentEntityOf. `_organization`
-// stays unused: the members directory is GLOBAL plane
-// (family-registry.ts: organizationNested: false) — the FIRST
-// family on it — so there is no fence value to stamp at all.
+// Head document → wire MemberEntity. Entity field (`type`)
+// from the head body; the lifecycle trio is stamped from the
+// lifecycle-current StateEntity via derive-members.ts's
+// memberParentOf (never re-copied from the head body —
+// genesis-wins-under-skew). `current` is required on the live
+// trio path (document-family always supplies it after the
+// DELETED filter). `_organization` stays unused: the members
+// directory is GLOBAL plane (family-registry.ts:
+// organizationNested: false) — the FIRST family on it — so
+// there is no fence value to stamp at all.
 function memberDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
-): unknown {
-    return {
-        id: document.uriId,
-        type: pickString(document.body, 'type'),
-    };
+    current: StateEntity,
+): MemberEntity {
+    return memberParentOf(document, current);
 }
 // The members wiring row — the ninth family, a 'trio' one
 // since the states-address retirement. The old FREEZE-at-
@@ -551,13 +591,19 @@ function memberDocumentEntityOf(
 // plane: no organization stamping (the members directory row
 // carries no organization_id) — see documentWriteResponseSpec's
 // registration-first consult (document-family.ts).
+// memberDocumentEntityOf requires the lifecycle-current
+// event; the generic trio path always supplies it after
+// DELETED filter.
 const MEMBERS_WIRING: DocumentFamilyWiring = {
     family: 'members',
     lifecycle: 'trio',
     notFoundTable: 'members',
     validateDocument: validateMemberDocumentBody,
     documentOp: postMemberDocumentOp,
-    entityOf: memberDocumentEntityOf,
+    entityOf: (document, organization, current) =>
+        memberDocumentEntityOf(
+            document, organization, current!,
+        ),
 };
 // The bare ai_members facet row spreads safely (no
 // organization_id, no trio — the SAME reason memberDocumentEntityOf's
@@ -566,6 +612,7 @@ const MEMBERS_WIRING: DocumentFamilyWiring = {
 function aiMemberDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
+    _current?: StateEntity,
 ): unknown {
     return {
         id: document.uriId,
@@ -596,6 +643,7 @@ const AI_MEMBERS_WIRING: DocumentFamilyWiring = {
 function humanMemberDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
+    _current?: StateEntity,
 ): unknown {
     return {
         id: document.uriId,
@@ -630,6 +678,7 @@ const HUMAN_MEMBERS_WIRING: DocumentFamilyWiring = {
 function identityDocumentEntityOf(
     document: DerivedDocument,
     _organization: Id,
+    _current?: StateEntity,
 ): unknown {
     return {
         id: document.uriId,
@@ -1636,8 +1685,6 @@ export interface MemberWritePairs {
 // consume — the objectiveDocumentBodyOf/objectiveRevisionBodyOf
 // precedent.
 
-// The wire body a live PUT members/:id would carry for this SAME
-// write: `type` alone — validateMemberDocumentBody's only field.
 // The wire body a live PUT members/:id would carry for this
 // SAME write: `type` plus the lifecycle trio. The member kind
 // is a server-supplied fact the caller pins; the trio is the
@@ -4217,6 +4264,16 @@ export const routes: Route[] = [
             ),
         put: documentPutHandler(FLOWS_WIRING),
     },
+    // GET flows/:id/history (states-URI elimination A3):
+    // deriveFlowStateHistory ASC → DESC; empty →
+    // missedReadError('flows'). Segment count 3 vs 2 so no
+    // collision with flows/:id. Member-tier GET via
+    // matchesOnSegmentBoundary on '/flows'.
+    route('flows/:id/history', {
+        get: documentStateHistoryHandler(
+            deriveFlowStateHistory, 'flows',
+        ),
+    }),
     // Undo-as-replay (Phase 14 Task 8). Phase Final Task 2:
     // flows + graph ROW halves stripped; restore writes the
     // 'updated' state event, revival states events, and the
@@ -4378,6 +4435,18 @@ export const routes: Route[] = [
             );
         },
     }),
+    // GET work-orders/history (states-URI elimination A2):
+    // org-scoped bulk lifecycle + field_values fold, (at, id)
+    // DESC. Always 200 array. MUST register BEFORE
+    // work-orders/:id so matchRoute's first-match does not
+    // capture the literal segment as `:id`. Member-tier GET
+    // via matchesOnSegmentBoundary on '/work-orders'.
+    route('work-orders/history', {
+        get: (db, _p, _actor, organization) =>
+            deriveWorkOrderHistories(
+                db, requireOrganization(organization),
+            ),
+    }),
     // work-orders/:id is the fourth family. GET is FLIPPED
     // (Task 7): absorbed into the generic documentEntityRoute
     // — the SAME wiring row PUT already rides (Task 3), so
@@ -4433,6 +4502,21 @@ export const routes: Route[] = [
                 db, param(p, 0), body, actor, pair,
             ),
     }),
+    // GET work-orders/:id/history (states-URI elimination A1):
+    // lifecycle + inline field_values fold, (at, id) DESC.
+    // Miss posture lives inside workOrderHistoryFor (empty →
+    // missedReadError). No api.ts pre-dispatch guard — the
+    // derive reads only this org's uri_prefix addresses.
+    // Member-tier GET via matchesOnSegmentBoundary on
+    // '/work-orders'.
+    route('work-orders/:id/history', {
+        get: (db, p, _actor, organization) =>
+            workOrderHistoryFor(
+                db,
+                requireOrganization(organization),
+                param(p, 0),
+            ),
+    }),
     // Flow work-order joins nest under their parent flow: the
     // flow id is param 0, so the SERVER filters the collection to
     // that flow. The leaf id is param 1; only PUT is exposed (the
@@ -4457,36 +4541,18 @@ export const routes: Route[] = [
                 db, param(p, 1), body, actor, pair,
             ),
     }),
-    // Field values nest under their parent STATE EVENT: the
-    // state event id is param 0. GET is FLIPPED by DEFAULT
-    // (Phase 14 Task 6): stateFieldValuesForStateEvent (api/
-    // derive-state-field-values.ts) derives the collection from
-    // the pair plane's two-source union (a transition's folded
-    // fieldValues ∪ historical leaf-address pairs from seed
-    // and pre-retirement writes) rather than the
-    // state_field_values table — visibility re-anchored onto
-    // stateEventVisibilityFor (Phase 15 Task 3) with the
-    // verified token organization, never the path. Wire shape
-    // held: ALWAYS 200; three-way filtered array (orphan/own →
-    // rows; foreign → []). Leaf PUT/DELETE retired Phase 15
-    // Task 7; collection GET survives.
-    route('states/:id/field-values', {
-        get: (db, p, _actor, organization) =>
-            stateFieldValuesForStateEvent(
-                db,
-                requireOrganization(organization),
-                param(p, 0),
-            ),
-    }),
+    // GET states/:id/field-values RETIRED (states-URI
+    // elimination C4): field values fold inline on
+    // GET work-orders/:id/history (and bulk history).
     // PUT/DELETE states/:id/field-values/:fvid RETIRED
-    // (Phase 15 Task 7): zero product callers; live writes
-    // ride the transition fold only. WRITE_RESPONSE_SPECS
-    // entry + seed address formation SURVIVE (finding 7).
-    // GET is FLIPPED (Task 7): the collection derives from the
-    // message ledger rather than the old records table. Rides
-    // the generic documentCollectionGetHandler — wire-identical
-    // to the hand-written db.records.getAll() dispatch it
-    // replaces (RECORDS_WIRING's own entityOf,
+    // (Phase 15 Task 7): live writes ride the transition
+    // fold only. WRITE_RESPONSE_SPECS entry + seed address
+    // formation SURVIVE (finding 7).
+    // GET records is FLIPPED (Task 7): the collection derives
+    // from the message ledger rather than the old records
+    // table. Rides the generic documentCollectionGetHandler
+    // — wire-identical to the hand-written db.records.getAll()
+    // dispatch it replaces (RECORDS_WIRING's own entityOf,
     // recordDocumentEntityOf, already picks the exact {id,
     // organization_id, name, description, position} shape, so
     // the list needs no records-special reassembly step). POST
@@ -4618,6 +4684,15 @@ export const routes: Route[] = [
                 },
             );
         },
+    }),
+    // GET records/:id/history (states-URI elimination A3):
+    // deriveRecordStateHistory ASC → DESC; empty →
+    // missedReadError('records'). Member-tier GET via
+    // matchesOnSegmentBoundary on '/records'.
+    route('records/:id/history', {
+        get: documentStateHistoryHandler(
+            deriveRecordStateHistory, 'records',
+        ),
     }),
     // GET is FLIPPED (Task 7): the collection derives from the
     // message ledger rather than the old record_attributes
@@ -4866,19 +4941,44 @@ export const routes: Route[] = [
 
     // GET is FLIPPED (Task 8): absorbed into the generic
     // documentGetHandler(MEMBERS_WIRING) — the SAME wiring row
-    // PUT already rides — wire-identical to the hand-written
-    // db.members.getById dispatch it replaces. PUT rides the
-    // generic documentPutHandler(MEMBERS_WIRING) (prior commit)
-    // — wire-identical to postMemberDocumentOp's own direct
-    // dispatch it replaces. Verbs stay {get, put} — members/:id
-    // has no DELETE today, mirroring the identities/:id
-    // precedent. Global plane: no organization stamping (the
-    // members directory row carries no organization_id) — see
+    // PUT already rides; memberDocumentEntityOf stamps entity
+    // fields plus the lifecycle-current trio (A10). PUT rides
+    // the generic documentPutHandler(MEMBERS_WIRING) (prior
+    // commit). Verbs stay {get, put} — members/:id has no
+    // DELETE today, mirroring the identities/:id precedent.
+    // Global plane: no organization stamping (the members
+    // directory row carries no organization_id) — see
     // documentWriteResponseSpec's own registration-first consult
     // (document-family.ts).
     route('members/:id', {
         get: documentGetHandler(MEMBERS_WIRING),
         put: documentPutHandler(MEMBERS_WIRING),
+    }),
+    // GET members/:id/history (states-URI elimination A4):
+    // deriveMemberStates filtered to entity_id; empty →
+    // EntityNotFoundError('members', id) — global-family
+    // posture (organizationNested: false), not
+    // missedReadError. Wire StateEntity (at, id) DESC.
+    // Member-tier GET via matchesOnSegmentBoundary on
+    // '/members'.
+    route('members/:id/history', {
+        get: async (db, params) => {
+            const id = param(params, 0);
+            const history = (await deriveMemberStates(db))
+                .filter((e) => e.entity_id === id)
+                .sort((a, b) =>
+                    a.at < b.at ? -1
+                        : a.at > b.at ? 1
+                            : a.id < b.id ? -1
+                                : a.id > b.id ? 1
+                                    : 0);
+            if (history.length === 0) {
+                throw new EntityNotFoundError(
+                    'members', id,
+                );
+            }
+            return history.toReversed();
+        },
     }),
     // Absorbed (Phase 4 Task 2) into the generic
     // documentEntityRoute — GET dispatches to the derived
@@ -4887,23 +4987,38 @@ export const routes: Route[] = [
     // MEMBER_ID-CAVEAT prose that lived here moved to the
     // IDEAS_WIRING block above.
     documentEntityRoute(IDEAS_WIRING),
+    // GET ideas/:id/history (states-URI elimination A3):
+    // deriveIdeaStateHistory ASC → DESC; empty →
+    // missedReadError('ideas'). Member-tier GET via
+    // matchesOnSegmentBoundary on '/ideas'.
+    route('ideas/:id/history', {
+        get: documentStateHistoryHandler(
+            deriveIdeaStateHistory, 'ideas',
+        ),
+    }),
     // Absorbed (Phase 4 Task 2) into the generic
     // documentEntityRoute — see the ideas/:id entry above for
     // the shared rationale; the Decision-7/MEMBER_ID-CAVEAT
     // prose moved to the PROJECTS_WIRING block above.
     documentEntityRoute(PROJECTS_WIRING),
+    // GET projects/:id/history (states-URI elimination A3):
+    // deriveProjectStateHistory ASC → DESC; empty →
+    // missedReadError('projects'). Member-tier GET via
+    // matchesOnSegmentBoundary on '/projects'.
+    route('projects/:id/history', {
+        get: documentStateHistoryHandler(
+            deriveProjectStateHistory, 'projects',
+        ),
+    }),
     // GET is FLIPPED (Task 7): the collection derives from the
     // message ledger rather than the old objectives table. Rides
-    // the generic documentCollectionGetHandler — wire-identical
-    // to the hand-written db.objectives.getAll() dispatch it
-    // replaces (OBJECTIVES_WIRING's own entityOf,
-    // objectiveDocumentEntityOf, already picks the exact {id,
-    // organization_id, position} shape, so the list needs no
-    // objectives-special reassembly step). POST stays this
-    // hand-written bundle — objectives' own create forms the
-    // document PLUS its first revision pair in one pass
-    // (postObjectiveCreationOp), mirroring records'/work-orders'
-    // own precedent.
+    // the generic documentCollectionGetHandler —
+    // objectiveDocumentEntityOf stamps entity fields plus the
+    // lifecycle-current trio (A9). POST stays this hand-written
+    // bundle — objectives' own create forms the document PLUS
+    // its first revision pair in one pass
+    // (postObjectiveCreationOp), mirroring records'/work-
+    // orders' own precedent.
     route('objectives', {
         get: documentCollectionGetHandler(OBJECTIVES_WIRING),
         // Forms the document + revision pairs pre-tx (Task 3)
@@ -4946,19 +5061,38 @@ export const routes: Route[] = [
             return postObjectiveCreationOp(db, body, pairs);
         },
     }),
+    // GET objectives/history (states-URI elimination A5):
+    // org-scoped bulk lifecycle StateEntity rows, (at, id)
+    // DESC. Always 200 array. MUST register BEFORE
+    // objectives/:id so matchRoute's first-match does not
+    // capture the literal segment as `:id`. Member-tier GET
+    // via matchesOnSegmentBoundary on '/objectives'.
+    route('objectives/history', {
+        get: (db, _p, _actor, organization) =>
+            deriveObjectiveHistories(
+                db, requireOrganization(organization),
+            ),
+    }),
     // objectives/:id is the seventh family. GET is FLIPPED
     // (Task 7): absorbed into the generic documentEntityRoute —
-    // GET dispatches to documentGetHandler(OBJECTIVES_WIRING),
-    // wire-identical to the hand-written db.objectives.getById
-    // dispatch it replaces (objectiveDocumentEntityOf reproduces
-    // the shape verbatim; the 'stateless' lifecycle skips the
-    // trio walk entirely, so there is no DELETE-head concept to
-    // filter). PUT stays documentPutHandler(OBJECTIVES_WIRING),
-    // unchanged from before this flip (Task 2); objectives/:id
-    // has no DELETE today, mirroring the ideas/projects/
-    // work-orders precedent that already rides this same
+    // GET dispatches to documentGetHandler(OBJECTIVES_WIRING);
+    // objectiveDocumentEntityOf stamps entity fields plus the
+    // lifecycle-current trio (A9). PUT stays
+    // documentPutHandler(OBJECTIVES_WIRING), unchanged from
+    // before this flip (Task 2); objectives/:id has no DELETE
+    // today, mirroring the ideas/projects/work-orders
+    // precedent that already rides this same
     // documentEntityRoute shape.
     documentEntityRoute(OBJECTIVES_WIRING),
+    // GET objectives/:id/history (states-URI elimination A3):
+    // deriveObjectiveStateHistory ASC → DESC; empty →
+    // missedReadError('objectives'). Member-tier GET via
+    // matchesOnSegmentBoundary on '/objectives'.
+    route('objectives/:id/history', {
+        get: documentStateHistoryHandler(
+            deriveObjectiveStateHistory, 'objectives',
+        ),
+    }),
     // Objective revisions nest under their parent objective: the
     // objective id is param 0, so the SERVER filters the
     // collection to that objective (the org fence still rides the
@@ -5041,38 +5175,15 @@ export const routes: Route[] = [
                 db, param(p, 1), body, actor, pair,
             ),
     }),
-    // GET is FLIPPED (Task 7): the collection derives from the
-    // message ledger via deriveStates (api/derive-states.ts's
-    // five-source union), not the raw states table — the
-    // client's own GET consumer (deriveOrganizationFacts and
-    // every get*States/get*StateDetails reader in
-    // state-events.ts) rides transitively, no web-app change.
-    route('states', {
-        get: (db, _p, _actor, organization) =>
-            deriveStates(db, requireOrganization(organization)),
-    }),
-    // states/:id RETIRED (states-address retirement Task 13):
-    // every verb on the address is a router 404. Collection
-    // GET /states and GET /states/:id/field-values survive.
-    // bare GET entity-states/:id RETIRED (Phase 15 Task 7):
-    // zero product callers. History below is the LIVE read.
-    // GET is FLIPPED (Phase 14 Task 7): derives via
-    // deriveStatesFor — the gate ALREADY fences this route
-    // (api/api.ts's entity-states/:id/history guard resolves
-    // the entity's owner via resolveOwningOrganization before
-    // dispatch), so the handler does not re-fence;
-    // deriveStatesFor's own header documents that
-    // precondition. Every client reader that names this
-    // address (getWorkOrderCurrentNodeId, getWorkOrderActive
-    // Claim, getProjectState/getRecordStateDetail/etc.) rides
-    // transitively, no web-app change.
-    route('entity-states/:id/history', {
-        get: (db, p, _actor, organization) =>
-            deriveStatesFor(
-                db, requireOrganization(organization),
-                param(p, 0),
-            ),
-    }),
+    // GET /states RETIRED (states-URI elimination C3): the
+    // bulk five-source union is gone. Per-entity history lives
+    // on GET <family>/:id/history; work-order and objective
+    // bulk history live on GET work-orders/history and
+    // GET objectives/history. GET /states/:id/field-values
+    // retired with C4 (inline fold on WO history). bare
+    // states/:id is already a router 404 (states-address
+    // retirement Task 13). entity-states history retired
+    // with C2.
 
     route('snapshots/schema', {
         get: async (db) =>

@@ -5,10 +5,8 @@ import {
     DEFAULT_NODE_MEMBER_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
     projectStateIsNotDeleted,
+    assertProjectState,
 } from '../../../api/types.ts';
-import {
-    getProjectStates,
-} from './state-events.ts';
 import type {
     FlowWithGraph,
     ProjectEntity,
@@ -457,31 +455,28 @@ export async function computeFlowBackupResolution(
     ctx: RequestContext,
     backup: Backup,
 ): Promise<ImportResolution> {
-    const [flows, projects, projectStates] =
+    // Lifecycle state rides the project GET row trio —
+    // no second hop to the states log.
+    const [flows, projects] =
         await Promise.all([
             ctx.GET<FlowWithGraph[]>('flows'),
             ctx.GET<ProjectEntity[]>(
                 'projects',
             ),
-            getProjectStates(ctx),
         ]);
     const flowExists = flows.some(
         f => f.id === backup.flow.id,
     );
     const project = backup.projectId
-        ? projects.find(p => {
-            if (p.id !== backup.projectId) {
-                return false;
-            }
-            const s = projectStates.get(p.id);
-            if (s === undefined) {
-                throw new Error(
-                    'Project has no state event: '
-                    + p.id,
-                );
-            }
-            return projectStateIsNotDeleted(s);
-        })
+        ? projects.find(p =>
+            p.id === backup.projectId
+            && projectStateIsNotDeleted(
+                assertProjectState(
+                    p.state,
+                    'project ' + p.id,
+                ),
+            ),
+        )
         : undefined;
 
     return {

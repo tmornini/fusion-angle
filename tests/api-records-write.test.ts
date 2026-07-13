@@ -66,7 +66,7 @@ test(
         // post-write check rides surviving /history.
         const history = await GET<{
             state: string;
-        }[]>(db, 'entity-states/rec-1/history', DEV_TOKEN);
+        }[]>(db, 'records/rec-1/history', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         const attrs = await GET<unknown[]>(
@@ -106,7 +106,7 @@ test(
         const history = await GET<{
             state: string;
             member_id: string;
-        }[]>(db, 'entity-states/rec-2/history', DEV_TOKEN);
+        }[]>(db, 'records/rec-2/history', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         assert.equal(
@@ -166,7 +166,7 @@ test(
             record.description, 'updated',
         );
         const history = await GET<unknown[]>(
-            db, 'entity-states/rec-1/history', DEV_TOKEN,
+            db, 'records/rec-1/history', DEV_TOKEN,
         );
         assert.equal(
             history.length, 1,
@@ -531,7 +531,7 @@ test(
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'entity-states/rec-at/history', DEV_TOKEN);
+        }[]>(db, 'records/rec-at/history', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
         assert.equal(current.state, 'active');

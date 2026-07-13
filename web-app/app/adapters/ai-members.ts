@@ -14,9 +14,8 @@ import {
     createSubscriptionChannel,
 } from '../channels.ts';
 import {
-    getMemberStateDetail,
-    getMemberStateDetails,
-} from './state-events.ts';
+    memberStateDetailFromRow,
+} from './members.ts';
 
 export {
     AIMember,
@@ -41,11 +40,11 @@ export type AIMemberDraft =
 // Assemble the AI-member map from already-read rows — pure,
 // no ctx, no IO. getAIMemberMap reads then delegates here;
 // getMembers (the roster) feeds this builder from one
-// batched read shared with the human builder.
+// batched read shared with the human builder. Lifecycle
+// trio rides each parent row (Phase A stamp).
 export function buildAIMemberMap(
     parents: readonly MemberEntity[],
     details: readonly AIMemberEntity[],
-    stateMap: ReadonlyMap<MemberId, MemberStateDetail>,
 ): Map<MemberId, AIMember> {
     const detailById = new Map(
         details.map(d => [d.id, d]),
@@ -59,16 +58,12 @@ export function buildAIMemberMap(
                 'no AI detail for member ' + parent.id,
             );
         }
-        const state = stateMap.get(parent.id);
-        if (state === undefined) {
-            throw new Error(
-                'no state event for AI member '
-                + parent.id,
-            );
-        }
         map.set(
             parent.id,
-            new AIMember(parent, detail, state),
+            new AIMember(
+                parent, detail,
+                memberStateDetailFromRow(parent),
+            ),
         );
     }
     return map;
@@ -77,13 +72,12 @@ export function buildAIMemberMap(
 export async function getAIMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, AIMember>> {
-    const [parents, details, stateMap] =
+    const [parents, details] =
         await Promise.all([
             ctx.GET<MemberEntity[]>('members'),
             ctx.GET<AIMemberEntity[]>('ai-members'),
-            getMemberStateDetails(ctx),
         ]);
-    return buildAIMemberMap(parents, details, stateMap);
+    return buildAIMemberMap(parents, details);
 }
 
 export async function getAIMembers(
@@ -97,15 +91,17 @@ export async function getAIMember(
     ctx: RequestContext,
     id: MemberId,
 ): Promise<AIMember> {
-    const [parent, detail, state] =
+    const [parent, detail] =
         await Promise.all([
             ctx.GET<MemberEntity>(`members/${id}`),
             ctx.GET<AIMemberEntity>(
                 `ai-members/${id}`,
             ),
-            getMemberStateDetail(ctx, id),
         ]);
-    return new AIMember(parent, detail, state);
+    return new AIMember(
+        parent, detail,
+        memberStateDetailFromRow(parent),
+    );
 }
 
 export async function getAIMemberEntity(

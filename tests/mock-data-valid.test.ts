@@ -56,12 +56,13 @@ import { postWorkOrderDocumentOp } from
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
 import {
-    stateFieldValuesForStateEvent,
-} from '../api/derive-state-field-values.ts';
-import {
-    deriveStates,
-    deriveStatesFor,
+    deriveWorkOrderLifecycle,
+    deriveMemberStates,
+    deriveInvitationStates,
+    workOrderHistoryFor,
 } from '../api/derive-states.ts';
+import { deriveIdeaStateHistory } from
+    '../api/derive-ideas.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     assignOrganization,
@@ -121,20 +122,26 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
     }),
 };
 
-// Phase Final Task 2: states ROW half stripped — validate
-// the derived plane (pair-plane truth).
-test('mock-data seeds non-empty derived states',
+// Phase Final Task 2 / C3: bulk deriveStates retired —
+// validate surviving family lifecycle derives.
+test('mock-data seeds non-empty derived lifecycle states',
 async () => {
     const db = await seededDb();
-    const rows = await deriveStates(db, '1');
-    assert.ok(rows.length > 0, 'derived states empty');
+    const rows = [
+        ...await deriveWorkOrderLifecycle(db),
+        ...await deriveMemberStates(db),
+        ...await deriveInvitationStates(db),
+        ...await deriveIdeaStateHistory(
+            db, STARK_ORGANIZATION, buildIdeas()[0]!.id,
+        ),
+    ];
+    assert.ok(rows.length > 0, 'derived lifecycle empty');
     for (const row of rows) {
         assert.doesNotThrow(
             () => validateStateEntity(withoutId(row)),
             'state ' + row.id,
         );
     }
-    // Phase Final Stage B: states table retired.
 });
 
 for (const [name, getAll, validate] of TABLES) {
@@ -177,8 +184,38 @@ async () => {
             'ideas empty in org ' + organization,
         );
         for (const idea of ideas) {
+            // GET stamps lifecycle trio; validateIdeaEntity is
+            // entity-fields only — strip the stamp before gate.
+            const {
+                state: _s,
+                state_at: _at,
+                state_event_id: _ev,
+                ...entity
+            } = withoutId(idea) as Record<string, unknown> & {
+                state: string;
+                state_at: string;
+                state_event_id: string;
+            };
+            void _s;
+            void _at;
+            void _ev;
+            assert.ok(
+                typeof idea.state === 'string'
+                && idea.state.length > 0,
+                'idea ' + idea.id + ' missing state',
+            );
+            assert.ok(
+                typeof idea.state_at === 'string'
+                && idea.state_at.length > 0,
+                'idea ' + idea.id + ' missing state_at',
+            );
+            assert.ok(
+                typeof idea.state_event_id === 'string'
+                && idea.state_event_id.length > 0,
+                'idea ' + idea.id + ' missing state_event_id',
+            );
             assert.doesNotThrow(
-                () => validateIdeaEntity(withoutId(idea)),
+                () => validateIdeaEntity(entity),
                 'idea ' + idea.id,
             );
         }
@@ -226,8 +263,42 @@ async () => {
             'projects empty in org ' + organization,
         );
         for (const project of projects) {
+            // GET stamps lifecycle trio; validateProjectEntity
+            // is entity-fields only — strip the stamp before
+            // gate.
+            const {
+                state: _s,
+                state_at: _at,
+                state_event_id: _ev,
+                ...entity
+            } = withoutId(project) as Record<string, unknown>
+                & {
+                    state: string;
+                    state_at: string;
+                    state_event_id: string;
+                };
+            void _s;
+            void _at;
+            void _ev;
+            assert.ok(
+                typeof project.state === 'string'
+                && project.state.length > 0,
+                'project ' + project.id + ' missing state',
+            );
+            assert.ok(
+                typeof project.state_at === 'string'
+                && project.state_at.length > 0,
+                'project ' + project.id
+                + ' missing state_at',
+            );
+            assert.ok(
+                typeof project.state_event_id === 'string'
+                && project.state_event_id.length > 0,
+                'project ' + project.id
+                + ' missing state_event_id',
+            );
             assert.doesNotThrow(
-                () => validateProjectEntity(withoutId(project)),
+                () => validateProjectEntity(entity),
                 'project ' + project.id,
             );
         }
@@ -309,20 +380,22 @@ test('mock-data derived baseline/actual scores pass'
 const ZULU_6 =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
-// Phase Final Task 2: states ROW half stripped — pin
-// derived-plane .at (pair plane is truth).
-test('mock-data derived states.at is 6-digit zulu',
+// Phase Final Task 2 / C3: pin derived-plane .at via
+// surviving lifecycle derives (pair plane is truth).
+test('mock-data derived lifecycle .at is 6-digit zulu',
 async () => {
     const db = await seededDb();
-    const rows = await deriveStates(db, '1');
-    assert.ok(rows.length > 0, 'derived states empty');
+    const rows = [
+        ...await deriveWorkOrderLifecycle(db),
+        ...await deriveMemberStates(db),
+    ];
+    assert.ok(rows.length > 0, 'derived lifecycle empty');
     for (const row of rows) {
         assert.match(
             row.at, ZULU_6,
-            'row ' + row.id + ' in derived states',
+            'row ' + row.id + ' in derived lifecycle',
         );
     }
-    // Phase Final Stage B: states table retired.
 });
 
 test('mock-data derived score .at is 6-digit zulu',
@@ -453,37 +526,37 @@ async () => {
 test('mock-data derived seed SFV pairs pass validator',
 async () => {
     const db = await seededDb();
-    // Seven seed leaf pairs at states/:id/field-values/:fvid.
-    // Discover via states that have field values by scanning
-    // known seed work-order transition events is brittle —
-    // instead pin non-empty union over every seeded WO's
-    // state events via the two-source derive.
+    // Seed field values ride transition folds; product reads
+    // fold them on work-order history (C4). Pin non-empty
+    // union over every seeded WO's history.
     const woIds = [
         ...buildWorkOrders().map(w => w.id),
         ...buildLeadToCloseWorkload().workOrders.map(w => w.id),
     ];
-    // Phase Final Task 2: states ROW half stripped —
-    // discover events via deriveStatesFor.
-    const allEvents = (
-        await Promise.all(
-            woIds.map(id =>
-                deriveStatesFor(db, STARK_ORGANIZATION, id),
-            ),
-        )
-    ).flat();
     let total = 0;
-    for (const ev of allEvents) {
-        const fvs = await stateFieldValuesForStateEvent(
-            db, STARK_ORGANIZATION, ev.id,
-        );
-        total += fvs.length;
-        for (const fv of fvs) {
-            assert.doesNotThrow(
-                () => validateStateFieldValueEntity(
-                    withoutId(fv),
-                ),
-                'sfv ' + fv.id,
+    for (const id of woIds) {
+        // Seeded WOs with no lifecycle throw missedRead;
+        // only those with history contribute folds.
+        let history;
+        try {
+            history = await workOrderHistoryFor(
+                db, STARK_ORGANIZATION, id,
             );
+        } catch {
+            continue;
+        }
+        for (const ev of history) {
+            total += ev.field_values.length;
+            for (const fv of ev.field_values) {
+                assert.doesNotThrow(
+                    () => validateStateFieldValueEntity({
+                        state_event_id: ev.id,
+                        attribute_id: fv.attribute_id,
+                        value: fv.value,
+                    }),
+                    'sfv ' + fv.id,
+                );
+            }
         }
     }
     assert.ok(total >= 7, 'expected >=7 SFV, got ' + total);
@@ -508,12 +581,9 @@ test(
             WORK_ORDERS_WIRING,
         )(db, [], 'current', STARK_ORGANIZATION) as
             WorkOrderEntity[];
-        // Phase Final Stage B: states table retired —
-        // lifecycle events from the pair plane.
-        const states = [
-            ...await deriveStates(db, '1'),
-            ...await deriveStates(db, '2'),
-        ];
+        // C3: bulk deriveStates retired — WO lifecycle
+        // from the pair-plane work-order derive.
+        const states = await deriveWorkOrderLifecycle(db);
         // Phase Final Task 2: memberships + members from
         // the pair plane.
         const organizationByWo = new Map(

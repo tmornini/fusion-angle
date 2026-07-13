@@ -69,13 +69,29 @@ function memberStateDetailOf(
     };
 }
 
+function memberParentEntity(
+    id: string,
+    type: 'human' | 'ai',
+    state: MemberState,
+) {
+    const detail = memberStateDetailOf(id, state);
+    return {
+        id,
+        type,
+        state: detail.state,
+        state_at: detail.stateAt,
+        state_event_id: detail.stateEventId,
+    };
+}
+
 export function makeHumanMember(
     id: string,
     name: string,
     state: MemberState = 'active',
 ): HumanMember {
+    const stateDetail = memberStateDetailOf(id, state);
     return new HumanMember(
-        { id, type: 'human' },
+        memberParentEntity(id, 'human', state),
         { id, ...humanDetail() },
         {
             erased: false,
@@ -84,7 +100,7 @@ export function makeHumanMember(
             phone: '',
             bio: '',
         },
-        memberStateDetailOf(id, state),
+        stateDetail,
     );
 }
 
@@ -93,10 +109,11 @@ export function makeAIMember(
     name: string,
     state: MemberState = 'active',
 ): AIMember {
+    const stateDetail = memberStateDetailOf(id, state);
     return new AIMember(
-        { id, type: 'ai' },
+        memberParentEntity(id, 'ai', state),
         { id, name, ...aiDetail() },
-        memberStateDetailOf(id, state),
+        stateDetail,
     );
 }
 

@@ -11,7 +11,7 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 // States-address retirement: /states/:id is a router 404.
 // Actor-stamping for lifecycle rides document trios —
 // PUT members/:id stamps requester_identity_id on the
-// pair, derived as member_id on GET entity-states history.
+// pair, derived as member_id on GET members/:id/history.
 test(
     'a retired states/:id body with forged member_id is 404',
     async () => {
@@ -49,7 +49,7 @@ test(
             id: string;
             member_id: string;
         }>>(
-            db, 'entity-states/current/history', DEV_TOKEN,
+            db, 'members/current/history', DEV_TOKEN,
         );
         const event = history.find(e => e.id === 'ev-1');
         assert.ok(event, 'trio event missing from history');

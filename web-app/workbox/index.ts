@@ -24,8 +24,9 @@ import {
 } from '../app/core.ts';
 import {
     getWorkOrders,
-    getTransitionEventsByWorkOrder,
-    getActiveClaimsByWorkOrder,
+    getWorkOrderHistories,
+    projectTransitions,
+    activeClaimFromHistory,
     getMemberMap,
     getFlowsForCreation,
     postWorkOrderCreation,
@@ -36,6 +37,7 @@ import {
     type NotReadyFlowEntry,
     type RequestContext,
     type WorkOrder,
+    type TransitionEvent,
 } from '../app/adapters/index.ts';
 import type { Id } from '../../api/types.ts';
 import {
@@ -162,10 +164,10 @@ async function loadInboxItems(
     ctx: RequestContext,
 ): Promise<InboxItem[]> {
     const [
-        workOrders, transitionsByWo, memberMap,
+        workOrders, histories, memberMap,
     ] = await Promise.all([
         getWorkOrders(ctx),
-        getTransitionEventsByWorkOrder(ctx),
+        getWorkOrderHistories(ctx),
         getMemberMap(ctx),
     ]);
     workOrdersById = new Map(
@@ -177,10 +179,29 @@ async function loadInboxItems(
             wo.flowGraph.lockTimeout,
         ]),
     );
-    const activeClaimsByWo =
-        await getActiveClaimsByWorkOrder(
-            ctx, lockTimeoutByWo,
+    const transitionsByWo = new Map<
+        Id, TransitionEvent[]
+    >();
+    const activeClaimsByWo = new Map<
+        Id, { memberId: Id; at: string }
+    >();
+    for (const [woId, history] of histories) {
+        const events = projectTransitions(
+            woId, history,
         );
+        if (events.length > 0) {
+            transitionsByWo.set(woId, events);
+        }
+        const lockTimeout =
+            lockTimeoutByWo.get(woId);
+        if (lockTimeout === undefined) continue;
+        const claim = activeClaimFromHistory(
+            history, lockTimeout,
+        );
+        if (claim !== null) {
+            activeClaimsByWo.set(woId, claim);
+        }
+    }
     return buildInboxItems(
         workOrders, transitionsByWo,
         activeClaimsByWo, memberMap, mode,

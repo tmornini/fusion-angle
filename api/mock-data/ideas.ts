@@ -7,7 +7,13 @@ import { daysFromNow } from './seed-kit.ts';
 // The seeded ideas. Fixed data; the composition root sets
 // organization_id at write time (the type omits it).
 export function buildIdeas():
-    Omit<IdeaEntity, 'organization_id'>[] {
+    Omit<
+        IdeaEntity,
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >[] {
     return [
         {
             id: 'eT5xdKjzLDmuRn3r7XMX4R',

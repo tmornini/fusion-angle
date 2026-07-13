@@ -93,10 +93,18 @@ export async function postProjectApproval(
     projectId: Id,
 ): Promise<void> {
     const {
-        id: _id, organization_id: _org, ...fields
+        id: _id,
+        organization_id: _org,
+        state: _state,
+        state_at: _stateAt,
+        state_event_id: _stateEventId,
+        ...fields
     } = await ctx.GET<ProjectEntity>(
         `projects/${projectId}`,
     );
+    void _state;
+    void _stateAt;
+    void _stateEventId;
     const [active, scoring] = await Promise.all([
         getActiveObjectives(ctx),
         getProjectScoring(ctx, projectId),
@@ -117,10 +125,18 @@ export async function postProjectArchival(
     projectId: Id,
 ): Promise<void> {
     const {
-        id: _id, organization_id: _org, ...fields
+        id: _id,
+        organization_id: _org,
+        state: _state,
+        state_at: _stateAt,
+        state_event_id: _stateEventId,
+        ...fields
     } = await ctx.GET<ProjectEntity>(
         `projects/${projectId}`,
     );
+    void _state;
+    void _stateAt;
+    void _stateEventId;
     const scoring = await getProjectScoring(
         ctx, projectId,
     );

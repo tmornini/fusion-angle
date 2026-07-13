@@ -50,10 +50,19 @@ test(
             name: string;
             description: string;
             position: number;
+            state: string;
+            state_at: string;
+            state_event_id: string;
         }>(db, 'records/rec-1', DEV_TOKEN);
         assert.equal(stored.id, 'rec-1');
         assert.equal(stored.name, 'Customer');
         assert.equal(stored.position, 1);
+        // GET stamps lifecycle-current trio from the event.
+        assert.equal(stored.state, 'active');
+        assert.equal(
+            stored.state_at, '2026-01-01T00:00:00.000000Z',
+        );
+        assert.equal(stored.state_event_id, 'ev-rec-1');
     },
 );
 

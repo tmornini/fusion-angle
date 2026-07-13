@@ -1,6 +1,6 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import { deriveFlowStateHistory } from
+    '../api/derive-flows.ts';
 import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -112,7 +112,7 @@ test(
         assert.equal(links[0]!.project_id, 'p1');
         assert.equal(links[0]!.flow_id, 'flow-1');
 
-        const events = await deriveStatesFor(db, '1', 'flow-1');
+        const events = await deriveFlowStateHistory(db, '1', 'flow-1');
         // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
         const ev = events[0]! as StateEntity;
@@ -139,7 +139,7 @@ test(
             db, 'flows/flow-1', DEV_TOKEN,
         );
         assert.equal(flow.id, 'flow-1');
-        const flowEvents = await deriveStatesFor(
+        const flowEvents = await deriveFlowStateHistory(
             db, '1', 'flow-1',
         );
         assert.equal(flowEvents.length, 1);
@@ -163,7 +163,7 @@ test(
 
         const events = await GET<StateEntity[]>(
             db,
-            'entity-states/flow-1/history',
+            'flows/flow-1/history',
             DEV_TOKEN,
         );
         assert.equal(events.length, 1);

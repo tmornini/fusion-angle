@@ -553,7 +553,12 @@ async function handleSave(
         return;
     }
     const recordFields: Omit<
-        RecordEntity, 'id' | 'organization_id'
+        RecordEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
     > = {
         name: draft.name.trim(),
         description: draft.description,

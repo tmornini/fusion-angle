@@ -11,11 +11,10 @@ import {
 import { getFlowGraph } from './flow-queries.ts';
 import {
     getFlowWorkOrderEntities,
-} from './work-orders-queries.ts';
-import {
-    getTransitionEventsByWorkOrder,
+    getWorkOrderHistories,
+    projectTransitions,
     type TransitionEvent,
-} from './state-events.ts';
+} from './work-orders-queries.ts';
 import {
     getMemberMap,
     memberName,
@@ -31,12 +30,12 @@ export async function getFlowStats(
 }> {
     const [
         graph,
-        eventsByWo,
+        histories,
         fwoRows,
         memberMap,
     ] = await Promise.all([
         getFlowGraph(ctx, flowId),
-        getTransitionEventsByWorkOrder(ctx),
+        getWorkOrderHistories(ctx),
         getFlowWorkOrderEntities(ctx, flowId),
         getMemberMap(ctx),
     ]);
@@ -44,10 +43,13 @@ export async function getFlowStats(
     const woIds = new Set(
         fwoRows.map(r => r.work_order_id),
     );
+    // projectTransitions sorts ASC; bulk wire is DESC.
     const transitions: TransitionEvent[] = [];
-    for (const [woId, events] of eventsByWo) {
+    for (const [woId, history] of histories) {
         if (!woIds.has(woId)) continue;
-        for (const ev of events) {
+        for (const ev of projectTransitions(
+            woId, history,
+        )) {
             transitions.push(ev);
         }
     }

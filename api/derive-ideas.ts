@@ -14,6 +14,7 @@ import {
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
+    currentLifecycleEvent,
     byIdAscending,
     DELETED_STATE,
     type DerivedDocument,
@@ -44,15 +45,19 @@ function submissionsUriPrefix(
 }
 
 // The derived entity: the head document's body minus the
-// lifecycle trio (state/state_at/state_event_id, simply never
-// copied across) plus organization_id stamped from the
-// derivation's OWN organization parameter — never the body's own
-// value. A create body omits organization_id; the org-scoped
-// store stamps it on the old plane, and the prefix scanned here
-// already IS that same org, so the stamp is unconditional.
+// lifecycle trio (head body fields are NOT copied — the trio is
+// stamped from the lifecycle-current StateEntity instead) plus
+// organization_id stamped from the derivation's OWN organization
+// parameter — never the body's own value. A create body omits
+// organization_id; the org-scoped store stamps it on the old
+// plane, and the prefix scanned here already IS that same org,
+// so the stamp is unconditional. `current` is required: every
+// live idea GET builds history first and passes the
+// lifecycle-current event (genesis-wins-under-skew).
 export function ideaEntityOf(
     document: DerivedDocument,
     organization: Id,
+    current: StateEntity,
 ): IdeaEntity {
     const body = document.body;
     return {
@@ -65,6 +70,9 @@ export function ideaEntityOf(
         proposed_solution: pickString(body, 'proposed_solution'),
         expected_outcome: pickString(body, 'expected_outcome'),
         success_metrics: pickString(body, 'success_metrics'),
+        state: current.state,
+        state_at: current.at,
+        state_event_id: current.id,
     };
 }
 
@@ -127,7 +135,12 @@ export async function deriveIdeas(
         if (currentDocumentState(history) === DELETED_STATE) {
             continue;
         }
-        ideas.push(ideaEntityOf(document, organization));
+        // After DELETED filter history is non-empty for every
+        // live trio document (genesis always mints an event).
+        const current = currentLifecycleEvent(history)!;
+        ideas.push(
+            ideaEntityOf(document, organization, current),
+        );
     }
     return ideas.sort(byIdAscending);
 }
@@ -156,7 +169,8 @@ export async function deriveIdea(
             db, ideaId, organization, IDEAS_TABLE,
         );
     }
-    return ideaEntityOf(document, organization);
+    const current = currentLifecycleEvent(history)!;
+    return ideaEntityOf(document, organization, current);
 }
 
 export async function deriveIdeaSubmissions(

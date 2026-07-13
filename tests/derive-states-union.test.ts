@@ -12,12 +12,21 @@ import {
     DEFAULT_LOCK_TIMEOUT, nowUtc, SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
 import {
-    deriveStates,
-    deriveStatesFor,
     deriveInvitationStates,
+    deriveMemberStates,
+    workOrderLifecycleStatesFor,
+    resolveOwningOrganization,
 } from '../api/derive-states.ts';
+import { deriveIdeaStateHistory } from
+    '../api/derive-ideas.ts';
+import { deriveObjectiveStateHistory } from
+    '../api/derive-objectives.ts';
 import {
-    formWritePair, appendMessagePair,
+    documentPairsAt,
+} from '../api/derive-documents.ts';
+import {
+    formWritePair,
+    canonicalUriPrefix,
 } from '../api/message-pair.ts';
 import {
     postMembershipDocumentOp,
@@ -26,17 +35,14 @@ import {
 } from '../api/routes.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 
-// The five-source union (deriveStates) and its per-entity
-// counterpart (deriveStatesFor). A hand-built multi-family
-// fixture drives ONE representative event through each source
-// — an idea document trio, an objectives document trio, an AI
-// member's document-trio genesis, a work order's create-op
-// birth, a flow-node delete AND restore, and an invitation's
-// grant AND accept — across TWO organizations, so the
-// assembled union's own fence and ordering are proven end to
-// end, plus the dedup invariant's both branches (an identical
-// collision is a harmless no-op; a divergent one crashes loud).
-// The states/:id orphan leg retired with the address.
+// Per-family history derives (states-URI elimination C2/C3).
+// A hand-built multi-family fixture drives ONE representative
+// event through each surviving source — idea, objective, AI
+// member, work order, flow-node delete/restore sidecars on
+// the pair plane, invitation grant/accept — across TWO
+// organizations. Bulk deriveStates / fence union RETIRED with
+// C3; fence force lives on resolveOwningOrganization + family
+// history routes.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -490,185 +496,131 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     };
 }
 
-// ---- 1. the assembled union: coverage, dedup, fence, order ------
+// ---- 1. ownership fence (bulk union retired with C3) --------
 
-test('deriveStates: every family\'s event appears exactly once,'
-+ ' the foreign org\'s row is fenced out, and the result is'
-+ ' id-lex ordered', async () => {
+test('resolveOwningOrganization: own entities resolve to A;'
++ ' foreign idea resolves to B (no bulk-union leak path)',
+async () => {
     const fx = await buildUnionFixture();
-    const rowsA = await deriveStates(fx.db, 'A');
-
-    const expectedIds = [
-        fx.ideaId + '-genesis',
-        fx.objectiveId + '-genesis',
-        fx.aiMemberId + '-genesis',
-        fx.workOrderId + '-ev1',
-        fx.workOrderId + '-ev2',
-        fx.workOrderId + '-ev3',
-        'ev-union-deleted',
-        'ev-union-restored',
-        'ev-union-grant',
-        'ev-union-accept',
-    ];
-    for (const id of expectedIds) {
-        const matches = rowsA.filter((row) => row.id === id);
-        assert.equal(
-            matches.length, 1, id + ' must appear exactly once',
-        );
-    }
-
-    // The foreign org's idea never leaks into A's fenced union.
     assert.equal(
-        rowsA.some(
-            (row) => row.id === fx.foreignIdeaId + '-genesis',
+        await resolveOwningOrganization(
+            fx.db, fx.ideaId, 'A',
         ),
-        false,
+        'A',
     );
-
-    // byIdAscending — the states table's own id-lex order.
-    const ids = rowsA.map((row) => row.id);
-    assert.deepEqual(ids, [...ids].sort());
-
-    // The foreign idea IS visible from org B's own union.
-    const rowsB = await deriveStates(fx.db, 'B');
     assert.equal(
-        rowsB.some(
-            (row) => row.id === fx.foreignIdeaId + '-genesis',
+        await resolveOwningOrganization(
+            fx.db, fx.workOrderId, 'A',
         ),
-        true,
+        'A',
+    );
+    assert.equal(
+        await resolveOwningOrganization(
+            fx.db, fx.foreignIdeaId, 'A',
+        ),
+        'B',
+    );
+    assert.equal(
+        await resolveOwningOrganization(
+            fx.db, fx.foreignIdeaId, 'B',
+        ),
+        'B',
     );
 });
 
-test('deriveStates: an identical cross-source id collision is a'
-+ ' harmless duplicate — no crash, one row survives', async () => {
-    const db = await seed();
-    const token = await organizationToken('adminA', 'A');
-    const sharedId = 'shared-id-identical';
-    const sharedEventId = 'ev-shared-identical';
-    const sharedAt = '2026-03-01T00:00:00.000000Z';
+// ---- 2. per-family history subsets, (at, id) order (C2) -----
 
-    const ideaRes = await handleRequest(db, req(
-        'PUT', '/ideas/' + sharedId, token,
-        ideaDocument('Shared', sharedEventId, sharedAt),
-    ));
-    assert.equal(ideaRes.status, 200);
-    await createAiMember(
-        db, token, sharedId, 'active', sharedEventId, sharedAt,
-    );
-
-    const rows = await deriveStates(db, 'A');
-    const matches = rows.filter((row) => row.id === sharedEventId);
-    assert.equal(matches.length, 1);
-    assert.equal(matches[0]!.entity_id, sharedId);
-    assert.equal(matches[0]!.state, 'active');
-    assert.equal(matches[0]!.at, sharedAt);
-});
-
-// A DIVERGENT collision cannot be constructed through two LIVE
-// routes (document trios do not share one immutability ledger
-// across families). So this test injects the colliding pairs
-// directly at the message plane (formWritePair +
-// appendMessagePair) — a forced, otherwise-impossible id
-// collision, standing in for a genuine bug in one of the five
-// derivations.
-test('deriveStates: a DIVERGENT cross-source id collision crashes'
-+ ' loud rather than silently picking a winner', async () => {
-    const db = await seed();
-    const collidingEventId = 'ev-collide-divergent';
-
-    const ideaPair = await formWritePair({
-        method: 'PUT',
-        pathname: '/ideas/idea-collide',
-        routePattern: 'ideas/:id',
-        routeSegments: ['ideas', ':id'],
-        pathSegments: ['ideas', 'idea-collide'],
-        headerFields: [],
-        body: {
-            state_event_id: collidingEventId,
-            state: 'active',
-            state_at: '2026-03-03T00:00:00.000000Z',
-        },
-        requesterIdentityId: 'adminA',
-        requestAt: '2026-03-03T00:00:00.000000Z',
-        organization: 'A',
-        responseStatus: 200,
-        responseBody: undefined,
-        headPairId: undefined,
-    });
-    await appendMessagePair(db, ideaPair);
-
-    // Member lifecycle derives from members/:id document trio
-    // (states-address retirement Task 6) — not the create-op
-    // body. Seed a members document carrying the SAME event id
-    // as the idea document above so the union collision fires.
-    const aiPair = await formWritePair({
-        method: 'PUT',
-        pathname: '/members/ai-collide',
-        routePattern: 'members/:id',
-        routeSegments: ['members', ':id'],
-        pathSegments: ['members', 'ai-collide'],
-        headerFields: [],
-        body: {
-            type: 'ai',
-            state: 'archived',
-            state_at: '2026-03-03T00:00:00.000001Z',
-            state_event_id: collidingEventId,
-        },
-        requesterIdentityId: 'adminA',
-        requestAt: '2026-03-03T00:00:00.000001Z',
-        organization: undefined,
-        responseStatus: 200,
-        responseBody: undefined,
-        headPairId: undefined,
-    });
-    await appendMessagePair(db, aiPair);
-
-    await assert.rejects(
-        () => deriveStates(db, 'A'),
-        /colliding states rows/,
-    );
-});
-
-// ---- 2. deriveStatesFor: per-family subsets, (at, id) order -----
-
-test('deriveStatesFor: each family\'s own entity subset', async () => {
+test('per-family history: each family\'s own entity subset',
+async () => {
     const fx = await buildUnionFixture();
 
     assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.ideaId))
+        (await deriveIdeaStateHistory(fx.db, 'A', fx.ideaId))
             .map((row) => row.id),
         [fx.ideaId + '-genesis'],
     );
     assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.objectiveId))
-            .map((row) => row.id),
+        (await deriveObjectiveStateHistory(
+            fx.db, 'A', fx.objectiveId,
+        )).map((row) => row.id),
         [fx.objectiveId + '-genesis'],
     );
     assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.aiMemberId))
+        (await deriveMemberStates(fx.db))
+            .filter((row) => row.entity_id === fx.aiMemberId)
             .map((row) => row.id),
         [fx.aiMemberId + '-genesis'],
     );
     assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.workOrderId))
-            .map((row) => row.id),
+        (await workOrderLifecycleStatesFor(
+            fx.db, 'A', fx.workOrderId,
+        )).map((row) => row.id),
         [
             fx.workOrderId + '-ev1', fx.workOrderId + '-ev2',
             fx.workOrderId + '-ev3',
         ],
     );
+    // Graph sidecars on the flow document pairs (C3).
+    const prefix = canonicalUriPrefix('A', '/flows/');
+    const [requests, responses] = await Promise.all([
+        fx.db.requests.getAllWhere('uri_prefix', prefix),
+        fx.db.responses.getAllWhere('uri_prefix', prefix),
+    ]);
+    const sidecarIds: string[] = [];
+    for (const pair of documentPairsAt(
+        requests, responses, prefix,
+    )) {
+        const delta = pair.body['graphDelta'];
+        const deletions =
+            typeof delta === 'object' && delta !== null
+                ? (delta as Record<string, unknown>)[
+                    'deletions'
+                ]
+                : undefined;
+        if (Array.isArray(deletions)) {
+            for (const entry of deletions) {
+                if (
+                    typeof entry === 'object'
+                    && entry !== null
+                ) {
+                    const f = entry as Record<string, unknown>;
+                    if (
+                        f['entityId'] === fx.deletedNodeId
+                        || f['entityId'] === fx.restoredNodeId
+                    ) {
+                        sidecarIds.push(String(f['eventId']));
+                    }
+                }
+            }
+        }
+        const revivals = pair.body['revivals'];
+        if (Array.isArray(revivals)) {
+            for (const entry of revivals) {
+                if (
+                    typeof entry === 'object'
+                    && entry !== null
+                ) {
+                    const f = entry as Record<string, unknown>;
+                    if (
+                        f['entityId'] === fx.deletedNodeId
+                        || f['entityId'] === fx.restoredNodeId
+                    ) {
+                        sidecarIds.push(String(f['eventId']));
+                    }
+                }
+            }
+        }
+    }
+    assert.ok(sidecarIds.includes('ev-union-deleted'));
+    assert.ok(sidecarIds.includes('ev-union-restored'));
     assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.deletedNodeId))
-            .map((row) => row.id),
-        ['ev-union-deleted'],
-    );
-    assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.restoredNodeId))
-            .map((row) => row.id),
-        ['ev-union-restored'],
-    );
-    assert.deepEqual(
-        (await deriveStatesFor(fx.db, 'A', fx.invitationId))
+        (await deriveInvitationStates(fx.db))
+            .filter((row) =>
+                row.entity_id === fx.invitationId)
+            .sort((a, b) =>
+                a.at < b.at ? -1 : a.at > b.at ? 1
+                    : a.id < b.id ? -1
+                        : a.id > b.id ? 1 : 0)
             .map((row) => row.id),
         ['ev-union-grant', 'ev-union-accept'],
     );
@@ -865,72 +817,5 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
     );
 });
 
-// Task 20 / Commandment XII: deriveTrioFamilyStates must scan
-// each family prefix once (requests + responses = 2), never
-// once per document id. Before the fold, N ideas cost
-// 2 + 2N ideas-prefix getAllWhere calls (discovery + per-id
-// deriveIdeaStateHistory re-fetches); after, exactly 2.
-test('deriveStates: trio family prefix scans stay O(families),'
-+ ' not O(documents)', async () => {
-    const db = await seed();
-    const tokenA = await organizationToken('adminA', 'A');
-    const IDEA_COUNT = 5;
-    for (let i = 0; i < IDEA_COUNT; i++) {
-        const id = 'idea-scan-' + i;
-        const res = await handleRequest(db, req(
-            'PUT', '/ideas/' + id, tokenA,
-            ideaDocument(
-                'Scan ' + i,
-                'ev-scan-' + i,
-                AT,
-            ),
-        ));
-        assert.equal(
-            res.status, 200,
-            'idea seed ' + id + ' failed',
-        );
-    }
-
-    const ideasPrefix = '/organizations/A/ideas/';
-    let ideasPrefixScans = 0;
-    const origReq = db.requests.getAllWhere
-        .bind(db.requests);
-    const origRes = db.responses.getAllWhere
-        .bind(db.responses);
-    db.requests.getAllWhere = async (column, key) => {
-        if (
-            column === 'uri_prefix'
-            && key === ideasPrefix
-        ) {
-            ideasPrefixScans += 1;
-        }
-        return origReq(column, key);
-    };
-    db.responses.getAllWhere = async (column, key) => {
-        if (
-            column === 'uri_prefix'
-            && key === ideasPrefix
-        ) {
-            ideasPrefixScans += 1;
-        }
-        return origRes(column, key);
-    };
-
-    const rows = await deriveStates(db, 'A');
-    const ideaRows = rows.filter(
-        (row) => row.entity_id.startsWith('idea-scan-'),
-    );
-    assert.equal(
-        ideaRows.length, IDEA_COUNT,
-        'each seeded idea must contribute one state row',
-    );
-    // Exactly one requests + one responses scan of the
-    // ideas prefix — not 2 + 2N.
-    assert.equal(
-        ideasPrefixScans, 2,
-        'ideas prefix must be scanned once per store'
-        + ' (got ' + ideasPrefixScans
-        + '; N+1 would be '
-        + (2 + 2 * IDEA_COUNT) + ')',
-    );
-});
+// deriveTrioFamilyStates / O(families) scan pin retired with
+// GET /states (C3). Per-id family history derives remain.

@@ -33,9 +33,9 @@ test('canonicalizeResource collapses long id segments', () => {
     );
     assert.equal(
         canonicalizeResource(
-            `entity-states/${id}/history`,
+            `work-orders/${id}/history`,
         ),
-        'entity-states/:id/history',
+        'work-orders/:id/history',
     );
     assert.equal(
         canonicalizeResource('states'),

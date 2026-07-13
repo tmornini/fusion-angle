@@ -1,6 +1,6 @@
 import { test } from 'node:test';
-import { deriveStates } from
-    '../api/derive-states.ts';
+import { deriveIdeaStateHistory } from
+    '../api/derive-ideas.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -473,8 +473,11 @@ test('a seeded idea\'s create-pair request reproduces its'
             state_at: string;
         };
     };
-    const _statesAll = await deriveStates(db, '1');
-    const genesis = _statesAll.find(s => s.id === parsed.body.state_event_id,
+    const history = await deriveIdeaStateHistory(
+        db, STARK_ORGANIZATION, idea.id,
+    );
+    const genesis = history.find(
+        s => s.id === parsed.body.state_event_id,
     )!;
     assert.ok(genesis, 'derived state missing');
     assert.equal(genesis.entity_id, idea.id);

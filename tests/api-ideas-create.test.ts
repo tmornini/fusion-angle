@@ -94,7 +94,7 @@ test(
         // bare entity-states/:id RETIRED (Phase 15 Task 7);
         // post-write check rides surviving /history.
         const stateRes = await handleRequest(db, req(
-            'GET', '/entity-states/idea-1/history',
+            'GET', '/ideas/idea-1/history',
             DEV_TOKEN,
         ));
         const history = await stateRes.json() as {
@@ -169,10 +169,10 @@ test(
             second.headers.get('Response-ID'),
             first.headers.get('Response-ID'),
         );
-        const { deriveStatesFor } = await import(
-            '../api/derive-states.ts'
+        const { deriveIdeaStateHistory } = await import(
+            '../api/derive-ideas.ts'
         );
-        const events = await deriveStatesFor(
+        const events = await deriveIdeaStateHistory(
             db, '1', 'idea-retry',
         );
         assert.equal(events.length, 1);

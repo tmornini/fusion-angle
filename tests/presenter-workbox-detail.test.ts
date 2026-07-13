@@ -15,15 +15,13 @@ import type {
     CreationTransition,
     StepTransition,
     TransitionEvent,
-} from '../web-app/app/adapters/state-events.ts';
-import type {
-    RecordAttribute,
-} from '../web-app/app/adapters/record-attributes.ts';
-import type {
     StateFieldValue,
     WorkOrder,
 } from
 '../web-app/app/adapters/work-orders-queries.ts';
+import type {
+    RecordAttribute,
+} from '../web-app/app/adapters/record-attributes.ts';
 import type {
     ConstraintViolation,
 } from '../web-app/app/record-constraints.ts';

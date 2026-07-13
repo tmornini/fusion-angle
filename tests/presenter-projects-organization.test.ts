@@ -140,7 +140,6 @@ function makeOrganization() {
         ideas_limit: 200,
     }, {
         usedSeats: 12,
-        lastActivityAt: '2026-05-01T00:00:00.000000Z',
     });
 }
 

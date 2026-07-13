@@ -7,13 +7,13 @@ import type {
     MemberState,
     MemberStateDetail,
 } from '../../../api/types.ts';
-import { HumanMember, nowUtc } from '../../../api/types.ts';
+import {
+    HumanMember,
+    nowUtc,
+    assertMemberState,
+} from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import { getMemberPii } from './identities.ts';
-import {
-    getMemberStateDetail,
-    getMemberStateDetails,
-} from './state-events.ts';
 import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
@@ -74,17 +74,30 @@ function memberPiiOf(
     };
 }
 
+// Lifecycle-current trio is stamped on the MemberEntity GET
+// row (Phase A). Map snake_case wire → MemberStateDetail;
+// no second hop to the states log / entity-states history.
+export function memberStateDetailFromRow(
+    row: MemberEntity,
+): MemberStateDetail {
+    return {
+        state: assertMemberState(
+            row.state, 'member ' + row.id,
+        ),
+        stateAt: row.state_at,
+        stateEventId: row.state_event_id,
+    };
+}
+
 // Assemble the human-member map from already-read rows —
 // pure, no ctx, no IO. getHumanMemberMap reads then
 // delegates here; getMembers (the roster) reads members,
-// human-members, identity-pii and states ONCE and feeds
-// this builder, deriving the state map a single time
-// rather than once per member kind.
+// human-members and identity-pii ONCE and feeds this
+// builder. Lifecycle trio rides each parent row.
 export function buildHumanMemberMap(
     parents: readonly MemberEntity[],
     details: readonly HumanMemberEntity[],
     piiRows: readonly IdentityPiiEntity[],
-    stateMap: ReadonlyMap<MemberId, MemberStateDetail>,
 ): Map<MemberId, HumanMember> {
     const detailById = new Map(
         details.map(d => [d.id, d]),
@@ -102,19 +115,12 @@ export function buildHumanMemberMap(
                 + parent.id,
             );
         }
-        const state = stateMap.get(parent.id);
-        if (state === undefined) {
-            throw new Error(
-                'no state event for human member '
-                + parent.id,
-            );
-        }
         map.set(
             parent.id,
             new HumanMember(
                 parent, detail,
                 memberPiiOf(piiById.get(parent.id)),
-                state,
+                memberStateDetailFromRow(parent),
             ),
         );
     }
@@ -124,7 +130,7 @@ export function buildHumanMemberMap(
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const [parents, details, piiRows, stateMap] =
+    const [parents, details, piiRows] =
         await Promise.all([
             ctx.GET<MemberEntity[]>('members'),
             ctx.GET<HumanMemberEntity[]>(
@@ -133,10 +139,9 @@ export async function getHumanMemberMap(
             ctx.GET<IdentityPiiEntity[]>(
                 'identity-pii',
             ),
-            getMemberStateDetails(ctx),
         ]);
     return buildHumanMemberMap(
-        parents, details, piiRows, stateMap,
+        parents, details, piiRows,
     );
 }
 
@@ -169,17 +174,17 @@ export async function getHumanMember(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMember> {
-    const [parent, detail, pii, state] =
+    const [parent, detail, pii] =
         await Promise.all([
             ctx.GET<MemberEntity>(`members/${id}`),
             ctx.GET<HumanMemberEntity>(
                 `human-members/${id}`,
             ),
             getMemberPii(ctx, id),
-            getMemberStateDetail(ctx, id),
         ]);
     return new HumanMember(
-        parent, detail, pii, state,
+        parent, detail, pii,
+        memberStateDetailFromRow(parent),
     );
 }
 

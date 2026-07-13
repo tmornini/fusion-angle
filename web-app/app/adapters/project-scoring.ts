@@ -9,6 +9,7 @@ import type {
 import {
     nowUtc,
     projectStateIsApproved,
+    assertProjectState,
 } from '../../../api/types.ts';
 import {
     filterByField,
@@ -24,9 +25,6 @@ import {
 import {
     getCurrentHumanMember,
 } from './members.ts';
-import {
-    getProjectStates,
-} from './state-events.ts';
 import {
     latestPerPair,
     weightedMeanByPosition,
@@ -175,24 +173,26 @@ export async function getPortfolioImpactSummary(
     projectCount: number;
     actualCount: number;
 }> {
+    // Approved filter reads the project GET row trio —
+    // no second hop to the states log.
     const [
         objectives,
         projectRows,
-        projectStates,
         allBaseline,
         allActual,
     ] = await Promise.all([
         getObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
-        getProjectStates(ctx),
         getAllBaselineScores(ctx),
         getAllActualScores(ctx),
     ]);
-    const approved = projectRows.filter(p => {
-        const s = projectStates.get(p.id);
-        return s !== undefined
-            && projectStateIsApproved(s);
-    });
+    const approved = projectRows.filter(p =>
+        projectStateIsApproved(
+            assertProjectState(
+                p.state, 'project ' + p.id,
+            ),
+        ),
+    );
     const posByObj = new Map<ObjectiveId, number>(
         objectives.map(o => [o.id, o.position]),
     );
@@ -266,26 +266,29 @@ export interface ObjectiveScoringInputs {
 export async function getObjectiveScoringInputs(
     ctx: RequestContext,
 ): Promise<ObjectiveScoringInputs> {
+    // Approved filter reads the project GET row trio —
+    // no second hop to the states log.
     const [
         activeObjectives,
         projectRows,
-        projectStates,
         baselineScores,
         actualScores,
     ] = await Promise.all([
         getActiveObjectives(ctx),
         ctx.GET<ProjectEntity[]>('projects'),
-        getProjectStates(ctx),
         getAllBaselineScores(ctx),
         getAllActualScores(ctx),
     ]);
     const approvedProjectIds = new Set(
         projectRows
-            .filter(p => {
-                const s = projectStates.get(p.id);
-                return s !== undefined
-                    && projectStateIsApproved(s);
-            })
+            .filter(p =>
+                projectStateIsApproved(
+                    assertProjectState(
+                        p.state,
+                        'project ' + p.id,
+                    ),
+                ),
+            )
             .map(p => p.id),
     );
     return {

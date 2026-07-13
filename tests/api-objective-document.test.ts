@@ -335,8 +335,15 @@ async () => {
     const got = await documentGetHandler(wiring)(
         db, ['obj-chain-1'], 'current', '1',
     );
+    // GET stamps lifecycle-current trio from the second
+    // event (later state_at wins), not the head body alone.
     assert.deepEqual(got, {
-        id: 'obj-chain-1', organization_id: '1', position: 2,
+        id: 'obj-chain-1',
+        organization_id: '1',
+        position: 2,
+        state: 'active',
+        state_at: '2026-01-02T00:00:00.000000Z',
+        state_event_id: 'obj-chain-1-ev2',
     });
 });
 

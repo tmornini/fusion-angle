@@ -452,6 +452,26 @@ export interface StateEntity {
     at: string;
 }
 
+// Nested field-value shape on work-order history events
+// (GET work-orders/:id/history). Folded from transition pair
+// bodies — no state_event_id on the wire (the parent event
+// already carries id). Distinct from StateFieldValueEntity,
+// which still carries state_event_id for the RESTRICT
+// referrer derive (deriveStateFieldValueReferrers).
+export interface TransitionFieldValueEntity {
+    id: Id;
+    attribute_id: Id;
+    value: string;
+}
+
+// Work-order history row: a lifecycle StateEntity plus the
+// transition field values whose state_event_id === id. Claim/
+// birth/release rows carry field_values: [].
+export interface WorkOrderHistoryEventEntity
+    extends StateEntity {
+    field_values: TransitionFieldValueEntity[];
+}
+
 export const SYSTEM_MEMBER_ID: Id = 'system';
 
 export const SYSTEM_MEMBER_NAME = 'System';
@@ -660,9 +680,15 @@ export class Identity {
 // SYSTEM_MEMBER_NAME constant. Kind-specific detail lives in
 // human_members / ai_members keyed by the same id. A
 // 'system' member is a parent row with no detail row.
+// Lifecycle-current event trio is a GET stamp only — not the
+// head PUT body's fields. state ← event.state, state_at ←
+// event.at, state_event_id ← event.id.
 export interface MemberEntity {
     id: MemberId;
     type: MemberKind;
+    state: string;
+    state_at: string;
+    state_event_id: string;
 }
 
 // human_members detail row, keyed by the shared member id.
@@ -965,6 +991,12 @@ export interface IdeaEntity {
     proposed_solution: string;
     expected_outcome: string;
     success_metrics: string;
+    // Lifecycle-current event trio (GET stamp only — not the
+    // head PUT body's fields). state ← event.state, state_at ←
+    // event.at, state_event_id ← event.id.
+    state: string;
+    state_at: string;
+    state_event_id: string;
 }
 
 export type ObjectiveId = Id;
@@ -973,6 +1005,12 @@ export interface ObjectiveEntity {
     id: ObjectiveId;
     organization_id: Id;
     position: number;
+    // Lifecycle-current event trio (GET stamp only — not the
+    // head PUT body's fields). state ← event.state, state_at ←
+    // event.at, state_event_id ← event.id.
+    state: string;
+    state_at: string;
+    state_event_id: string;
 }
 
 export interface ObjectiveRevisionEntity {
@@ -1044,6 +1082,12 @@ export interface ProjectEntity {
     estimated_cost: number;
     actual_cost: number;
     position: number;
+    // Lifecycle-current event trio (GET stamp only — not the
+    // head PUT body's fields). state ← event.state, state_at ←
+    // event.at, state_event_id ← event.id.
+    state: string;
+    state_at: string;
+    state_event_id: string;
 }
 
 export interface GraphNode {
@@ -1287,6 +1331,12 @@ export interface RecordEntity {
     name: string;
     description: string;
     position: number;
+    // Lifecycle-current event trio (GET stamp only — not the
+    // head PUT body's fields). state ← event.state, state_at ←
+    // event.at, state_event_id ← event.id.
+    state: string;
+    state_at: string;
+    state_event_id: string;
 }
 
 export interface RecordAttributeEntity {

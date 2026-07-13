@@ -97,10 +97,15 @@ const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
-    entityOf: (document, organization) => ({
+    // Mirror routes.ts objectiveDocumentEntityOf: stamp trio
+    // from lifecycle-current (required on trio path).
+    entityOf: (document, organization, current) => ({
         id: document.uriId,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
+        state: current!.state,
+        state_at: current!.at,
+        state_event_id: current!.id,
     }),
 };
 
@@ -122,16 +127,55 @@ async function derivedObjective(
     ) as Promise<ObjectiveEntity>;
 }
 
-function wireObjective(
+// PUT response shape (documentWriteResponseSpec successBody):
+// entity fields only — no lifecycle trio on the write wire.
+function wireObjectivePut(
     id: string,
     position: number,
     organization = STARK_ORGANIZATION,
-): ObjectiveEntity {
+) {
     return {
         id,
         organization_id: organization,
         position,
     };
+}
+
+// GET objectiveDocumentEntityOf form: entity fields plus
+// lifecycle-current trio (state ← event.state, state_at ←
+// event.at, state_event_id ← event.id) — never the head
+// body trio.
+function wireObjectiveGet(
+    id: string,
+    position: number,
+    state: string,
+    stateAt: string,
+    stateEventId: string,
+    organization = STARK_ORGANIZATION,
+): ObjectiveEntity {
+    return {
+        ...wireObjectivePut(id, position, organization),
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
+    };
+}
+
+// Seeded genesis trio (objectiveSeedBody): state active,
+// at MOCK_SEED_TIMESTAMP, event id seed-objective-${id}-active.
+function wireSeededObjective(
+    id: string,
+    position: number,
+    organization = STARK_ORGANIZATION,
+): ObjectiveEntity {
+    return wireObjectiveGet(
+        id,
+        position,
+        'active',
+        '2026-01-01T00:00:00.000000Z',
+        'seed-objective-' + id + '-active',
+        organization,
+    );
 }
 
 function decodeRequestMessage(message: string): {
@@ -258,10 +302,15 @@ async () => {
         assert.equal(
             wireText,
             JSON.stringify(
-                wireObjective(
+                wireSeededObjective(
                     t.id, t.position, t.organization,
                 ),
             ),
+        );
+        assert.equal(derived.state, 'active');
+        assert.equal(
+            derived.state_event_id,
+            'seed-objective-' + t.id + '-active',
         );
     }
 
@@ -505,6 +554,13 @@ test('live-write chain: create, reposition, revision edit,'
             await getRes.text(), JSON.stringify(derived),
         );
         assert.equal(derived.position, 50);
+        assert.equal(derived.state, 'active');
+        assert.equal(
+            derived.state_at, '2026-06-01T00:00:00.000000Z',
+        );
+        assert.equal(
+            derived.state_event_id, objectiveId + '-active',
+        );
         const revRes = await handleRequest(db, req(
             'GET',
             '/objectives/' + objectiveId + '/revisions',
@@ -546,9 +602,13 @@ test('live-write chain: create, reposition, revision edit,'
             await getRes.text(), JSON.stringify(derived),
         );
         assert.equal(derived.position, 77);
+        assert.equal(derived.state, 'active');
+        assert.equal(
+            derived.state_event_id, objectiveId + '-active',
+        );
         assert.deepEqual(
             await reposition.json(),
-            wireObjective(objectiveId, 77),
+            wireObjectivePut(objectiveId, 77),
         );
     }
 
@@ -1027,13 +1087,23 @@ async () => {
         assert.equal(put.status, 200);
         assert.deepEqual(
             await put.json(),
-            wireObjective(f.id, f.position),
+            wireObjectivePut(f.id, f.position),
         );
     }
+    const fixtureAt = '2026-06-13T00:00:00.000000Z';
     const expectedAdded = [
-        wireObjective('obj-drift-a', 10),
-        wireObjective('obj-drift-m', 20),
-        wireObjective('obj-drift-z', 30),
+        wireObjectiveGet(
+            'obj-drift-a', 10, 'active',
+            fixtureAt, 'obj-drift-a-active',
+        ),
+        wireObjectiveGet(
+            'obj-drift-m', 20, 'active',
+            fixtureAt, 'obj-drift-m-active',
+        ),
+        wireObjectiveGet(
+            'obj-drift-z', 30, 'active',
+            fixtureAt, 'obj-drift-z-active',
+        ),
     ];
     const res = await handleRequest(
         db, req('GET', '/objectives', token),
@@ -1055,6 +1125,76 @@ async () => {
             await single.text(), JSON.stringify(row),
         );
     }
+});
+
+// case-7d mirror for objectives GET: a clock-skewed later
+// arrival whose state_at sorts BELOW genesis does NOT
+// displace genesis as lifecycle-current. Head body fields
+// (position) may reflect the later arrival; the GET trio must
+// stay genesis (state ← event.state, state_at ← event.at,
+// state_event_id ← event.id).
+
+test('GET objective trio is lifecycle-current under clock skew'
++ ' (genesis-wins-under-skew, case 7d)', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const objectiveId = 'obj-drift-skew-1';
+    const genesisAt = '2026-06-01T00:00:00.000000Z';
+    const genesisEv = 'obj-drift-skew-1-genesis';
+    const skewedAt = '2020-01-01T00:00:00.000000Z';
+    const skewedEv = 'obj-drift-skew-1-skewed';
+
+    const genesis = await handleRequest(db, req(
+        'PUT', '/objectives/' + objectiveId, token, {
+            position: 1,
+            state: 'active',
+            state_at: genesisAt,
+            state_event_id: genesisEv,
+        },
+    ));
+    assert.equal(genesis.status, 200);
+
+    // Later arrival, earlier state_at, different state +
+    // position. 'archived' is a live objective state — if
+    // it won as current the GET trio would flip; genesis-
+    // wins keeps the objective active.
+    const skewed = await handleRequest(db, req(
+        'PUT', '/objectives/' + objectiveId, token, {
+            position: 99,
+            state: 'archived',
+            state_at: skewedAt,
+            state_event_id: skewedEv,
+        },
+    ));
+    assert.equal(skewed.status, 200);
+
+    const expected = wireObjectiveGet(
+        objectiveId, 99, 'active',
+        genesisAt, genesisEv,
+    );
+
+    const res = await handleRequest(
+        db, req('GET', '/objectives/' + objectiveId, token),
+    );
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), JSON.stringify(expected));
+
+    const derived = await derivedObjective(
+        db, STARK_ORGANIZATION, objectiveId,
+    );
+    assert.equal(
+        JSON.stringify(derived), JSON.stringify(expected),
+    );
+    assert.equal(derived.position, 99);
+    assert.equal(derived.state, 'active');
+    assert.equal(derived.state_at, genesisAt);
+    assert.equal(derived.state_event_id, genesisEv);
+
+    const objectives = await derivedObjectives(
+        db, STARK_ORGANIZATION,
+    );
+    const row = objectives.find((o) => o.id === objectiveId);
+    assert.deepEqual(row, expected);
 });
 
 // -- 10. revision PUT wire equals GET collection entry ---------

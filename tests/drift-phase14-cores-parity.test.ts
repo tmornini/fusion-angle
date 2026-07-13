@@ -12,10 +12,7 @@ import {
     invitationLifecycleStatesFor,
     workOrderLifecycleStatesFor,
     workOrderClaimHistoryFor,
-    documentStateHeadFor,
 } from '../api/derive-states.ts';
-import { ATTRIBUTE_RESTRICT_TABLES } from
-    '../api/record-attribute-refs.ts';
 import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,
@@ -38,7 +35,8 @@ import { organizationToken } from './token-fixtures.ts';
 // entity's states/:id rows) gets the SAME pin — the write path
 // this ONE calls (postWorkOrderClaimOp) is live since Task 4;
 // the other two cores' own write paths (invitations-domain.ts)
-// land in a later task.
+// land in a later task. documentStateHeadFor pins retired with
+// C5 (the helper itself is gone).
 
 const BASE = 'http://localhost';
 
@@ -339,180 +337,4 @@ test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
     );
     assert.deepEqual(inTxMissing, preTxMissing);
     assert.deepEqual(preTxMissing, []);
-});
-
-// -- documentStateHeadFor (Phase 14 Task 5) -----------------------
-
-// The member_id-echo head helper's OWN write-gate table lists —
-// one pin per one of its four call sites (api/routes.ts:
-// postIdeaDocumentOp, postProjectDocumentOp,
-// postRecordDocumentOp, postRecordWriteOp's edit arm), each
-// against a genuinely-found head AND a never-created id, the SAME
-// pre-tx-vs-in-tx shape every pin above follows.
-
-test('documentStateHeadFor: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open db.transaction view sharing'
-+ ' postIdeaDocumentOp\'s own table list)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const id = 'idea-parity-head';
-    const put = await handleRequest(db, req(
-        'PUT', '/ideas/' + id, token, {
-            title: 'T', position: 1,
-            problem_statement: 'p', target_users: 't',
-            proposed_solution: 's', expected_outcome: 'o',
-            success_metrics: 'm',
-            state: 'active', state_at: nowUtc(),
-            state_event_id: id + '-ev1',
-        },
-    ));
-    assert.equal(put.status, 200);
-
-    // Phase Final Task 2: ideas row half stripped from
-    // postIdeaDocumentOp; tx list matches the live op.
-    const ideaTxTables =
-        ['requests', 'responses'];
-    const preTx = await documentStateHeadFor(db, id);
-    const inTx = await db.transaction(
-        ideaTxTables,
-        (view) => documentStateHeadFor(view, id),
-    );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx?.state, 'active');
-
-    const preTxMissing = await documentStateHeadFor(
-        db, 'no-such-idea',
-    );
-    const inTxMissing = await db.transaction(
-        ideaTxTables,
-        (view) => documentStateHeadFor(view, 'no-such-idea'),
-    );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.equal(preTxMissing, null);
-});
-
-test('documentStateHeadFor: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open db.transaction view sharing'
-+ ' postProjectDocumentOp\'s own table list)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const id = 'project-parity-head';
-    const put = await handleRequest(db, req(
-        'PUT', '/projects/' + id, token, {
-            title: 'T', description: 'd', progress: 5,
-            start_date: '2026-01-01',
-            target_end_date: '2026-02-01',
-            estimated_cost: 100, actual_cost: 50, position: 1,
-            state: 'submitted', state_at: nowUtc(),
-            state_event_id: id + '-ev1',
-        },
-    ));
-    assert.equal(put.status, 200);
-
-    // Phase Final Task 2: projects row half stripped from
-    // postProjectDocumentOp; tx list matches the live op.
-    const projectTxTables =
-        ['requests', 'responses'];
-    const preTx = await documentStateHeadFor(db, id);
-    const inTx = await db.transaction(
-        projectTxTables,
-        (view) => documentStateHeadFor(view, id),
-    );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx?.state, 'submitted');
-
-    const preTxMissing = await documentStateHeadFor(
-        db, 'no-such-project',
-    );
-    const inTxMissing = await db.transaction(
-        projectTxTables,
-        (view) => documentStateHeadFor(view, 'no-such-project'),
-    );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.equal(preTxMissing, null);
-});
-
-test('documentStateHeadFor: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open db.transaction view sharing'
-+ ' postRecordDocumentOp\'s own table list)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const id = 'record-parity-head';
-    const put = await handleRequest(db, req(
-        'PUT', '/records/' + id, token, {
-            name: 'N', description: 'd', position: 1,
-            state: 'active', state_at: nowUtc(),
-            state_event_id: id + '-ev1',
-        },
-    ));
-    assert.equal(put.status, 200);
-
-    // Phase Final Task 2: records ROW half stripped.
-    const recordTxTables =
-        ['requests', 'responses'];
-    const preTx = await documentStateHeadFor(db, id);
-    const inTx = await db.transaction(
-        recordTxTables,
-        (view) => documentStateHeadFor(view, id),
-    );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx?.state, 'active');
-
-    const preTxMissing = await documentStateHeadFor(
-        db, 'no-such-record',
-    );
-    const inTxMissing = await db.transaction(
-        recordTxTables,
-        (view) => documentStateHeadFor(view, 'no-such-record'),
-    );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.equal(preTxMissing, null);
-});
-
-test('documentStateHeadFor: byte-identical pre-tx (the plain'
-+ ' adapter) vs in-tx (an open db.transaction view sharing'
-+ ' postRecordWriteOp\'s own — larger — table list)', async () => {
-    const db = await seededDb();
-    const token = await organizationToken();
-    const id = 'record-write-parity-head';
-    const created = await handleRequest(db, req(
-        'POST', '/records', token, {
-            kind: 'create',
-            id,
-            record: {
-                organization_id: STARK_ORGANIZATION,
-                name: 'N', description: 'd', position: 1,
-            },
-            attributes: [],
-            initialState: 'active',
-            initialStateEventId: id + '-ev1',
-            initialStateAt: nowUtc(),
-        },
-    ));
-    assert.equal(created.status, 204);
-
-    // Phase Final Task 2: records + record_attributes ROW
-    // halves stripped from postRecordWriteOp's tx list.
-    const composedTxTables = [...new Set([
-        ...ATTRIBUTE_RESTRICT_TABLES,
-        'requests', 'responses',
-    ])];
-    const preTx = await documentStateHeadFor(db, id);
-    const inTx = await db.transaction(
-        composedTxTables,
-        (view) => documentStateHeadFor(view, id),
-    );
-    assert.deepEqual(inTx, preTx);
-    assert.equal(preTx?.state, 'active');
-
-    const preTxMissing = await documentStateHeadFor(
-        db, 'no-such-record-write',
-    );
-    const inTxMissing = await db.transaction(
-        composedTxTables,
-        (view) =>
-            documentStateHeadFor(view, 'no-such-record-write'),
-    );
-    assert.deepEqual(inTxMissing, preTxMissing);
-    assert.equal(preTxMissing, null);
 });

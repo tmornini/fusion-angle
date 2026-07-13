@@ -585,16 +585,23 @@ async function performConversion(
         }),
     );
     // Strip server-stamped keys: postIdeaConversion's
-    // promotedIdea is Omit<IdeaEntity,'id'|'organization_id'>.
-    // Passing the full entity through a variable bypasses
-    // excess-property checks and 400s at the validator.
+    // promotedIdea is entity fields only (no id, org, or GET
+    // lifecycle trio). Passing the full entity through a
+    // variable bypasses excess-property checks and 400s at
+    // the validator.
     const {
         id: _id,
         organization_id: _organizationId,
+        state: _state,
+        state_at: _stateAt,
+        state_event_id: _stateEventId,
         ...promotedIdea
     } = ideaEntity;
     void _id;
     void _organizationId;
+    void _state;
+    void _stateAt;
+    void _stateEventId;
     await postIdeaConversion(
         ctx,
         ideaId,

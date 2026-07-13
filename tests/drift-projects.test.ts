@@ -73,9 +73,9 @@ function projectDocument(
     };
 }
 
-// Wire entity shape WRITE_RESPONSE_SPECS + projectEntityOf
-// form (id first, organization_id, then entity fields).
-function wireProject(
+// PUT response shape (documentWriteResponseSpec successBody):
+// entity fields only — no lifecycle trio on the write wire.
+function wireProjectPut(
     id: string,
     title: string,
     position = 1,
@@ -94,6 +94,29 @@ function wireProject(
         actual_cost: 0,
         position,
         ...overrides,
+    };
+}
+
+// GET projectEntityOf form: entity fields plus lifecycle-
+// current trio (state ← event.state, state_at ← event.at,
+// state_event_id ← event.id) — never the head body trio.
+function wireProjectGet(
+    id: string,
+    title: string,
+    state: string,
+    stateAt: string,
+    stateEventId: string,
+    position = 1,
+    organization = '1',
+    overrides: Record<string, unknown> = {},
+) {
+    return {
+        ...wireProjectPut(
+            id, title, position, organization, overrides,
+        ),
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
     };
 }
 
@@ -220,14 +243,23 @@ async () => {
         assert.equal(put.status, 200);
         assert.deepEqual(
             await put.json(),
-            wireProject(f.id, f.title),
+            wireProjectPut(f.id, f.title),
         );
     }
     // id-lex expected order: a, m, z — NOT insertion order.
     const expectedAdded = [
-        wireProject('project-drift-a', 'Alpha'),
-        wireProject('project-drift-m', 'Mike'),
-        wireProject('project-drift-z', 'Zulu'),
+        wireProjectGet(
+            'project-drift-a', 'Alpha', 'submitted',
+            '2026-07-01T00:00:01.000000Z', 'ev-drift-a',
+        ),
+        wireProjectGet(
+            'project-drift-m', 'Mike', 'submitted',
+            '2026-07-01T00:00:02.000000Z', 'ev-drift-m',
+        ),
+        wireProjectGet(
+            'project-drift-z', 'Zulu', 'submitted',
+            '2026-07-01T00:00:00.000000Z', 'ev-drift-z',
+        ),
     ];
     const res = await handleRequest(
         db, req('GET', '/projects', token),
@@ -285,14 +317,18 @@ test('derived history keeps the FIRST arrival\'s authorship'
     assert.equal(derived[0]!.member_id, 'current');
 
     // Wire entity reflects the SECOND title; authorship of the
-    // head event stays on member A.
+    // head event stays on member A; GET trio is the one event.
     const getRes = await handleRequest(
         db, req('GET', '/projects/' + projectId, tokenA),
     );
     assert.equal(getRes.status, 200);
     assert.equal(
         await getRes.text(),
-        JSON.stringify(wireProject(projectId, 'Second')),
+        JSON.stringify(wireProjectGet(
+            projectId, 'Second', 'submitted',
+            '2026-04-01T00:00:00.000000Z',
+            'ev-drift-authorship-caveat',
+        )),
     );
 });
 
@@ -345,18 +381,32 @@ async () => {
         db, req('GET', '/projects/' + projectId, token),
     );
     assert.equal(beforeDelete.status, 200);
-    const beforeWire = await beforeDelete.json() as {
-        title: string;
-        progress: number;
-    };
-    assert.equal(beforeWire.title, 'Lifecycle Project Edited');
-    assert.equal(beforeWire.progress, 10);
+    assert.equal(
+        await beforeDelete.text(),
+        JSON.stringify(wireProjectGet(
+            projectId, 'Lifecycle Project Edited',
+            'under_review',
+            '2026-03-02T00:00:00.000000Z',
+            'ev-drift-lifecycle-review',
+            2,
+            '1',
+            {
+                description: 'd2',
+                progress: 10,
+                start_date: '2026-03-01',
+                target_end_date: '2026-06-01',
+                estimated_cost: 200,
+                actual_cost: 10,
+            },
+        )),
+    );
     const derivedBefore = await deriveProject(
         db, '1', projectId,
     );
+    assert.equal(derivedBefore.state, 'under_review');
     assert.equal(
-        JSON.stringify(beforeWire),
-        JSON.stringify(derivedBefore),
+        derivedBefore.state_event_id,
+        'ev-drift-lifecycle-review',
     );
 
     await handleRequest(db, req(
@@ -462,4 +512,80 @@ test('live conversion case: a converted idea\'s project'
     );
     assert.equal(derivedHistory.length, 1);
     assert.equal(derivedHistory[0]!.state, 'submitted');
+    // GET trio is the lifecycle-current genesis event.
+    assert.equal(derived.state, 'submitted');
+    assert.equal(
+        derived.state_at, '2026-05-01T00:00:01.000000Z',
+    );
+    assert.equal(
+        derived.state_event_id, 'ev-drift-conversion-project',
+    );
+});
+
+// case-7d mirror for projects GET: a clock-skewed later
+// arrival whose state_at sorts BELOW genesis does NOT
+// displace genesis as lifecycle-current. Head body fields
+// (title) may reflect the later arrival; the GET trio must
+// stay genesis.
+test('GET project trio is lifecycle-current under clock skew'
++ ' (genesis-wins-under-skew, case 7d)', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const projectId = 'project-drift-skew-1';
+    const genesisAt = '2026-05-01T00:00:00.000000Z';
+    const genesisEv = projectId + '-genesis';
+    const skewedAt = '2020-01-01T00:00:00.000000Z';
+    const skewedEv = projectId + '-skewed';
+
+    const genesis = await handleRequest(db, req(
+        'PUT', '/projects/' + projectId, token,
+        projectDocument(
+            'Genesis Title', 'submitted',
+            genesisAt, genesisEv,
+        ),
+    ));
+    assert.equal(genesis.status, 200);
+
+    // Later arrival, earlier state_at, different state + title.
+    const skewed = await handleRequest(db, req(
+        'PUT', '/projects/' + projectId, token,
+        projectDocument(
+            'Skewed Title', 'under_review',
+            skewedAt, skewedEv,
+        ),
+    ));
+    assert.equal(skewed.status, 200);
+
+    const expected = wireProjectGet(
+        projectId, 'Skewed Title', 'submitted',
+        genesisAt, genesisEv,
+    );
+    const getRes = await handleRequest(
+        db, req('GET', '/projects/' + projectId, token),
+    );
+    assert.equal(getRes.status, 200);
+    assert.equal(await getRes.text(), JSON.stringify(expected));
+
+    const derived = await deriveProject(db, '1', projectId);
+    assert.equal(
+        JSON.stringify(derived), JSON.stringify(expected),
+    );
+    assert.equal(derived.title, 'Skewed Title');
+    assert.equal(derived.state, 'submitted');
+    assert.equal(derived.state_at, genesisAt);
+    assert.equal(derived.state_event_id, genesisEv);
+
+    const listRes = await handleRequest(
+        db, req('GET', '/projects', token),
+    );
+    assert.equal(listRes.status, 200);
+    const list = await listRes.json() as {
+        id: string;
+        state: string;
+        state_at: string;
+        state_event_id: string;
+        title: string;
+    }[];
+    const row = list.find((project) => project.id === projectId);
+    assert.deepEqual(row, expected);
 });

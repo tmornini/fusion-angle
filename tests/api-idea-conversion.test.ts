@@ -1,12 +1,12 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { GET, POST, PUT } from '../api/api.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
+import { deriveProjectStateHistory } from
+    '../api/derive-projects.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
@@ -141,9 +141,9 @@ test(
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'entity-states/idea-1/history', DEV_TOKEN);
-        const ideaCurrent =
-            ideaHistory[ideaHistory.length - 1]!;
+        }[]>(db, 'ideas/idea-1/history', DEV_TOKEN);
+        // Family history is DESC — index 0 is current.
+        const ideaCurrent = ideaHistory[0]!;
         assert.equal(ideaCurrent.state, 'promoted');
         assert.equal(ideaCurrent.member_id, 'current');
         // The idea event carries the caller-supplied ideaStateAt.
@@ -153,7 +153,7 @@ test(
 
         // The new project entered at its initial state, also
         // authored by the actor.
-        const projectEvents = await deriveStatesFor(db, '1', 'p1');
+        const projectEvents = await deriveProjectStateHistory(db, '1', 'p1');
         assert.equal(projectEvents.length, 1);
         assert.equal(projectEvents[0]!.state, 'submitted');
         assert.equal(projectEvents[0]!.member_id, 'current');
@@ -361,10 +361,10 @@ test(
         );
         assert.equal(project.id, 'p1');
         const ideaHistory = await GET<{ state: string }[]>(
-            db, 'entity-states/idea-1/history', DEV_TOKEN,
+            db, 'ideas/idea-1/history', DEV_TOKEN,
         );
-        const ideaCurrent =
-            ideaHistory[ideaHistory.length - 1]!;
+        // Family history is DESC — index 0 is current.
+        const ideaCurrent = ideaHistory[0]!;
         assert.equal(ideaCurrent.state, 'promoted');
     },
 );

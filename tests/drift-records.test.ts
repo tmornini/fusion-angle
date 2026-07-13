@@ -98,7 +98,9 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'records',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    entityOf: (document, organization) => {
+    // Mirror routes.ts recordDocumentEntityOf: stamp trio
+    // from lifecycle-current (required on trio path).
+    entityOf: (document, organization, current) => {
         const body = document.body;
         return {
             id: document.uriId,
@@ -106,6 +108,9 @@ const RECORDS_TEST_WIRING: DocumentFamilyWiring = {
             name: pickString(body, 'name'),
             description: pickString(body, 'description'),
             position: pickNumber(body, 'position'),
+            state: current!.state,
+            state_at: current!.at,
+            state_event_id: current!.id,
         };
     },
 };
@@ -900,48 +905,77 @@ async () => {
 });
 
 // -- 8. genesis-wins-under-skew ----------------------------------
+// case-7d mirror for records GET: a clock-skewed later
+// arrival whose state_at sorts BELOW genesis does NOT
+// displace genesis as lifecycle-current. Head body fields
+// (name) may reflect the later arrival; the GET trio must
+// stay genesis (state ← event.state, state_at ← event.at,
+// state_event_id ← event.id).
 
-test('a clock-skewed transition does NOT displace genesis — '
-+ 'wire + derive + order-asserting full-history', async () => {
+test('GET record trio is lifecycle-current under clock skew'
++ ' (genesis-wins-under-skew, case 7d)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = 'rec-drift-skew-1';
+    const genesisAt = '2026-06-01T00:00:00.000000Z';
+    const genesisEv = 'rec-drift-skew-1-genesis';
+    const skewedAt = '2020-01-01T00:00:00.000000Z';
+    const skewedEv = 'rec-drift-skew-1-skewed';
 
     const genesis = await handleRequest(db, req(
         'PUT', '/records/' + recordId, token, {
             name: 'Genesis Title', description: 'd', position: 1,
             state: 'active',
-            state_at: '2026-06-01T00:00:00.000000Z',
-            state_event_id: 'rec-drift-skew-1-genesis',
+            state_at: genesisAt,
+            state_event_id: genesisEv,
         },
     ));
     assert.equal(genesis.status, 200);
 
+    // Later arrival, earlier state_at, different state + name.
+    // 'deleted' would hide the row if it won as current —
+    // genesis-wins keeps the record live and active.
     const skewed = await handleRequest(db, req(
         'PUT', '/records/' + recordId, token, {
             name: 'Skewed Title', description: 'd', position: 1,
             state: 'deleted',
-            state_at: '2020-01-01T00:00:00.000000Z',
-            state_event_id: 'rec-drift-skew-1-skewed',
+            state_at: skewedAt,
+            state_event_id: skewedEv,
         },
     ));
     assert.equal(skewed.status, 200);
+
+    const expected = {
+        id: recordId,
+        organization_id: STARK_ORGANIZATION,
+        name: 'Skewed Title',
+        description: 'd',
+        position: 1,
+        state: 'active',
+        state_at: genesisAt,
+        state_event_id: genesisEv,
+    };
 
     const res = await handleRequest(
         db, req('GET', '/records/' + recordId, token),
     );
     assert.equal(res.status, 200);
-    const wireText = await res.text();
+    assert.equal(await res.text(), JSON.stringify(expected));
+
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
     );
-    assert.equal(wireText, JSON.stringify(derived));
+    assert.equal(
+        JSON.stringify(derived), JSON.stringify(expected),
+    );
     assert.equal(derived.name, 'Skewed Title');
+    assert.equal(derived.state, 'active');
+    assert.equal(derived.state_at, genesisAt);
+    assert.equal(derived.state_event_id, genesisEv);
 
     const records = await derivedRecords(db, STARK_ORGANIZATION);
-    assert.equal(
-        records.some((r) => r.id === recordId), true,
-    );
+    const row = records.find((r) => r.id === recordId);
+    assert.deepEqual(row, expected);
 
     const history = await deriveRecordStateHistory(
         db, STARK_ORGANIZATION, recordId,
@@ -955,16 +989,16 @@ test('a clock-skewed transition does NOT displace genesis — '
         })),
         [
             {
-                id: 'rec-drift-skew-1-skewed',
+                id: skewedEv,
                 entity_id: recordId,
                 state: 'deleted',
-                at: '2020-01-01T00:00:00.000000Z',
+                at: skewedAt,
             },
             {
-                id: 'rec-drift-skew-1-genesis',
+                id: genesisEv,
                 entity_id: recordId,
                 state: 'active',
-                at: '2026-06-01T00:00:00.000000Z',
+                at: genesisAt,
             },
         ],
     );

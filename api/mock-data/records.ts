@@ -15,7 +15,13 @@ export const projectBriefRecordId =
     'rec02Pr0jBriefRec0rd02';
 
 export function buildRecords():
-    Omit<RecordEntity, 'organization_id'>[] {
+    Omit<
+        RecordEntity,
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >[] {
     return [
         {
             id: customerProfileRecordId,

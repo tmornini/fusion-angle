@@ -1,5 +1,7 @@
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import {
+    workOrderLifecycleStatesFor,
+    workOrderHistoryFor,
+} from '../api/derive-states.ts';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
@@ -16,9 +18,6 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import { nowUtc } from '../api/types.ts';
 import { EntityNotFoundError } from '../api/db.ts';
-import {
-    stateFieldValuesForStateEvent,
-} from '../api/derive-state-field-values.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 
@@ -26,7 +25,7 @@ import { STARK_ORGANIZATION } from
 // event and an OPTIONAL claim-release event in ONE transaction.
 // Phase Final Task 2: state_field_values ROW half stripped —
 // field values ride the op pair body (pair-plane oracle via
-// stateFieldValuesForStateEvent). Authorship is the verified
+// workOrderHistoryFor inline fold). Authorship is the verified
 // caller (actor).
 
 const LOCK_TIMEOUT_SECONDS = 300;
@@ -60,7 +59,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 function eventsFor(
     db: MemoryDbAdapter,
 ): Promise<{ state: string; member_id: string; at: string }[]> {
-    return deriveStatesFor(db, '1', 'wo1');
+    return workOrderLifecycleStatesFor(db, '1', 'wo1');
 }
 
 test(
@@ -128,16 +127,20 @@ test(
         assert.equal(events.length, 1);
         assert.equal(events[0]!.state, 'n-next');
         // Phase Final Task 2: SFV row plane empty; pair-plane
-        // two-source union carries the fold.
+        // transition fold rides work-order history.
         // Phase Final Stage B: state_field_values retired.
-        const fvs = await stateFieldValuesForStateEvent(
-            db, STARK_ORGANIZATION, 'te1',
+        const history = await workOrderHistoryFor(
+            db, STARK_ORGANIZATION, 'wo1',
         );
-        assert.equal(fvs.length, 1);
-        assert.equal(fvs[0]!.id, 'fv-1');
-        assert.equal(fvs[0]!.state_event_id, 'te1');
-        assert.equal(fvs[0]!.attribute_id, 'attr-1');
-        assert.equal(fvs[0]!.value, 'high');
+        const transition = history.find(
+            (row) => row.id === 'te1',
+        );
+        assert.ok(transition !== undefined);
+        assert.deepEqual(transition!.field_values, [{
+            id: 'fv-1',
+            attribute_id: 'attr-1',
+            value: 'high',
+        }]);
     },
 );
 
@@ -252,11 +255,12 @@ test(
         );
         const events = await eventsFor(db);
         assert.equal(events.length, 0);
-        // Orphan parent event → EntityNotFoundError (404),
-        // not an empty array.
+        // Failed gate left no lifecycle → history 404s
+        // (empty lifecycle), not an empty field_values array
+        // under a ghost event id.
         await assert.rejects(
-            () => stateFieldValuesForStateEvent(
-                db, STARK_ORGANIZATION, 'te1',
+            () => workOrderHistoryFor(
+                db, STARK_ORGANIZATION, 'wo1',
             ),
             EntityNotFoundError,
         );

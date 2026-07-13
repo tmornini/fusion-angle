@@ -99,6 +99,9 @@ function makeHumanMember() {
         {
             id: 'hw_1',
             type: 'human',
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'st-hw_1',
         },
         {
             id: 'hw_1',
@@ -130,6 +133,9 @@ function makeAIMember() {
         {
             id: 'ai_1',
             type: 'ai',
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'st-ai_1',
         },
         {
             id: 'ai_1',

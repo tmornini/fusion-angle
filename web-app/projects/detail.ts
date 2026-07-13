@@ -31,7 +31,7 @@ import {
     Project,
     getProject,
     getProjectEntity,
-    getProjectStateDetail,
+    projectStateDetailFromRow,
     ProjectView,
     putProjectFields,
     postProjectStateChange,
@@ -124,9 +124,9 @@ const isFieldKey = makeFieldKeyValidator(FIELDS);
 // have no position accessor at all — composing a wire body
 // from the view would corrupt progress/actual_cost and fail
 // to compile on position. So the loader retains the RAW
-// entity + state detail beside the view (the same two GETs
-// getProject fires today — zero added hops), the
-// web-app/ideas/detail.ts state.view.entity precedent.
+// entity + state detail beside the view. Lifecycle trio is
+// stamped on the ProjectEntity GET row — map via
+// projectStateDetailFromRow; no second states hop.
 async function loadProjectView(
     projectId: string,
     ctx: RequestContext,
@@ -137,15 +137,14 @@ async function loadProjectView(
 }> {
     const [
         entity,
-        detail,
         objectives,
         scoring,
     ] = await Promise.all([
         getProjectEntity(ctx, projectId),
-        getProjectStateDetail(ctx, projectId),
         getObjectives(ctx),
         getProjectScoring(ctx, projectId),
     ]);
+    const detail = projectStateDetailFromRow(entity);
     const view = new ProjectView(
         new Project(entity, detail),
         objectives,
@@ -697,8 +696,14 @@ async function handleSave(): Promise<void> {
             const {
                 id: _id,
                 organization_id: _org,
+                state: _priorState,
+                state_at: _priorAt,
+                state_event_id: _priorEventId,
                 ...entityFields
             } = entity;
+            void _priorState;
+            void _priorAt;
+            void _priorEventId;
             await postProjectStateChange(
                 ctx, projectId,
                 {

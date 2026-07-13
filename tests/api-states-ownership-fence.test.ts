@@ -139,7 +139,7 @@ async function seed(): Promise<{
     });
     // Own-org idea document — the entity_id a retired PUT
     // would have named. Lands through the document address
-    // so surviving history/field-values reads have a target.
+    // so surviving family-history reads have a target.
     const token = await organizationToken('memberA', 'A');
     const idea = await handleRequest(db, req(
         'PUT', '/ideas/idea-a', token, {
@@ -178,32 +178,20 @@ for (const method of ['GET', 'PUT', 'POST', 'DELETE'] as
     });
 }
 
-test('GET /states is 200', async () => {
-    const { db, token } = await seed();
-    const res = await handleRequest(
-        db, req('GET', '/states', token),
-    );
-    assert.equal(res.status, 200);
-    const rows = await res.json() as { id: string }[];
-    assert.ok(
-        rows.some(r => r.id === 'idea-a-genesis'),
-        'own-org genesis surfaces on the collection',
-    );
-});
+// GET /states RETIRED (states-URI elimination C3). Own-org
+// genesis force lives on GET ideas/:id/history below and
+// collection history isolation on work-orders/history +
+// objectives/history. GET states/:id/field-values retired
+// (C4) — field values fold on work-order history (A1/A2).
 
-test('GET /states/:id/field-values is 200', async () => {
+// Family-history fence (states-URI elimination C2): the old
+// entity-states/:id/history pins fold onto ideas/:id/history.
+// Full per-family fence coverage lives in
+// api-entity-history-routes.test.ts.
+test('GET /ideas/:id/history is 200', async () => {
     const { db, token } = await seed();
     const res = await handleRequest(db, req(
-        'GET', '/states/idea-a-genesis/field-values', token,
-    ));
-    assert.equal(res.status, 200);
-    assert.deepEqual(await res.json(), []);
-});
-
-test('GET /entity-states/:id/history is 200', async () => {
-    const { db, token } = await seed();
-    const res = await handleRequest(db, req(
-        'GET', '/entity-states/idea-a/history', token,
+        'GET', '/ideas/idea-a/history', token,
     ));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
@@ -213,8 +201,8 @@ test('GET /entity-states/:id/history is 200', async () => {
     );
 });
 
-test('surviving GET entity-states/:id/history still fences'
-+ ' foreign ownership (403 with forbidden body)',
+test('GET /ideas/:id/history fences foreign ownership'
++ ' (403 with forbidden body)',
 async () => {
     const { db, token } = await seed();
     await seedOrganizationDocument(db, 'B', 'Beta');
@@ -248,14 +236,14 @@ async () => {
     ));
     assert.equal(foreignIdea.status, 200);
     const res = await handleRequest(db, req(
-        'GET', '/entity-states/idea-b/history', token,
+        'GET', '/ideas/idea-b/history', token,
     ));
     assert.equal(res.status, 403);
     assert.deepEqual(
         await res.json(),
         {
             error:
-                'forbidden: entity_states/idea-b belongs to'
+                'forbidden: ideas/idea-b belongs to'
                 + ' a different organization',
         },
     );

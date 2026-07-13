@@ -16,8 +16,8 @@ import {
     getArchivedObjectiveIds,
     getObjectives,
 } from '../web-app/app/adapters/objectives.ts';
-import { getProjectStates } from
-    '../web-app/app/adapters/state-events.ts';
+import { getProjectEntities } from
+    '../web-app/app/adapters/projects.ts';
 import type { Id, ProjectState } from
     '../api/types.ts';
 import type { RequestContext } from
@@ -49,10 +49,11 @@ async function projectIdsByState(
     ctx: RequestContext,
     wanted: ProjectState,
 ): Promise<Id[]> {
-    const states = await getProjectStates(ctx);
-    return [...states]
-        .filter(([, state]) => state === wanted)
-        .map(([id]) => id);
+    // Lifecycle state rides the project GET row trio.
+    const rows = await getProjectEntities(ctx);
+    return rows
+        .filter(p => p.state === wanted)
+        .map(p => p.id);
 }
 
 test('seeds every objective seed plus the org-2 objective',
@@ -65,7 +66,34 @@ async () => {
     // getObjectives is org-scoped to the token's org (Stark).
     assert.equal(rows.length, OBJECTIVE_SEEDS.length);
     for (const r of rows) {
-        const { id: _id, ...body } = r;
+        // GET stamps lifecycle trio; validateObjectiveEntity
+        // is entity-fields only — strip the stamp before gate.
+        const {
+            id: _id,
+            state: _s,
+            state_at: _at,
+            state_event_id: _ev,
+            ...body
+        } = r;
+        void _s;
+        void _at;
+        void _ev;
+        assert.ok(
+            typeof r.state === 'string'
+            && r.state.length > 0,
+            'objective ' + r.id + ' missing state',
+        );
+        assert.ok(
+            typeof r.state_at === 'string'
+            && r.state_at.length > 0,
+            'objective ' + r.id + ' missing state_at',
+        );
+        assert.ok(
+            typeof r.state_event_id === 'string'
+            && r.state_event_id.length > 0,
+            'objective ' + r.id
+            + ' missing state_event_id',
+        );
         validateObjectiveEntity(body);
     }
     // Org-2 objective via derive from the other plane.
@@ -104,7 +132,7 @@ test('postMockDataLoad seeds one revision per objective',
 
 // All five objective seeds mint genesis state 'active' via
 // the create-body trio (states-address retirement) — none
-// are archived. Pair-plane GET /states derives those rows.
+// are archived. GET objectives stamps that trio on rows.
 test('postMockDataLoad seeds zero archived objectives',
     async () => {
         const db = memoryDbAdapter();

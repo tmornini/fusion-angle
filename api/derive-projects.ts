@@ -9,6 +9,7 @@ import {
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
+    currentLifecycleEvent,
     byIdAscending,
     DELETED_STATE,
     type DerivedDocument,
@@ -34,15 +35,19 @@ function projectsUriPrefix(organization: Id): string {
 }
 
 // The derived entity: the head document's body minus the
-// lifecycle trio (state/state_at/state_event_id, simply never
-// copied across) plus organization_id stamped from the
-// derivation's OWN organization parameter — never the body's own
-// value. A create body omits organization_id; the org-scoped
-// store stamps it on the old plane, and the prefix scanned here
-// already IS that same org, so the stamp is unconditional.
+// lifecycle trio (head body fields are NOT copied — the trio is
+// stamped from the lifecycle-current StateEntity instead) plus
+// organization_id stamped from the derivation's OWN organization
+// parameter — never the body's own value. A create body omits
+// organization_id; the org-scoped store stamps it on the old
+// plane, and the prefix scanned here already IS that same org,
+// so the stamp is unconditional. `current` is required: every
+// live project GET builds history first and passes the
+// lifecycle-current event (genesis-wins-under-skew).
 export function projectEntityOf(
     document: DerivedDocument,
     organization: Id,
+    current: StateEntity,
 ): ProjectEntity {
     const body = document.body;
     return {
@@ -57,6 +62,9 @@ export function projectEntityOf(
         estimated_cost: pickNumber(body, 'estimated_cost'),
         actual_cost: pickNumber(body, 'actual_cost'),
         position: pickNumber(body, 'position'),
+        state: current.state,
+        state_at: current.at,
+        state_event_id: current.id,
     };
 }
 
@@ -120,7 +128,12 @@ export async function deriveProjects(
         if (currentDocumentState(history) === DELETED_STATE) {
             continue;
         }
-        projects.push(projectEntityOf(document, organization));
+        // After DELETED filter history is non-empty for every
+        // live trio document (genesis always mints an event).
+        const current = currentLifecycleEvent(history)!;
+        projects.push(
+            projectEntityOf(document, organization, current),
+        );
     }
     return projects.sort(byIdAscending);
 }
@@ -150,7 +163,8 @@ export async function deriveProject(
             db, projectId, organization, PROJECTS_TABLE,
         );
     }
-    return projectEntityOf(document, organization);
+    const current = currentLifecycleEvent(history)!;
+    return projectEntityOf(document, organization, current);
 }
 
 // One row per pair whose state_event_id is NEW — the document

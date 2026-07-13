@@ -12,16 +12,17 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     getObjectives,
     getArchivedObjectiveIds,
+    getObjectiveArchivalEvents,
+    getObjectiveHistories,
     getObjectiveRevisionsByObjective,
     getActiveObjectives,
     getCurrentObjectiveDefinitions,
+    getObjectiveStateDetails,
     postObjectiveCreation,
     postObjectiveArchival,
+    postObjectiveReactivation,
     putObjectivePosition,
 } from '../web-app/app/adapters/objectives.ts';
-import {
-    getObjectiveStateDetails,
-} from '../web-app/app/adapters/state-events.ts';
 import {
     computeNewPosition,
 } from '../web-app/app/drag-reorder-positions.ts';
@@ -186,8 +187,8 @@ test('getArchivedObjectiveIds returns a Set', async () => {
     await seedAdminSchema(db);
     const ctx = ctxFor(db);
     // Seed archived via the document PUT carrying the
-    // lifecycle trio — GET states derives objective
-    // history from the document plane (Task 2).
+    // lifecycle trio — GET objectives stamps state on
+    // the row (states-URI elimination B6).
     await ctx.PUT(
         'objectives/o1',
         objectiveDoc(0, 'archived', 'ev-o1-arch'),
@@ -196,6 +197,46 @@ test('getArchivedObjectiveIds returns a Set', async () => {
     assert.ok(ids.has('o1'));
     assert.equal(ids.size, 1);
 });
+
+test(
+    'getObjectiveArchivalEvents streams archived'
+    + ' history rows only',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedCurrentMember(db);
+        const ctx = ctxFor(db);
+        await postObjectiveCreation(
+            ctx, 'o1', 'Rev', 'd', 0,
+        );
+        await postObjectiveArchival(ctx, 'o1');
+        await postObjectiveReactivation(ctx, 'o1');
+        await postObjectiveArchival(ctx, 'o1');
+
+        const histories =
+            await getObjectiveHistories(ctx);
+        assert.ok(
+            histories.some(r => r.state === 'active'),
+        );
+        assert.equal(
+            histories.filter(
+                r => r.state === 'archived',
+            ).length,
+            2,
+        );
+
+        const archivals =
+            await getObjectiveArchivalEvents(ctx);
+        assert.equal(archivals.length, 2);
+        for (const a of archivals) {
+            assert.equal(a.objectiveId, 'o1');
+            assert.equal(typeof a.memberId, 'string');
+            assert.match(
+                a.at, /^\d{4}-\d{2}-\d{2}T/,
+            );
+        }
+    },
+);
 
 test(
     'postObjectiveCreation writes via GET the objective'
@@ -216,6 +257,17 @@ test(
         assert.equal(objectives[0]!.id, 'o1');
         assert.equal(objectives[0]!.position, 1);
         assert.equal(objectives[0]!.organization_id, '1');
+        // GET stamps lifecycle-current genesis trio.
+        assert.equal(objectives[0]!.state, 'active');
+        assert.equal(
+            typeof objectives[0]!.state_at, 'string',
+        );
+        assert.equal(
+            typeof objectives[0]!.state_event_id, 'string',
+        );
+        assert.ok(
+            objectives[0]!.state_event_id.length > 0,
+        );
 
         const revisions =
             await getObjectiveRevisionsByObjective(
@@ -381,6 +433,9 @@ test(
                     id: 'o1',
                     organization_id: '1',
                     position: 3,
+                    state: 'active',
+                    state_at: '2026-01-01T00:00:00.000000Z',
+                    state_event_id: 'ev-o1-prior',
                 };
             },
             PUT: async () => ({}),

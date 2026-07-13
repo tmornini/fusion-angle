@@ -64,7 +64,13 @@ function buildHumanMember(
     department = 'Eng',
 ): HumanMember {
     return new HumanMember(
-        { id, type: 'human' },
+        {
+            id,
+            type: 'human',
+            state: 'active',
+            state_at: '2026-01-01T00:00:00.000000Z',
+            state_event_id: 'st-' + id,
+        },
         {
             id,
             title,

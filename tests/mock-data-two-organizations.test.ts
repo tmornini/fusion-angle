@@ -65,7 +65,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'records',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    entityOf: (document, organization) => ({
+    entityOf: (document, organization, current) => ({
         id: document.uriId,
         organization_id: organization,
         name: String(document.body['name'] ?? ''),
@@ -73,6 +73,9 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
             document.body['description'] ?? '',
         ),
         position: Number(document.body['position'] ?? 0),
+        state: current!.state,
+        state_at: current!.at,
+        state_event_id: current!.id,
     }),
 };
 
@@ -109,14 +112,17 @@ async function derivedRecordAttributes(
 
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
-    lifecycle: 'stateless',
+    lifecycle: 'trio',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
     documentOp: postObjectiveDocumentOp,
-    entityOf: (document, organization) => ({
+    entityOf: (document, organization, current) => ({
         id: document.uriId,
         organization_id: organization,
         position: pickNumber(document.body, 'position'),
+        state: current!.state,
+        state_at: current!.at,
+        state_event_id: current!.id,
     }),
 };
 

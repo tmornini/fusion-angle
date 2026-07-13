@@ -59,49 +59,6 @@ test(
 );
 
 test(
-    'a Region A entity-states history fence-read fault redacts'
-    + ' to the fixed 500',
-    async () => {
-        const db = await freshDb();
-        // Surviving ownership guard: GET entity-states/:id/
-        // history resolves the named entity's owner via
-        // resolveOwningOrganization (pair plane), which reads
-        // responses by uri_id first. Fault THAT read alone.
-        // (The states/:id PUT ownership fence retired with the
-        // route; the redaction contract is the subject.)
-        const original =
-            db.responses.getAllWhere.bind(db.responses);
-        (db.responses as unknown as {
-            getAllWhere: (
-                column: string, key: string,
-            ) => ReturnType<typeof original>;
-        }).getAllWhere = async (column, key) => {
-            if (column === 'uri_id' && key === 'fault-entity') {
-                throw new Error('secret fence fault detail');
-            }
-            return original(column, key);
-        };
-        const response = await handleRequest(
-            db,
-            new Request(
-                'http://localhost/entity-states/'
-                    + 'fault-entity/history',
-                {
-                    headers: {
-                        'Authorization':
-                            'Bearer ' + DEV_TOKEN,
-                    },
-                },
-            ),
-        );
-        assert.equal(response.status, 500);
-        const { error } =
-            (await response.json()) as { error: string };
-        assert.equal(error, 'internal error');
-    },
-);
-
-test(
     'a MissingTableError fence fault still propagates,'
     + ' never redacted to the fixed 500',
     async () => {

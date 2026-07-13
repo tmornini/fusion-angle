@@ -11,7 +11,9 @@ import {
     deriveWorkOrderLifecycle,
     workOrderLifecycleStatesFor,
     workOrderClaimHistoryFor,
+    workOrderHistoryFor,
 } from '../api/derive-states.ts';
+import { EntityNotFoundError } from '../api/db.ts';
 import { STARK_ORGANIZATION } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { generateCryptoSafeBase62 } from
@@ -472,5 +474,146 @@ test('workOrderLifecycleStatesFor: a never-created work-order id'
             db, STARK_ORGANIZATION, 'no-such-work-order',
         ),
         [],
+    );
+});
+
+// workOrderHistoryFor reuses the lifecycle core and folds
+// field_values from transition pairs (DESC; index 0 current).
+// Transition rows carry {id, attribute_id, value}; claim/
+// birth/release rows carry []. Empty → missedReadError.
+test('workOrderHistoryFor: folds field_values onto transition'
++ ' events, [] on claim/birth/release, DESC current-first',
+async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const workOrderId = 'wo-task1-history-fold';
+    const graph = workOrderFlowGraph(8 * 60 * 60);
+
+    const created = await handleRequest(db, req(
+        'POST', '/work-orders', token,
+        createWorkOrderBody(
+            workOrderId, workOrderId + '-fwo', graph,
+            {
+                ids: [
+                    workOrderId + '-ev1',
+                    workOrderId + '-ev2',
+                    workOrderId + '-ev3',
+                ],
+                ats: [nowUtc(), nowUtc(), nowUtc()],
+                states: ['n-start', 'n-middle', 'claimed'],
+            },
+            nowUtc(),
+        ),
+    ));
+    assert.equal(created.status, 204);
+
+    const transitionAt = nowUtc();
+    const transition = await handleRequest(db, req(
+        'POST', '/work-orders/' + workOrderId + '/transition',
+        token, {
+            transitionEventId: workOrderId + '-te1',
+            targetState: 'n-middle',
+            fieldValues: [
+                {
+                    id: workOrderId + '-fv1',
+                    fields: {
+                        state_event_id: workOrderId + '-te1',
+                        attribute_id: 'attr-severity',
+                        value: 'high',
+                    },
+                },
+                {
+                    id: workOrderId + '-fv2',
+                    fields: {
+                        state_event_id: workOrderId + '-te1',
+                        attribute_id: 'attr-note',
+                        value: 'checked',
+                    },
+                },
+            ],
+            release: null,
+            transitionAt,
+        },
+    ));
+    assert.equal(transition.status, 204);
+
+    const releaseEventId = generateCryptoSafeBase62();
+    const releaseAt = nowUtc();
+    const release = await handleRequest(db, req(
+        'POST',
+        '/work-orders/' + workOrderId + '/release',
+        token, {
+            releaseEventId,
+            releaseAt,
+        },
+    ));
+    assert.equal(release.status, 204);
+
+    const history = await workOrderHistoryFor(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    // birth(3) + transition(1) + release(1) = 5, DESC.
+    assert.equal(history.length, 5);
+    assert.equal(history[0]!.id, releaseEventId);
+    assert.equal(history[0]!.state, 'claim_released');
+    assert.deepEqual(history[0]!.field_values, []);
+
+    const transitionRow = history.find(
+        (row) => row.id === workOrderId + '-te1',
+    );
+    assert.ok(transitionRow !== undefined);
+    assert.equal(transitionRow!.state, 'n-middle');
+    // Field values sorted by id ascending (stateFieldValuesFrom
+    // parity).
+    assert.deepEqual(transitionRow!.field_values, [
+        {
+            id: workOrderId + '-fv1',
+            attribute_id: 'attr-severity',
+            value: 'high',
+        },
+        {
+            id: workOrderId + '-fv2',
+            attribute_id: 'attr-note',
+            value: 'checked',
+        },
+    ]);
+
+    const claimed = history.find(
+        (row) => row.id === workOrderId + '-ev3',
+    );
+    assert.ok(claimed !== undefined);
+    assert.equal(claimed!.state, 'claimed');
+    assert.deepEqual(claimed!.field_values, []);
+
+    // ASC lifecycle without fold matches history without
+    // field_values, reversed.
+    const lifecycle = sortByAtId(
+        await workOrderLifecycleStatesFor(
+            db, STARK_ORGANIZATION, workOrderId,
+        ),
+    );
+    assert.deepEqual(
+        history.map((row) => ({
+            id: row.id,
+            entity_id: row.entity_id,
+            state: row.state,
+            member_id: row.member_id,
+            at: row.at,
+        })),
+        [...lifecycle].toReversed(),
+    );
+});
+
+test('workOrderHistoryFor: empty lifecycle throws'
++ ' EntityNotFoundError for an absent id', async () => {
+    const db = await seededDb();
+    await assert.rejects(
+        () => workOrderHistoryFor(
+            db, STARK_ORGANIZATION, 'no-such-work-order',
+        ),
+        (err: unknown) =>
+            err instanceof EntityNotFoundError
+            && err.message
+                === 'Not found: work_orders/no-such-work-order',
     );
 });

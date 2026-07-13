@@ -1,17 +1,12 @@
 import type {
     OrganizationEntity,
     MembershipEntity,
-    StateEntity,
 } from '../../../api/types.ts';
 import {
     getOrganization as fetchOrganization,
     putOrganization,
 } from './organizations.ts';
-import {
-    formatCalendarDate,
-    formatDate,
-    DISPLAY_ABSENT,
-} from '../format.ts';
+import { formatCalendarDate } from '../format.ts';
 import {
     activeOrganization,
     type RequestContext,
@@ -35,12 +30,9 @@ async function getOrganizationEntity(
 
 // Ledger-derived facts about the org, computed at read time:
 // seat usage counts DISTINCT identities in the memberships
-// ledger; last activity is the latest `at` in the org's
-// states log, or null when the org has no events yet —
-// rendered DISPLAY_ABSENT, never a fabricated instant.
+// ledger (org-fenced through the org-owned fence).
 export interface OrganizationDerived {
     readonly usedSeats: number;
-    readonly lastActivityAt: string | null;
 }
 
 export class Organization {
@@ -107,37 +99,21 @@ export class Organization {
             this.#entity.next_billing,
         );
     }
-
-    lastActivityText(): string {
-        return this.#derived.lastActivityAt === null
-            ? DISPLAY_ABSENT
-            : formatDate(this.#derived.lastActivityAt);
-    }
 }
 
-// Derive seat usage and last activity from their ledgers.
-// Both reads are org-fenced: memberships through the
-// org-owned fence, states through the parent fence — so the
-// counts are the active org's slice.
+// Derive seat usage from the memberships ledger.
+// The read is org-fenced through the org-owned fence —
+// so the count is the active org's slice.
 async function deriveOrganizationFacts(
     ctx: RequestContext,
 ): Promise<OrganizationDerived> {
-    const [memberships, states] = await Promise.all([
-        ctx.GET<MembershipEntity[]>('memberships'),
-        ctx.GET<StateEntity[]>('states'),
-    ]);
+    const memberships =
+        await ctx.GET<MembershipEntity[]>('memberships');
     const identities = new Set(
         memberships.map(m => m.identity_id),
     );
-    let latest: string | null = null;
-    for (const event of states) {
-        if (latest === null || event.at > latest) {
-            latest = event.at;
-        }
-    }
     return {
         usedSeats: identities.size,
-        lastActivityAt: latest,
     };
 }
 

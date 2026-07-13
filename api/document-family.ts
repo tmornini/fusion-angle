@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
-import type { Id } from './types.ts';
+import type { Id, StateEntity } from './types.ts';
 import type { MessagePair } from './message-pair.ts';
 import { canonicalUriPrefix } from './message-pair.ts';
 import { familyRegistration } from './family-registry.ts';
@@ -11,6 +11,7 @@ import {
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
+    currentLifecycleEvent,
     byIdAscending,
     DELETED_STATE,
     type DerivedDocument,
@@ -118,9 +119,15 @@ export interface DocumentFamilyWiring {
         pair?: MessagePair,
     ) => Promise<unknown>;
     // Head-pair body -> wire entity (id + organization_id
-    // stamped by the caller).
+    // stamped by the caller). Trio families that embed the
+    // lifecycle-current event (ideas, projects, records,
+    // objectives, members) receive `current` after the
+    // DELETED filter; other families accept and ignore the
+    // optional third argument.
     readonly entityOf: (
-        document: DerivedDocument, organization: Id,
+        document: DerivedDocument,
+        organization: Id,
+        current?: StateEntity,
     ) => unknown;
 }
 
@@ -228,6 +235,12 @@ async function derivedDocumentEntity(
                 wiring, db, organization, id,
             );
         }
+        // After DELETED filter history is non-empty for every
+        // live trio document (genesis always mints an event).
+        const current = currentLifecycleEvent(history)!;
+        return wiring.entityOf(
+            document, organization, current,
+        );
     }
     return wiring.entityOf(document, organization);
 }
@@ -294,6 +307,35 @@ export function documentEntityRoute(
     };
 }
 
+// GET <family>/:id/history (states-URI elimination A3): wrap a
+// family derive*StateHistory (ASC StateEntity[]) with (at, id)
+// DESC so index 0 is current, and empty → missedReadError
+// (403 foreign / 404 absent) using the family's table name for
+// an honest body. Does NOT change the derive's own ASC for
+// other callers (drift / family-specific oracles).
+export type DocumentStateHistoryDerive = (
+    db: DbAdapter,
+    organization: Id,
+    entityId: Id,
+) => Promise<StateEntity[]>;
+
+export function documentStateHistoryHandler(
+    deriveFn: DocumentStateHistoryDerive,
+    tableName: string,
+): GetHandler {
+    return async (db, params, _actor, organization) => {
+        const org = requireOrganization(organization);
+        const id = param(params, 0);
+        const history = await deriveFn(db, org, id);
+        if (history.length === 0) {
+            throw await missedReadError(
+                db, id, org, tableName,
+            );
+        }
+        return history.toReversed();
+    };
+}
+
 // The generic per-family list derivation, split out from
 // documentCollectionRoute below (mirroring documentGetHandler/
 // documentEntityRoute's own split) so a caller needing the bare
@@ -349,6 +391,14 @@ export function documentCollectionGetHandler(
                     currentDocumentState(history)
                         === DELETED_STATE
                 ) continue;
+                const current =
+                    currentLifecycleEvent(history)!;
+                rows.push(
+                    wiring.entityOf(
+                        document, organizationId, current,
+                    ) as { id: Id },
+                );
+                continue;
             }
             rows.push(
                 wiring.entityOf(

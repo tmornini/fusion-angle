@@ -6,8 +6,10 @@ import {
 } from '../api/db-memory.ts';
 import { UniqueConstraintError } from '../api/db.ts';
 import { handleRequest, RequestError } from '../api/api.ts';
-import { deriveFlowGraphStates } from '../api/derive-states.ts';
 import { postFlowUndoOp } from '../api/routes.ts';
+import {
+    documentPairsAt,
+} from '../api/derive-documents.ts';
 import {
     resolveFlowUndoTarget,
 } from '../api/derive-flows.ts';
@@ -560,17 +562,14 @@ test(
 
 // -- 6. SIDECAR-KEEP ---------------------------
 
-// deriveFlowGraphStates (api/derive-states.ts) scans EVERY
-// flows/:id document pair's OWN stored body for
-// graphDelta.deletions/revivals — including a pair the UNDO
-// route itself synthesized. This proves the sidecar mechanism
-// keeps working on an undo-authored pair specifically: a node
-// deleted by a save, then revived by undo, must show
-// 'deleted' then 'restored' in the derived states log.
+// graphDelta.deletions / revivals ride the flow document-
+// pair body (including pairs the UNDO route synthesizes).
+// C3 retired deriveFlowGraphStates — pin the pair plane
+// directly: a node deleted by a save, then revived by undo,
+// must leave both sidecar entries on stored pairs.
 test(
-    'SIDECAR-KEEP: deriveFlowGraphStates reads the'
-    + ' deleted/restored events an undo-authored'
-    + ' document pair carries, same as any other save',
+    'SIDECAR-KEEP: undo-authored document pairs carry'
+    + ' deleted/restored sidecars on graphDelta/revivals',
     async () => {
         const db = await freshDb();
         const token = await organizationToken();
@@ -633,15 +632,59 @@ test(
         );
         assert.equal(undone.status, 204);
 
-        const states = await deriveFlowGraphStates(db);
-        const nodeStates = states
-            .filter((s) => s.entity_id === nodeId)
-            .sort((a, b) => (a.at < b.at ? -1 : 1));
+        const prefix = canonicalUriPrefix('1', '/flows/');
+        const [requests, responses] = await Promise.all([
+            db.requests.getAllWhere('uri_prefix', prefix),
+            db.responses.getAllWhere('uri_prefix', prefix),
+        ]);
+        const pairs = documentPairsAt(
+            requests, responses, prefix,
+        ).filter((p) => p.uriId === flowId);
+        const states: { state: string; at: string }[] = [];
+        for (const pair of pairs) {
+            const delta = pair.body['graphDelta'];
+            const deletions =
+                typeof delta === 'object' && delta !== null
+                    ? (delta as Record<string, unknown>)[
+                        'deletions'
+                    ]
+                    : undefined;
+            if (Array.isArray(deletions)) {
+                for (const entry of deletions) {
+                    if (
+                        typeof entry !== 'object'
+                        || entry === null
+                    ) continue;
+                    const f = entry as Record<string, unknown>;
+                    if (f['entityId'] !== nodeId) continue;
+                    states.push({
+                        state: 'deleted',
+                        at: String(f['at'] ?? ''),
+                    });
+                }
+            }
+            const revivals = pair.body['revivals'];
+            if (Array.isArray(revivals)) {
+                for (const entry of revivals) {
+                    if (
+                        typeof entry !== 'object'
+                        || entry === null
+                    ) continue;
+                    const f = entry as Record<string, unknown>;
+                    if (f['entityId'] !== nodeId) continue;
+                    states.push({
+                        state: 'restored',
+                        at: String(f['at'] ?? ''),
+                    });
+                }
+            }
+        }
+        states.sort((a, b) => (a.at < b.at ? -1 : 1));
         assert.deepEqual(
-            nodeStates.map((s) => s.state),
+            states.map((s) => s.state),
             ['deleted', 'restored'],
             'the undo-authored pair\'s own revival is'
-            + ' visible to the sidecar reader',
+            + ' visible on the pair plane',
         );
     },
 );

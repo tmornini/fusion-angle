@@ -1,8 +1,4 @@
 import type { DbAdapter } from './db.ts';
-import {
-    EntityNotFoundError,
-    ForeignOrganizationError,
-} from './db.ts';
 import type {
     Id, RequestEntity, ResponseEntity, StateFieldValueEntity,
 } from './types.ts';
@@ -20,17 +16,16 @@ import {
 // Phase 14 Task 6: state_field_values (SFV) truth, derived from
 // the pair plane instead of read off its own table. Author gate
 // 5's own census: the LIVE writer is postWorkOrderTransitionOp
-// (api/routes.ts) — it folds every field-value row for a
-// transition into that SAME transaction's state_field_values
-// .put calls, alongside ONE transition OPERATION pair
+// (api/routes.ts) — ONE transition OPERATION pair
 // (work-orders/:id/transition) whose body carries the fold
 // (fieldValues: [{id, fields}]) — no per-value pair of its
 // own. The STANDALONE leaf address
-// (states/:id/field-values/:fvid) is RETIRED with the states
-// address itself; this derive is SINGLE-SOURCE (transition
-// fold only). Seed forms transition op pairs that carry the
-// same fold, so historical leaf pairs are no longer a derive
-// source.
+// (states/:id/field-values/:fvid) retired with the states
+// address; GET states/:id/field-values retired (states-URI
+// elimination C4) — product reads fold field values on
+// work-order history. This module keeps the single-source
+// fold for RESTRICT (deriveStateFieldValueReferrers). Seed
+// forms transition op pairs that carry the same fold.
 
 function matchingPrefixes(
     requests: readonly RequestEntity[],
@@ -93,8 +88,9 @@ function transitionFieldValueCandidates(
 // every other derive in this migration applies. A DELETE head
 // excludes the row (defensive; transitions never tombstone).
 // UNFENCED: callers narrow to their own organization
-// (deriveStateFieldValueReferrers / stateFieldValuesForStateEvent
-// below), never before this fold runs.
+// (deriveStateFieldValueReferrers below; work-order history
+// folds via fieldValuesByTransitionEvent on entity-scoped
+// transition pairs), never before this fold runs.
 export function stateFieldValuesFrom(
     requests: readonly RequestEntity[],
     responses: readonly ResponseEntity[],
@@ -125,10 +121,10 @@ export function stateFieldValuesFrom(
 //   orphan  → visible (no event anywhere)
 //   visible → own-org (or owner-null entity)
 //   hidden  → foreign organization
-// Boolean fold: visibility !== 'hidden'. Wire shape held
-// exactly (ALWAYS 200 for GET field-values; three-way filtered
-// array). boundOrganization is the verified token claim, never
-// a path segment.
+// Boolean fold: visibility !== 'hidden'. Used by RESTRICT
+// referrers only (GET field-values retired C4).
+// boundOrganization is the verified token claim, never a
+// path segment.
 async function isVisibleStateEvent(
     view: DbAdapter,
     boundOrganization: Id,
@@ -223,48 +219,4 @@ export async function deriveStateFieldValueReferrers(
         byAttribute.set(row.attribute_id, list);
     }
     return byAttribute;
-}
-
-// The GET-facing reader (states/:id/field-values). Visibility
-// via stateEventVisibilityFor (pair plane) is honest:
-//   visible → derive rows (200)
-//   hidden  → ForeignOrganizationError (403)
-//   orphan  → EntityNotFoundError (404)
-// Once visible, ONE shared readonly tx over requests+responses
-// (torn-read closure) derives the WHOLE plane: the GET path may
-// scan wider than the RESTRICT write gate (Author gate 5's own
-// hard constraint), and the transition fold has no address of
-// its own keyed by state_event_id, so a narrower read is not
-// available regardless — see this module's header.
-export async function stateFieldValuesForStateEvent(
-    db: DbAdapter,
-    boundOrganization: Id,
-    stateEventId: Id,
-): Promise<StateFieldValueEntity[]> {
-    const visibility = await stateEventVisibilityFor(
-        db, boundOrganization, stateEventId,
-    );
-    if (visibility === 'hidden') {
-        throw new ForeignOrganizationError(
-            'state_field_values', stateEventId,
-        );
-    }
-    if (visibility === 'orphan') {
-        throw new EntityNotFoundError(
-            'state_field_values', stateEventId,
-        );
-    }
-    return db.transaction(
-        ['requests', 'responses'],
-        async (view) => {
-            const [requests, responses] = await Promise.all([
-                view.requests.getAll(),
-                view.responses.getAll(),
-            ]);
-            return stateFieldValuesFrom(requests, responses)
-                .filter(
-                    (row) => row.state_event_id === stateEventId,
-                );
-        },
-    );
 }

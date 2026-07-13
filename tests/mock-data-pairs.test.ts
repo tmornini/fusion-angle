@@ -1,6 +1,7 @@
 import { test } from 'node:test';
-import { deriveStates } from
-    '../api/derive-states.ts';
+import {
+    workOrderLifecycleStatesFor,
+} from '../api/derive-states.ts';
 import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { postMockDataLoad, postBootstrap } from '../api/mock-data.ts';
@@ -747,8 +748,10 @@ test('a seeded transition pair\'s stored request'
         requests, firstTrace.id,
     );
     assert.ok(row, 'no request row for the seeded transition');
-    const _statesAll = await deriveStates(db, '1');
-    const written = _statesAll.find(s => s.id === firstTrace.id)!;
+    const lifecycle = await workOrderLifecycleStatesFor(
+        db, STARK_ORGANIZATION, firstTrace.entity_id,
+    );
+    const written = lifecycle.find(s => s.id === firstTrace.id)!;
     assert.ok(written, 'derived state missing');
     assert.equal(row!.requester_identity_id, written.member_id);
     // Index 0 is its work order's OWN first event, so a
@@ -766,10 +769,13 @@ test('a seeded transition pair\'s stored request'
         divergingRow,
         'no request row for the diverging transition',
     );
-    const divergingWritten =
-        (await deriveStates(db, '1')).find(
-            s => s.id === divergingTrace.id,
-        )!;
+    const divergingLifecycle =
+        await workOrderLifecycleStatesFor(
+            db, STARK_ORGANIZATION, divergingTrace.entity_id,
+        );
+    const divergingWritten = divergingLifecycle.find(
+        s => s.id === divergingTrace.id,
+    )!;
     assert.equal(
         divergingRow!.requester_identity_id,
         divergingWritten.member_id,

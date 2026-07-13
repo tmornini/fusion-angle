@@ -783,9 +783,16 @@ const MEMBER_BODY_KEYS: readonly string[] = [
     'type',
 ];
 
+// Entity-field body only — lifecycle trio is GET stamp /
+// document-body, never part of this validator's key set.
+export type MemberEntityFields = Omit<
+    MemberEntity,
+    'id' | 'state' | 'state_at' | 'state_event_id'
+>;
+
 export function validateMemberEntity(
     body: Record<string, unknown>,
-): Omit<MemberEntity, 'id'> {
+): MemberEntityFields {
     assertOnlyKeys(
         body, MEMBER_BODY_KEYS, 'MemberEntity',
     );
@@ -804,7 +811,7 @@ const MEMBER_DOCUMENT_BODY_KEYS: readonly string[] = [
 ];
 
 export interface MemberDocumentBody {
-    readonly entity: Omit<MemberEntity, 'id'>;
+    readonly entity: MemberEntityFields;
     readonly state: MemberState;
     readonly state_at: string;
     readonly state_event_id: string;
@@ -1332,9 +1339,17 @@ const IDEA_BODY_KEYS: readonly string[] = [
     'success_metrics',
 ];
 
+// Entity-field body only — lifecycle trio is GET stamp /
+// document-body, never part of this validator's key set.
+export type IdeaEntityFields = Omit<
+    IdeaEntity,
+    'id' | 'organization_id' | 'state' | 'state_at'
+        | 'state_event_id'
+>;
+
 export function validateIdeaEntity(
     body: Record<string, unknown>,
-): Omit<IdeaEntity, 'id'> {
+): IdeaEntityFields & { organization_id: string } {
     assertOnlyKeys(
         body, IDEA_BODY_KEYS, 'IdeaEntity',
     );
@@ -1376,7 +1391,7 @@ const IDEA_DOCUMENT_BODY_KEYS: readonly string[] = [
 ];
 
 export interface IdeaDocumentBody {
-    readonly entity: Omit<IdeaEntity, 'id' | 'organization_id'>;
+    readonly entity: IdeaEntityFields;
     readonly state: IdeaState;
     readonly state_at: string;
     readonly state_event_id: string;
@@ -1446,9 +1461,17 @@ const PROJECT_BODY_KEYS: readonly string[] = [
     'actual_cost', 'position',
 ];
 
+// Entity-field body only — lifecycle trio is GET stamp /
+// document-body, never part of this validator's key set.
+export type ProjectEntityFields = Omit<
+    ProjectEntity,
+    'id' | 'organization_id' | 'state' | 'state_at'
+        | 'state_event_id'
+>;
+
 export function validateProjectEntity(
     body: Record<string, unknown>,
-): Omit<ProjectEntity, 'id'> {
+): ProjectEntityFields & { organization_id: string } {
     assertOnlyKeys(
         body,
         PROJECT_BODY_KEYS,
@@ -1495,8 +1518,7 @@ const PROJECT_DOCUMENT_BODY_KEYS: readonly string[] = [
 ];
 
 export interface ProjectDocumentBody {
-    readonly entity:
-        Omit<ProjectEntity, 'id' | 'organization_id'>;
+    readonly entity: ProjectEntityFields;
     readonly state: ProjectState;
     readonly state_at: string;
     readonly state_event_id: string;
@@ -2138,9 +2160,17 @@ const OBJECTIVE_BODY_KEYS: readonly string[] = [
     'organization_id', 'position',
 ];
 
+// Entity-field body only — lifecycle trio is GET stamp /
+// document-body, never part of this validator's key set.
+export type ObjectiveEntityFields = Omit<
+    ObjectiveEntity,
+    'id' | 'organization_id' | 'state' | 'state_at'
+        | 'state_event_id'
+>;
+
 export function validateObjectiveEntity(
     body: Record<string, unknown>,
-): Omit<ObjectiveEntity, 'id'> {
+): ObjectiveEntityFields & { organization_id: string } {
     assertOnlyKeys(
         body, OBJECTIVE_BODY_KEYS, 'Objective',
     );
@@ -2183,8 +2213,7 @@ const OBJECTIVE_DOCUMENT_BODY_KEYS: readonly string[] = [
 ];
 
 export interface ObjectiveDocumentBody {
-    readonly entity:
-        Omit<ObjectiveEntity, 'id' | 'organization_id'>;
+    readonly entity: ObjectiveEntityFields;
     readonly state: ObjectiveState;
     readonly state_at: string;
     readonly state_event_id: string;
@@ -2466,9 +2495,17 @@ const RECORD_BODY_KEYS: readonly string[] = [
     'organization_id', 'name', 'description', 'position',
 ];
 
+// Entity-field body only — lifecycle trio is GET stamp /
+// document-body, never part of this validator's key set.
+export type RecordEntityFields = Omit<
+    RecordEntity,
+    'id' | 'organization_id' | 'state' | 'state_at'
+        | 'state_event_id'
+>;
+
 export function validateRecordEntity(
     body: Record<string, unknown>,
-): Omit<RecordEntity, 'id'> {
+): RecordEntityFields & { organization_id: string } {
     assertOnlyKeys(
         body, RECORD_BODY_KEYS, 'RecordEntity',
     );
@@ -2501,8 +2538,7 @@ const RECORD_DOCUMENT_BODY_KEYS: readonly string[] = [
 ];
 
 export interface RecordDocumentBody {
-    readonly entity:
-        Omit<RecordEntity, 'id' | 'organization_id'>;
+    readonly entity: RecordEntityFields;
     readonly state: RecordState;
     readonly state_at: string;
     readonly state_event_id: string;
@@ -2826,7 +2862,8 @@ export function validateFlowTagEntity(
 export interface RecordWriteCreateBody {
     readonly kind: 'create';
     readonly id: RecordId;
-    readonly record: Omit<RecordEntity, 'id'>;
+    readonly record:
+        RecordEntityFields & { organization_id: string };
     readonly attributes: readonly RecordAttributeEntity[];
     readonly initialState: RecordState;
     readonly initialStateEventId: string;
@@ -2836,7 +2873,8 @@ export interface RecordWriteCreateBody {
 export interface RecordWriteEditBody {
     readonly kind: 'edit';
     readonly id: RecordId;
-    readonly record: Omit<RecordEntity, 'id'>;
+    readonly record:
+        RecordEntityFields & { organization_id: string };
     readonly attributes: readonly RecordAttributeEntity[];
     // The echoed lifecycle trio (Phase 6 Task 4, the SECOND
     // named wire delta): an edit now carries the SAME

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import { deriveRecordStateHistory } from
+    '../api/derive-records.ts';
 import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
@@ -9,21 +9,17 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import {
     getRecord,
+    getRecordModel,
     getRecords,
     putRecord,
-    getRecordState,
     postRecordChange,
     postRecordStateChange,
 } from '../web-app/app/adapters/records.ts';
-import {
-    getRecordStateDetail,
-} from '../web-app/app/adapters/state-events.ts';
 import {
     jsonArrayField,
 } from '../api/types.ts';
 import {
     seedCurrentMember,
-    seedHumanMember,
 } from './member-fixtures.ts';
 import {
     seedAdminSchema,
@@ -50,10 +46,8 @@ test(
         const stored = await getRecord(ctx, 'rec-1');
         assert.equal(stored.id, 'rec-1');
         assert.equal(stored.name, 'Customer');
-        const state = await getRecordState(
-            ctx, 'rec-1',
-        );
-        assert.equal(state, 'active');
+        // Lifecycle-current trio is stamped on the GET row.
+        assert.equal(stored.state, 'active');
     },
 );
 
@@ -151,9 +145,9 @@ test(
             ],
             initialState: 'active',
         });
-        // Echo the create's own known head — never a fresh
-        // mint (the RecordChangeEdit trio Task 4 added).
-        const head = await getRecordStateDetail(ctx, 'rec-1');
+        // Echo the create's own known head from the GET row
+        // trio — never a fresh mint (RecordChangeEdit).
+        const head = await getRecordModel(ctx, 'rec-1');
         await postRecordChange(ctx, 'rec-1', {
             kind: 'edit',
             record: {
@@ -171,9 +165,9 @@ test(
                     constraints: jsonArrayField([]),
                 },
             ],
-            state: head.state,
-            stateAt: head.stateAt,
-            stateEventId: head.stateEventId,
+            state: head.stateValue(),
+            stateAt: head.stateAtValue(),
+            stateEventId: head.stateEventIdValue(),
             removedAttributeIds: ['a-old'],
         });
         const attrs = await ctx.GET<
@@ -226,7 +220,8 @@ test(
 
 test(
     'postRecordStateChange records a new event'
-    + ' without touching the entity row',
+    + ' without changing non-lifecycle entity fields'
+    + ' on GET',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
@@ -242,29 +237,93 @@ test(
             attributes: [],
             initialState: 'active',
         });
-        const rec1 = await getRecord(ctx, 'rec-1');
+        const before = await getRecord(ctx, 'rec-1');
         await postRecordStateChange(
-            ctx, rec1, 'archived',
+            ctx, before, 'archived',
         );
-        const stored = await getRecord(ctx, 'rec-1');
-        assert.equal(stored.description, 'orig');
-        const state = await getRecordState(
+        const after = await getRecord(ctx, 'rec-1');
+        // Entity content fields unchanged; GET trio advances
+        // to the transition event (lifecycle-current stamp).
+        assert.equal(after.name, before.name);
+        assert.equal(after.description, 'orig');
+        assert.equal(after.position, before.position);
+        assert.equal(after.state, 'archived');
+        assert.notEqual(
+            after.state_event_id, before.state_event_id,
+        );
+        const model = await getRecordModel(
             ctx, 'rec-1',
         );
-        assert.equal(state, 'archived');
+        assert.equal(model.stateValue(), 'archived');
+        const events = await deriveRecordStateHistory(db, '1', 'rec-1');
+        assert.equal(
+            after.state_event_id, events.at(-1)?.id,
+        );
+        assert.equal(
+            after.state_at, events.at(-1)?.at,
+        );
     },
 );
 
+// getRecordState (the entity-states history reader) is
+// deleted — production-dead. Its throws-on-absence force
+// re-homes onto getRecordModel: a missing record is a GET
+// miss (Not found), not a dual-plane "no state event".
 test(
-    'getRecordState throws when no state event'
-    + ' exists for the record',
+    'getRecordModel rejects a missing record',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const ctx = createRequestContext(db, await organizationToken());
         await assert.rejects(
-            () => getRecordState(ctx, 'rec-missing'),
-            /no state event/,
+            () => getRecordModel(ctx, 'rec-missing'),
+            /Not found/,
+        );
+    },
+);
+
+// Former adapters-state-events pin: bulk record lifecycle
+// is the GET-stamped row collection — an idea with an
+// overlapping alphabet value must not appear as a record.
+test(
+    'getRecords excludes a same-valued idea',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedCurrentMember(db);
+        const ctx = createRequestContext(
+            db, await organizationToken(),
+        );
+        await postRecordChange(ctx, 'r1', {
+            kind: 'create',
+            record: {
+                name: 'R',
+                description: 'd',
+                position: 1,
+            },
+            attributes: [],
+            initialState: 'active',
+        });
+        await ctx.PUT('ideas/i1', {
+            title: 'I',
+            position: 1,
+            problem_statement: 'p',
+            target_users: 't',
+            proposed_solution: 's',
+            expected_outcome: 'o',
+            success_metrics: 'm',
+            state: 'archived',
+            state_at: '2026-01-01T00:00:01.000000Z',
+            state_event_id: 'ev-i1',
+        });
+        const rows = await getRecords(ctx);
+        const ids = rows.map(
+            r => r.record.idForLink(),
+        );
+        assert.ok(ids.includes('r1'));
+        assert.ok(
+            !ids.includes('i1'),
+            'idea must not leak into records',
         );
     },
 );
@@ -291,7 +350,7 @@ test(
         await postRecordStateChange(
             ctx, rec1, 'archived',
         );
-        const events = await deriveStatesFor(db, '1',
+        const events = await deriveRecordStateHistory(db, '1',
             'rec-1',
         );
         const values = events

@@ -17,6 +17,7 @@ import {
 } from '../../../api/work-order-claims.ts';
 import {
     validateWorkOrderFlowGraph,
+    getWorkOrderHistory,
     type WorkOrder,
 } from './work-orders-queries.ts';
 import {
@@ -37,7 +38,6 @@ import { sha256Bytes } from '../../../shared/digest.ts';
 import {
     nextPosition,
 } from '../drag-reorder-positions.ts';
-import type { StateEntity } from '../../../api/types.ts';
 import {
     validateRecordTransition,
     RecordTransitionViolations,
@@ -260,13 +260,13 @@ export async function postWorkOrderTransition(
     // transition implicitly releases it — carry a
     // 'claim_released' event the named POST writes atomically
     // alongside the transition. The release event is authored
-    // server-side by the verified caller (actor), exactly as
-    // the old commit batch authored it through PUT /states/:id.
-    const states = await ctx.GET<StateEntity[]>(
-        'states',
+    // server-side by the verified caller (actor). One
+    // per-id history read supplies the claim ledger.
+    const history = await getWorkOrderHistory(
+        ctx, workOrderId,
     );
     const latestClaim = latestClaimEvent(
-        states, workOrderId,
+        history, workOrderId,
     );
     const hasLiveClaim = latestClaim !== null
         && latestClaim.state === 'claimed'

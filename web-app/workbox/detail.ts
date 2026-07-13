@@ -17,9 +17,10 @@ import {
 import { navigateTo } from '../app/core.ts';
 import {
     getWorkOrder,
-    getWorkOrderTransitionEvents,
-    getStateFieldValuesByEvent,
-    getWorkOrderActiveClaim,
+    getWorkOrderHistory,
+    transitionEventsFromHistory,
+    fieldValuesByEventFromHistory,
+    activeClaimFromHistory,
     getMemberMap,
     postWorkOrderTransition,
     postWorkOrderClaim,
@@ -238,26 +239,24 @@ async function loadPresenter(
 ): Promise<WorkboxDetailPresenter> {
     const workOrder =
         await getWorkOrder(ctx, workOrderId);
-    const transitions =
-        await getWorkOrderTransitionEvents(
-            ctx, workOrderId,
-        );
-    const [
-        fieldValuesByEvent,
-        activeClaim,
-        memberMap,
-        recordId,
-    ] = await Promise.all([
-        getStateFieldValuesByEvent(
-            ctx, transitions.map(t => t.id),
-        ),
-        getWorkOrderActiveClaim(
-            ctx, workOrderId,
-            workOrder.flowGraph.lockTimeout,
-        ),
-        getMemberMap(ctx),
-        getRecordForWorkOrder(ctx, workOrderId),
-    ]);
+    // One per-id history read supplies transitions,
+    // field values, and the active claim (DESC wire;
+    // transitionEventsFromHistory sorts ASC).
+    const history =
+        await getWorkOrderHistory(ctx, workOrderId);
+    const transitions = transitionEventsFromHistory(
+        workOrderId, history,
+    );
+    const fieldValuesByEvent =
+        fieldValuesByEventFromHistory(history);
+    const activeClaim = activeClaimFromHistory(
+        history, workOrder.flowGraph.lockTimeout,
+    );
+    const [memberMap, recordId] =
+        await Promise.all([
+            getMemberMap(ctx),
+            getRecordForWorkOrder(ctx, workOrderId),
+        ]);
     const attributes: RecordAttribute[] =
         recordId === null
             ? []

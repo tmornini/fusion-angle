@@ -44,7 +44,6 @@ import {
     identityTargetsFor,
 } from './notifications.ts';
 import {
-    resolveOwningOrganization,
     resolveGlobalOwner,
 } from './derive-states.ts';
 import {
@@ -365,11 +364,10 @@ export async function handleRequest(
         // Region A of the pre-dispatch ownership fence (Phase 12
         // Task 1): every read below — fenceRequest's own
         // memberships/roleGrants/requests/responses reads, and
-        // the entity-states guard's pair-plane ownership
-        // resolve — is storage-corruption territory should it
-        // throw. Redact through the shared helper rather than
-        // letting the fault reach the wire; MissingTableError
-        // still escapes.
+        // the organizations/:id membership fence resolve — is
+        // storage-corruption territory should it throw. Redact
+        // through the shared helper rather than letting the
+        // fault reach the wire; MissingTableError still escapes.
         try {
             const fence = await fenceRequest(authed);
             if (!fence.ok) {
@@ -426,43 +424,6 @@ export async function handleRequest(
                     { error: 'Not found: ' + pathname },
                     { status: HTTP_NOT_FOUND },
                 );
-            }
-            // entity-states/:id/history reads derived state
-            // the store fence cannot cover; gate on PARENT
-            // ownership — a DIFFERENT org's entity 403s, an
-            // orphan or own entity passes. The history-leak
-            // bug gated on entity_id alone. Bare
-            // entity-states/:id RETIRED (Phase 15 Task 7).
-            if (method === 'GET'
-                && fencePattern
-                    === 'entity-states/:id/history') {
-                // PAIR-PLANE (Phase 15 Task 5): ownership
-                // resolves through resolveOwningOrganization
-                // (org-nested documents, invitations, flow-
-                // graph history, memberships, organizations
-                // self-as-owner) — never the raw entity-table
-                // probes. Soft-deleted and hard-spliced parents
-                // still report their true owner via the
-                // append-only pair plane.
-                const entityId = param(fenceParams, 0);
-                const owner = await resolveOwningOrganization(
-                    adapter,
-                    entityId,
-                    fenced.organization,
-                );
-                if (owner !== null
-                    && owner !== fenced.organization) {
-                    return Response.json(
-                        {
-                            error:
-                                foreignOrganizationMessage(
-                                    'entity_states',
-                                    entityId,
-                                ),
-                        },
-                        { status: HTTP_FORBIDDEN },
-                    );
-                }
             }
             actor = fenced.principal.id;
             organization = fenced.organization;

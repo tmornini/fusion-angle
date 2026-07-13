@@ -248,19 +248,28 @@ export function stateHistoryFrom(
                         : 0);
 }
 
-// The CURRENT lifecycle state: the (state_at, state_event_id)
+// The CURRENT lifecycle event: the (state_at, state_event_id)
 // reduction over a document's FULL history — a later `at` wins,
 // an equal `at` falls to the larger id — never arrival order,
 // never the envelope `at`s, so a clock-skewed transition (an
 // older state_at than genesis) never displaces genesis. Mirrors
 // StateStore.getCurrentForIn's own (at, id) reduction over the
 // real states table exactly (shared/ledger-reduction.ts's
-// default compare).
+// default compare). Families that stamp the lifecycle trio on
+// GET rows (ideas, projects, records, objectives, members)
+// read the whole event; others only need `.state` via
+// currentDocumentState.
+export function currentLifecycleEvent(
+    history: readonly StateEntity[],
+): StateEntity | undefined {
+    return latestByKey(history, () => 'current')
+        .get('current');
+}
+
 export function currentDocumentState(
     history: readonly StateEntity[],
 ): string | undefined {
-    return latestByKey(history, () => 'current')
-        .get('current')?.state;
+    return currentLifecycleEvent(history)?.state;
 }
 
 // The shared id-lex ordering (the IndexedDB reference) every

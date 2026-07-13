@@ -9,7 +9,9 @@ import type {
 import {
     Idea, nowUtc,
     ideaIsVisible,
+    assertIdeaState,
 } from '../../../api/types.ts';
+import type { IdeaStateDetail } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     getCurrentHumanMember,
@@ -27,10 +29,6 @@ import {
 import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
-import {
-    getIdeaStateDetail,
-    getIdeaStateDetails,
-} from './state-events.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -120,33 +118,40 @@ export interface IdeaWithSubmitter {
     readonly submittedAt: string;
 }
 
+// Lifecycle-current trio is stamped on the IdeaEntity GET
+// row (Phase A). Map snake_case wire → IdeaStateDetail;
+// no second hop to the states log / entity-states history.
+function ideaStateDetailFromRow(
+    row: IdeaEntity,
+): IdeaStateDetail {
+    return {
+        state: assertIdeaState(
+            row.state, 'idea ' + row.id,
+        ),
+        stateAt: row.state_at,
+        stateEventId: row.state_event_id,
+    };
+}
+
 export async function getIdeas(
     ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
     const rows = await getIdeaEntities(ctx);
     const [
-        memberMap, submissions, stateMap,
+        memberMap, submissions,
     ] = await Promise.all([
         getMemberMap(ctx),
         getIdeaSubmissionEntities(
             ctx, rows.map(r => r.id),
         ),
-        getIdeaStateDetails(ctx),
     ]);
     const submissionMap = new Map(
         submissions.map(s => [s.idea_id, s]),
     );
     return rows
-        .filter(row => {
-            const detail = stateMap.get(row.id);
-            if (detail === undefined) {
-                throw new Error(
-                    'Idea has no state event: '
-                    + row.id,
-                );
-            }
-            return ideaIsVisible(detail.state);
-        })
+        .filter(row => ideaIsVisible(
+            ideaStateDetailFromRow(row).state,
+        ))
         .map(row => {
             const submission =
                 submissionMap.get(row.id);
@@ -156,9 +161,11 @@ export async function getIdeas(
                     + row.id,
                 );
             }
-            const detail = stateMap.get(row.id)!;
             return {
-                idea: new Idea(row, detail),
+                idea: new Idea(
+                    row,
+                    ideaStateDetailFromRow(row),
+                ),
                 entity: row,
                 submitterName: memberName(
                     memberMap,
@@ -175,15 +182,16 @@ export async function getIdea(
     ideaId: string,
 ): Promise<IdeaWithSubmitter> {
     const [
-        row, submission, memberMap, detail,
+        row, submission, memberMap,
     ] = await Promise.all([
         getIdeaEntity(ctx, ideaId),
         getIdeaSubmissionEntity(ctx, ideaId),
         getMemberMap(ctx),
-        getIdeaStateDetail(ctx, ideaId),
     ]);
     return {
-        idea: new Idea(row, detail),
+        idea: new Idea(
+            row, ideaStateDetailFromRow(row),
+        ),
         entity: row,
         submitterName: memberName(
             memberMap, submission.member_id,
@@ -205,9 +213,18 @@ export async function getIdea(
 // genuine transition (postIdeaStateChange below) mints a fresh
 // trio. Genesis (postIdeaCreation below) is just the
 // head-absent case of this SAME PUT (Decision 7) — one shape
-// serves create, edit, and transition.
+// serves create, edit, and transition. GET IdeaEntity also
+// carries snake_case lifecycle stamp fields — omit them here
+// so the PUT body is not double-keyed (snake + camel).
 export type IdeaDocumentFields =
-    Omit<IdeaEntity, 'id' | 'organization_id'> & {
+    Omit<
+        IdeaEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    > & {
         readonly state: IdeaState;
         readonly stateAt: string;
         readonly stateEventId: string;
@@ -244,7 +261,14 @@ export async function putIdea(
 export async function postIdeaCreation(
     ctx: RequestContext,
     id: string,
-    entity: Omit<IdeaEntity, 'id' | 'organization_id'>,
+    entity: Omit<
+        IdeaEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >,
     initialState: IdeaState,
 ): Promise<void> {
     await putIdea(ctx, id, {
@@ -259,13 +283,23 @@ export async function postIdeaCreation(
 // (mint-once-reuse — a retry of the SAME transition resends
 // this same pinned pair, converging at the op) over the
 // idea's CURRENT entity fields — hop count 1 → 1 (one
-// ctx.PUT, via putIdea).
+// ctx.PUT, via putIdea). Strip GET-stamped snake_case trio
+// so putIdea's camelCase mint is the only lifecycle payload.
 export async function postIdeaStateChange(
     ctx: RequestContext,
     idea: IdeaEntity,
     state: IdeaState,
 ): Promise<void> {
-    const { id, ...entity } = idea;
+    const {
+        id,
+        state: _priorState,
+        state_at: _priorAt,
+        state_event_id: _priorEventId,
+        ...entity
+    } = idea;
+    void _priorState;
+    void _priorAt;
+    void _priorEventId;
     await putIdea(ctx, id, {
         ...entity,
         state,
@@ -325,9 +359,23 @@ export async function postIdeaConversion(
     ctx: RequestContext,
     ideaId: string,
     projectId: string,
-    project: Omit<ProjectEntity, 'id' | 'organization_id'>,
+    project: Omit<
+        ProjectEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >,
     projectState: ProjectState,
-    promotedIdea: Omit<IdeaEntity, 'id' | 'organization_id'>,
+    promotedIdea: Omit<
+        IdeaEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >,
     baselines: readonly {
         objectiveId: ObjectiveId;
         score: number;

@@ -11,13 +11,11 @@ import {
     postProjectArchival,
 } from '../web-app/app/adapters/project-publish.ts';
 import {
-    getProjectState,
-} from '../web-app/app/adapters/state-events.ts';
-import { putProject } from
-    '../web-app/app/adapters/projects.ts';
+    getProjectEntity,
+    putProject,
+} from '../web-app/app/adapters/projects.ts';
 import {
     seedCurrentMember,
-    seedHumanMember,
 } from './member-fixtures.ts';
 import {
     seedAdminSchema,
@@ -110,8 +108,8 @@ test('postProjectApproval moves state to approved',
               at: '2026-05-14T00:00:00.000000Z' },
         );
         await postProjectApproval(ctx, 'p1');
-        const s = await getProjectState(ctx, 'p1');
-        assert.equal(s, 'approved');
+        const row = await getProjectEntity(ctx, 'p1');
+        assert.equal(row.state, 'approved');
     });
 
 test('postProjectApproval throws when not ready',
@@ -173,6 +171,6 @@ test('postProjectArchival moves state to archived',
               at: '2026-05-15T00:00:00.000000Z' },
         );
         await postProjectArchival(ctx, 'p1');
-        const s = await getProjectState(ctx, 'p1');
-        assert.equal(s, 'archived');
+        const row = await getProjectEntity(ctx, 'p1');
+        assert.equal(row.state, 'archived');
     });

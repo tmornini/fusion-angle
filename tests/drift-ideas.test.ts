@@ -69,10 +69,9 @@ function ideaDocument(
     };
 }
 
-// Wire entity shape WRITE_RESPONSE_SPECS + ideaEntityOf form
-// (id first, organization_id, then entity fields — JSON key
-// order of documentWriteResponseSpec successBody).
-function wireIdea(
+// PUT response shape (documentWriteResponseSpec successBody):
+// entity fields only — no lifecycle trio on the write wire.
+function wireIdeaPut(
     id: string,
     title: string,
     position = 1,
@@ -88,6 +87,26 @@ function wireIdea(
         proposed_solution: 's',
         expected_outcome: 'o',
         success_metrics: 'm',
+    };
+}
+
+// GET ideaEntityOf form: entity fields plus lifecycle-current
+// trio (state ← event.state, state_at ← event.at,
+// state_event_id ← event.id) — never the head body trio.
+function wireIdeaGet(
+    id: string,
+    title: string,
+    state: string,
+    stateAt: string,
+    stateEventId: string,
+    position = 1,
+    organization = '1',
+) {
+    return {
+        ...wireIdeaPut(id, title, position, organization),
+        state,
+        state_at: stateAt,
+        state_event_id: stateEventId,
     };
 }
 
@@ -208,14 +227,23 @@ async () => {
         // the stored pair; values match WRITE_RESPONSE_SPECS.
         assert.deepEqual(
             await put.json(),
-            wireIdea(f.id, f.title),
+            wireIdeaPut(f.id, f.title),
         );
     }
     // id-lex expected order: a, m, z — NOT insertion order.
     const expectedAdded = [
-        wireIdea('idea-drift-a', 'Alpha'),
-        wireIdea('idea-drift-m', 'Mike'),
-        wireIdea('idea-drift-z', 'Zulu'),
+        wireIdeaGet(
+            'idea-drift-a', 'Alpha', 'active',
+            '2026-07-01T00:00:01.000000Z', 'ev-drift-a',
+        ),
+        wireIdeaGet(
+            'idea-drift-m', 'Mike', 'active',
+            '2026-07-01T00:00:02.000000Z', 'ev-drift-m',
+        ),
+        wireIdeaGet(
+            'idea-drift-z', 'Zulu', 'active',
+            '2026-07-01T00:00:00.000000Z', 'ev-drift-z',
+        ),
     ];
     const res = await handleRequest(
         db, req('GET', '/ideas', token),
@@ -273,14 +301,18 @@ test('derived history keeps the FIRST arrival\'s authorship'
     assert.equal(derived[0]!.member_id, 'current');
 
     // Wire entity reflects the SECOND title; authorship of the
-    // head event stays on member A.
+    // head event stays on member A; GET trio is the one event.
     const getRes = await handleRequest(
         db, req('GET', '/ideas/' + ideaId, tokenA),
     );
     assert.equal(getRes.status, 200);
     assert.equal(
         await getRes.text(),
-        JSON.stringify(wireIdea(ideaId, 'Second')),
+        JSON.stringify(wireIdeaGet(
+            ideaId, 'Second', 'active',
+            '2026-04-01T00:00:00.000000Z',
+            'ev-drift-authorship-caveat',
+        )),
     );
 });
 
@@ -393,9 +425,12 @@ test('live-write lifecycle: create + edit + transition +'
     assert.equal(beforeDelete.status, 200);
     assert.equal(
         await beforeDelete.text(),
-        JSON.stringify(
-            wireIdea(ideaId, 'Lifecycle Idea Edited', 2),
-        ),
+        JSON.stringify(wireIdeaGet(
+            ideaId, 'Lifecycle Idea Edited', 'in_review',
+            '2026-03-02T00:00:00.000000Z',
+            'ev-drift-lifecycle-review',
+            2,
+        )),
     );
 
     await handleRequest(db, req(
@@ -495,14 +530,81 @@ test('live approve then convert: derived idea history'
     );
     // Entity GET still serves the promoted idea (only
     // 'deleted' tombstones); list filters via ideaIsVisible.
+    // GET trio is the lifecycle-current 'promoted' event.
     const getRes = await handleRequest(
         db, req('GET', '/ideas/' + ideaId, token),
     );
     assert.equal(getRes.status, 200);
     assert.equal(
         await getRes.text(),
-        JSON.stringify(
-            wireIdea(ideaId, 'Approve Then Convert'),
-        ),
+        JSON.stringify(wireIdeaGet(
+            ideaId, 'Approve Then Convert', 'promoted',
+            '2026-06-03T00:00:00.000000Z',
+            'ev-drift-conversion-promoted',
+        )),
     );
+});
+
+// case-7d mirror for ideas GET: a clock-skewed later arrival
+// whose state_at sorts BELOW genesis does NOT displace genesis
+// as lifecycle-current. Head body fields (title) may reflect
+// the later arrival; the GET trio must stay genesis.
+test('GET idea trio is lifecycle-current under clock skew'
++ ' (genesis-wins-under-skew, case 7d)', async () => {
+    const db = await seededDb();
+    const token = await organizationToken();
+    const ideaId = 'idea-drift-skew-1';
+    const genesisAt = '2026-05-01T00:00:00.000000Z';
+    const genesisEv = ideaId + '-genesis';
+    const skewedAt = '2020-01-01T00:00:00.000000Z';
+    const skewedEv = ideaId + '-skewed';
+
+    const genesis = await handleRequest(db, req(
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Genesis Title', 'active', genesisAt, genesisEv,
+        ),
+    ));
+    assert.equal(genesis.status, 200);
+
+    // Later arrival, earlier state_at, different state + title.
+    const skewed = await handleRequest(db, req(
+        'PUT', '/ideas/' + ideaId, token,
+        ideaDocument(
+            'Skewed Title', 'in_review', skewedAt, skewedEv,
+        ),
+    ));
+    assert.equal(skewed.status, 200);
+
+    const expected = wireIdeaGet(
+        ideaId, 'Skewed Title', 'active', genesisAt, genesisEv,
+    );
+    const getRes = await handleRequest(
+        db, req('GET', '/ideas/' + ideaId, token),
+    );
+    assert.equal(getRes.status, 200);
+    assert.equal(await getRes.text(), JSON.stringify(expected));
+
+    const derived = await deriveIdea(db, '1', ideaId);
+    assert.equal(
+        JSON.stringify(derived), JSON.stringify(expected),
+    );
+    assert.equal(derived.title, 'Skewed Title');
+    assert.equal(derived.state, 'active');
+    assert.equal(derived.state_at, genesisAt);
+    assert.equal(derived.state_event_id, genesisEv);
+
+    const listRes = await handleRequest(
+        db, req('GET', '/ideas', token),
+    );
+    assert.equal(listRes.status, 200);
+    const list = await listRes.json() as {
+        id: string;
+        state: string;
+        state_at: string;
+        state_event_id: string;
+        title: string;
+    }[];
+    const row = list.find((idea) => idea.id === ideaId);
+    assert.deepEqual(row, expected);
 });

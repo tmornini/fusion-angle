@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
+import { deriveMemberStates } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { GET, POST, PUT, handleRequest } from '../api/api.ts';
@@ -102,7 +102,7 @@ test(
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'entity-states/w1/history', DEV_TOKEN);
+        }[]>(db, 'members/w1/history', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
         assert.equal(current.state, 'active');
@@ -173,7 +173,8 @@ test(
             db, 'human-members/w1', DEV_TOKEN);
         assert.equal(facet.title, 'Director');
         // The edit wrote no event — the lone create event holds.
-        const events = await deriveStatesFor(db, '1', 'w1');
+        const events = (await deriveMemberStates(db))
+            .filter((e) => e.entity_id === 'w1');
         // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');

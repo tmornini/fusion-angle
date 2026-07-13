@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
+import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { GET, POST } from '../api/api.ts';
@@ -139,7 +139,7 @@ test(
         assert.equal(links[0]!.flow_id, 'f1');
         assert.equal(links[0]!.work_order_id, 'wo-1');
 
-        const events = await deriveStatesFor(db, '1', 'wo-1');
+        const events = await workOrderLifecycleStatesFor(db, '1', 'wo-1');
         // Phase Final Stage B: states table retired.
         assert.equal(events.length, 3);
         // The three events land IN ORDER: start, post-start,
@@ -163,7 +163,7 @@ test(
         const db = await freshDb();
         await POST(db, 'work-orders', createBody(), DEV_TOKEN);
 
-        const events = await deriveStatesFor(db, '1', 'wo-1');
+        const events = await workOrderLifecycleStatesFor(db, '1', 'wo-1');
         // Phase Final Stage B: states table retired.
         assert.equal(events.length, 3);
         const byId = new Map(
@@ -202,7 +202,7 @@ test(
             db, 'work-orders/wo-1', DEV_TOKEN,
         );
         assert.equal(wo.id, 'wo-1');
-        const woEvents = await deriveStatesFor(
+        const woEvents = await workOrderLifecycleStatesFor(
             db, '1', 'wo-1',
         );
         assert.equal(woEvents.length, 3);

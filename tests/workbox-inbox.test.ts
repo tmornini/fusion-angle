@@ -27,15 +27,13 @@ import {
     getWorkOrders,
     putWorkOrder,
     type WorkOrder,
+    type TransitionEvent,
 } from '../web-app/app/adapters/index.ts';
 import {
     buildInboxItems,
     type ActiveClaim,
 } from
 '../web-app/app/presenters/workbox-inbox.ts';
-import type {
-    TransitionEvent,
-} from '../web-app/app/adapters/state-events.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';

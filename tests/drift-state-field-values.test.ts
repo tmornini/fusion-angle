@@ -12,8 +12,9 @@ import { seedCurrentMember } from './member-fixtures.ts';
 import { nowUtc } from '../api/types.ts';
 import {
     deriveStateFieldValueReferrers,
-    stateFieldValuesForStateEvent,
 } from '../api/derive-state-field-values.ts';
+import { workOrderHistoryFor } from
+    '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 
@@ -22,8 +23,9 @@ import { STARK_ORGANIZATION } from
 // the SFV table is empty after live transitions. Coverage
 // re-homes to pair-plane derive + wire-byte handleRequest
 // assertions. Leaf PUT/DELETE routes retired Phase 15 Task 7;
-// live writes ride the transition fold only. Seed still forms
-// leaf-address pairs via formSeedPair (WRS survives).
+// GET states/:id/field-values retired (states-URI elimination
+// C4) — product reads fold field values on work-order
+// history. Live writes ride the transition fold only.
 
 const BASE = 'http://localhost';
 const LOCK_TIMEOUT_SECONDS = 300;
@@ -111,8 +113,10 @@ async () => {
     // Phase Final Stage B: state_field_values table retired.
 });
 
-test('GET /states/:id/field-values wire equals'
-+ ' stateFieldValuesForStateEvent over a live fold',
+// C4: route parity re-homes onto work-order history
+// (inline field_values fold), not GET states/:id/field-values.
+test('GET work-orders/:id/history wire equals'
++ ' workOrderHistoryFor over a live fold',
 async () => {
     const db = await seededDb();
     await POST(
@@ -135,23 +139,27 @@ async () => {
 
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/states/te1/field-values', token),
+        db, req('GET', '/work-orders/wo1/history', token),
     );
     assert.equal(res.status, 200);
     const wireText = await res.text();
-    const derived = await stateFieldValuesForStateEvent(
-        db, STARK_ORGANIZATION, 'te1',
+    const derived = await workOrderHistoryFor(
+        db, STARK_ORGANIZATION, 'wo1',
     );
     assert.equal(wireText, JSON.stringify(derived));
-    assert.equal(derived.length, 1);
-    assert.equal(derived[0]!.id, 'fv-1');
-    // Phase Final Stage B: state_field_values table retired.
+    const transition = derived.find((row) => row.id === 'te1');
+    assert.ok(transition !== undefined);
+    assert.deepEqual(transition!.field_values, [{
+        id: 'fv-1',
+        attribute_id: 'attr-1',
+        value: 'high',
+    }]);
 });
 
 // Non-lex field-value ids so collection order is not
 // insertion order (byIdAscending craftsmanship).
-test('GET field-values collection is id-lex ordered after'
-+ ' non-lex transition fold', async () => {
+test('work-order history field_values are id-lex ordered'
++ ' after non-lex transition fold', async () => {
     const db = await seededDb();
     await POST(
         db, 'work-orders/wo1/transition', {
@@ -190,12 +198,17 @@ test('GET field-values collection is id-lex ordered after'
     );
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/states/te-lex/field-values', token),
+        db, req('GET', '/work-orders/wo1/history', token),
     );
     assert.equal(res.status, 200);
-    const list = await res.json() as { id: string }[];
+    const list = await res.json() as {
+        id: string;
+        field_values: { id: string }[];
+    }[];
+    const transition = list.find((row) => row.id === 'te-lex');
+    assert.ok(transition !== undefined);
     assert.deepEqual(
-        list.map(r => r.id),
+        transition!.field_values.map(r => r.id),
         ['fv-a', 'fv-m', 'fv-z'],
     );
 });

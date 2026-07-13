@@ -8,7 +8,7 @@ import {
     MS_PER_SECOND,
 } from '../../api/types.ts';
 import type { TransitionEvent }
-    from './adapters/state-events.ts';
+    from './adapters/work-orders-queries.ts';
 import { shouldShowMemberHazard } from './flow-graph.ts';
 import type { MemberHazardLevel } from './flow-graph.ts';
 

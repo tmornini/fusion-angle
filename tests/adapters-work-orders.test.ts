@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
+import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import {
@@ -20,6 +20,10 @@ import {
 '../web-app/app/adapters/work-orders-mutations.ts';
 import {
     getWorkOrder,
+    getWorkOrderActiveClaim,
+    getWorkOrderCurrentNodeId,
+    getWorkOrderTransitionEvents,
+    getActiveClaimsByWorkOrder,
 } from
 '../web-app/app/adapters/work-orders-queries.ts';
 import {
@@ -31,13 +35,6 @@ import {
     generateCryptoSafeBase62,
 } from
 '../shared/crypto-safe-base62.ts';
-import {
-    getWorkOrderActiveClaim,
-    getActiveClaimsByWorkOrder,
-    getWorkOrderCurrentNodeId,
-    getWorkOrderTransitionEvents,
-} from
-'../web-app/app/adapters/state-events.ts';
 import {
     deleteWorkOrderClaim,
 } from
@@ -281,7 +278,7 @@ test(
         // is residual pin.
 
         const events =
-            await deriveStatesFor(db, '1', woId);
+            await workOrderLifecycleStatesFor(db, '1', woId);
         // start node, post-start, claimed
         assert.equal(events.length, 3);
         const nonClaim = events.filter(
@@ -598,7 +595,7 @@ test(
         await pause(2);
         await postWorkOrderClaim(ctx, woId);
         const events =
-            await deriveStatesFor(db, '1', woId);
+            await workOrderLifecycleStatesFor(db, '1', woId);
         const claimed = events.filter(
             (e: StateEntity) =>
                 e.state === 'claimed',
@@ -785,7 +782,7 @@ test(
         const woId = await createWorkOrder(ctx, 'f1');
         await deleteWorkOrderClaim(ctx, woId);
         const events = await ctx.GET<StateEntity[]>(
-            'entity-states/' + woId + '/history',
+            'work-orders/' + woId + '/history',
         );
         const released = events.filter(
             (e) => e.state === 'claim_released',
@@ -827,7 +824,7 @@ test(
         });
 
         const allEvents =
-            await deriveStatesFor(db, '1', woId);
+            await workOrderLifecycleStatesFor(db, '1', woId);
         const transitionEvt = allEvents.find(
             (e: StateEntity) =>
                 e.state === 'n-finish',

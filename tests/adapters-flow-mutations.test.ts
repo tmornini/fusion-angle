@@ -149,7 +149,7 @@ test(
         await createBaseFlow(ctx, 'flow-1');
         const events =
             await ctx.GET<StateEntity[]>(
-                'entity-states/flow-1/history',
+                'flows/flow-1/history',
             );
         assert.equal(events.length, 1);
         const ev = events[0]!;
@@ -174,12 +174,13 @@ test(
         });
         const events =
             await ctx.GET<StateEntity[]>(
-                'entity-states/flow-1/history',
+                'flows/flow-1/history',
             );
         assert.equal(events.length, 2);
+        // Family history is DESC — current first.
         const states = events.map(e => e.state);
         assert.deepEqual(
-            states, ['active', 'updated'],
+            states, ['updated', 'active'],
         );
     },
 );
@@ -348,7 +349,7 @@ test(
         await ctx.PUT('flows/flow-1', body, headers);
         await ctx.PUT('flows/flow-1', body, headers);
         const events = await ctx.GET<StateEntity[]>(
-            'entity-states/flow-1/history',
+            'flows/flow-1/history',
         );
         assert.equal(events.length, 2);
     },
@@ -383,10 +384,11 @@ test(
             at: '2099-01-02T00:00:00.000000Z',
         });
         const events = await ctx.GET<StateEntity[]>(
-            'entity-states/flow-1/history',
+            'flows/flow-1/history',
         );
+        // Family history is DESC — index 0 is current.
         assert.equal(
-            events.at(-1)!.at,
+            events[0]!.at,
             '2099-01-02T00:00:00.000000Z',
         );
     },
@@ -426,10 +428,11 @@ test(
             ifResponseIdHeaders(responseId),
         );
         const events = await ctx.GET<StateEntity[]>(
-            'entity-states/flow-1/history',
+            'flows/flow-1/history',
         );
+        // Family history is DESC — index 0 is current.
         assert.equal(
-            events.at(-1)!.at,
+            events[0]!.at,
             '2099-01-03T00:00:00.000000Z',
         );
     },

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import { deriveRecordStateHistory } from
+    '../api/derive-records.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -134,7 +134,7 @@ test('postRecordDocumentOp genesis (head-absent) returns the'
 async () => {
     const db = await freshDb();
     // Phase Final Task 2: states ROW half stripped — pair
-    // required for deriveStatesFor to see the genesis trio.
+    // required for deriveRecordStateHistory to see genesis.
     const body = {
         ...recordDocument('Fresh', 'active', AT, 'ev-1'),
         organization_id: '1',
@@ -156,7 +156,7 @@ async () => {
     assert.equal(written.name, 'Fresh');
     assert.equal(written.organization_id, '1');
     // Phase Final Stage B: records table retired.
-    const events = await deriveStatesFor(db, '1', 'rec-1');
+    const events = await deriveRecordStateHistory(db, '1', 'rec-1');
     assert.equal(events.length, 1);
     assert.equal(events[0]!.state, 'active');
     assert.equal(events[0]!.member_id, 'current');
@@ -207,7 +207,7 @@ async () => {
         },
         'member-b',
     );
-    const events = await deriveStatesFor(db, '1', 'rec-2');
+    const events = await deriveRecordStateHistory(db, '1', 'rec-2');
     assert.equal(events.length, 1);
     assert.equal(events[0]!.member_id, 'current');
     assert.equal(second.name, 'Second');
@@ -261,7 +261,7 @@ test('postRecordDocumentOp with a fresh trio posts a'
     await postRecordDocumentOp(
         db, 'rec-3', secondBody, 'current', secondPair,
     );
-    const events = await deriveStatesFor(db, '1', 'rec-3');
+    const events = await deriveRecordStateHistory(db, '1', 'rec-3');
     assert.deepEqual(
         events.map(e => e.state).toSorted(),
         ['active', 'archived'],
@@ -290,7 +290,7 @@ test('a byte-identical resend replays the stored response:'
     await handleRequest(
         db, req('PUT', '/records/rec-resend', token, body),
     );
-    const events = await deriveStatesFor(db, '1', 'rec-resend');
+    const events = await deriveRecordStateHistory(db, '1', 'rec-resend');
     assert.equal(events.length, 1);
     assert.equal((await db.requests.getAll()).length, 4);
     assert.equal((await db.responses.getAll()).length, 4);

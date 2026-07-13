@@ -1,6 +1,6 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import { deriveProjectStateHistory } from
+    '../api/derive-projects.ts';
 import { strict as assert } from 'node:assert';
 
 import {
@@ -32,12 +32,26 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 
+// PUT body entity fields only — seed/put supply the lifecycle
+// trio (state/stateAt/stateEventId). GET ProjectEntity carries
+// the stamped trio (Phase A); list/detail read it from the row.
 function buildProject(
     id: string,
     title: string,
-    overrides?: Partial<ProjectEntity>,
-): Omit<ProjectEntity, 'id'> {
-    const base: Omit<ProjectEntity, 'id'> = {
+    overrides?: Partial<
+        Omit<
+            ProjectEntity,
+            | 'id'
+            | 'state'
+            | 'state_at'
+            | 'state_event_id'
+        >
+    >,
+): Omit<
+    ProjectEntity,
+    'id' | 'state' | 'state_at' | 'state_event_id'
+> {
+    return {
         organization_id: '1',
         title,
         description: 'desc for ' + title,
@@ -47,11 +61,8 @@ function buildProject(
         estimated_cost: 50000,
         actual_cost: 12000,
         position: 1,
+        ...overrides,
     };
-    const { id: _drop, ...rest } = {
-        ...base, ...overrides, id,
-    } as ProjectEntity;
-    return rest;
 }
 
 // Seeds a project through the SAME document PUT the live route
@@ -331,7 +342,8 @@ test(
 
 test(
     'postProjectStateChange records a state event'
-    + ' without changing entity fields on GET',
+    + ' without changing non-lifecycle entity fields'
+    + ' on GET',
     async () => {
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
@@ -342,20 +354,42 @@ test(
         const {
             id: _id,
             organization_id: _org,
+            state: _priorState,
+            state_at: _priorAt,
+            state_event_id: _priorEventId,
             ...fields
         } = before;
+        void _priorState;
+        void _priorAt;
+        void _priorEventId;
 
         await postProjectStateChange(
             ctx, 'p1', fields, 'archived',
         );
 
         const after = await getProjectEntity(ctx, 'p1');
-        assert.deepEqual(after, before);
-        const events = await deriveStatesFor(db, '1', 'p1');
+        // Entity content fields unchanged; GET trio advances
+        // to the transition event (lifecycle-current stamp).
+        assert.equal(after.title, before.title);
+        assert.equal(after.position, before.position);
+        assert.equal(
+            after.description, before.description,
+        );
+        assert.equal(after.state, 'archived');
+        assert.notEqual(
+            after.state_event_id, before.state_event_id,
+        );
+        const events = await deriveProjectStateHistory(db, '1', 'p1');
         // genesis + transition
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'archived',
+        );
+        assert.equal(
+            after.state_event_id, events.at(-1)?.id,
+        );
+        assert.equal(
+            after.state_at, events.at(-1)?.at,
         );
     },
 );

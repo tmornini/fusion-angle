@@ -1,5 +1,5 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
+import { deriveMemberStates } from
     '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { adminContext } from './context-fixtures.ts';
@@ -60,7 +60,8 @@ test(
         const pii = await deriveIdentityPii(db, 'w1');
         assert.equal(pii.name, 'Alice');
         // Phase Final Stage B: identity spine tables retired.
-        const events = await deriveStatesFor(db, '1', 'w1');
+        const events = (await deriveMemberStates(db))
+            .filter((e) => e.entity_id === 'w1');
         // Phase Final Stage B: states table retired.
         assert.equal(events.length, 1);
         assert.equal(events[0]?.state, 'active');
@@ -95,11 +96,12 @@ test(
         // Archive rides PUT members/:id with a fresh
         // trio — pin history via the live derived path.
         const events = await ctx.GET<StateEntity[]>(
-            'entity-states/w1/history',
+            'members/w1/history',
         );
         assert.equal(events.length, 2);
+        // Family history is DESC — index 0 is current.
         assert.equal(
-            events.at(-1)?.state, 'archived',
+            events[0]?.state, 'archived',
         );
     },
 );

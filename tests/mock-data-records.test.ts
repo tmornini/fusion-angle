@@ -1,6 +1,8 @@
 import { test } from 'node:test';
-import { deriveStatesFor } from
-    '../api/derive-states.ts';
+import {
+    workOrderLifecycleStatesFor,
+    workOrderHistoryFor,
+} from '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import {
     memoryDbAdapter,
@@ -16,9 +18,6 @@ import {
 } from '../api/validators.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import {
-    stateFieldValuesForStateEvent,
-} from '../api/derive-state-field-values.ts';
 import {
     documentCollectionGetHandler,
     type DocumentFamilyWiring,
@@ -60,7 +59,7 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
     notFoundTable: 'records',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
-    entityOf: (document, organization) => ({
+    entityOf: (document, organization, current) => ({
         id: document.uriId,
         organization_id: organization,
         name: String(document.body['name'] ?? ''),
@@ -68,6 +67,9 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
             document.body['description'] ?? '',
         ),
         position: Number(document.body['position'] ?? 0),
+        state: current!.state,
+        state_at: current!.at,
+        state_event_id: current!.id,
     }),
 };
 
@@ -276,7 +278,7 @@ test(
                 'wo.flow_graph',
             );
 
-        const events = await deriveStatesFor(db, '1', woId);
+        const events = await workOrderLifecycleStatesFor(db, '1', woId);
         const transitions = events.filter(
             e => e.state !== 'claimed'
                 && e.state !== 'claim_released'
@@ -312,16 +314,12 @@ test(
             + ' edges so the gate is reachable',
         );
 
-        const eventIds = transitions.map(t => t.id);
-        const values = (
-            await Promise.all(
-                eventIds.map(id =>
-                    stateFieldValuesForStateEvent(
-                        db, STARK_ORGANIZATION, id,
-                    ),
-                ),
-            )
-        ).flat();
+        const history = await workOrderHistoryFor(
+            db, STARK_ORGANIZATION, woId,
+        );
+        const values = history.flatMap(
+            (row) => row.field_values,
+        );
         const storedAttrIds = new Set(
             values.map(v => v.attribute_id),
         );

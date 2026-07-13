@@ -15,10 +15,10 @@ import { STARK_ORGANIZATION } from
 
 // Objectives' own state-history reduction (states-address
 // retirement): unit-level trio walk + echo dedup, and the
-// deriveStatesFor union leg that serves GET /entity-states/:id/
-// history. Uses seedAdminSchema (not postMockDataLoad) so the
-// suite stays self-contained; seeded genesis lives in
-// mock-data/drift pins. Writes go through the live gate.
+// family history route GET objectives/:id/history. Uses
+// seedAdminSchema (not postMockDataLoad) so the suite stays
+// self-contained; seeded genesis lives in mock-data/drift
+// pins. Writes go through the live gate.
 
 const BASE = 'http://localhost';
 
@@ -80,8 +80,8 @@ test('deriveObjectiveStateHistory returns the trio walk in'
     );
 });
 
-test('GET /entity-states/:id/history carries the objective'
-+ ' trio rows (deriveStatesFor union)', async () => {
+test('GET objectives/:id/history carries the objective'
++ ' trio rows (DESC current-first)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const id = 'obj-derive-history-1';
@@ -100,9 +100,16 @@ test('GET /entity-states/:id/history carries the objective'
         },
     ));
     const res = await handleRequest(db, req(
-        'GET', '/entity-states/' + id + '/history', token,
+        'GET', '/objectives/' + id + '/history', token,
     ));
     assert.equal(res.status, 200);
-    const rows = JSON.parse(await res.text());
+    const rows = JSON.parse(await res.text()) as {
+        id: string; state: string;
+    }[];
     assert.equal(rows.length, 2);
+    // Family history is DESC — index 0 is current.
+    assert.equal(rows[0]!.id, id + '-ev2');
+    assert.equal(rows[0]!.state, 'archived');
+    assert.equal(rows[1]!.id, id + '-ev1');
+    assert.equal(rows[1]!.state, 'active');
 });

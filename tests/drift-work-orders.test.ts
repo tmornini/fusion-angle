@@ -43,10 +43,10 @@ import {
 } from '../api/work-order-claims.ts';
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
-import { deriveStatesFor } from '../api/derive-states.ts';
 import {
-    stateFieldValuesForStateEvent,
-} from '../api/derive-state-field-values.ts';
+    workOrderLifecycleStatesFor,
+    workOrderHistoryFor,
+} from '../api/derive-states.ts';
 import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
 import {
     buildLeadToCloseWorkload,
@@ -626,9 +626,9 @@ async () => {
     // The full chain: create(3) + transition1(1) +
     // transition2(2) + entity PUT(0) + fresh claim(1) +
     // repeat-claim(0) + rejected claim(0) + unclaim(1) = 8.
-    // Release is pair-plane-only — pin via deriveStatesFor.
+    // Release is pair-plane-only — pin via lifecycle derive.
     assert.equal(
-        (await deriveStatesFor(
+        (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         )).length,
         8,
@@ -708,7 +708,7 @@ test('duplicate-create: two creates, same work-order id, fresh'
     // Phase Final Stage B: work_orders table retired.
 
     assert.equal(
-        (await deriveStatesFor(
+        (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
         )).length,
         6,
@@ -1475,9 +1475,9 @@ async () => {
         db, STARK_ORGANIZATION, workOrderId,
     );
     // Pin the test-side pair replay against the live
-    // production derive (deriveStatesFor) — both read the same
+    // production derive (lifecycle) — both read the same
     // op-pair composition (create/claim/release/transition).
-    const derivedHistory = await deriveStatesFor(
+    const derivedHistory = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
     assert.deepEqual(replay.events, derivedHistory);
@@ -1487,11 +1487,18 @@ async () => {
     assert.equal(replay.events.length, 11);
 
     // Phase Final Task 2: SFV row plane empty; pair-plane
-    // two-source union carries the transition fold.
-    const derivedFieldValues =
-        await stateFieldValuesForStateEvent(
-            db, STARK_ORGANIZATION, 'wo-drift-trace-1-te2',
-        );
+    // transition fold rides work-order history (C4).
+    const history = await workOrderHistoryFor(
+        db, STARK_ORGANIZATION, workOrderId,
+    );
+    const derivedFieldValues = history.flatMap((row) =>
+        row.field_values.map((fv) => ({
+            id: fv.id,
+            state_event_id: row.id,
+            attribute_id: fv.attribute_id,
+            value: fv.value,
+        })),
+    );
     assert.equal(replay.fieldValues.length, 2);
     // Phase Final Stage B: state_field_values table retired.
     assert.deepEqual(

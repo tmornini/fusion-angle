@@ -113,8 +113,16 @@ test(
             db, STARK_ORGANIZATION, 'project-drv-skew',
         );
         // Arrival order still governs the entity's OTHER fields —
-        // the two reductions are independent.
+        // the two reductions are independent. GET trio stays
+        // genesis (genesis-wins-under-skew).
         assert.equal(derived.title, 'Skewed Title');
+        assert.equal(derived.state, 'submitted');
+        assert.equal(
+            derived.state_at, '2026-06-01T00:00:00.000000Z',
+        );
+        assert.equal(
+            derived.state_event_id, 'ev-drv-skew-genesis',
+        );
         const projects = await deriveProjects(
             db, STARK_ORGANIZATION,
         );

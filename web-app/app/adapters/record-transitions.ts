@@ -1,12 +1,13 @@
 import type {
     Id,
     RecordAttributeId,
-    StateFieldValueEntity,
     WorkOrderEntity,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     validateWorkOrderFlowGraph,
+    getWorkOrderHistory,
+    currentNodeIdFromHistory,
 } from './work-orders-queries.ts';
 import {
     getRecordForWorkOrder,
@@ -14,10 +15,6 @@ import {
 import {
     getRecordAttributesByRecord,
 } from './record-attributes.ts';
-import {
-    getWorkOrderCurrentNodeId,
-    getWorkOrderTransitionEvents,
-} from './state-events.ts';
 import {
     validateAttributeValue,
 } from '../record-constraints.ts';
@@ -49,6 +46,8 @@ export class RecordTransitionViolations
 // the workbox action screen paints. Required attrs and
 // constraint checks run against that node's refs only;
 // the target node's fields are collected after arrival.
+// One GET work-orders/:id/history supplies current node
+// and every prior field value (folded on each row).
 export async function validateRecordTransition(
     ctx: RequestContext,
     workOrderId: Id,
@@ -61,10 +60,11 @@ export async function validateRecordTransition(
     const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
+    const history = await getWorkOrderHistory(
+        ctx, workOrderId,
+    );
     const currentNodeId =
-        await getWorkOrderCurrentNodeId(
-            ctx, workOrderId,
-        );
+        currentNodeIdFromHistory(history);
     if (currentNodeId === null) {
         throw new Error(
             'work order has no current node: '
@@ -95,24 +95,16 @@ export async function validateRecordTransition(
         attributes.map(a => [a.id, a]),
     );
 
-    const transitions =
-        await getWorkOrderTransitionEvents(
-            ctx, workOrderId,
-        );
-    // The field values are nested under their parent state event,
-    // so fetch each transition event's values directly — no whole-
-    // table scan + client-side event filter. Each read is server-
-    // filtered to its event by the state_event_id FK.
-    const perEvent = await Promise.all(
-        transitions.map(t => ctx.GET<StateFieldValueEntity[]>(
-            'states/' + t.id + '/field-values',
-        )),
-    );
+    // History is DESC: first-wins per attribute is the
+    // latest written value (same as ASC overwrite).
     const storedValueByAttr = new Map<
         RecordAttributeId, string
     >();
-    for (const fvs of perEvent) {
-        for (const fv of fvs) {
+    for (const row of history) {
+        for (const fv of row.field_values) {
+            if (storedValueByAttr.has(fv.attribute_id)) {
+                continue;
+            }
             storedValueByAttr.set(
                 fv.attribute_id, fv.value,
             );

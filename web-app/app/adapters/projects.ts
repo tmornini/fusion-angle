@@ -8,16 +8,13 @@ import type {
 import {
     Project,
     projectStateIsNotDeleted,
+    assertProjectState,
     msSinceUtc,
     nowUtc,
     COST_DIVISOR,
     MS_PER_DAY,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
-import {
-    getProjectStateDetail,
-    getProjectStateDetails,
-} from './state-events.ts';
 import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
@@ -60,26 +57,31 @@ export async function getProjectEntities(
     return ctx.GET<ProjectEntity[]>('projects');
 }
 
+// Lifecycle-current trio is stamped on the ProjectEntity GET
+// row (Phase A). Map snake_case wire → ProjectStateDetail;
+// no second hop to the states log / entity-states history.
+export function projectStateDetailFromRow(
+    row: ProjectEntity,
+): ProjectStateDetail {
+    return {
+        state: assertProjectState(
+            row.state, 'project ' + row.id,
+        ),
+        stateAt: row.state_at,
+        stateEventId: row.state_event_id,
+    };
+}
+
 export async function getProjects(
     ctx: RequestContext,
 ): Promise<Project[]> {
-    const [rows, detailMap] = await Promise.all([
-        getProjectEntities(ctx),
-        getProjectStateDetails(ctx),
-    ]);
+    const rows = await getProjectEntities(ctx);
     return rows
-        .filter(row => {
-            const detail = detailMap.get(row.id);
-            if (detail === undefined) {
-                throw new Error(
-                    'Project has no state event: '
-                    + row.id,
-                );
-            }
-            return projectStateIsNotDeleted(detail.state);
-        })
+        .filter(row => projectStateIsNotDeleted(
+            projectStateDetailFromRow(row).state,
+        ))
         .map(row => new Project(
-            row, detailMap.get(row.id)!,
+            row, projectStateDetailFromRow(row),
         ));
 }
 
@@ -87,11 +89,10 @@ export async function getProject(
     ctx: RequestContext,
     id: string,
 ): Promise<Project> {
-    const [row, detail] = await Promise.all([
-        getProjectEntity(ctx, id),
-        getProjectStateDetail(ctx, id),
-    ]);
-    return new Project(row, detail);
+    const row = await getProjectEntity(ctx, id);
+    return new Project(
+        row, projectStateDetailFromRow(row),
+    );
 }
 
 export class ProjectView {
@@ -255,9 +256,18 @@ export async function getProjectEntity(
 // this side of the adapter seam — the IdeaDocumentFields
 // precedent (adapters/ideas.ts). organization_id is EXCLUDED
 // too — the client never supplies it (the org fence stamps it
-// downstream).
+// downstream). GET ProjectEntity also carries snake_case
+// lifecycle stamp fields — omit them here so the PUT body is
+// not double-keyed (snake + camel).
 export type ProjectDocumentFields =
-    Omit<ProjectEntity, 'id' | 'organization_id'> & {
+    Omit<
+        ProjectEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    > & {
         readonly state: ProjectState;
         readonly stateAt: string;
         readonly stateEventId: string;
@@ -282,16 +292,33 @@ export async function putProject(
 
 // The current row's writable fields, read fresh so the
 // domain ops below can overwrite whole-row without the
-// caller ever holding the wire shape.
+// caller ever holding the wire shape. Strip GET-stamped
+// snake_case trio so putProject's camelCase mint is the only
+// lifecycle payload.
 async function projectRowFields(
     ctx: RequestContext,
     id: string,
-): Promise<Omit<ProjectEntity, 'id' | 'organization_id'>> {
+): Promise<
+    Omit<
+        ProjectEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >
+> {
     const {
         id: _id,
         organization_id: _org,
+        state: _state,
+        state_at: _stateAt,
+        state_event_id: _stateEventId,
         ...fields
     } = await getProjectEntity(ctx, id);
+    void _state;
+    void _stateAt;
+    void _stateEventId;
     return fields;
 }
 
@@ -348,10 +375,19 @@ export async function putProjectPosition(
 // supply the eight fields they already hold FROM RAW SOURCES
 // ONLY — never from ProjectView's display-transformed
 // accessors (see the DATA-CORRUPTION TRAP note on ProjectView).
+// Entity fields only — strip any GET-stamped snake_case trio
+// at the call site before passing here.
 export async function postProjectStateChange(
     ctx: RequestContext,
     id: string,
-    fields: Omit<ProjectEntity, 'id' | 'organization_id'>,
+    fields: Omit<
+        ProjectEntity,
+        | 'id'
+        | 'organization_id'
+        | 'state'
+        | 'state_at'
+        | 'state_event_id'
+    >,
     state: ProjectState,
 ): Promise<void> {
     await putProject(ctx, id, {

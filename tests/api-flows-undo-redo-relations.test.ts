@@ -41,7 +41,6 @@ import type {
     FlowWithGraph,
     GraphNode,
     GraphEdge,
-    StateEntity,
     StoredGraph,
 } from '../api/types.ts';
 import {
@@ -51,6 +50,9 @@ import {
     asStoredGraph,
 } from '../api/validators.ts';
 import {
+    documentPairsAt,
+} from '../api/derive-documents.ts';
+import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import {
@@ -59,8 +61,8 @@ import {
 
 // Phase Final Task 2: graph relation ROW halves stripped.
 // Undo/redo oracles re-home to pair-plane GET graph and
-// entity-states history (deriveFlowGraphStates from
-// graphDelta/revivals SIDECAR-KEEP).
+// graphDelta.deletions / revivals on flow document pairs
+// (SIDECAR-KEEP). deriveFlowGraphStates retired with C3.
 
 const FLOW_ID = 'flow-ur';
 
@@ -182,14 +184,83 @@ async function pairGraph(
     );
 }
 
-async function latestStateFor(
-    ctx: RequestContext,
+// SIDECAR-KEEP: node/edge deleted|restored lives on the
+// flow document-pair body (graphDelta.deletions / revivals),
+// not a bulk states derive (C3 retired that).
+async function latestSidecarStateFor(
+    db: MemoryDbAdapter,
     entityId: string,
 ): Promise<string> {
-    const events = await ctx.GET<StateEntity[]>(
-        'entity-states/' + entityId + '/history',
+    const [requests, responses] = await Promise.all([
+        db.requests.getAll(),
+        db.responses.getAll(),
+    ]);
+    const prefixes = new Set(
+        requests
+            .filter((r) => /\/flows\/$/.test(r.uri_prefix))
+            .map((r) => r.uri_prefix),
     );
-    return events.at(-1)!.state;
+    const events: {
+        state: string;
+        at: string;
+        id: string;
+    }[] = [];
+    for (const prefix of prefixes) {
+        for (const pair of documentPairsAt(
+            requests, responses, prefix,
+        )) {
+            const delta = pair.body['graphDelta'];
+            const deletions =
+                typeof delta === 'object' && delta !== null
+                    ? (delta as Record<string, unknown>)[
+                        'deletions'
+                    ]
+                    : undefined;
+            if (Array.isArray(deletions)) {
+                for (const entry of deletions) {
+                    if (
+                        typeof entry !== 'object'
+                        || entry === null
+                    ) continue;
+                    const f = entry as Record<string, unknown>;
+                    if (f['entityId'] !== entityId) continue;
+                    events.push({
+                        state: 'deleted',
+                        at: String(f['at'] ?? ''),
+                        id: String(f['eventId'] ?? ''),
+                    });
+                }
+            }
+            const revivals = pair.body['revivals'];
+            if (Array.isArray(revivals)) {
+                for (const entry of revivals) {
+                    if (
+                        typeof entry !== 'object'
+                        || entry === null
+                    ) continue;
+                    const f = entry as Record<string, unknown>;
+                    if (f['entityId'] !== entityId) continue;
+                    events.push({
+                        state: 'restored',
+                        at: String(f['at'] ?? ''),
+                        id: String(f['eventId'] ?? ''),
+                    });
+                }
+            }
+        }
+    }
+    events.sort((a, b) =>
+        a.at < b.at ? -1
+            : a.at > b.at ? 1
+                : a.id < b.id ? -1
+                    : a.id > b.id ? 1
+                        : 0);
+    const last = events.at(-1);
+    assert.ok(
+        last !== undefined,
+        'no graph-sidecar events for ' + entityId,
+    );
+    return last!.state;
 }
 
 // performUndo gates on hasUndoHistory client-side BEFORE ever
@@ -202,7 +273,7 @@ test(
     + ' edge: pair graph includes them, latest state'
     + " is 'restored'",
     async () => {
-        const { ctx } = await setupMemDb();
+        const { db, ctx } = await setupMemDb();
         const a = buildNode('a', { isCreate: true });
         const x = buildNode('x');
         const xEdge = buildEdge('xe', 'a', 'x');
@@ -221,10 +292,10 @@ test(
             'X is tombstoned after the deleting save',
         );
         assert.equal(
-            await latestStateFor(ctx, 'x'), 'deleted',
+            await latestSidecarStateFor(db, 'x'), 'deleted',
         );
         assert.equal(
-            await latestStateFor(ctx, 'xe'), 'deleted',
+            await latestSidecarStateFor(db, 'xe'), 'deleted',
         );
 
         // UNDO from the current (X-less) graph back to the
@@ -249,11 +320,11 @@ test(
         // And X's LATEST state event supersedes the
         // tombstone with a non-'deleted' 'restored'.
         assert.equal(
-            await latestStateFor(ctx, 'x'), 'restored',
+            await latestSidecarStateFor(db, 'x'), 'restored',
             "revived node's latest state is 'restored'",
         );
         assert.equal(
-            await latestStateFor(ctx, 'xe'), 'restored',
+            await latestSidecarStateFor(db, 'xe'), 'restored',
             "revived edge's latest state is 'restored'",
         );
     },
@@ -263,7 +334,7 @@ test(
     'ADD-THEN-UNDO deletes the added node: pair graph'
     + ' omits it (working-not-target is a deletion)',
     async () => {
-        const { ctx } = await setupMemDb();
+        const { db, ctx } = await setupMemDb();
         const a = buildNode('a', { isCreate: true });
         const x = buildNode('x');
 
@@ -289,7 +360,7 @@ test(
             'undo of an add deletes the added node',
         );
         assert.equal(
-            await latestStateFor(ctx, 'x'), 'deleted',
+            await latestSidecarStateFor(db, 'x'), 'deleted',
         );
     },
 );
@@ -335,7 +406,7 @@ test(
     'REDO round-trip: redo re-applies the delete after'
     + ' an undo revived it (X tombstoned again)',
     async () => {
-        const { ctx } = await setupMemDb();
+        const { db, ctx } = await setupMemDb();
         const a = buildNode('a', { isCreate: true });
         const x = buildNode('x');
         const xEdge = buildEdge('xe', 'a', 'x');
@@ -367,7 +438,7 @@ test(
             'redo re-applies the delete: X tombstoned again',
         );
         assert.equal(
-            await latestStateFor(ctx, 'x'), 'deleted',
+            await latestSidecarStateFor(db, 'x'), 'deleted',
             "redo re-tombstones X (latest state 'deleted')",
         );
     },

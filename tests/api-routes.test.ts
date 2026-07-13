@@ -28,18 +28,20 @@ const COLLECTION_ROUTES: readonly string[] = [
     'flows',
     'projects/any-project/flows',
     'work-orders',
+    'work-orders/history',
     'flows/any-flow/work-orders',
-    // states/:id/field-values is no longer a 200-[] collection
-    // for an absent event — orphan → 404, foreign → 403.
+    // GET states/:id/field-values RETIRED (C4); field values
+    // fold on work-orders/:id/history.
     'records',
     'record-attributes',
     'flows/any-flow/records',
     'ideas/any-idea/submissions',
     'objectives',
+    'objectives/history',
     'objectives/any-objective/revisions',
     'projects/any-project/objective-baseline-scores',
     'projects/any-project/objective-actual-scores',
-    'states',
+    // GET /states RETIRED (states-URI elimination C3).
 ];
 
 for (const route of COLLECTION_ROUTES) {

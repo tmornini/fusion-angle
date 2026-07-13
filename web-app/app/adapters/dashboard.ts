@@ -2,6 +2,8 @@ import {
     ideaIsVisible,
     projectStateIsApproved,
     projectStateIsNotDeleted,
+    assertIdeaState,
+    assertProjectState,
     MS_PER_DAY,
 } from '../../../api/types.ts';
 import {
@@ -11,10 +13,6 @@ import {
 import { formatSigned } from '../scoring-format.ts';
 import type { RequestContext } from './shared.ts';
 import { getIdeaEntities } from './ideas.ts';
-import {
-    getIdeaStates,
-    getProjectStates,
-} from './state-events.ts';
 import { getProjectEntities } from './projects.ts';
 import { getFlowEntities } from './flows.ts';
 import {
@@ -69,22 +67,20 @@ export type GaugeData = RatioGauge | BipolarGauge;
 export async function getDashboardGauges(
     ctx: RequestContext,
 ): Promise<GaugeData[]> {
-    const [allProjects, projectStates, impact] =
+    // Lifecycle state rides the project GET row trio
+    // (Phase A stamp) — no second hop to the states log.
+    const [allProjects, impact] =
         await Promise.all([
             getProjectEntities(ctx),
-            getProjectStates(ctx),
             getPortfolioImpactSummary(ctx),
         ]);
-    const projects = allProjects.filter(p => {
-        const s = projectStates.get(p.id);
-        if (s === undefined) {
-            throw new Error(
-                'Project has no state event: '
-                + p.id,
-            );
-        }
-        return projectStateIsApproved(s);
-    });
+    const projects = allProjects.filter(p =>
+        projectStateIsApproved(
+            assertProjectState(
+                p.state, 'project ' + p.id,
+            ),
+        ),
+    );
 
     const msPerDay = MS_PER_DAY;
     const now = Date.now();
@@ -207,33 +203,38 @@ export async function getDashboardStats(
 ): Promise<
     { label: string; value: number }[]
 > {
-    const [
-        ideas, ideaStates, projects,
-        projectStates, flows,
-    ] = await Promise.all([
-        getIdeaEntities(ctx),
-        getIdeaStates(ctx),
-        getProjectEntities(ctx),
-        getProjectStates(ctx),
-        getFlowEntities(ctx),
-    ]);
+    // Header counts (header-info.ts on every sidebar
+    // page) read lifecycle from the entity GET row trios
+    // already fetched — two fewer states-log requests.
+    const [ideas, projects, flows] =
+        await Promise.all([
+            getIdeaEntities(ctx),
+            getProjectEntities(ctx),
+            getFlowEntities(ctx),
+        ]);
 
     return [
         {
             label: 'Ideas',
-            value: ideas.filter(row => {
-                const s = ideaStates.get(row.id);
-                return s !== undefined
-                    && ideaIsVisible(s);
-            }).length,
+            value: ideas.filter(row =>
+                ideaIsVisible(
+                    assertIdeaState(
+                        row.state,
+                        'idea ' + row.id,
+                    ),
+                ),
+            ).length,
         },
         {
             label: 'Projects',
-            value: projects.filter(p => {
-                const s = projectStates.get(p.id);
-                return s !== undefined
-                    && projectStateIsNotDeleted(s);
-            }).length,
+            value: projects.filter(p =>
+                projectStateIsNotDeleted(
+                    assertProjectState(
+                        p.state,
+                        'project ' + p.id,
+                    ),
+                ),
+            ).length,
         },
         {
             label: 'Flows',

@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import {
     invitationLifecycleStatesFor,
+    deriveInvitationStates,
+    resolveOwningOrganization,
 } from '../api/derive-states.ts';
 import { currentInvitationState } from
     '../api/invitations-domain.ts';
@@ -346,26 +348,28 @@ test('accept makes the invitation org reachable', async () => {
     assert.deepEqual(sarahOrganizations, ['1', '2']);
 });
 
-test('an invitation event stays out of other orgs /states',
+// GET /states RETIRED (C3). Pin invitation ownership via
+// resolveOwningOrganization — inviting org owns the
+// invitation; foreign askers still resolve that owner (and
+// would fence it out of a bulk union that no longer exists).
+test('an invitation event is owned by the inviting org',
 async () => {
     const db = await seed();
     const id = await grantSarahToWayne(db);
-    const wayne = await statesEntityIds(db, '2');
-    assert.ok(wayne.has(id));   // visible in the inviting org
-    const stark = await statesEntityIds(db, '1');
-    assert.ok(!stark.has(id));  // hidden from every other tenant
+    const rows = await deriveInvitationStates(db);
+    assert.ok(
+        rows.some((r) => r.entity_id === id),
+        'invitation lifecycle events derive for the grant',
+    );
+    assert.equal(
+        await resolveOwningOrganization(db, id, '2'),
+        '2',
+    );
+    assert.equal(
+        await resolveOwningOrganization(db, id, '1'),
+        '2',
+    );
 });
-
-async function statesEntityIds(
-    db: MemoryDbAdapter,
-    organization: string,
-): Promise<Set<string>> {
-    const res = await handleRequest(db, req(
-        'GET', '/states', await organizationToken('current', organization)));
-    assert.equal(res.status, 200);
-    const rows = await res.json() as { entity_id: string }[];
-    return new Set(rows.map(r => r.entity_id));
-}
 
 // Caller-minted id + at: replay idempotency at the API level.
 // A fixed body posted twice must produce exactly one event — the
