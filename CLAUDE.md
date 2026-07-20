@@ -202,12 +202,14 @@ is HTTP-only.
   `identityDefaultOrganization`: the identity's SET default
   org (`identity_default_organizations` ledger, latest
   wins), else its PRIMARY membership org, else a 403 — there
-  is no global default. Membership and roles derive fresh
-  every request (`callerOrganizationIds` →
-  `deriveMembershipsForIdentity`; `deriveRoleGrants`), so a
-  revoked grant loses access on the very next request.
-  Org-scoped PUT/DELETE hit the write-ownership fence
-  (`writeOwnershipFenceFor` → `resolveGlobalOwner`) so a
+  is no global default. Membership and roles come from
+  access-token claims (baked at mint from membership
+  `type`; gate projects for the fenced org). NAMED
+  COVENANT: de-membership / demotion / revocation bite at
+  next mint/refresh/exchange or access TTL (≤ 15 min), not
+  the very next request. Ownership fences stay pair-plane.
+  Org-scoped PUT/DELETE hit the write authorizer
+  (`writeAuthorizerFor` → `resolveGlobalOwner`) so a
   foreign id 403s rather than genesis-ing in the caller's
   namespace; genuine absence still 404s (or genesis on
   PUT). Authentication runs before the no-match 404 —
@@ -411,7 +413,7 @@ round-trip, in-browser ZIP, snapshot import-validation /
 quota / atomic-import, the
 memory + localStorage transaction backends, the tx runners
 and view, the commit batch route, api routing, navigation,
-mock-data validity (pair count 1506 / bootstrap 13 absolute;
+mock-data validity (pair count 1494 / bootstrap 12 absolute;
 the mock-data fingerprint file retired with the clients
 table), client registration facet + derive, the two-tier
 hazard predicate (`flow-graph-hazard.test.ts`), presenter
@@ -429,8 +431,8 @@ elimination pins: `api-work-order-history.test.ts` (per-id
 `api-entity-history-routes.test.ts` (trio-family per-id),
 `api-members-history.test.ts`,
 `api-objective-history.test.ts` (bulk). Phase Final adds
-the write-ownership fence pin
-(`api-write-ownership-fence.test.ts`); store/decorator
+the write authorizer pin
+(`api-write-authorizer.test.ts`); store/decorator
 unit tests and dual-write shadow-ledger row oracles
 retired with their subjects. Honest HTTP status covenant
 pins: `api-unauthenticated-route-ordering.test.ts` (401

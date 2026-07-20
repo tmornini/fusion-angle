@@ -2,13 +2,10 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type {
     Id,
-    ResponseEntity,
     IdentityPiiEntity,
     IdentityCredentialEntity,
     IdentityCredentialKind,
     IdentityCredentialStatus,
-    RoleGrantEntity,
-    RoleGrantAction,
     IdentityProviderEntity,
     IdentityProviderAction,
     IdentityTokenRevocationEntity,
@@ -23,11 +20,6 @@ import {
     byIdAscending,
     type DerivedDocument,
 } from './derive-documents.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
-import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
 
 // The identity spine's own reduction over the message ledger —
 // Phase 10 Task 7, the roster phase's LAST derivation before the
@@ -66,22 +58,8 @@ import {
 // outside a transaction (the deriveMembers/deriveInvitations
 // precedent) is sufficient for them.
 //
-// GATE 16 — THE ROLE-GRANTS RESPONSE-BODY DEVIATION (a NAMED
-// deviation from every other facet here): deriveRoleGrants/
-// deriveRoleGrant read the stored RESPONSE body, not the request
-// body. A live role-grant PUT's wire REQUEST omits organization_id
-// (the client relies on it being inferred from the active
-// organization — web-app/app/adapters/role-grants.ts); the
-// ORG-SCOPED row-plane store stamps it at write time
-// (OrganizationScopedEntityStore#stamp), and the route's OWN
-// WRITE_RESPONSE_SPECS entry ('role-grants/:id', api/routes.ts)
-// re-derives the SAME stamp from the verified fence organization
-// into the RESPONSE body it forms and stores — so the RESPONSE,
-// never the REQUEST, is the authoritative, fence-stamped row.
-// Every other event-plane facet here (credentials, providers,
-// revocations) carries its full entity — including identity_id —
-// in the wire REQUEST already (validators.ts confirms each body-
-// key list), so the deviation does not spread to them.
+// Role-grants RETIRED: membership `type` bakes claim roles at
+// mint; Gate-16 response-body deviation deleted with the family.
 //
 // Every function below reads db.requests/db.responses (+
 // pickString over their decoded bodies) ONLY, mirroring api/
@@ -263,103 +241,6 @@ export async function deriveCredential(
         );
     }
     return credentialEntityOf(document);
-}
-
-// ---- role_grants — the gate 16 response-body deviation ----------
-
-const ROLE_GRANTS_PREFIX =
-    canonicalUriPrefix(undefined, '/role-grants/');
-
-// A stored message's JSON body, response side — requestBodyOf's
-// twin (api/derive-documents.ts), needed here ONLY because gate 16
-// reads the response, never the request.
-function responseBodyOf(message: string): Record<string, unknown> {
-    const model = parseJson(message, defaultBodyRegistry());
-    const body = HttpMessage.fromModel(model).body();
-    return body.exists()
-        ? JSON.parse(body.toText()) as Record<string, unknown>
-        : {};
-}
-
-function roleGrantEntityOf(
-    document: DerivedDocument,
-    responseBody: Record<string, unknown>,
-): RoleGrantEntity {
-    return {
-        id: document.uriId,
-        organization_id:
-            pickString(responseBody, 'organization_id'),
-        identity_id: pickString(responseBody, 'identity_id'),
-        role: pickString(responseBody, 'role'),
-        action: pickString(responseBody, 'action') as
-            RoleGrantAction,
-        by_member_id: pickString(responseBody, 'by_member_id'),
-        at: pickString(responseBody, 'at'),
-    };
-}
-
-async function fetchRoleGrantDocuments(
-    db: DbAdapter,
-): Promise<{
-    documents: Map<string, DerivedDocument>;
-    responseById: Map<Id, ResponseEntity>;
-}> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere(
-            'uri_prefix', ROLE_GRANTS_PREFIX,
-        ),
-        db.responses.getAllWhere(
-            'uri_prefix', ROLE_GRANTS_PREFIX,
-        ),
-    ]);
-    return {
-        documents: deriveDocumentsAt(
-            requests, responses, ROLE_GRANTS_PREFIX,
-        ),
-        responseById: new Map(
-            responses.map((response) => [response.id, response]),
-        ),
-    };
-}
-
-// document.pairId IS a responses.id already matched by
-// deriveDocumentsAt's own reduction over the SAME responses array
-// — the lookup below cannot miss; `!` names an internal
-// invariant, not a distrust of validated storage.
-function roleGrantFromDocument(
-    document: DerivedDocument,
-    responseById: Map<Id, ResponseEntity>,
-): RoleGrantEntity {
-    const response = responseById.get(document.pairId)!;
-    return roleGrantEntityOf(
-        document, responseBodyOf(response.message),
-    );
-}
-
-// Heads at '/role-grants/', id-lex ordered; latest-per-uriId.
-export async function deriveRoleGrants(
-    db: DbAdapter,
-): Promise<RoleGrantEntity[]> {
-    const { documents, responseById } =
-        await fetchRoleGrantDocuments(db);
-    const rows: RoleGrantEntity[] = [];
-    for (const document of documents.values()) {
-        rows.push(roleGrantFromDocument(document, responseById));
-    }
-    return rows.sort(byIdAscending);
-}
-
-export async function deriveRoleGrant(
-    db: DbAdapter,
-    id: Id,
-): Promise<RoleGrantEntity> {
-    const { documents, responseById } =
-        await fetchRoleGrantDocuments(db);
-    const document = documents.get(id);
-    if (document === undefined) {
-        throw new EntityNotFoundError('role_grants', id);
-    }
-    return roleGrantFromDocument(document, responseById);
 }
 
 // ---- identity_providers — same event-plane shape, REQUEST body -

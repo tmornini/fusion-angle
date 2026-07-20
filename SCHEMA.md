@@ -104,11 +104,11 @@ view — omits it.
 
 The append-only ledgers every pair-wired HTTP write appends
 into. Seeded demo data forms pairs pre-tx (`formSeedPair`);
-`EXPECTED_PAIR_COUNT` 1506 / bootstrap 13 is absolute.
+`EXPECTED_PAIR_COUNT` 1494 / bootstrap 12 is absolute.
 Global-spine (pass-through), NOT org-fenced at the store:
 tenancy lives IN `uri_prefix`, enforced at the route gate
-and the write-ownership fence
-(`api/write-ownership-fence.ts` via
+and the write authorizer
+(`api/write-authorizer.ts` via
 `resolveOwningOrganization`).
 
 ### requests

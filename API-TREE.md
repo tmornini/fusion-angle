@@ -25,7 +25,7 @@ That mechanism will replace the existing ledger's and common states system by mo
   |      └─|─ /notifications                   • TARGET-STATE: postgres LISTEN/NOTIFY for all changes to identity
   |      └─|─ /pii                             • full physical removal from the DB required, i.e. physical delete, all others: Delete-At: header
   |      └─|─ /registration                    • RECONCILED (clients retirement): client registration facet — single-slot PUT-overwrite document (grant_types, redirect_uris, jwks, aud, status), admin-realm writes, kind-'service' gate; grantClientCredentials derives it pre-token (bearer-exempt precedent); DELETE tombstone = deregistration
-  |      └─|─ /role-grants                     • all of them, single document
+  |      └─|─ /role-grants                     • RETIRED (membership type + claim roles)
   |      └─|─ /third-party-identity-providers  • all of them, single document
   |      └─|─ /token-revocations               • RECONCILED: shipped FLAT, not nested here — GET|PUT /identity-token-revocations/:id (GLOBAL-plane, no organization_id), the answer WAS "PUT/GET"; GET stays admin-only, PUT widened to member-tier SELF-target only at WP8 (Phase 13 Task 8) — a member may revoke its own chain, naming another identity still requires admin — see the Auth RECONCILED 2026-07-06 block, go-to-church-peaceful-castle.md §Phases 3…N
   |      └─|─ /memberships/                    • /memberships/ with forced and/or filtered identity
@@ -69,7 +69,7 @@ That mechanism will replace the existing ledger's and common states system by mo
 └─|─ /snapshots/
   |  └── export                               • TARGET-STATE: not shipped as a dedicated route today — export is client-side over GET /snapshots/schema (full snapshot body); a first-class /snapshots/export remains a known future addition
   |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; pure message-plane keys requests+responses; no schema version marker)
-  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1506 pairs / bootstrap 13 absolute post states-address retirement; SeededCredentials re-pointed off identity rows at Final Task 1(d))
+  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1494 pairs / bootstrap 12 absolute after role-grant retirement; SeededCredentials re-pointed off identity rows at Final Task 1(d))
   |  └── schema                               • RECONCILED: GET|DELETE /snapshots/schema (existence + full export, or drop)
   |  └── bootstrap                            • RECONCILED: POST /snapshots/bootstrap (pristine minimal seed)
   |  └── pristine                             • TARGET-STATE: deferred — bootstrap covers the minimal seed today; a dedicated /snapshots/pristine remains a known future addition if the two seed paths must diverge on the wire

@@ -47,6 +47,7 @@ import {
     verifyPassword,
 } from '../shared/password-hash.ts';
 import {
+    composeClaimRole,
     currentDefaultOrganizationFor,
 } from './authorization.ts';
 import {
@@ -155,7 +156,7 @@ async function nameFor(
 // The subject's reachable orgs — every org it is a member of,
 // derived fresh from the membership ledger (never cached). The
 // source of the token's `orgs` claim and the exchange's
-// member-check.
+// member-check. Mint-time only — the gate reads claims.
 export async function subjectOrganizations(
     adapter: DbAdapter,
     identityId: Id,
@@ -163,6 +164,20 @@ export async function subjectOrganizations(
     const rows = await deriveMembershipsForIdentity(
         adapter, identityId);
     return rows.map(m => m.organization_id);
+}
+
+// Claim roles baked at mint: one `{type}:{organization_id}`
+// per live membership. The gate projects these for the fenced
+// org; it never re-derives role grants.
+async function subjectRoles(
+    adapter: DbAdapter,
+    identityId: Id,
+): Promise<string[]> {
+    const rows = await deriveMembershipsForIdentity(
+        adapter, identityId);
+    return rows.map(
+        m => composeClaimRole(m.type, m.organization_id),
+    );
 }
 
 // The org a flat (un-exchanged) token resolves to, server-side:
@@ -212,20 +227,26 @@ async function primaryMembershipOrganization(
 // Mint an access + refresh JWT pair. The access token gets a
 // fresh short-lived jti; the refresh token carries `refreshJti`
 // (its lifecycle is tracked separately in identity_tokens). The
-// access token also carries the active `org` (when exchanged
-// into a tenant) and the reachable `orgs` set; the refresh
-// token stays org-agnostic so a tenant switch re-exchanges.
+// access token carries claim roles (`{type}:{org}`), the active
+// `org` (when exchanged into a tenant), and the reachable
+// `orgs` set; the refresh token stays org/role-agnostic so a
+// tenant switch re-exchanges and the next access mint re-bakes.
 async function mintPair(
     identityId: Id,
     name: string,
     refreshJti: string,
     act?: { sub: Id },
-    scope?: { organization?: Id; organizations?: readonly Id[] },
+    scope?: {
+        organization?: Id;
+        organizations?: readonly Id[];
+        roles?: readonly string[];
+    },
 ): Promise<TokenResponse> {
     const iat = nowEpochSeconds();
+    const roles = scope?.roles ?? [];
     const accessToken = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: identityId, roles: [], name, iat,
+        sub: identityId, roles, name, iat,
         ttlSeconds: ACCESS_TTL_SECONDS,
         jti: generateCryptoSafeBase62(),
         ...(act ? { act } : {}),
@@ -283,9 +304,11 @@ async function issueTokenPair(
     const at = nowUtc();
     const organizations =
         await subjectOrganizations(adapter, identityId);
+    const roles = await subjectRoles(adapter, identityId);
     const response = await mintPair(identityId, name, refreshJti, act, {
         ...(organization ? { organization } : {}),
         organizations,
+        roles,
     });
     const pair = seed === undefined
         ? undefined
@@ -676,9 +699,11 @@ async function grantRefresh(
     const name = await nameFor(adapter, verified.claims.sub);
     const organizations = await subjectOrganizations(
         adapter, verified.claims.sub);
+    const roles = await subjectRoles(
+        adapter, verified.claims.sub);
     const response = await mintPair(
         verified.claims.sub, name, newJti,
-        undefined, { organizations },
+        undefined, { organizations, roles },
     );
     const pair = await formAuthPair(
         seed, body, verified.claims.sub, HTTP_OK, response,
@@ -1059,13 +1084,15 @@ async function grantAuthorizationCode(
     const name = await nameFor(adapter, issuer.identityId);
     const organizations =
         await subjectOrganizations(adapter, issuer.identityId);
+    const roles =
+        await subjectRoles(adapter, issuer.identityId);
     // act.sub = the acting client (RFC 8693), mirroring
     // grantTokenExchange's own act:{sub: actor}. sub stays
     // the user; issuer.clientId is already verified equal to
     // the redeeming client_id above.
     const response = await mintPair(
         issuer.identityId, name, refreshJti,
-        { sub: issuer.clientId }, { organizations },
+        { sub: issuer.clientId }, { organizations, roles },
     );
     const pair = await formAuthPair(
         seed, body, issuer.identityId, HTTP_OK, response,

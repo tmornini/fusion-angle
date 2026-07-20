@@ -8,14 +8,12 @@ import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { Id, OrganizationEntity } from '../api/types.ts';
-import type { Principal } from '../api/access-token.ts';
 import { postMockDataLoad, postBootstrap } from
     '../api/mock-data.ts';
 import {
     deriveOrganizations,
     deriveOrganization,
 } from '../api/derive-organizations.ts';
-import { callerOrganizationIds } from '../api/request-auth.ts';
 import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
@@ -23,6 +21,10 @@ import {
 import { buildMembers } from '../api/mock-data/members.ts';
 import { organizationToken, devToken } from './token-fixtures.ts';
 import { organizationRow } from './test-fixtures.ts';
+import { deriveMembershipsForIdentity } from
+    '../api/derive-memberships.ts';
+import { mintAccessToken, TOKEN_AUDIENCE } from
+    '../api/access-token.ts';
 
 // Phase Final Task 2: organizations dual-write stripped. This
 // file no longer compares derive vs old-table oracles — the
@@ -84,13 +86,41 @@ const SINGLE_ORGANIZATION_IDENTITY_ID: Id =
 // The derived-source twin of enumerateMyOrganizations: the
 // SAME membership-filter step (callerOrganizationIds), sourcing
 // the row list from deriveOrganizations.
+// Token for drift: claim organizations/roles match live
+// memberships for the subject (gate reads claims only).
+async function membershipClaimToken(
+    db: DbAdapter, identityId: Id,
+): Promise<string> {
+    const memberships = await deriveMembershipsForIdentity(
+        db, identityId,
+    );
+    const organizations = memberships.map(
+        m => m.organization_id,
+    );
+    const roles = memberships.map(
+        m => m.type + ':' + m.organization_id,
+    );
+    return mintAccessToken({
+        aud: TOKEN_AUDIENCE,
+        sub: identityId,
+        roles,
+        name: 'drift-organizations',
+        organizations,
+        iat: 1_700_000_000,
+        ttlSeconds: 10_000_000_000,
+        jti: 'drift-org-' + identityId,
+    });
+}
+
 async function derivedReachableOrganizations(
     db: DbAdapter, identityId: Id,
 ): Promise<OrganizationEntity[]> {
-    const principal: Principal = {
-        id: identityId, roles: [], name: 'drift-organizations',
-    };
-    const mine = await callerOrganizationIds(db, principal);
+    const memberships = await deriveMembershipsForIdentity(
+        db, identityId,
+    );
+    const mine = new Set(
+        memberships.map(m => m.organization_id),
+    );
     const organizations = await deriveOrganizations(db);
     return organizations.filter((o) => mine.has(o.id));
 }
@@ -99,7 +129,8 @@ async function wireReachableOrganizations(
     db: MemoryDbAdapter, identityId: Id,
 ): Promise<OrganizationEntity[]> {
     const res = await handleRequest(db, req(
-        'GET', '/organizations', await devToken(identityId),
+        'GET', '/organizations',
+        await membershipClaimToken(db, identityId),
     ));
     assert.equal(res.status, 200);
     return (await res.json()) as OrganizationEntity[];

@@ -5,10 +5,12 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { devToken } from './token-fixtures.ts';
+import {
+    claimToken,
+    devToken,
+} from './token-fixtures.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
@@ -26,23 +28,14 @@ function req(
     });
 }
 
-// Below-facade pair formation (the member-fixtures.ts idiom):
-// the per-org authz checks below derive from the pair plane once
-// memberships/role_grants flip, so a raw row here would go
-// derivation-invisible. Every id/field value stays IDENTICAL to
-// the raw puts these replace — only the write mechanism changes.
+// Membership type is privilege; claim roles bake at mint /
+// exchange. Seed type:"admin" in A and type:"member" in B.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
     id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
     const organization = body.organization_id as string;
-    // A real organizations/:id document (Phase 13 Task 3's
-    // fixture prerequisite; seedOrganizationDocument is idempotent
-    // — a no-op on a repeat organization id) — a membership pair
-    // with no document for its own org stays derivation-invisible
-    // to deriveMembershipsForIdentity's own enumerate-then-probe
-    // (via deriveOrganizations).
     await seedOrganizationDocument(db, organization, organization);
     const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
     if (spec === undefined || !('status' in spec)) {
@@ -72,79 +65,49 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 // `current` is a member of BOTH orgs but admin ONLY in A.
-// The exchange is membership-fenced, so it succeeds into
-// either org — which means AUTHZ, not the fence, is what
-// must keep the org-A grant from acting in org B.
+// Facade exchange re-bakes claim roles from membership type,
+// so admin surfaces in B stay denied while content works.
 async function memberOfBothAdminInA(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedMembershipPair(db, 'm-a', {
-        organization_id: 'A', identity_id: 'current',
+        organization_id: 'A',
+        identity_id: 'current',
+        type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     await seedMembershipPair(db, 'm-b', {
-        organization_id: 'B', identity_id: 'current',
-        at: '2026-06-04T00:00:00.000000Z',
-    });
-    await seedRoleGrantPair(db, 'g-a', {
-        organization_id: 'A', identity_id: 'current',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system',
+        organization_id: 'B',
+        identity_id: 'current',
+        type: 'member',
         at: '2026-06-04T00:00:00.000000Z',
     });
     return db;
 }
 
-test('a role granted in org A does not authorize in org B',
-async () => {
+test('admin type in org A does not authorize admin'
++ ' surfaces in org B', async () => {
     const db = await memberOfBothAdminInA();
+    // memberships is admin-only; member type in B must 403.
     const res = await handleRequest(db, req(
-        'GET', '/organizations/B/ideas',
-        await devToken('current')));
+        'GET', '/organizations/B/memberships',
+        await claimToken({
+            organizations: ['A', 'B'],
+            roles: ['admin:A', 'member:B'],
+        })));
     assert.equal(res.status, 403);
 });
 
-test('the same role authorizes within its own org',
+test('the same admin type authorizes within its own org',
 async () => {
     const db = await memberOfBothAdminInA();
     const res = await handleRequest(db, req(
-        'GET', '/organizations/A/ideas',
-        await devToken('current')));
+        'GET', '/organizations/A/memberships',
+        await claimToken({
+            organizations: ['A', 'B'],
+            roles: ['admin:A', 'member:B'],
+        })));
     assert.equal(res.status, 200);
 });
 
@@ -153,13 +116,9 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedMembershipPair(db, 'm', {
-        organization_id: '1', identity_id: 'current',
-        at: '2026-06-04T00:00:00.000000Z',
-    });
-    await seedRoleGrantPair(db, 'g', {
-        organization_id: '1', identity_id: 'current',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system',
+        organization_id: '1',
+        identity_id: 'current',
+        type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, req(

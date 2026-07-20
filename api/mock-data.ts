@@ -22,7 +22,6 @@ import {
     memberDocumentBodyOf,
     postIdentityDocumentOp,
     postIdentityCredentialDocumentOp,
-    postRoleGrantDocumentOp,
     identityDocumentBodyOf,
 } from './routes.ts';
 import type {
@@ -109,11 +108,9 @@ import {
     ORGANIZATION_TWO_OBJECTIVE,
     membershipSeedBody,
     bootstrapMembershipId,
-    bootstrapRoleGrantId,
     bootstrapSystemStateEventId,
     humanMemberPiiSeedBody,
     bootstrapCurrentMemberPiiBody,
-    roleGrantSeedBody,
     identityCredentialSeedBody,
 } from './mock-data/seed-message-pairs.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
@@ -334,7 +331,13 @@ async function postMockDataLoadIn(
                         adapter,
                         'seed-membership-'
                         + member.id + '-' + n,
-                        membershipSeedBody(organization, member.id),
+                        membershipSeedBody(
+                            organization,
+                            member.id,
+                            member.id === 'current'
+                                ? 'admin'
+                                : 'member',
+                        ),
                         SYSTEM_MEMBER_ID,
                         requirePair(
                             pairs,
@@ -441,62 +444,9 @@ async function postMockDataLoadIn(
                 seedPairKey('identities/:id', SYSTEM_MEMBER_ID),
             ),
         ),
-        // Task 6: the two admin role grants for `current` — driven
-        // through postRoleGrantDocumentOp so each forms a message
-        // pair too (Path A). ORG-STAMP (verification finding):
-        // each invocation carries its OWN organization — role-
-        // grants/:id's successBody re-stamps organization_id from
-        // THIS argument, so an undefined/wrong value here would
-        // silently corrupt the stored response body with no
-        // fingerprint pin catching it (requests/responses are
-        // excluded tables).
-        postRoleGrantDocumentOp(
-            adapter,
-            'seed-role-current-admin',
-            roleGrantSeedBody(
-                STARK_ORGANIZATION, 'current', 'admin',
-            ),
-            SYSTEM_MEMBER_ID,
-            requirePair(
-                pairs,
-                seedPairKey(
-                    'role-grants/:id', 'seed-role-current-admin',
-                ),
-            ),
-        ),
-        postRoleGrantDocumentOp(
-            adapter,
-            'seed-role-current-admin-org2',
-            roleGrantSeedBody(
-                ORGANIZATION_TWO, 'current', 'admin',
-            ),
-            SYSTEM_MEMBER_ID,
-            requirePair(
-                pairs,
-                seedPairKey(
-                    'role-grants/:id',
-                    'seed-role-current-admin-org2',
-                ),
-            ),
-        ),
-        // Every non-admin human gets the member role in its
-        // membership org (same assignOrganization(index) partition as
-        // the membership seed above), so each seeded sign-in
-        // lands on a working content tier — not a 403 wall.
-        ...members.flatMap((member, index) => {
-            if (member.id === 'current') return [];
-            const organization = assignOrganization(index);
-            const id = 'seed-role-' + member.id + '-member';
-            return [postRoleGrantDocumentOp(
-                adapter,
-                id,
-                roleGrantSeedBody(organization, member.id, 'member'),
-                SYSTEM_MEMBER_ID,
-                requirePair(
-                    pairs, seedPairKey('role-grants/:id', id),
-                ),
-            )];
-        }),
+        // Role grants retired: membership `type` (admin for
+        // current, member otherwise) seeds privilege; mint
+        // bakes claim roles from those memberships.
     ]);
 
     // System-member genesis rides the members/:id document
@@ -805,7 +755,9 @@ async function postMockDataLoadIn(
                 postMembershipDocumentOp(
                     adapter,
                     'seed-membership-' + m.id,
-                    membershipSeedBody(STARK_ORGANIZATION, m.id),
+                    membershipSeedBody(
+                        STARK_ORGANIZATION, m.id, 'member',
+                    ),
                     SYSTEM_MEMBER_ID,
                     requirePair(
                         pairs,
@@ -1118,7 +1070,6 @@ export async function postBootstrap(
         systemMemberPair,
         piiPair,
         systemIdentityPair,
-        roleGrantPair,
         systemStateEventAt,
         defaultOrganizationPair,
         organizationPair,
@@ -1134,7 +1085,7 @@ export async function postBootstrap(
         (view) => postBootstrapIn(
             view, currentMemberBody, currentMemberPairs,
             membershipPair, systemMemberPair, piiPair,
-            systemIdentityPair, roleGrantPair,
+            systemIdentityPair,
             systemStateEventAt,
             defaultOrganizationPair, organizationPair,
         ),
@@ -1167,7 +1118,6 @@ async function postBootstrapIn(
     systemMemberPair: MessagePair,
     piiPair: MessagePair,
     systemIdentityPair: MessagePair,
-    roleGrantPair: MessagePair,
     systemStateEventAt: string,
     defaultOrganizationPair: MessagePair,
     organizationPair: MessagePair,
@@ -1212,7 +1162,9 @@ async function postBootstrapIn(
         postMembershipDocumentOp(
             adapter,
             bootstrapMembershipId,
-            membershipSeedBody(STARK_ORGANIZATION, 'current'),
+            membershipSeedBody(
+                STARK_ORGANIZATION, 'current', 'admin',
+            ),
             SYSTEM_MEMBER_ID,
             membershipPair,
         ),
@@ -1243,20 +1195,7 @@ async function postBootstrapIn(
         // Phase Final Task 2: organizations ROW half stripped
         // — pair-plane only, mirroring postMockDataLoadIn.
         appendMessagePair(adapter, organizationPair),
-        // Task 6: bootstrap's own admin role grant — driven
-        // through postRoleGrantDocumentOp, the SAME op
-        // postMockDataLoadIn's own admin role-grant sites now
-        // ride. ORG-STAMP (verification finding): roleGrantPair
-        // was formed carrying THIS grant's own organization_id
-        // (STARK_ORGANIZATION) — see formBootstrapMessagePair.
-        postRoleGrantDocumentOp(
-            adapter,
-            bootstrapRoleGrantId,
-            roleGrantSeedBody(
-                STARK_ORGANIZATION, 'current', 'admin',
-            ),
-            SYSTEM_MEMBER_ID,
-            roleGrantPair,
-        ),
+        // Role grants retired: membership type:"admin" above
+        // is the privilege seed; mint bakes claim roles.
     ]);
 }

@@ -553,8 +553,8 @@ async () => {
 
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    assert.equal(requests.length, 6);
-    assert.equal(responses.length, 6);
+    assert.equal(requests.length, 5);
+    assert.equal(responses.length, 5);
 
     const flowAddress = requests.filter(
         r => r.uri_prefix === '/organizations/1/flows/'

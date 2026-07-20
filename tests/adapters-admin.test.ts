@@ -137,6 +137,7 @@ async function seedMembership(
     const body = {
         organization_id: '1',
         identity_id: identityId,
+        type: identityId === 'current' ? 'admin' : 'member',
         at,
     };
     const spec = WRITE_RESPONSE_SPECS['memberships/:id'];

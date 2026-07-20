@@ -275,13 +275,10 @@ test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
 
 const PASSWORD = 's3cret';
 
-test('SECURITY: a session minted via a real grant is admitted'
-+ ' by the Bearer gate; once its chain is revoked, the SAME'
-+ ' refresh token — presented live, through authenticateRequest'
-+ ' — is 401ed by tokenRevocationReason\'s by-jti fold, now'
-+ ' running against the DERIVED plane (isTokenRevoked treats an'
-+ ' unknown jti as NOT revoked, so a derivation miss here would'
-+ ' fail OPEN)', async () => {
+test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
++ ' token still passes the gate until exp; its REFRESH'
++ ' grant is 401ed (per-request revocation retired;'
++ ' mint-path checks remain)', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await seedRootAdmin(db);
@@ -308,35 +305,40 @@ test('SECURITY: a session minted via a real grant is admitted'
         client_id: 'web',
     });
     assert.equal(grantRes.status, 200);
-    const { refresh_token: refreshToken } =
-        await grantRes.json() as { refresh_token: string };
+    const {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+    } = await grantRes.json() as {
+        access_token: string;
+        refresh_token: string;
+    };
     const rootJti = jtiOf(refreshToken);
 
-    // Live BEFORE revocation: the refresh token itself, presented
-    // as a Bearer through the REAL gate (authenticateRequest),
-    // reaches an admin-only route.
+    // Live BEFORE revocation: access token reaches admin route.
     const before = await handleRequest(
-        db, req('GET', '/identity-tokens', refreshToken),
+        db, req('GET', '/identity-tokens', accessToken),
     );
     assert.equal(before.status, 200);
 
-    // Revoke the whole chain — any member-tier bearer may POST
-    // the rotation/revocation sub-routes (MEMBER_VERBS
-    // '/identity-tokens': ['POST']).
+    // Revoke the whole chain.
     const revokeRes = await handleRequest(db, req(
         'POST', `/identity-tokens/${rootJti}/revocation`,
-        DEV_TOKEN, {},
+        accessToken, {},
     ));
     assert.equal(revokeRes.status, 204);
 
-    // The SAME refresh token, re-presented: the gate denies it,
-    // live end-to-end, on the DERIVED plane.
-    const after = await handleRequest(
-        db, req('GET', '/identity-tokens', refreshToken),
+    // ACCESS still passes the gate (≤15-min staleness covenant).
+    const afterAccess = await handleRequest(
+        db, req('GET', '/identity-tokens', accessToken),
     );
-    assert.equal(after.status, 401);
-    const afterBody = await after.json() as { error: string };
-    assert.equal(afterBody.error, 'token chain revoked');
+    assert.equal(afterAccess.status, 200);
+
+    // REFRESH grant is denied at mint path.
+    const refreshRes = await tokenGrant(db, {
+        grant_type: 'refresh',
+        refresh_token: refreshToken,
+    });
+    assert.equal(refreshRes.status, 401);
 });
 
 // -- 5: GATE 3 (Phase 13 Task 7) — the code-spend guard's -------

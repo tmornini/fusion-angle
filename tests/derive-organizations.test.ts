@@ -140,10 +140,11 @@ async () => {
     const db = await freshDb();
     await putOrganization(db, 'org-d', 'Flat');
     const requests = await db.requests.getAll();
-    // seedAdminSchema forms 3 pairs; this PUT is the 4th.
-    assert.equal(requests.length, 4);
-    assert.equal(requests[3]!.uri_prefix, '/organizations/');
-    assert.equal(requests[3]!.uri_id, 'org-d');
+    // seedAdminSchema forms 2 pairs (role-grants retired);
+    // this PUT is the 3rd.
+    assert.equal(requests.length, 3);
+    assert.equal(requests[2]!.uri_prefix, '/organizations/');
+    assert.equal(requests[2]!.uri_id, 'org-d');
 
     const derived = await deriveOrganization(db, 'org-d');
     assert.equal(derived.id, 'org-d');

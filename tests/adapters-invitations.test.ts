@@ -32,7 +32,6 @@ import {
 } from '../web-app/app/adapters/invitations.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
@@ -93,40 +92,6 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: DbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 // Two orgs (Stark '1', Wayne '2'). Tony ('current') is admin
 // and member of both. Sarah is a Stark-only member. Dave is an
 // identity with no membership anywhere (a fresh invitee).
@@ -144,20 +109,17 @@ async function seedRows(db: DbAdapter): Promise<void> {
     await seedOrganizationDocument(db, '1', 'Stark');
     await seedOrganizationDocument(db, '2', 'Wayne');
     for (const organization of ['1', '2']) {
-        await seedRoleGrantPair(db, 'rg-current-' + organization, {
-            organization_id: organization, identity_id: 'current',
-            role: 'admin', action: 'granted',
-            by_member_id: 'system', at: AT,
-        });
         await seedMembershipPair(db, 'm-current-' + organization, {
             organization_id: organization, identity_id: 'current',
+        type: 'admin',
             at: AT,
         });
     }
     await seedPerson(db, 'current', 'Tony', 'demo@example.com');
     await seedPerson(db, 'sarah', 'Sarah', 'sarah@x.com');
     await seedMembershipPair(db, 'm-sarah-1', {
-        organization_id: '1', identity_id: 'sarah', at: AT,
+        organization_id: '1', identity_id: 'sarah',
+        type: 'member', at: AT,
     });
     await seedPerson(db, 'dave', 'Dave', 'dave@x.com');
 }
@@ -210,6 +172,7 @@ async function deriveMembershipsAll(db: DbAdapter) {
         id: string;
         organization_id: string;
         identity_id: string;
+        type: string;
         at: string;
     }> = [];
     for (const organization of organizations) {
@@ -392,13 +355,9 @@ async () => {
     // so a genuinely-undocumented org is the honest "gone" case
     // on BOTH planes).
     const { db } = await ctxFor('current', '2');
-    await seedRoleGrantPair(db, 'rg-current-3', {
-        organization_id: '3', identity_id: 'current',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system', at: AT,
-    });
     await seedMembershipPair(db, 'm-current-3', {
-        organization_id: '3', identity_id: 'current', at: AT,
+        organization_id: '3', identity_id: 'current',
+        type: 'admin', at: AT,
     });
     const tony = await ctxOn(db, 'current', '3');
     await postInvitationGrant(tony, 'sarah@x.com');

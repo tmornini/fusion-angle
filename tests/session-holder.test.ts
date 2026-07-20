@@ -57,7 +57,9 @@ test('a token with reachable orgs has one', async () => {
 });
 
 test('a flat token (no orgs claim) has none', async () => {
-    putSessionToken(await devToken());
+    // devToken always carries organizations; empty orgs is
+    // the no-reachability shape (reachableToken([],)).
+    putSessionToken(await reachableToken('current', []));
     assert.equal(sessionHasReachableOrganization(), false);
     deleteSessionToken();
 });

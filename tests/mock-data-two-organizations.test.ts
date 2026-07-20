@@ -5,9 +5,6 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { postMockDataLoad } from '../api/mock-data.ts';
-import {
-    currentRolesForInOrganization,
-} from '../api/authorization.ts';
 import { verifyPassword } from '../shared/password-hash.ts';
 import {
     deriveIdeas,
@@ -49,7 +46,6 @@ import { deriveMembershipsForIdentity } from
 import { deriveMemberParents } from
     '../api/derive-members.ts';
 import {
-    deriveRoleGrants,
     deriveCredentialsFor,
 } from '../api/derive-identity-spine.ts';
 import { deriveOrganizations } from
@@ -180,15 +176,16 @@ async () => {
 
 test('current holds admin in both orgs', async () => {
     const { db } = await seed();
-    // Phase Final Task 2: role_grants ROW half stripped.
-    const grants = await deriveRoleGrants(db);
-    assert.ok(
-        currentRolesForInOrganization(grants, 'current', ORGANIZATION_ONE)
-            .includes('admin'));
-    assert.ok(
-        currentRolesForInOrganization(grants, 'current', ORGANIZATION_TWO)
-            .includes('admin'));
-    // Phase Final Stage B: identity spine tables retired.
+    // Privilege is membership type:"admin"; mint bakes
+    // claim roles from that type.
+    const rows = await deriveMembershipsForIdentity(
+        db, 'current',
+    );
+    const byOrganization = new Map(
+        rows.map(m => [m.organization_id, m.type]),
+    );
+    assert.equal(byOrganization.get(ORGANIZATION_ONE), 'admin');
+    assert.equal(byOrganization.get(ORGANIZATION_TWO), 'admin');
 });
 
 test('both organizations exist with distinct names',

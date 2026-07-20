@@ -5,33 +5,38 @@ import {
     postBootstrap,
     postMockDataLoad,
 } from '../api/mock-data.ts';
-import {
-    currentRolesForInOrganization,
-} from '../api/authorization.ts';
-import { deriveRoleGrants } from
-    '../api/derive-identity-spine.ts';
+import { deriveMembershipsForIdentity } from
+    '../api/derive-memberships.ts';
 
-// Phase Final Task 2: role_grants ROW half stripped — oracle
-// is the pair plane.
+// Privilege is membership type:"admin" — claim roles bake
+// from that type at mint. No role-grants family.
 
 test('bootstrap seeds current as admin', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postBootstrap(db);
-    const rows = await deriveRoleGrants(db);
+    const rows = await deriveMembershipsForIdentity(
+        db, 'current',
+    );
     assert.ok(
-        currentRolesForInOrganization(rows, 'current', '1')
-            .includes('admin'));
-    // Phase Final Stage B: identity spine tables retired.
+        rows.some(
+            m => m.organization_id === '1'
+                && m.type === 'admin',
+        ),
+    );
 });
 
 test('mock data seeds current as admin', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     await postMockDataLoad(db);
-    const rows = await deriveRoleGrants(db);
+    const rows = await deriveMembershipsForIdentity(
+        db, 'current',
+    );
     assert.ok(
-        currentRolesForInOrganization(rows, 'current', '1')
-            .includes('admin'));
-    // Phase Final Stage B: identity spine tables retired.
+        rows.some(
+            m => m.organization_id === '1'
+                && m.type === 'admin',
+        ),
+    );
 });

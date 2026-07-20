@@ -12,7 +12,6 @@ import {
 } from './test-fixtures.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
@@ -26,7 +25,7 @@ import {
 
 // New foreign-op 403 pins (HTTP status covenant): work-order
 // claim/release and flow undo were untested for foreign-org
-// callers. The write fence never covers these POSTs; the miss
+// callers. The write authorizer never covers these POSTs; the miss
 // path probe is the only guard.
 
 const BASE = 'http://localhost';
@@ -81,56 +80,14 @@ async function membershipPair(
     });
 }
 
-async function roleGrantPair(
-    roleGrantId: string,
-    body: Record<string, unknown>,
-    organization: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error('missing role-grants/:id spec');
-    }
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/role-grants/${roleGrantId}`,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', roleGrantId],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [roleGrantId], body, SYSTEM_MEMBER_ID,
-            organization,
-        ),
-        headPairId: undefined,
-    });
-}
-
 async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
-    const roleBody = {
-        organization_id: ORGANIZATION_B,
-        identity_id: 'current',
-        role: 'admin',
-        action: 'granted',
-        by_member_id: 'system',
-        at: AT,
-    };
-    await postRoleGrantDocumentOp(
-        db, 'rg-current-admin-b', roleBody, SYSTEM_MEMBER_ID,
-        await roleGrantPair(
-            'rg-current-admin-b', roleBody, ORGANIZATION_B,
-        ),
-    );
     const memBody = {
         organization_id: ORGANIZATION_B,
         identity_id: 'current',
+        type: 'admin',
         at: AT,
     };
     await postMembershipDocumentOp(
@@ -268,32 +225,3 @@ test('foreign-org flow undo is 403', async () => {
     });
 });
 
-test('foreign-org role-grants/:id GET is 403', async () => {
-    const db = await twoOrganizationDb();
-    const tokenA = await organizationToken(
-        'current', ORGANIZATION_A,
-    );
-    const tokenB = await organizationToken(
-        'current', ORGANIZATION_B,
-    );
-    const created = await handleRequest(db, req(
-        'PUT', '/role-grants/rg-foreign-get', tokenA, {
-            identity_id: 'someone',
-            role: 'member',
-            action: 'granted',
-            by_member_id: 'current',
-            at: AT,
-        },
-    ));
-    assert.equal(created.status, 200);
-
-    const foreign = await handleRequest(db, req(
-        'GET', '/role-grants/rg-foreign-get', tokenB,
-    ));
-    assert.equal(foreign.status, 403);
-    assert.deepEqual(await foreign.json(), {
-        error:
-            'forbidden: role_grants/rg-foreign-get belongs to'
-            + ' a different organization',
-    });
-});

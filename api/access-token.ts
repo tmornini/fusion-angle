@@ -9,8 +9,9 @@ import { latestByKey } from '../shared/ledger-reduction.ts';
 
 // The resolved principal — the verified subject of a request.
 // Distinct from the storage `Identity` ({id,kind}): this is
-// the token's claim view. `roles` stays [] until SP-4 reads
-// role_grants; `name` is a display copy.
+// the token's claim view. `roles` are `{type}:{organization_id}`
+// claims baked at mint from memberships; the gate projects
+// them for the fenced org. `name` is a display copy.
 export interface Principal {
     readonly id: Id;
     readonly roles: readonly string[];

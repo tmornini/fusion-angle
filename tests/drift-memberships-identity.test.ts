@@ -367,6 +367,7 @@ async () => {
             id: existing!.id,
             organization_id: existing!.organization_id,
             identity_id: existing!.identity_id,
+            type: existing!.type,
             at: existing!.at,
         },
     ));

@@ -183,8 +183,8 @@ test('a byte-identical PUT resend to work-orders/:id converges'
         db, 'work-orders/wo-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 4);
-    assert.equal((await db.responses.getAll()).length, 4);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 // -- 4. postWorkOrderCreationOp's synthesized create pairs
@@ -319,8 +319,8 @@ test('a work-order create appends a PUT-shaped document pair'
     assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    assert.equal(requests.length, 6);
-    assert.equal(responses.length, 6);
+    assert.equal(requests.length, 5);
+    assert.equal(responses.length, 5);
 
     const documentRow =
         documentRowAt(requests, ENTITY_PREFIX, 'wo-c1');
@@ -432,7 +432,7 @@ test('a work-order create ignores a raw colliding states'
         ),
     ));
     assert.equal(res.status, 204);
-    // 3 bootstrap pairs + 3 create pairs (op/document/join).
-    assert.equal((await db.requests.getAll()).length, 6);
-    assert.equal((await db.responses.getAll()).length, 6);
+    // 2 seed pairs (org+membership) + 3 create pairs.
+    assert.equal((await db.requests.getAll()).length, 5);
+    assert.equal((await db.responses.getAll()).length, 5);
 });

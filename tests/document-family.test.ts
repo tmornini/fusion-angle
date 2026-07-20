@@ -412,7 +412,7 @@ async () => {
             resend.headers.get('Response-ID'),
             edit.headers.get('Response-ID'),
         );
-        assert.equal((await db.requests.getAll()).length, 5);
+        assert.equal((await db.requests.getAll()).length, 4);
     });
 });
 
@@ -560,8 +560,8 @@ async () => {
         assert.equal(followingHead.length, 1);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
-        assert.equal((await db.requests.getAll()).length, 5);
-        assert.equal(responses.length, 5);
+        assert.equal((await db.requests.getAll()).length, 4);
+        assert.equal(responses.length, 4);
     });
 });
 

@@ -177,8 +177,8 @@ test(
             db, '1', 'idea-retry',
         );
         assert.equal(events.length, 1);
-        assert.equal((await db.requests.getAll()).length, 4);
-        assert.equal((await db.responses.getAll()).length, 4);
+        assert.equal((await db.requests.getAll()).length, 3);
+        assert.equal((await db.responses.getAll()).length, 3);
     },
 );
 
@@ -195,6 +195,7 @@ test(
             ),
         ));
         assert.equal(res.status, 405);
-        assert.equal((await db.requests.getAll()).length, 3);
+        // seedRootAdmin only (org + membership); no write pair.
+        assert.equal((await db.requests.getAll()).length, 2);
     },
 );

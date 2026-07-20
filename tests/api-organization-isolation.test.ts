@@ -5,7 +5,11 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { devToken, organizationToken } from './token-fixtures.ts';
+import {
+    claimToken,
+    devToken,
+    organizationToken,
+} from './token-fixtures.ts';
 import {
     ideaBody,
     organizationRow,
@@ -21,7 +25,6 @@ import {
 } from './identity-fixtures.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
@@ -69,10 +72,6 @@ async function twoOrganizations(): Promise<MemoryDbAdapter> {
     // prefix, so an org referenced only by a membership/role-grant
     // pair stays derivation-invisible without its own document.
     await seedOrganizationDocument(db, 'A', 'Acme');
-    await seedRoleGrantPair(
-        db, 'role-current-admin-a', 'A', 'current', 'admin',
-        '2020-01-01T00:00:00.000000Z',
-    );
     await seedMembershipPair(db, 'm-a', 'A', 'current');
     // Seeded through the live document PUT so a1's message
     // pair exists — GET ideas / GET ideas/:id derive from the
@@ -160,8 +159,13 @@ async () => {
     // Phase Final Stage B: organizations table retired
     // — B need not derive for membership-filter
     // exclusion of non-members.
+    // Enumerate is claim-orgs filtered (mint-time snapshot).
+    const token = await claimToken({
+        organizations: ['1', 'A'],
+        roles: ['admin:1', 'admin:A'],
+    });
     const res = await handleRequest(db, req(
-        'GET', '/organizations', await devToken('current')));
+        'GET', '/organizations', token));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
     // 'current' is ALSO a member of seedRootAdmin's own org '1'
@@ -178,12 +182,12 @@ test('the facade requires a bearer token', async () => {
     assert.equal(res.status, 401);
 });
 
-// ---- A roleless member (membership, no role grant) ----
-// The non-admin invitee. GET /organizations self-fences to
-// the caller's own memberships, so it gates on authentication,
-// not a role; org-owned reads and writes stay admin-gated.
+// ---- A content-tier member (type:"member") ----
+// Not admin. GET /organizations is claim-orgs filtered;
+// admin surfaces (members, memberships, orgs write) stay
+// admin-gated. Content surfaces (ideas) are member-permitted.
 
-async function rolelessMemberDb(): Promise<MemoryDbAdapter> {
+async function contentMemberDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     // seedAdminSchema (not bare postSchemaCreation) so `current`
     // can create org A through the live document PUT below —
@@ -205,30 +209,35 @@ async function rolelessMemberDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('a roleless member enumerates only their member orgs',
+test('a content-tier member enumerates only their member orgs',
 async () => {
-    const db = await rolelessMemberDb();
+    const db = await contentMemberDb();
     const res = await handleRequest(db, req(
-        'GET', '/organizations', await devToken('sarah')));
+        'GET', '/organizations',
+        await organizationToken('sarah', 'A')));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
     assert.deepEqual(rows.map(r => r.id), ['A']);
 });
 
-test('a roleless member is still denied org-owned reads',
+test('a content-tier member is still denied admin reads',
 async () => {
-    const db = await rolelessMemberDb();
+    const db = await contentMemberDb();
+    // GET /members is member-tier (roster display); memberships
+    // is the admin-only surface.
     const res = await handleRequest(db, req(
-        'GET', '/members', await devToken('sarah')));
+        'GET', '/memberships',
+        await organizationToken('sarah', 'A')));
     assert.equal(res.status, 403);
 });
 
-test('a roleless member is still denied org-owned writes',
+test('a content-tier member is still denied admin writes',
 async () => {
-    const db = await rolelessMemberDb();
+    const db = await contentMemberDb();
     const res = await handleRequest(db, req(
-        'PUT', '/ideas/new-idea', await devToken('sarah'),
-        { id: 'new-idea', ...ideaBody('A', 'sneak') }));
+        'PUT', '/organizations/A',
+        await organizationToken('sarah', 'A'),
+        organizationRow('Hijack')));
     assert.equal(res.status, 403);
 });
 
@@ -513,9 +522,16 @@ async function seedMembershipPair(
             'no per-write response spec for memberships/:id',
         );
     }
+    // type:admin for current/pb (seeded as admins of their
+    // orgs); type:member for everyone else.
+    const type =
+        identityId === 'current' || identityId === 'pb'
+            ? 'admin'
+            : 'member';
     const body = {
         organization_id: organization,
         identity_id: identityId,
+        type,
         at: T8_AT,
     };
     const pair: MessagePair = await formWritePair({
@@ -540,59 +556,6 @@ async function seedMembershipPair(
     );
 }
 
-// The role-grants twin of seedMembershipPair above (Phase 13
-// Task 1): gate 4's own role check derives from the role_grants
-// PAIR PLANE once it flips, so a raw db.roleGrants.put with no
-// pair would go derivation-invisible. Parameterized by `role`
-// and `at` (unlike seedMembershipPair's own hardcodes) since
-// this file's role-grant call sites span both admin and member
-// grants, at two distinct timestamps. Every id/field value stays
-// IDENTICAL to the raw put this replaces — only the write
-// mechanism changes.
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    roleGrantId: string,
-    organization: string,
-    identityId: string,
-    role: string,
-    at: string,
-): Promise<void> {
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const body = {
-        organization_id: organization,
-        identity_id: identityId,
-        role,
-        action: 'granted',
-        by_member_id: 'system',
-        at,
-    };
-    const pair: MessagePair = await formWritePair({
-        method: 'PUT',
-        pathname: `/role-grants/${roleGrantId}`,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', roleGrantId],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [roleGrantId], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, roleGrantId, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 async function deepDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -610,9 +573,6 @@ async function deepDb(): Promise<MemoryDbAdapter> {
     // other way around.
     await seedOrganizationDocument(db, 'A', 'Acme');
     await seedOrganizationDocument(db, 'B', 'Beta');
-    await seedRoleGrantPair(
-        db, 'rg-current-a', 'A', 'current', 'admin', T8_AT,
-    );
     await seedMembershipPair(db, 'mem-current-a', 'A', 'current');
     for (const [id, organization] of [
         ['pa', 'A'], ['pb', 'B'],
@@ -639,9 +599,6 @@ async function deepDb(): Promise<MemoryDbAdapter> {
     // flipped GET projects/:id/flows route reads only the
     // message ledger). No case in this file exercises 'pb's OWN
     // authorization, so this is inert everywhere but the seed.
-    await seedRoleGrantPair(
-        db, 'rg-pb-admin-b', 'B', 'pb', 'admin', T8_AT,
-    );
     // Member document trios for pa/pb (states/:id retired).
     // seMem-* event ids keep the collection-fence assertions
     // stable. Members are global-plane; ownership rides the
@@ -649,9 +606,19 @@ async function deepDb(): Promise<MemoryDbAdapter> {
     for (const [id, organization, author] of [
         ['pa', 'A', 'current'], ['pb', 'B', 'pb'],
     ] as const) {
+        // author is admin of the target org — claim roles must
+        // say so (organizationToken only admins `current`).
+        const authorToken = author === 'current'
+            ? await organizationToken(author, organization)
+            : await claimToken({
+                sub: author,
+                organization,
+                organizations: [organization],
+                roles: ['admin:' + organization],
+            });
         const memberWrite = await handleRequest(db, req(
             'PUT', '/members/' + id,
-            await organizationToken(author, organization),
+            authorToken,
             {
                 type: 'human',
                 state: 'active',
@@ -1067,11 +1034,8 @@ async () => {
 test('nested credentials are admin-only (member denied)',
 async () => {
     const db = await deepDb();
-    // Grant pa the member role in A so it resolves a non-admin
-    // role through the gate (membership alone is roleless).
-    await seedRoleGrantPair(
-        db, 'rg-pa-member-a', 'A', 'pa', 'member', T8_AT,
-    );
+    // pa's membership type:"member" bakes claim role member:A
+    // via organizationToken — admin surface stays denied.
     const asAdmin = await handleRequest(db, req(
         'GET', '/organizations/A/identities/pa/credentials',
         await organizationToken('current', 'A')));

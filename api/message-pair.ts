@@ -613,7 +613,6 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'identity-tokens/:jti/rotation',
     'identity-tokens/:jti/revocation',
     'organizations/:id',
-    'role-grants/:id',
     'identity-providers/:id',
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that

@@ -37,7 +37,6 @@ import type {
     ProjectObjectiveActualScoreEntity,
     RecordEntity,
     RecordAttributeEntity,
-    RoleGrantEntity,
     MembershipEntity,
     IdentityProviderEntity,
     WorkOrderEntity,
@@ -84,7 +83,6 @@ import {
     validateRecordAttributeDocumentBody,
     validateRecordDocumentBody,
     validateRecordWriteBody,
-    validateRoleGrantEntity,
     validateWorkOrderClaimBody,
     validateWorkOrderCreateBody,
     validateWorkOrderDocumentBody,
@@ -192,8 +190,6 @@ import {
     deriveCredential,
     deriveClientRegistration,
     deriveIdentityKind,
-    deriveRoleGrants,
-    deriveRoleGrant,
     deriveIdentityProviders,
     deriveIdentityProvider,
     deriveTokenRevocation,
@@ -2618,31 +2614,6 @@ async function requireServiceIdentity(
     }
 }
 
-// Role grant document write — Phase Final Task 2: the
-// role_grants ROW half is stripped — pure pair-plane write.
-// organization_id is stamped by WRITE_RESPONSE_SPECS from the
-// fence (never trusted client echo). `pair` is optional so a
-// below-facade caller keeps compiling.
-export async function postRoleGrantDocumentOp(
-    db: DbAdapter,
-    _id: Id,
-    body: Record<string, unknown>,
-    _actor: Id,
-    pair?: MessagePair,
-): Promise<Omit<RoleGrantEntity, 'id'>> {
-    const entity = withoutId(body) as unknown as
-        Omit<RoleGrantEntity, 'id'>;
-    return db.transaction(
-        // Phase Final Task 2: role_grants ROW half stripped.
-        ['requests', 'responses'],
-        async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
-            }
-            return entity;
-        },
-    );
-}
 
 // Identity provider document write — Phase Final Task 2: the
 // identity_providers ROW half is stripped (gate 1 DEFAULT:
@@ -2981,22 +2952,6 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) => ({
             id: param(params, 0),
             ...validateOrganizationEntity(withoutId(body ?? {})),
-        }),
-    },
-    // role_grants rides the ORG-SCOPED store (unlike its GLOBAL-
-    // plane siblings above), which auto-stamps organization_id
-    // from the verified token — the wire body omits it (see
-    // web-app/app/adapters/role-grants.ts). The gate has no
-    // access to that scoped store, so it re-derives the same
-    // stamp here, mirroring 'projects/:id' et al.
-    'role-grants/:id': {
-        status: HTTP_OK,
-        successBody: (params, body, _actor, organization) => ({
-            id: param(params, 0),
-            ...validateRoleGrantEntity({
-                ...withoutId(body ?? {}),
-                organization_id: organization,
-            }),
         }),
     },
     'identity-providers/:id': {
@@ -3722,7 +3677,7 @@ export const routes: Route[] = [
     // serve 2-segment family/:id patterns. ADMIN-ONLY via
     // deny-by-default (/identities has no MEMBER_VERBS
     // entry); GLOBAL plane (no org nesting, no
-    // write-ownership fence). DELETE is a marked tombstone =
+    // write authorizer). DELETE is a marked tombstone =
     // deregistration; the gate forms the 204 pair, the
     // handler appends it — idempotent by construction.
     route('identities/:id/registration', {
@@ -3783,56 +3738,6 @@ export const routes: Route[] = [
                 },
             );
         },
-    }),
-    // GET is FLIPPED (Phase 10 Task 8): derived via
-    // deriveRoleGrants, THEN fenced to the caller's org by
-    // organization_id — SIMPLER than identity-pii/credentials'
-    // gate 15 membership-pair-plane fence above, because
-    // role_grants carries its OWN organization_id (gate 16:
-    // deriveRoleGrants reads it off the stored RESPONSE, the
-    // fence-stamped value), matching the row plane's
-    // OrganizationScopedEntityStore#getAll (filter ==
-    // organization_id).
-    route('role-grants', {
-        get: async (db, _p, _actor, organization) => {
-            const organizationId = requireOrganization(
-                organization,
-            );
-            return (await deriveRoleGrants(db)).filter(
-                (grant) => grant.organization_id === organizationId,
-            );
-        },
-    }),
-    // Hand-written in place of makeIdRoute<RoleGrantEntity> so
-    // PUT can append its message pair in the same transaction
-    // as the write — the factory's fixed closures have no
-    // per-family pair selector (see message-pair.ts). role_grants
-    // is a HistoryEntityStore ledger row (latest-wins per
-    // (organization_id, identity_id, role)), so this is
-    // EVENT-APPEND: no head-read, no Supersedes. Verbs stay
-    // {get, put}. GET is FLIPPED (Phase 10 Task 8): derived via
-    // deriveRoleGrant, then fenced the SAME way the collection
-    // above is — a foreign-org grant 403s
-    // (ForeignOrganizationError); a genuinely absent one 404s
-    // via deriveRoleGrant's EntityNotFoundError.
-    route('role-grants/:id', {
-        get: async (db, p, _actor, organization) => {
-            const organizationId = requireOrganization(
-                organization,
-            );
-            const id = param(p, 0);
-            const grant = await deriveRoleGrant(db, id);
-            if (grant.organization_id !== organizationId) {
-                throw new ForeignOrganizationError(
-                    'role_grants', id,
-                );
-            }
-            return grant;
-        },
-        put: (db, p, body, actor, pair) =>
-            postRoleGrantDocumentOp(
-                db, param(p, 0), body, actor, pair,
-            ),
     }),
     // GET is FLIPPED (Phase 13 Task 6, gate 7 discharged):
     // derived via deriveIdentityTokens — every identity_tokens

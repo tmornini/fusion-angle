@@ -33,8 +33,6 @@ import {
     MOCK_SEED_TIMESTAMP,
 } from '../api/mock-data/seed-constants.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
-import { deriveRoleGrant } from
-    '../api/derive-identity-spine.ts';
 import { deriveOrganization } from
     '../api/derive-organizations.ts';
 
@@ -112,10 +110,9 @@ import { deriveOrganization } from
 // per row — formed by seedHumanCredentials' OWN local pass-1/
 // pass-2 split, api/mock-data.ts, since a credential's hashed
 // secret is unknown until PBKDF2 resolves and so can never join
-// this file's shared pre-tx pass) + 12 role-grant document pairs
-// (Phase 10 Task 6: the 2 admin grants for `current` plus one
-// member grant per non-admin human, one role-grants/:id pair per
-// row) + 861 work-order historical-trace transition op pairs
+// this file's shared pre-tx pass) + 0 role-grant document pairs
+// (retired: membership type carries privilege; mint bakes
+// claims) + 861 work-order historical-trace transition op pairs
 // (states-address retirement Task 12: 211 hand-authored + 650
 // generated events reshape into work-orders/:id/transition
 // pairs — same count as the bare states/:id traces they
@@ -127,13 +124,12 @@ import { deriveOrganization } from
 // keyed /identities/:id/default-org/ address; Phase Final
 // Task 2 strips the identity_default_organizations ROW half —
 // pairs alone remain) + 1 gate0001 Capture step (R1-FIX-A
-// re-home) = 1506. System-member genesis folds into the
+// re-home) = 1494 after role-grant retirement (was 1506 − 12
+// role-grant pairs). System-member genesis folds into the
 // members/:id document trio (states-address retirement Task 8)
 // — no bare states/:id pair. A dropped or reordered invocation
-// changes this count.
-// Accounting: 1513 − 861 bare traces − 7 leaf SFV
-// + 861 transition ops = 1506.
-const EXPECTED_PAIR_COUNT = 1506;
+// changes this count. Bootstrap absolute is 12 (was 13).
+const EXPECTED_PAIR_COUNT = 1494;
 
 test('a mock-data seed populates balanced pairs',
 async () => {
@@ -388,7 +384,7 @@ test('a seeded system member\'s member-document pair sits at'
 });
 
 test('a seeded membership document pair sits at its org-nested'
-+ ' entity address, its body carrying the three membership'
++ ' entity address, its body carrying the four membership'
 + ' keys', async () => {
     const db = memoryDbAdapter();
     await postMockDataLoad(db);
@@ -407,7 +403,7 @@ test('a seeded membership document pair sits at its org-nested'
     };
     assert.deepEqual(
         Object.keys(embedded.body).sort(),
-        ['at', 'identity_id', 'organization_id'],
+        ['at', 'identity_id', 'organization_id', 'type'],
     );
 });
 
@@ -985,31 +981,29 @@ test('a seeded credential\'s response body carries the full'
     );
 });
 
-test('a seeded role grant\'s response body organization_id'
-+ ' matches the derived grant (Phase 10 Task 6 org-stamp'
-+ ' regression; Phase Final Task 2 strips role_grants ROW'
-+ ' half — oracle is the pair plane)', async () => {
+test('seeded memberships carry type and no role-grant'
++ ' pairs remain', async () => {
     const db = memoryDbAdapter();
     await postMockDataLoad(db);
-    const id = 'seed-role-current-admin-org2';
-    // Phase Final Task 2: role_grants empty after strip.
-    // Phase Final Stage B: identity spine tables retired.
-    const grant = await deriveRoleGrant(db, id);
-    assert.equal(grant.organization_id, ORGANIZATION_TWO);
     const requests = await db.requests.getAll();
-    const requestRow = requests.find(r => r.uri_id === id);
-    assert.ok(requestRow, 'no request row for ' + id);
-    const responses = await db.responses.getAll();
-    const responseRow = responses.find(
-        r => r.id === requestRow!.id,
-    );
-    assert.ok(responseRow, 'no response row for ' + id);
-    const embedded = JSON.parse(responseRow!.message) as {
-        body: Record<string, unknown>;
-    };
     assert.equal(
-        embedded.body.organization_id, grant.organization_id,
+        requests.filter(r =>
+            r.uri_prefix.includes('/role-grants/')).length,
+        0,
     );
+    const membershipReqs = requests.filter(r =>
+        r.uri_prefix.includes('/memberships/'));
+    assert.ok(membershipReqs.length > 0);
+    for (const row of membershipReqs) {
+        const embedded = JSON.parse(row.message) as {
+            body: Record<string, unknown>;
+        };
+        assert.ok(
+            embedded.body.type === 'admin'
+            || embedded.body.type === 'member',
+            'membership ' + row.uri_id + ' missing type',
+        );
+    }
 });
 
 test('seed pairs verify against their hashes', async () => {
@@ -1027,7 +1021,7 @@ test('seed pairs verify against their hashes', async () => {
     }
 });
 
-test('a bootstrap seed populates exactly thirteen balanced,'
+test('a bootstrap seed populates exactly twelve balanced,'
 + ' hash-verified pairs for the current member and the system'
 + ' member', async () => {
     const db = memoryDbAdapter();
@@ -1048,23 +1042,17 @@ test('a bootstrap seed populates exactly thirteen balanced,'
     // (identities/:id/pii) closes the intake decomposition's
     // bootstrap side — 4 + 2 + 1 = 7. Phase 10 Task 6 mirrors
     // the mock-data seed's own remaining raw writes: the system
-    // member's OWN identities/:id document, its OWN role grant
-    // (bootstrap-role-current-admin), and the current member's
-    // + the system member's OWN identity-credential documents
-    // (formed by seedHumanCredentials' local pass-1/pass-2
-    // split, api/mock-data.ts) — 7 + 1 + 1 + 2 = 11. Phase 11
-    // Task 8 mirrors the mock-data seed's own last "STAYS RAW"
-    // deferral: bootstrap's OWN default-org event
-    // ('bootstrap-default-org-current') forms its OWN pair too
-    // — 11 + 1 = 12. Phase 12 Task 3 mirrors the mock-data
-    // seed's own new organizations family: bootstrap's OWN lone
-    // organizations pair (STARK_ORGANIZATION — bootstrap seeds
-    // no second org; Phase Final Task 2 strips the ROW half)
-    // — 12 + 1 = 13. States-address retirement Task 8 folds
-    // system-member genesis into the members/:id document trio
-    // — the bare states/:id pair is gone (was 14, now 13).
-    assert.equal(requests.length, 13);
-    assert.equal(responses.length, 13);
+    // member's OWN identities/:id document and the current
+    // member's + the system member's OWN identity-credential
+    // documents (formed by seedHumanCredentials' local pass-1/
+    // pass-2 split, api/mock-data.ts) — 7 + 1 + 2 = 10. Role-
+    // grant pair retired (membership type:"admin" is privilege).
+    // Phase 11 Task 8: bootstrap's OWN default-org event
+    // ('bootstrap-default-org-current') — 10 + 1 = 11. Phase 12
+    // Task 3: bootstrap's OWN lone organizations pair
+    // (STARK_ORGANIZATION) — 11 + 1 = 12.
+    assert.equal(requests.length, 12);
+    assert.equal(responses.length, 12);
     const atEntity = requests.filter(
         r => r.uri_prefix === '/human-members/'
             && r.uri_id === 'current',

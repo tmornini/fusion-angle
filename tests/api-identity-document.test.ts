@@ -163,8 +163,8 @@ test('a byte-identical PUT resend to identities/:id converges'
         db, 'identities/id-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 4);
-    assert.equal((await db.responses.getAll()).length, 4);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file

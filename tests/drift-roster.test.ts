@@ -747,6 +747,7 @@ async () => {
         'PUT', '/memberships/' + membershipId, token, {
             organization_id: STARK_ORGANIZATION,
             identity_id: humanId,
+        type: 'member',
             at: nowUtc(),
         },
     ));
@@ -1208,6 +1209,7 @@ test('plain PUT-supersession at a membership address — a'
         'PUT', '/memberships/' + membershipId, token, {
             organization_id: STARK_ORGANIZATION,
             identity_id: identityId,
+        type: 'member',
             at: '2026-06-01T00:00:00.000000Z',
         },
     ));
@@ -1223,6 +1225,7 @@ test('plain PUT-supersession at a membership address — a'
         'PUT', '/memberships/' + membershipId, token, {
             organization_id: STARK_ORGANIZATION,
             identity_id: identityId,
+        type: 'member',
             at: '2020-01-01T00:00:00.000000Z',
         },
     ));
@@ -1265,6 +1268,7 @@ async () => {
         'PUT', '/memberships/' + membershipId, token, {
             organization_id: STARK_ORGANIZATION,
             identity_id: orphanId,
+        type: 'member',
             at: nowUtc(),
         },
     ));

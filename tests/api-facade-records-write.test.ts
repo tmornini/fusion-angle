@@ -12,7 +12,6 @@ import {
 } from './test-fixtures.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
@@ -105,54 +104,15 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 // `current` holds admin in org A (the administered org) and
 // is a member of org A only. Roles are per-org since Phase 3,
 // so the org-A grant authorizes the facade write.
 async function oneOrganization(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedRoleGrantPair(db, 'role-current-admin-a', {
-        organization_id: 'A', identity_id: 'current',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
     await seedMembershipPair(db, 'm-a', {
         organization_id: 'A', identity_id: 'current',
+        type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     return db;

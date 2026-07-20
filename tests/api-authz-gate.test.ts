@@ -34,7 +34,7 @@ test('an admin is permitted', async () => {
     assert.ok(Array.isArray(rows));   // 200, not 403
 });
 
-test('admin may write a role grant', async () => {
+test('role-grants routes are retired (404)', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const res = await handleRequest(db, new Request(
@@ -46,19 +46,21 @@ test('admin may write a role grant', async () => {
             },
             body: JSON.stringify({
                 organization_id: '1',
-                identity_id: 'p2', role: 'viewer',
+                identity_id: 'p2',
+                role: 'viewer',
                 action: 'granted',
                 by_member_id: 'current',
                 at: '2026-06-03T00:00:00.000000Z',
             }),
         }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 404);
 });
 
-test('a non-admin may not write a role grant', async () => {
-    const db = await freshDb();   // no admin
+test('admin may write a membership type', async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
     const res = await handleRequest(db, new Request(
-        `${BASE}/role-grants/r1`, {
+        `${BASE}/memberships/m-p2`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -66,13 +68,12 @@ test('a non-admin may not write a role grant', async () => {
             },
             body: JSON.stringify({
                 organization_id: '1',
-                identity_id: 'p2', role: 'viewer',
-                action: 'granted',
-                by_member_id: 'current',
+                identity_id: 'p2',
+                type: 'member',
                 at: '2026-06-03T00:00:00.000000Z',
             }),
         }));
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 200);
 });
 
 test('authentication precedes authorization (401 first)',

@@ -18,7 +18,6 @@ import { seedIdentityPii } from './identity-fixtures.ts';
 import {
     postMemberDocumentOp,
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     memberDocumentBodyOf,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
@@ -43,6 +42,7 @@ async function allMemberships(db: MemoryDbAdapter) {
         id: string;
         organization_id: string;
         identity_id: string;
+        type: string;
         at: string;
     }> = [];
     for (const organization of organizations) {
@@ -110,40 +110,6 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 function req(
     method: string,
     path: string,
@@ -174,20 +140,17 @@ async function seed(): Promise<MemoryDbAdapter> {
     await seedOrganizationDocument(db, '1', 'Stark');
     await seedOrganizationDocument(db, '2', 'Wayne');
     for (const organization of ['1', '2']) {
-        await seedRoleGrantPair(db, 'rg-current-' + organization, {
-            organization_id: organization, identity_id: 'current',
-            role: 'admin', action: 'granted',
-            by_member_id: 'system', at: AT,
-        });
         await seedMembershipPair(db, 'm-current-' + organization, {
             organization_id: organization, identity_id: 'current',
+        type: 'admin',
             at: AT,
         });
     }
     await person(db, 'current', 'Tony', 'demo@example.com');
     await person(db, 'sarah', 'Sarah', 'sarah@x.com');
     await seedMembershipPair(db, 'm-sarah-1', {
-        organization_id: '1', identity_id: 'sarah', at: AT,
+        organization_id: '1', identity_id: 'sarah',
+        type: 'member', at: AT,
     });
     return db;
 }

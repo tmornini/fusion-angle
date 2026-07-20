@@ -1356,16 +1356,24 @@ export interface OrganizationEntity {
     ideas_limit: number;
 }
 
+// Membership privilege within an organization. Baked into
+// access-token role claims at mint as `{type}:{organization_id}`
+// (e.g. admin:1). Elevate/demote is a membership PUT; there is
+// no separate role-grants family.
+export type MembershipType = 'admin' | 'member';
+
 // The covenant binding an identity to an organization, with
-// the moment of union. The source of "which orgs can this
-// identity reach" — enumerated globally for a subject, scoped
-// per-tenant through the org guard. A person in N orgs has N
-// membership rows; member.id === identity.id stays global
-// (one profile, many memberships).
+// the moment of union and the privilege of that join. Source
+// of "which orgs can this identity reach" and mint-time role
+// baking. A person in N orgs has N membership rows;
+// member.id === identity.id stays global (one profile, many
+// memberships). Not a pure join: `type` is a privilege
+// attribute of the relationship.
 export interface MembershipEntity {
     id: Id;
     organization_id: Id;
     identity_id: Id;
+    type: MembershipType;
     at: string;
 }
 

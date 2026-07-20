@@ -149,8 +149,8 @@ test('a byte-identical resend converges: one event,'
     );
     const events = await deriveProjectStateHistory(db, '1', 'doc-3');
     assert.equal(events.length, 1);
-    assert.equal((await db.requests.getAll()).length, 4);
-    assert.equal((await db.responses.getAll()).length, 4);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 test('the pair body and GET wire both carry the'
@@ -179,8 +179,9 @@ test('the pair body and GET wire both carry the'
     );
     assert.equal(wire.state_event_id, 'ev-doc-4');
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 4);
-    const parsed = JSON.parse(requests[3]!.message) as {
+    // seedRootAdmin 2 + project PUT 1
+    assert.equal(requests.length, 3);
+    const parsed = JSON.parse(requests[2]!.message) as {
         body: { state: string; state_at: string };
     };
     assert.equal(parsed.body.state, 'under_review');

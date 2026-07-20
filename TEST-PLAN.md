@@ -215,11 +215,11 @@ shared event-append write address. Lifecycle writes are
 document-trio PUTs
 (ideas/projects/records/flows/objectives/members) and named
 ops (work-order create/claim/transition/release,
-invitations). The ownership fence
+invitations). The ownership authorizer
 (`resolveOwningOrganization`) makes a foreign org's
 `entity_id` 403 on per-entity family history (members
 global miss is 404). Also closed: WP1 and the records
-hard-delete forgery channel. Write-ownership fence returns
+hard-delete forgery channel. Write authorizer returns
 foreign-id PUT/DELETE 403 on org-scoped families.
 Unauthenticated callers to any non-bearer-exempt path
 (including retired/unknown routes) get 401 before a
@@ -2149,7 +2149,7 @@ the claude-in-chrome MCP.
   appear and the org become reachable. PASS: pending ⇒ not in
   roster, not reachable; accepted ⇒ both. Source: the org
   fence (`resolveOwningOrganization` via
-  `writeOwnershipFenceFor`), `acceptInvitation`.
+  `writeAuthorizerFor`), `acceptInvitation`.
 - [ ] **V7 — Authz: non-admin grant/revoke rejected; invitee
   may still read & accept** Sign in as a NON-admin member of
   an org (a seeded human with no admin role). PASS: any

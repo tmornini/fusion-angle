@@ -339,7 +339,8 @@ test("the zone's confinement: a non-/pii DELETE (a memberships"
     const put = await handleRequest(db, req(
         'PUT', '/memberships/ms-confine-1',
         await organizationToken(),
-        { organization_id: '1', identity_id: 'current', at: AT },
+        { organization_id: '1', identity_id: 'current',
+        type: 'admin', at: AT },
     ));
     assert.equal(put.status, 200);
     const putId = put.headers.get('Response-ID');

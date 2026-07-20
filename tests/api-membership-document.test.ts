@@ -25,19 +25,16 @@ import {
 
 // Phase 8 Task 2 (eighth family, 'stateless'): PUT
 // /memberships/:id takes the entity's OWN fields only — no
-// lifecycle trio, and no lifecycle concept exists for a
-// membership row AT ALL (a pure join relation — the
-// record-attributes precedent's actual sibling, not
-// work-orders'/objectives' own distinct 'stateless'
-// rationales). UNLIKE work-orders/record-attributes/objectives,
-// every entity field (INCLUDING organization_id) is REQUIRED on
-// the wire — memberships' PUT body carries its own
-// organization_id today, never a fence-stamped omission.
+// lifecycle trio. Membership carries privilege type (admin|
+// member) baked into claims at mint — not a pure join.
+// Every entity field (INCLUDING organization_id and type) is
+// REQUIRED on the wire.
 
 function documentFields() {
     return {
         organization_id: '1',
         identity_id: 'sarah',
+        type: 'member',
         at: '2026-01-01T00:00:00.000000Z',
     };
 }
@@ -45,7 +42,7 @@ function documentFields() {
 // -- 1. validateMembershipDocumentBody -----------------------
 
 test('validateMembershipDocumentBody accepts the exact'
-+ ' three-key body', () => {
++ ' four-key body', () => {
     const doc = validateMembershipDocumentBody(documentFields());
     assert.deepEqual(doc.entity, documentFields());
 });
@@ -78,7 +75,9 @@ test('validateMembershipDocumentBody rejects a stray key with'
 test('validateMembershipDocumentBody rejects each missing key,'
 + ' byte-identical to validateMembershipEntity on both paths',
 () => {
-    for (const key of ['organization_id', 'identity_id', 'at']) {
+    for (const key of [
+        'organization_id', 'identity_id', 'type', 'at',
+    ]) {
         const body = { ...documentFields() };
         delete (body as Record<string, unknown>)[key];
         let documentMessage: string | undefined;
@@ -150,8 +149,11 @@ test('a byte-identical PUT resend to memberships/:id converges'
         db, 'memberships/ms-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 4);
-    assert.equal((await db.responses.getAll()).length, 4);
+    // seedAdminSchema: org + membership (no role-grant) = 2;
+    // one unique membership PUT = 3 (byte-identical resend
+    // dedups).
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file

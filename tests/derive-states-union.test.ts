@@ -5,7 +5,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { organizationToken } from './token-fixtures.ts';
+import {
+    claimToken,
+    organizationToken,
+} from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import {
@@ -30,7 +33,6 @@ import {
 } from '../api/message-pair.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
@@ -46,6 +48,20 @@ import { seedIdentityPii } from './identity-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
+
+// Non-current admins need explicit claim roles — organizationToken
+// only bakes admin for sub === 'current'.
+async function adminToken(
+    sub: string, organization: string,
+): Promise<string> {
+    return claimToken({
+        sub,
+        organization,
+        organizations: [organization],
+        roles: ['admin:' + organization],
+    });
+}
+
 
 function req(
     method: string,
@@ -106,40 +122,6 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 // Two orgs (A, B), one admin identity each — the derive-states-
 // events.test.ts precedent, reused so every write below (ideas,
 // ai-members, work-orders, flows, invitations, memberships) rides
@@ -153,21 +135,13 @@ async function seed(): Promise<MemoryDbAdapter> {
     // enumerate-then-probe (via deriveOrganizations).
     await seedOrganizationDocument(db, 'A', 'Acme');
     await seedOrganizationDocument(db, 'B', 'Beta');
-    await seedRoleGrantPair(db, 'rg-a', {
-        organization_id: 'A', identity_id: 'adminA',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system', at: AT,
-    });
-    await seedRoleGrantPair(db, 'rg-b', {
-        organization_id: 'B', identity_id: 'adminB',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system', at: AT,
-    });
     await seedMembershipPair(db, 'm-a', {
-        organization_id: 'A', identity_id: 'adminA', at: AT,
+        organization_id: 'A', identity_id: 'adminA',
+        type: 'admin', at: AT,
     });
     await seedMembershipPair(db, 'm-b', {
-        organization_id: 'B', identity_id: 'adminB', at: AT,
+        organization_id: 'B', identity_id: 'adminB',
+        type: 'admin', at: AT,
     });
     return db;
 }
@@ -388,8 +362,8 @@ interface UnionFixture {
 // fences per row, not merely per family.
 async function buildUnionFixture(): Promise<UnionFixture> {
     const db = await seed();
-    const tokenA = await organizationToken('adminA', 'A');
-    const tokenB = await organizationToken('adminB', 'B');
+    const tokenA = await adminToken('adminA', 'A');
+    const tokenB = await adminToken('adminB', 'B');
 
     // (a-idea) an idea's own embedded genesis trio, in org A —
     // plus a FOREIGN idea in org B (never included in A's own
@@ -440,7 +414,8 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     );
     const membershipRes = await handleRequest(db, req(
         'PUT', '/memberships/ms-ai-union', tokenA,
-        { organization_id: 'A', identity_id: aiMemberId, at: AT },
+        { organization_id: 'A', identity_id: aiMemberId,
+        type: 'member', at: AT },
     ));
     assert.equal(membershipRes.status, 200);
 
@@ -644,7 +619,7 @@ test('deriveInvitationStates: a duplicate grant on the same'
 + ' \'pending\' row, and posts no event on the old plane for'
 + ' the duplicate\'s own id', async () => {
     const db = await seed();
-    const tokenA = await organizationToken('adminA', 'A');
+    const tokenA = await adminToken('adminA', 'A');
     await person(
         db, 'invitee-dup', 'Dup Invitee', 'invitee-dup@x.com',
     );
@@ -700,7 +675,7 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
 + ' derives exactly ONE \'accepted\' row, keyed to the FIRST'
 + ' accept\'s own event id', async () => {
     const db = await seed();
-    const tokenA = await organizationToken('adminA', 'A');
+    const tokenA = await adminToken('adminA', 'A');
     await person(
         db, 'invitee-reaccept', 'Reaccept Invitee',
         'invitee-reaccept@x.com',
@@ -761,7 +736,7 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
 + ' derives exactly ONE \'declined\' row, keyed to the FIRST'
 + ' decline\'s own event id', async () => {
     const db = await seed();
-    const tokenA = await organizationToken('adminA', 'A');
+    const tokenA = await adminToken('adminA', 'A');
     await person(
         db, 'invitee-redecline', 'Redecline Invitee',
         'invitee-redecline@x.com',

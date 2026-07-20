@@ -350,6 +350,7 @@ test(
         const membershipBody = {
             organization_id: '1',
             identity_id: 'member_without_pii',
+        type: 'member',
             at: '2020-01-01T00:00:00.000000Z',
         };
         await postMembershipDocumentOp(

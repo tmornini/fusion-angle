@@ -6,7 +6,7 @@ import {
     type InvitationState,
 } from './types.ts';
 import {
-    currentRolesForInOrganization,
+    projectClaimRolesForOrganization,
 } from './authorization.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import { identityDefaultOrganization } from './authentication.ts';
@@ -53,7 +53,6 @@ import {
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
     deriveIdentityPiiRows,
-    deriveRoleGrants,
 } from './derive-identity-spine.ts';
 import {
     deriveInvitationStates,
@@ -73,13 +72,14 @@ async function callerActiveOrganization(
         );
 }
 
-async function callerIsOrganizationAdmin(
+function callerIsOrganizationAdmin(
     ctx: AuthenticatedContext,
     organization: Id,
-): Promise<boolean> {
-    const rows = await deriveRoleGrants(ctx.base);
-    return currentRolesForInOrganization(
-        rows, ctx.principal.id, organization,
+): boolean {
+    // Admin of O is claim-role admin:O projected for that org.
+    // Mint bakes roles from membership type; no live ledger.
+    return projectClaimRolesForOrganization(
+        ctx.principal.roles, organization,
     ).includes('admin');
 }
 
@@ -297,7 +297,7 @@ async function sentInvitations(
             'forbidden: identity has no organization',
             HTTP_FORBIDDEN);
     }
-    if (!await callerIsOrganizationAdmin(ctx, organization)) {
+    if (!callerIsOrganizationAdmin(ctx, organization)) {
         return errorJson(
             'forbidden: listing sent invitations requires'
             + ' an admin role', HTTP_FORBIDDEN);
@@ -360,7 +360,7 @@ async function grantInvitation(
             'forbidden: identity has no organization',
             HTTP_FORBIDDEN);
     }
-    if (!await callerIsOrganizationAdmin(ctx, organization)) {
+    if (!callerIsOrganizationAdmin(ctx, organization)) {
         return errorJson(
             'forbidden: granting an invitation requires an'
             + ' admin role', HTTP_FORBIDDEN);
@@ -741,9 +741,12 @@ async function acceptInvitation(
     // Rides the shared former (Phase 9 Task 2), which resolves
     // the SAME WRITE_RESPONSE_SPECS ['memberships/:id'] entry
     // a live PUT /memberships/:id resolves.
+    // Accept writes type:"member" explicitly — closes the gap
+    // where accept wrote membership with no role grant.
     const membershipDocumentBody = {
         organization_id: inv.organization_id,
         identity_id: ctx.principal.id,
+        type: 'member',
         at,
     };
     const membershipDocument = await formDocumentPairFor(
@@ -894,7 +897,7 @@ async function revokeInvitation(
         return errorJson('Not found: /invitations/' + id,
             HTTP_NOT_FOUND);
     }
-    if (!await callerIsOrganizationAdmin(
+    if (!callerIsOrganizationAdmin(
         ctx, inv.organization_id)) {
         return errorJson(
             'forbidden: revoking an invitation requires an'

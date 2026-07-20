@@ -218,8 +218,8 @@ test(
         // bootstrap pairs = 11.
         const allRequests = await db.requests.getAll();
         const allResponses = await db.responses.getAll();
-        assert.equal(allRequests.length, 11);
-        assert.equal(allResponses.length, 11);
+        assert.equal(allRequests.length, 10);
+        assert.equal(allResponses.length, 10);
         assert.equal(allRequests.length, allResponses.length);
 
         const atProjectAddress = allRequests.filter(

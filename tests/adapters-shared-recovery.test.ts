@@ -67,7 +67,6 @@ import {
 } from '../web-app/app/adapters/init.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
@@ -174,40 +173,6 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 // Authorize `current` as admin of `org` and stamp the
 // membership the gate fences on — the per-org grant the
 // facade reads (mirrors api-org-isolation's twoOrganizations).
@@ -224,14 +189,9 @@ async function seedOrganizationAdmin(
     // resolve.
     await seedOrganizationDocumentPair(
         db, organization, organization);
-    await seedRoleGrantPair(db, 'role-current-' + organization, {
-        organization_id: organization, identity_id: 'current',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
     await seedMembershipPair(db, 'm-current-' + organization, {
         organization_id: organization, identity_id: 'current',
+        type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
 }

@@ -17,7 +17,6 @@ import {
 } from '../web-app/app/adapters/authentication.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
@@ -77,52 +76,13 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 async function passwordUserCtx() {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await seedRoleGrantPair(db, 'rg', {
-        organization_id: '1',
-        identity_id: 'current', role: 'admin',
-        action: 'granted', by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
     await seedMembershipPair(db, 'm', {
         organization_id: '1',
         identity_id: 'current',
+        type: 'admin',
         at: '2020-01-01T00:00:00.000000Z',
     });
     // Below-facade pair formation (Phase 13 Task 8): the login

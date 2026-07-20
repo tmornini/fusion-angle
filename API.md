@@ -332,7 +332,7 @@ register **before** the `:id` document routes so
 6. `GET members/:id/history` — `deriveMemberStates`
    filtered to `entity_id`, sorted DESC. Global-family
    miss: empty → `EntityNotFoundError('members', id)`
-   → **404** only (no org ownership fence).
+   → **404** only (no org write authorizer).
 7. `GET work-orders/:id/history` —
    `workOrderHistoryFor` (entity-scoped op-pair replay
    + transition fold). Wire:
@@ -390,8 +390,8 @@ members) and named ops (work-order create / claim /
 transition / release, invitations) — never a shared
 event-append address.
 
-Org-scoped document PUT/DELETE hit the write-ownership
-fence (`api/write-ownership-fence.ts` →
+Org-scoped document PUT/DELETE hit the write authorizer
+(`api/write-authorizer.ts` →
 `resolveOwningOrganization`) so a foreign id 403s
 rather than genesis-ing in the caller's namespace;
 genuine absence still 404s (or genesis on PUT).

@@ -158,8 +158,8 @@ async () => {
         db, 'record-attributes/ra-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 4);
-    assert.equal((await db.responses.getAll()).length, 4);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 // -- 4. the DELETE-head derives absent — below-route via the

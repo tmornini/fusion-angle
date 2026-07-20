@@ -32,7 +32,8 @@ import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
 
-// Pair-plane lifecycle derives and ownership fences (Phase 11
+// Pair-plane lifecycle derives and ownership resolution
+// (Phase 11
 // onward; bulk lifecycle collection retired — states-URI
 // elimination C3). Per-entity history rides GET
 // <family>/:id/history; work-order and objective bulk history

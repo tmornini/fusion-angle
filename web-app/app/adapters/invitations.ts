@@ -14,6 +14,12 @@ import {
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
+import {
+    getSessionCredentials,
+    putSessionCredentials,
+} from './session-credentials.ts';
+import { postSessionRefresh } from './session-refresh.ts';
+import { putSessionToken } from './init.ts';
 export {
     isInvitationState,
 } from '../../../api/types.ts';
@@ -157,7 +163,9 @@ export async function postInvitationGrant(
 }
 
 // Accept an invitation — the server writes the membership in the
-// invitation's org and appends 'accepted' in one atomic batch.
+// invitation's org (type:"member") and appends 'accepted' in one
+// atomic batch. Then remint via the refresh grant so the access
+// token gains the new member:O claim (roles bake only at mint).
 export async function postInvitationAcceptance(
     ctx: RequestContext,
     id: Id,
@@ -168,7 +176,34 @@ export async function postInvitationAcceptance(
     await ctx.POST('invitations/' + id + '/acceptance', {
         membershipId, acceptEventId, acceptAt,
     });
+    await remintSessionClaims(ctx);
     invitationChanges.notify();
+}
+
+// Re-bake access-token roles from live memberships. Best-effort:
+// a missing/dead refresh leaves the session as-is; the user can
+// re-login. Never throws on refresh failure after a successful
+// accept — the membership write already committed.
+async function remintSessionClaims(
+    ctx: RequestContext,
+): Promise<void> {
+    let stored;
+    try {
+        stored = getSessionCredentials();
+    } catch {
+        return;
+    }
+    if (stored === null) return;
+    try {
+        const creds = await postSessionRefresh(
+            ctx, stored.refreshToken,
+        );
+        putSessionCredentials(creds);
+        putSessionToken(creds.accessToken);
+    } catch {
+        // accept already committed; claims catch up on next
+        // natural refresh or login
+    }
 }
 
 export async function postInvitationDecline(

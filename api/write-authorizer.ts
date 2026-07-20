@@ -3,20 +3,20 @@ import { ForeignOrganizationError } from './db.ts';
 import type { Id } from './types.ts';
 import { resolveGlobalOwner } from './derive-states.ts';
 
-// Pre-write ownership gate on the pair plane. Without it, a
-// foreign-id PUT would genesis in the caller's own namespace
-// (pair plane is per-org namespaced). Resolves the document's
-// owner BEFORE the handler runs:
+// Pre-write ownership authorizer on the pair plane. Without
+// it, a foreign-id PUT would genesis in the caller's own
+// namespace (pair plane is per-org namespaced). Resolves the
+// document's owner BEFORE the handler runs:
 // owner-null → genesis proceeds; foreign →
 // ForeignOrganizationError (HTTP 403 — the honest covenant;
 // existence of opaque high-entropy ids is accepted).
 //
 // Designed ONCE at the gate/op seam (api.ts consults
-// writeOwnershipFenceFor; assertWritableInOrganization is the
+// writeAuthorizerFor; assertWritableInOrganization is the
 // single throw site). Cost class matches
 // resolveOwningOrganization (hit ~19µs / miss ~1.9ms).
 
-export interface WriteOwnershipFence {
+export interface WriteAuthorizer {
     readonly table: string;
     readonly idParamIndex: number;
 }
@@ -24,8 +24,8 @@ export interface WriteOwnershipFence {
 // The 9 org-scoped families' existing-id PUT/DELETE addresses.
 // Collection POSTs (genesis of a new id) are intentionally
 // absent — owner-null is the happy path for those.
-const WRITE_OWNERSHIP_FENCE:
-    ReadonlyMap<string, WriteOwnershipFence> = new Map([
+const WRITE_AUTHORIZERS:
+    ReadonlyMap<string, WriteAuthorizer> = new Map([
         ['ideas/:id', {
             table: 'ideas', idParamIndex: 0,
         }],
@@ -50,19 +50,16 @@ const WRITE_OWNERSHIP_FENCE:
         ['memberships/:id', {
             table: 'memberships', idParamIndex: 0,
         }],
-        ['role-grants/:id', {
-            table: 'role_grants', idParamIndex: 0,
-        }],
     ]);
 
-export function writeOwnershipFenceFor(
+export function writeAuthorizerFor(
     routePattern: string,
     method: string,
-): WriteOwnershipFence | undefined {
+): WriteAuthorizer | undefined {
     if (method !== 'PUT' && method !== 'DELETE') {
         return undefined;
     }
-    return WRITE_OWNERSHIP_FENCE.get(routePattern);
+    return WRITE_AUTHORIZERS.get(routePattern);
 }
 
 export async function assertWritableInOrganization(

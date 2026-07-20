@@ -100,9 +100,9 @@ test('PUT identity-tokens/:id appends its pair at the entity'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 4);
-    assert.equal(requests[3]!.uri_prefix, '/identity-tokens/');
-    assert.equal(requests[3]!.uri_id, 'tok-1');
+    assert.equal(requests.length, 3);
+    assert.equal(requests[2]!.uri_prefix, '/identity-tokens/');
+    assert.equal(requests[2]!.uri_id, 'tok-1');
     const domainRow = await deriveIdentityToken(db, 'tok-1');
     assert.deepEqual(await res.json(), domainRow);
 });
@@ -160,11 +160,11 @@ test('PUT identity-token-revocations/:id appends its pair at'
     ));
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
-    assert.equal(requests.length, 4);
+    assert.equal(requests.length, 3);
     assert.equal(
-        requests[3]!.uri_prefix, '/identity-token-revocations/',
+        requests[2]!.uri_prefix, '/identity-token-revocations/',
     );
-    assert.equal(requests[3]!.uri_id, 'rev-1');
+    assert.equal(requests[2]!.uri_id, 'rev-1');
     // Phase Final Task 2: identity_token_revocations ROW half
     // stripped — oracle is the pair plane.
     const domainRow =
@@ -254,8 +254,8 @@ async () => {
     // 3 bootstrap + seededDb's own pair-forming PUT (Phase 13
     // Task 6's seeding re-point) = 4; the 409 itself appends
     // nothing further.
-    assert.equal((await db.requests.getAll()).length, 4);
-    assert.equal((await db.responses.getAll()).length, 4);
+    assert.equal((await db.requests.getAll()).length, 3);
+    assert.equal((await db.responses.getAll()).length, 3);
 });
 
 // ── identity-tokens/:jti/revocation — operation address ──
@@ -494,7 +494,7 @@ async () => {
     // the pre-tx lookup now needs a real authorize pair, not a
     // raw authorizationCodes row alone) + the root's own event
     // pair + the grant's own operation pair.
-    assert.equal(requests.length, 6);
+    assert.equal(requests.length, 5);
 });
 
 test('a token-exchange grant (a real /authentication/token'

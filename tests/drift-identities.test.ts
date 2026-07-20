@@ -36,8 +36,6 @@ import {
     deriveIdentityPii,
     deriveCredentialsFor,
     deriveCredential,
-    deriveRoleGrants,
-    deriveRoleGrant,
     deriveIdentityProviders,
     deriveIdentityProvider,
     deriveTokenRevocation,
@@ -49,8 +47,6 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedIdentityCredential } from './identity-fixtures.ts';
-import { currentRolesForInOrganization } from
-    '../api/authorization.ts';
 import { identityByEmail } from '../api/authentication.ts';
 
 // Phase Final Task 2: identity spine dual-write stripped.
@@ -420,7 +416,8 @@ test('identity-pii collection (11 seeded slots) fenced both'
         await organizationToken('current', ORGANIZATION_TWO),
         {
             organization_id: ORGANIZATION_TWO,
-            identity_id: foreignId, at: nowUtc(),
+            identity_id: foreignId,
+        type: 'member', at: nowUtc(),
         },
     ));
     assert.equal(
@@ -559,7 +556,8 @@ test('credentials fence-input fix: a mismatched write (address'
         'PUT', '/memberships/ms-' + identityA, adminToken,
         {
             organization_id: STARK_ORGANIZATION,
-            identity_id: identityA, at: nowUtc(),
+            identity_id: identityA,
+        type: 'member', at: nowUtc(),
         },
     ));
     await handleRequest(db, req(
@@ -567,7 +565,8 @@ test('credentials fence-input fix: a mismatched write (address'
         await organizationToken('current', ORGANIZATION_TWO),
         {
             organization_id: ORGANIZATION_TWO,
-            identity_id: identityB, at: nowUtc(),
+            identity_id: identityB,
+        type: 'member', at: nowUtc(),
         },
     ));
 
@@ -623,184 +622,6 @@ test('credentials fence-input fix: a mismatched write (address'
 // -- double-PUT proving derived (response.at, id) == row-plane --
 // -- last-call-wins ------------------------------------------------
 
-test('role-grants parity (org fence legs both orgs) + getById +'
-+ ' 404 bytes, driven against a LIVE-CREATED grant whose request'
-+ ' body lacks organization_id (gate 16); providers + revocations'
-+ ' parity (empty collections + live-write rows); a same-address'
-+ ' double-PUT (credentials) proving the derived (response.at,'
-+ ' id) reduction matches the row-plane last-call-wins within one'
-+ ' realm (the cross-realm window is the named gate-12'
-+ ' acceptance, not drift-tested here)', async () => {
-    const db = await seededDb();
-
-    // -- seeded role-grants collection + org fence legs --
-    const derivedGrants = sortById(await deriveRoleGrants(db));
-    assert.equal(derivedGrants.length, 12);
-    // Phase Final Stage B: identity spine tables retired.
-    for (const row of derivedGrants) {
-        const one = await deriveRoleGrant(db, row.id);
-        assert.deepEqual(one, row);
-    }
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        const derivedForOrganization = sortById(
-            (await deriveRoleGrants(db)).filter(
-                (g) => g.organization_id === organization,
-            ),
-        );
-        assert.ok(derivedForOrganization.length > 0);
-        for (const g of derivedForOrganization) {
-            assert.equal(g.organization_id, organization);
-        }
-    }
-
-    // -- LIVE-CREATED grant: gate 16's deviation — the wire
-    // REQUEST omits organization_id (web-app/app/adapters/
-    // role-grants.ts); only the fence-stamped RESPONSE carries
-    // it, which is why deriveRoleGrant(s) read the response. --
-    const adminToken = await organizationToken(
-        'current', ORGANIZATION_TWO,
-    );
-    const grantId = 'role-grant-live-1';
-    const grantPut = await handleRequest(db, req(
-        'PUT', '/role-grants/' + grantId, adminToken,
-        {
-            identity_id: 'current', role: 'reviewer',
-            action: 'granted', by_member_id: 'current',
-            at: nowUtc(),
-        },
-    ));
-    assert.equal(grantPut.status, 200);
-    const derivedLive = await deriveRoleGrant(db, grantId);
-    assert.equal(derivedLive.organization_id, ORGANIZATION_TWO);
-    const derivedGrantsAfter = sortById(
-        await deriveRoleGrants(db),
-    );
-    assert.equal(derivedGrantsAfter.length, 13);
-
-    const missingGrantId = 'no-such-role-grant';
-    const expectedGrantMessage =
-        'Not found: role_grants/' + missingGrantId;
-    await assert.rejects(
-        () => deriveRoleGrant(db, missingGrantId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedGrantMessage,
-    );
-
-    // -- providers + revocations: empty collections seeded,
-    // then a live-write each --
-    assert.deepEqual(await deriveIdentityProviders(db), []);
-    // Phase Final Stage B: identity spine tables retired.
-
-    const providerId = 'provider-live-1';
-    const providerPut = await handleRequest(db, req(
-        'PUT', '/identity-providers/' + providerId, adminToken,
-        {
-            identity_id: 'current', provider: 'google',
-            provider_subject: 'google-sub-1',
-            action: 'linked', at: nowUtc(),
-        },
-    ));
-    assert.equal(providerPut.status, 200);
-    const derivedProviders = sortById(
-        await deriveIdentityProviders(db),
-    );
-    assert.equal(derivedProviders.length, 1);
-    assert.equal(
-        (await deriveIdentityProvider(db, providerId)).id,
-        providerId,
-    );
-    // Phase Final Stage B: identity spine tables retired.
-    const missingProviderId = 'no-such-provider';
-    const expectedProviderMessage =
-        'Not found: identity_providers/' + missingProviderId;
-    await assert.rejects(
-        () => deriveIdentityProvider(db, missingProviderId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedProviderMessage,
-    );
-
-    // -- same-address double-PUT (a deterministic credential
-    // cid): the derived (response.at, id) reduction matches the
-    // row-plane's plain last-call-wins, within one realm. Runs
-    // BEFORE the revocation-live write below — a revocation
-    // event for 'current' invalidates every token issued to
-    // 'current' before its `at`, which would otherwise 401 the
-    // SAME adminToken this credential write still needs. --
-    const cid = 'cred-double-put-1';
-    const firstPut = await handleRequest(db, req(
-        'PUT',
-        '/identities/current/credentials/' + cid, adminToken,
-        {
-            identity_id: 'current', kind: 'password',
-            status: 'set', secret: 'hash-one', at: nowUtc(),
-        },
-    ));
-    assert.equal(firstPut.status, 200);
-    const secondPut = await handleRequest(db, req(
-        'PUT',
-        '/identities/current/credentials/' + cid, adminToken,
-        {
-            identity_id: 'current', kind: 'password',
-            status: 'rotated', secret: 'hash-two', at: nowUtc(),
-        },
-    ));
-    assert.equal(secondPut.status, 200);
-    assert.ok(secondPut.headers.get('Supersedes'));
-    const derivedCredential = await deriveCredential(
-        db, 'current', cid,
-    );
-    assert.equal(derivedCredential.secret, 'hash-two');
-    assert.equal(derivedCredential.status, 'rotated');
-
-    // Phase Final Stage B: identity spine tables retired.
-    const revocationId = 'revocation-live-1';
-    const revocationPut = await handleRequest(db, req(
-        'PUT', '/identity-token-revocations/' + revocationId,
-        adminToken, { identity_id: 'current', at: nowUtc() },
-    ));
-    assert.equal(revocationPut.status, 200);
-    const derivedRev = await deriveTokenRevocation(
-        db, revocationId,
-    );
-    assert.equal(derivedRev.identity_id, 'current');
-    const missingRevocationId = 'no-such-revocation';
-    const expectedRevocationMessage =
-        'Not found: identity_token_revocations/'
-        + missingRevocationId;
-    await assert.rejects(
-        () => deriveTokenRevocation(db, missingRevocationId),
-        (err: unknown) =>
-            err instanceof EntityNotFoundError
-            && err.message === expectedRevocationMessage,
-    );
-
-    // -- the by-identity fold (Phase 13 Task 4): the coarse
-    // 'sign out everywhere' gate reads THIS shape. Parity with
-    // the row plane is necessary but not sufficient (II
-    // Security) — a derivation MISS here would ADMIT a
-    // signed-out session, so the leg also drives adminToken
-    // (minted with an iat that predates the revocation's `at`
-    // above) through the LIVE Bearer gate and proves it now
-    // 401s, showing the revocation is SEEN, not merely mirrored
-    // on the row plane. --
-    const derivedForCurrent = sortById(
-        await deriveTokenRevocationsFor(db, 'current'),
-    );
-    assert.equal(derivedForCurrent.length, 1);
-    assert.deepEqual(
-        await deriveTokenRevocationsFor(db, 'no-such-identity'),
-        [],
-    );
-    const revoked = await handleRequest(
-        db, req('GET', '/members', adminToken),
-    );
-    assert.equal(revoked.status, 401);
-});
-
 // -- 4b. the hot-path FILTERED shape: currentRolesForInOrganization
 // -- over derived vs row-plane role-grant rows, for a seeded -----
 // -- admin and a seeded member, per organization — case 4's own --
@@ -809,215 +630,8 @@ test('role-grants parity (org fence legs both orgs) + getById +'
 // -- flipped readers (callerRolesInOrganization,
 // -- callerIsOrganizationAdmin) actually apply --------------------
 
-test("role-grants hot-path filtered shape: currentRolesFor"
-+ "InOrganization over derived grants for a seeded admin"
-+ " ('current') and a seeded member, per organization",
-async () => {
-    const db = await seededDb();
-    // Phase Final Stage B: identity spine tables retired.
-    // sarahId: STARK-only seeded member. mikeId: ORGANIZATION_TWO-
-    // only seeded member (both from the mock-data member pool;
-    // 'current' is seeded admin in BOTH orgs).
-    const sarahId = 'LhfaUUf4IumVsCSGB4xjdK';
-    const mikeId = 'bLP3X1hb1mSz8gY9neogU3';
-    const memberIdFor = new Map([
-        [STARK_ORGANIZATION, sarahId],
-        [ORGANIZATION_TWO, mikeId],
-    ]);
-
-    for (const organization of [
-        STARK_ORGANIZATION, ORGANIZATION_TWO,
-    ]) {
-        const derivedAdminRows = await deriveRoleGrants(db);
-        const derivedAdminRoles = currentRolesForInOrganization(
-            derivedAdminRows, 'current', organization,
-        );
-        assert.ok(derivedAdminRoles.includes('admin'));
-
-        const memberId = memberIdFor.get(organization)!;
-        const derivedMemberRoles = currentRolesForInOrganization(
-            derivedAdminRows, memberId, organization,
-        );
-        assert.ok(!derivedMemberRoles.includes('admin'));
-        assert.ok(derivedMemberRoles.includes('member'));
-    }
-});
-
 // -- 5. live-write chain, re-compared on BOTH planes at every ---
 // -- step -----------------------------------------------------------
-
-test('live-write chain: create person identity + pii (bundle 2)'
-+ ' -> PUT pii again (supersession within the hard-delete zone)'
-+ ' -> create human member (bundle 4) -> composed edit -> ERASE'
-+ " (derived pii 404s; the ledger-wide zero-PII-bytes scan, gate"
-+ " 5's drift twin) -> role-grant PUT -> revocation PUT --"
-+ ' re-compared on both planes at every step', async () => {
-    const db = await seededDb();
-    const adminToken = await organizationToken(
-        'current', STARK_ORGANIZATION,
-    );
-    const personId = 'chain-person-1';
-
-    // Step 1: create person identity (bundle 2: operation +
-    // identityDocument pairs) — derived identity appears.
-    const created = await handleRequest(db, req(
-        'POST', '/identities', adminToken,
-        { id: personId, kind: 'person' },
-    ));
-    assert.equal(created.status, 204);
-    assert.deepEqual(
-        await derivedIdentity(
-            db, GLOBAL_PLANE_PLACEHOLDER, personId,
-        ),
-        { id: personId, kind: 'person' },
-    );
-
-    // The pii PUT, first content — the derived pii appears.
-    const firstPii = {
-        name: 'Chain Person', email: 'chain-person@example.com',
-        phone: '', bio: '',
-    };
-    const piiPut1 = await handleRequest(db, req(
-        'PUT', '/identities/' + personId + '/pii', adminToken,
-        firstPii,
-    ));
-    assert.equal(piiPut1.status, 200);
-    const derivedPii1 = await deriveIdentityPii(db, personId);
-    assert.equal(derivedPii1.name, 'Chain Person');
-
-    // Step 2: PUT pii again — the hard-delete zone's own
-    // supersession (gate 4): still exactly ONE pair, the derived
-    // head updates to the new content, no Supersedes header (the
-    // zone is chainless — api-pii-hard-delete.test.ts case 1).
-    const secondPii = {
-        name: 'Chain Person Renamed',
-        email: 'chain-person-renamed@example.com',
-        phone: '', bio: '',
-    };
-    const piiPut2 = await handleRequest(db, req(
-        'PUT', '/identities/' + personId + '/pii', adminToken,
-        secondPii,
-    ));
-    assert.equal(piiPut2.status, 200);
-    assert.equal(piiPut2.headers.get('Supersedes'), null);
-    const piiPrefix = canonicalUriPrefix(
-        undefined, '/identities/' + personId + '/pii/',
-    );
-    const atAddress = (await db.requests.getAll()).filter(
-        (r) => r.uri_prefix === piiPrefix,
-    );
-    assert.equal(atAddress.length, 1);
-    const derivedPii2 = await deriveIdentityPii(db, personId);
-    assert.equal(derivedPii2.name, 'Chain Person Renamed');
-
-    // Step 3: create a human member (bundle 4) — its own
-    // derived identity appears too.
-    const humanId = 'chain-human-1';
-    const humanGenesisAt = nowUtc();
-    const humanGenesisEventId = humanId + '-genesis';
-    const humanCreated = await handleRequest(db, req(
-        'POST', '/human-members', adminToken,
-        {
-            id: humanId,
-            detail: {
-                title: 't', department: 'd',
-                strengths: [],
-                team_dimensions: {},
-            },
-            initialState: 'active',
-            initialStateEventId: humanGenesisEventId,
-            initialStateAt: humanGenesisAt,
-        },
-    ));
-    assert.equal(humanCreated.status, 204);
-    assert.deepEqual(
-        await derivedIdentity(
-            db, GLOBAL_PLANE_PLACEHOLDER, humanId,
-        ),
-        { id: humanId, kind: 'person' },
-    );
-
-    // Step 4: composed edit — identity document stable; edit
-    // echoes the create trio so the members/:id document folds.
-    const humanEdited = await handleRequest(db, req(
-        'POST', '/human-members/' + humanId, adminToken,
-        {
-            detail: {
-                title: 't2', department: 'd2',
-                strengths: [],
-                team_dimensions: {},
-            },
-            state: 'active',
-            stateAt: humanGenesisAt,
-            stateEventId: humanGenesisEventId,
-        },
-    ));
-    assert.equal(humanEdited.status, 204);
-    assert.deepEqual(
-        await derivedIdentity(
-            db, GLOBAL_PLANE_PLACEHOLDER, humanId,
-        ),
-        { id: humanId, kind: 'person' },
-    );
-
-    // Step 5: ERASE the chain person's pii — derived 404s;
-    // ledger-wide zero-PII-bytes scan (gate 5). Gate 6 residual:
-    // pre-Final identity_pii orphan rows until Stage B.
-    const erase = await handleRequest(db, req(
-        'DELETE', '/identities/' + personId + '/pii', adminToken,
-    ));
-    assert.equal(erase.status, 204);
-    await assert.rejects(
-        () => deriveIdentityPii(db, personId), EntityNotFoundError,
-    );
-    const erasedValues = [
-        firstPii.name, firstPii.email,
-        secondPii.name, secondPii.email,
-    ];
-    const messages = [
-        ...(await db.requests.getAll()).map((r) => r.message),
-        ...(await db.responses.getAll()).map((r) => r.message),
-    ];
-    for (const value of erasedValues) {
-        assert.ok(
-            !messages.some((m) => m.includes(value)),
-            'found an erased value in the ledger: ' + value,
-        );
-    }
-
-    // Step 6: role-grant PUT — a live grant for the human
-    // member, re-compared on both planes.
-    const grantId = 'chain-role-grant-1';
-    const grantPut = await handleRequest(db, req(
-        'PUT', '/role-grants/' + grantId, adminToken,
-        {
-            identity_id: humanId, role: 'member',
-            action: 'granted', by_member_id: 'current',
-            at: nowUtc(),
-        },
-    ));
-    assert.equal(grantPut.status, 200);
-    assert.equal(
-        (await deriveRoleGrant(db, grantId)).identity_id,
-        humanId,
-    );
-
-    // Step 7: revocation PUT — live log-out-everywhere.
-    const revocationId = 'chain-revocation-1';
-    const revocationPut = await handleRequest(db, req(
-        'PUT', '/identity-token-revocations/' + revocationId,
-        adminToken, { identity_id: humanId, at: nowUtc() },
-    ));
-    assert.equal(revocationPut.status, 200);
-    assert.equal(
-        (await deriveTokenRevocation(db, revocationId))
-            .identity_id,
-        humanId,
-    );
-    // Phase Final Stage B: identity spine tables retired.
-    // Phase Final Stage B: identity spine tables retired.
-    // Phase Final Stage B: identity spine tables retired.
-});
 
 // -- 6. invitations enrichment JOIN parity (SATISFIED -----------
 // -- TRANSITIVELY — case 2 already proves the two row sets ------
@@ -1108,92 +722,3 @@ test('invitations enrichment parity: the personName/'
 // -- 7. method-filter proof + genesis-wins-under-skew + the -----
 // -- E6 resend branches at drift altitude ------------------------
 
-test('method-filter proof: the identities create-op POST pair'
-+ ' is never read as a document pair (exactly one PUT document'
-+ ' pair lands at identities/:id after create); genesis-wins-'
-+ "under-skew (a NAMED divergence from drift-roster.test.ts's"
-+ ' own case 9 — identities carries no domain `at` to skew any'
-+ ' more than memberships does, so plain arrival-order'
-+ " supersession is proven instead); the E6 resend fast path at"
-+ ' drift altitude (role-grants/:id)', async () => {
-    const db = await seededDb();
-    const adminToken = await organizationToken();
-
-    // -- method-filter: POST /identities forms an operation pair
-    // sharing the identities/:id uriId (family-registry.ts:
-    // createBodyIdField 'id') — documentPairsAt must exclude it,
-    // leaving exactly ONE PUT document pair at the address. --
-    const methodId = 'identities-method-filter-1';
-    const created = await handleRequest(db, req(
-        'POST', '/identities', adminToken,
-        { id: methodId, kind: 'person' },
-    ));
-    assert.equal(created.status, 204);
-    const prefix = canonicalUriPrefix(undefined, '/identities/');
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
-    ]);
-    const atAddress = requests.filter(
-        (r) => r.uri_id === methodId,
-    );
-    assert.equal(atAddress.length, 2);
-    const documentPairs = documentPairsAt(
-        requests, responses, prefix,
-    ).filter((pair) => pair.uriId === methodId);
-    assert.equal(documentPairs.length, 1);
-    assert.equal(documentPairs[0]!.method, 'PUT');
-
-    // -- genesis-wins-under-skew (an identities address; the
-    // SAME NAMED divergence drift-roster.test.ts's case 9
-    // accepts for memberships): identities/:id carries no domain
-    // `at` either, so a second PUT still supersedes by ARRIVAL
-    // order alone. --
-    const skewId = 'identities-skew-1';
-    await handleRequest(db, req(
-        'POST', '/identities', adminToken,
-        { id: skewId, kind: 'person' },
-    ));
-    const secondPut = await handleRequest(db, req(
-        'PUT', '/identities/' + skewId, adminToken,
-        { kind: 'service' },
-    ));
-    assert.equal(secondPut.status, 200);
-    assert.ok(secondPut.headers.get('Supersedes'));
-    const derivedSkewed = await derivedIdentity(
-        db, GLOBAL_PLANE_PLACEHOLDER, skewId,
-    );
-    assert.equal(derivedSkewed.kind, 'service');
-
-    // -- the E6 resend fast path at drift altitude
-    // (role-grants/:id): a byte-identical PUT resend replays
-    // the stored response and appends NO second pair
-    // (drift-roster.test.ts's own resend-idempotency case). --
-    const grantId = 'identities-resend-grant-1';
-    const grantBody = {
-        identity_id: 'current', role: 'member',
-        action: 'granted', by_member_id: 'current',
-        at: nowUtc(),
-    };
-    const first = await handleRequest(db, req(
-        'PUT', '/role-grants/' + grantId, adminToken, grantBody,
-    ));
-    assert.equal(first.status, 200);
-    const beforeCount = (await db.requests.getAll()).length;
-    const resend = await handleRequest(db, req(
-        'PUT', '/role-grants/' + grantId, adminToken, grantBody,
-    ));
-    assert.equal(resend.status, 200);
-    assert.equal(
-        (await db.requests.getAll()).length, beforeCount,
-    );
-    assert.equal(
-        first.headers.get('Response-ID'),
-        resend.headers.get('Response-ID'),
-    );
-    assert.equal(
-        (await deriveRoleGrant(db, grantId)).identity_id,
-        'current',
-    );
-    // Phase Final Stage B: identity spine tables retired.
-});

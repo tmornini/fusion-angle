@@ -9,11 +9,13 @@ test('validates a membership body', () => {
         validateMembershipEntity({
             organization_id: '1',
             identity_id: 'current',
+        type: 'admin',
             at: '2026-06-04T00:00:00.000000Z',
         }),
         {
             organization_id: '1',
             identity_id: 'current',
+        type: 'admin',
             at: '2026-06-04T00:00:00.000000Z',
         },
     );
@@ -24,6 +26,7 @@ test('rejects a membership with an extra key', () => {
         validateMembershipEntity({
             organization_id: '1',
             identity_id: 'current',
+        type: 'member',
             at: '2026-06-04T00:00:00.000000Z',
             role: 'admin',
         }));
@@ -34,7 +37,17 @@ test('rejects a membership with a bad timestamp', () => {
         validateMembershipEntity({
             organization_id: '1',
             identity_id: 'current',
+        type: 'member',
             at: 'not-a-date',
+        }));
+});
+
+test('rejects a membership missing type', () => {
+    assert.throws(() =>
+        validateMembershipEntity({
+            organization_id: '1',
+            identity_id: 'current',
+            at: '2026-06-04T00:00:00.000000Z',
         }));
 });
 

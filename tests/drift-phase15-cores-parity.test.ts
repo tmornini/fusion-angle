@@ -607,6 +607,7 @@ test('stateEventVisibilityFor: member-genesis op-born'
         'PUT', '/memberships/ms-p15-vis-owned', token, {
             organization_id: STARK_ORGANIZATION,
             identity_id: ownedId,
+        type: 'member',
             at: nowUtc(),
         },
     ));

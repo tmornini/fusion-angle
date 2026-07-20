@@ -14,7 +14,6 @@ import {
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
@@ -127,40 +126,6 @@ async function seedMembershipPair(
         headPairId: undefined,
     });
     await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
     );
 }
@@ -575,6 +540,7 @@ async () => {
     await seedMembershipPair(db, 'm-current', {
         organization_id: '1',
         identity_id: 'current',
+        type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, tokenRequest({
@@ -597,6 +563,7 @@ async () => {
     await seedMembershipPair(db, 'm-current', {
         organization_id: '1',
         identity_id: 'current',
+        type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const before =
@@ -619,6 +586,7 @@ async () => {
     await seedMembershipPair(db, 'm-current', {
         organization_id: '1',
         identity_id: 'current',
+        type: 'admin',
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, tokenRequest({
@@ -658,15 +626,10 @@ async function signedClientSetup() {
 test('client_credentials issues a gate-valid token', async () => {
     const db = await freshDb();
     // the service principal (client id) holds an admin role
-    await seedRoleGrantPair(db, 'rg-svc', {
-        organization_id: '1',
-        identity_id: 'svc-client', role: 'admin',
-        action: 'granted', by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
     await seedMembershipPair(db, 'm-svc', {
         organization_id: '1',
         identity_id: 'svc-client',
+        type: 'member',
         at: '2020-01-01T00:00:00.000000Z',
     });
     const { client, assertion } =

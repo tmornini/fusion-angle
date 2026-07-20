@@ -75,6 +75,9 @@ test('a member is denied the admin surfaces', async () => {
         assert.equal(
             res.status, 403, method + ' ' + path);
     }
+    // role-grants retired — unknown route is 404 for an
+    // authenticated caller (401-before-404 still holds
+    // unauthenticated).
     const grant = await handleRequest(db, req(
         'PUT', '/role-grants/evil', token, {
             organization_id: '1',
@@ -82,5 +85,5 @@ test('a member is denied the admin surfaces', async () => {
             action: 'granted', by_member_id: MEMBER,
             at: '2026-06-10T00:00:00.000000Z',
         }));
-    assert.equal(grant.status, 403);
+    assert.equal(grant.status, 404);
 });

@@ -1,56 +1,36 @@
 import type {
     Id,
-    RoleGrantAction,
-    RoleGrantEntity,
+    MembershipType,
     IdentityDefaultOrganizationEntity,
 } from './types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 
-// On an equal-`at` tie the FAIL-CLOSED action wins regardless
-// of row order — a revoke beats a co-timestamped grant on
-// every backend. Equal actions fall to the id tail for
-// determinism.
-const ACTION_RANK: Record<RoleGrantAction, number> = {
-    revoked: 1,
-    granted: 0,
-};
-
-function failClosed(
-    candidate: RoleGrantEntity,
-    incumbent: RoleGrantEntity,
-): boolean {
-    if (candidate.at !== incumbent.at) {
-        return candidate.at > incumbent.at;
-    }
-    const c = ACTION_RANK[candidate.action];
-    const i = ACTION_RANK[incumbent.action];
-    if (c !== i) return c > i;
-    return candidate.id > incumbent.id;
+// Claim role shape: `{type}:{organization_id}` (e.g. admin:1).
+// Baked at mint from membership type + organization; projected
+// back to plain ROUTE_POLICY bases (admin / member) for the
+// fenced organization at the gate.
+export function composeClaimRole(
+    type: MembershipType,
+    organizationId: Id,
+): string {
+    return type + ':' + organizationId;
 }
 
-// Roles an identity currently holds IN A GIVEN ORG: the latest
-// action per role within that org — a 'granted' with no later
-// 'revoked' wins. The org predicate sits beside the identity
-// filter, so a grant in another org is invisible here: this is
-// the per-tenant fence at the role layer, the half of
-// `role_grants.organization_id` the gate had been writing but
-// never reading. A same-`at` tie falls to the fail-closed rank
-// above.
-export function currentRolesForInOrganization(
-    rows: readonly RoleGrantEntity[],
-    identityId: Id,
+// Project claim roles for the fenced organization into plain
+// policy bases. A claim whose suffix is not the fenced org is
+// invisible here — the per-tenant fence at the claim layer.
+export function projectClaimRolesForOrganization(
+    claimRoles: readonly string[],
     organization: Id,
 ): string[] {
-    const inOrganization = rows.filter(
-        row => row.identity_id === identityId
-            && row.organization_id === organization,
-    );
-    const latest = latestByKey(
-        inOrganization, row => row.role, failClosed,
-    );
+    const suffix = ':' + organization;
     const held: string[] = [];
-    for (const [role, last] of latest) {
-        if (last.action === 'granted') held.push(role);
+    for (const claim of claimRoles) {
+        if (!claim.endsWith(suffix)) continue;
+        const base = claim.slice(0, claim.length - suffix.length);
+        if (base === 'admin' || base === 'member') {
+            held.push(base);
+        }
     }
     return held;
 }
@@ -101,7 +81,7 @@ export function matchesOnSegmentBoundary(
 
 // The verbs the `member` role may use, per content prefix.
 // Admin surfaces — identities, credentials,
-// providers, role-grants, memberships, organization and
+// providers, memberships, organization and
 // member WRITES, snapshots — are absent: deny-by-default
 // keeps them at the root admin entries. members/ai-members/
 // human-members appear read-only here for author and roster
@@ -112,7 +92,7 @@ export function matchesOnSegmentBoundary(
 // analogously: a member may revoke its OWN token chain — a real
 // logout-everywhere, not merely rotation/revocation of a single
 // session. This route-policy entry only clears the coarse
-// content-prefix check; api/api.ts's Region B ownership fence
+// content-prefix check; api/api.ts's Region B write authorizer
 // keeps the write self-only — naming another identity still
 // requires admin. GET stays admin-only, untouched.
 const MEMBER_VERBS: Readonly<

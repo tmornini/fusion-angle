@@ -114,16 +114,25 @@ async () => {
     assert.ok(again.identities.length > 0);
 });
 
-test('a logout-everywhere revokes earlier tokens', async () => {
+// Per-request access-token revocation is RETIRED. Mint /
+// refresh / exchange still consult the revocation ledger; a
+// live access token works until exp (≤ ACCESS_TTL_SECONDS) —
+// the NAMED staleness covenant. These cases pin that access
+// GETs are NOT blocked by the revocation ledger mid-token.
+
+test('a logout-everywhere does not kill a live access token',
+async () => {
     const db = await freshDb();
-    // The rejected token predates the revocation stamp; the
-    // writer (devToken, iat 1.7e9) is stamped AFTER it, so the
-    // revocation does not revoke its own writer.
-    const stale = await mintAccessToken({
+    // Claim-bearing access token: fence uses claim orgs/roles,
+    // not the revocation ledger.
+    const live = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'current',
+        roles: ['admin:1'],
+        name: 'Demo',
+        organizations: ['1'],
         iat: 1_600_000_000, ttlSeconds: 10_000_000_000,
-        jti: 'stale',
+        jti: 'stale-but-live',
     });
     await PUT(
         db, 'identity-token-revocations/r1',
@@ -133,20 +142,23 @@ test('a logout-everywhere revokes earlier tokens', async () => {
         },
         await devToken(),
     );
-    await assert.rejects(
-        () => GET(db, 'members', stale), /revoked/);
+    // Still admitted — revocation bites at next mint/exchange.
+    assert.deepEqual(
+        await GET(db, 'members', live),
+        await GET(db, 'members', await devToken()),
+    );
 });
 
-test('a token minted within the revocation second is dead',
-async () => {
+test('a token minted within a revocation second still'
++ ' works until exp', async () => {
     const db = await freshDb();
-    // The revocation is stamped at T.900; the token's iat is
-    // the same whole second. Shared seconds fail closed — the
-    // sub-second remainder must not let the token survive.
     const revokedAt = '2021-01-01T00:00:00.900000Z';
     const sameSecond = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'current',
+        roles: ['admin:1'],
+        name: 'Demo',
+        organizations: ['1'],
         iat: Math.floor(Date.parse(revokedAt) / 1000),
         ttlSeconds: 10_000_000_000,
         jti: 'same-second',
@@ -156,20 +168,13 @@ async () => {
         { identity_id: 'current', at: revokedAt },
         await devToken(),
     );
-    await assert.rejects(
-        () => GET(db, 'members', sameSecond), /revoked/);
+    const rows = await GET<unknown[]>(db, 'members', sameSecond);
+    assert.ok(Array.isArray(rows));
 });
 
-test('a token whose jti is revoked in the ledger is denied',
-async () => {
+test('a jti revoked in the ledger still admits the access'
++ ' token until exp', async () => {
     const db = await freshDb();
-    // the access token (devToken jti = dev-current) is issued
-    // then its chain is revoked in the identity_tokens ledger.
-    // Seeded via the PUT route (not a raw store write): the
-    // gate's by-jti fold now derives from the message ledger
-    // (Phase 13 Task 6), so a pair-less row would be invisible
-    // to it — the PUT route forms both the row AND its pair, the
-    // SAME mechanism a live write uses.
     await PUT(
         db, 'identity-tokens/e1',
         {
@@ -188,9 +193,10 @@ async () => {
         },
         await devToken(),
     );
-    await assert.rejects(
-        async () => GET(db, 'members', await devToken()),
-        /chain revoked/);
+    const rows = await GET<unknown[]>(
+        db, 'members', await devToken(),
+    );
+    assert.ok(Array.isArray(rows));
 });
 
 test('snapshots/schema needs no bearer even with a schema',

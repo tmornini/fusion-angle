@@ -10,7 +10,6 @@ import { seedOrganizationDocument } from './test-fixtures.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
@@ -19,7 +18,7 @@ import { formWritePair } from '../api/message-pair.ts';
 // the document-trio genesis; foreign ownership is 403 with an
 // honest body. Full per-family fence coverage lives in
 // api-entity-history-routes.test.ts. Per-family write-
-// ownership fence pins live in api-write-ownership-fence.
+// write authorizer pins live in api-write-authorizer.
 // Unknown-route 404 (writes-nothing) lives in api.test.ts.
 
 const BASE = 'http://localhost';
@@ -75,40 +74,6 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 async function seed(): Promise<{
     db: MemoryDbAdapter;
     token: string;
@@ -119,14 +84,7 @@ async function seed(): Promise<{
     await seedMembershipPair(db, 'm-a', {
         organization_id: 'A',
         identity_id: 'memberA',
-        at: AT,
-    });
-    await seedRoleGrantPair(db, 'rg-a', {
-        organization_id: 'A',
-        identity_id: 'memberA',
-        role: 'member',
-        action: 'granted',
-        by_member_id: SYSTEM_MEMBER_ID,
+        type: 'admin',
         at: AT,
     });
     // Own-org idea document — family-history reads target it.
@@ -170,14 +128,7 @@ async () => {
     await seedMembershipPair(db, 'm-b', {
         organization_id: 'B',
         identity_id: 'memberB',
-        at: AT,
-    });
-    await seedRoleGrantPair(db, 'rg-b', {
-        organization_id: 'B',
-        identity_id: 'memberB',
-        role: 'member',
-        action: 'granted',
-        by_member_id: SYSTEM_MEMBER_ID,
+        type: 'admin',
         at: AT,
     });
     const tokenB = await organizationToken('memberB', 'B');

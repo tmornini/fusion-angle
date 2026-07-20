@@ -93,22 +93,14 @@ async () => {
     assert.ok(ownResponse);
 });
 
-test("a member's self-revoke actually signs out: a token"
-+ ' minted before the revocation stamp is dead afterward',
+test("a member's self-revoke: ACCESS still works until exp"
++ ' (NAMED ≤15-min covenant); REFRESH grant is 401ed',
 async () => {
     const db = await freshDb();
     const memberToken = await organizationToken('member1');
-    // The writer's own token (iat 1.7e9) postdates the
-    // revocation stamp below, so it survives its own write — the
-    // api-token-gate.test.ts 'a logout-everywhere revokes
-    // earlier tokens' precedent. `stale` predates it and must
-    // die.
-    const stale = await mintAccessToken({
-        aud: TOKEN_AUDIENCE,
-        sub: 'member1', roles: [], name: 'Demo',
-        iat: 1_600_000_000, ttlSeconds: 10_000_000_000,
-        jti: 'stale-member1',
-    });
+    // Logout-everywhere stamp. Per-request gate no longer
+    // consults the ledger — outstanding ACCESS tokens work
+    // until exp; the next refresh/mint is denied.
     const res = await handleRequest(db, req(
         'PUT', '/identity-token-revocations/self-rev-2',
         memberToken,
@@ -118,8 +110,11 @@ async () => {
         },
     ));
     assert.equal(res.status, 200);
-    await assert.rejects(
-        () => GET(db, 'members', stale), /revoked/);
+    // Access token still admits member-tier GET.
+    const still = await handleRequest(
+        db, req('GET', '/members', memberToken),
+    );
+    assert.equal(still.status, 200);
 });
 
 test('a member PUT identity-token-revocations/:id naming'

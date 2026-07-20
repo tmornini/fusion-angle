@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    currentRolesForInOrganization, isPermitted,
+    composeClaimRole,
+    projectClaimRolesForOrganization,
+    isPermitted,
     matchesOnSegmentBoundary,
 } from '../api/authorization.ts';
 
@@ -31,85 +33,43 @@ test('a prefix matches only on a segment boundary', () => {
         matchesOnSegmentBoundary('/anything', '/'), true);
 });
 
-const grant = (
-    id: string, identity: string, role: string,
-    action: 'granted' | 'revoked', at: string,
-    organization: string,
-) => ({
-    id, organization_id: organization, identity_id: identity,
-    role, action, by_member_id: 'system', at,
+test('composeClaimRole joins type and organization', () => {
+    assert.equal(composeClaimRole('admin', '1'), 'admin:1');
+    assert.equal(composeClaimRole('member', 'A'), 'member:A');
 });
 
-test('a granted role with no later revoke is held', () => {
-    const rows = [
-        grant('1', 'current', 'admin', 'granted',
-            '2026-01-01T00:00:00.000000Z', 'A'),
-    ];
+test('projectClaimRolesForOrganization keeps only the'
++ ' fenced org bases', () => {
     assert.deepEqual(
-        currentRolesForInOrganization(rows, 'current', 'A'),
-        ['admin']);
-});
-
-test('latest action per (identity, role) wins', () => {
-    const rows = [
-        grant('1', 'current', 'admin', 'granted',
-            '2026-01-01T00:00:00.000000Z', 'A'),
-        grant('2', 'current', 'admin', 'revoked',
-            '2026-02-01T00:00:00.000000Z', 'A'),
-    ];
-    assert.deepEqual(
-        currentRolesForInOrganization(rows, 'current', 'A'), []);
-});
-
-test('roles are isolated per identity', () => {
-    const rows = [
-        grant('1', 'current', 'admin', 'granted',
-            '2026-01-01T00:00:00.000000Z', 'A'),
-    ];
-    assert.deepEqual(
-        currentRolesForInOrganization(rows, 'other', 'A'), []);
-});
-
-test('roles are isolated per org', () => {
-    const rows = [
-        grant('1', 'current', 'admin', 'granted',
-            '2026-01-01T00:00:00.000000Z', 'A'),
-    ];
-    assert.deepEqual(
-        currentRolesForInOrganization(rows, 'current', 'A'),
+        projectClaimRolesForOrganization(
+            ['admin:A', 'member:B'], 'A',
+        ),
         ['admin']);
     assert.deepEqual(
-        currentRolesForInOrganization(rows, 'current', 'B'), []);
+        projectClaimRolesForOrganization(
+            ['admin:A', 'member:B'], 'B',
+        ),
+        ['member']);
+    assert.deepEqual(
+        projectClaimRolesForOrganization(
+            ['admin:A', 'member:B'], 'C',
+        ),
+        []);
 });
 
-test('a same-instant revoke beats the grant, either order',
-() => {
-    // FAIL CLOSED: a co-timestamped revoke wins regardless of
-    // insertion order — same-instant pairs only arise across
-    // realms (two tabs), where append order proves nothing.
-    const at = '2026-03-01T00:00:00.000000Z';
+test('projectClaimRolesForOrganization ignores unknown'
++ ' bases', () => {
     assert.deepEqual(
-        currentRolesForInOrganization([
-            grant('1', 'current', 'admin', 'granted',
-                at, 'A'),
-            grant('2', 'current', 'admin', 'revoked',
-                at, 'A'),
-        ], 'current', 'A'),
-        []);
-    assert.deepEqual(
-        currentRolesForInOrganization([
-            grant('1', 'current', 'admin', 'revoked',
-                at, 'A'),
-            grant('2', 'current', 'admin', 'granted',
-                at, 'A'),
-        ], 'current', 'A'),
-        []);
+        projectClaimRolesForOrganization(
+            ['viewer:A', 'admin:A'], 'A',
+        ),
+        ['admin']);
 });
 
 test('admin is permitted on every verb at root', () => {
     for (const verb of ['GET', 'PUT', 'POST', 'DELETE']) {
         assert.equal(
-            isPermitted(verb, '/role-grants/x', ['admin']),
+            isPermitted(verb, '/memberships/x', ['admin']),
             true);
         assert.equal(
             isPermitted(verb, '/members', ['admin']), true);
@@ -143,7 +103,7 @@ test('member tier: content surfaces are permitted', () => {
 
 test('member tier: admin surfaces stay denied', () => {
     assert.equal(
-        isPermitted('PUT', '/role-grants/r1', ['member']),
+        isPermitted('PUT', '/memberships/m1', ['member']),
         false);
     assert.equal(
         isPermitted('GET', '/memberships', ['member']),

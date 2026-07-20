@@ -131,7 +131,7 @@ document handlers with identities wiring. NO member-tier authz
 entry — the route falls to the root admin tier by the existing
 deny-by-default policy: admin-only reads and writes, zero new
 authz machinery. Global plane (identities are global; no org
-nesting; no write-ownership fence involvement).
+nesting; no write authorizer involvement).
 
 ### 5. Registration UI
 

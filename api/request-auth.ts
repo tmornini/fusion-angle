@@ -16,16 +16,12 @@ import type {
 } from './request-context.ts';
 import { HTTP_FORBIDDEN } from './http-errors.ts';
 import {
-    currentRolesForInOrganization,
+    projectClaimRolesForOrganization,
     isPermitted,
 } from './authorization.ts';
 import {
-    tokenRevocationReason,
     identityDefaultOrganization,
 } from './authentication.ts';
-import { deriveMembershipsForIdentity } from
-    './derive-memberships.ts';
-import { deriveRoleGrants } from './derive-identity-spine.ts';
 
 // Authenticate at the one chokepoint. Match is pure and
 // first, but authentication runs BEFORE the no-match 404 —
@@ -79,31 +75,14 @@ export async function authenticateRequest(
     if (result.claims.sub === ANONYMOUS_ID) {
         return 'anonymous principal not authenticated';
     }
-    const revoked = await tokenRevocationReason(
-        ctx.base, result.claims.sub,
-        result.claims.iat, result.claims.jti,
-    );
-    if (revoked !== null) {
-        return revoked;
-    }
+    // Per-request revocation retired: mint/refresh/exchange
+    // still consult the revocation ledger. A revoked access
+    // token works until exp (≤ ACCESS_TTL_SECONDS) — the
+    // NAMED ≤15-min staleness covenant.
     return {
         ...ctx,
         principal: principalFromClaims(result.claims),
     };
-}
-
-// Roles are per-org, but a grant is keyed by identity: read
-// this principal's grants through the identity_id index, then
-// currentRolesForInOrganization filters to the org — identity is
-// global, roles are per-org. Derived ONCE per request at the
-// gate; every authorizer consumes the same derivation.
-async function callerRolesInOrganization(
-    adapter: DbAdapter,
-    principal: Principal,
-    organization: Id,
-): Promise<string[]> {
-    const rows = await deriveRoleGrants(adapter);
-    return currentRolesForInOrganization(rows, principal.id, organization);
 }
 
 type FenceResult =
@@ -115,12 +94,16 @@ type FenceResult =
 // identity's default (its set choice, else primary membership)
 // — and rides the vessel for authz. A flat token whose
 // identity resolves to no organization is DENIED: there is no
-// global default to fall back on. The membership ledger is
-// the live truth; the token's organization claim is a mint-
-// time snapshot of it. Membership is re-derived on EVERY
-// fenced request so a revoked membership stops access now —
-// not when the token expires (the 15-minute de-membership
-// window). Phase Final Task 5 retired the store decorator:
+// global default to fall back on.
+//
+// NAMED COVENANT (membership/role/revocation staleness):
+// membership and roles come from token claims, not live
+// identity-spine reads. De-membership, demotion, and
+// logout-everywhere bite at the next mint/refresh/exchange
+// or access-token expiry — ≤ ACCESS_TTL_SECONDS (15 min) —
+// not on the very next request. Ownership fences
+// (write authorizer / resolveGlobalOwner) remain pair-plane
+// reads. Phase Final Task 5 retired the store decorator:
 // handlers receive ctx.base; pair-plane tenancy rides
 // uri_prefix.
 export async function fenceRequest(
@@ -139,7 +122,7 @@ export async function fenceRequest(
         };
     }
     const memberOrganizations =
-        await callerOrganizationIds(ctx.base, ctx.principal);
+        callerOrganizationIdsFromClaims(ctx.principal);
     if (!memberOrganizations.has(organization)) {
         return {
             ok: false,
@@ -148,8 +131,8 @@ export async function fenceRequest(
             status: HTTP_FORBIDDEN,
         };
     }
-    const roles = await callerRolesInOrganization(
-        ctx.base, ctx.principal, organization,
+    const roles = projectClaimRolesForOrganization(
+        ctx.principal.roles, organization,
     );
     return {
         ok: true,
@@ -194,19 +177,24 @@ export function authorizeIdentityPii(
         + ' requires an admin role';
 }
 
-// The orgs a caller can reach, derived FRESH from the
-// membership ledger (never the token claim, so it cannot be
-// stale). Shared by GET /organizations and the
-// organizations/:id read fence in handleRequest.
+// The orgs a caller can reach, from the token's organizations
+// claim (mint-time membership snapshot). Shared by GET
+// /organizations and the organizations/:id read fence in
+// handleRequest. Staleness is the NAMED ≤15-min covenant.
+export function callerOrganizationIdsFromClaims(
+    principal: Principal,
+): Set<Id> {
+    return new Set(principal.organizations ?? []);
+}
+
+// Adapter-shaped alias retained for callers that still pass
+// a DbAdapter — the claim set is authoritative; the adapter
+// is unused. Prefer callerOrganizationIdsFromClaims.
 export async function callerOrganizationIds(
-    adapter: DbAdapter,
+    _adapter: DbAdapter,
     principal: Principal,
 ): Promise<Set<Id>> {
-    const memberships = await deriveMembershipsForIdentity(
-        adapter, principal.id);
-    return new Set(
-        memberships.map(m => m.organization_id),
-    );
+    return callerOrganizationIdsFromClaims(principal);
 }
 
 // Parse a request body that must be a JSON OBJECT. Valid JSON

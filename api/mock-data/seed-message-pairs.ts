@@ -997,19 +997,23 @@ export function aiMemberSeedBody(
 }
 
 // The wire body a live PUT memberships/:id would carry for this
-// SAME write: {organization_id, identity_id, at} — the
+// SAME write: {organization_id, identity_id, type, at} — the
 // membershipDocumentEntityOf precedent (api/routes.ts), the ONE
 // shape every seeded membership row (human, AI, bootstrap)
 // shares. Hoisted so pass 1 (this file) and pass 2
 // (mock-data.ts) share the SAME construction — the
-// humanMemberSeedBody/aiMemberSeedBody precedent, generalized to
-// the roster's own join relation.
+// humanMemberSeedBody/aiMemberSeedBody precedent, generalized
+// to the roster membership entity. `type` is required: writers
+// pass it explicitly (no schema default).
 export function membershipSeedBody(
-    organizationId: Id, identityId: Id,
+    organizationId: Id,
+    identityId: Id,
+    type: 'admin' | 'member',
 ): Record<string, unknown> {
     return {
         organization_id: organizationId,
         identity_id: identityId,
+        type,
         at: MOCK_SEED_TIMESTAMP,
     };
 }
@@ -1365,13 +1369,18 @@ export function buildMockDataInvocations():
         organizations.forEach((organization, n) => {
             const membershipId =
                 'seed-membership-' + member.id + '-' + n;
+            const type = member.id === 'current'
+                ? 'admin' as const
+                : 'member' as const;
             invocations.push({
                 key: seedPairKey('memberships/:id', membershipId),
                 routePattern: 'memberships/:id',
                 idParams: [membershipId],
                 organization,
                 requesterIdentityId: SYSTEM_MEMBER_ID,
-                body: membershipSeedBody(organization, member.id),
+                body: membershipSeedBody(
+                    organization, member.id, type,
+                ),
             });
         });
         const createBody = humanMemberSeedBody(member);
@@ -1476,48 +1485,9 @@ export function buildMockDataInvocations():
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: identityDocumentBodyOf('service'),
     });
-    // Task 6: the two admin role grants for `current` (one per
-    // organization it joins), then one member-role grant per
-    // non-admin human — the SAME assignOrganization(index)
-    // partition the membership loop above uses — closing the
-    // last raw roleGrants.put sites the mock-data seed held.
-    invocations.push({
-        key: seedPairKey(
-            'role-grants/:id', 'seed-role-current-admin',
-        ),
-        routePattern: 'role-grants/:id',
-        idParams: ['seed-role-current-admin'],
-        organization: STARK_ORGANIZATION,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        body: roleGrantSeedBody(
-            STARK_ORGANIZATION, 'current', 'admin',
-        ),
-    });
-    invocations.push({
-        key: seedPairKey(
-            'role-grants/:id', 'seed-role-current-admin-org2',
-        ),
-        routePattern: 'role-grants/:id',
-        idParams: ['seed-role-current-admin-org2'],
-        organization: ORGANIZATION_TWO,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        body: roleGrantSeedBody(
-            ORGANIZATION_TWO, 'current', 'admin',
-        ),
-    });
-    members.forEach((member, index) => {
-        if (member.id === 'current') return;
-        const organization = assignOrganization(index);
-        const id = 'seed-role-' + member.id + '-member';
-        invocations.push({
-            key: seedPairKey('role-grants/:id', id),
-            routePattern: 'role-grants/:id',
-            idParams: [id],
-            organization,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: roleGrantSeedBody(organization, member.id, 'member'),
-        });
-    });
+    // Role grants retired: membership `type` seeds the
+    // privilege (admin for current, member otherwise) and mint
+    // bakes claim roles from those memberships.
     const ideaIndexById = new Map(
         ideas.map((idea, i) => [idea.id, i]),
     );
@@ -1725,7 +1695,9 @@ export function buildMockDataInvocations():
             idParams: [membershipId],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: membershipSeedBody(STARK_ORGANIZATION, m.id),
+            body: membershipSeedBody(
+                STARK_ORGANIZATION, m.id, 'member',
+            ),
         });
         // Task 6: the AI member's OWN identities/:id document
         // pair — an AI member's identity row exists (finding 10
@@ -2256,7 +2228,6 @@ export async function formBootstrapMessagePair(
     readonly systemMemberPair: MessagePair;
     readonly piiPair: MessagePair;
     readonly systemIdentityPair: MessagePair;
-    readonly roleGrantPair: MessagePair;
     readonly systemStateEventAt: string;
     readonly defaultOrganizationPair: MessagePair;
     readonly organizationPair: MessagePair;
@@ -2321,7 +2292,9 @@ export async function formBootstrapMessagePair(
             idParams: [bootstrapMembershipId],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: membershipSeedBody(STARK_ORGANIZATION, 'current'),
+            body: membershipSeedBody(
+                STARK_ORGANIZATION, 'current', 'admin',
+            ),
         },
         requestAt,
     );
@@ -2368,23 +2341,8 @@ export async function formBootstrapMessagePair(
         },
         requestAt,
     );
-    // Task 6: bootstrap's own admin role-grant document pair —
-    // the mock-data seed's own 'seed-role-current-admin'
-    // precedent above, mirrored here for bootstrap's lone
-    // organization.
-    const roleGrantPair = await formSeedPair(
-        {
-            key: seedPairKey('role-grants/:id', bootstrapRoleGrantId),
-            routePattern: 'role-grants/:id',
-            idParams: [bootstrapRoleGrantId],
-            organization: STARK_ORGANIZATION,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: roleGrantSeedBody(
-                STARK_ORGANIZATION, 'current', 'admin',
-            ),
-        },
-        requestAt,
-    );
+    // Role grants retired: bootstrap membership carries
+    // type:"admin"; mint bakes the claim role from it.
     // Task 8 (Phase 11): bootstrap's own default-org event forms
     // its OWN pair too — the mock-data seed's own per-member
     // precedent above, mirrored here for bootstrap's lone
@@ -2422,7 +2380,6 @@ export async function formBootstrapMessagePair(
         systemMemberPair,
         piiPair,
         systemIdentityPair,
-        roleGrantPair,
         systemStateEventAt,
         defaultOrganizationPair,
         organizationPair,

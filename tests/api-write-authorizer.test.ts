@@ -12,7 +12,6 @@ import {
 } from './test-fixtures.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
@@ -22,7 +21,7 @@ import {
 import { SYSTEM_MEMBER_ID, nowUtc } from '../api/types.ts';
 
 // Phase Final Task 1(e): pass-first pins for the pre-write
-// ownership gate. Foreign-id PUT 404 per family class;
+// ownership authorizer. Foreign-id PUT 404 per family class;
 // foreign-id DELETE 404 (records/:id, memberships/:id);
 // genesis (owner-null) unaffected. Wire body is the same
 // EntityNotFoundError shape OrganizationScopedEntityStore
@@ -95,59 +94,18 @@ async function membershipPair(
     });
 }
 
-async function roleGrantPair(
-    roleGrantId: string,
-    body: Record<string, unknown>,
-    organization: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error('missing role-grants/:id spec');
-    }
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/role-grants/${roleGrantId}`,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', roleGrantId],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [roleGrantId], body, SYSTEM_MEMBER_ID,
-            organization,
-        ),
-        headPairId: undefined,
-    });
-}
-
 // Org A = seedRootAdmin's '1'; Org B is a second tenant that
 // `current` also administers — foreign-id probes always use the
-// B token against an A-owned document.
+// B token against an A-owned document. Privilege is membership
+// type:"admin" (claim roles bake at mint).
 async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
-    const roleBody = {
-        organization_id: ORGANIZATION_B,
-        identity_id: 'current',
-        role: 'admin',
-        action: 'granted',
-        by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000000Z',
-    };
-    await postRoleGrantDocumentOp(
-        db, 'role-current-admin-b', roleBody, SYSTEM_MEMBER_ID,
-        await roleGrantPair(
-            'role-current-admin-b', roleBody, ORGANIZATION_B,
-        ),
-    );
     const memBody = {
         organization_id: ORGANIZATION_B,
         identity_id: 'current',
+        type: 'admin',
         at: '2020-01-01T00:00:00.000000Z',
     };
     await postMembershipDocumentOp(
@@ -254,6 +212,7 @@ test('foreign-id DELETE memberships/:id 403s', async () => {
         'PUT', '/memberships/m-other-a', tokenA, {
             organization_id: ORGANIZATION_A,
             identity_id: 'someone-else',
+        type: 'member',
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
@@ -280,39 +239,6 @@ test('foreign-id DELETE memberships/:id 403s', async () => {
     };
     assert.equal(row.organization_id, ORGANIZATION_A);
     // Phase Final Stage B: roster tables retired.
-});
-
-test('foreign-id PUT role-grants/:id 403s', async () => {
-    const db = await twoOrganizationDb();
-    const tokenA = await organizationToken('current', ORGANIZATION_A);
-    const tokenB = await organizationToken('current', ORGANIZATION_B);
-    const created = await handleRequest(db, req(
-        'PUT', '/role-grants/rg-a', tokenA, {
-            identity_id: 'someone-else',
-            role: 'member',
-            action: 'granted',
-            by_member_id: 'current',
-            at: '2026-01-01T00:00:00.000000Z',
-        },
-    ));
-    assert.equal(created.status, 200);
-
-    const foreign = await handleRequest(db, req(
-        'PUT', '/role-grants/rg-a', tokenB, {
-            identity_id: 'someone-else',
-            role: 'admin',
-            action: 'granted',
-            by_member_id: 'current',
-            at: '2026-01-02T00:00:00.000000Z',
-        },
-    ));
-    assert.equal(foreign.status, 403);
-    const body = await foreign.json() as { error: string };
-    assert.equal(
-        body.error,
-        'forbidden: role_grants/rg-a belongs to a different'
-        + ' organization',
-    );
 });
 
 test('foreign-id PUT projects/:id 403s (second family class)',

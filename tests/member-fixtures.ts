@@ -303,6 +303,7 @@ async function seedMembership(
     const body = {
         organization_id: MEMBER_ORGANIZATION,
         identity_id: id,
+        type: 'member',
         at: '2020-01-01T00:00:00.000000Z',
     };
     await postMembershipDocumentOp(

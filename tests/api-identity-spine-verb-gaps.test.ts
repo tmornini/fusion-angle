@@ -265,53 +265,53 @@ test('DELETE identity-token-revocations/:id 405s (no delete'
     assert.equal(res.status, 405);
 });
 
-test('PUT role-grants 405s (no put handler wired)', async () => {
+test('PUT role-grants 404s (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/role-grants', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('POST role-grants 405s (no post handler wired)',
+test('POST role-grants 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/role-grants', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE role-grants 405s (no delete handler wired)',
+test('DELETE role-grants 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/role-grants', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('POST role-grants/:id 405s (no post handler wired)',
+test('POST role-grants/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/role-grants/rg1', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE role-grants/:id 405s (no delete handler wired)',
+test('DELETE role-grants/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/role-grants/rg1', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
 test('PUT identity-tokens 405s (no put handler wired)',

@@ -601,7 +601,7 @@ git commit -m "add client registration derive plane"
   `HTTP_BAD_REQUEST`, `EntityNotFoundError` (all already
   imported by routes.ts — verify each and add any missing);
   ROUTE_POLICY deny-by-default (api/authorization.ts:162-168)
-  — NO member-tier entry, NO write-ownership-fence entry, NO
+  — NO member-tier entry, NO write-authorizer entry, NO
   request-auth carve-out: the route is admin-only and global
   with zero new authz code. `matchRoute` is exact-segment, so
   it can never fall into the `identities/:id/pii` carve-out
@@ -838,7 +838,7 @@ Insert into the routes array after the
     // serve 2-segment family/:id patterns. ADMIN-ONLY via
     // deny-by-default (/identities has no MEMBER_VERBS
     // entry); GLOBAL plane (no org nesting, no
-    // write-ownership fence). DELETE is a marked tombstone =
+    // write authorizer). DELETE is a marked tombstone =
     // deregistration; the gate forms the 204 pair, the
     // handler appends it — idempotent by construction.
     route('identities/:id/registration', {

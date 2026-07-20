@@ -47,9 +47,9 @@ import {
     resolveGlobalOwner,
 } from './derive-states.ts';
 import {
-    writeOwnershipFenceFor,
+    writeAuthorizerFor,
     assertWritableInOrganization,
-} from './write-ownership-fence.ts';
+} from './write-authorizer.ts';
 import {
     exchangeBearerForOrganization,
     postToken,
@@ -227,16 +227,17 @@ function writeResponseSpecFor(
     return method === 'PUT' ? entry.put : entry.post;
 }
 
-// The one catch shared by both pre-dispatch ownership-fence
-// regions (handleRequest, below) so their redaction discipline
-// cannot diverge. A fence read is storage-corruption territory,
-// not a domain outcome — it gets the SAME fixed 500 body the
-// domain-boundary catch (below, ~:938) already gives every other
-// unmapped fault, console-logged with the request identity for
-// correlation. MissingTableError is the one designed exception:
-// it re-raises FIRST, exactly as the domain-boundary catch
-// re-raises it, so web-app/core.ts's redirectIfMissingTable
-// recovery still fires.
+// The one catch shared by both pre-dispatch ownership regions
+// (handleRequest, below) so their redaction discipline cannot
+// diverge: fenceRequest membership/role reads, and the write
+// authorizer's owner resolve. A thrown read is storage-
+// corruption territory, not a domain outcome — it gets the SAME
+// fixed 500 body the domain-boundary catch (below, ~:938)
+// already gives every other unmapped fault, console-logged with
+// the request identity for correlation. MissingTableError is
+// the one designed exception: it re-raises FIRST, exactly as
+// the domain-boundary catch re-raises it, so
+// web-app/core.ts's redirectIfMissingTable recovery still fires.
 function redactedFenceFailure(
     ctx: IncomingContext,
     error: unknown,
@@ -470,13 +471,14 @@ export async function handleRequest(
         body = parse.body;
     }
 
-    // Region B of the pre-dispatch ownership fence (Phase 12
+    // Region B of the pre-dispatch write authorizer (Phase 12
     // Task 1, joined by WP8's self-only revocation guard below):
     // the one UNCONDITIONAL write guard below runs after body-
     // parse regardless of bearerExempt, mirroring Region A above.
-    // The states/:id ownership fence RETIRED with the route
+    // The states/:id ownership authorizer RETIRED with the route
     // (states-address retirement Task 13); field-values leaf
-    // write fence RETIRED with the leaf routes (Phase 15 Task 7).
+    // write authorizer RETIRED with the leaf routes (Phase 15
+    // Task 7).
     try {
         // WP8 (Phase 13 Task 8): the self-only revocation guard.
         // MEMBER_VERBS widens PUT /identity-token-revocations to
@@ -533,7 +535,7 @@ export async function handleRequest(
             && matched.delete !== undefined);
 
     try {
-        // Pre-write ownership gate for the 9 org-scoped
+        // Pre-write ownership authorizer for the 9 org-scoped
         // families' existing-id PUT/DELETE. Pair-plane
         // owner-null → genesis proceeds; foreign →
         // ForeignOrganizationError (HTTP 403). Runs BEFORE
@@ -545,17 +547,18 @@ export async function handleRequest(
             && !bearerExempt
             && organization !== undefined
         ) {
-            const writeFence = writeOwnershipFenceFor(
+            const writeAuthorizer = writeAuthorizerFor(
                 routePattern, method,
             );
-            if (writeFence !== undefined) {
-                const entityId = params[writeFence.idParamIndex];
+            if (writeAuthorizer !== undefined) {
+                const entityId =
+                    params[writeAuthorizer.idParamIndex];
                 if (entityId !== undefined && entityId !== '') {
                     await assertWritableInOrganization(
                         effective,
                         entityId,
                         organization,
-                        writeFence.table,
+                        writeAuthorizer.table,
                     );
                 }
             }

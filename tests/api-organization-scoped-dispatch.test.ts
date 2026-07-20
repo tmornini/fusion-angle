@@ -12,11 +12,16 @@ import {
 import { ideaBody, seedAdminSchema } from './test-fixtures.ts';
 
 // A real signed token for `current` (admin, via seedRootAdmin)
-// carrying an active `org` — what the facade exchange mints.
+// carrying claim roles + organizations + an active `org` —
+// what the facade exchange mints under claim-based fencing.
 async function organizationToken(organization: string): Promise<string> {
+    const org = organization || '1';
     return mintAccessToken({
         aud: TOKEN_AUDIENCE,
-        sub: 'current', roles: [], name: 'Demo',
+        sub: 'current',
+        roles: ['admin:' + org],
+        name: 'Demo',
+        organizations: [org],
         iat: 1_700_000_000,
         ttlSeconds: 10_000_000_000,
         jti: 'org-scoped-test',

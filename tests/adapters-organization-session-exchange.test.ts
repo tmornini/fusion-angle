@@ -46,6 +46,7 @@ async function seedMembershipPair(
     const body = {
         organization_id: organization,
         identity_id: identityId,
+        type: 'member',
         at: AT,
     };
     const spec = WRITE_RESPONSE_SPECS['memberships/:id'];

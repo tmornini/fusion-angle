@@ -19,7 +19,6 @@ import type { NotificationEvent } from '../api/notifications.ts';
 import { REQUEST_ID_HEADER } from '../api/request-context.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
@@ -209,21 +208,15 @@ test('a full login flow keeps requests/responses balanced,'
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
-    // 8: the fixture's own pii + credential pairs (2, Phase 13
-    // Task 8's seedIdentityPii/seedIdentityCredential re-point) +
-    // seedRootAdmin's own organization document + role-grant +
-    // membership pairs (3) precede the login flow's two AUTH hops
-    // (authorize, token — operation-addressed) plus the token
-    // grant's OWN identity_tokens row event pair (Phase 13 Task 5:
-    // grantAuthorizationCode's root gains its own pair at the
-    // row's address, distinct from the token hop's operation
-    // pair).
-    assert.equal(requests.length, 8);
+    // seedRootAdmin: org + membership (2; role-grants retired)
+    // + pii + credential (2) + authorize + token + token-event
+    // (3) = 7.
+    assert.equal(requests.length, 7);
     // The AUTH hops stay operation-addressed (uriId ''); the
     // token grant's row event pair rides its OWN row's address
     // instead, so it alone carries a non-empty uri_id in this
-    // slice.
-    const authHops = requests.slice(5).filter(
+    // slice. Indices 4–5 are authorize + token.
+    const authHops = requests.slice(4).filter(
         row => row.uri_prefix === '/authentication/authorize/'
             || row.uri_prefix === '/authentication/token/',
     );
@@ -231,7 +224,7 @@ test('a full login flow keeps requests/responses balanced,'
     for (const row of authHops) {
         assert.equal(row.uri_id, '');
     }
-    const tokenEventRequest = requests.slice(5).find(
+    const tokenEventRequest = requests.slice(4).find(
         row => row.uri_prefix === '/identity-tokens/',
     );
     assert.ok(tokenEventRequest);
@@ -242,7 +235,7 @@ test('a full login flow keeps requests/responses balanced,'
     // empty) uri_id — a request/response pair shares one `id`
     // AND one (uri_prefix, uri_id) address (appendMessagePair),
     // so this is the identical classification, re-applied.
-    const responseAuthHops = responses.slice(5).filter(
+    const responseAuthHops = responses.slice(4).filter(
         row => row.uri_prefix === '/authentication/authorize/'
             || row.uri_prefix === '/authentication/token/',
     );
@@ -250,7 +243,7 @@ test('a full login flow keeps requests/responses balanced,'
     for (const row of responseAuthHops) {
         assert.equal(row.uri_id, '');
     }
-    const tokenEventResponse = responses.slice(5).find(
+    const tokenEventResponse = responses.slice(4).find(
         row => row.uri_prefix === '/identity-tokens/',
     );
     assert.ok(tokenEventResponse);
@@ -365,12 +358,12 @@ test('a refresh grant stores its own redacted pair with no'
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
     // 11: the fixture's own pii + credential pairs (2, Phase 13
-    // Task 8) + seedRootAdmin's 3 fixture pairs + authorize +
+    // Task 8) + seedRootAdmin's 2 fixture pairs + authorize +
     // token (the token hop's own event pair, Phase 13 Task 5,
     // brings fullLoginFlow's count to 8) + refresh's own
     // operation pair + refresh's rotate-branch event pairs (2:
     // the retired root, the issued successor — Phase 13 Task 5).
-    assert.equal(requests.length, 11);
+    assert.equal(requests.length, 10);
     const liveSecrets = [
         first.refresh_token, rotated.access_token,
         rotated.refresh_token,
@@ -401,11 +394,11 @@ test('a token-exchange grant stores its own redacted pair'
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
     // 7: the fixture's own pii + credential pairs (2, Phase 13
-    // Task 8) + seedRootAdmin's 3 fixture pairs + the exchange's
+    // Task 8) + seedRootAdmin's 2 fixture pairs + the exchange's
     // own event pair (Phase 13 Task 5: issueTokenPair's root
     // gains its own pair at the row's address) + its operation
     // pair.
-    assert.equal(requests.length, 7);
+    assert.equal(requests.length, 6);
     const liveSecrets = [
         subjectToken, body.access_token, body.refresh_token,
     ];
@@ -456,52 +449,14 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: GuardedDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
 
 test('a client_credentials grant stores its own redacted pair'
 + ' with no live secrets', async () => {
     const db = await dbWithPasswordUser();
-    await seedRoleGrantPair(db, 'rg-svc', {
-        organization_id: '1',
-        identity_id: 'svc-client', role: 'admin',
-        action: 'granted', by_member_id: 'system',
-        at: '2020-01-01T00:00:00.000000Z',
-    });
     await seedMembershipPair(db, 'm-svc', {
         organization_id: '1',
         identity_id: 'svc-client',
+        type: 'member',
         at: '2020-01-01T00:00:00.000000Z',
     });
     const signer = await makeAssertionSigner('ES256');
@@ -530,13 +485,13 @@ test('a client_credentials grant stores its own redacted pair'
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
     // 7: dbWithPasswordUser's own pii + credential pairs (2,
-    // Phase 13 Task 8) + the fixture's own role-grant +
+    // Phase 13 Task 8) + the fixture's own 
     // membership pair (Phase 13 Task 1) + the registration-
     // facet pair the fixture seeds (clients elimination)
     // precede the token grant's own event pair (Phase 13
     // Task 5: issueTokenPair's root gains its own pair at
     // the row's address) plus its operation pair.
-    assert.equal(requests.length, 7);
+    assert.equal(requests.length, 6);
     const liveSecrets = [
         assertion, body.access_token, body.refresh_token,
     ];

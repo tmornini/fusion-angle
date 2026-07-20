@@ -16,7 +16,6 @@ import { sha256Hex } from '../shared/digest.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
 import {
     postMembershipDocumentOp,
-    postRoleGrantDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
@@ -107,40 +106,6 @@ async function seedMembershipPair(
     );
 }
 
-async function seedRoleGrantPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['role-grants/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for role-grants/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/role-grants/' + id,
-        routePattern: 'role-grants/:id',
-        routeSegments: ['role-grants', ':id'],
-        pathSegments: ['role-grants', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        headPairId: undefined,
-    });
-    await postRoleGrantDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-}
-
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -150,13 +115,9 @@ async function freshDb(): Promise<MemoryDbAdapter> {
         './root-admin-fixture.ts'
     );
     await seedOrganizationDocument(db, '1', 'Stark');
-    await seedRoleGrantPair(db, 'rg-current-1', {
-        organization_id: '1', identity_id: 'current',
-        role: 'admin', action: 'granted',
-        by_member_id: 'system', at: AT,
-    });
     await seedMembershipPair(db, 'm-current-1', {
-        organization_id: '1', identity_id: 'current', at: AT,
+        organization_id: '1', identity_id: 'current',
+        type: 'admin', at: AT,
     });
     await person(db, 'current', 'Tony', 'demo@example.com');
     await person(db, 'sarah', 'Sarah', 'sarah@x.com');
@@ -189,11 +150,11 @@ async () => {
     assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    // 7: the fixture's own role-grant + membership pair (Phase
-    // 13 Task 1), two identities/:id/pii pairs (Phase 15
-    // gate 6), the organizations/:id document (Stage B), and
-    // the grant's own 2 pairs.
-    assert.equal(requests.length, 7);
+    // 6: the fixture's own membership pair (Phase 13 Task 1;
+    // role-grant retired), two identities/:id/pii pairs
+    // (Phase 15 gate 6), the organizations/:id document
+    // (Stage B), and the grant's own 2 pairs.
+    assert.equal(requests.length, 6);
     const atAddress = requests.filter(
         r => r.uri_prefix === '/invitations/'
             && r.uri_id === 'inv-doc-1',
@@ -243,17 +204,18 @@ test('a failed (member-conflict) grant appends nothing',
 async () => {
     const db = await freshDb();
     await seedMembershipPair(db, 'm-sarah-conflict', {
-        organization_id: '1', identity_id: 'sarah', at: AT,
+        organization_id: '1', identity_id: 'sarah',
+        type: 'member', at: AT,
     });
     const res = await grant(db, 'inv-doc-fail');
     assert.equal(res.status, 409);
-    // 6: the fixture's own role-grant + membership pair, two
+    // 5: the fixture's own membership pair, two
     // identities/:id/pii pairs (Phase 15 gate 6), the
     // organizations/:id document (Stage B), plus sarah's own
     // conflicting membership pair (Phase 13 Task 1) — the
-    // failed grant appends nothing further.
-    assert.equal((await db.requests.getAll()).length, 6);
-    assert.equal((await db.responses.getAll()).length, 6);
+    // failed grant appends nothing further. Role-grant retired.
+    assert.equal((await db.requests.getAll()).length, 5);
+    assert.equal((await db.responses.getAll()).length, 5);
 });
 
 // ── accept: the memberships document pair (the B2 closure) ──
@@ -294,6 +256,7 @@ test('a fresh accept appends its memberships document at the'
     assert.equal(documents.length, 1);
     assert.deepEqual(documents[0]!.body, {
         organization_id: '1', identity_id: 'sarah',
+        type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
     });
     // The direct proof: the generic, family-agnostic document
@@ -307,6 +270,7 @@ test('a fresh accept appends its memberships document at the'
     assert.deepEqual(derived, {
         id: 'ms-doc-3', organization_id: '1',
         identity_id: 'sarah',
+        type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
     });
 });
@@ -449,12 +413,12 @@ test('every stored invitation-family message verifies against'
     // 3 grants x 2 (operation + invitation document) + 1 accept
     // x 2 (operation + memberships document) + 1 decline x 1
     // (operation only — decline synthesizes no document) = 9,
-    // plus the fixture's own role-grant + membership pair
-    // (Phase 13 Task 1), four identities/:id/pii pairs
-    // (current, sarah, bruce, clark — Phase 15 gate 6), and
-    // the organizations/:id document (Stage B) = 16.
-    assert.equal(requests.length, 16);
-    assert.equal(responses.length, 16);
+    // plus the fixture's own membership pair (Phase 13
+    // Task 1; role-grant retired), four identities/:id/pii
+    // pairs (current, sarah, bruce, clark — Phase 15 gate 6),
+    // and the organizations/:id document (Stage B) = 15.
+    assert.equal(requests.length, 15);
+    assert.equal(responses.length, 15);
     for (const row of requests) {
         assert.equal(
             await sha256Hex(row.message), row.message_hash,
