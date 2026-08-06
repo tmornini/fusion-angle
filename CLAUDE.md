@@ -233,19 +233,23 @@ is HTTP-only.
   inside the work-order document pair. Flow undo resolves
   its restore target from the flow's own document-pair
   history (Phase 14 Task 8). Lifecycle history is nine GET
-  registrations (`GET <family>/:id/history` for ideas /
-  projects / records / flows / objectives / members /
+  registrations plus one value-history
+  (`GET <family>/:id/history` for ideas / projects /
+  record-types / flows / objectives / members /
   work-orders, plus bulk `GET work-orders/history` and
-  `GET objectives/history`) — wire `(at, id)` DESC; work-
+  `GET objectives/history`, plus
+  `GET .../record-types/:type/instances/:id/history`
+  for value revisions) — wire `(at, id)` DESC; work-
   order routes fold `field_values` inline. Ideas /
-  projects / records / objectives / members GET rows embed
-  the lifecycle trio. Phase 15 retired
-  `flows/:id/versions[...]` and the zero-caller shared
-  event-append / current-state-alias / nested field-values
-  families — all router 404. Phase Final DELETED the
-  graph/version tables with the rest of the row plane.
-  Ownership fences resolve on the pair plane
-  (`resolveOwningOrganization`,
+  projects / record-types / objectives / members GET
+  rows embed the lifecycle trio. Flat `/records` and
+  `/record-attributes` are RETIRED (router 404). Phase
+  15 retired `flows/:id/versions[...]` and the
+  zero-caller shared event-append / current-state-alias
+  / nested field-values families — all router 404.
+  Phase Final DELETED the graph/version tables with the
+  rest of the row plane. Ownership fences resolve on
+  the pair plane (`resolveOwningOrganization`,
   `stateEventVisibilityFor` for RESTRICT). Flow tags
   (`flows/:id/tags/:name`) are the first document family
   that never had a backing table; post-Final every family
@@ -512,7 +516,13 @@ apply to it (RED is the audit's first finding).
   commits whole or aborts whole, so a failed import leaves
   prior data intact with no manual wipe. Validators run at the
   gate (`parseAndValidateSnapshot`, `scanForRetiredKeys`,
-  quota pre-flight) BEFORE the transaction. The simulated
+  quota pre-flight) BEFORE the transaction.
+  `scanForRetiredKeys` (client) and the server snapshot
+  validator also reject retired message-plane
+  `uri_prefix` patterns — currently flat
+  `/organizations/:org/records/` and
+  `/organizations/:org/record-attributes/` (anchored so
+  `flows/:id/records` join pairs pass). The simulated
   localStorage tier rolls back logic errors the same way, but
   its multi-key flush is still not OS-atomic on a mid-write
   quota error — the one gap IndexedDB closes.
@@ -528,22 +538,27 @@ apply to it (RED is the audit's first finding).
   entity's current state is the latest derived event on its
   `entity_id` under the `(at, id)` total order. Reversal is
   a *new* event with the new state, not an edit of a prior
-  pair. Surviving HTTP surface (reads only, nine
-  registrations, wire DESC): per-entity
+  pair. Surviving HTTP surface (reads only, nine lifecycle
+  + one value-history, wire DESC): per-entity
   `GET <family>/:id/history` for ideas / projects /
-  records / flows / objectives / members / work-orders
-  (org-nested empty → foreign 403 / absent 404; members
-  global 404), bulk `GET work-orders/history` and
-  `GET objectives/history` (always 200 arrays), and
+  record-types / flows / objectives / members /
+  work-orders (org-nested empty → foreign 403 / absent
+  404; members global 404), bulk `GET work-orders/history`
+  and `GET objectives/history` (always 200 arrays),
   work-order `field_values` folded **inline** on the WO
-  history routes (no successor field-values GET). Entity
-  GET rows for ideas / projects / records / objectives /
-  members embed the lifecycle trio. Lifecycle writes are
-  document-trio PUTs
-  (ideas/projects/records/flows/objectives/members) and
-  named ops (work-order create/claim/transition/release,
-  invitations) — every verb on the retired shared event-
-  append address is router 404;
+  history routes (no successor field-values GET), and
+  instance value-revision history at
+  `GET .../record-types/:type/instances/:id/history`
+  (`{at, etag, values}` DESC by current read ACL). Entity
+  GET rows for ideas / projects / record-types /
+  objectives / members embed the lifecycle trio.
+  Lifecycle writes are document-trio PUTs
+  (ideas/projects/record-types/flows/objectives/members)
+  and named ops (work-order create/claim/transition/
+  release, invitations); instance values ride PUT
+  genesis / PATCH If-Match / DELETE tombstone — every
+  verb on the retired shared event-append address and
+  flat `/records` / `/record-attributes` is router 404;
   `stateEventCollisionFromPairs` is gone. The `states`
   table, `StateStore`, and `EntityStore` are DELETED
   (Phase Final). Document DELETE is a marked tombstone

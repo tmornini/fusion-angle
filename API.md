@@ -265,23 +265,74 @@ Legend for classification:
 - `POST /work-orders/:id/release` — operation (named
   unclaim; 204; foreign-WO 403; nonexistent-WO 404).
 
-### 2.8 Records & attributes
+### 2.8 Record types, attributes & instances
 
-- `GET /records` · `GET|PUT|DELETE /records/:id` — primitive.
-  `PUT` is a document write (§3.33/§5.7) — the fifth family,
-  and the first `'trio'` family whose `:id` address also
-  carries a live `DELETE`. `GET` now rides the SAME generic
-  document machinery `PUT` does — both the list (`GET
-  /records`) and the entity read (`GET /records/:id`) derive
-  from the message ledger (Task 7, Phase 6), not a
-  hand-written dispatch; `DELETE` stays hand-written,
-  unchanged.
-- `POST /records` — operation, create-or-edit write (§3.20).
-  Member-tier.
-- `GET /record-attributes` · `GET|PUT /record-attributes/:id` —
-  primitive.
-- `DELETE /record-attributes/:id` — RESTRICT delete (409 if
-  referenced; referrer check + splice in one tx).
+Org-nested primary wire (no dual-wire flat `/records`
+facade). Base path:
+
+`organizations/:organization-id/record-types`
+
+Nested under `:record-type-id`:
+`/history`, `/attributes[/:attribute-id]`,
+`/instances[/:instance-id[/history]]`.
+
+In-table nested routes match **before** the org facade
+(dispatch inversion — ARCHITECTURE.md § Facade). Path
+`:organization-id` must equal the fenced claim org else
+**403** (no auto-exchange; nonexistent path org is also
+403 — no route-topology oracle). Flat
+`/records[/:id[/history]]` and
+`/record-attributes[/:id]` are RETIRED (router 404;
+unauth → 401 first). Snapshot import rejects legacy
+`uri_prefix` under those retired patterns (API.md
+§2.13; `scanForRetiredKeys` + server validator).
+
+**Record types** (schema; member READ / admin MUTATION;
+`'trio'` SIMPLE PUT class — last-writer-wins, no
+If-Match this wave):
+
+- `GET .../record-types` — member; collection
+- `GET .../record-types/:id` — member; no attribute embed
+- `PUT .../record-types/:id` — admin; create or replace
+  head (§5.7)
+- `POST .../record-types` — admin; composed create/edit
+  (§3.20)
+- `DELETE .../record-types/:id` — admin; tombstone;
+  RESTRICT if live instances or `flows/:id/records`
+  joins
+- `GET .../record-types/:id/history` — member;
+  lifecycle-trio history (§2.10)
+
+**Attributes** (nested under type; `'stateless'` SIMPLE
+PUT; admin mutation; body drops `record_id` — type id
+rides the uri prefix; ACL arrays
+`read_roles` / `write_roles` on the document):
+
+- `GET .../attributes` · `GET .../attributes/:id` —
+  member; includes ACL arrays
+- `PUT .../attributes/:id` — admin; body includes ACL
+- `DELETE .../attributes/:id` — admin; RESTRICT (WO
+  frozen graph + live flow-graph + state field values
+  + live instance heads carrying a value)
+
+**Instances** (data rows; member path-tier +
+per-attribute ACL; full dialect in §5.4.1 / §5.20):
+
+- `GET .../instances` — member; list; read-ACL
+  projection; id-lex ASC; row embeds `etag`
+- `GET .../instances/:id` — member; project by read ACL;
+  **ETag** header
+- `PUT .../instances/:id` — member; **create only** —
+  409 if address spent (incl. tombstone)
+- `PATCH .../instances/:id` — member; **If-Match
+  required** (428 / 412)
+- `DELETE .../instances/:id` — member; tombstone;
+  unconditional (phase 1)
+- `GET .../instances/:id/history` — member;
+  value-revision chain (`{at, etag, values}` DESC)
+
+`flows/:id/records` (flow↔type join) is UNTOUCHED —
+accepted debt, not this family's wire.
 
 ### 2.9 Objectives
 
@@ -301,8 +352,9 @@ Legend for classification:
 
 Lifecycle is pair-plane only. The `states` table and every
 verb on the shared event-append address are RETIRED
-(states-address retirement + Phase Final). Nine GET
-registrations replace the retired bulk collection,
+(states-address retirement + Phase Final). **Nine
+lifecycle GET registrations + one value-history
+(instances)** replace the retired bulk collection,
 per-entity history alias, and field-values read surface.
 Wire order is `(at, id)`
 **DESC** on every registration (index 0 = current). No
@@ -313,7 +365,7 @@ literal `work-orders/history` and `objectives/history`
 register **before** the `:id` document routes so
 `matchRoute` does not treat `history` as an id.
 
-**Nine registrations**
+**Nine lifecycle registrations**
 
 1. `GET ideas/:id/history` —
    `documentStateHistoryHandler(deriveIdeaStateHistory,
@@ -323,8 +375,11 @@ register **before** the `:id` document routes so
    absent **404** (honest family body).
 2. `GET projects/:id/history` — same builder over
    `deriveProjectStateHistory` / `'projects'`.
-3. `GET records/:id/history` — same builder over
-   `deriveRecordStateHistory` / `'records'`.
+3. `GET organizations/:org/record-types/:id/history` —
+   same builder over
+   `deriveRecordStateHistory` / `'record_types'`
+   (nested address; flat `records/:id/history` is
+   router 404).
 4. `GET flows/:id/history` — same builder over
    `deriveFlowStateHistory` / `'flows'`.
 5. `GET objectives/:id/history` — same builder over
@@ -356,14 +411,24 @@ register **before** the `:id` document routes so
    `StateEntity` only (no `field_values`), DESC
    overall. **Always 200** array.
 
+**One value-history registration (not a lifecycle
+clone).**
+`GET organizations/:org/record-types/:type/instances/:id/history`
+— value-revision chain: `{ at, etag, values }[]` DESC,
+projected by the caller's **current** read ACL (never
+ACL-as-of-then). Foreign 403 / absent 404 / tombstone
+404. Full dialect: §5.20.
+
 **Head-state on entity GETs (lifecycle trio).** Ideas,
-projects, records, objectives, and members GET rows
-embed `state`, `state_at`, `state_event_id` stamped
+projects, record-types, objectives, and members GET
+rows embed `state`, `state_at`, `state_event_id` stamped
 from the lifecycle-current event (genesis-wins-under-
 skew), never the head PUT body alone. Flows skip the
 embed (no consumer). Work-orders stay `'stateless'` —
 lifecycle lives only on create / claim / transition /
-release ops and the history routes above.
+release ops and the history routes above. Instances
+carry `values` (full-state head), not the lifecycle
+trio.
 
 **Field values have no successor route.** Product
 reads fold them inline on work-order history (7)/(8).
@@ -385,10 +450,12 @@ work-order transition fold only. No
 op pairs, not bare leaf pairs (§5.16 / §5.19).
 
 Lifecycle **writes** ride document-trio PUTs
-(ideas / projects / records / flows / objectives /
+(ideas / projects / record-types / flows / objectives /
 members) and named ops (work-order create / claim /
 transition / release, invitations) — never a shared
-event-append address.
+event-append address. Instance value writes ride PUT
+genesis / PATCH If-Match / DELETE tombstone (§5.20) —
+not lifecycle-trio PUTs.
 
 Org-scoped document PUT/DELETE hit the write authorizer
 (`api/write-authorizer.ts` →
@@ -1314,62 +1381,74 @@ like every other atomic write in this catalog.
   clients — the shipped UI always sends the transaction's
   own id. Pins: `tests/api-work-order-transition.test.ts`.
 
-### 3.20 `POST /records` — record write (create or edit)
+### 3.20 `POST .../record-types` — record-type write (create or edit)
 
-`postRecordWriteOp` (`api/routes.ts`).
+`postRecordWriteOp` (`api/routes.ts`) at
+`organizations/:organization-id/record-types` (admin-
+gated; the flat `POST /records` address is RETIRED —
+router 404). Wire body shape inherits the prior
+create/edit kind discriminator (`kind`, field names,
+trio keys); only the route address and policy tier
+changed (admin, not member).
 
 - tx: `['requests','responses']`
 - actual: `validateRecordWriteBody(body)`; if removals,
-  RESTRICT referrer check (pair-plane) → 409 rolls back; then
-  the bundle's pairs appended LAST: operation, document
-  (lifecycle trio on body), N attribute-PUTs, M
-  attribute-DELETEs.
-- doctrinal: `post_op` + `put_record` + attribute put/delete
-  pairs as `post_write_record`.
-- props: atomic; **RESTRICT** (a removed attribute still referenced
-  409s and rolls back the whole write, so no pair lands for it
-  either); member-tier.
+  RESTRICT referrer check (pair-plane) → 409 rolls back;
+  then the bundle's pairs appended LAST: operation,
+  document (lifecycle trio on body), N attribute-PUTs,
+  M attribute-DELETEs.
+- doctrinal: `post_op` + `put_record_type` + attribute
+  put/delete pairs as `post_write_record_type`.
+- props: atomic; **RESTRICT** (a removed attribute still
+  referenced 409s and rolls back the whole write, so no
+  pair lands for it either); **admin-tier**.
 
-**The bundle: 2+N (create) or 2+N+M (edit) pairs, one tx (Phase
-6 Task 4 — the migration's FIRST VARIABLE-CARDINALITY
-synthesis).** Unlike the flows/work-orders create-triple
-(§3.12/§3.17, always exactly three), a record write's pair count
-scales with its own attribute arrays: the operation pair, the
-document pair, one attribute-PUT pair per `attributes[]` entry
-(N), and — edit only — one attribute-DELETE pair per
-`removedAttributeIds` entry (M; a create body has no
-`removedAttributeIds` field at all, so M is always 0 there). The
-route pre-forms every non-operation pair beside the gate's own
-operation pair, ONLY when the gate supplied both a pair and a
-fence organization — a below-facade caller (`api/mock-data.ts`)
+**The bundle: 2+N (create) or 2+N+M (edit) pairs, one tx
+(Phase 6 Task 4 — the migration's FIRST
+VARIABLE-CARDINALITY synthesis; re-homed nested by the
+org-nested record-types wave).** Unlike the
+flows/work-orders create-triple (§3.12/§3.17, always
+exactly three), a record-type write's pair count scales
+with its own attribute arrays: the operation pair, the
+document pair, one attribute-PUT pair per
+`attributes[]` entry (N), and — edit only — one
+attribute-DELETE pair per `removedAttributeIds` entry
+(M; a create body has no `removedAttributeIds` field at
+all, so M is always 0 there). The route pre-forms every
+non-operation pair beside the gate's own operation pair,
+ONLY when the gate supplied both a pair and a fence
+organization — a below-facade caller (`api/mock-data.ts`)
 skips them all:
 
-- **The document pair** — PUT-shaped, at `records/:id`'s own
-  address (the SAME address `POST /records` collapses onto, via
-  the registry's create-address override — §5.6), body
-  `recordDocumentBodyOf(b)`: the entity's own three fields
-  (`name`, `description`, `position`; `organization_id`
-  excluded) plus the lifecycle trio — mapped from
-  `initialState*` on create, carried verbatim from the body's
-  own echoed trio on edit — validated through
+- **The document pair** — PUT-shaped, at
+  `organizations/:org/record-types/:id`'s own address
+  (the SAME address nested `POST .../record-types`
+  collapses onto), body `recordDocumentBodyOf(b)`: the
+  entity's own three fields (`name`, `description`,
+  `position`; `organization_id` excluded) plus the
+  lifecycle trio — mapped from `initialState*` on
+  create, carried verbatim from the body's own echoed
+  trio on edit — validated through
   `validateRecordDocumentBody` (belt-and-suspenders:
-  `initialStateEventId` carries no non-empty rule of its own on
-  create, so an empty value 400s HERE rather than minting an
-  invalid pair) — byte-indistinguishable from a live
-  genesis/edit `PUT /records/:id`.
-- **N attribute-PUT pairs** — one per `attributes[]` entry,
-  PUT-shaped at `record-attributes/:id`'s own address, body
-  `recordAttributeDocumentBodyOf(attr)` (the id-strip
-  destructure: the entity fields minus `id` and
-  `organization_id`) — byte-indistinguishable from a live
-  `PUT /record-attributes/:id`.
+  `initialStateEventId` carries no non-empty rule of
+  its own on create, so an empty value 400s HERE rather
+  than minting an invalid pair) — byte-indistinguishable
+  from a live genesis/edit
+  `PUT .../record-types/:id`.
+- **N attribute-PUT pairs** — one per `attributes[]`
+  entry, PUT-shaped at the nested
+  `.../record-types/:type/attributes/:id` address, body
+  `recordAttributeDocumentBodyOf(attr)` (entity fields
+  minus `id` / `organization_id` / parent `record_id` —
+  type id rides the uri prefix) — byte-indistinguishable
+  from a live `PUT .../attributes/:id`.
 - **M attribute-DELETE pairs** (edit only) — one per
   `removedAttributeIds` entry, DELETE-shaped at the SAME
-  `record-attributes/:id` address the attribute's own PUT pair
-  used, status 204 with no body — every DELETE response is
-  UNIVERSALLY 204 with no body (`api/api.ts`'s gate) —
-  byte-indistinguishable from a live
-  `DELETE /record-attributes/:id`.
+  nested attribute address the attribute's own PUT pair
+  used, status 204 with no body — every DELETE response
+  is UNIVERSALLY 204 with no body (`api/api.ts`'s gate)
+  — byte-indistinguishable from a live
+  `DELETE .../attributes/:id`.
 
 The shared BODY builders (`recordDocumentBodyOf`,
 `recordAttributeDocumentBodyOf`) feed `formDocumentPairFor`
@@ -1388,21 +1467,22 @@ All pairs share ONE `requestAt` (the write's own origination) yet
 strictly-later response `at` stamps, so the document pair —
 appended AFTER the operation pair — becomes the entity address's
 head, exactly like flows'/work-orders' own create (§3.12/§3.17).
-A duplicate create (same record id) therefore records
+A duplicate create (same record-type id) therefore records
 `Supersedes` on its own new document pair against the PRIOR
-document pair; the duplicate's own operation pair, reading that
-SAME shared address fresh at gate entry, supersedes that same
-prior document pair too (`records` is `'simple'` concurrency,
-§5.4). The whole bundle commits or none: a mid-transaction
-failure (a state-ledger collision, or a RESTRICTed removal)
-leaves ZERO of the bundle's pairs, exactly like every other
-atomic write in this catalog.
+document pair; the duplicate's own operation pair, reading
+that SAME shared address fresh at gate entry, supersedes
+that same prior document pair too (`record-types` is
+`'simple'` concurrency, §5.4). The whole bundle commits or
+none: a mid-transaction failure (a state-ledger collision,
+or a RESTRICTed removal) leaves ZERO of the bundle's pairs,
+exactly like every other atomic write in this catalog.
 
-**The edit-only trio.** `RecordWriteEditBody` now carries the
-SAME `state`/`state_at`/`state_event_id` keys `PUT /records/:id`
-(§3.33) accepts, with the SAME validation rules — an edit body
-without them 400s before ever reaching the referrer check above
-(step 5): the RESTRICT proof depends on that ordering. The client
+**The edit-only trio.** `RecordWriteEditBody` now carries
+the SAME `state`/`state_at`/`state_event_id` keys
+`PUT .../record-types/:id` (§3.33) accepts, with the SAME
+validation rules — an edit body without them 400s before
+ever reaching the referrer check above (step 5): the
+RESTRICT proof depends on that ordering. The client
 (`postRecordChange`, `web-app/app/adapters/records.ts`) echoes
 the trio from the already-loaded detail model
 (`RecordChangeEdit.state`/`stateAt`/`stateEventId`) — zero new
@@ -1687,32 +1767,36 @@ the shared event-append address is retired (§2.10).
   replays the STORED head event's `member_id`, never the
   editing actor.
 
-### 3.33 `PUT /records/:id` — record document write (not a POST)
+### 3.33 `PUT .../record-types/:id` — type document write
 
-One shape serves create, edit, and transition (Decision 7): the
-body is the entity's own three writable fields (`name`,
-`description`, `position`) plus the lifecycle trio (`state`,
-`state_at`, `state_event_id`). Genesis is head-presence-defined
-— the first PUT at an id IS the birth, though a record's
-genesis normally arrives through the composed `POST /records`
-(§3.20) instead; this PUT's genesis arm exists for a live
-PUT-first flow and mirrors ideas/projects exactly rather than
-special-casing records as PUT-only-for-edits.
-`postRecordStateChange` (the adapter's transition op) now mints
-a fresh trio and fires this SAME document PUT;
-the shared event-append address is retired (§2.10).
-`GET /records/:id` rides
-`documentGetHandler`; `DELETE /records/:id` stays hand-written
-(pair-plane tombstone).
+One shape serves create, edit, and transition (Decision 7):
+the body is the entity's own three writable fields
+(`name`, `description`, `position`) plus the lifecycle
+trio (`state`, `state_at`, `state_event_id`). Genesis is
+head-presence-defined — the first PUT at an id IS the
+birth, though a type's genesis normally arrives through
+the composed `POST .../record-types` (§3.20) instead;
+this PUT's genesis arm exists for a live PUT-first flow
+and mirrors ideas/projects exactly. Flat
+`PUT /records/:id` is RETIRED (router 404).
+`postRecordStateChange` (the adapter's transition op)
+mints a fresh trio and fires this SAME nested document
+PUT; the shared event-append address is retired
+(§2.10). `GET .../record-types/:id` rides
+`documentGetHandler`; `DELETE .../record-types/:id` is
+the RESTRICT tombstone (§5.7). **Admin-tier** mutation
+(schema surface).
 
 - tx: `['requests','responses']`
 - actual: `appendMessagePair(pair)` — entity fields plus
   lifecycle trio on the document body; pair-plane only.
-- doctrinal: `put_record_document` (lifecycle on the body).
-- props: atomic; member-tier; `validateRecordDocumentBody`;
-  idempotent; MEMBER_ID CAVEAT — a state-unchanged edit
-  replays the STORED head event's `member_id`, never the
-  editing actor.
+- doctrinal: `put_record_type_document` (lifecycle on
+  the body).
+- props: atomic; admin-tier;
+  `validateRecordDocumentBody`; idempotent;
+  MEMBER_ID CAVEAT — a state-unchanged edit replays the
+  STORED head event's `member_id`, never the editing
+  actor.
 
 ---
 
@@ -2016,6 +2100,49 @@ rides the SAME generic `documentGetHandler` (§5.5, Task 8) —
 its response additionally carries the `Response-ID` header
 (§3.13).
 
+### 5.4.1 Instance concurrency: create-only PUT + If-Match PATCH
+
+Sibling dialect to §5.4's two PUT classes. Instances are
+NOT on `DOCUMENT_CLASS_ROUTE_PATTERNS` (R10) and do NOT
+ride `documentPutHandler`. They introduce platform-wide
+`PATCH` plus a strong **ETag / If-Match** dialect:
+
+- **PUT = create only.** Client-minted id; body
+  `{ set: [{ attribute_id, value }] }` (`clear` on PUT
+  → **400**). If ANY prior head exists at the address —
+  including a tombstone — **409**. The address is
+  spent; recovery is a fresh client-minted id. An
+  If-Match header on PUT is **400** (one dialect per
+  verb). Success **200** + `ETag` header (house style —
+  201 has zero call sites).
+- **PATCH = locked partial update.** Requires exactly
+  one strong If-Match validator (lists / `*` → **400**).
+  Body `{ set?, clear? }` merges into the full-state
+  head (`{ values }`). Missing If-Match → **428**;
+  stale → **412**; absent/tombstoned head → **404**
+  (PATCH never creates or revives).
+- **409 vs 412 NAMED.** Create collision (address
+  already used) is **409**. Lost-update on an existing
+  live head is **412**. Do not collapse them — they
+  answer different questions ("does this identity
+  exist?" vs "did concurrent writers race?"). Spec
+  decision 13 schedules post-ship review of folding
+  this divergence with flows' If-Response-ID →
+  If-Match unification.
+- **ETag source.** Wire ETag is the head pair's
+  **response identity** (strong, double-quoted). The
+  stored `responses.etag` column is a sha256 of the
+  BODY — content-addressing, storage-only, **unrelated
+  to the wire ETag**. Implementers must not conflate
+  them.
+- **Replay.** Byte-identical resend hits the
+  idempotency fast path first. If-Match is hoisted /
+  hash-covered, so two PATCHes differing only in
+  If-Match are different messages. DELETE is
+  tombstone-wins (replay → 204).
+
+Full outcome / projection / history tables: §5.20.
+
 ### 5.5 ideas/projects/flows: generic components
 
 `ideas/:id`, `ideas` (collection), `projects/:id`, `projects`
@@ -2095,66 +2222,64 @@ every deliberate verb gap the family still carries (PUT/DELETE
 `flows/:id/work-orders`; GET/POST `flows/:id/work-orders/:woid`
 — its DELETE already pinned in `api-flows-verb-gaps.test.ts`).
 
-### 5.7 The fifth family: records and the DELETE-pair filter
+### 5.7 The fifth family: record-types (nested) and the DELETE-pair filter
 
-Task 2 (Phase 6) registers `records` as the fifth
-`DocumentFamilyWiring` row (`RECORDS_WIRING`, beside
-ideas/projects/flows/work-orders in `api/routes.ts`). `records`
-is `'trio'` — Decision 7's election as amended: a family is
-`'trio'` when its lifecycle fits the trio (a single current
-state, authored once per transition, folded into the SAME
-document PUT that edits its entity fields) rather than
-`'stateless'` (a lifecycle written by its own dedicated ops,
-never a document PUT) — records' active/archived/deleted
-lifecycle fits the trio exactly as ideas/projects/flows' does,
-so the amendment stays narrow: it elects records into the
-EXISTING `'trio'` class rather than widening the class itself.
+Phase 6 Task 2 registered the fifth
+`DocumentFamilyWiring` row as flat `records`
+(`RECORDS_WIRING`, `'trio'`). The org-nested
+record-types wave re-homes that family:
 
-`records` is also the FIRST family whose `:id` address carries
-a live `DELETE` route alongside a `'trio'` PUT.
-`documentLifecycleEvents` (`api/derive-documents.ts`) walked
-every 2xx PUT/DELETE pair at a document address and
-`pickString`-threw on a DELETE pair's body — always EMPTY
-(design decision 6: DELETE tombstones a document, it carries no
-wire fields) — since no `'trio'` family before records ever had
-a live DELETE at its own document address for the throw to
-reach. Author gate 9's fix: the walk now SKIPS a DELETE-method
-pair entirely, so a delete-then-recreate history (`PUT`,
-`DELETE`, `PUT`) yields the two PUT trios rather than crashing —
-behavior-preserving for ideas/projects/flows (none has a DELETE
-at its own document address). At the time of this fix, `GET
-/records/:id` and `GET /records` were still hand-written,
-old-plane (`RECORDS_WIRING`'s `entityOf` unreached until Task 7
-flipped them), so the fix was proven directly against
-fabricated pairs (`tests/api-record-document.test.ts`), not
-through a live route. `GET` now rides the SAME generic document
-machinery `PUT` does — both the list (`GET /records`, via
-`documentCollectionGetHandler`) and the entity read (`GET
-/records/:id`, via `documentGetHandler`) derive from the
-message ledger (Task 7, Phase 6), not a hand-written dispatch.
+- **Wire = storage** at
+  `organizations/:org/record-types[/:id]`.
+- Flat `/records[/:id[/history]]` and
+  `/record-attributes[/:id]` are RETIRED (router 404;
+  unauth → 401 first). Snapshot retired-prefix scan
+  rejects legacy `uri_prefix` under those patterns.
+- Family registration name is `record-types` /
+  storage name `record_types`; lifecycle alphabet and
+  DELETE-pair filter posture are unchanged.
+- Nested attributes replace flat `record-attributes`
+  (still `'stateless'` SIMPLE PUT; ACL arrays on the
+  document; RESTRICT gains a live-instance-head leg).
+- Nested instances are a **separate** surface (§5.20)
+  — not DOCUMENT_CLASS, not trio.
 
-**PUT /records/:id** now dispatches through
-`documentPutHandler(RECORDS_WIRING)` — the SAME `'simple'`
-concurrency class ideas/projects/work-orders ride (§5.4) — and
-`WRITE_RESPONSE_SPECS['records/:id']` is
-`documentWriteResponseSpec(RECORDS_WIRING)`.
+`'trio'` election (Decision 7 as amended) still holds:
+a family is `'trio'` when its lifecycle fits the trio
+(a single current state, authored once per transition,
+folded into the SAME document PUT that edits its
+entity fields) rather than `'stateless'`. Record-types'
+active/archived/deleted lifecycle fits the trio exactly
+as ideas/projects/flows' does.
 
-**The wire is unchanged except the named trio delta.** The
-response's `{id, organization_id, name, description, position}`
-keys are byte-identical to the prior hand-written route — the
-entity/trio separation in `RecordDocumentBody` guarantees it.
-The three named wire deltas: (1) the PUT request body now
-carries the trio; (2) `putRecord`/`postRecordStateChange`
-(`web-app/app/adapters/records.ts`) speak the trio in
-camelCase, translating to snake_case at the wire seam; (3) the
-records list's drag-reorder and the detail page's no-attribute-
-change save each echo the trio from data already loaded (the
-list model's `RecordModel` accessors; `currentView.record`) —
-zero new hops. `tests/api-record-document.test.ts` (the
-below-gate op/validator/DELETE-filter pins) plus the untouched
-existing suite (byte-identical GET/DELETE, the deleted-
-exclusion test, `postRecordStateChange`'s states-log assertions)
-are the fold's proof.
+Record-types remain the FIRST trio family whose `:id`
+address carries a live `DELETE` beside a `'trio'` PUT.
+`documentLifecycleEvents` (`api/derive-documents.ts`)
+SKIPS a DELETE-method pair entirely (Author gate 9), so
+a delete-then-recreate history (`PUT`, `DELETE`, `PUT`)
+yields the two PUT trios rather than crashing on an
+empty DELETE body.
+
+**Type DELETE RESTRICT** is net-new vs the old bare
+tombstone: any live (non-tombstoned) instance under the
+type, OR any live `flows/:id/records` join naming the
+type → **409** naming the blockers.
+
+**PUT .../record-types/:id** dispatches through
+`documentPutHandler` on the nested wiring — the SAME
+`'simple'` concurrency class ideas/projects/work-orders
+ride (§5.4). Schema races are last-writer-wins
+(admin-only mutation volume; no If-Match this wave).
+`GET` rides the same generic document machinery
+(collection + entity). Composed create/edit is
+`POST .../record-types` (§3.20), admin-gated.
+
+Adapters (`web-app/app/adapters/records.ts`) speak the
+nested path; `putRecord` / `postRecordStateChange`
+still carry the lifecycle trio in camelCase at the
+wire seam. The list drag-reorder and detail no-
+attribute-change save echo the trio from data already
+loaded — zero new hops.
 
 ### 5.8 The seventh family: objectives and Author gate 3's second amendment
 
@@ -3278,12 +3403,14 @@ Phase 15 Task 7 retired zero-caller route families; states-
 address retirement made **every verb** on the shared
 event-append address a router **404** (unauthenticated →
 401 first). Product callers were already zero. Surviving
-live history surfaces (§2.10 — nine registrations, wire
-`(at, id)` DESC, index 0 = current):
+live history surfaces (§2.10 — **nine lifecycle + one
+value-history**, wire `(at, id)` DESC, index 0 =
+current):
 
 1. `GET ideas/:id/history`
 2. `GET projects/:id/history`
-3. `GET records/:id/history`
+3. `GET organizations/:org/record-types/:id/history`
+   (flat `records/:id/history` RETIRED → router 404)
 4. `GET flows/:id/history`
 5. `GET objectives/:id/history`
 6. `GET members/:id/history` (global; absent → 404)
@@ -3292,6 +3419,10 @@ live history surfaces (§2.10 — nine registrations, wire
    `field_values`)
 9. `GET objectives/history` (bulk; always 200;
    `StateEntity` only)
+10. (value-history, not lifecycle)
+    `GET .../record-types/:type/instances/:id/history`
+    → `{ at, etag, values }[]` projected by current
+    read ACL (§5.20)
 
 Per-entity org-nested legs (1–5, 7) empty →
 `missedReadError` → foreign **403** / absent **404**.
@@ -3301,9 +3432,9 @@ and (8). `stateEventVisibilityFor` remains the RESTRICT /
 ownership 3-tier probe, not a public collection.
 
 Head-state trio (`state`, `state_at`, `state_event_id`)
-embeds on GET rows for ideas / projects / records /
+embeds on GET rows for ideas / projects / record-types /
 objectives / members (not flows; work-orders stay
-stateless).
+stateless; instances carry `values`, not trio).
 
 `flow_versions` routes and table are GONE (Phase 15
 retired routes; Phase Final deleted the table). Also
@@ -3328,3 +3459,122 @@ derives / § Last readers → Phase Final as-built rather than
 as further §5.N narrative chapters here. A single
 chronological §5 voice is optional prose work, not a
 contract gate — elected DEFER at Phase Final Task 7.
+
+### 5.20 Instances family — full-state heads + If-Match
+
+First-class data rows under a record type. Wire =
+
+`organizations/:org/record-types/:type/instances[/:id[/history]]`
+
+Storage name `record_instances`. NOT on
+`DOCUMENT_CLASS_ROUTE_PATTERNS` (R10) — headPairId and
+document-class PUT machinery do not apply. Member path-
+tier at the gate, then per-attribute ACL. Schema (type +
+attributes) is admin-only; instance values are
+member-writable per `write_roles`.
+
+**Stored shape = full state.** Document head body is
+`{ values: [{ attribute_id, value }] }` (address carries
+org + type). Wire PATCH is operation-plane
+(`set` / `clear`); the server merges pre-tx and appends
+a full-state revision. GET is one head read (R5) —
+never a client-side fold of revision history.
+
+**PUT genesis (create-only).**
+
+```http
+PUT .../instances/{instance-id}
+{ "set": [ { "attribute_id": "...", "value": "..." } ] }
+```
+
+| Case | Result |
+| --- | --- |
+| Type absent under fenced org | **404** |
+| `clear` key present | **400** |
+| If-Match present on PUT | **400** (one dialect per verb) |
+| Any prior head (incl. tombstone) | **409** (address spent) |
+| Write-ACL fail on any `set` key | **403** all-or-nothing |
+| Constraint / type / unknown attr | **400** |
+| Success | **200** + `ETag` header |
+
+`set: []` is legal (no schema-level required —
+decision 14). Existence check is in-tx (read-check-
+write); genesis pairs carry no `follows`, so UNIQUE
+`follows` cannot backstop create races.
+
+**PATCH (If-Match required).**
+
+```http
+PATCH .../instances/{instance-id}
+If-Match: "<etag>"
+{ "set": [...], "clear": ["attribute_id"] }
+```
+
+| Case | Result |
+| --- | --- |
+| Head absent or tombstoned | **404** |
+| If-Match absent | **428** |
+| If-Match ≠ head response id | **412** |
+| If-Match = head | Proceed; `follows` set |
+| Duplicate attr in `set`, or attr in both `set` and `clear` | **400** |
+| Empty `set` and `clear` | **400** |
+| Write-ACL fail | **403** all-or-nothing |
+| Constraint / type / unknown attr | **400** |
+| `clear` of already-absent value | Success no-op |
+
+Pipeline (decision 15): pre-tx read head → resolve
+type + attributes → outcomes → validate → authorize →
+merge → form pair with `follows` = head response id
+(crypto pre-tx). ONE transaction appends. Concurrent
+supersede → UNIQUE `responses.follows` →
+`UniqueConstraintError` → **412**. Lost update is
+client re-GET + reconcile + retry; server never auto-
+merges concurrent patches.
+
+**409 vs 412 (NAMED).** Create collision → **409**.
+Lost-update on a live head → **412**. See §5.4.1 and
+spec decision 13 (post-ship If-Match unification with
+flows).
+
+**DELETE.** Unconditional tombstone (phase 1; placement
+RESTRICT is phase 2). Tombstone-wins: a DELETE after
+an interleaved PATCH still leaves the address spent;
+PUT never revives. Replay → **204**.
+
+**GET projection.** Return only read-permitted
+attributes. Sparse PATCH is required for correctness
+with filtered GET. Zero readable attributes still
+yields **200** with empty `values` (existence is
+member-visible). Collection: id-lex ASC; list rows
+embed `etag` string (no per-row response headers).
+Detail GET / PUT / PATCH success carry the strong
+`ETag` header.
+
+**Write-success bodies.** PUT and PATCH 200 bodies echo
+the request-derived delta (validated `set` / `clear` as
+applied + address-derived ids) and the new `ETag` —
+NEVER the merged head (replay must not freeze one
+caller's read projection or leak write-only-not-read
+values). GET is the only projection surface.
+
+**Value-revision history.**
+`GET .../instances/:id/history` — NOT a tenth lifecycle-
+trio clone. Each entry `{ at, etag, values }` DESC,
+projected by the caller's **current** read ACL. Foreign
+403 / absent 404 / tombstone 404.
+
+**ETag definition.** Head pair's response identity —
+strong, double-quoted. If-Match parses exactly one
+strong validator. The stored `responses.etag` column
+(body sha256) is **unrelated** to this wire ETag
+(§5.4.1).
+
+**Miss posture (R2).** Every miss surface answers
+through `missedReadError` (foreign 403 / absent 404
+honest family body `record_instances`).
+
+**Phase 2 residual (G6 — not this wave).** Work-order
+transitions still carry inline `field_values`; instance
+binding (`instance_id` + asserted `record_type_id`),
+placement UNIQUE, and SoT flip are a separate future
+stack. `flows/:id/records` join family is UNTOUCHED.

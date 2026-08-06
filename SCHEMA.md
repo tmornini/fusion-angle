@@ -27,13 +27,14 @@ entity validation on creation ensures every field is
 present.
 
 Every domain family (ideas, projects, flows, work orders,
-records, objectives, roster, identity spine, organizations,
-states, field values, flow tags, …) is a **derivation** over
-message pairs at a URI address. There is no per-entity table
-and no dual-write half. Reads reassemble documents and
-lifecycle state from the pair plane (`api/derive-*.ts`);
-writes append pairs only (`tx` lists
-`['requests','responses']` on every pair-wired path).
+record-types / attributes / instances, objectives, roster,
+identity spine, organizations, states, field values, flow
+tags, …) is a **derivation** over message pairs at a URI
+address. There is no per-entity table and no dual-write
+half. Reads reassemble documents and lifecycle state from
+the pair plane (`api/derive-*.ts`); writes append pairs
+only (`tx` lists `['requests','responses']` on every
+pair-wired path).
 
 **Orphan stores (gate 6) — CANONICAL residual statement.**
 Author gate 6 elected leave-inert (no sweep). IndexedDB opens
@@ -153,11 +154,17 @@ is rejected by `validateResponseEntity` as invalid.
 | uri_id | TEXT | Resource id, or `''` for a collection |
 | at | TEXT | RFC-3339 Zulu — envelope metadata |
 | status | INTEGER | HTTP status, 100..599 |
-| etag | TEXT | The response's ETag |
+| etag | TEXT | Body content-address (sha256 of message) |
 | message_hash | TEXT | sha256 hex digest of `message` |
 | message | TEXT | The canonical stored HTTP message |
 | follows | TEXT | ABSENT unless this follows a prior pair |
 | supersedes | TEXT | ABSENT unless this supersedes a pair |
+
+`responses.etag` is storage-only content-addressing —
+**unrelated to the wire ETag** on instance
+GET/PUT/PATCH (wire ETag = head pair response id; see
+API.md §5.4.1 / §5.20). Implementers must not conflate
+them.
 
 Validator: `validateResponseEntity` (`api/validators.ts`).
 Secondary indexes: `uri_prefix`, `uri_id`, and the unique
@@ -187,10 +194,55 @@ never a row to begin with.
 
 Post-Phase-Final, ideas, projects, flows (including
 graphDelta/revivals for graph lifecycle), work orders,
-records, objectives, memberships, invitations, identities,
-organizations, role grants, and the rest share this
-no-table posture: each is a URI-addressed pair family with
-a derive module (`api/derive-*.ts`) and no row store.
+record-types / attributes / instances, objectives,
+memberships, invitations, identities, organizations, role
+grants, and the rest share this no-table posture: each is
+a URI-addressed pair family with a derive module
+(`api/derive-*.ts`) and no row store.
+
+### Record types, attributes & instances (pair-plane only)
+
+Org-nested wire = storage (no dual-wire flat `/records`):
+
+```text
+/organizations/:organization-id/record-types/
+  :record-type-id
+    /history
+    /attributes/:attribute-id
+    /instances/:instance-id
+      /history
+```
+
+- **record-types** — `'trio'` SIMPLE document family;
+  lifecycle alphabet active/archived/deleted; admin
+  mutation; type DELETE RESTRICT on live instances or
+  `flows/:id/records` joins. Derive:
+  `api/derive-record-types.ts`.
+- **attributes** — nested under type; `'stateless'`
+  SIMPLE PUT; body drops parent `record_id` (type id
+  rides the uri prefix); ACL arrays on the document;
+  RESTRICT DELETE (WO frozen graph + live flow-graph +
+  state field values + live instance heads). Flat
+  `/record-attributes` RETIRED.
+- **instances** — full-state revision heads store
+  `{ values: [{ attribute_id, value }] }`. Wire PATCH
+  is **operation-plane** (`set` / `clear`); the server
+  merges pre-tx and appends a full-state document pair.
+  GET is one head read. PUT create-only (409 if address
+  spent, including tombstone). PATCH If-Match (428 /
+  412). DELETE tombstone-wins. Value-revision history
+  at `.../instances/:id/history` is **not** a lifecycle-
+  trio clone. Derive:
+  `api/derive-record-instances.ts`. Wire ETag = head
+  response id (unrelated to `responses.etag` column).
+
+Snapshot import rejects retired flat prefixes
+`/organizations/:org/records/` and
+`/organizations/:org/record-attributes/` (anchored so
+`flows/:id/records` join pairs pass) via
+`RETIRED_URI_PREFIX_PATTERNS` on both server
+(`api/snapshot-validator.ts`) and client
+(`scanForRetiredKeys`).
 
 ### Client registration (pair-plane only, no table)
 
@@ -221,7 +273,7 @@ conceptual alphabets remain in `api/types.ts`
 (`MEMBER_STATES`, `IDEA_STATES`, `PROJECT_STATES`, …) and
 are asserted by validators and derive cores.
 
-### History read map (nine GET registrations)
+### History read map (nine lifecycle + one value-history)
 
 Wire order is `(at, id)` **DESC** (index 0 = current) on
 every history route. See API.md §2.10 for full fence and
@@ -232,8 +284,9 @@ wire detail.
    403 foreign / 404 absent
 2. `GET projects/:id/history` —
    `deriveProjectStateHistory` → same
-3. `GET records/:id/history` —
-   `deriveRecordStateHistory` → same
+3. `GET organizations/:org/record-types/:id/history` —
+   `deriveRecordStateHistory` → same (flat
+   `records/:id/history` RETIRED)
 4. `GET flows/:id/history` —
    `deriveFlowStateHistory` → same
 5. `GET objectives/:id/history` —
@@ -250,6 +303,9 @@ wire detail.
 9. `GET objectives/history` —
    `deriveObjectiveHistories` → `StateEntity[]`;
    always 200
+10. (value-history, not lifecycle)
+    `GET .../record-types/:type/instances/:id/history`
+    → `{ at, etag, values }[]` by current read ACL
 
 Org-nested per-id empty → `missedReadError` (foreign
 403 / absent 404 via `resolveOwningOrganization`).
@@ -262,19 +318,21 @@ uses `stateFieldValuesFrom` /
 `deriveStateFieldValueReferrers` and
 `stateEventVisibilityFor`.
 
-**Head-state trio.** Ideas / projects / records /
+**Head-state trio.** Ideas / projects / record-types /
 objectives / members GET rows embed `state`,
 `state_at`, `state_event_id` from the lifecycle-current
 event. Flows skip the embed; work-orders stay
-`'stateless'`.
+`'stateless'`; instances carry full-state `values`.
 
 The bulk lifecycle collection, bare event-append
-address, per-entity current-state alias, and nested
-field-values collection/write are RETIRED (router
+address, per-entity current-state alias, nested
+field-values collection/write, and flat
+`/records` / `/record-attributes` are RETIRED (router
 404). Lifecycle writes ride document-trio PUTs
-(ideas/projects/records/flows/objectives/members) and
-named ops (work-order create/claim/transition/release,
-invitations).
+(ideas/projects/record-types/flows/objectives/members)
+and named ops (work-order create/claim/transition/
+release, invitations). Instance value writes ride PUT
+genesis / PATCH If-Match / DELETE tombstone.
 
 Domain notes (vocabulary, not storage):
 

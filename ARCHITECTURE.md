@@ -87,59 +87,80 @@ write authorizer for org-scoped PUT/DELETE).
 
 ## Records
 
-A Record is a named data shape: name + description +
-ordered attributes + per-attribute constraints. A flow
-binds to one Record via `flow_records` (one binding per
-flow, app-enforced — no UNIQUE index on `flow_id`);
-a Record can back many flows. Each per-node attribute
-ref (`NodeAttribute`) points at one `record_attributes.id`
-and carries a `mode` (`'editable'` or `'readonly'`) and an
-`isRequired` flag. Hidden is structural: absence from the
-node's `attributes` array.
+Vocabulary split (org-nested record-types wave):
+
+- **Record type** — wire `record-types`, storage
+  `record_types`. Schema: name + description + ordered
+  attributes + constraints.
+- **Attribute** — nested `.../attributes`. Field + ACL
+  (`read_roles` / `write_roles`).
+- **Instance** — nested `.../instances`. Data row:
+  full-state `{ values }` head.
+
+A flow binds to one record type via `flows/:id/records`
+(one binding per flow, app-enforced — no UNIQUE index on
+`flow_id`); a type can back many flows. Each per-node
+attribute ref (`NodeAttribute`) points at one nested
+attribute id and carries a `mode` (`'editable'` or
+`'readonly'`) and an `isRequired` flag. Hidden is
+structural: absence from the node's `attributes` array.
 
 Six attribute types: `text`, `number`, `select`, `radio`,
-`date`, `checkbox`. Three constraint kinds: `regex` (text only),
-`range_min` and `range_max` (number or date only). The
-applicability rule has two enforcement sites:
-`assertConstraintAppliesTo` at the row writer and the
-editor filtering the kind picker.
+`date`, `checkbox`. Three constraint kinds: `regex` (text
+only), `range_min` and `range_max` (number or date only).
+Applicability has two enforcement sites:
+`assertConstraintAppliesTo` at the writer and the editor
+filtering the kind picker. Server value validation on
+instance PUT/PATCH shares the constraint engine
+(`api/` — not `shared/`).
 
-The property-test gate at work-order transitions:
+Wire = storage at
+`organizations/:org/record-types/:type/{attributes,instances}/...`.
+Flat `/records` and `/record-attributes` are RETIRED.
+Schema: member READ / admin MUTATION (SIMPLE PUT class).
+Instances: member path-tier + per-attribute ACL; PUT
+create-only (409 if address spent); PATCH If-Match
+(428 / 412); DELETE tombstone-wins. See API.md §2.8 /
+§5.4.1 / §5.20.
+
+The property-test gate at work-order transitions
+(phase 1 — dual-model window still live):
 `validateRecordTransition(ctx, workOrderId, pendingValues)`
 resolves the work order's CURRENT node from the ledger,
-walks that node's attribute refs → Record attributes,
+walks that node's attribute refs → type attributes,
 gathers stored values from the work-order history fold
 (`getWorkOrderHistory` → inline `field_values` on each
 transition event), overlays pending values from the form,
 and runs requiredness + `validateAttributeValue`. The gate
 matches the workbox action screen (current-node fields
-only) — target-node required attrs are checked when the
-operator leaves that node later. Returns aggregated
-`ConstraintViolation[]`. `postWorkOrderTransition` throws
+only). Returns aggregated `ConstraintViolation[]`.
+`postWorkOrderTransition` throws
 `RecordTransitionViolations` on non-empty results; the
 workbox page module catches the typed error and surfaces
-the violations banner.
+the violations banner. Phase 2 (separate stack) flips
+SoT to the bound instance and places UNIQUE on
+`(work_order_id, instance_id)`.
 
 The pure constraint runner is `record-constraints.ts`
 (`validateAttributeValue`, `formatViolation`) — the gate
 (`record-transitions.ts`) runs the validation; the workbox
 presenter renders violations via `formatViolation`.
-Extracted as a pure module so a future editor live preview
-and a fuzz runner can share it too.
 
-A work order's frozen `flow_graph` references
-`record_attributes.id` directly. If a Record's attribute
-is deleted while a flow that targets it is in flight, the
-gate throws `node X references unknown attribute Y` rather
-than silently coercing — versioned Record snapshots arrive
-in a future iteration.
+A work order's frozen `flow_graph` references attribute
+ids directly. If an attribute is deleted while a flow
+that targets it is in flight, the gate throws
+`node X references unknown attribute Y` rather than
+silently coercing — versioned type snapshots arrive in a
+future iteration. Attribute DELETE RESTRICT also blocks
+on live instance heads carrying a value for that
+attribute.
 
-The user-facing vocabulary is strict: `Record` is the
-definition, `Attribute` is one of its properties,
-`Constraint` is a per-attribute predicate. The storage
-term `entity` never appears in user-facing strings. UI
-copy says "Work orders using this Record" rather than
-"instances."
+User-facing UI still says **Record** for the type
+(sidebar, page titles) while the wire says
+`record-types`. Instance UI is the minimal surface on
+record detail (create / edit / delete + 412 recovery).
+The storage term `entity` never appears in user-facing
+strings.
 
 ## Auth, Org-scoping & Identity
 
@@ -278,6 +299,20 @@ existing handler is org-fenced automatically. `GET
 /organizations` (`enumerateMyOrganizations`) returns the
 caller's reachable orgs, derived fresh from the membership
 ledger (never the possibly-stale token claim).
+
+**Dispatch inversion (org-nested record-types wave).**
+In-table `organizations/...` route patterns match
+**before** the blind facade rewrite (`matchRoute` first;
+`facadeRequest` only when unmatched). Nested record-
+types / attributes / instances therefore never
+auto-exchange against the path org. Path
+`:organization-id` must equal the VERIFIED token claim
+org else **403** (no auto-exchange; nonexistent path
+org is also 403 — no route-topology oracle). Every
+other org-nested family that still rides the facade
+keeps facade behavior; regression surface is
+`tests/api-facade-*.test.ts` +
+`tests/api-dispatch-inversion.test.ts`.
 
 ### Boot + org-switcher
 
@@ -465,19 +500,23 @@ convenience that defaults to the singleton adapter and
 session token. Tests pass `createRequestContext` a
 `MemoryDbAdapter`.
 
-`api/routes.ts` covers the surviving lifecycle-history
-surface — **nine GET registrations**, wire `(at, id)`
-**DESC** (index 0 = current):
+`api/routes.ts` covers the surviving history surface —
+**nine lifecycle GET registrations + one value-history
+(instances)**, wire `(at, id)` **DESC** (index 0 =
+current):
 
 1. `GET ideas/:id/history`
 2. `GET projects/:id/history`
-3. `GET records/:id/history`
+3. `GET organizations/:org/record-types/:id/history`
 4. `GET flows/:id/history`
 5. `GET objectives/:id/history`
 6. `GET members/:id/history` (global; absent → 404)
 7. `GET work-orders/:id/history` (inline `field_values`)
 8. `GET work-orders/history` (bulk; always 200)
 9. `GET objectives/history` (bulk; always 200)
+10. (value-history)
+    `GET .../record-types/:type/instances/:id/history`
+    → `{ at, etag, values }[]` by current read ACL
 
 All reads derive from the message ledger. Trio-family
 and members per-id handlers wrap family
@@ -489,19 +528,24 @@ bulk emit `WorkOrderHistoryEventEntity` with transition
 `field_values` folded inline (`{id, attribute_id,
 value}`; claim/birth/release carry `[]`) — there is no
 successor field-values GET. Bulk legs always return an
-array. Ideas / projects / records / objectives / members
-GET entity rows also embed the lifecycle trio (`state`,
-`state_at`, `state_event_id`) from the lifecycle-current
-event. `stateEventVisibilityFor` remains the RESTRICT /
-ownership 3-tier probe. Every verb on the retired shared
-event-append address is router 404. Phase 15 Task 7 also
-retired the per-entity current-state alias, nested
-field-values writes, and
+array. Ideas / projects / record-types / objectives /
+members GET entity rows also embed the lifecycle trio
+(`state`, `state_at`, `state_event_id`) from the
+lifecycle-current event. Instances carry full-state
+`values`, not the trio. `stateEventVisibilityFor`
+remains the RESTRICT / ownership 3-tier probe. Every
+verb on the retired shared event-append address is
+router 404. Flat `/records` and `/record-attributes`
+are also router 404. Phase 15 Task 7 also retired the
+per-entity current-state alias, nested field-values
+writes, and
 `GET|POST|PUT|DELETE flows/:id/versions[...]` — all
 router 404. Lifecycle writes ride document-trio PUTs and
 named ops (work-order create/claim/transition/release,
-invitations), not a shared event-append address. When no
-schema exists, non-entry pages redirect to snapshots.
+invitations), not a shared event-append address.
+Instance value writes ride PUT genesis / PATCH
+If-Match / DELETE tombstone. When no schema exists,
+non-entry pages redirect to snapshots.
 
 ## Write-path derives (Phase 14)
 
@@ -921,13 +965,15 @@ layer directly.
   `DISPLAY_ABSENT`. Do not use magic strings like `'Unknown'`.
 - **`RequestContext` is the only I/O surface.** Every data-
   access adapter takes `ctx: RequestContext` first and uses
-  `ctx.GET/PUT/DELETE/POST/commit`. The standalone
-  `GET/PUT/...` exports in `api/api.ts` are the transport
-  `ctx` delegates to — adapters never import them directly.
-  Each verb dispatches its own request with its own per-op
-  transactions: two awaited reads on one ctx are NOT a
-  snapshot — a write (same tab or cross-tab) can land
-  between them.
+  `ctx.GET/PUT/PATCH/DELETE/POST/commit`. The standalone
+  verb exports in `api/api.ts` are the transport `ctx`
+  delegates to — adapters never import them directly.
+  `ctx.PATCH` is platform-wide (instances are the first
+  live consumer; `*WithEtag` variants return the strong
+  ETag for If-Match). Each verb dispatches its own request
+  with its own per-op transactions: two awaited reads on
+  one ctx are NOT a snapshot — a write (same tab or
+  cross-tab) can land between them.
 - **Platform-shim vs data-access adapters share `adapters/`.**
   Data-access adapters (`ideas.ts`, `flow-queries.ts`, etc.)
   fetch entity data through `ctx`. Platform shims
@@ -944,13 +990,28 @@ layer directly.
   Change-awareness flows through notification channels (e.g.,
   `ideaChanges.notify()`), never through return values —
   callers tell the channel rather than branch on a result.
-- **Records adapters.** `adapters/records.ts` owns Record
-  lifecycle (CRUD + `postRecordStateChange`).
+  Instance mutations that must round-trip an ETag are the
+  named exception (`putRecordInstance` /
+  `patchRecordInstance` return `RecordInstance` with
+  `etag`).
+- **Records adapters.** `adapters/records.ts` owns record-
+  type lifecycle over nested
+  `organizations/:org/record-types[...]` (CRUD +
+  `postRecordStateChange` / composed
+  `postRecordChange`).
   `adapters/record-attributes.ts` exposes
-  `getRecordAttributesByRecord`, sort-ordered.
-  `adapters/flow-records.ts` is the binding seam
-  (`getRecordForFlow`, `getFlowSummariesForRecord`,
-  `getWorkOrdersForRecord`).
+  `getRecordAttributesByRecord` over the nested
+  attributes collection, sort-ordered.
+  `adapters/record-instances.ts` is the instances seam
+  (`getRecordInstances`, `getRecordInstance`,
+  `putRecordInstance`, `patchRecordInstance`,
+  `deleteRecordInstance`, `getRecordInstanceHistory`) —
+  values as `Map`, etag opaque (quotes stripped) for
+  If-Match.
+  `adapters/flow-records.ts` is the flow↔type binding
+  seam (`getRecordForFlow`, `getFlowSummariesForRecord`,
+  `getWorkOrdersForRecord`) — wire still
+  `flows/:id/records`.
   `adapters/record-transitions.ts` orchestrates the
   property-test gate via `validateRecordTransition`;
   `postWorkOrderTransition`
