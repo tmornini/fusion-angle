@@ -107,6 +107,17 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 
 // ── regime 1: the route-table 405s (15 patterns, 36 combos) ──
 
+// Task 10: PATCH alphabet — no identity-spine patch yet.
+test('PATCH identities/:id 405s (no patch handler'
++ ' wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PATCH', '/identities/i1', token, {},
+    ));
+    assert.equal(res.status, 405);
+});
+
 test('PUT identities 405s (no put handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();

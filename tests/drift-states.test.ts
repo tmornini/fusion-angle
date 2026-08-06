@@ -33,7 +33,7 @@ import { deriveIdeaStateHistory } from
 import { deriveProjectStateHistory } from
     '../api/derive-projects.ts';
 import { deriveRecordStateHistory } from
-    '../api/derive-records.ts';
+    '../api/derive-record-types.ts';
 import { deriveFlowStateHistory } from
     '../api/derive-flows.ts';
 import { deriveObjectiveStateHistory } from
@@ -333,7 +333,9 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
         id: buildProjects()[0]!.id,
     },
     {
-        family: 'record', routeFamily: 'records',
+        family: 'record',
+        routeFamily: 'organizations/' + STARK_ORGANIZATION
+            + '/record-types',
         id: customerProfileRecordId,
     },
     {
@@ -1324,8 +1326,10 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
     );
     const recordId = 'drift-states-record-skew-1';
 
+    const typePath = '/organizations/'
+        + STARK_ORGANIZATION + '/record-types/' + recordId;
     const genesis = await handleRequest(db, req(
-        'PUT', '/records/' + recordId, token, {
+        'PUT', typePath, token, {
             name: 'Genesis Title', description: 'd', position: 1,
             state: 'active',
             state_at: '2026-05-01T00:00:00.000000Z',
@@ -1335,7 +1339,7 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
     assert.equal(genesis.status, 200);
 
     const skewed = await handleRequest(db, req(
-        'PUT', '/records/' + recordId, token, {
+        'PUT', typePath, token, {
             name: 'Skewed Title', description: 'd', position: 1,
             state: 'archived',
             state_at: '2020-01-01T00:00:00.000000Z',

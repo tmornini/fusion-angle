@@ -146,6 +146,17 @@ export const RETIRED_STATE_VALUES_PER_ENTITY:
     ],
 };
 
+// Mirrored from api/snapshot-validator.ts
+// RETIRED_URI_PREFIX_PATTERNS (gate of record). Client
+// pre-flight only. Task 5: records; Task 8:
+// record-attributes. Anchored so flows/:id/records join
+// paths pass.
+const RETIRED_URI_PREFIX_PATTERNS:
+    readonly RegExp[] = [
+    /^\/organizations\/[^/]+\/records\//,
+    /^\/organizations\/[^/]+\/record-attributes\//,
+];
+
 export class SnapshotIncompatibleError extends Error {
     readonly retired: readonly string[];
     constructor(retired: readonly string[]) {
@@ -159,7 +170,7 @@ export class SnapshotIncompatibleError extends Error {
     }
 }
 
-function scanForRetiredKeys(
+export function scanForRetiredKeys(
     parsed: unknown,
 ): string[] {
     const findings: string[] = [];
@@ -221,6 +232,40 @@ function scanForRetiredKeys(
                     'states[].state=' + v,
                 );
                 seenStates.add(v);
+            }
+        }
+    }
+    // Fourth leg: retired message-plane uri_prefix
+    // values on the surviving requests/responses tables.
+    for (const table of [
+        'requests', 'responses',
+    ] as const) {
+        const rows = snap[table];
+        if (!Array.isArray(rows)) continue;
+        const seen = new Set<string>();
+        for (const row of rows) {
+            if (!row || typeof row !== 'object') {
+                continue;
+            }
+            const prefix = (
+                row as { uri_prefix?: unknown }
+            ).uri_prefix;
+            if (typeof prefix !== 'string') {
+                continue;
+            }
+            for (
+                const p of RETIRED_URI_PREFIX_PATTERNS
+            ) {
+                if (
+                    p.test(prefix)
+                    && !seen.has(prefix)
+                ) {
+                    findings.push(
+                        table + '[].uri_prefix='
+                        + prefix,
+                    );
+                    seen.add(prefix);
+                }
             }
         }
     }

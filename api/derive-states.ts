@@ -78,7 +78,7 @@ import {
 // canonicalUriPrefix / family-registry.ts has no entry for it).
 const ORGANIZATION_NESTED_ENTITY_FAMILIES = [
     'ideas', 'projects', 'flows',
-    'work-orders', 'records', 'objectives',
+    'work-orders', 'record-types', 'objectives',
 ] as const;
 
 const ORGANIZATION_NESTED_FAMILY_ADDRESS_PATTERN = new RegExp(

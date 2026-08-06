@@ -1,42 +1,77 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { adminContext } from './context-fixtures.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
+import {
+    createRequestContext,
+    type RequestContext,
+} from '../web-app/app/adapters/shared.ts';
+import { organizationToken } from './token-fixtures.ts';
+import {
+    seedCurrentMember,
+} from './member-fixtures.ts';
+import {
+    seedAdminSchema,
+} from './test-fixtures.ts';
+import {
+    postRecordChange,
+} from '../web-app/app/adapters/records.ts';
 import {
     getRecordAttributesByRecord,
 } from
 '../web-app/app/adapters/record-attributes.ts';
 
-function attributeRow(
-    recordId: string,
-    name: string,
-    sortOrder: number,
-) {
-    return {
-        organization_id: '1',
-        record_id: recordId,
-        name,
-        attribute_type: 'text' as const,
-        sort_order: sortOrder,
-        options: [],
-        constraints: [],
-    };
+// Nested attributes via the flipped adapter (Task 21):
+// getRecordAttributesByRecord GETs the per-type collection;
+// fixtures land through nested composed create so the parent
+// type exists for the collection probe.
+
+async function seededCtx() {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await seedCurrentMember(db);
+    const ctx = createRequestContext(
+        db, await organizationToken(),
+    );
+    return { db, ctx };
+}
+
+async function seedTypeWithAttrs(
+    ctx: RequestContext,
+    typeId: string,
+    attrs: readonly {
+        id: string;
+        name: string;
+        sort_order: number;
+    }[],
+): Promise<void> {
+    await postRecordChange(ctx, typeId, {
+        kind: 'create',
+        record: {
+            name: typeId,
+            description: '',
+            position: 1,
+        },
+        attributes: attrs.map(a => ({
+            id: a.id,
+            record_id: typeId,
+            name: a.name,
+            attribute_type: 'text' as const,
+            sort_order: a.sort_order,
+            options: [],
+            constraints: [],
+        })),
+        initialState: 'active',
+    });
 }
 
 test(
     'getRecordAttributesByRecord maps storage rows'
     + ' to the camelCase domain shape',
     async () => {
-        const { ctx } = await adminContext();
-        // NAMED re-pin (Task 7): getRecordAttributesByRecord
-        // reads record-attributes through the flipped GET (this
-        // commit) — a raw db.recordAttributes.put leaves no
-        // message pair at this address, so the fixture must land
-        // through the SAME wire-reachable PUT the live route
-        // serves.
-        await ctx.PUT(
-            'record-attributes/a-1',
-            attributeRow('rec-1', 'A1', 3),
-        );
+        const { ctx } = await seededCtx();
+        await seedTypeWithAttrs(ctx, 'rec-1', [
+            { id: 'a-1', name: 'A1', sort_order: 3 },
+        ]);
         const [attr] = await
             getRecordAttributesByRecord(
                 ctx, 'rec-1',
@@ -50,6 +85,8 @@ test(
             sortOrder: 3,
             options: [],
             constraints: [],
+            readRoles: ['member', 'admin'],
+            writeRoles: ['member', 'admin'],
         });
     },
 );
@@ -58,19 +95,14 @@ test(
     'getRecordAttributesByRecord returns only the'
     + ' attributes for the given recordId',
     async () => {
-        const { ctx } = await adminContext();
-        await ctx.PUT(
-            'record-attributes/a-1',
-            attributeRow('rec-1', 'A1', 1),
-        );
-        await ctx.PUT(
-            'record-attributes/a-2',
-            attributeRow('rec-1', 'A2', 2),
-        );
-        await ctx.PUT(
-            'record-attributes/b-1',
-            attributeRow('rec-2', 'B1', 1),
-        );
+        const { ctx } = await seededCtx();
+        await seedTypeWithAttrs(ctx, 'rec-1', [
+            { id: 'a-1', name: 'A1', sort_order: 1 },
+            { id: 'a-2', name: 'A2', sort_order: 2 },
+        ]);
+        await seedTypeWithAttrs(ctx, 'rec-2', [
+            { id: 'b-1', name: 'B1', sort_order: 1 },
+        ]);
         const rec1 = await
             getRecordAttributesByRecord(
                 ctx, 'rec-1',
@@ -84,19 +116,21 @@ test(
     'getRecordAttributesByRecord returns rows in'
     + ' sortOrder ascending',
     async () => {
-        const { ctx } = await adminContext();
-        await ctx.PUT(
-            'record-attributes/a-mid',
-            attributeRow('rec-1', 'middle', 5),
-        );
-        await ctx.PUT(
-            'record-attributes/a-first',
-            attributeRow('rec-1', 'first', 1),
-        );
-        await ctx.PUT(
-            'record-attributes/a-last',
-            attributeRow('rec-1', 'last', 10),
-        );
+        const { ctx } = await seededCtx();
+        await seedTypeWithAttrs(ctx, 'rec-1', [
+            {
+                id: 'a-mid', name: 'middle',
+                sort_order: 5,
+            },
+            {
+                id: 'a-first', name: 'first',
+                sort_order: 1,
+            },
+            {
+                id: 'a-last', name: 'last',
+                sort_order: 10,
+            },
+        ]);
         const rows = await
             getRecordAttributesByRecord(
                 ctx, 'rec-1',

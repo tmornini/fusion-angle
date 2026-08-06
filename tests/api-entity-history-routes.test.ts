@@ -413,7 +413,7 @@ async function seedRecordLifecycle(
         db,
         req(
             'PUT',
-            '/records/' + id,
+            '/organizations/1/record-types/' + id,
             token,
             recordBody(
                 'Hist Record',
@@ -428,7 +428,7 @@ async function seedRecordLifecycle(
         db,
         req(
             'PUT',
-            '/records/' + id,
+            '/organizations/1/record-types/' + id,
             token,
             recordBody(
                 'Hist Record',
@@ -442,7 +442,7 @@ async function seedRecordLifecycle(
 }
 
 test(
-    'GET records/:id/history: 200 DESC current-first',
+    'GET nested record-types/:id/history: 200 DESC current-first',
     async () => {
         const db = await freshDb();
         const id = 'record-hist-1';
@@ -451,7 +451,7 @@ test(
             db,
             req(
                 'GET',
-                '/records/' + id + '/history',
+                '/organizations/1/record-types/' + id + '/history',
                 DEV_TOKEN,
             ),
         );
@@ -467,7 +467,7 @@ test(
 );
 
 test(
-    'GET records/:id/history foreign → 403 honest body',
+    'GET nested record-types/:id/history foreign → 403 honest body',
     async () => {
         const db = memoryDbAdapter();
         await postMockDataLoad(db);
@@ -475,7 +475,8 @@ test(
             db,
             req(
                 'GET',
-                '/records',
+                '/organizations/' + ORGANIZATION_TWO
+                    + '/record-types',
                 await organizationToken(
                     'current', ORGANIZATION_TWO,
                 ),
@@ -488,7 +489,7 @@ test(
             db,
             req(
                 'GET',
-                '/records/' + foreign.id + '/history',
+                '/organizations/1/record-types/' + foreign.id + '/history',
                 DEV_TOKEN,
             ),
         );
@@ -496,14 +497,14 @@ test(
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'forbidden: records/' + foreign.id
+            'forbidden: record_types/' + foreign.id
                 + ' belongs to a different organization',
         );
     },
 );
 
 test(
-    'GET records/:id/history absent → 404',
+    'GET nested record-types/:id/history absent → 404',
     async () => {
         const db = await freshDb();
         const missing = 'no-such-record';
@@ -511,7 +512,7 @@ test(
             db,
             req(
                 'GET',
-                '/records/' + missing + '/history',
+                '/organizations/1/record-types/' + missing + '/history',
                 DEV_TOKEN,
             ),
         );
@@ -519,7 +520,7 @@ test(
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'Not found: records/' + missing,
+            'Not found: record_types/' + missing,
         );
     },
 );

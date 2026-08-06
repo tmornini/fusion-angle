@@ -38,6 +38,7 @@ export * from './work-orders-mutations.ts';
 export * from './work-orders-deletions.ts';
 export * from './records.ts';
 export * from './record-attributes.ts';
+export * from './record-instances.ts';
 export * from './flow-records.ts';
 export * from './record-transitions.ts';
 export * from './flow-defaults.ts';

@@ -4,28 +4,25 @@ import type {
     AttributeType,
     Constraint,
 } from '../api/types.ts';
-import type {
-    RecordAttribute,
-} from '../web-app/app/adapters/record-attributes.ts';
 import {
+    type AttributeSchemaRow,
     validateAttributeValue,
     formatViolation,
-} from '../web-app/app/record-constraints.ts';
+} from '../api/record-constraints.ts';
 
 function makeAttribute(
     attributeType: AttributeType,
     constraints: Constraint[] = [],
-    overrides: Partial<RecordAttribute> = {},
-): RecordAttribute {
+    overrides: Partial<AttributeSchemaRow> = {},
+): AttributeSchemaRow {
     return {
         id: 'a-1',
-        organizationId: '1',
-        recordId: 'rec-1',
         name: 'Field',
         attributeType,
-        sortOrder: 0,
         options: [],
         constraints,
+        readRoles: ['member', 'admin'],
+        writeRoles: ['member', 'admin'],
         ...overrides,
     };
 }

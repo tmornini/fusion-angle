@@ -60,6 +60,17 @@ async () => {
     assert.equal(res.status, 405);
 });
 
+// Task 10: PATCH alphabet — no work-orders patch yet.
+test('PATCH work-orders/:id 405s (no patch handler'
++ ' wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PATCH', '/work-orders/wo1', token, {},
+    ));
+    assert.equal(res.status, 405);
+});
+
 test('DELETE work-orders 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();

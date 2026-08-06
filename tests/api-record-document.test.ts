@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { deriveRecordStateHistory } from
-    '../api/derive-records.ts';
+    '../api/derive-record-types.ts';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -16,6 +16,9 @@ import {
     documentLifecycleEvents,
 } from '../api/derive-documents.ts';
 import { formWritePair } from '../api/message-pair.ts';
+import {
+    RECORD_TYPE_DETAIL_PATTERN,
+} from '../api/family-registry.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
@@ -140,10 +143,10 @@ async () => {
         organization_id: '1',
     };
     const pair = await formWritePair({
-        method: 'PUT', pathname: '/records/rec-1',
-        routePattern: 'records/:id',
-        routeSegments: ['records', ':id'],
-        pathSegments: ['records', 'rec-1'],
+        method: 'PUT', pathname: '/organizations/1/record-types/rec-1',
+        routePattern: RECORD_TYPE_DETAIL_PATTERN,
+        routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
+        pathSegments: ['organizations', '1', 'record-types', 'rec-1'],
         headerFields: [], body,
         requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
@@ -186,10 +189,10 @@ async () => {
         organization_id: '1',
     };
     const firstPair = await formWritePair({
-        method: 'PUT', pathname: '/records/rec-2',
-        routePattern: 'records/:id',
-        routeSegments: ['records', ':id'],
-        pathSegments: ['records', 'rec-2'],
+        method: 'PUT', pathname: '/organizations/1/record-types/rec-2',
+        routePattern: RECORD_TYPE_DETAIL_PATTERN,
+        routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
+        pathSegments: ['organizations', '1', 'record-types', 'rec-2'],
         headerFields: [], body: firstBody,
         requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
@@ -226,10 +229,10 @@ test('postRecordDocumentOp with a fresh trio posts a'
         organization_id: '1',
     };
     const firstPair = await formWritePair({
-        method: 'PUT', pathname: '/records/rec-3',
-        routePattern: 'records/:id',
-        routeSegments: ['records', ':id'],
-        pathSegments: ['records', 'rec-3'],
+        method: 'PUT', pathname: '/organizations/1/record-types/rec-3',
+        routePattern: RECORD_TYPE_DETAIL_PATTERN,
+        routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
+        pathSegments: ['organizations', '1', 'record-types', 'rec-3'],
         headerFields: [], body: firstBody,
         requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
@@ -247,10 +250,10 @@ test('postRecordDocumentOp with a fresh trio posts a'
         organization_id: '1',
     };
     const secondPair = await formWritePair({
-        method: 'PUT', pathname: '/records/rec-3',
-        routePattern: 'records/:id',
-        routeSegments: ['records', ':id'],
-        pathSegments: ['records', 'rec-3'],
+        method: 'PUT', pathname: '/organizations/1/record-types/rec-3',
+        routePattern: RECORD_TYPE_DETAIL_PATTERN,
+        routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
+        pathSegments: ['organizations', '1', 'record-types', 'rec-3'],
         headerFields: [], body: secondBody,
         requesterIdentityId: 'current',
         requestAt: '2026-01-02T00:00:00.000000Z',
@@ -285,10 +288,18 @@ test('a byte-identical resend replays the stored response:'
         'Idempotent', 'active', AT, 'ev-resend',
     );
     await handleRequest(
-        db, req('PUT', '/records/rec-resend', token, body),
+        db, req(
+            'PUT',
+            '/organizations/1/record-types/rec-resend',
+            token, body,
+        ),
     );
     await handleRequest(
-        db, req('PUT', '/records/rec-resend', token, body),
+        db, req(
+            'PUT',
+            '/organizations/1/record-types/rec-resend',
+            token, body,
+        ),
     );
     const events = await deriveRecordStateHistory(db, '1', 'rec-resend');
     assert.equal(events.length, 1);
@@ -320,10 +331,10 @@ async function storedPairAt(
 }> {
     const pair = await formWritePair({
         method,
-        pathname: '/records/' + uriId,
-        routePattern: 'records/:id',
-        routeSegments: ['records', ':id'],
-        pathSegments: ['records', uriId],
+        pathname: '/organizations/1/record-types/' + uriId,
+        routePattern: RECORD_TYPE_DETAIL_PATTERN,
+        routeSegments: RECORD_TYPE_DETAIL_PATTERN.split('/'),
+        pathSegments: ['organizations', '1', 'record-types', uriId],
         headerFields: [],
         body,
         requesterIdentityId: 'current',
@@ -359,7 +370,7 @@ async function storedPairAt(
 test('documentLifecycleEvents skips a DELETE-method pair,'
 + ' yielding the two PUT trios across a delete-then-recreate'
 + ' history', async () => {
-    const prefix = '/organizations/1/records/';
+    const prefix = '/organizations/1/record-types/';
     const first = await storedPairAt(
         'PUT', 'rec-x', '2026-01-01T00:00:00.000000Z',
         recordDocument('First', 'active', AT, 'ev-x1'),

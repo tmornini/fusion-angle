@@ -505,9 +505,9 @@ last (they wipe the database). See `CLAUDE.md` section
 | I. Cross-Cutting Concerns | 30 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
-| R. Records | 19 |
+| R. Records | 25 |
 | L. IndexedDB Persistence Tier | 9 |
-| **Total** | **393** |
+| **Total** | **399** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -517,8 +517,8 @@ only. Combined with the CLI automated suite:
 | Layer                  | Cases    |
 |------------------------|---------:|
 | CLI automated tests    |     2656 |
-| Browser regression     |      393 |
-| **Combined TOTAL**     | **3049** |
+| Browser regression     |      399 |
+| **Combined TOTAL**     | **3055** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
@@ -2743,6 +2743,37 @@ write-domain collision.
   control exists in the toy) or via the snapshot wipe.
   PASS: lifecycle state reads `archived`; the list page
   excludes the row from active counts.
+- [ ] **R16** Open Customer Profile detail. PASS: an
+  Instances section lists instances (id + readable values)
+  or "No instances yet", with a "New instance" control.
+  (mutation domain: `records` / instances under the type —
+  Agent-F2 exclusive.)
+- [ ] **R17** Click "New instance". PASS: a base62 id is
+  minted, PUT creates an empty instance (etag consumed),
+  and the section enters edit mode with writable attribute
+  inputs (readable non-writable attributes render
+  read-only; unreadable omitted).
+- [ ] **R18** Fill a writable field and click Save. PASS:
+  `patchRecordInstance` succeeds with the held etag; the
+  section returns to list mode and the new value appears.
+- [ ] **R19** Concurrent-tab 412 recovery: open the same
+  instance editor in two tabs; save a different value in
+  tab B; then save in tab A. PASS: tab A surfaces "This
+  instance changed underneath you — values refreshed;
+  re-apply your edit", re-GETs fresh values + etag, and
+  stays in edit so the operator can re-apply.
+- [ ] **R20** Click Delete on an instance; confirm in the
+  house dialog (`data-dialog-open` /
+  `confirm-delete-instance`). PASS: instance disappears
+  from the list; reopening the address is not available
+  (spent id).
+- [ ] **R21** ACL projection (member vs admin): as admin,
+  every attribute on the edit form is writable. As a
+  member against attributes whose `write_roles` exclude
+  `member` (set via API / seed), those fields render
+  read-only and unreadable fields are omitted. PASS:
+  projection matches held roles; no ACL editing UI on
+  this page.
 
 ## L. IndexedDB Persistence Tier
 
@@ -2797,7 +2828,7 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Agent-D       | D1–D37            |    X |       Y |    Z |
 | Agent-E       | E1–E11 + E10a     |   12 |       0 |    0 |
 | Agent-F       | F1–F77 + FS1–FS9  |    X |       Y |    Z |
-| Agent-F2      | WB1–WB22 + subs, R1–R15 | X |    0 |    0 |
+| Agent-F2      | WB1–WB22 + subs, R1–R21 | X |    0 |    0 |
 | Agent-G       | G9–14,19–26,36–46 |    X |       0 |    0 |
 | Phase-3       | I1–I30            |    X |       Y |    Z |
 | Phase-4       | G30–G35 + L1–L9   |    X |       0 |    0 |

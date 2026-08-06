@@ -25,17 +25,28 @@ import {
     hoistedHeaderFields,
     responseFromStored,
     wireHeadersFor,
+    attachEtag,
+    parseIfMatch,
     PAIR_WIRED_ROUTE_PATTERNS,
     DOCUMENT_CLASS_ROUTE_PATTERNS,
     REPLAY_EXEMPT_ROUTE_PATTERNS,
     IF_RESPONSE_ID_HEADER,
+    IF_MATCH_HEADER,
 } from './message-pair.ts';
 import type { MessagePair, AuthPairSeed } from './message-pair.ts';
-import { familyRegistration } from './family-registry.ts';
+import {
+    familyRegistration,
+    INSTANCE_DETAIL_PATTERN,
+    CREATE_ONLY_PUT_ROUTE_PATTERNS,
+} from './family-registry.ts';
 import {
     documentFamilyWiring,
     documentHeadPairId,
 } from './document-family.ts';
+import {
+    instancesUriPrefix,
+    deriveInstanceHead,
+} from './derive-record-instances.ts';
 import {
     ANONYMOUS_ID,
     decodeAccessToken,
@@ -45,6 +56,7 @@ import {
 } from './notifications.ts';
 import {
     resolveGlobalOwner,
+    missedReadError,
 } from './derive-states.ts';
 import {
     writeAuthorizerFor,
@@ -67,6 +79,7 @@ import {
     HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
     HTTP_PRECONDITION_FAILED,
+    HTTP_PRECONDITION_REQUIRED,
 } from './http-errors.ts';
 import {
     AUTHENTICATION_ROUTES,
@@ -159,7 +172,8 @@ async function facadeRequest(
     // outer vessel's id across the re-entry.
     headers.set(REQUEST_ID_HEADER, ctx.requestId);
     const hasBody = ctx.method === 'PUT'
-        || ctx.method === 'POST';
+        || ctx.method === 'POST'
+        || ctx.method === 'PATCH';
     const flatRequest = new Request(flatUrl.toString(), {
         method: ctx.method,
         headers,
@@ -215,7 +229,9 @@ function postWriteNotification(
 // PUT alongside its composed-edit POST, and 'human-members/:id'
 // joins it (Phase 8 Task 4) for a DIFFERENT reason — its `put`
 // slot serves no live route at all, only the synthesized
-// detail-document bundle and the seed (see routes.ts).
+// detail-document bundle and the seed (see routes.ts). Task 10:
+// resolve put / patch / else post EXPLICITLY — never let PATCH
+// silently fall into the post branch.
 function writeResponseSpecFor(
     routePattern: string,
     method: string,
@@ -224,7 +240,23 @@ function writeResponseSpecFor(
     if (entry === undefined || 'status' in entry) {
         return entry;
     }
-    return method === 'PUT' ? entry.put : entry.post;
+    if (method === 'PUT') return entry.put;
+    if (method === 'PATCH') return entry.patch;
+    return entry.post;
+}
+
+// Instance PATCH ETag (R8): the REVISION pair's response
+// id (new head), not the wire PATCH pair. Recovery is one
+// UNIQUE follows lookup on the If-Match-verified head the
+// wire operation raced — synthesis Mechanism (Task 17).
+async function revisionEtagForInstancePatch(
+    db: DbAdapter,
+    ifMatchPairId: string,
+): Promise<string | undefined> {
+    const rows = await db.responses.getAllWhere(
+        'follows', ifMatchPairId,
+    );
+    return rows[0]?.id;
 }
 
 // The one catch shared by both pre-dispatch ownership regions
@@ -267,15 +299,6 @@ export async function handleRequest(
     const pathSegments = pathname
         .split('/')
         .filter(Boolean);
-    // Facade: /organizations/:org/:entity[/:id] — exchange the
-    // caller's bearer for an org-scoped token and re-enter the
-    // gate against the flat resource path, so the existing
-    // handler is fenced automatically. Organization rides the one
-    // verified token, never the path.
-    if (pathSegments[0] === 'organizations'
-        && pathSegments.length >= 3) {
-        return facadeRequest(ctx, request, pathSegments);
-    }
     if (pathSegments[0] === 'identities'
         && pathSegments.length === 3
         && pathSegments[2] === 'default-org') {
@@ -303,7 +326,22 @@ export async function handleRequest(
     // Match first (pure, no I/O). Authentication runs before
     // the no-match 404 so an unauthenticated caller never maps
     // route topology (unknown path and real route both 401).
+    // In-table organizations/... patterns win over the facade
+    // when registered; the facade swallows only unmatched
+    // nested org paths (length ≥ 3).
     const match = matchRoute(routeTable, pathSegments);
+    // Facade: /organizations/:org/:entity[/:id] — exchange the
+    // caller's bearer for an org-scoped token and re-enter the
+    // gate against the flat resource path, so the existing
+    // handler is fenced automatically. Organization rides the
+    // one verified token, never the path.
+    if (
+        match === null
+        && pathSegments[0] === 'organizations'
+        && pathSegments.length >= 3
+    ) {
+        return facadeRequest(ctx, request, pathSegments);
+    }
     const matchedRoutePattern = match !== null
         ? match.route.segments.join('/')
         : undefined;
@@ -333,6 +371,10 @@ export async function handleRequest(
     // exempt route (no fence ran, so no role to hold) — the
     // guard below only ever runs on an authenticated route.
     let callerIsAdmin = false;
+    // Fenced claim roles for the active organization —
+    // threaded to every handler (Task 10 reconciliation 5).
+    // Empty for bearer-exempt routes (no fence ran).
+    let roles: readonly string[] = [];
     // BOOTSTRAP_ROUTES: the accepted dev-tier auth-free
     // snapshot plane (removed at the Postgres server tier) —
     // see api/request-auth.ts. An unmatched path can never be
@@ -378,6 +420,30 @@ export async function handleRequest(
                 );
             }
             const fenced = fence.ctx;
+            // Nested org path fence: after fenceRequest and
+            // before authorizeRequest. Path org never authorizes
+            // alone — mismatch (incl. nonexistent path org)
+            // is 403 with a fixed body. No auto-exchange.
+            // Bare organizations/:id keeps its own membership
+            // fence below; every other organizations/... match
+            // takes this arm.
+            if (
+                match !== null
+                && match.route.segments[0]
+                    === 'organizations'
+                && fencePattern !== 'organizations/:id'
+                && fenceParams[0]
+                    !== fenced.organization
+            ) {
+                return Response.json(
+                    {
+                        error: 'forbidden: path organization'
+                            + ' does not match the token'
+                            + ' organization',
+                    },
+                    { status: HTTP_FORBIDDEN },
+                );
+            }
             const authzFailure =
                 fencePattern === 'identities/:id/pii'
                     ? authorizeIdentityPii(
@@ -428,6 +494,7 @@ export async function handleRequest(
             }
             actor = fenced.principal.id;
             organization = fenced.organization;
+            roles = fenced.roles;
             callerIsAdmin = fenced.roles.includes('admin');
         } catch (error) {
             return redactedFenceFailure(ctx, error);
@@ -455,7 +522,11 @@ export async function handleRequest(
     // server fault — it must not flow into the
     // domain-boundary try below.
     let body: Record<string, unknown> | undefined;
-    if (method === 'PUT' || method === 'POST') {
+    if (
+        method === 'PUT'
+        || method === 'POST'
+        || method === 'PATCH'
+    ) {
         const parse = await parseObjectBody(request);
         if (!parse.ok) {
             return Response.json(
@@ -520,7 +591,7 @@ export async function handleRequest(
     }
 
     const isWrite = method === 'PUT' || method === 'POST'
-        || method === 'DELETE';
+        || method === 'DELETE' || method === 'PATCH';
     // A route pattern can be pair-wired for one verb (PUT,
     // say) while exposing no handler for another (DELETE) —
     // ideas/:id is exactly this today. Requiring the matched
@@ -528,9 +599,12 @@ export async function handleRequest(
     // exactly as it did before pairs existed, rather than
     // running the pair machinery (and its successBody
     // validation) against a request no handler will ever see.
+    // Task 10: PATCH joins the write alphabet the same way.
     const hasWriteHandler =
         (method === 'PUT' && matched.put !== undefined)
         || (method === 'POST' && matched.post !== undefined)
+        || (method === 'PATCH'
+            && matched.patch !== undefined)
         || (method === 'DELETE'
             && matched.delete !== undefined);
 
@@ -563,6 +637,26 @@ export async function handleRequest(
                 }
             }
         }
+        // Create-only PUT (Task 15): If-Match is rejected
+        // before pair formation — create is unconditional
+        // and the in-tx spent-address check owns the race.
+        const isCreateOnlyWrite = method === 'PUT'
+            && CREATE_ONLY_PUT_ROUTE_PATTERNS
+                .has(routePattern);
+        if (
+            isCreateOnlyWrite
+            && request.headers.get(IF_MATCH_HEADER)
+                !== null
+        ) {
+            return Response.json(
+                {
+                    error: 'If-Match is not accepted on PUT: '
+                        + 'create is unconditional at '
+                        + pathname,
+                },
+                { status: HTTP_BAD_REQUEST },
+            );
+        }
         // The shadow-ledger pair: formed pre-tx (all crypto and
         // address resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in
@@ -575,6 +669,9 @@ export async function handleRequest(
         let pair: MessagePair | undefined;
         if (isWrite && hasWriteHandler && !bearerExempt
             && PAIR_WIRED_ROUTE_PATTERNS.has(routePattern)) {
+            // Nested attribute paths store under the type
+            // attributes prefix directly (flat rewrite retired
+            // Task 23).
             const address = messageAddress(
                 matched.segments, pathSegments,
             );
@@ -587,9 +684,14 @@ export async function handleRequest(
             // The head-read class is encoded PER ROUTE PATTERN,
             // never inferred from uriId — an event-append
             // address (states/:id) has a non-empty uriId yet
-            // must never chain (message-pair.ts).
+            // must never chain (message-pair.ts). Create-only
+            // (R10) forces undefined so genesis carries neither
+            // supersedes nor follows — the in-tx spent check
+            // owns the race.
             const headPairId =
-                DOCUMENT_CLASS_ROUTE_PATTERNS.has(routePattern)
+                !isCreateOnlyWrite
+                && DOCUMENT_CLASS_ROUTE_PATTERNS
+                    .has(routePattern)
                     ? await headPairIdAt(
                         effective, canonicalPrefix, uriId,
                     )
@@ -695,7 +797,41 @@ export async function handleRequest(
                     effective, pair.requestHash,
                 );
                 if (replay !== undefined) {
-                    return responseFromStored(replay);
+                    const response =
+                        responseFromStored(replay);
+                    if (
+                        routePattern
+                            === INSTANCE_DETAIL_PATTERN
+                    ) {
+                        // PUT create: ETag = wire pair id.
+                        // PATCH: ETag = revision that followed
+                        // the If-Match head (R8 original).
+                        if (method === 'PATCH') {
+                            const raw = request.headers
+                                .get(IF_MATCH_HEADER);
+                            const ifMatch = raw === null
+                                ? undefined
+                                : parseIfMatch(raw);
+                            if (ifMatch !== undefined) {
+                                const revisionId =
+                                    await revisionEtagForInstancePatch(
+                                        effective, ifMatch,
+                                    );
+                                if (
+                                    revisionId !== undefined
+                                ) {
+                                    return attachEtag(
+                                        response,
+                                        revisionId,
+                                    );
+                                }
+                            }
+                        }
+                        return attachEtag(
+                            response, replay.id,
+                        );
+                    }
+                    return response;
                 }
             }
             // The locked four-outcome table (spec §The two PUT
@@ -728,6 +864,74 @@ export async function handleRequest(
                     );
                 }
             }
+            // Instance PATCH If-Match ladder (Task 17 / R5):
+            // AFTER replay (load-bearing). Tombstone == absent.
+            // Wire pair is operation-plane; revision pair
+            // carries follows = verified head (UNIQUE
+            // backstop).
+            if (
+                method === 'PATCH'
+                && routePattern
+                    === INSTANCE_DETAIL_PATTERN
+            ) {
+                const pathOrganization = param(params, 0);
+                const typeId = param(params, 1);
+                const instanceId = param(params, 2);
+                const head = await deriveInstanceHead(
+                    effective,
+                    pathOrganization,
+                    typeId,
+                    instanceId,
+                );
+                if (head === undefined) {
+                    throw await missedReadError(
+                        effective,
+                        instanceId,
+                        organization
+                            ?? pathOrganization,
+                        'record_instances',
+                    );
+                }
+                const raw = request.headers
+                    .get(IF_MATCH_HEADER);
+                if (raw === null) {
+                    return Response.json(
+                        {
+                            error: 'If-Match is required '
+                                + 'to PATCH ' + pathname,
+                        },
+                        {
+                            status:
+                                HTTP_PRECONDITION_REQUIRED,
+                        },
+                    );
+                }
+                const ifMatch = parseIfMatch(raw);
+                if (ifMatch === undefined) {
+                    return Response.json(
+                        {
+                            error: 'If-Match must carry '
+                                + 'exactly one strong '
+                                + 'validator',
+                        },
+                        { status: HTTP_BAD_REQUEST },
+                    );
+                }
+                if (ifMatch !== head.pairId) {
+                    return Response.json(
+                        {
+                            error: 'If-Match does not '
+                                + 'match the current '
+                                + 'instance at '
+                                + pathname,
+                        },
+                        {
+                            status:
+                                HTTP_PRECONDITION_FAILED,
+                        },
+                    );
+                }
+            }
         }
         switch (method) {
             case 'GET': {
@@ -747,6 +951,7 @@ export async function handleRequest(
                     params,
                     actor,
                     organization,
+                    roles,
                 );
                 // Response-ID attach (spec §The two PUT
                 // classes): a locked-family document GET
@@ -794,6 +999,30 @@ export async function handleRequest(
                         });
                     }
                 }
+                // Instance detail ETag (Task 16 / R8): strong
+                // validator from the head document-pair id
+                // (PUT|DELETE only — never a PATCH wire pair).
+                // Distinct from responses.etag (body sha).
+                if (
+                    routePattern
+                        === INSTANCE_DETAIL_PATTERN
+                ) {
+                    const headPairId =
+                        await documentHeadPairId(
+                            effective,
+                            instancesUriPrefix(
+                                param(params, 0),
+                                param(params, 1),
+                            ),
+                            param(params, 2),
+                        );
+                    if (headPairId !== undefined) {
+                        return attachEtag(
+                            Response.json(result),
+                            headPairId,
+                        );
+                    }
+                }
                 return Response.json(result);
             }
             case 'PUT': {
@@ -815,6 +1044,8 @@ export async function handleRequest(
                         body!,
                         actor,
                         pair,
+                        organization,
+                        roles,
                     );
                 if (pair !== undefined) {
                     const stored = await storedResponseFor(
@@ -830,7 +1061,100 @@ export async function handleRequest(
                         adapter, routePattern, params,
                         body, organization, actor,
                     );
-                    return responseFromStored(stored);
+                    const response =
+                        responseFromStored(stored);
+                    if (
+                        routePattern
+                            === INSTANCE_DETAIL_PATTERN
+                    ) {
+                        return attachEtag(
+                            response, stored.id,
+                        );
+                    }
+                    return response;
+                }
+                postWriteNotification(
+                    adapter, routePattern, params,
+                    body, organization, actor,
+                );
+                if (result === undefined) {
+                    return new Response(null, {
+                        status: HTTP_NO_CONTENT,
+                    });
+                }
+                return Response.json(result);
+            }
+            case 'PATCH': {
+                // Task 10/17: instance PATCH wires through
+                // the same gate shape as PUT (pair + replay
+                // + ETag). Ladder ran pre-dispatch above.
+                if (!matched.patch) {
+                    return Response.json(
+                        {
+                            error:
+                                'Method PATCH not'
+                                + ' allowed on '
+                                + pathname,
+                        },
+                        { status: HTTP_METHOD_NOT_ALLOWED },
+                    );
+                }
+                const result =
+                    await matched.patch(
+                        effective,
+                        params,
+                        body!,
+                        actor,
+                        pair,
+                        organization,
+                        roles,
+                    );
+                if (pair !== undefined) {
+                    const stored = await storedResponseFor(
+                        effective, pair.requestHash,
+                    );
+                    if (stored === undefined) {
+                        throw new Error(
+                            'wired write stored no pair: '
+                            + routePattern,
+                        );
+                    }
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization, actor,
+                    );
+                    const response =
+                        responseFromStored(stored);
+                    if (
+                        routePattern
+                            === INSTANCE_DETAIL_PATTERN
+                    ) {
+                        // R8: ETag = revision head, not the
+                        // wire PATCH operation pair.
+                        const raw = request.headers
+                            .get(IF_MATCH_HEADER);
+                        const ifMatch = raw === null
+                            ? undefined
+                            : parseIfMatch(raw);
+                        if (ifMatch !== undefined) {
+                            const revisionId =
+                                await revisionEtagForInstancePatch(
+                                    effective, ifMatch,
+                                );
+                            if (
+                                revisionId !== undefined
+                            ) {
+                                return attachEtag(
+                                    response,
+                                    revisionId,
+                                );
+                            }
+                        }
+                        return attachEtag(
+                            response, stored.id,
+                        );
+                    }
+                    return response;
                 }
                 postWriteNotification(
                     adapter, routePattern, params,
@@ -861,6 +1185,8 @@ export async function handleRequest(
                     params,
                     actor,
                     pair,
+                    organization,
+                    roles,
                 );
                 if (pair !== undefined) {
                     const stored = await storedResponseFor(
@@ -978,6 +1304,7 @@ export async function handleRequest(
                         actor,
                         pair,
                         organization,
+                        roles,
                     );
                 }
                 if (pair !== undefined) {
@@ -1157,11 +1484,12 @@ function facadeHeaders(
     return headers;
 }
 
-// The ONE await site for a GET-shaped facade call — GET and
-// GETWithResponseId are both thin wrappers over this, so the
-// simulateLatency literal-count pin (pair-write-coverage.test.ts)
-// stays at exactly 4 no matter how many GET-shaped verbs read
-// from it (delegation, not a copy-pasted fifth await site).
+// The ONE await site for a GET-shaped facade call — GET,
+// GETWithResponseId, and GETWithEtag are thin wrappers over
+// this, so the simulateLatency literal-count pin
+// (pair-write-coverage.test.ts) stays at exactly 4 no matter
+// how many GET-shaped verbs read from it (delegation, not a
+// copy-pasted fifth await site).
 async function getResponse(
     adapter: ClientFacadeAdapter,
     resource: string,
@@ -1180,6 +1508,56 @@ async function getResponse(
             },
         ),
     );
+}
+
+// The ONE await site for a body-write facade call — PUT,
+// PUTWithEtag, PATCH, and PATCHWithEtag all share it so the
+// latency pin stays 4 (R3: never a fifth bare
+// await adapter.simulateLatency()).
+async function bodyWriteResponse(
+    adapter: ClientFacadeAdapter,
+    method: 'PUT' | 'PATCH',
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+    requestId?: string,
+): Promise<Response> {
+    await adapter.simulateLatency();
+    const headers = facadeHeaders(token, requestId, true);
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
+    return handleRequest(
+        adapter,
+        new Request(
+            `${BASE_URL}/${resource}`,
+            {
+                method,
+                headers,
+                body: JSON.stringify(payload),
+            },
+        ),
+    );
+}
+
+// Strong ETag header → opaque pair id (strip surrounding
+// quotes when present). Absent / empty → undefined.
+function etagFromHeader(
+    response: Response,
+): string | undefined {
+    const raw = response.headers.get('ETag');
+    if (raw === null || raw === '') {
+        return undefined;
+    }
+    if (
+        raw.length >= 2
+        && raw[0] === '"'
+        && raw[raw.length - 1] === '"'
+    ) {
+        return raw.slice(1, -1);
+    }
+    return raw;
 }
 
 export async function GET<T>(
@@ -1217,6 +1595,24 @@ export async function GETWithResponseId<T>(
     };
 }
 
+// Instance / concurrency sibling of GET: body plus the strong
+// ETag (quotes stripped) for If-Match on a later PATCH.
+export async function GETWithEtag<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    token: string,
+    requestId?: string,
+): Promise<{ body: T; etag: string | undefined }> {
+    const response = await getResponse(
+        adapter, resource, token, requestId,
+    );
+    const body = await unwrapResponse<T>(response);
+    return {
+        body,
+        etag: etagFromHeader(response),
+    };
+}
+
 export async function PUT<T>(
     adapter: ClientFacadeAdapter,
     resource: string,
@@ -1225,24 +1621,66 @@ export async function PUT<T>(
     headerFields?: readonly (readonly [string, string])[],
     requestId?: string,
 ): Promise<T> {
-    await adapter.simulateLatency();
-    const headers = facadeHeaders(token, requestId, true);
-    for (const [name, value] of headerFields ?? []) {
-        headers[name] = value;
-    }
     return unwrapResponse<T>(
-        await handleRequest(
-            adapter,
-            new Request(
-                `${BASE_URL}/${resource}`,
-                {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(payload),
-                },
-            ),
+        await bodyWriteResponse(
+            adapter, 'PUT', resource, payload, token,
+            headerFields, requestId,
         ),
     );
+}
+
+export async function PUTWithEtag<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+    requestId?: string,
+): Promise<{ body: T; etag: string | undefined }> {
+    const response = await bodyWriteResponse(
+        adapter, 'PUT', resource, payload, token,
+        headerFields, requestId,
+    );
+    const body = await unwrapResponse<T>(response);
+    return {
+        body,
+        etag: etagFromHeader(response),
+    };
+}
+
+export async function PATCH<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+    requestId?: string,
+): Promise<T> {
+    return unwrapResponse<T>(
+        await bodyWriteResponse(
+            adapter, 'PATCH', resource, payload, token,
+            headerFields, requestId,
+        ),
+    );
+}
+
+export async function PATCHWithEtag<T>(
+    adapter: ClientFacadeAdapter,
+    resource: string,
+    payload: Record<string, unknown>,
+    token: string,
+    headerFields?: readonly (readonly [string, string])[],
+    requestId?: string,
+): Promise<{ body: T; etag: string | undefined }> {
+    const response = await bodyWriteResponse(
+        adapter, 'PATCH', resource, payload, token,
+        headerFields, requestId,
+    );
+    const body = await unwrapResponse<T>(response);
+    return {
+        body,
+        etag: etagFromHeader(response),
+    };
 }
 
 export async function DELETE(

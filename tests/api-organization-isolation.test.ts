@@ -364,11 +364,21 @@ async function seedChain(
         },
     ));
     // Phase Final Stage B: records table retired — seed
-    // through the live document PUT so the pair plane owns it.
+    // through nested record-types PUT (admin-only schema
+    // mutation; claimToken when identity is not `current`).
+    const recToken = identity === 'current'
+        ? await organizationToken(identity, organization)
+        : await claimToken({
+            sub: identity,
+            organization,
+            organizations: [organization],
+            roles: ['admin:' + organization],
+        });
     const recWrite = await handleRequest(db, req(
         'PUT',
-        '/organizations/' + organization + '/records/r' + s,
-        await organizationToken(identity, organization),
+        '/organizations/' + organization
+            + '/record-types/r' + s,
+        recToken,
         {
             name: 'r', description: 'd', position: 0,
             state: 'active', state_at: T8_AT,

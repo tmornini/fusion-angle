@@ -44,10 +44,10 @@ test('work-orders is the fourth registered family,'
     });
 });
 
-test('records is the fifth registered family, simple'
+test('record-types is the fifth registered family, simple'
 + ' like ideas, projects, and work-orders', () => {
-    assert.deepEqual(familyRegistration('records'), {
-        family: 'records',
+    assert.deepEqual(familyRegistration('record-types'), {
+        family: 'record-types',
         organizationNested: true,
         concurrency: 'simple',
         createBodyIdField: 'id',
@@ -55,7 +55,7 @@ test('records is the fifth registered family, simple'
 });
 
 test('record-attributes is the sixth registered family,'
-+ ' simple like records', () => {
++ ' simple like record-types', () => {
     assert.deepEqual(familyRegistration('record-attributes'), {
         family: 'record-attributes',
         organizationNested: true,
@@ -65,7 +65,7 @@ test('record-attributes is the sixth registered family,'
 });
 
 test('objectives is the seventh registered family, simple'
-+ ' like records and record-attributes', () => {
++ ' like record-types and record-attributes', () => {
     assert.deepEqual(familyRegistration('objectives'), {
         family: 'objectives',
         organizationNested: true,

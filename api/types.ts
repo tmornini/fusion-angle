@@ -31,6 +31,13 @@ export const ATTRIBUTE_TYPES = [
 
 export type AttributeType = typeof ATTRIBUTE_TYPES[number];
 
+// Stamped into nested attribute document bodies on CREATE
+// when read_roles / write_roles are omitted. Storage always
+// carries both arrays explicitly — never filled at read time.
+// ONE constant for both roles (Uniformity).
+export const DEFAULT_ATTRIBUTE_ACL_ROLES =
+    ['member', 'admin'] as const;
+
 export type Constraint =
     | { kind: 'regex'; pattern: string }
     | { kind: 'range_min'; min: string }

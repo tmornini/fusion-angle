@@ -48,21 +48,61 @@ async () => {
     );
 });
 
-test('record-attributes nests under the organization',
+test('nested attribute pattern stores under type attributes',
 async () => {
-    // The multi-word segment diverges from its table-name
-    // root ('records') but is org-owned — pinned here so
-    // the tier set can never silently drop it.
+    const typeId = 'rec01CustProfRec0rdAB1';
     const pair = await formWritePair({
         ...INPUT,
-        pathname: '/record-attributes/ra1',
-        routePattern: 'record-attributes/:id',
-        routeSegments: ['record-attributes', ':id'],
-        pathSegments: ['record-attributes', 'ra1'],
+        pathname: '/organizations/1/record-types/'
+            + typeId + '/attributes/ra1',
+        routePattern:
+            'organizations/:organization-id/record-types/'
+            + ':record-type-id/attributes/:attribute-id',
+        routeSegments: [
+            'organizations', ':organization-id',
+            'record-types', ':record-type-id',
+            'attributes', ':attribute-id',
+        ],
+        pathSegments: [
+            'organizations', '1',
+            'record-types', typeId,
+            'attributes', 'ra1',
+        ],
+        body: {
+            name: 'Contact Email',
+            attribute_type: 'text',
+            sort_order: 2,
+            options: [],
+            constraints: [],
+        },
     });
     assert.equal(
         pair.uriPrefix,
-        '/organizations/1/record-attributes/',
+        '/organizations/1/record-types/'
+        + typeId + '/attributes/',
+    );
+});
+
+test('nested record-type detail stores at type prefix',
+async () => {
+    const pair = await formWritePair({
+        ...INPUT,
+        pathname: '/organizations/1/record-types/r1',
+        routePattern:
+            'organizations/:organization-id/record-types/'
+            + ':record-type-id',
+        routeSegments: [
+            'organizations', ':organization-id',
+            'record-types', ':record-type-id',
+        ],
+        pathSegments: [
+            'organizations', '1',
+            'record-types', 'r1',
+        ],
+    });
+    assert.equal(
+        pair.uriPrefix,
+        '/organizations/1/record-types/',
     );
 });
 

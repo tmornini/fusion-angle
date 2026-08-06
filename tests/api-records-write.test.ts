@@ -20,13 +20,13 @@ async function freshDb() {
 // ── Create variant ──────
 
 test(
-    'POST records create writes the'
+    'POST nested record-types create writes the'
     + ' record, initial state event, and'
     + ' attributes in one operation',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -55,31 +55,31 @@ test(
         const record = await GET<{
             id: string;
             name: string;
-        }>(db, 'records/rec-1', DEV_TOKEN);
+        }>(db, 'organizations/1/record-types/rec-1', DEV_TOKEN);
         assert.equal(record.name, 'Quarterly Renewals');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
         // surviving /history.
         const history = await GET<{
             state: string;
-        }[]>(db, 'records/rec-1/history', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-1/history', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         const attrs = await GET<unknown[]>(
-            db, 'record-attributes', DEV_TOKEN,
+            db, 'organizations/1/record-types/rec-1/attributes', DEV_TOKEN,
         );
         assert.equal(attrs.length, 1);
     },
 );
 
 test(
-    'POST records create with empty'
+    'POST nested record-types create with empty'
     + ' attributes still writes the record and'
     + ' state event',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'create',
             id: 'rec-2',
             record: {
@@ -95,7 +95,7 @@ test(
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const record = await GET<{ name: string }>(
-            db, 'records/rec-2', DEV_TOKEN,
+            db, 'organizations/1/record-types/rec-2', DEV_TOKEN,
         );
         assert.equal(record.name, 'Empty');
         // bare per-entity current-state alias RETIRED
@@ -103,7 +103,7 @@ test(
         const history = await GET<{
             state: string;
             member_id: string;
-        }[]>(db, 'records/rec-2/history', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-2/history', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         assert.equal(
@@ -115,12 +115,12 @@ test(
 // ── Edit variant ──────
 
 test(
-    'POST records edit updates the'
+    'POST nested record-types edit updates the'
     + ' record fields without touching state',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -135,7 +135,7 @@ test(
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -157,13 +157,13 @@ test(
         const record = await GET<{
             name: string;
             description: string;
-        }>(db, 'records/rec-1', DEV_TOKEN);
+        }>(db, 'organizations/1/record-types/rec-1', DEV_TOKEN);
         assert.equal(record.name, 'After');
         assert.equal(
             record.description, 'updated',
         );
         const history = await GET<unknown[]>(
-            db, 'records/rec-1/history', DEV_TOKEN,
+            db, 'organizations/1/record-types/rec-1/history', DEV_TOKEN,
         );
         assert.equal(
             history.length, 1,
@@ -173,12 +173,12 @@ test(
 );
 
 test(
-    'POST records edit removes'
+    'POST nested record-types edit removes'
     + ' attributes by id and adds new ones',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -204,7 +204,7 @@ test(
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -234,7 +234,7 @@ test(
         const all = await GET<{
             id: string;
             name: string;
-        }[]>(db, 'record-attributes', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-1/attributes', DEV_TOKEN);
         assert.equal(all.length, 1);
         assert.equal(all[0]!.id, 'a-new');
         assert.equal(all[0]!.name, 'New');
@@ -242,12 +242,12 @@ test(
 );
 
 test(
-    'POST records edit updates an'
+    'POST nested record-types edit updates an'
     + ' existing attribute by upsert',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -272,7 +272,7 @@ test(
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -301,7 +301,12 @@ test(
         const stored = await GET<{
             name: string;
             attribute_type: string;
-        }>(db, 'record-attributes/a-1', DEV_TOKEN);
+        }>(
+            db,
+            'organizations/1/record-types/rec-1'
+            + '/attributes/a-1',
+            DEV_TOKEN,
+        );
         assert.equal(stored.name, 'Renamed');
         assert.equal(
             stored.attribute_type, 'number',
@@ -312,13 +317,13 @@ test(
 // ── Failure modes ──────
 
 test(
-    'POST records rejects an empty'
+    'POST nested record-types rejects an empty'
     + ' attribute name',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records', {
+            () => POST(db, 'organizations/1/record-types', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -349,14 +354,14 @@ test(
 );
 
 test(
-    'POST records rejects an'
+    'POST nested record-types rejects an'
     + ' attribute whose record_id does not'
     + ' match the top-level id',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records', {
+            () => POST(db, 'organizations/1/record-types', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -387,13 +392,13 @@ test(
 );
 
 test(
-    'POST records rejects an unknown'
+    'POST nested record-types rejects an unknown'
     + ' kind discriminator',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records', {
+            () => POST(db, 'organizations/1/record-types', {
                 kind: 'destroy',
                 id: 'rec-1',
                 record: {
@@ -409,13 +414,13 @@ test(
 );
 
 test(
-    'POST records rejects an invalid'
+    'POST nested record-types rejects an invalid'
     + ' initialState',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records', {
+            () => POST(db, 'organizations/1/record-types', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -435,13 +440,13 @@ test(
 );
 
 test(
-    'POST records rejects a body with'
+    'POST nested record-types rejects a body with'
     + ' an unexpected key',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records', {
+            () => POST(db, 'organizations/1/record-types', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -462,13 +467,13 @@ test(
 );
 
 test(
-    'POST records rejects a body with'
+    'POST nested record-types rejects a body with'
     + ' a missing required key',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'records', {
+            () => POST(db, 'organizations/1/record-types', {
                 kind: 'edit',
                 id: 'rec-1',
                 record: {
@@ -484,12 +489,12 @@ test(
 );
 
 test(
-    'POST records create threads caller'
+    'POST nested record-types create threads caller'
     + ' initialStateAt to the initial state event',
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'create',
             id: 'rec-at',
             record: {
@@ -513,7 +518,7 @@ test(
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'records/rec-at/history', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-at/history', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
         assert.equal(current.state, 'active');
@@ -528,7 +533,7 @@ test(
 );
 
 test(
-    'POST records create ignores a raw colliding states'
+    'POST nested record-types create ignores a raw colliding states'
     + ' row (states ROW half stripped)',
     async () => {
         const db = await freshDb();
@@ -536,7 +541,7 @@ test(
         // a raw colliding states row no longer aborts the
         // pair-plane create.
     // Phase Final Stage B: states table retired.
-        await POST(db, 'records', {
+        await POST(db, 'organizations/1/record-types', {
             kind: 'create',
             id: 'rec-survives',
             record: {
@@ -551,7 +556,7 @@ test(
                 '2099-07-01T00:00:00.000000Z',
         }, DEV_TOKEN);
         const rec = await GET<{ id: string }>(
-            db, 'records/rec-survives', DEV_TOKEN,
+            db, 'organizations/1/record-types/rec-survives', DEV_TOKEN,
         );
         assert.equal(rec.id, 'rec-survives');
     },

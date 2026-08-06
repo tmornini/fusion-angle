@@ -51,6 +51,7 @@ export const HTTP_NOT_FOUND = 404;
 export const HTTP_METHOD_NOT_ALLOWED = 405;
 export const HTTP_CONFLICT = 409;
 export const HTTP_PRECONDITION_FAILED = 412;
+export const HTTP_PRECONDITION_REQUIRED = 428;
 export const HTTP_UNPROCESSABLE_ENTITY = 422;
 export const HTTP_INTERNAL_ERROR = 500;
 export const HTTP_NOT_IMPLEMENTED = 501;

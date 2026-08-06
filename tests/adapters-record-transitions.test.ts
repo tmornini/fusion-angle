@@ -7,7 +7,7 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -21,6 +21,9 @@ import {
 import {
     putWorkOrder,
 } from '../web-app/app/adapters/work-orders-mutations.ts';
+import {
+    postRecordChange,
+} from '../web-app/app/adapters/records.ts';
 import {
     SYSTEM_MEMBER_ID,
     DEFAULT_LOCK_TIMEOUT,
@@ -98,7 +101,7 @@ async function seedWorkOrder(
     flowGraph: WorkOrderFlowGraph,
     currentNodeId: string,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     await putWorkOrder(ctx, id, {
         displayId: 'WO-1',
         flowGraph,
@@ -126,7 +129,7 @@ async function seedBinding(
     flowId: string,
     recordId: string,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     await ctx.PUT(
         'flows/' + flowId + '/records/fr-' + flowId,
         {
@@ -153,7 +156,7 @@ async function seedFlowLink(
     // The flow↔work-order join nests under its parent flow now,
     // so the parent flow must exist to be enumerated — the
     // record lookup walks flows → work-orders → records.
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId,
         linkId: flowId + '-link',
@@ -175,11 +178,9 @@ async function seedFlowLink(
     );
 }
 
-// NAMED re-pin (Task 7): getRecordForWorkOrder's attribute
-// lookup reads record-attributes through the flipped GET (this
-// commit) — a raw db.recordAttributes.put leaves no message
-// pair at this address, so the fixture must land through the
-// SAME wire-reachable PUT the live route serves.
+// Nested attributes (Task 21): parent type must exist for
+// the collection probe; attribute lands at the nested
+// detail address the flipped adapter GETs.
 async function seedAttribute(
     db: MemoryDbAdapter,
     id: string,
@@ -192,17 +193,40 @@ async function seedAttribute(
         constraints?: unknown[];
     } = {},
 ): Promise<void> {
-    const ctx = createRequestContext(db, await devToken());
-    await ctx.PUT('record-attributes/' + id, {
-        organization_id: '1',
-        record_id: recordId,
-        name: options.name ?? 'Attr',
-        attribute_type:
-            options.attribute_type ?? 'text',
-        sort_order: 1,
-        options: [],
-        constraints: options.constraints ?? [],
-    });
+    const ctx = createRequestContext(
+        db, await organizationToken(),
+    );
+    try {
+        await ctx.GET(
+            'organizations/1/record-types/'
+            + recordId,
+        );
+    } catch {
+        await postRecordChange(ctx, recordId, {
+            kind: 'create',
+            record: {
+                name: recordId,
+                description: '',
+                position: 1,
+            },
+            attributes: [],
+            initialState: 'active',
+        });
+    }
+    await ctx.PUT(
+        'organizations/1/record-types/'
+        + recordId
+        + '/attributes/'
+        + id,
+        {
+            name: options.name ?? 'Attr',
+            attribute_type:
+                options.attribute_type ?? 'text',
+            sort_order: 1,
+            options: [],
+            constraints: options.constraints ?? [],
+        },
+    );
 }
 
 test(
@@ -224,7 +248,7 @@ test(
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-create',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', new Map(),
         );
@@ -268,7 +292,7 @@ test(
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', new Map(),
         );
@@ -311,7 +335,7 @@ test(
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1', new Map(),
         );
@@ -351,7 +375,7 @@ test(
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-step',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         // NAMED re-pin (Phase 15 Task 7): leaf PUT
         // states/:id/field-values/:fvid retires; seed the
         // stored field value through the transition fold —
@@ -418,7 +442,7 @@ test(
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Code',
         });
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1',
             new Map([['a-1', 'ABC']]),
@@ -465,7 +489,7 @@ test(
                     '^[^@]+@[^@]+\\.[^@]+$',
             }],
         });
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
             ctx, 'wo-1',
             new Map([['a-1', 'not-an-email']]),
@@ -497,7 +521,7 @@ test(
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-ghost',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await assert.rejects(
             () => validateRecordTransition(
                 ctx, 'wo-1', new Map(),

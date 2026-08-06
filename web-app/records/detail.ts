@@ -9,6 +9,8 @@ import {
 } from '../app/loading-states.ts';
 import {
     navigateTo,
+    handleDialogClick,
+    closeDialog,
 } from '../app/core.ts';
 import {
     sessionContext,
@@ -20,15 +22,26 @@ import {
     postRecordChange,
     subscribeRecordChanges,
     generateCryptoSafeBase62,
+    getRecordInstances,
+    getRecordInstance,
+    putRecordInstance,
+    patchRecordInstance,
+    deleteRecordInstance,
+    activeOrganization,
 } from '../app/adapters/index.ts';
 import {
     RecordDetailPresenter,
     RecordDetailEditPresenter,
     recordDraftFromView,
     allowedConstraintKinds,
+    projectInstanceFields,
+    instanceListItems,
+    INSTANCE_CONFLICT_NOTICE,
     type RecordDetailDraft,
     type AttributeDraft,
     type RecordDetailView,
+    type InstancesSectionView,
+    type InstanceFieldView,
 } from '../app/presenters/index.ts';
 import type {
     RecordEntity,
@@ -37,7 +50,15 @@ import type {
 } from '../../api/types.ts';
 import type {
     RecordAttribute,
+    RecordInstance,
 } from '../app/adapters/index.ts';
+import {
+    RequestError,
+    HTTP_PRECONDITION_FAILED,
+} from '../../api/http-errors.ts';
+import {
+    projectClaimRolesForOrganization,
+} from '../../api/authorization.ts';
 
 const { signal } = createPageAbort();
 
@@ -49,12 +70,22 @@ type PageState =
         originalAttributes:
             readonly RecordAttribute[];
         pendingAttributeName: string;
+    }
+    | {
+        kind: 'instances-editing';
+        instanceId: string;
+        draft: Record<string, string>;
+        etag: string;
+        fields: readonly InstanceFieldView[];
+        conflictNotice: string | null;
     };
 
 let pageState: PageState = { kind: 'reading' };
 let currentView: RecordDetailView | null = null;
 let recordId: string | null = null;
 let saveInProgress = false;
+let pendingDeleteInstanceId: string | null = null;
+let loadedInstances: RecordInstance[] = [];
 
 export async function init(
     params?: Record<string, string>,
@@ -77,6 +108,64 @@ export async function init(
     });
 }
 
+function heldRoles(): readonly string[] {
+    const ctx = sessionContext();
+    return projectClaimRolesForOrganization(
+        ctx.identity.roles,
+        activeOrganization(ctx),
+    );
+}
+
+function buildInstancesSection(
+    instances: readonly RecordInstance[],
+    attributes: readonly RecordAttribute[],
+    editing: PageState & {
+        kind: 'instances-editing';
+    } | null,
+): InstancesSectionView {
+    if (editing !== null) {
+        return {
+            instances: [],
+            editing: {
+                instanceId: editing.instanceId,
+                fields: editing.fields.map(f => ({
+                    ...f,
+                    value: f.access === 'writable'
+                        ? (editing.draft[
+                            f.attributeId
+                        ] ?? f.value)
+                        : f.value,
+                })),
+                conflictNotice:
+                    editing.conflictNotice,
+            },
+        };
+    }
+    return {
+        instances: instanceListItems(
+            instances, attributes,
+        ),
+        editing: null,
+    };
+}
+
+function composeView(
+    base: Omit<RecordDetailView, 'instances'>,
+): RecordDetailView {
+    const editing =
+        pageState.kind === 'instances-editing'
+            ? pageState
+            : null;
+    return {
+        ...base,
+        instances: buildInstancesSection(
+            loadedInstances,
+            base.attributes,
+            editing,
+        ),
+    };
+}
+
 async function load(
     root: HTMLElement,
 ): Promise<void> {
@@ -87,9 +176,13 @@ async function load(
         skeleton: buildSkeleton('detail', 1),
         fetch: async () => {
             const ctx = sessionContext();
-            const [record,
-                attributes, flows,
-                workOrders] = await Promise.all([
+            const [
+                record,
+                attributes,
+                flows,
+                workOrders,
+                instances,
+            ] = await Promise.all([
                 getRecordModel(ctx, id),
                 getRecordAttributesByRecord(
                     ctx, id,
@@ -98,20 +191,25 @@ async function load(
                     ctx, id,
                 ),
                 getWorkOrdersForRecord(ctx, id),
+                getRecordInstances(ctx, id),
             ]);
             return {
                 record,
-                attributes, flows, workOrders,
+                attributes,
+                flows,
+                workOrders,
+                instances,
             };
         },
         retry: () => load(root),
         onData: loaded => {
-            currentView = {
+            loadedInstances = [...loaded.instances];
+            currentView = composeView({
                 record: loaded.record,
                 attributes: loaded.attributes,
                 boundFlows: loaded.flows,
                 workOrders: loaded.workOrders,
-            };
+            });
             render(root);
             bindActions(root);
         },
@@ -120,19 +218,25 @@ async function load(
 
 function render(root: HTMLElement): void {
     if (!currentView) return;
-    if (pageState.kind === 'reading') {
+    if (pageState.kind === 'editing') {
         const presenter =
-            new RecordDetailPresenter(
-                currentView,
+            new RecordDetailEditPresenter(
+                pageState.draft,
+                pageState.pendingAttributeName,
             );
         setHtml(root, presenter.buildPage());
         return;
     }
+    // Refresh instances section projection for
+    // reading and instances-editing states.
+    currentView = composeView({
+        record: currentView.record,
+        attributes: currentView.attributes,
+        boundFlows: currentView.boundFlows,
+        workOrders: currentView.workOrders,
+    });
     const presenter =
-        new RecordDetailEditPresenter(
-            pageState.draft,
-            pageState.pendingAttributeName,
-        );
+        new RecordDetailPresenter(currentView);
     setHtml(root, presenter.buildPage());
 }
 
@@ -157,6 +261,40 @@ function bindActions(root: HTMLElement): void {
         e => onKeydown(root, e),
         { signal },
     );
+    // Delete confirm lives outside #page-root.
+    document.addEventListener(
+        'click',
+        e => onDocumentClick(root, e),
+        { signal },
+    );
+}
+
+function onDocumentClick(
+    root: HTMLElement, e: MouseEvent,
+): void {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    const openEl = target.closest(
+        '[data-dialog-open='
+        + '"confirm-delete-instance"]',
+    );
+    if (openEl) {
+        pendingDeleteInstanceId =
+            openEl.getAttribute(
+                'data-instance-id',
+            );
+    }
+    if (handleDialogClick(target, e)) {
+        return;
+    }
+    const confirm = target.closest(
+        '[data-action='
+        + '"confirm-delete-instance"]',
+    );
+    if (confirm) {
+        closeDialog('confirm-delete-instance');
+        void handleDeleteInstance(root);
+    }
 }
 
 function onKeydown(
@@ -185,10 +323,23 @@ function onKeydown(
 }
 
 function onClick(
-    root: HTMLElement, e: Event,
+    root: HTMLElement, e: MouseEvent,
 ): void {
     const target = e.target;
     if (!(target instanceof Element)) return;
+    if (handleDialogClick(target, e)) {
+        const openEl = target.closest(
+            '[data-dialog-open='
+            + '"confirm-delete-instance"]',
+        );
+        if (openEl) {
+            pendingDeleteInstanceId =
+                openEl.getAttribute(
+                    'data-instance-id',
+                );
+        }
+        return;
+    }
     const btn = target.closest('button, a');
     if (!btn) return;
     const flowLink = btn.getAttribute(
@@ -224,6 +375,9 @@ function onClick(
     }
     if (btn.id === 'record-edit-btn') {
         if (!currentView) return;
+        if (pageState.kind !== 'reading') {
+            return;
+        }
         const draft = recordDraftFromView(
             currentView,
         );
@@ -253,9 +407,33 @@ function onClick(
         bindActions(root);
         return;
     }
+    if (btn.id === 'record-new-instance-btn') {
+        void handleNewInstance(root);
+        return;
+    }
+    if (btn.id === 'record-instance-save-btn') {
+        void handleInstanceSave(root);
+        return;
+    }
+    if (
+        btn.id === 'record-instance-cancel-btn'
+    ) {
+        pageState = { kind: 'reading' };
+        render(root);
+        bindActions(root);
+        return;
+    }
     const action = btn.getAttribute(
         'data-action',
     );
+    if (action === 'edit-instance') {
+        const id = btn.getAttribute(
+            'data-instance-id',
+        );
+        if (!id) return;
+        void handleEditInstance(root, id);
+        return;
+    }
     if (action === 'remove-attribute') {
         const row = btn.closest(
             '[data-attribute-id]',
@@ -297,6 +475,231 @@ function onClick(
         removeConstraint(attrId, idx);
         render(root);
         bindActions(root);
+    }
+}
+
+function fieldsFromAttributes(
+    attributes: readonly RecordAttribute[],
+    values: ReadonlyMap<string, string>,
+): InstanceFieldView[] {
+    return projectInstanceFields(
+        attributes.map(a => ({
+            id: a.id,
+            name: a.name,
+            readRoles: a.readRoles,
+            writeRoles: a.writeRoles,
+        })),
+        values,
+        heldRoles(),
+    );
+}
+
+function draftFromFields(
+    fields: readonly InstanceFieldView[],
+): Record<string, string> {
+    const draft: Record<string, string> = {};
+    for (const f of fields) {
+        if (f.access === 'writable') {
+            draft[f.attributeId] = f.value;
+        }
+    }
+    return draft;
+}
+
+async function handleNewInstance(
+    root: HTMLElement,
+): Promise<void> {
+    if (!recordId || !currentView) return;
+    if (pageState.kind !== 'reading') return;
+    if (saveInProgress) return;
+    const ctx = sessionContext();
+    const instanceId = generateCryptoSafeBase62();
+    saveInProgress = true;
+    try {
+        const created = await putRecordInstance(
+            ctx, recordId, instanceId, [],
+        );
+        const fields = fieldsFromAttributes(
+            currentView.attributes,
+            new Map(),
+        );
+        pageState = {
+            kind: 'instances-editing',
+            instanceId,
+            draft: draftFromFields(fields),
+            etag: created.etag,
+            fields,
+            conflictNotice: null,
+        };
+        loadedInstances = [
+            ...loadedInstances,
+            {
+                id: instanceId,
+                recordTypeId: recordId,
+                values: new Map(),
+                etag: created.etag,
+            },
+        ];
+        render(root);
+        bindActions(root);
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to create instance', err,
+        );
+    } finally {
+        saveInProgress = false;
+    }
+}
+
+async function handleEditInstance(
+    root: HTMLElement,
+    instanceId: string,
+): Promise<void> {
+    if (!recordId || !currentView) return;
+    if (pageState.kind !== 'reading') return;
+    const ctx = sessionContext();
+    try {
+        const detail = await getRecordInstance(
+            ctx, recordId, instanceId,
+        );
+        const fields = fieldsFromAttributes(
+            currentView.attributes,
+            detail.values,
+        );
+        pageState = {
+            kind: 'instances-editing',
+            instanceId,
+            draft: draftFromFields(fields),
+            etag: detail.etag,
+            fields,
+            conflictNotice: null,
+        };
+        render(root);
+        bindActions(root);
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to load instance', err,
+        );
+    }
+}
+
+async function handleInstanceSave(
+    root: HTMLElement,
+): Promise<void> {
+    if (pageState.kind !== 'instances-editing') {
+        return;
+    }
+    if (!recordId) return;
+    if (saveInProgress) return;
+    const ctx = sessionContext();
+    const {
+        instanceId, draft, etag, fields,
+    } = pageState;
+    // Empty string is rejected at the gate; only ship
+    // non-empty writable values in this minimal UI
+    // (no clear-on-blank path yet).
+    const set = fields
+        .filter(f => f.access === 'writable')
+        .map(f => ({
+            attributeId: f.attributeId,
+            value: (draft[f.attributeId] ?? '')
+                .trim(),
+        }))
+        .filter(entry => entry.value !== '');
+    saveInProgress = true;
+    try {
+        const result = await patchRecordInstance(
+            ctx,
+            recordId,
+            instanceId,
+            etag,
+            { set },
+        );
+        pageState = { kind: 'reading' };
+        showToast('Instance saved', 'success');
+        void result.etag;
+        await load(root);
+    } catch (err) {
+        if (
+            err instanceof RequestError
+            && err.status
+                === HTTP_PRECONDITION_FAILED
+        ) {
+            try {
+                const fresh =
+                    await getRecordInstance(
+                        ctx,
+                        recordId,
+                        instanceId,
+                    );
+                if (!currentView) return;
+                const freshFields =
+                    fieldsFromAttributes(
+                        currentView.attributes,
+                        fresh.values,
+                    );
+                pageState = {
+                    kind: 'instances-editing',
+                    instanceId,
+                    draft: draftFromFields(
+                        freshFields,
+                    ),
+                    etag: fresh.etag,
+                    fields: freshFields,
+                    conflictNotice:
+                        INSTANCE_CONFLICT_NOTICE,
+                };
+                render(root);
+                bindActions(root);
+                showToast(
+                    INSTANCE_CONFLICT_NOTICE,
+                    'warning',
+                );
+            } catch (regetErr) {
+                reportFault(
+                    ctx,
+                    'Failed to refresh instance',
+                    regetErr,
+                );
+            }
+            return;
+        }
+        reportFault(
+            ctx, 'Failed to save instance', err,
+        );
+    } finally {
+        saveInProgress = false;
+    }
+}
+
+async function handleDeleteInstance(
+    root: HTMLElement,
+): Promise<void> {
+    if (!recordId) return;
+    const instanceId = pendingDeleteInstanceId;
+    pendingDeleteInstanceId = null;
+    if (!instanceId) return;
+    if (saveInProgress) return;
+    const ctx = sessionContext();
+    saveInProgress = true;
+    try {
+        await deleteRecordInstance(
+            ctx, recordId, instanceId,
+        );
+        if (
+            pageState.kind === 'instances-editing'
+            && pageState.instanceId === instanceId
+        ) {
+            pageState = { kind: 'reading' };
+        }
+        showToast('Instance deleted', 'success');
+        await load(root);
+    } catch (err) {
+        reportFault(
+            ctx, 'Failed to delete instance', err,
+        );
+    } finally {
+        saveInProgress = false;
     }
 }
 
@@ -351,13 +754,29 @@ function onChange(
 }
 
 function onInput(e: Event): void {
-    if (pageState.kind !== 'editing') return;
     const target = e.target;
     if (
         !(target instanceof HTMLInputElement)
         && !(target instanceof
             HTMLTextAreaElement)
     ) return;
+    if (
+        pageState.kind === 'instances-editing'
+    ) {
+        const action = target.getAttribute(
+            'data-action',
+        );
+        if (action === 'instance-field-value') {
+            const attrId = target.getAttribute(
+                'data-attribute-id',
+            );
+            if (!attrId) return;
+            pageState.draft[attrId] =
+                target.value;
+        }
+        return;
+    }
+    if (pageState.kind !== 'editing') return;
     if (target.id === 'record-edit-name') {
         pageState.draft.name = target.value;
         return;

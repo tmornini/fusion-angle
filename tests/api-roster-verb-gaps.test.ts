@@ -74,6 +74,17 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 
 // ── regime 1: the route-table 405s ──
 
+// Task 10: PATCH alphabet — no roster-surface patch yet.
+test('PATCH members/:id 405s (no patch handler wired)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PATCH', '/members/m1', token, {},
+    ));
+    assert.equal(res.status, 405);
+});
+
 test('PUT members 405s (no put handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();

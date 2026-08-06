@@ -252,7 +252,8 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // synthesized attribute-PUT pair (the create balance is now
     // 2+N, not 1).
     const created = await handleRequest(db, req(
-        'POST', '/records', org2Token,
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/record-types', org2Token,
         createRecordBody(
             'inv-rec-1', 'inv-rec-1-ev', ORGANIZATION_TWO,
             [{
@@ -271,14 +272,16 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
 
     // DELETE — a fresh PUT then its tombstone (records, org 2).
     const recordPut = await handleRequest(db, req(
-        'PUT', '/records/inv-rec-2', org2Token,
+        'PUT', '/organizations/' + ORGANIZATION_TWO
+            + '/record-types/inv-rec-2', org2Token,
         recordPutBody(
             'inv-rec-2', 'Invariant Record', ORGANIZATION_TWO,
         ),
     ));
     assert.equal(recordPut.status, 200);
     const recordDeleted = await handleRequest(db, req(
-        'DELETE', '/records/inv-rec-2', org2Token,
+        'DELETE', '/organizations/' + ORGANIZATION_TWO
+            + '/record-types/inv-rec-2', org2Token,
     ));
     assert.equal(recordDeleted.status, 204);
 

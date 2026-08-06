@@ -57,6 +57,17 @@ async () => {
     assert.equal(res.status, 405);
 });
 
+// Task 10: PATCH alphabet — no objectives-family patch yet.
+test('PATCH objectives/:id 405s (no patch handler'
++ ' wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PATCH', '/objectives/o1', token, {},
+    ));
+    assert.equal(res.status, 405);
+});
+
 test('DELETE objectives 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();

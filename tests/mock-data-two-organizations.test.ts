@@ -26,13 +26,11 @@ import {
 } from '../api/document-family.ts';
 import {
     validateRecordDocumentBody,
-    validateRecordAttributeDocumentBody,
     validateObjectiveDocumentBody,
     pickNumber,
 } from '../api/validators.ts';
 import {
     postRecordDocumentOp,
-    postRecordAttributeDocumentOp,
     postObjectiveDocumentOp,
 } from '../api/routes.ts';
 import type {
@@ -56,9 +54,9 @@ import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
 
 const RECORDS_WIRING: DocumentFamilyWiring = {
-    family: 'records',
+    family: 'record-types',
     lifecycle: 'trio',
-    notFoundTable: 'records',
+    notFoundTable: 'record_types',
     validateDocument: validateRecordDocumentBody,
     documentOp: postRecordDocumentOp,
     entityOf: (document, organization, current) => ({
@@ -75,19 +73,6 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
     }),
 };
 
-const RECORD_ATTRIBUTES_WIRING: DocumentFamilyWiring = {
-    family: 'record-attributes',
-    lifecycle: 'stateless',
-    notFoundTable: 'record_attributes',
-    validateDocument: validateRecordAttributeDocumentBody,
-    documentOp: postRecordAttributeDocumentOp,
-    entityOf: (document, organization) => ({
-        id: document.uriId,
-        organization_id: organization,
-        ...document.body,
-    }),
-};
-
 async function derivedRecords(
     db: MemoryDbAdapter, organization: string,
 ): Promise<RecordEntity[]> {
@@ -96,14 +81,60 @@ async function derivedRecords(
     ) as Promise<RecordEntity[]>;
 }
 
+// Task 8: flat alias window re-points attributes to nested
+// storage — read through the live GET.
 async function derivedRecordAttributes(
     db: MemoryDbAdapter, organization: string,
 ): Promise<RecordAttributeEntity[]> {
-    return documentCollectionGetHandler(
-        RECORD_ATTRIBUTES_WIRING,
-    )(
-        db, [], 'current', organization,
-    ) as Promise<RecordAttributeEntity[]>;
+    const token = await organizationToken(
+        'current', organization,
+    );
+    const typesRes = await handleRequest(
+        db,
+        new Request(
+            'http://localhost/organizations/'
+            + organization + '/record-types',
+            {
+                headers: {
+                    Authorization: 'Bearer ' + token,
+                },
+            },
+        ),
+    );
+    if (typesRes.status !== 200) {
+        throw new Error(
+            'derivedRecordAttributes: types GET '
+            + typesRes.status,
+        );
+    }
+    const types =
+        await typesRes.json() as { id: string }[];
+    const out: RecordAttributeEntity[] = [];
+    for (const type of types) {
+        const res = await handleRequest(
+            db,
+            new Request(
+                'http://localhost/organizations/'
+                + organization + '/record-types/'
+                + type.id + '/attributes',
+                {
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                    },
+                },
+            ),
+        );
+        if (res.status !== 200) {
+            throw new Error(
+                'derivedRecordAttributes: GET '
+                + res.status,
+            );
+        }
+        out.push(
+            ...await res.json() as RecordAttributeEntity[],
+        );
+    }
+    return out;
 }
 
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
@@ -315,9 +346,13 @@ async () => {
     }
     assert.ok(allAttrs.length > 0, 'attributes exist');
     for (const attr of allAttrs) {
+        const parentId =
+            (attr as { record_type_id?: string })
+                .record_type_id
+            ?? attr.record_id;
         assert.equal(
             attr.organization_id,
-            recordOrganization.get(attr.record_id),
+            recordOrganization.get(parentId),
             `attribute ${attr.id} org mismatch`);
     }
     // Phase Final Stage B: record_attributes table retired.

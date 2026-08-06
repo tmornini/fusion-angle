@@ -31,8 +31,7 @@ const COLLECTION_ROUTES: readonly string[] = [
     'flows/any-flow/work-orders',
     // GET states/:id/field-values RETIRED (C4); field values
     // fold on work-orders/:id/history.
-    'records',
-    'record-attributes',
+    'organizations/1/record-types',
     'flows/any-flow/records',
     'ideas/any-idea/submissions',
     'objectives',

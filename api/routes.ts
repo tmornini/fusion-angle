@@ -44,6 +44,11 @@ import type {
     MemberKind,
     MemberState,
     OrganizationEntity,
+    AttributeType,
+    Constraint,
+} from './types.ts';
+import {
+    DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from './types.ts';
 import {
     validateAIMemberCreateBody,
@@ -81,6 +86,10 @@ import {
     validateFlowTagEntity,
     validateFlowTagName,
     validateRecordAttributeDocumentBody,
+    validateAttributeDocumentCreate,
+    validateAttributeDocumentReplace,
+    validateInstancePutBody,
+    validateInstancePatchBody,
     validateRecordDocumentBody,
     validateRecordWriteBody,
     validateWorkOrderClaimBody,
@@ -101,6 +110,7 @@ import {
     formWritePair,
     headPairIdAt,
     pairResponseBody,
+    ifMatchFromPair,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { replacePiiSlot } from './pii-hard-delete.ts';
@@ -120,6 +130,11 @@ import {
     deleteRecordAttributeSafe,
 } from './record-attribute-refs.ts';
 import {
+    collectRecordTypeReferrers,
+    hasTypeReferrers,
+    describeTypeReferrers,
+} from './record-type-refs.ts';
+import {
     rotateRefreshJti,
     revokeTokenChain,
 } from './authentication.ts';
@@ -129,6 +144,7 @@ import {
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_CONFLICT,
+    HTTP_PRECONDITION_FAILED,
 } from './http-errors.ts';
 import {
     reduceCreateGraphDelta,
@@ -145,6 +161,41 @@ import {
     deriveProjectStateHistory,
     projectEntityOf,
 } from './derive-projects.ts';
+import {
+    deriveRecordTypeCollection,
+    deriveRecordTypeEntity,
+    deriveRecordTypeStateHistory,
+    requireRecordTypeExists,
+} from './derive-record-types.ts';
+import {
+    RECORD_TYPES_COLLECTION_PATTERN,
+    RECORD_TYPE_DETAIL_PATTERN,
+    RECORD_TYPE_HISTORY_PATTERN,
+    ATTRIBUTES_COLLECTION_PATTERN,
+    ATTRIBUTE_DETAIL_PATTERN,
+    INSTANCES_COLLECTION_PATTERN,
+    INSTANCE_DETAIL_PATTERN,
+    INSTANCE_HISTORY_PATTERN,
+} from './family-registry.ts';
+import {
+    deriveDocumentsAt,
+    byIdAscending,
+} from './derive-documents.ts';
+import {
+    instancesUriPrefix,
+    deriveInstanceHead,
+    deriveInstanceCollection,
+    deriveInstanceRevisions,
+    mergeInstanceValues,
+} from './derive-record-instances.ts';
+import {
+    assertWritableAttributeIds,
+    projectReadableValues,
+} from './attribute-acl.ts';
+import {
+    validateInstanceValues,
+    type AttributeSchemaRow,
+} from './record-constraints.ts';
 import {
     flowEntityOf,
     deriveFlow,
@@ -169,7 +220,6 @@ import { deriveFlowTag } from './derive-flow-tags.ts';
 import {
     deriveObjectiveRevisions,
 } from './derive-objective-revisions.ts';
-import { deriveRecordStateHistory } from './derive-records.ts';
 import {
     deriveObjectiveStateHistory,
     deriveObjectiveHistories,
@@ -219,7 +269,6 @@ import {
     documentGetHandler,
     documentPutHandler,
     documentStateHistoryHandler,
-    documentHeadPairId,
     documentWriteResponseSpec,
     registerDocumentFamilyWiring,
     type DocumentFamilyWiring,
@@ -347,119 +396,28 @@ const WORK_ORDERS_WIRING: DocumentFamilyWiring = {
     documentOp: postWorkOrderDocumentOp,
     entityOf: workOrderDocumentEntityOf,
 };
-// Head document → wire RecordEntity. Entity fields come from
-// the head body; the lifecycle trio is stamped from the
-// lifecycle-current StateEntity (never re-copied from the
-// head body — genesis-wins-under-skew). `current` is required
-// on the live trio path (document-family always supplies it
-// after the DELETED filter).
-function recordDocumentEntityOf(
-    document: DerivedDocument,
-    organization: Id,
-    current: StateEntity,
-): RecordEntity {
-    const body = document.body;
-    return {
-        id: document.uriId,
-        organization_id: organization,
-        name: pickString(body, 'name'),
-        description: pickString(body, 'description'),
-        position: pickNumber(body, 'position'),
-        state: current.state,
-        state_at: current.at,
-        state_event_id: current.id,
-    };
-}
-// The records wiring row — the fifth family, and the first
-// 'trio' family whose :id address also carries a live DELETE
-// route (Author gate 9: documentLifecycleEvents now skips a
-// DELETE-method pair — see its own comment in derive-
-// documents.ts). notFoundTable is 'records' (its storage table
-// name matches its family name, like ideas/projects/flows).
-// recordDocumentEntityOf requires the lifecycle-current event;
-// the generic trio path always supplies it after DELETED
-// filter.
-const RECORDS_WIRING: DocumentFamilyWiring = {
-    family: 'records',
-    lifecycle: 'trio',
-    notFoundTable: 'records',
-    validateDocument: validateRecordDocumentBody,
-    documentOp: postRecordDocumentOp,
-    entityOf: (document, organization, current) =>
-        recordDocumentEntityOf(
-            document, organization, current!,
-        ),
-};
-// The generic GET machinery this entityOf serves flips onto
-// record-attributes at Task 7 too (this commit, the SAME
-// commit as RECORDS_WIRING's own flip above): GET
-// record-attributes/:id and GET record-attributes now ride it.
-// A body spread is safe here exactly as
-// workOrderDocumentEntityOf's own comment argues: the head
-// pair's body, stamped with id and organization_id, already
-// carries exactly the {record_id, name, attribute_type,
-// sort_order, options, constraints} keys
-// validateRecordAttributeDocumentBody's gate admits — no
-// per-field picking needed, and (UNLIKE a 'trio' family) there
-// is no trio to leak, since 'stateless' rejects one at the gate.
-function recordAttributeDocumentEntityOf(
-    document: DerivedDocument,
-    organization: Id,
-    _current?: StateEntity,
-): unknown {
-    return {
-        id: document.uriId,
-        organization_id: organization,
-        ...document.body,
-    };
-}
-// The record-attributes wiring row — the sixth family, and the
-// SECOND 'stateless' one (work-orders is the first). Sharper
-// evidence than work-orders': a work order's lifecycle CAN be
-// (and is) authored — just never through the document address —
-// so ITS 'stateless' classification is vacuous-in-PRACTICE
-// (WORK_ORDERS_WIRING's own comment). A record attribute carries
-// no lifecycle concept AT ALL: no RecordAttributeState alphabet
-// exists anywhere in types.ts, and no call site posts a states
-// event keyed to an attribute id (grep-proven at research) — its
-// 'stateless' classification is vacuous BY CONSTRUCTION —
-// memberships (MEMBERSHIPS_WIRING below, Phase 8) joins this
-// SAME bucket as its actual sibling, not "the stronger of the
-// two" this comment once claimed when record-attributes stood
-// alone against work-orders' vacuous-in-practice one.
-// notFoundTable is 'record_attributes' — the SECOND family
-// whose storage table name (db-backed.ts's EntityStore key)
-// differs from its hyphenated family/route name (work-orders/
-// work_orders was the first).
-const RECORD_ATTRIBUTES_WIRING: DocumentFamilyWiring = {
-    family: 'record-attributes',
-    lifecycle: 'stateless',
-    notFoundTable: 'record_attributes',
-    validateDocument: validateRecordAttributeDocumentBody,
-    documentOp: postRecordAttributeDocumentOp,
-    entityOf: recordAttributeDocumentEntityOf,
-};
+// Objectives wiring follows; record-types and nested
+// attributes use inline handlers (Task 23 retired flat
+// RECORDS_WIRING / RECORD_ATTRIBUTES_WIRING).
+//
 // The generic GET machinery (documentGetHandler/
-// documentCollectionGetHandler) this entityOf serves flips onto
-// objectives at Task 7 (this commit): GET objectives/:id and GET
-// objectives now ride it, exactly as recordDocumentEntityOf/
-// recordAttributeDocumentEntityOf each served their OWN family's
-// GET path at the prior flip. The wire row is constructed ID
-// FIRST — {id, organization_id, position} — the SAME seven-
-// sibling convention every shipped entityOf follows; picked
-// explicitly (pickNumber) rather than a body spread, mirroring
-// recordDocumentEntityOf's own choice (NOT
-// workOrderDocumentEntityOf's/recordAttributeDocumentEntityOf's
-// spread): the wire body tolerates an organization_id key
-// alongside position, and a spread would let that raw, unstamped
-// key leak into the read path ahead of the fenced `organization`
-// argument — picking only `position` closes that off by
-// construction. Head document → wire ObjectiveEntity. Entity
-// fields come from the head body; the lifecycle trio is stamped
-// from the lifecycle-current StateEntity (never re-copied from
-// the head body — genesis-wins-under-skew). `current` is required
-// on the live trio path (document-family always supplies it
-// after the DELETED filter).
+// documentCollectionGetHandler) this entityOf serves
+// flips onto objectives: GET objectives/:id and GET
+// objectives ride it. The wire row is constructed ID
+// FIRST — {id, organization_id, position} — the SAME
+// seven-sibling convention every shipped entityOf
+// follows; picked explicitly (pickNumber) rather than a
+// body spread: the wire body tolerates an organization_id
+// key alongside position, and a spread would let that raw,
+// unstamped key leak into the read path ahead of the
+// fenced `organization` argument — picking only
+// `position` closes that off by construction. Head
+// document → wire ObjectiveEntity. Entity fields come
+// from the head body; the lifecycle trio is stamped from
+// the lifecycle-current StateEntity (never re-copied from
+// the head body — genesis-wins-under-skew). `current` is
+// required on the live trio path (document-family always
+// supplies it after the DELETED filter).
 function objectiveDocumentEntityOf(
     document: DerivedDocument,
     organization: Id,
@@ -504,10 +462,9 @@ const OBJECTIVES_WIRING: DocumentFamilyWiring = {
 // Task 8) this entityOf will serve: the head pair's body already
 // carries exactly {organization_id, identity_id, at} —
 // memberships' wire PUT body includes its OWN organization_id
-// (UNLIKE work-orders'/record-attributes' tolerated-but-optional
-// stamp), so a spread is safe here for the same reason
-// recordAttributeDocumentEntityOf's own comment gives: no
-// per-field picking needed, and there is no trio to leak.
+// (UNLIKE work-orders' tolerated-but-optional stamp), so a
+// spread is safe here: no per-field picking needed, and
+// there is no trio to leak.
 // `_organization` stays unused: this entityOf reads
 // organization_id off the body itself, never the fence argument
 // — the org-scoped store already stamps organization_id at
@@ -524,10 +481,9 @@ function membershipDocumentEntityOf(
     };
 }
 // The memberships wiring row — the eighth family, and the
-// FOURTH 'stateless' one, joining RECORD_ATTRIBUTES_WIRING's
-// vacuous-BY-CONSTRUCTION bucket as its actual sibling (that
-// row's own comment above now admits memberships rather than
-// standing alone). This is the CORRECTED stateless-fork
+// FOURTH 'stateless' one (record-attributes shared the same
+// vacuous-BY-CONSTRUCTION bucket before Task 23 retired its
+// flat wiring row). This is the CORRECTED stateless-fork
 // contrast (Author gate 3, adjudicated at the roster phase —
 // OBJECTIVES_WIRING's own comment above re-reads its "type-level
 // fork" claim as history, not standing doctrine): work-orders'
@@ -710,8 +666,6 @@ registerDocumentFamilyWiring(IDEAS_WIRING);
 registerDocumentFamilyWiring(PROJECTS_WIRING);
 registerDocumentFamilyWiring(FLOWS_WIRING);
 registerDocumentFamilyWiring(WORK_ORDERS_WIRING);
-registerDocumentFamilyWiring(RECORDS_WIRING);
-registerDocumentFamilyWiring(RECORD_ATTRIBUTES_WIRING);
 registerDocumentFamilyWiring(OBJECTIVES_WIRING);
 registerDocumentFamilyWiring(MEMBERSHIPS_WIRING);
 registerDocumentFamilyWiring(MEMBERS_WIRING);
@@ -734,28 +688,49 @@ registerDocumentFamilyWiring(IDENTITIES_WIRING);
 // declare their return types with the SAME handler vocabulary
 // routes.ts itself uses, rather than a structurally-duplicated
 // alias.
+// GetHandler trails organization + roles (the fenced claim
+// projection). Existing handlers may ignore trailing args —
+// fewer-parameter closures are assignable.
 export type GetHandler = (
     adapter: DbAdapter,
     params: string[],
     actor: Id,
     organization: Id | undefined,
+    roles: readonly string[],
 ) => Promise<unknown>;
 
-// PutHandler, PostHandler, and DeleteHandler carry a trailing
-// pair: it is undefined for bearer-exempt and not-yet-wired
-// writes (TypeScript cannot prove bearerExempt was false inside
-// the gate's one shared dispatch switch), and defined for a
-// route named in message-pair.ts's PAIR_WIRED_ROUTE_PATTERNS.
-// A wired handler's LAST in-tx act is appending it (absence
-// there is a wiring bug — crash loud); an unwired handler
-// ignores the extra argument (TypeScript permits a closure
-// with fewer declared parameters than its assigned type).
+// PutHandler, PatchHandler, PostHandler, and DeleteHandler
+// carry a trailing pair: it is undefined for bearer-exempt and
+// not-yet-wired writes (TypeScript cannot prove bearerExempt
+// was false inside the gate's one shared dispatch switch), and
+// defined for a route named in message-pair.ts's
+// PAIR_WIRED_ROUTE_PATTERNS. A wired handler's LAST in-tx act
+// is appending it (absence there is a wiring bug — crash
+// loud); an unwired handler ignores the extra argument
+// (TypeScript permits a closure with fewer declared
+// parameters than its assigned type). Organization + roles
+// trail every write verb (reconciliation 5 / Task 10).
 export type PutHandler = (
     adapter: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
     pair: MessagePair | undefined,
+    organization: Id | undefined,
+    roles: readonly string[],
+) => Promise<unknown>;
+
+// Task 10: PATCH joins the verb alphabet. No route carries a
+// patch handler yet — the type + Route slot land so later
+// instance routes can wire without another alphabet widen.
+export type PatchHandler = (
+    adapter: DbAdapter,
+    params: string[],
+    payload: Record<string, unknown>,
+    actor: Id,
+    pair: MessagePair | undefined,
+    organization: Id | undefined,
+    roles: readonly string[],
 ) => Promise<unknown>;
 
 type DeleteHandler = (
@@ -763,16 +738,18 @@ type DeleteHandler = (
     params: string[],
     actor: Id,
     pair: MessagePair | undefined,
+    organization: Id | undefined,
+    roles: readonly string[],
 ) => Promise<void>;
 
-// PostHandler alone also carries a trailing fence
-// organization, mirroring GetHandler's rationale above: the
-// verified token claim the gate resolved, never the path.
-// Undefined for a bearer-exempt or global route. Only the
-// conversion handler consults it today (to form the created
+// PostHandler also carries fence organization + roles,
+// mirroring GetHandler's rationale: the verified token claim
+// the gate resolved, never the path. Undefined organization
+// for a bearer-exempt or global route. Only the conversion
+// handler consults organization today (to form the created
 // project's OWN document-address pair beside the operation
 // pair above); every other POST handler ignores the extra
-// trailing arg, the same fewer-parameter-closure precedent
+// trailing args, the same fewer-parameter-closure precedent
 // `pair` already established.
 type PostHandler = (
     adapter: DbAdapter,
@@ -781,12 +758,14 @@ type PostHandler = (
     actor: Id,
     pair: MessagePair | undefined,
     organization: Id | undefined,
+    roles: readonly string[],
 ) => Promise<unknown>;
 
 export interface Route {
     segments: string[];
     get?: GetHandler;
     put?: PutHandler;
+    patch?: PatchHandler;
     delete?: DeleteHandler;
     post?: PostHandler;
 }
@@ -796,6 +775,7 @@ export function route(
     handlers: {
         get?: GetHandler;
         put?: PutHandler;
+        patch?: PatchHandler;
         delete?: DeleteHandler;
         post?: PostHandler;
     },
@@ -846,8 +826,10 @@ async function membershipsAcrossAllOrganizations(
     const organizations = await deriveOrganizations(db);
     const perOrganization = await Promise.all(
         organizations.map((organization) =>
+            // Empty roles: internal pair-plane scan, not a
+            // user-facing dispatch (Task 10 GetHandler arity).
             documentCollectionGetHandler(MEMBERSHIPS_WIRING)(
-                db, [], actor, organization.id,
+                db, [], actor, organization.id, [],
             ) as Promise<MembershipEntity[]>,
         ),
     );
@@ -905,7 +887,7 @@ export interface RecordWritePairs {
 
 // The shared BODY builders — the ONE-voice seam: pure functions
 // consumed by BOTH the live route-inline formation
-// (route('records', ...) below) and the seed's invocation
+// (nested POST .../record-types) and the seed's invocation
 // construction (api/mock-data/seed-message-pairs.ts). NOT a
 // shared pair-FORMER (Premature Generalization, verification-
 // corrected against an earlier draft): the route needs the
@@ -913,7 +895,8 @@ export interface RecordWritePairs {
 // seed needs neither. Pair formation stays two pipelines,
 // sharing only these bodies.
 
-// The wire body a live PUT records/:id would carry for this
+// The wire body a live PUT .../record-types/:id would carry
+// for this
 // SAME write: the entity fields (organization_id excluded, like
 // every genuine client PUT — validateRecordDocumentBody's own
 // comment) plus the lifecycle trio. Create maps the trio from
@@ -942,50 +925,216 @@ export function recordDocumentBodyOf(
         };
 }
 
-// The id-strip destructure precedent (Task 3's Step 0 finding):
-// a live PUT record-attributes/:id's stored body is the entity
-// fields minus `id` and `organization_id` — reproduced here
-// rather than re-derived, so a synthesized attribute pair's
-// body can never drift from what the live route would have
-// stored for the identical row.
+// Nested attribute storage body (Task 8): strip id /
+// organization_id / record_id (parentage is the URI under
+// the type) and stamp DEFAULT_ATTRIBUTE_ACL_ROLES so seed
+// and composed-op pairs always carry both ACL arrays.
 export function recordAttributeDocumentBodyOf(
     row: Record<string, unknown>,
 ): Record<string, unknown> {
     const {
-        id: _id, organization_id: _organizationId, ...rest
+        id: _id,
+        organization_id: _organizationId,
+        record_id: _recordId,
+        ...rest
     } = row;
-    return rest;
+    const defaultRoles: string[] = [
+        ...DEFAULT_ATTRIBUTE_ACL_ROLES,
+    ];
+    return {
+        ...rest,
+        read_roles:
+            Array.isArray(rest['read_roles'])
+                ? rest['read_roles']
+                : [...defaultRoles],
+        write_roles:
+            Array.isArray(rest['write_roles'])
+                ? rest['write_roles']
+                : [...defaultRoles],
+    };
 }
 
-// Phase Final Task 1(a): the attribute's owning organization
-// from its STORED document-pair head response body (the
-// WRITE_RESPONSE_SPECS successBody stamp). Row fallback
-// remains for raw-seeded RESTRICT fixtures until Stage B
-// deletes the table; production always has pairs.
-async function recordAttributeOrganizationFromPairs(
+// Shared composed-write pair bundle for nested POST
+// .../record-types (Task 9 / Task 23). Document address is
+// RECORD_TYPE_DETAIL_PATTERN; attributes form at
+// ATTRIBUTE_DETAIL_PATTERN.
+async function formRecordWritePairs(
     db: DbAdapter,
-    uriPrefix: string,
-    id: Id,
-): Promise<Id | null> {
-    const headPairId = await documentHeadPairId(
-        db, uriPrefix, id,
+    b: RecordWriteBody,
+    actor: Id,
+    pair: MessagePair,
+    organization: Id,
+    documentRoutePattern: string,
+    documentParams: readonly string[],
+): Promise<RecordWritePairs> {
+    const documentBody = recordDocumentBodyOf(b);
+    // Belt-and-suspenders (the flows precedent): a create's
+    // initialStateEventId carries no non-empty check of its
+    // own (R2's byte-pinned birth names), so an empty value
+    // must still 400 here — at the document trio's own gate —
+    // rather than silently minting an invalid synthesized
+    // pair.
+    validateRecordDocumentBody(documentBody);
+    const document = await formDocumentPairFor(db, {
+        routePattern: documentRoutePattern,
+        params: [...documentParams],
+        body: documentBody,
+        requesterIdentityId: actor,
+        requestAt: pair.requestAt,
+        organization,
+    });
+    // Attribute pairs form at nested ATTRIBUTE_DETAIL_
+    // PATTERN addresses (type id = top-level body id);
+    // bodies rectified (no record_id, ACL stamped).
+    const attributePuts = await Promise.all(
+        b.attributes.map(async (attr) => {
+            const attributeBody =
+                recordAttributeDocumentBodyOf(
+                    attr as unknown as
+                        Record<string, unknown>,
+                );
+            return formDocumentPairFor(db, {
+                routePattern: ATTRIBUTE_DETAIL_PATTERN,
+                params: [
+                    organization, b.id, attr.id,
+                ],
+                body: attributeBody,
+                requesterIdentityId: actor,
+                requestAt: pair.requestAt,
+                organization,
+            });
+        }),
     );
-    if (headPairId === undefined) return null;
-    const headResponse =
-        await db.responses.getById(headPairId);
-    // pairResponseBody only reads responseMessage — form a
-    // minimal carrier so the pure decoder stays one voice.
-    const headBody = pairResponseBody({
-        responseMessage: headResponse.message,
-    } as MessagePair);
-    const organizationId = headBody?.['organization_id'];
-    if (typeof organizationId !== 'string') {
-        throw new Error(
-            'record-attribute head lacks organization_id: '
-            + id,
+    const removedIds = b.kind === 'edit'
+        ? b.removedAttributeIds : [];
+    const attributeDeletes = await Promise.all(
+        removedIds.map(async (id) => {
+            // DELETE responses are UNIVERSALLY 204 with no
+            // body (message-pair.ts resolution, mirrored
+            // here for the synthesized removal pair) —
+            // SPEC-LESS, so an explicit response override
+            // skips WRITE_RESPONSE_SPECS entirely.
+            return formDocumentPairFor(db, {
+                routePattern: ATTRIBUTE_DETAIL_PATTERN,
+                params: [
+                    organization, b.id, id,
+                ],
+                body: undefined,
+                requesterIdentityId: actor,
+                requestAt: pair.requestAt,
+                organization,
+                method: 'DELETE',
+                response: {
+                    status: HTTP_NO_CONTENT,
+                    body: undefined,
+                },
+            });
+        }),
+    );
+    return {
+        operation: pair,
+        document,
+        attributePuts,
+        attributeDeletes,
+    };
+}
+
+// Nested attributes URI prefix under a live type.
+function attributesUriPrefix(
+    organization: Id,
+    recordTypeId: Id,
+): string {
+    return '/organizations/' + organization
+        + '/record-types/' + recordTypeId
+        + '/attributes/';
+}
+
+// Live attribute heads → AttributeSchemaRow map for
+// instance ACL + value gates (Tasks 15/17). Roles and
+// type fields ride the stored nested document body.
+function attributeSchemaOf(
+    id: string,
+    body: Record<string, unknown>,
+): AttributeSchemaRow {
+    const optionsRaw = body['options'];
+    const constraintsRaw = body['constraints'];
+    const readRolesRaw = body['read_roles'];
+    const writeRolesRaw = body['write_roles'];
+    return {
+        id,
+        name: pickString(body, 'name'),
+        attributeType: pickString(
+            body, 'attribute_type',
+        ) as AttributeType,
+        options: Array.isArray(optionsRaw)
+            ? optionsRaw as string[]
+            : [],
+        constraints: Array.isArray(constraintsRaw)
+            ? constraintsRaw as Constraint[]
+            : [],
+        readRoles: Array.isArray(readRolesRaw)
+            ? readRolesRaw as string[]
+            : [],
+        writeRoles: Array.isArray(writeRolesRaw)
+            ? writeRolesRaw as string[]
+            : [],
+    };
+}
+
+async function loadAttributeSchemaById(
+    db: DbAdapter,
+    organization: Id,
+    recordTypeId: Id,
+): Promise<Map<string, AttributeSchemaRow>> {
+    const prefix = attributesUriPrefix(
+        organization, recordTypeId,
+    );
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere('uri_prefix', prefix),
+        db.responses.getAllWhere('uri_prefix', prefix),
+    ]);
+    const documents = deriveDocumentsAt(
+        requests, responses, prefix,
+    );
+    const map = new Map<string, AttributeSchemaRow>();
+    for (const [id, document] of documents) {
+        map.set(
+            id,
+            attributeSchemaOf(id, document.body),
         );
     }
-    return organizationId;
+    return map;
+}
+
+// Wire row for a nested attribute head. Prefers the stored
+// response body (WRITE_RESPONSE_SPECS stamp carries create-
+// time ACL defaults when the client omitted them); falls
+// back to the request body + address echoes. Storage always
+// carries both ACL arrays after a successful create.
+async function nestedAttributeWireOf(
+    db: DbAdapter,
+    organization: Id,
+    recordTypeId: Id,
+    attributeId: Id,
+    pairId: string,
+    requestBody: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+    const headResponse = await db.responses.getById(pairId);
+    const responseBody = pairResponseBody({
+        responseMessage: headResponse.message,
+    } as MessagePair);
+    if (
+        responseBody !== undefined
+        && typeof responseBody['name'] === 'string'
+    ) {
+        return responseBody;
+    }
+    return {
+        id: attributeId,
+        organization_id: organization,
+        record_type_id: recordTypeId,
+        ...requestBody,
+    };
 }
 
 // Record creation or edit, discriminated by payload.kind.
@@ -1034,9 +1183,14 @@ export async function postRecordWriteOp(
                 const boundOrganization = requireOrganization(
                     organization ?? body.record.organization_id,
                 );
+                // Flat window: body.id is the record (type)
+                // id; fourth-leg instance scan scopes there.
                 const referrers =
                     await collectAttributeReferrers(
-                        view, boundOrganization, removedIds,
+                        view,
+                        boundOrganization,
+                        removedIds,
+                        body.id,
                     );
                 for (const [id, refs] of referrers) {
                     if (hasReferrers(refs)) {
@@ -1175,7 +1329,8 @@ export async function postProjectDocumentOp(
 // head-presence-defined, byte-identical to postIdeaDocumentOp/
 // postProjectDocumentOp. UNLIKE those two, a record's genesis
 // normally arrives through the composed create
-// (postRecordWriteOp, POST /records) rather than this PUT —
+// (postRecordWriteOp, POST .../record-types) rather than
+// this PUT —
 // this op's genesis arm exists for a live PUT-first flow.
 // Phase Final Task 2: the records ROW half is stripped — the
 // pair + states.postEvent commit as ONE transaction (states
@@ -2674,6 +2829,7 @@ export interface WriteResponseSpec {
 // level (see isPerVerbWriteResponseSpec in api.ts).
 export interface PerVerbWriteResponseSpec {
     readonly put?: WriteResponseSpec;
+    readonly patch?: WriteResponseSpec;
     readonly post?: WriteResponseSpec;
 }
 
@@ -2738,26 +2894,101 @@ export const WRITE_RESPONSE_SPECS:
             ),
         }),
     },
-    'records': { status: HTTP_NO_CONTENT },
-    // The generic document-form builder (api/document-family.ts)
-    // absorbs the hand-written successBody — see the ideas/:id
-    // entry above for the shared rationale. records/:id emits the
-    // SAME bytes as before ({id, organization_id, name,
-    // description, position}): validateRecordDocumentBody's
-    // entity/trio separation guarantees doc.entity never carries
-    // the trio, byte-identical to today's hand-built body.
-    'records/:id': documentWriteResponseSpec(RECORDS_WIRING),
-    // The generic document-form builder (api/document-family.ts)
-    // absorbs the hand-written successBody — see the ideas/:id
-    // entry above for the shared rationale. record-attributes/:id
-    // emits the SAME bytes as before ({id, organization_id,
-    // record_id, name, attribute_type, sort_order, options,
-    // constraints}): validateRecordAttributeDocumentBody's
-    // entity/organization_id separation guarantees doc.entity
-    // never carries the key, byte-identical to today's
-    // hand-built body.
-    'record-attributes/:id':
-        documentWriteResponseSpec(RECORD_ATTRIBUTES_WIRING),
+    // Nested composed POST (Task 9 / Task 23): 204 op response;
+    // document + attribute pairs form at nested addresses.
+    [RECORD_TYPES_COLLECTION_PATTERN]: {
+        status: HTTP_NO_CONTENT,
+    },
+    // Nested record-types detail (Task 3): put-only per-verb
+    // entry. Id is param 1 (:record-type-id); organization_id
+    // is param 0 (path org, already org-matched at the gate).
+    [RECORD_TYPE_DETAIL_PATTERN]: {
+        put: {
+            status: HTTP_OK,
+            successBody: (params, body) => {
+                const doc = validateRecordDocumentBody(
+                    withoutId(body ?? {}),
+                );
+                return {
+                    id: param(params, 1),
+                    organization_id: param(params, 0),
+                    ...doc.entity,
+                };
+            },
+        },
+    },
+    // Nested attributes detail (Task 7): put-only. Params:
+    // 0=org, 1=type, 2=attribute. Address-derived echoes for
+    // organization_id / record_type_id. Create stamps ACL
+    // defaults when keys omitted; replace requires both —
+    // successBody picks by key presence for the response
+    // shape; the handler re-checks against head presence.
+    [ATTRIBUTE_DETAIL_PATTERN]: {
+        put: {
+            status: HTTP_OK,
+            successBody: (params, body) => {
+                const raw = withoutId(body ?? {});
+                const entity =
+                    'read_roles' in raw
+                    && 'write_roles' in raw
+                        ? validateAttributeDocumentReplace(
+                            raw,
+                        )
+                        : validateAttributeDocumentCreate(
+                            raw,
+                        );
+                return {
+                    id: param(params, 2),
+                    organization_id: param(params, 0),
+                    record_type_id: param(params, 1),
+                    ...entity,
+                };
+            },
+        },
+    },
+    // Nested instances detail (Task 15 PUT create-only;
+    // Task 17 PATCH delta). Wire success body echoes the
+    // request delta only — never the merged head.
+    [INSTANCE_DETAIL_PATTERN]: {
+        put: {
+            status: HTTP_OK,
+            successBody: (params, body) => {
+                const validated = validateInstancePutBody(
+                    body ?? {},
+                );
+                return {
+                    id: param(params, 2),
+                    organization_id: param(params, 0),
+                    record_type_id: param(params, 1),
+                    set: validated.set,
+                };
+            },
+        },
+        // PATCH successBody must NOT validate the delta.
+        // Pair formation runs before the gate's If-Match
+        // ladder (replay needs the hash first); body shape
+        // 400 is the handler's job so 428/412 answer first
+        // (Task 20 ladder steps 6–7). On the 200 path the
+        // body is already valid, so the echo matches the
+        // handler's re-validated set/clear.
+        patch: {
+            status: HTTP_OK,
+            successBody: (params, body) => {
+                const raw = body ?? {};
+                return {
+                    id: param(params, 2),
+                    organization_id: param(params, 0),
+                    record_type_id: param(params, 1),
+                    set: Array.isArray(raw['set'])
+                        ? raw['set']
+                        : [],
+                    clear: Array.isArray(raw['clear'])
+                        ? raw['clear']
+                        : [],
+                };
+            },
+        },
+    },
     'flows/:id/records/:frid': {
         status: HTTP_OK,
         successBody: (params, body) => ({
@@ -3106,6 +3337,192 @@ export async function formDocumentPairFor(
         ...(chain === 'follows' && head !== undefined
             ? { follows: head } : {}),
     });
+}
+
+// Instance DELETE tombstone append (Task 18 / R4 / R9).
+// Spent address = any prior response at the instance
+// uri_id (live head OR existing tombstone). Virgin
+// address → missedReadError (R2). Spent → append the
+// gate-formed DELETE pair in one tx (R4 tombstone-wins
+// is ledger-complete — every non-replay DELETE appends,
+// including over an already-tombstoned head). In-tx
+// re-probe (R9) closes a concurrent un-spend race:
+// never treat a virgin address as tombstonable. No
+// attribute ACL — path-tier only (existence, not values).
+// If-Match on DELETE is not a dialect (gate ignores it).
+export async function postInstanceDeleteOp(
+    db: DbAdapter,
+    p: string[],
+    _actor: Id,
+    pair: MessagePair | undefined,
+    organization: Id | undefined,
+    _roles: readonly string[],
+): Promise<void> {
+    const org = requireOrganization(organization);
+    const typeId = param(p, 1);
+    const instanceId = param(p, 2);
+    await requireRecordTypeExists(db, org, typeId);
+    if (pair === undefined) {
+        throw new Error(
+            'instance DELETE requires a formed pair',
+        );
+    }
+    const prefix = instancesUriPrefix(org, typeId);
+    const spentPre = await instanceAddressSpent(
+        db, prefix, instanceId,
+    );
+    if (!spentPre) {
+        throw await missedReadError(
+            db, instanceId, org, 'record_instances',
+        );
+    }
+    await db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            // R9: re-probe spent inside the append tx so a
+            // concurrent writer cannot leave us appending a
+            // tombstone onto a virgin address, and so a
+            // concurrent tombstone still lets us append
+            // (tombstone-wins / ledger-complete).
+            const spent = await instanceAddressSpent(
+                view, prefix, instanceId,
+            );
+            if (!spent) {
+                throw await missedReadError(
+                    view, instanceId, org,
+                    'record_instances',
+                );
+            }
+            await appendMessagePair(view, pair);
+        },
+    );
+}
+
+async function instanceAddressSpent(
+    db: DbAdapter,
+    prefix: string,
+    instanceId: Id,
+): Promise<boolean> {
+    const responses = await db.responses.getAllWhere(
+        'uri_prefix', prefix,
+    );
+    return responses.some(
+        (response) => response.uri_id === instanceId,
+    );
+}
+
+// Instance PATCH two-pair append (Task 17 / R5 / R9).
+// ifMatchTarget is the CLIENT's gate-verified If-Match pair
+// id recovered from the formed wire pair — never a live
+// re-derived head. Merge values read the current head only
+// when it still equals ifMatchTarget; revision.follows and
+// the in-tx check both anchor on ifMatchTarget so a concurrent
+// advance cannot silently rebase.
+export async function postInstancePatchOp(
+    db: DbAdapter,
+    p: string[],
+    body: Record<string, unknown>,
+    actor: Id,
+    pair: MessagePair | undefined,
+    organization: Id | undefined,
+    roles: readonly string[],
+): Promise<void> {
+    const org = requireOrganization(organization);
+    const typeId = param(p, 1);
+    const instanceId = param(p, 2);
+    const pathname = '/organizations/' + org
+        + '/record-types/' + typeId
+        + '/instances/' + instanceId;
+    if (pair === undefined) {
+        throw new Error(
+            'instance PATCH requires a formed pair',
+        );
+    }
+    const ifMatchTarget = ifMatchFromPair(pair);
+    if (ifMatchTarget === undefined) {
+        // Gate requires If-Match; a pair without it is a
+        // wiring bug, never a normal path.
+        throw new Error(
+            'instance PATCH pair lacks If-Match',
+        );
+    }
+    // Values only — head must still equal the client's
+    // If-Match target or we 412 (no silent rebase).
+    const head = await deriveInstanceHead(
+        db, org, typeId, instanceId,
+    );
+    if (
+        head === undefined
+        || head.pairId !== ifMatchTarget
+    ) {
+        throw new ApiError(
+            'If-Match does not match the current '
+                + 'instance at ' + pathname,
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+    const validated = validateInstancePatchBody(body);
+    const attributesById = await loadAttributeSchemaById(
+        db, org, typeId,
+    );
+    const aclIds = [
+        ...validated.set.map(
+            (entry) => entry.attribute_id,
+        ),
+        ...validated.clear,
+    ];
+    assertWritableAttributeIds(
+        aclIds, attributesById, roles,
+    );
+    validateInstanceValues(
+        validated.set, attributesById,
+    );
+    const mergedValues = mergeInstanceValues(
+        head.values, {
+            set: validated.set,
+            clear: validated.clear,
+        },
+    );
+    // Revision: EXPLICIT follows = ifMatchTarget (never a
+    // newer live head). Wire is operation-plane (no
+    // follows); UNIQUE on revision.follows serializes
+    // concurrent writers. Ghost-replay closed via
+    // headerFields: [] on the synthetic revision.
+    const revisionPair = await formDocumentPairFor(db, {
+        routePattern: INSTANCE_DETAIL_PATTERN,
+        params: [org, typeId, instanceId],
+        method: 'PUT',
+        body: { values: mergedValues },
+        requesterIdentityId: actor,
+        requestAt: pair.requestAt,
+        organization: org,
+        chain: 'follows',
+        follows: ifMatchTarget,
+        response: { status: HTTP_OK, body: {} },
+    });
+    await db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            // R9: live head must still be the client's
+            // If-Match target, not merely "unchanged since
+            // our re-derive".
+            const live = await deriveInstanceHead(
+                view, org, typeId, instanceId,
+            );
+            if (
+                live === undefined
+                || live.pairId !== ifMatchTarget
+            ) {
+                throw new ApiError(
+                    'If-Match does not match the current '
+                        + 'instance at ' + pathname,
+                    HTTP_PRECONDITION_FAILED,
+                );
+            }
+            await appendMessagePair(view, pair);
+            await appendMessagePair(view, revisionPair);
+        },
+    );
 }
 
 export const routes: Route[] = [
@@ -4458,133 +4875,193 @@ export const routes: Route[] = [
     // (Phase 15 Task 7): live writes ride the transition
     // fold only. WRITE_RESPONSE_SPECS entry + seed address
     // formation SURVIVE (finding 7).
-    // GET records is FLIPPED (Task 7): the collection derives
-    // from the message ledger rather than the old records
-    // table. Rides the generic documentCollectionGetHandler
-    // — wire-identical to the hand-written db.records.getAll()
-    // dispatch it replaces (RECORDS_WIRING's own entityOf,
-    // recordDocumentEntityOf, already picks the exact {id,
-    // organization_id, name, description, position} shape, so
-    // the list needs no records-special reassembly step). POST
-    // stays this hand-written bundle — records' own create forms
-    // the document PLUS N attribute pairs in one pass
-    // (postRecordWriteOp), unlike ideas/projects' bare genesis
-    // fold, so a separate create verb remains here, mirroring
-    // work-orders' and flows' own precedent.
-    route('records', {
-        get: documentCollectionGetHandler(RECORDS_WIRING),
-        // Member-tier POST — /records carries POST in
-        // MEMBER_VERBS. Forms the document pair, one
-        // attribute-PUT pair per attributes[] entry, and one
-        // attribute-DELETE pair per removedAttributeIds entry
-        // (edit only) pre-tx, beside the gate's own operation
-        // pair — the SAME shape a live PUT records/:id and N/M
-        // live PUT/DELETE record-attributes/:id requests would
-        // each carry — ONLY when the gate supplied both a pair
-        // and a fence organization (the route('flows') condition
-        // verbatim); a below-facade caller (api/mock-data.ts, no
-        // gate) skips all pairs, preserving dual-write
-        // discipline. See postRecordWriteOp for the transaction
-        // shape.
+    // Nested record-types surface (Task 2 READ + Task 3
+    // WRITE + Task 9 composed POST). Org-nested primary
+    // addresses; member GET via MEMBER_VERBS
+    // '/organizations/:id/record-types'; mutations stay admin
+    // by absence. Handlers are inline (param index 1 is
+    // :record-type-id) rather than the flat document-family
+    // factories — documentPutHandler always takes param 0 as
+    // id. PUT reuses postRecordDocumentOp (same trio body /
+    // pair append). POST reuses formRecordWritePairs +
+    // postRecordWriteOp with nested document addresses.
+    // DELETE is inline records/:id posture plus type RESTRICT.
+    route(RECORD_TYPES_COLLECTION_PATTERN, {
+        get: (db, _p, _actor, organization) =>
+            deriveRecordTypeCollection(
+                db, requireOrganization(organization),
+            ),
+        // Admin-only composed create/edit (MEMBER_VERBS has
+        // GET only). Same transaction / RESTRICT discipline
+        // as flat POST /records; document pair at the nested
+        // detail address, attributes at ATTRIBUTE_DETAIL_
+        // PATTERN.
         post: async (
             db, _p, body, actor, pair, organization,
         ) => {
             let pairs: RecordWritePairs | undefined;
-            if (pair !== undefined && organization !== undefined) {
+            if (
+                pair !== undefined
+                && organization !== undefined
+            ) {
                 const b = validateRecordWriteBody(body);
-                const documentBody = recordDocumentBodyOf(b);
-                // Belt-and-suspenders (the flows precedent): a
-                // create's initialStateEventId carries no
-                // non-empty check of its own (R2's byte-pinned
-                // birth names), so an empty value must still
-                // 400 here — at the document trio's own gate —
-                // rather than silently minting an invalid
-                // synthesized pair.
-                validateRecordDocumentBody(documentBody);
-                const document = await formDocumentPairFor(db, {
-                    routePattern: 'records/:id',
-                    params: [b.id],
-                    body: documentBody,
-                    requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    organization,
-                });
-                const attributePuts = await Promise.all(
-                    b.attributes.map(async (attr) => {
-                        const attributeBody =
-                            recordAttributeDocumentBodyOf(
-                                attr as unknown as
-                                    Record<string, unknown>,
-                            );
-                        return formDocumentPairFor(db, {
-                            routePattern: 'record-attributes/:id',
-                            params: [attr.id],
-                            body: attributeBody,
-                            requesterIdentityId: actor,
-                            requestAt: pair.requestAt,
-                            organization,
-                        });
-                    }),
+                pairs = await formRecordWritePairs(
+                    db, b, actor, pair, organization,
+                    RECORD_TYPE_DETAIL_PATTERN,
+                    [organization, b.id],
                 );
-                const removedIds = b.kind === 'edit'
-                    ? b.removedAttributeIds : [];
-                const attributeDeletes = await Promise.all(
-                    removedIds.map(async (id) => {
-                        // DELETE responses are UNIVERSALLY 204
-                        // with no body (message-pair.ts
-                        // resolution, mirrored here for the
-                        // synthesized removal pair) — SPEC-LESS,
-                        // so an explicit response override skips
-                        // WRITE_RESPONSE_SPECS entirely.
-                        return formDocumentPairFor(db, {
-                            routePattern: 'record-attributes/:id',
-                            params: [id],
-                            body: undefined,
-                            requesterIdentityId: actor,
-                            requestAt: pair.requestAt,
-                            organization,
-                            method: 'DELETE',
-                            response: {
-                                status: HTTP_NO_CONTENT,
-                                body: undefined,
-                            },
-                        });
-                    }),
-                );
-                pairs = {
-                    operation: pair,
-                    document,
-                    attributePuts,
-                    attributeDeletes,
-                };
             }
             return postRecordWriteOp(
                 db, body, actor, pairs, organization,
             );
         },
     }),
-    // records/:id is the fifth family, and the FIRST whose own
-    // :id address also carries a live DELETE (RECORDS_WIRING's
-    // own comment names why). GET is FLIPPED (Task 7): absorbed
-    // into the generic documentGetHandler(RECORDS_WIRING) — the
-    // SAME wiring row PUT already rides — wire-identical to the
-    // hand-written db.records.getById dispatch it replaces
-    // (recordDocumentEntityOf reproduces the shape verbatim, and
-    // the 'trio' lifecycle walk 404s a lifecycle-deleted record
-    // exactly as the old physical-delete plane did). PUT stays
-    // documentPutHandler(RECORDS_WIRING) — the Decision 7 trio
-    // fold, unchanged from before this flip. DELETE stays
-    // hand-written — a splice + pair append in the same
-    // transaction, exactly as before (the factory's fixed
-    // closures have no per-family pair selector; see
-    // message-pair.ts) — a splice route is not a document
-    // verb-class member (Task 9 covers the DELETE pattern).
-    route('records/:id', {
-        get: documentGetHandler(RECORDS_WIRING),
-        put: documentPutHandler(RECORDS_WIRING),
-        // Phase Final Task 2: records ROW half stripped —
-        // DELETE is a pure pair-plane tombstone append.
-        delete: (db, _p, _actor, pair) => {
+    route(RECORD_TYPE_DETAIL_PATTERN, {
+        get: (db, p, _actor, organization) =>
+            deriveRecordTypeEntity(
+                db, requireOrganization(organization),
+                param(p, 1),
+            ),
+        put: (db, p, body, actor, pair) =>
+            postRecordDocumentOp(
+                db, param(p, 1), body, actor, pair,
+            ),
+        // Admin DELETE with NET-NEW type RESTRICT. RESTRICT
+        // check and tombstone append share one tx; referrer
+        // scan awaits only row ops on the view (auto-commit
+        // discipline). Path org is already gate-matched to
+        // the token org; DeleteHandler has no fence arg.
+        delete: async (db, params, _actor, pair) => {
+            const organization = requireOrganization(
+                param(params, 0),
+            );
+            const id = param(params, 1);
+            await db.transaction(
+                ['requests', 'responses'],
+                async (view) => {
+                    const refs =
+                        await collectRecordTypeReferrers(
+                            view, organization, id,
+                        );
+                    if (hasTypeReferrers(refs)) {
+                        throw new ApiError(
+                            describeTypeReferrers(id, refs),
+                            HTTP_CONFLICT,
+                        );
+                    }
+                    if (pair !== undefined) {
+                        await appendMessagePair(view, pair);
+                    }
+                },
+            );
+        },
+    }),
+    route(RECORD_TYPE_HISTORY_PATTERN, {
+        get: async (db, p, _actor, organization) => {
+            const org = requireOrganization(organization);
+            const id = param(p, 1);
+            const history =
+                await deriveRecordTypeStateHistory(
+                    db, org, id,
+                );
+            if (history.length === 0) {
+                throw await missedReadError(
+                    db, id, org, 'record_types',
+                );
+            }
+            return history.toReversed();
+        },
+    }),
+    // Nested attributes collection (Task 7): member GET under
+    // a live type. Parent probe first (record_types 404);
+    // heads at .../attributes/, id-lex. No POST (parity with
+    // the flat family — composed op + PUT are the creators).
+    route(ATTRIBUTES_COLLECTION_PATTERN, {
+        get: async (db, p, _actor, organization) => {
+            const org = requireOrganization(organization);
+            const typeId = param(p, 1);
+            await requireRecordTypeExists(db, org, typeId);
+            const prefix = attributesUriPrefix(org, typeId);
+            const [requests, responses] =
+                await Promise.all([
+                    db.requests.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                    db.responses.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                ]);
+            const documents = deriveDocumentsAt(
+                requests, responses, prefix,
+            );
+            const rows: { id: string }[] = [];
+            for (const [id, document] of documents) {
+                const wire = await nestedAttributeWireOf(
+                    db, org, typeId, id,
+                    document.pairId, document.body,
+                );
+                rows.push(wire as { id: string });
+            }
+            return rows.sort(byIdAscending);
+        },
+    }),
+    // Nested attribute detail (Task 7): member GET, admin
+    // PUT (create vs replace by head presence), admin DELETE
+    // with four-leg RESTRICT. No WRITE_AUTHORIZERS (deep
+    // sub-family — parent type 404 + path org gate).
+    route(ATTRIBUTE_DETAIL_PATTERN, {
+        get: async (db, p, _actor, organization) => {
+            const org = requireOrganization(organization);
+            const typeId = param(p, 1);
+            const attrId = param(p, 2);
+            await requireRecordTypeExists(db, org, typeId);
+            const prefix = attributesUriPrefix(org, typeId);
+            const [requests, responses] =
+                await Promise.all([
+                    db.requests.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                    db.responses.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                ]);
+            const document = deriveDocumentsAt(
+                requests, responses, prefix,
+            ).get(attrId);
+            if (document === undefined) {
+                throw await missedReadError(
+                    db, attrId, org, 'record_attributes',
+                );
+            }
+            return nestedAttributeWireOf(
+                db, org, typeId, attrId,
+                document.pairId, document.body,
+            );
+        },
+        put: async (db, p, body, _actor, pair) => {
+            const org = param(p, 0);
+            const typeId = param(p, 1);
+            const attrId = param(p, 2);
+            await requireRecordTypeExists(db, org, typeId);
+            const prefix = attributesUriPrefix(org, typeId);
+            const [requests, responses] =
+                await Promise.all([
+                    db.requests.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                    db.responses.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                ]);
+            const hasHead = deriveDocumentsAt(
+                requests, responses, prefix,
+            ).has(attrId);
+            const raw = withoutId(body);
+            if (hasHead) {
+                validateAttributeDocumentReplace(raw);
+            } else {
+                validateAttributeDocumentCreate(raw);
+            }
             return db.transaction(
                 ['requests', 'responses'],
                 async (view) => {
@@ -4594,79 +5071,31 @@ export const routes: Route[] = [
                 },
             );
         },
-    }),
-    // GET records/:id/history (states-URI elimination A3):
-    // deriveRecordStateHistory ASC → DESC; empty →
-    // missedReadError('records'). Member-tier GET via
-    // matchesOnSegmentBoundary on '/records'.
-    route('records/:id/history', {
-        get: documentStateHistoryHandler(
-            deriveRecordStateHistory, 'records',
-        ),
-    }),
-    // GET is FLIPPED (Task 7): the collection derives from the
-    // message ledger rather than the old record_attributes
-    // table. Rides the generic documentCollectionGetHandler —
-    // wire-identical to the hand-written
-    // db.recordAttributes.getAll() dispatch it replaces
-    // (RECORD_ATTRIBUTES_WIRING's own entityOf,
-    // recordAttributeDocumentEntityOf, already spreads the head
-    // pair's body verbatim, so the list needs no
-    // record-attributes-special reassembly step). No POST here —
-    // record-attributes carries no create verb of its own,
-    // unchanged from before this flip.
-    route('record-attributes', {
-        get: documentCollectionGetHandler(
-            RECORD_ATTRIBUTES_WIRING,
-        ),
-    }),
-    // record-attributes/:id is the sixth family. GET is FLIPPED
-    // (Task 7): absorbed into the generic
-    // documentGetHandler(RECORD_ATTRIBUTES_WIRING) — the SAME
-    // wiring row PUT already rides — wire-identical to the
-    // hand-written db.recordAttributes.getById dispatch it
-    // replaces (recordAttributeDocumentEntityOf reproduces the
-    // shape verbatim; the 'stateless' lifecycle skips the trio
-    // walk entirely, so a DELETE head is the only tombstone
-    // signal, already 404-absent via deriveDocumentsAt). PUT
-    // stays documentPutHandler(RECORD_ATTRIBUTES_WIRING),
-    // unchanged from before this flip. DELETE stays
-    // hand-written — the RESTRICT check and the pair append ride
-    // the SAME transaction, exactly as before (the factory's
-    // fixed closures have no per-family pair selector; see
-    // message-pair.ts) — a splice route is not a document
-    // verb-class member (Task 9 covers the DELETE pattern).
-    route('record-attributes/:id', {
-        get: documentGetHandler(RECORD_ATTRIBUTES_WIRING),
-        put: documentPutHandler(RECORD_ATTRIBUTES_WIRING),
-        // DELETE is RESTRICT, not cascade: an attribute
-        // still named by state_field_values rows or bound
-        // in a flow / work-order graph refuses to die (409
-        // naming the referrers) — destroying it would
-        // orphan immutable event payloads. The referrer
-        // check and the splice ride ONE transaction, so no
-        // writer can slip a new reference between them; the
-        // pair appends inside that SAME transaction, as the
-        // last act after the safe delete succeeds.
         delete: async (db, p, _actor, pair) => {
-            const id = param(p, 0);
-            // Phase Final Stage B: organization_id from the
-            // attribute's STORED document-pair response body
-            // only — record_attributes table retired. RESTRICT
-            // 409 bytes stay; the pair is the only delete
-            // side-effect.
+            const org = param(p, 0);
+            const typeId = param(p, 1);
+            const attrId = param(p, 2);
+            await requireRecordTypeExists(db, org, typeId);
             if (pair === undefined) {
                 throw new Error(
-                    'record-attribute DELETE without pair',
+                    'nested attribute DELETE without pair',
                 );
             }
-            const pairOrganizationId =
-                await recordAttributeOrganizationFromPairs(
-                    db, pair.uriPrefix, id,
-                );
-            if (pairOrganizationId === null) {
-                throw new EntityNotFoundError(
-                    'record_attributes', id,
+            const prefix = attributesUriPrefix(org, typeId);
+            const [requests, responses] =
+                await Promise.all([
+                    db.requests.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                    db.responses.getAllWhere(
+                        'uri_prefix', prefix,
+                    ),
+                ]);
+            if (!deriveDocumentsAt(
+                requests, responses, prefix,
+            ).has(attrId)) {
+                throw await missedReadError(
+                    db, attrId, org, 'record_attributes',
                 );
             }
             return db.transaction(
@@ -4676,14 +5105,193 @@ export const routes: Route[] = [
                 ])],
                 async (view) => {
                     await deleteRecordAttributeSafe(
-                        view,
-                        pairOrganizationId,
-                        id,
+                        view, org, attrId, typeId,
                     );
                     await appendMessagePair(view, pair);
                 },
             );
         },
+    }),
+    // Nested instances collection (Task 16): member GET
+    // under a live type. Parent probe first; heads via
+    // deriveInstanceCollection; each row projects values
+    // by attribute ACL and embeds etag (pair id, no quotes).
+    route(INSTANCES_COLLECTION_PATTERN, {
+        get: async (
+            db, p, _actor, organization, roles,
+        ) => {
+            const org = requireOrganization(organization);
+            const typeId = param(p, 1);
+            await requireRecordTypeExists(db, org, typeId);
+            const attributesById =
+                await loadAttributeSchemaById(
+                    db, org, typeId,
+                );
+            const heads = await deriveInstanceCollection(
+                db, org, typeId,
+            );
+            return heads.map((head) => ({
+                id: head.id,
+                organization_id: org,
+                record_type_id: typeId,
+                values: projectReadableValues(
+                    head.values, attributesById, roles,
+                ),
+                etag: head.pairId,
+            }));
+        },
+    }),
+    // Nested instance value-revision history (Task 19).
+    // NOT a lifecycle-trio clone: each entry is full state
+    // from a revision (or genesis) PUT pair (R5 — no fold),
+    // projected by the caller's CURRENT read ACL. Wire
+    // (at, id) DESC so index 0 is the live head. Empty →
+    // missedReadError('record_instances') (R2: foreign 403
+    // / absent-or-tombstoned 404). Parent type miss first.
+    // Segment count > detail so first-match is safe either
+    // order; registered before detail for literal-history
+    // house order (work-orders/history precedent).
+    route(INSTANCE_HISTORY_PATTERN, {
+        get: async (
+            db, p, _actor, organization, roles,
+        ) => {
+            const org = requireOrganization(organization);
+            const typeId = param(p, 1);
+            const instanceId = param(p, 2);
+            await requireRecordTypeExists(db, org, typeId);
+            const revisions = await deriveInstanceRevisions(
+                db, org, typeId, instanceId,
+            );
+            if (revisions.length === 0) {
+                throw await missedReadError(
+                    db, instanceId, org,
+                    'record_instances',
+                );
+            }
+            const attributesById =
+                await loadAttributeSchemaById(
+                    db, org, typeId,
+                );
+            return revisions.toReversed().map((rev) => ({
+                at: rev.at,
+                etag: rev.pairId,
+                values: projectReadableValues(
+                    rev.values, attributesById, roles,
+                ),
+            }));
+        },
+    }),
+    // Nested instance detail (Task 15 PUT create-only;
+    // Task 16 GET projection + missedReadError R2;
+    // Task 17 PATCH If-Match + full-state revision;
+    // Task 18 DELETE tombstone-wins R4/R9).
+    // Ladder PUT: parent type 404 → body 400 → write-ACL
+    // 403 → value 400 → in-tx spent-address check (R9) +
+    // append. Ladder PATCH: shape → unknown attr → ACL on
+    // set∪clear → value on set → two-pair tx (R5/R9).
+    // Ladder DELETE: parent type 404 → address spent
+    // (any pair, including tombstone) else missedReadError;
+    // in-tx re-probe + append tombstone (R4 ledger-
+    // complete). No WRITE_AUTHORIZERS (deep sub-family).
+    // Not in DOCUMENT_CLASS (R10). GET/write ETag attaches
+    // in api.ts. DELETE is out of WRITE_RESPONSE_SPECS
+    // (gate hardcodes 204).
+    route(INSTANCE_DETAIL_PATTERN, {
+        get: async (
+            db, p, _actor, organization, roles,
+        ) => {
+            const org = requireOrganization(organization);
+            const typeId = param(p, 1);
+            const instanceId = param(p, 2);
+            await requireRecordTypeExists(db, org, typeId);
+            const head = await deriveInstanceHead(
+                db, org, typeId, instanceId,
+            );
+            if (head === undefined) {
+                throw await missedReadError(
+                    db, instanceId, org,
+                    'record_instances',
+                );
+            }
+            const attributesById =
+                await loadAttributeSchemaById(
+                    db, org, typeId,
+                );
+            return {
+                id: head.id,
+                organization_id: org,
+                record_type_id: typeId,
+                values: projectReadableValues(
+                    head.values, attributesById, roles,
+                ),
+            };
+        },
+        put: async (
+            db, p, body, _actor, pair, _organization,
+            roles,
+        ) => {
+            const org = param(p, 0);
+            const typeId = param(p, 1);
+            const instanceId = param(p, 2);
+            const pathname = '/organizations/' + org
+                + '/record-types/' + typeId
+                + '/instances/' + instanceId;
+            await requireRecordTypeExists(
+                db, org, typeId,
+            );
+            const validated =
+                validateInstancePutBody(body);
+            const attributesById =
+                await loadAttributeSchemaById(
+                    db, org, typeId,
+                );
+            const attributeIds = validated.set.map(
+                (entry) => entry.attribute_id,
+            );
+            assertWritableAttributeIds(
+                attributeIds, attributesById, roles,
+            );
+            validateInstanceValues(
+                validated.set, attributesById,
+            );
+            const prefix = instancesUriPrefix(
+                org, typeId,
+            );
+            await db.transaction(
+                ['requests', 'responses'],
+                async (view) => {
+                    const responses =
+                        await view.responses
+                            .getAllWhere(
+                                'uri_prefix', prefix,
+                            );
+                    const spent = responses.some(
+                        (r) => r.uri_id === instanceId,
+                    );
+                    if (spent) {
+                        throw new ApiError(
+                            'instance already exists at '
+                                + pathname,
+                            HTTP_CONFLICT,
+                        );
+                    }
+                    if (pair !== undefined) {
+                        await appendMessagePair(
+                            view, pair,
+                        );
+                    }
+                },
+            );
+        },
+        patch: (db, p, body, actor, pair, organization,
+            roles,
+        ) => postInstancePatchOp(
+            db, p, body, actor, pair, organization, roles,
+        ),
+        delete: (db, p, actor, pair, organization, roles,
+        ) => postInstanceDeleteOp(
+            db, p, actor, pair, organization, roles,
+        ),
     }),
     // Flow↔record bindings nest under their parent flow: the flow
     // id is param 0, so the SERVER filters the collection to that

@@ -5,7 +5,8 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from
+    './token-fixtures.ts';
 import {
     seedAdminSchema,
     seedOrganizationDocument,
@@ -17,11 +18,9 @@ import {
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 
-// Verify-first (Correction C): facadeRequest forwards POST
-// bodies and re-enters the gate against the org-scoped
-// `effective` adapter, so a records POST through
-// the facade is org-fenced exactly like a flat PUT. These
-// pin that behavior; no facade code is added unless red.
+// Task 23: nested record-types is in-table (no facade
+// re-entry). Flat /organizations/:org/records re-enters flat
+// and 404s. Pins keep nested org stamp + flat retirement.
 
 const BASE = 'http://localhost';
 
@@ -39,9 +38,6 @@ function req(
     });
 }
 
-// An edit record write puts only the record row — the path
-// that isolates the org stamp from the create-path member
-// and initial-state writes.
 function editBody(organization: string) {
     return {
         kind: 'edit',
@@ -58,24 +54,15 @@ function editBody(organization: string) {
     };
 }
 
-// Below-facade pair formation (the member-fixtures.ts idiom):
-// the facade's own org-A authz check derives from the pair plane
-// once memberships/role_grants flip, so a raw row here would go
-// derivation-invisible. Every id/field value stays IDENTICAL to
-// the raw puts these replace — only the write mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
     id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
     const organization = body.organization_id as string;
-    // A real organizations/:id document (Phase 13 Task 3's
-    // fixture prerequisite; seedOrganizationDocument is idempotent
-    // — a no-op on a repeat organization id) — a membership pair
-    // with no document for its own org stays derivation-invisible
-    // to deriveMembershipsForIdentity's own enumerate-then-probe
-    // (via deriveOrganizations).
-    await seedOrganizationDocument(db, organization, organization);
+    await seedOrganizationDocument(
+        db, organization, organization,
+    );
     const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
     if (spec === undefined || !('status' in spec)) {
         throw new Error(
@@ -104,9 +91,6 @@ async function seedMembershipPair(
     );
 }
 
-// `current` holds admin in org A (the administered org) and
-// is a member of org A only. Roles are per-org since Phase 3,
-// so the org-A grant authorizes the facade write.
 async function oneOrganization(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -118,34 +102,55 @@ async function oneOrganization(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('a facade records write stamps the bound org'
+test('nested record-types write stamps the bound org'
     + ' over a forged record', async () => {
     const db = await oneOrganization();
+    const token = await organizationToken('current', 'A');
     const res = await handleRequest(db, req(
-        'POST', '/organizations/A/records',
-        await devToken('current'),
+        'POST', '/organizations/A/record-types',
+        token,
         editBody('B')));
     assert.equal(res.status, 204);
-    // Phase Final Task 2: records ROW half stripped — wire
-    // GET stamps organization_id from the fence.
     const get = await handleRequest(db, req(
-        'GET', '/organizations/A/records/rec-1',
-        await devToken('current'),
+        'GET',
+        '/organizations/A/record-types/rec-1',
+        token,
     ));
     assert.equal(get.status, 200);
     const stored = await get.json() as {
         organization_id: string;
     };
     assert.equal(stored.organization_id, 'A');
-    // Phase Final Stage B: records table retired.
 });
 
-test('a facade records write into a non-member org'
+test('nested record-types write into a non-member org'
     + ' is 403', async () => {
     const db = await oneOrganization();
+    // Token scoped to A cannot use path org B (org-match).
+    const token = await organizationToken('current', 'A');
     const res = await handleRequest(db, req(
-        'POST', '/organizations/B/records',
-        await devToken('current'),
+        'POST', '/organizations/B/record-types',
+        token,
         editBody('B')));
     assert.equal(res.status, 403);
+});
+
+test('authenticated flat GET /records → 404',
+async () => {
+    const db = await oneOrganization();
+    const token = await organizationToken('current', 'A');
+    const res = await handleRequest(
+        db, req('GET', '/records', token),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('unauthenticated GET /records → 401',
+async () => {
+    const db = await oneOrganization();
+    const res = await handleRequest(
+        db,
+        new Request(`${BASE}/records`, { method: 'GET' }),
+    );
+    assert.equal(res.status, 401);
 });

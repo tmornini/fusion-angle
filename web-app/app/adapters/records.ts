@@ -72,10 +72,27 @@ export function notifyRecordChange(): void {
     recordChanges.notify();
 }
 
+// Org-nested record-types wire (Task 21). Schema mutations
+// stay admin-tier on the nested surface; members GET only.
+function recordTypesPath(ctx: RequestContext): string {
+    return 'organizations/'
+        + activeOrganization(ctx)
+        + '/record-types';
+}
+
+function recordTypePath(
+    ctx: RequestContext,
+    id: RecordId,
+): string {
+    return recordTypesPath(ctx) + '/' + id;
+}
+
 export async function getRecordEntities(
     ctx: RequestContext,
 ): Promise<RecordEntity[]> {
-    return ctx.GET<RecordEntity[]>('records');
+    return ctx.GET<RecordEntity[]>(
+        recordTypesPath(ctx),
+    );
 }
 
 export async function getRecord(
@@ -83,7 +100,7 @@ export async function getRecord(
     id: RecordId,
 ): Promise<RecordEntity> {
     return ctx.GET<RecordEntity>(
-        `records/${id}`,
+        recordTypePath(ctx, id),
     );
 }
 
@@ -121,23 +138,27 @@ export async function getRecordModel(
 export async function getRecords(
     ctx: RequestContext,
 ): Promise<RecordWithCounts[]> {
-    const [
-        rows, attributes, flowRecords,
-    ] = await Promise.all([
+    const [rows, flowRecords] = await Promise.all([
         getRecordEntities(ctx),
-        ctx.GET<RecordAttributeEntity[]>(
-            'record-attributes',
-        ),
         getAllFlowRecords(ctx),
     ]);
+    // Per-type nested attributes collection — server-side
+    // filter replaces the retired flat bulk + client filter.
+    const attrLists = await Promise.all(
+        rows.map(row => ctx.GET<
+            RecordAttributeEntity[]
+        >(
+            recordTypePath(ctx, row.id)
+            + '/attributes',
+        )),
+    );
     const attrCountByRecord = new Map<
         string, number
     >();
-    for (const a of attributes) {
+    for (let i = 0; i < rows.length; i++) {
         attrCountByRecord.set(
-            a.record_id,
-            (attrCountByRecord
-                .get(a.record_id) ?? 0) + 1,
+            rows[i]!.id,
+            attrLists[i]!.length,
         );
     }
     const flowCountByRecord = new Map<
@@ -196,7 +217,7 @@ export async function putRecord(
     const {
         state, stateAt, stateEventId, ...entity
     } = document;
-    await ctx.PUT(`records/${id}`, {
+    await ctx.PUT(recordTypePath(ctx, id), {
         ...entity,
         state,
         state_at: stateAt,
@@ -266,7 +287,7 @@ export async function postRecordChange(
     if (change.kind === 'create') {
         const initialStateEventId =
             generateCryptoSafeBase62();
-        await ctx.POST('records', {
+        await ctx.POST(recordTypesPath(ctx), {
             kind: 'create',
             id,
             record,
@@ -276,7 +297,7 @@ export async function postRecordChange(
             initialStateAt: nowUtc(),
         });
     } else {
-        await ctx.POST('records', {
+        await ctx.POST(recordTypesPath(ctx), {
             kind: 'edit',
             id,
             record,

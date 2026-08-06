@@ -97,3 +97,80 @@
     align-items: center;
     gap: 0.5rem;
 }
+
+.record-instance-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.record-instance-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid
+        hsl(var(--color-border));
+}
+
+.record-instance-row:last-child {
+    border-bottom: none;
+}
+
+.record-instance-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.record-instance-id {
+    font-family: var(--font-mono, monospace);
+}
+
+.record-instance-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+}
+
+.record-instance-value {
+    display: inline-flex;
+    gap: 0.25rem;
+    align-items: baseline;
+}
+
+.record-instance-actions {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+}
+
+.record-instance-field-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.record-instance-field {
+    display: grid;
+    grid-template-columns: 8rem 1fr;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.record-instance-conflict[data-tone="warning"] {
+    color: hsl(var(--warning-text));
+    background: hsl(var(--warning-soft));
+    border: 1px solid hsl(var(--warning-border));
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.record-instance-readonly {
+    color: hsl(var(--foreground));
+}

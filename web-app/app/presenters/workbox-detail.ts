@@ -26,7 +26,7 @@ import {
 } from '../icons.ts';
 import {
     formatViolation,
-} from '../record-constraints.ts';
+} from '../../../api/record-constraints.ts';
 
 const ATTRIBUTE_HTML_TYPE: Record<
     string,

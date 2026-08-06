@@ -2,6 +2,8 @@ import type { DbAdapter } from './db.ts';
 import { ForeignOrganizationError } from './db.ts';
 import type { Id } from './types.ts';
 import { resolveGlobalOwner } from './derive-states.ts';
+import { RECORD_TYPE_DETAIL_PATTERN } from
+    './family-registry.ts';
 
 // Pre-write ownership authorizer on the pair plane. Without
 // it, a foreign-id PUT would genesis in the caller's own
@@ -21,9 +23,11 @@ export interface WriteAuthorizer {
     readonly idParamIndex: number;
 }
 
-// The 9 org-scoped families' existing-id PUT/DELETE addresses.
-// Collection POSTs (genesis of a new id) are intentionally
-// absent — owner-null is the happy path for those.
+// The 9 org-scoped families' existing-id PUT/DELETE/PATCH
+// addresses. Collection POSTs (genesis of a new id) are
+// intentionally absent — owner-null is the happy path for
+// those. PATCH must share this map so a future flat PATCH
+// cannot bypass the ownership fence (Task 10 / Security).
 const WRITE_AUTHORIZERS:
     ReadonlyMap<string, WriteAuthorizer> = new Map([
         ['ideas/:id', {
@@ -38,17 +42,20 @@ const WRITE_AUTHORIZERS:
         ['work-orders/:id', {
             table: 'work_orders', idParamIndex: 0,
         }],
-        ['records/:id', {
-            table: 'records', idParamIndex: 0,
-        }],
-        ['record-attributes/:id', {
-            table: 'record_attributes', idParamIndex: 0,
-        }],
+        // Flat records/:id + record-attributes/:id retired
+        // (Task 23). Nested types use RECORD_TYPE_DETAIL_
+        // PATTERN below; nested attributes have no row
+        // (parent type 404 + path org gate).
         ['objectives/:id', {
             table: 'objectives', idParamIndex: 0,
         }],
         ['memberships/:id', {
             table: 'memberships', idParamIndex: 0,
+        }],
+        // Nested record-types detail (Task 3): id is param
+        // index 1 (:record-type-id).
+        [RECORD_TYPE_DETAIL_PATTERN, {
+            table: 'record_types', idParamIndex: 1,
         }],
     ]);
 
@@ -56,7 +63,11 @@ export function writeAuthorizerFor(
     routePattern: string,
     method: string,
 ): WriteAuthorizer | undefined {
-    if (method !== 'PUT' && method !== 'DELETE') {
+    if (
+        method !== 'PUT'
+        && method !== 'DELETE'
+        && method !== 'PATCH'
+    ) {
         return undefined;
     }
     return WRITE_AUTHORIZERS.get(routePattern);

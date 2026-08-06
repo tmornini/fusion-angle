@@ -25,17 +25,19 @@ function sourceText(relativePath: string): string {
     return readFileSync(repoRoot + relativePath, 'utf8');
 }
 
-// A write registration: a Route entry exposing put, post, or
-// delete. `route()` builds every entry (the `makeIdRoute()`
-// factory that used to build some of them was retired once its
-// last two live callers — members/:id, objectives/:id — were
-// replaced with pair-appending bespoke routes), so this walks
-// the table generically rather than caring how an entry was
-// built.
+// A write registration: a Route entry exposing put, post,
+// patch, or delete. `route()` builds every entry (the
+// `makeIdRoute()` factory that used to build some of them was
+// retired once its last two live callers — members/:id,
+// objectives/:id — were replaced with pair-appending bespoke
+// routes), so this walks the table generically rather than
+// caring how an entry was built. Task 10: patch joins the
+// alphabet — intentional widen, not weakening.
 function writtenPattern(entry: Route): string | undefined {
     if (
         entry.put === undefined
         && entry.post === undefined
+        && entry.patch === undefined
         && entry.delete === undefined
     ) {
         return undefined;
@@ -72,6 +74,31 @@ test('every write-verb route is pair-wired or named exempt',
             'unwired, un-exempt write route: ' + pattern,
         );
     }
+});
+
+// Task 10: a synthetic patch-only route is a write for the
+// walker. Without a PAIR_WIRED / named-exempt entry it would
+// fail the completeness gate above — the alphabet grew, so
+// the gate must see patch. Currently no live route carries
+// patch; this pins the walker, not a table row.
+test('patch-only synthetic is a write route the walker'
++ ' would require pair-wired', () => {
+    const synthetic: Route = {
+        segments: ['patch-only-synthetic', ':id'],
+        // Cast: no live PatchHandler yet; the walker only
+        // tests presence, never calls.
+        patch: (async () => ({})) as Route['patch'],
+    };
+    const pattern = writtenPattern(synthetic);
+    assert.equal(pattern, 'patch-only-synthetic/:id');
+    assert.equal(
+        PAIR_WIRED_ROUTE_PATTERNS.has(pattern!),
+        false,
+    );
+    assert.equal(
+        NAMED_EXEMPT_ROUTE_PATTERNS.has(pattern!),
+        false,
+    );
 });
 
 test('AUTHENTICATION_ROUTES ride the dedicated pair arm, so'

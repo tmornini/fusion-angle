@@ -21,11 +21,9 @@ import {
 } from '../api/document-family.ts';
 import {
     validateRecordDocumentBody,
-    validateRecordAttributeDocumentBody,
 } from '../api/validators.ts';
 import {
     postRecordDocumentOp,
-    postRecordAttributeDocumentOp,
 } from '../api/routes.ts';
 import {
     deriveFlowRecords,
@@ -51,7 +49,7 @@ async function seeded(): Promise<MemoryDbAdapter> {
 }
 
 const RECORDS_WIRING: DocumentFamilyWiring = {
-    family: 'records',
+    family: 'record-types',
     lifecycle: 'trio',
     notFoundTable: 'records',
     validateDocument: validateRecordDocumentBody,
@@ -67,19 +65,6 @@ const RECORDS_WIRING: DocumentFamilyWiring = {
         state: current!.state,
         state_at: current!.at,
         state_event_id: current!.id,
-    }),
-};
-
-const RECORD_ATTRIBUTES_WIRING: DocumentFamilyWiring = {
-    family: 'record-attributes',
-    lifecycle: 'stateless',
-    notFoundTable: 'record_attributes',
-    validateDocument: validateRecordAttributeDocumentBody,
-    documentOp: postRecordAttributeDocumentOp,
-    entityOf: (document, organization) => ({
-        id: document.uriId,
-        organization_id: organization,
-        ...document.body,
     }),
 };
 
@@ -101,6 +86,7 @@ async function allRecords(
     return out;
 }
 
+// Task 23: nested attributes — collect per type under each org.
 async function allAttributes(
     db: MemoryDbAdapter,
 ): Promise<RecordAttributeEntity[]> {
@@ -108,13 +94,42 @@ async function allAttributes(
     for (const organization of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
-        out.push(
-            ...await documentCollectionGetHandler(
-                RECORD_ATTRIBUTES_WIRING,
-            )(
-                db, [], 'current', organization,
-            ) as RecordAttributeEntity[],
+        const token = await organizationToken(
+            'current', organization,
         );
+        const typesRes = await handleRequest(
+            db,
+            new Request(
+                'http://localhost/organizations/'
+                + organization + '/record-types',
+                {
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                    },
+                },
+            ),
+        );
+        assert.equal(typesRes.status, 200);
+        const types = await typesRes.json() as { id: string }[];
+        for (const type of types) {
+            const res = await handleRequest(
+                db,
+                new Request(
+                    'http://localhost/organizations/'
+                    + organization + '/record-types/'
+                    + type.id + '/attributes',
+                    {
+                        headers: {
+                            Authorization: 'Bearer ' + token,
+                        },
+                    },
+                ),
+            );
+            assert.equal(res.status, 200);
+            out.push(
+                ...await res.json() as RecordAttributeEntity[],
+            );
+        }
     }
     return out;
 }
@@ -142,7 +157,9 @@ test(
         const attrs = await allAttributes(db);
         for (const rec of records) {
             const own = attrs.filter(
-                a => a.record_id === rec.id,
+                a => (a as { record_type_id?: string }).record_type_id
+                    === rec.id
+                || a.record_id === rec.id,
             );
             assert.ok(
                 own.length >= 3,

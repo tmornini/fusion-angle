@@ -872,7 +872,8 @@ async () => {
         'current', STARK_ORGANIZATION,
     );
     const recordsRes = await handleRequest(
-        db, req('GET', '/records', recordToken),
+        db, req('GET', '/organizations/' + STARK_ORGANIZATION
+            + '/record-types', recordToken),
     );
     assert.equal(recordsRes.status, 200);
     const recordsStark = await recordsRes.json() as {
@@ -1003,8 +1004,9 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
     const projectId = 'u6YkHhlGc91oDMkr3x0isa';
 
     const attrPut = await handleRequest(db, req(
-        'PUT', '/record-attributes/' + attrId, token, {
-            record_id: 'rec01CustProfRec0rdAB1',
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/attributes/' + attrId, token, {
             name: 'P15 Bind',
             attribute_type: 'text',
             sort_order: 99,
@@ -1164,8 +1166,9 @@ test('residual pin: soft-deleted node drops from'
     const projectId = 'u6YkHhlGc91oDMkr3x0isa';
 
     const attrPut = await handleRequest(db, req(
-        'PUT', '/record-attributes/' + attrId, token, {
-            record_id: 'rec01CustProfRec0rdAB1',
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/attributes/' + attrId, token, {
             name: 'P15 SoftDel',
             attribute_type: 'text',
             sort_order: 99,
@@ -1281,8 +1284,10 @@ test('residual pin: soft-deleted node drops from'
     assert.ok(residual);
     assert.equal(residual!.action, 'added');
 
+    // recordTypeId scopes the Task 7 instance leg (empty
+    // until Task 14 writes instances).
     const pairPlane = await collectAttributeReferrers(
-        db, STARK_ORGANIZATION, [attrId],
+        db, STARK_ORGANIZATION, [attrId], 'r1',
     );
     assert.deepEqual(
         pairPlane.get(attrId)!.flowIds, [],
@@ -1293,7 +1298,9 @@ test('residual pin: soft-deleted node drops from'
     // node is NOT a RESTRICT referrer → DELETE 204.
     const deleted = await handleRequest(db, req(
         'DELETE',
-        '/record-attributes/' + attrId,
+        '/organizations/' + STARK_ORGANIZATION
+            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/attributes/' + attrId,
         token,
     ));
     assert.equal(deleted.status, 204);
@@ -1340,14 +1347,27 @@ async function transitionWithFieldValue(
     assert.equal(created.status, 204);
 
     // Phase Final Stage B: record_attributes retired.
+    const typePut = await handleRequest(db, req(
+        'PUT',
+        '/organizations/' + STARK_ORGANIZATION
+            + '/record-types/rec-p15-fv',
+        token,
+        {
+            name: 'P15 FV Parent', description: '',
+            position: 0,
+            state: 'active',
+            state_at: nowUtc(),
+            state_event_id: 'rec-p15-fv-genesis',
+        },
+    ));
+    assert.equal(typePut.status, 200);
     const attrWrite = await handleRequest(db, req(
         'PUT',
         '/organizations/' + STARK_ORGANIZATION
-            + '/record-attributes/' + attributeId,
+            + '/record-types/rec-p15-fv'
+            + '/attributes/' + attributeId,
         token,
         {
-            organization_id: STARK_ORGANIZATION,
-            record_id: 'rec-p15-fv',
             name: 'Note',
             attribute_type: 'text',
             sort_order: 0,
@@ -1549,11 +1569,13 @@ function sortedReferrerShape(
     valueCount: number;
     flowIds: string[];
     workOrderIds: string[];
+    instanceIds: string[];
 } {
     return {
         valueCount: refs.valueCount,
         flowIds: [...refs.flowIds].sort(),
         workOrderIds: [...refs.workOrderIds].sort(),
+        instanceIds: [...refs.instanceIds].sort(),
     };
 }
 
@@ -1621,8 +1643,10 @@ async () => {
         'seed must name at least one bound attribute',
     );
 
+    // recordTypeId scopes the Task 7 instance leg (empty
+    // until Task 14 writes instances).
     const preTx = await collectAttributeReferrers(
-        db, STARK_ORGANIZATION, attributeIds,
+        db, STARK_ORGANIZATION, attributeIds, 'seed-type',
     );
     const inTx = await db.transaction(
         // Stage B: roster + objectives/records retired.
@@ -1633,6 +1657,7 @@ async () => {
             view,
             STARK_ORGANIZATION,
             attributeIds,
+            'seed-type',
         ),
     );
     assertReferrerParity(
@@ -1659,8 +1684,9 @@ async () => {
     const projectId = 'u6YkHhlGc91oDMkr3x0isa';
 
     const attrPut = await handleRequest(db, req(
-        'PUT', '/record-attributes/' + attrId, token, {
-            record_id: 'rec01CustProfRec0rdAB1',
+        'PUT', '/organizations/' + STARK_ORGANIZATION
+            + '/record-types/' + 'rec01CustProfRec0rdAB1'
+            + '/attributes/' + attrId, token, {
             name: 'P15 Restrict',
             attribute_type: 'text',
             sort_order: 99,
@@ -1756,8 +1782,10 @@ async () => {
     ));
     assert.equal(woCreated.status, 204);
 
+    // recordTypeId scopes the Task 7 instance leg (empty
+    // until Task 14 writes instances).
     const pairPlane = await collectAttributeReferrers(
-        db, STARK_ORGANIZATION, [attrId],
+        db, STARK_ORGANIZATION, [attrId], 'r1',
     );
     // Pre-tx vs in-tx parity (pair plane only).
     const inTx = await db.transaction(
@@ -1769,6 +1797,7 @@ async () => {
             view,
             STARK_ORGANIZATION,
             [attrId],
+            'r1',
         ),
     );
     assertReferrerParity(

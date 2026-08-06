@@ -111,8 +111,17 @@ const MEMBER_VERBS: Readonly<
     '/flows/:id/work-orders': ['GET', 'PUT'],
     '/flows/:id/records': ['GET', 'PUT', 'DELETE'],
     '/flows/:id/tags': ['GET', 'PUT', 'DELETE'],
-    '/records': ['GET', 'PUT', 'DELETE', 'POST'],
-    '/record-attributes': ['GET', 'PUT', 'DELETE'],
+    // Nested record-types schema READ (decision 16): one
+    // MEMBER_VERBS row covers the whole subtree's GETs via
+    // matchesOnSegmentBoundary (`:id` is a one-segment
+    // wildcard). Schema mutations stay admin by absence —
+    // flat /records and /record-attributes retired (Task 23).
+    '/organizations/:id/record-types': ['GET'],
+    // Nested instances (Task 15): member create/patch/
+    // delete + GET. Path-tier only — field ACL is the
+    // write authorizer for set/clear contents.
+    '/organizations/:id/record-types/:tid/instances':
+        ['GET', 'PUT', 'PATCH', 'DELETE'],
     // Nested field-values collection RETIRED (states-URI
     // elimination C4); field values fold on WO history.
     '/work-orders': ['GET', 'PUT', 'POST'],
@@ -135,14 +144,18 @@ const MEMBER_TIER: readonly PolicyEntry[] =
     );
 
 // Deny-by-default policy. `admin` is allowed on every verb at
-// the root prefix `/` — "admin everywhere" in four honest
-// lines, no implicit-superuser special case. The member tier
-// widens the content surfaces to the `member` role.
+// the root prefix `/` — "admin everywhere" in five honest
+// lines (Task 10 adds PATCH), no implicit-superuser special
+// case. The member tier widens the content surfaces to the
+// `member` role. Admin PATCH on handler-less routes answers
+// 405 (known verb, no handler); members still 403 by absence
+// of member PATCH rows outside future instance surfaces.
 export const ROUTE_POLICY: readonly PolicyEntry[] = [
     { verb: 'GET', pathPrefix: '/', roles: ['admin'] },
     { verb: 'PUT', pathPrefix: '/', roles: ['admin'] },
     { verb: 'POST', pathPrefix: '/', roles: ['admin'] },
     { verb: 'DELETE', pathPrefix: '/', roles: ['admin'] },
+    { verb: 'PATCH', pathPrefix: '/', roles: ['admin'] },
     ...MEMBER_TIER,
 ];
 

@@ -62,6 +62,7 @@ import {
     assertObjectiveState,
     assertProjectState,
     assertRecordState,
+    DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from './types.ts';
 import {
     isProviderModelId,
@@ -2479,6 +2480,188 @@ export interface RecordDocumentBody {
 // gate is the sole entity-shape check for the document PUT
 // (validateRecordEntity REQUIRES organization_id, which this
 // body never carries pre-stamp). Name non-empty re-homes here.
+// Instance PUT genesis body (Task 15 create-only). Wire
+// carries exactly {set}; clear is PATCH-only (Task 17).
+// Empty string values rejected at the body gate (G9);
+// type/constraint conformance is validateInstanceValues
+// after ACL.
+export interface InstancePutBody {
+    readonly set: {
+        readonly attribute_id: string;
+        readonly value: string;
+    }[];
+}
+
+export function validateInstancePutBody(
+    body: Record<string, unknown>,
+): InstancePutBody {
+    assertOnlyKeys(
+        body, ['set'], 'InstancePutBody',
+    );
+    const raw = asArray(
+        body['set'], 'InstancePutBody.set',
+    );
+    const set: {
+        attribute_id: string;
+        value: string;
+    }[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < raw.length; i++) {
+        const label =
+            'InstancePutBody.set[' + i + ']';
+        const entry = asObject(raw[i], label);
+        assertOnlyKeys(
+            entry,
+            ['attribute_id', 'value'],
+            label,
+        );
+        const attributeId = pickString(
+            entry, 'attribute_id',
+        );
+        if (attributeId === '') {
+            throw new ValidationError(
+                label
+                    + '.attribute_id must be non-empty',
+            );
+        }
+        if (seen.has(attributeId)) {
+            throw new ValidationError(
+                'duplicate attribute_id "'
+                    + attributeId
+                    + '" in InstancePutBody.set',
+            );
+        }
+        seen.add(attributeId);
+        const value = pickString(entry, 'value');
+        if (value === '') {
+            throw new ValidationError(
+                label + '.value must not be empty',
+            );
+        }
+        set.push({
+            attribute_id: attributeId,
+            value,
+        });
+    }
+    return { set };
+}
+
+// Instance PATCH body (Task 17): keys ⊆ {set, clear};
+// both optional; effective emptiness → 400. set∩clear
+// overlap → 400; duplicate id within set → 400; '' in
+// set → 400 (G9). Value type/constraint conformance is
+// validateInstanceValues after ACL (set only).
+export interface InstancePatchBody {
+    readonly set: {
+        readonly attribute_id: string;
+        readonly value: string;
+    }[];
+    readonly clear: string[];
+}
+
+export function validateInstancePatchBody(
+    body: Record<string, unknown>,
+): InstancePatchBody {
+    assertOnlyKeys(
+        body, [], 'InstancePatchBody',
+        ['set', 'clear'],
+    );
+    const set: {
+        attribute_id: string;
+        value: string;
+    }[] = [];
+    const setSeen = new Set<string>();
+    if ('set' in body) {
+        const raw = asArray(
+            body['set'], 'InstancePatchBody.set',
+        );
+        for (let i = 0; i < raw.length; i++) {
+            const label =
+                'InstancePatchBody.set[' + i + ']';
+            const entry = asObject(raw[i], label);
+            assertOnlyKeys(
+                entry,
+                ['attribute_id', 'value'],
+                label,
+            );
+            const attributeId = pickString(
+                entry, 'attribute_id',
+            );
+            if (attributeId === '') {
+                throw new ValidationError(
+                    label
+                        + '.attribute_id must be '
+                        + 'non-empty',
+                );
+            }
+            if (setSeen.has(attributeId)) {
+                throw new ValidationError(
+                    'duplicate attribute_id "'
+                        + attributeId
+                        + '" in InstancePatchBody.set',
+                );
+            }
+            setSeen.add(attributeId);
+            const value = pickString(entry, 'value');
+            if (value === '') {
+                throw new ValidationError(
+                    label + '.value must not be empty',
+                );
+            }
+            set.push({
+                attribute_id: attributeId,
+                value,
+            });
+        }
+    }
+    const clear: string[] = [];
+    const clearSeen = new Set<string>();
+    if ('clear' in body) {
+        const raw = asArray(
+            body['clear'], 'InstancePatchBody.clear',
+        );
+        for (let i = 0; i < raw.length; i++) {
+            const label =
+                'InstancePatchBody.clear[' + i + ']';
+            const attributeId = raw[i];
+            if (
+                typeof attributeId !== 'string'
+                || attributeId === ''
+            ) {
+                throw new ValidationError(
+                    label
+                        + ' must be a non-empty string',
+                );
+            }
+            if (clearSeen.has(attributeId)) {
+                throw new ValidationError(
+                    'duplicate attribute_id "'
+                        + attributeId
+                        + '" in InstancePatchBody.clear',
+                );
+            }
+            clearSeen.add(attributeId);
+            clear.push(attributeId);
+        }
+    }
+    if (set.length + clear.length === 0) {
+        throw new ValidationError(
+            'InstancePatchBody requires a non-empty '
+                + 'set or clear',
+        );
+    }
+    for (const attributeId of clear) {
+        if (setSeen.has(attributeId)) {
+            throw new ValidationError(
+                'attribute_id "'
+                    + attributeId
+                    + '" appears in both set and clear',
+            );
+        }
+    }
+    return { set, clear };
+}
+
 export function validateRecordDocumentBody(
     body: Record<string, unknown>,
 ): RecordDocumentBody {
@@ -2596,9 +2779,25 @@ const RECORD_ATTRIBUTE_DOCUMENT_BODY_KEYS:
     'sort_order', 'options', 'constraints',
 ];
 
+// Optional on the flat wire (Task 8 alias window): omitted
+// keys stamp DEFAULT_ATTRIBUTE_ACL_ROLES so storage never
+// drifts from the nested create-stamp voice.
+const RECORD_ATTRIBUTE_DOCUMENT_OPTIONAL_KEYS:
+    readonly string[] = [
+    'organization_id', 'read_roles', 'write_roles',
+];
+
 export interface RecordAttributeDocumentBody {
-    readonly entity:
-        Omit<RecordAttributeEntity, 'id' | 'organization_id'>;
+    readonly entity: {
+        record_id: string;
+        name: string;
+        attribute_type: AttributeType;
+        sort_order: number;
+        options: string[];
+        constraints: Constraint[];
+        read_roles: string[];
+        write_roles: string[];
+    };
 }
 
 // The HTTP-body gate for PUT /record-attributes/:id: the
@@ -2609,28 +2808,19 @@ export interface RecordAttributeDocumentBody {
 // write, the client never supplies it; the org fence stamps it
 // on the response) yet rides the `optional` allowance rather
 // than `expected` — a caller-forged organization_id is
-// tolerated-but-ignored, not rejected. Phase Final Task 2:
-// record_attributes ROW half stripped — this gate is the sole
-// entity-shape check for the document PUT. REASON this
-// validator exists rather than wiring
-// validateRecordAttributeEntity straight into
-// documentWriteResponseSpec: that generic builder calls
-// validateDocument WITHOUT pre-stamping organization_id (the
-// stamp lands only in the RESPONSE, after validation), while
-// today's hand-written response spec pre-stamps the key BEFORE
-// calling validateRecordAttributeEntity — wiring the shipped
-// entity validator in directly would 500 any body lacking the
-// key, where today it 200s. Entity fields are picked directly
-// (the same constraints/options rules
-// validateRecordAttributeEntity enforces) rather than
-// delegated to it — that function REQUIRES organization_id,
-// which this body never carries pre-stamp.
+// tolerated-but-ignored, not rejected. Task 8: flat wire keeps
+// record_id for the alias window; ACL defaults stamp on both
+// create and replace so nothing drifts from nested storage.
+// Phase Final Task 2: record_attributes ROW half stripped —
+// this gate is the sole entity-shape check for the document
+// PUT.
 export function validateRecordAttributeDocumentBody(
     body: Record<string, unknown>,
 ): RecordAttributeDocumentBody {
     assertOnlyKeys(
         body, RECORD_ATTRIBUTE_DOCUMENT_BODY_KEYS,
-        'RecordAttributeDocumentBody', ['organization_id'],
+        'RecordAttributeDocumentBody',
+        RECORD_ATTRIBUTE_DOCUMENT_OPTIONAL_KEYS,
     );
     const name = pickString(body, 'name');
     if (name === '') {
@@ -2675,6 +2865,20 @@ export function validateRecordAttributeDocumentBody(
             + attributeType + "'",
         );
     }
+    const defaultRoles: string[] = [
+        ...DEFAULT_ATTRIBUTE_ACL_ROLES,
+    ];
+    const label = 'RecordAttributeDocumentBody';
+    const readRoles = 'read_roles' in body
+        ? pickNonEmptyStringArray(
+            body, 'read_roles', label,
+        )
+        : [...defaultRoles];
+    const writeRoles = 'write_roles' in body
+        ? pickNonEmptyStringArray(
+            body, 'write_roles', label,
+        )
+        : [...defaultRoles];
     return {
         entity: {
             record_id: pickString(body, 'record_id'),
@@ -2683,8 +2887,154 @@ export function validateRecordAttributeDocumentBody(
             sort_order: pickNumber(body, 'sort_order'),
             options,
             constraints,
+            read_roles: readRoles,
+            write_roles: writeRoles,
         },
     };
+}
+
+// Nested attribute document under a record-type address
+// (Task 6). No record_id — parentage is the URI. Create
+// stamps DEFAULT_ATTRIBUTE_ACL_ROLES when ACL keys are
+// omitted; replace requires both keys (no silent drift
+// back to defaults). Role strings are free non-empty
+// strings; [] is legal (admins only via bypass).
+export const NESTED_ATTRIBUTE_DOCUMENT_BODY_KEYS = [
+    'name', 'attribute_type', 'sort_order',
+    'options', 'constraints',
+    'read_roles', 'write_roles',
+] as const;
+
+const NESTED_ATTRIBUTE_CORE_KEYS = [
+    'name', 'attribute_type', 'sort_order',
+    'options', 'constraints',
+] as const;
+
+const NESTED_ATTRIBUTE_ACL_KEYS = [
+    'read_roles', 'write_roles',
+] as const;
+
+export interface AttributeDocument {
+    name: string;
+    attribute_type: AttributeType;
+    sort_order: number;
+    options: string[];
+    constraints: Constraint[];
+    read_roles: string[];
+    write_roles: string[];
+}
+
+function pickNonEmptyStringArray(
+    body: Record<string, unknown>,
+    key: string,
+    entityLabel: string,
+): string[] {
+    const arr = asArray(body[key], key);
+    return arr.map((item, i) => {
+        const s = asString(item, key + '[' + i + ']');
+        if (s === '') {
+            throw new ValidationError(
+                entityLabel + '.' + key + '['
+                + i + '] must be non-empty',
+            );
+        }
+        return s;
+    });
+}
+
+function validateAttributeDocument(
+    body: Record<string, unknown>,
+    mode: 'create' | 'replace',
+): AttributeDocument {
+    const label = 'AttributeDocumentBody';
+    if (mode === 'create') {
+        assertOnlyKeys(
+            body,
+            NESTED_ATTRIBUTE_CORE_KEYS,
+            label,
+            NESTED_ATTRIBUTE_ACL_KEYS,
+        );
+    } else {
+        assertOnlyKeys(
+            body,
+            NESTED_ATTRIBUTE_DOCUMENT_BODY_KEYS,
+            label,
+        );
+    }
+    const name = pickString(body, 'name');
+    if (name === '') {
+        throw new ValidationError(
+            label + '.name must be non-empty',
+        );
+    }
+    const attributeType = asAttributeType(
+        body['attribute_type'],
+        label + '.attribute_type',
+    );
+    const constraintsArr = asArray(
+        body['constraints'], 'constraints',
+    );
+    const constraints = constraintsArr.map(
+        (item, i) => {
+            const constraint = asConstraint(
+                item,
+                'constraints[' + i + ']',
+            );
+            assertConstraintAppliesTo(
+                constraint.kind,
+                attributeType,
+                'constraints[' + i + ']',
+            );
+            return constraint;
+        },
+    );
+    const options = pickStringArray(body, 'options');
+    if (
+        (attributeType === 'select'
+            || attributeType === 'radio')
+        && options.length === 0
+    ) {
+        throw new ValidationError(
+            label + '.options'
+            + ' must list at least one option'
+            + " for attribute_type '"
+            + attributeType + "'",
+        );
+    }
+    const defaultRoles: string[] = [
+        ...DEFAULT_ATTRIBUTE_ACL_ROLES,
+    ];
+    const readRoles = 'read_roles' in body
+        ? pickNonEmptyStringArray(
+            body, 'read_roles', label,
+        )
+        : [...defaultRoles];
+    const writeRoles = 'write_roles' in body
+        ? pickNonEmptyStringArray(
+            body, 'write_roles', label,
+        )
+        : [...defaultRoles];
+    return {
+        name,
+        attribute_type: attributeType,
+        sort_order: pickNumber(body, 'sort_order'),
+        options,
+        constraints,
+        read_roles: readRoles,
+        write_roles: writeRoles,
+    };
+}
+
+export function validateAttributeDocumentCreate(
+    body: Record<string, unknown>,
+): AttributeDocument {
+    return validateAttributeDocument(body, 'create');
+}
+
+export function validateAttributeDocumentReplace(
+    body: Record<string, unknown>,
+): AttributeDocument {
+    return validateAttributeDocument(body, 'replace');
 }
 
 const FLOW_RECORD_BODY_KEYS: readonly string[] = [

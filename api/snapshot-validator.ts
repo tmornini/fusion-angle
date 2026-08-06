@@ -1,9 +1,20 @@
 import { TABLE_NAMES } from './db.ts';
 import { extractErrorMessage } from '../shared/error-helpers.ts';
+import { ValidationError } from './types.ts';
 import {
     validateRequestEntity,
     validateResponseEntity,
 } from './validators.ts';
+
+// Anchored retired message-plane uri_prefix patterns.
+// Task 5: flat records. Task 8: flat record-attributes.
+// Anchored so the live flows/:id/records join family is
+// accepted (never a substring match).
+const RETIRED_URI_PREFIX_PATTERNS:
+    readonly RegExp[] = [
+    /^\/organizations\/[^/]+\/records\//,
+    /^\/organizations\/[^/]+\/record-attributes\//,
+];
 
 // Map table name → entity validator. Stored rows
 // carry `id` as their storage key — strip it before
@@ -41,6 +52,8 @@ function validateSnapshotRow(
 // message identifying which table or row failed.
 // Unknown top-level keys (including a legacy
 // `__schema_version__` marker) are ignored.
+// Retired-prefix findings throw ValidationError so
+// the wire answers 400 (api/api.ts house body).
 export function parseAndValidateSnapshot(
     json: string,
 ): Map<string, { id: string }[]> {
@@ -93,6 +106,26 @@ export function parseAndValidateSnapshot(
             }
             const r = row as Record<string, unknown>;
             validateSnapshotRow(table, r, i);
+            const prefix = r['uri_prefix'];
+            if (typeof prefix === 'string') {
+                for (
+                    const p of RETIRED_URI_PREFIX_PATTERNS
+                ) {
+                    if (p.test(prefix)) {
+                        throw new ValidationError(
+                            'Invalid snapshot: row '
+                            + i
+                            + ' in table "'
+                            + table
+                            + '" carries retired'
+                            + ' uri_prefix '
+                            + prefix
+                            + '. Re-snapshot from'
+                            + ' current state.',
+                        );
+                    }
+                }
+            }
             if (typeof r['id'] !== 'string') {
                 throw new Error(
                     'Invalid snapshot: row '

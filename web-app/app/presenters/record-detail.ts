@@ -25,6 +25,338 @@ import {
     RECORD_STATE_CONFIG,
 } from './state-display.ts';
 
+// Projected instance field for the edit form. Unreadable
+// attributes are omitted from the array entirely.
+export type InstanceFieldAccess =
+    | 'writable'
+    | 'readonly';
+
+export interface InstanceFieldView {
+    readonly attributeId: string;
+    readonly name: string;
+    readonly value: string;
+    readonly access: InstanceFieldAccess;
+}
+
+export interface InstanceListItemView {
+    readonly id: string;
+    readonly fields: readonly {
+        readonly name: string;
+        readonly value: string;
+    }[];
+}
+
+export interface InstanceEditView {
+    readonly instanceId: string;
+    readonly fields: readonly InstanceFieldView[];
+    readonly conflictNotice: string | null;
+}
+
+export interface InstancesSectionView {
+    readonly instances:
+        readonly InstanceListItemView[];
+    readonly editing: InstanceEditView | null;
+}
+
+// Client-side twin of attribute ACL evaluation (admin
+// bypass + role intersect). Roles are plain bases
+// (admin / member), already projected for the fenced org.
+export interface InstanceAttributeAcl {
+    readonly id: string;
+    readonly name: string;
+    readonly readRoles: readonly string[];
+    readonly writeRoles: readonly string[];
+}
+
+export const INSTANCE_CONFLICT_NOTICE =
+    'This instance changed underneath you'
+    + ' — values refreshed; re-apply your edit';
+
+function rolesIntersect(
+    held: readonly string[],
+    allowed: readonly string[],
+): boolean {
+    return allowed.some(
+        role => held.includes(role),
+    );
+}
+
+export function projectInstanceFields(
+    attributes: readonly InstanceAttributeAcl[],
+    values: ReadonlyMap<string, string>,
+    roles: readonly string[],
+): InstanceFieldView[] {
+    const isAdmin = roles.includes('admin');
+    const out: InstanceFieldView[] = [];
+    for (const attr of attributes) {
+        const canRead = isAdmin
+            || rolesIntersect(
+                roles, attr.readRoles,
+            );
+        if (!canRead) continue;
+        const canWrite = isAdmin
+            || rolesIntersect(
+                roles, attr.writeRoles,
+            );
+        out.push({
+            attributeId: attr.id,
+            name: attr.name,
+            value: values.get(attr.id) ?? '',
+            access: canWrite
+                ? 'writable'
+                : 'readonly',
+        });
+    }
+    return out;
+}
+
+export function instanceListItems(
+    instances: readonly {
+        readonly id: string;
+        readonly values: ReadonlyMap<
+            string, string
+        >;
+    }[],
+    attributes: readonly {
+        readonly id: string;
+        readonly name: string;
+    }[],
+): InstanceListItemView[] {
+    const nameById = new Map(
+        attributes.map(
+            a => [a.id, a.name] as const,
+        ),
+    );
+    return instances.map(inst => {
+        const fields: {
+            name: string;
+            value: string;
+        }[] = [];
+        for (const [attrId, value] of
+            inst.values
+        ) {
+            const name = nameById.get(attrId);
+            if (name === undefined) continue;
+            fields.push({ name, value });
+        }
+        return { id: inst.id, fields };
+    });
+}
+
+export class RecordInstancesPresenter {
+    readonly #view: InstancesSectionView;
+
+    constructor(view: InstancesSectionView) {
+        this.#view = view;
+    }
+
+    buildCard(): SafeHtml {
+        return html`<div
+            class="card mb-6 p-6"
+            id="record-instances-section">
+            <div class="${
+                'flex items-center'
+                + ' justify-between gap-4 mb-4'
+            }">
+                <h2 class="${
+                    'text-lg font-semibold'
+                }">Instances</h2>
+                ${this.#view.editing === null
+                    ? html`<button type="button"
+                        id="record-new-instance-btn"
+                        class="${
+                            'btn btn-ghost btn-sm'
+                        }">
+                        ${iconPlus(
+                            ICON_SIZE.sm, '',
+                        )}
+                        New instance
+                    </button>`
+                    : html``}
+            </div>
+            ${this.#view.editing !== null
+                ? this.#buildEditForm(
+                    this.#view.editing,
+                )
+                : this.#buildList()}
+        </div>`;
+    }
+
+    #buildList(): SafeHtml {
+        if (this.#view.instances.length === 0) {
+            return html`<p class="text-muted"
+                >No instances yet.</p>`;
+        }
+        return html`<ul
+            class="record-instance-list">
+            ${this.#view.instances.map(
+                item => this.#buildListItem(item),
+            )}
+        </ul>`;
+    }
+
+    #buildListItem(
+        item: InstanceListItemView,
+    ): SafeHtml {
+        const valueBits = item.fields.length === 0
+            ? html`<span class="text-muted text-sm"
+                >(empty)</span>`
+            : item.fields.map(
+                f => html`<span
+                    class="record-instance-value">
+                    <span class="${
+                        'text-muted text-sm'
+                    }">${f.name}:</span>
+                    <span>${f.value}</span>
+                </span>`,
+            );
+        return html`<li
+            class="record-instance-row"
+            data-instance-id="${item.id}">
+            <div class="record-instance-meta">
+                <code class="${
+                    'record-instance-id text-sm'
+                }">${item.id}</code>
+                <div class="${
+                    'record-instance-values'
+                }">${valueBits}</div>
+            </div>
+            <div class="record-instance-actions">
+                <button type="button"
+                    class="btn btn-ghost btn-xs"
+                    data-action="edit-instance"
+                    data-instance-id="${
+                        item.id
+                    }">
+                    ${iconEdit(ICON_SIZE.sm, '')}
+                    Edit
+                </button>
+                <button type="button"
+                    class="btn btn-ghost btn-xs"
+                    data-dialog-open="${
+                        'confirm-delete-instance'
+                    }"
+                    data-instance-id="${
+                        item.id
+                    }">
+                    ${iconTrash(ICON_SIZE.sm, '')}
+                    Delete
+                </button>
+            </div>
+        </li>`;
+    }
+
+    #buildEditForm(
+        edit: InstanceEditView,
+    ): SafeHtml {
+        return html`<div
+            class="record-instance-edit"
+            data-instance-id="${
+                edit.instanceId
+            }">
+            <div class="${
+                'flex items-center'
+                + ' justify-between gap-4 mb-4'
+            }">
+                <code class="${
+                    'record-instance-id text-sm'
+                }">${edit.instanceId}</code>
+                <div class="flex gap-2">
+                    <button type="button"
+                        id="${
+                            'record-instance-'
+                            + 'cancel-btn'
+                        }"
+                        class="${
+                            'btn btn-ghost btn-sm'
+                        }">
+                        ${iconX(ICON_SIZE.sm, '')}
+                        Cancel
+                    </button>
+                    <button type="button"
+                        id="${
+                            'record-instance-'
+                            + 'save-btn'
+                        }"
+                        class="${
+                            'btn btn-primary btn-sm'
+                        }">
+                        ${iconCheck(
+                            ICON_SIZE.sm, '',
+                        )}
+                        Save
+                    </button>
+                </div>
+            </div>
+            ${edit.conflictNotice !== null
+                ? html`<p class="${
+                    'record-instance-conflict'
+                    + ' mb-4 text-sm'
+                }"
+                    data-tone="warning"
+                    role="status"
+                    >${edit.conflictNotice}</p>`
+                : html``}
+            <div class="${
+                'record-instance-field-list'
+            }">
+                ${edit.fields.map(
+                    f => this.#buildEditField(f),
+                )}
+            </div>
+        </div>`;
+    }
+
+    #buildEditField(
+        f: InstanceFieldView,
+    ): SafeHtml {
+        if (f.access === 'writable') {
+            return html`<div
+                class="record-instance-field"
+                data-attribute-id="${
+                    f.attributeId
+                }"
+                data-access="writable">
+                <label class="label"
+                    for="${
+                        'instance-field-'
+                        + f.attributeId
+                    }">${f.name}</label>
+                <input type="text"
+                    id="${
+                        'instance-field-'
+                        + f.attributeId
+                    }"
+                    class="input input-sm"
+                    data-action="${
+                        'instance-field-value'
+                    }"
+                    data-attribute-id="${
+                        f.attributeId
+                    }"
+                    value="${f.value}" />
+            </div>`;
+        }
+        return html`<div
+            class="record-instance-field"
+            data-attribute-id="${
+                f.attributeId
+            }"
+            data-access="readonly">
+            <span class="label"
+                >${f.name}</span>
+            <span class="${
+                'record-instance-readonly'
+                + ' text-sm'
+            }">${
+                f.value === ''
+                    ? '—'
+                    : f.value
+            }</span>
+        </div>`;
+    }
+}
+
 export interface RecordDetailView {
     readonly record: RecordModel;
     readonly attributes:
@@ -35,6 +367,7 @@ export interface RecordDetailView {
     }[];
     readonly workOrders:
         readonly WorkOrder[];
+    readonly instances: InstancesSectionView;
 }
 
 export class RecordDetailPresenter {
@@ -94,6 +427,9 @@ export class RecordDetailPresenter {
                         .descriptionText()
                 }</p>
             ${this.#buildAttributesCard()}
+            ${new RecordInstancesPresenter(
+                this.#view.instances,
+            ).buildCard()}
             ${this.#buildBoundFlowsCard()}
             ${this.#buildWorkOrdersCard()}
         </div>`;

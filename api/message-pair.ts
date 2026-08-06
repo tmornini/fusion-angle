@@ -29,7 +29,13 @@ import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
 import { REQUEST_ID_HEADER } from './request-context.ts';
-import { familyRegistration } from './family-registry.ts';
+import {
+    familyRegistration,
+    RECORD_TYPES_COLLECTION_PATTERN,
+    RECORD_TYPE_DETAIL_PATTERN,
+    ATTRIBUTE_DETAIL_PATTERN,
+    INSTANCE_DETAIL_PATTERN,
+} from './family-registry.ts';
 import { HTTP_OK } from './http-errors.ts';
 
 // The shadow-ledger message pair: one row in `requests`, one
@@ -144,7 +150,8 @@ export function canonicalUriPrefix(
     const registered = familyRegistration(first);
     const nested = registered !== undefined
         ? registered.organizationNested
-        : ORGANIZATION_NESTED_FIRST_SEGMENTS.has(first);
+        : ORGANIZATION_NESTED_FIRST_SEGMENTS
+            .has(first);
     if (organization !== undefined && nested) {
         return '/organizations/' + organization
             + flatPrefix;
@@ -354,6 +361,64 @@ export function httpDateOf(at: string): string {
 // reads the SAME header name the hash covers.
 export const IF_RESPONSE_ID_HEADER = 'if-response-id';
 
+// PATCH concurrency dialect (Task 10/11): If-Match carries
+// the strong ETag (head document-pair response id). Not a
+// credential — stored verbatim so two PATCHes differing only
+// in If-Match are different messages for replay identity.
+export const IF_MATCH_HEADER = 'if-match';
+
+// Parse a wire If-Match value into the opaque pair id.
+// Accepts exactly one strong etag (`"id"`). Anything else —
+// `*`, weak (`W/"…"`), lists, unquoted — yields undefined;
+// the caller answers 400 (malformed precondition).
+export function parseIfMatch(
+    header: string,
+): string | undefined {
+    if (
+        header.length < 2
+        || header[0] !== '"'
+        || header[header.length - 1] !== '"'
+    ) {
+        return undefined;
+    }
+    const inner = header.slice(1, -1);
+    if (inner.length === 0 || inner.includes('"')) {
+        return undefined;
+    }
+    return inner;
+}
+
+// Recover the client's If-Match target from a formed wire
+// pair's request message (hoisted into the hash). This is
+// the gate-verified anchor for R9 / revision.follows — never
+// re-derive a live head and treat it as the client's echo.
+export function ifMatchFromPair(
+    pair: MessagePair,
+): string | undefined {
+    const model = parseJson(
+        pair.requestMessage, defaultBodyRegistry(),
+    );
+    const field = model.fields.find(
+        (line) => line.name === IF_MATCH_HEADER,
+    );
+    if (field === undefined) return undefined;
+    return parseIfMatch(field.value);
+}
+
+// Strong wire ETag for a document-pair response id.
+// Distinct from `responses.etag` (body sha256 column).
+export function strongEtagOf(pairId: string): string {
+    return '"' + pairId + '"';
+}
+
+// Attach the strong ETag header; returns the same Response.
+export function attachEtag(
+    response: Response, pairId: string,
+): Response {
+    response.headers.set('ETag', strongEtagOf(pairId));
+    return response;
+}
+
 // The header fields worth storing in a pair's request message:
 // enumerated explicitly (never hoisted blindly). `authorization`
 // is redacted downstream (message-redaction.ts); the rest are
@@ -361,6 +426,7 @@ export const IF_RESPONSE_ID_HEADER = 'if-response-id';
 const HOISTED_HEADER_NAMES: readonly string[] = [
     'authorization', 'content-type', 'idempotency-key',
     REQUEST_ID_HEADER, IF_RESPONSE_ID_HEADER,
+    IF_MATCH_HEADER,
 ];
 
 export function hoistedHeaderFields(request: Request): FieldLine[] {
@@ -517,6 +583,12 @@ const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     // this SAME override table so createdEntityUriId serves both
     // callers with one voice.
     'invitations': 'invitationId',
+    // Nested composed POST (Task 9): pattern is not a bare
+    // family name, so the registry consult never fires — body
+    // `id` collapses the operation pair onto the type's uri_id
+    // (same supersession collapse the retired flat POST
+    // /records used).
+    [RECORD_TYPES_COLLECTION_PATTERN]: 'id',
 };
 
 export function createdEntityUriId(
@@ -542,17 +614,15 @@ export function createdEntityUriId(
     // family, Phase 5 Task 1) is the second: POST work-orders is
     // also a live bare collection-POST create route whose
     // pattern is literally 'work-orders', so the coincidence now
-    // fires for TWO live routes. Records (fifth family, Phase 6
-    // Task 1) is the third: POST records is also a live bare
+    // fires for TWO live routes. Flat POST records retired
+    // (Task 23); nested collection POST rides
+    // CREATE_BODY_ID_FIELDS above. Identities (twelfth
+    // family, Phase 10 Task 4) is the third live bare
     // collection-POST create route whose pattern is literally
-    // 'records', so the coincidence now fires for THREE live
-    // routes. Identities (twelfth family, Phase 10 Task 4) is the
-    // fourth: POST identities is also a live bare collection-POST
-    // create route whose pattern is literally 'identities' — the
-    // SAME slot the literal table above used to answer, now
-    // answered from the registry instead, so the coincidence now
-    // fires for FOUR live routes. Falls back to the literal table
-    // for every not-yet-registered pattern.
+    // 'identities' — the SAME slot the literal table above used
+    // to answer, now answered from the registry instead.
+    // Falls back to the literal table for every not-yet-
+    // registered pattern.
     const registered = familyRegistration(routePattern);
     const field = registered !== undefined
         ? registered.createBodyIdField
@@ -589,9 +659,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'work-orders/:id/transition',
     'work-orders/:id/release',
     'flows/:id/work-orders/:woid',
-    'records',
-    'records/:id',
-    'record-attributes/:id',
+    // Flat records + record-attributes retired (Task 23).
     'flows/:id/records/:frid',
     'objectives',
     'objectives/:id',
@@ -614,6 +682,15 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'identity-tokens/:jti/revocation',
     'organizations/:id',
     'identity-providers/:id',
+    // Nested record-types collection POST (Task 9) + detail
+    // PUT/DELETE (Task 3).
+    RECORD_TYPES_COLLECTION_PATTERN,
+    RECORD_TYPE_DETAIL_PATTERN,
+    // Nested attributes detail (Task 7): admin PUT/DELETE.
+    ATTRIBUTE_DETAIL_PATTERN,
+    // Nested instances detail (Task 15): create-only PUT
+    // (PAIR_WIRED only — R10 keeps DOCUMENT_CLASS clear).
+    INSTANCE_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
     // address via formSeedPair + WRITE_RESPONSE_SPECS.
@@ -679,9 +756,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'work-orders',
         'work-orders/:id',
         'flows/:id/work-orders/:woid',
-        'records',
-        'records/:id',
-        'record-attributes/:id',
+        // Flat records + record-attributes retired (Task 23).
         'flows/:id/records/:frid',
         'objectives',
         'objectives/:id',
@@ -698,6 +773,17 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'identities/:id/registration',
         'memberships/:id',
         'organizations/:id',
+        // Nested record-types collection POST (Task 9): same
+        // head-read class as flat `records` so op + document
+        // share the supersession chain at the type uri_id.
+        RECORD_TYPES_COLLECTION_PATTERN,
+        // Nested record-types detail (Task 3): simple class —
+        // gate stamps supersedes for non-locked PUTs; no
+        // If-Match required on types.
+        RECORD_TYPE_DETAIL_PATTERN,
+        // Nested attributes detail (Task 7): simple class —
+        // attributes never join the If-Match dialect.
+        ATTRIBUTE_DETAIL_PATTERN,
         // states/:id/field-values/:fvid RETIRED from live wire
         // (Phase 15 Task 7); seed still forms pairs at that
         // address via formSeedPair + WRITE_RESPONSE_SPECS.

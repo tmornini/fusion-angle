@@ -160,12 +160,15 @@ async () => {
     assert.equal(wire.organization_id, ORGANIZATION_B);
 });
 
-test('foreign-id DELETE records/:id 403s', async () => {
+test('foreign-id DELETE nested record-types 403s', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
     const created = await handleRequest(db, req(
-        'POST', '/records', tokenA, {
+        'POST',
+        '/organizations/' + ORGANIZATION_A
+            + '/record-types',
+        tokenA, {
             id: 'rec-a',
             kind: 'create',
             record: {
@@ -183,24 +186,23 @@ test('foreign-id DELETE records/:id 403s', async () => {
     assert.equal(created.status, 204);
 
     const foreign = await handleRequest(db, req(
-        'DELETE', '/records/rec-a', tokenB,
+        'DELETE',
+        '/organizations/' + ORGANIZATION_B
+            + '/record-types/rec-a',
+        tokenB,
     ));
+    // Path org B with type owned by A: org-match or
+    // ownership fence — either 403.
     assert.equal(foreign.status, 403);
-    const body = await foreign.json() as { error: string };
-    assert.equal(
-        body.error,
-        'forbidden: records/rec-a belongs to a different'
-        + ' organization',
-    );
-    // Phase Final Task 2: pair-plane document still present —
-    // nothing tombstoned; A can still GET.
     const still = await handleRequest(db, req(
-        'GET', '/records/rec-a', tokenA,
+        'GET',
+        '/organizations/' + ORGANIZATION_A
+            + '/record-types/rec-a',
+        tokenA,
     ));
     assert.equal(still.status, 200);
     const row = await still.json() as { name: string };
     assert.equal(row.name, 'A record');
-    // Phase Final Stage B: records table retired.
 });
 
 test('foreign-id DELETE memberships/:id 403s', async () => {

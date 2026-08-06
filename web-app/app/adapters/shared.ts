@@ -5,7 +5,11 @@ import {
 import {
     GET as httpGet,
     GETWithResponseId as httpGetWithResponseId,
+    GETWithEtag as httpGetWithEtag,
     PUT as httpPut,
+    PUTWithEtag as httpPutWithEtag,
+    PATCH as httpPatch,
+    PATCHWithEtag as httpPatchWithEtag,
     DELETE as httpDelete,
     POST as httpPost,
     UnauthorizedError,
@@ -69,11 +73,30 @@ export interface RequestContext {
     GETWithResponseId<T>(
         resource: string,
     ): Promise<{ body: T; responseId: string | undefined }>;
+    // Body plus strong ETag (quotes stripped) for If-Match.
+    GETWithEtag<T>(
+        resource: string,
+    ): Promise<{ body: T; etag: string | undefined }>;
     PUT<T>(
         resource: string,
         body: Record<string, unknown>,
         headerFields?: readonly (readonly [string, string])[],
     ): Promise<T>;
+    PUTWithEtag<T>(
+        resource: string,
+        body: Record<string, unknown>,
+        headerFields?: readonly (readonly [string, string])[],
+    ): Promise<{ body: T; etag: string | undefined }>;
+    PATCH<T>(
+        resource: string,
+        body: Record<string, unknown>,
+        headerFields?: readonly (readonly [string, string])[],
+    ): Promise<T>;
+    PATCHWithEtag<T>(
+        resource: string,
+        body: Record<string, unknown>,
+        headerFields?: readonly (readonly [string, string])[],
+    ): Promise<{ body: T; etag: string | undefined }>;
     DELETE(resource: string): Promise<void>;
     POST<T>(
         resource: string,
@@ -142,6 +165,17 @@ function makeRequestContext(
                 ),
             );
         },
+        GETWithEtag: <T>(resource: string) => {
+            recordApiRequest('GET', resource);
+            return run<{
+                body: T;
+                etag: string | undefined;
+            }>(
+                tok => httpGetWithEtag<T>(
+                    adapter, resource, tok, requestId,
+                ),
+            );
+        },
         PUT: <T>(
             resource: string,
             body: Record<string, unknown>,
@@ -154,6 +188,53 @@ function makeRequestContext(
                     adapter, resource, body, tok,
                     headerFields, requestId,
                 ));
+        },
+        PUTWithEtag: <T>(
+            resource: string,
+            body: Record<string, unknown>,
+            headerFields?:
+                readonly (readonly [string, string])[],
+        ) => {
+            recordApiRequest('PUT', resource);
+            return run<{
+                body: T;
+                etag: string | undefined;
+            }>(
+                tok => httpPutWithEtag<T>(
+                    adapter, resource, body, tok,
+                    headerFields, requestId,
+                ),
+            );
+        },
+        PATCH: <T>(
+            resource: string,
+            body: Record<string, unknown>,
+            headerFields?:
+                readonly (readonly [string, string])[],
+        ) => {
+            recordApiRequest('PATCH', resource);
+            return run<T>(
+                tok => httpPatch<T>(
+                    adapter, resource, body, tok,
+                    headerFields, requestId,
+                ));
+        },
+        PATCHWithEtag: <T>(
+            resource: string,
+            body: Record<string, unknown>,
+            headerFields?:
+                readonly (readonly [string, string])[],
+        ) => {
+            recordApiRequest('PATCH', resource);
+            return run<{
+                body: T;
+                etag: string | undefined;
+            }>(
+                tok => httpPatchWithEtag<T>(
+                    adapter, resource, body, tok,
+                    headerFields, requestId,
+                ),
+            );
         },
         DELETE: (resource: string) => {
             recordApiRequest('DELETE', resource);

@@ -15,7 +15,8 @@
 // among others) wait for their own demand before a slot, a
 // registration, or a helper is added on their behalf.
 
-export type ConcurrencyClass = 'simple' | 'locked';
+export type ConcurrencyClass =
+    'simple' | 'locked' | 'create-only';
 
 export interface FamilyRegistration {
     readonly family: string;        // first path segment
@@ -52,12 +53,15 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         createBodyIdField: 'id',
     },
     {
-        family: 'records',
+        family: 'record-types',
         organizationNested: true,
         concurrency: 'simple',
         createBodyIdField: 'id',
     },
     {
+        // Nested attributes under a type share storage under
+        // the type prefix; this row remains for registry
+        // completeness (stateless sub-family).
         family: 'record-attributes',
         organizationNested: true,
         concurrency: 'simple',
@@ -140,3 +144,35 @@ export function familyRegistration(
         (entry) => entry.family === family,
     );
 }
+
+// Org-nested record-types wire addresses (Task 2). Nested-
+// primary; the path org is never authorization alone — the
+// gate's org-match arm compares it to the fenced token org.
+export const RECORD_TYPES_COLLECTION_PATTERN =
+    'organizations/:organization-id/record-types';
+export const RECORD_TYPE_DETAIL_PATTERN =
+    RECORD_TYPES_COLLECTION_PATTERN + '/:record-type-id';
+export const RECORD_TYPE_HISTORY_PATTERN =
+    RECORD_TYPE_DETAIL_PATTERN + '/history';
+// Nested attributes under a record type (Task 7).
+export const ATTRIBUTES_COLLECTION_PATTERN =
+    RECORD_TYPE_DETAIL_PATTERN + '/attributes';
+export const ATTRIBUTE_DETAIL_PATTERN =
+    ATTRIBUTES_COLLECTION_PATTERN + '/:attribute-id';
+// Nested instances under a record type (Task 14 patterns;
+// routes land in Tasks 15–19).
+export const INSTANCES_COLLECTION_PATTERN =
+    RECORD_TYPE_DETAIL_PATTERN + '/instances';
+export const INSTANCE_DETAIL_PATTERN =
+    INSTANCES_COLLECTION_PATTERN + '/:instance-id';
+export const INSTANCE_HISTORY_PATTERN =
+    INSTANCE_DETAIL_PATTERN + '/history';
+
+// Create-only PUT addresses (Task 15): If-Match rejected;
+// in-tx spent-address check owns the race. NOT registered
+// in DOCUMENT_CLASS_ROUTE_PATTERNS (R10) — headPairId stays
+// undefined so genesis carries neither supersedes nor
+// follows.
+export const CREATE_ONLY_PUT_ROUTE_PATTERNS:
+    ReadonlySet<string> =
+    new Set([INSTANCE_DETAIL_PATTERN]);

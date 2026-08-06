@@ -53,6 +53,17 @@ async () => {
     assert.equal(res.status, 405);
 });
 
+// Task 10: PATCH alphabet — no flows-family patch yet.
+test('PATCH flows/:id 405s (no patch handler wired)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PATCH', '/flows/f1', token, {},
+    ));
+    assert.equal(res.status, 405);
+});
+
 // POST flows/:id/versions/:vid verb-gap RETIRED with the
 // versions routes (Phase 15 Task 7) — router 404, not 405.
 

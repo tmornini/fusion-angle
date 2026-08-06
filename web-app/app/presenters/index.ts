@@ -143,12 +143,22 @@ export {
 export {
     RecordDetailPresenter,
     RecordDetailEditPresenter,
+    RecordInstancesPresenter,
     recordDraftFromView,
     allowedConstraintKinds,
     formatConstraint,
+    projectInstanceFields,
+    instanceListItems,
+    INSTANCE_CONFLICT_NOTICE,
     type RecordDetailView,
     type RecordDetailDraft,
     type AttributeDraft,
+    type InstancesSectionView,
+    type InstanceEditView,
+    type InstanceFieldView,
+    type InstanceListItemView,
+    type InstanceFieldAccess,
+    type InstanceAttributeAcl,
 } from './record-detail.ts';
 export {
     IdentityDetailPresenter,

@@ -17,14 +17,14 @@ import {
 } from './record-attributes.ts';
 import {
     validateAttributeValue,
-} from '../record-constraints.ts';
+} from '../../../api/record-constraints.ts';
 import type {
     ConstraintViolation,
-} from '../record-constraints.ts';
+} from '../../../api/record-constraints.ts';
 
 export type {
     ConstraintViolation,
-} from '../record-constraints.ts';
+} from '../../../api/record-constraints.ts';
 
 export class RecordTransitionViolations
     extends Error {
