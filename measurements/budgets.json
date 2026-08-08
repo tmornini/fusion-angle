@@ -1,89 +1,89 @@
 {
     "auth": {
-        "readyMs": 309
+        "readyMs": 297
     },
     "billing": {
-        "readyMs": 497
+        "readyMs": 419
     },
     "dashboard": {
-        "readyMs": 1218
+        "readyMs": 676
     },
     "design-system": {
-        "readyMs": 490
+        "readyMs": 407
     },
     "flow-detail": {
-        "readyMs": 624
+        "readyMs": 400
     },
     "flow-stats": {
-        "readyMs": 621
+        "readyMs": 440
     },
     "flows": {
-        "readyMs": 682
+        "readyMs": 513
     },
     "idea-convert": {
-        "readyMs": 822
+        "readyMs": 470
     },
     "idea-create": {
-        "readyMs": 560
+        "readyMs": 397
     },
     "idea-detail": {
-        "readyMs": 645
+        "readyMs": 414
     },
     "ideas": {
-        "readyMs": 739
+        "readyMs": 572
     },
     "identities": {
-        "readyMs": 602
+        "readyMs": 429
     },
     "identity-detail": {
-        "readyMs": 901
+        "readyMs": 543
     },
     "identity-providers": {
-        "readyMs": 612
+        "readyMs": 419
     },
     "identity-tokens": {
-        "readyMs": 571
+        "readyMs": 446
     },
     "invitations": {
-        "readyMs": 654
+        "readyMs": 442
     },
     "landing": {
-        "readyMs": 309
+        "readyMs": 291
     },
     "member-detail": {
-        "readyMs": 621
+        "readyMs": 442
     },
     "members": {
-        "readyMs": 643
+        "readyMs": 425
     },
     "not-found": {
-        "readyMs": 365
+        "readyMs": 256
     },
     "organization": {
-        "readyMs": 1185
+        "readyMs": 572
     },
     "project-detail": {
-        "readyMs": 956
+        "readyMs": 552
     },
     "projects": {
-        "readyMs": 850
+        "readyMs": 639
     },
     "record-create": {
-        "readyMs": 476
+        "readyMs": 437
     },
     "record-detail": {
-        "readyMs": 837
+        "readyMs": 584
     },
     "records": {
-        "readyMs": 840
+        "readyMs": 604
     },
     "snapshots": {
-        "readyMs": 653
+        "readyMs": 493
     },
     "workbox": {
-        "readyMs": 947
+        "readyMs": 507
     },
     "workbox-detail": {
-        "readyMs": 1271
+        "readyMs": 716
     }
 }

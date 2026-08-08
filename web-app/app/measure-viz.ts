@@ -24,11 +24,12 @@ export const HISTORY_PATH =
 export const BUDGETS_PATH =
     'measurements/budgets.json';
 export const VIZ_OUTPUT_PATH =
-    'measurements/index.html';
+    'measurements/page-load-times-broken-in-ichat.html';
 
 /**
  * Read disk history + budgets, write measurements/
- * index.html. Throws named Errors (caller maps to exit 1).
+ * page-load-times-broken-in-ichat.html. Throws named
+ * Errors (caller maps to exit 1).
  */
 export function generateMeasureViz(
     repoRoot: string,
