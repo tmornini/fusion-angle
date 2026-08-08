@@ -188,9 +188,14 @@ type CredentialRecipient = {
     readonly email: string;
 };
 
+type PasswordHasher = (
+    plaintext: string,
+) => Promise<string>;
+
 async function seedHumanCredentials(
     adapter: DbAdapter,
     recipients: readonly CredentialRecipient[],
+    hashPasswordFn: PasswordHasher = hashPassword,
 ): Promise<SeededCredentials> {
     const planned = await Promise.all(
         recipients.map(async recipient => {
@@ -201,11 +206,12 @@ async function seedHumanCredentials(
                 identityId: recipient.identityId,
                 username: recipient.email,
                 password,
-                secret: await hashPassword(password),
+                secret: await hashPasswordFn(password),
             };
         }));
-    const systemCredentialId = 'seed-cred-system-client-secret';
-    const systemSecret = await hashPassword(
+    const systemCredentialId =
+        'seed-cred-system-client-secret';
+    const systemSecret = await hashPasswordFn(
         generateCryptoSafeBase62());
     // Pass 1 (no tx): each credential's message pair, formed from
     // the SAME post-hash secret pass 2 below writes — the row
@@ -275,8 +281,13 @@ async function seedHumanCredentials(
 
 export { OBJECTIVE_SEEDS };
 
+export type PostMockDataLoadOptions = {
+    readonly hashPassword?: PasswordHasher;
+};
+
 export async function postMockDataLoad(
     adapter: DbAdapter,
+    options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): every pair-wired op-invocation's message
     // pair, formed up front — formWritePair's hashing is async
@@ -305,6 +316,7 @@ export async function postMockDataLoad(
             identityId: member.id,
             email: member.email,
         })),
+        options?.hashPassword,
     );
     await adapter.postSchemaCreation();
     return creds;
