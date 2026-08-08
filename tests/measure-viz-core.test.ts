@@ -16,6 +16,7 @@ import {
     pageKeysUnion,
     rankPages,
     buildPayload,
+    trendLabelIndices,
     MEASURE_BOOT_PAGE_INIT,
     VIZ_PAYLOAD_VERSION,
 } from '../web-app/app/measure-viz-core.ts';
@@ -445,4 +446,133 @@ test('buildPayload empty sweeps throws', () => {
         ),
         /no sweeps/i,
     );
+});
+
+// --- trendLabelIndices ---
+
+test('trendLabelIndices labels samples only', () => {
+    // 9 sweeps; page present on all but 6 and 7
+    const page = 'not-found';
+    const sweeps: CoreHistoryLine[] = [];
+    for (let i = 0; i < 9; i++) {
+        if (i === 6 || i === 7) {
+            sweeps.push(sampleSweep(`t${i}`, {
+                other: { readyMs: 1, phases: {} },
+            }));
+        } else {
+            sweeps.push(sampleSweep(`t${i}`, {
+                [page]: {
+                    readyMs: 100 + i,
+                    phases: {},
+                },
+            }));
+        }
+    }
+    const labels = trendLabelIndices(
+        sweeps, page, 0, 8, 20,
+    );
+    assert.deepEqual(
+        labels,
+        [0, 1, 2, 3, 4, 5, 8],
+    );
+    assert.ok(!labels.includes(6));
+    assert.ok(!labels.includes(7));
+});
+
+test('trendLabelIndices always keeps first/last sample', () => {
+    const page = 'dashboard';
+    const sweeps: CoreHistoryLine[] = [];
+    for (let i = 0; i < 20; i++) {
+        sweeps.push(sampleSweep(`t${i}`, {
+            [page]: { readyMs: 100, phases: {} },
+        }));
+    }
+    const labels = trendLabelIndices(
+        sweeps, page, 0, 19, 3,
+    );
+    assert.ok(labels.length <= 3);
+    assert.equal(labels[0], 0);
+    assert.equal(labels[labels.length - 1], 19);
+    assert.ok(labels.includes(0));
+    assert.ok(labels.includes(19));
+});
+
+test('trendLabelIndices includes from/to only if sampled', () => {
+    // fromIndex=6 page missing → not forced
+    // toIndex=8 present → included
+    const page = 'not-found';
+    const sweeps: CoreHistoryLine[] = [];
+    for (let i = 0; i < 9; i++) {
+        if (i === 6 || i === 7) {
+            sweeps.push(sampleSweep(`t${i}`, {}));
+        } else {
+            sweeps.push(sampleSweep(`t${i}`, {
+                [page]: {
+                    readyMs: 100,
+                    phases: {},
+                },
+            }));
+        }
+    }
+    const labels = trendLabelIndices(
+        sweeps, page, 6, 8, 3,
+    );
+    assert.ok(!labels.includes(6));
+    assert.ok(labels.includes(8));
+});
+
+test('trendLabelIndices thins among candidates only', () => {
+    const page = 'dashboard';
+    const sweeps: CoreHistoryLine[] = [];
+    for (let i = 0; i < 9; i++) {
+        sweeps.push(sampleSweep(`t${i}`, {
+            [page]: { readyMs: 100, phases: {} },
+        }));
+    }
+    const labels = trendLabelIndices(
+        sweeps, page, 0, 8, 5,
+    );
+    assert.ok(labels.length <= 5);
+    for (const i of labels) {
+        assert.ok(
+            sweeps[i]?.pages[page] !== undefined,
+            `index ${i} must have page sample`,
+        );
+    }
+    // sorted ascending unique
+    for (let j = 1; j < labels.length; j++) {
+        assert.ok(labels[j]! > labels[j - 1]!);
+    }
+});
+
+test('not-found shaped fixture labels the peak', () => {
+    // Production-like: page on 0-5 and 8; missing 6,7
+    // idx 5 is the peak and must be labeled when present
+    const page = 'not-found';
+    const ready: Array<number | undefined> = [
+        100, 110, 120, 130, 140, 500,
+        undefined, undefined, 150,
+    ];
+    const sweeps = ready.map((ms, i) => {
+        if (ms === undefined) {
+            return sampleSweep(`t${i}`, {
+                other: { readyMs: 1, phases: {} },
+            });
+        }
+        return sampleSweep(`t${i}`, {
+            [page]: { readyMs: ms, phases: {} },
+        });
+    });
+    const labels = trendLabelIndices(
+        sweeps, page, 0, 8, 8,
+    );
+    assert.ok(
+        labels.includes(5),
+        'peak idx 5 labeled when it has data',
+    );
+    assert.ok(
+        !labels.includes(6),
+        'idx 6 must not be labeled for not-found',
+    );
+    assert.ok(!labels.includes(7));
 });

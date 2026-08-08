@@ -2559,13 +2559,20 @@ export interface InstancePatchBody {
     readonly clear: string[];
 }
 
-export function validateInstancePatchBody(
+// Shared set/clear dialect (instance PATCH + WO transition
+// instance shape). `label` prefixes every error string so
+// instance call sites pass 'InstancePatchBody' and keep
+// every existing message BYTE-IDENTICAL.
+export function validateValueDelta(
     body: Record<string, unknown>,
-): InstancePatchBody {
-    assertOnlyKeys(
-        body, [], 'InstancePatchBody',
-        ['set', 'clear'],
-    );
+    label: string,
+): {
+    set: {
+        attribute_id: string;
+        value: string;
+    }[];
+    clear: string[];
+} {
     const set: {
         attribute_id: string;
         value: string;
@@ -2573,23 +2580,23 @@ export function validateInstancePatchBody(
     const setSeen = new Set<string>();
     if ('set' in body) {
         const raw = asArray(
-            body['set'], 'InstancePatchBody.set',
+            body['set'], label + '.set',
         );
         for (let i = 0; i < raw.length; i++) {
-            const label =
-                'InstancePatchBody.set[' + i + ']';
-            const entry = asObject(raw[i], label);
+            const entryLabel =
+                label + '.set[' + i + ']';
+            const entry = asObject(raw[i], entryLabel);
             assertOnlyKeys(
                 entry,
                 ['attribute_id', 'value'],
-                label,
+                entryLabel,
             );
             const attributeId = pickString(
                 entry, 'attribute_id',
             );
             if (attributeId === '') {
                 throw new ValidationError(
-                    label
+                    entryLabel
                         + '.attribute_id must be '
                         + 'non-empty',
                 );
@@ -2598,14 +2605,15 @@ export function validateInstancePatchBody(
                 throw new ValidationError(
                     'duplicate attribute_id "'
                         + attributeId
-                        + '" in InstancePatchBody.set',
+                        + '" in ' + label + '.set',
                 );
             }
             setSeen.add(attributeId);
             const value = pickString(entry, 'value');
             if (value === '') {
                 throw new ValidationError(
-                    label + '.value must not be empty',
+                    entryLabel
+                        + '.value must not be empty',
                 );
             }
             set.push({
@@ -2618,18 +2626,18 @@ export function validateInstancePatchBody(
     const clearSeen = new Set<string>();
     if ('clear' in body) {
         const raw = asArray(
-            body['clear'], 'InstancePatchBody.clear',
+            body['clear'], label + '.clear',
         );
         for (let i = 0; i < raw.length; i++) {
-            const label =
-                'InstancePatchBody.clear[' + i + ']';
+            const entryLabel =
+                label + '.clear[' + i + ']';
             const attributeId = raw[i];
             if (
                 typeof attributeId !== 'string'
                 || attributeId === ''
             ) {
                 throw new ValidationError(
-                    label
+                    entryLabel
                         + ' must be a non-empty string',
                 );
             }
@@ -2637,18 +2645,12 @@ export function validateInstancePatchBody(
                 throw new ValidationError(
                     'duplicate attribute_id "'
                         + attributeId
-                        + '" in InstancePatchBody.clear',
+                        + '" in ' + label + '.clear',
                 );
             }
             clearSeen.add(attributeId);
             clear.push(attributeId);
         }
-    }
-    if (set.length + clear.length === 0) {
-        throw new ValidationError(
-            'InstancePatchBody requires a non-empty '
-                + 'set or clear',
-        );
     }
     for (const attributeId of clear) {
         if (setSeen.has(attributeId)) {
@@ -2658,6 +2660,25 @@ export function validateInstancePatchBody(
                     + '" appears in both set and clear',
             );
         }
+    }
+    return { set, clear };
+}
+
+export function validateInstancePatchBody(
+    body: Record<string, unknown>,
+): InstancePatchBody {
+    assertOnlyKeys(
+        body, [], 'InstancePatchBody',
+        ['set', 'clear'],
+    );
+    const { set, clear } = validateValueDelta(
+        body, 'InstancePatchBody',
+    );
+    if (set.length + clear.length === 0) {
+        throw new ValidationError(
+            'InstancePatchBody requires a non-empty '
+                + 'set or clear',
+        );
     }
     return { set, clear };
 }
@@ -3910,18 +3931,58 @@ export interface WorkOrderTransitionRelease {
     readonly at: string;
 }
 
-export interface WorkOrderTransitionBody {
+// Dual-tolerant body shapes (Task 4 dual-accept; Task 8
+// gate cut): the LIVE gate rejects the fieldValues key in
+// the dispatch arrow. This validator still accepts BOTH
+// shapes for the below-facade / stored-data tier (seed
+// pure-moves, history fold of stored pairs). Discriminated
+// on the presence of the `fieldValues` key.
+export interface WorkOrderLegacyTransitionBody {
+    readonly kind: 'legacy';
     readonly transitionEventId: string;
     readonly targetState: string;
-    readonly fieldValues: readonly WorkOrderTransitionFieldValue[];
+    readonly fieldValues:
+        readonly WorkOrderTransitionFieldValue[];
     readonly release: WorkOrderTransitionRelease | null;
     readonly transitionAt: string;
 }
 
-const WORK_ORDER_TRANSITION_KEYS: readonly string[] = [
-    'transitionEventId', 'targetState',
-    'fieldValues', 'release', 'transitionAt',
-];
+export interface WorkOrderInstanceTransitionBody {
+    readonly kind: 'instance';
+    readonly transitionEventId: string;
+    readonly targetState: string;
+    readonly instanceId: string | null;
+    readonly recordTypeId: string | null;
+    readonly set: {
+        readonly attribute_id: string;
+        readonly value: string;
+    }[];
+    readonly clear: string[];
+    readonly release: WorkOrderTransitionRelease | null;
+    readonly transitionAt: string;
+}
+
+export type WorkOrderTransitionBody =
+    | WorkOrderLegacyTransitionBody
+    | WorkOrderInstanceTransitionBody;
+
+const WORK_ORDER_LEGACY_TRANSITION_KEYS:
+    readonly string[] = [
+        'transitionEventId', 'targetState',
+        'fieldValues', 'release', 'transitionAt',
+    ];
+
+const WORK_ORDER_INSTANCE_TRANSITION_KEYS:
+    readonly string[] = [
+        'transitionEventId', 'targetState',
+        'release', 'transitionAt',
+    ];
+
+const WORK_ORDER_INSTANCE_TRANSITION_OPTIONAL:
+    readonly string[] = [
+        'instance_id', 'record_type_id',
+        'set', 'clear',
+    ];
 
 const TRANSITION_RELEASE_KEYS: readonly string[] = [
     'id', 'state', 'at',
@@ -3931,24 +3992,41 @@ const TRANSITION_FIELD_VALUE_KEYS: readonly string[] = [
     'id', 'fields',
 ];
 
-// The HTTP-body gate for POST /work-orders/:id/transition: the
-// transition state event (target node), zero or more field-
-// value folds, and an OPTIONAL claim-release event. The web-
-// app computes WHAT to write — the target node, the field
-// rows, and whether a live claim must be released. Phase
-// Final Task 2: state_field_values ROW half stripped; each
-// fields object is fully validated here via
-// validateStateFieldValueEntity (re-homed from the store put)
-// AFTER the MANDATORY state_event_id === transitionEventId
-// pin (Phase 15 Task 3, wire delta (4)). Authorship of the
-// transition event AND the release event is stamped from the
-// verified caller in the route, never the body.
-export function validateWorkOrderTransitionBody(
+function parseTransitionRelease(
+    rawRelease: unknown,
+): WorkOrderTransitionRelease | null {
+    if (rawRelease === null) return null;
+    const label = 'WorkOrderTransitionBody.release';
+    const obj = asObject(rawRelease, label);
+    assertOnlyKeys(obj, TRANSITION_RELEASE_KEYS, label);
+    const id = asString(obj['id'], label + '.id');
+    if (id === '') {
+        throw new ValidationError(
+            label + '.id must be non-empty',
+        );
+    }
+    const state = asString(obj['state'], label + '.state');
+    if (state === '') {
+        throw new ValidationError(
+            label + '.state must be non-empty',
+        );
+    }
+    const at = validateTimestampField(
+        obj, 'at', label,
+    );
+    return { id, state, at };
+}
+
+// Legacy fieldValues branch — stored-data / below-facade
+// tier only (Task 8 cut the live gate). kind:'legacy'.
+// Every valid legacy body carries the fieldValues key;
+// hybrids 400 in assertOnlyKeys.
+function validateWorkOrderLegacyTransitionBody(
     body: Record<string, unknown>,
-): WorkOrderTransitionBody {
+): WorkOrderLegacyTransitionBody {
     assertOnlyKeys(
         body,
-        WORK_ORDER_TRANSITION_KEYS,
+        WORK_ORDER_LEGACY_TRANSITION_KEYS,
         'WorkOrderTransitionBody',
     );
     const transitionEventId = pickString(
@@ -3972,7 +4050,8 @@ export function validateWorkOrderTransitionBody(
         'WorkOrderTransitionBody.fieldValues',
     ).map((v, i) => {
         const label =
-            'WorkOrderTransitionBody.fieldValues[' + i + ']';
+            'WorkOrderTransitionBody.fieldValues['
+            + i + ']';
         const row = asObject(v, label);
         assertOnlyKeys(
             row, TRANSITION_FIELD_VALUE_KEYS, label,
@@ -4012,37 +4091,127 @@ export function validateWorkOrderTransitionBody(
         validateStateFieldValueEntity(fields);
         return { id, fields };
     });
-    const rawRelease = body['release'];
-    let release: WorkOrderTransitionRelease | null = null;
-    if (rawRelease !== null) {
-        const label = 'WorkOrderTransitionBody.release';
-        const obj = asObject(rawRelease, label);
-        assertOnlyKeys(obj, TRANSITION_RELEASE_KEYS, label);
-        const id = asString(obj['id'], label + '.id');
-        if (id === '') {
-            throw new ValidationError(
-                label + '.id must be non-empty',
-            );
-        }
-        const state = asString(obj['state'], label + '.state');
-        if (state === '') {
-            throw new ValidationError(
-                label + '.state must be non-empty',
-            );
-        }
-        const at = validateTimestampField(
-            obj, 'at', label,
-        );
-        release = { id, state, at };
-    }
+    const release = parseTransitionRelease(body['release']);
     const transitionAt = validateTimestampField(
         body, 'transitionAt',
         'WorkOrderTransitionBody',
     );
     return {
+        kind: 'legacy',
         transitionEventId, targetState,
         fieldValues, release, transitionAt,
     };
+}
+
+// Instance set/clear branch (Task 4 dual-accept window).
+// A2: bind-assert fields required with set/clear and
+// forbidden on pure moves (one-dialect-per-shape).
+function validateWorkOrderInstanceTransitionBody(
+    body: Record<string, unknown>,
+): WorkOrderInstanceTransitionBody {
+    assertOnlyKeys(
+        body,
+        WORK_ORDER_INSTANCE_TRANSITION_KEYS,
+        'WorkOrderTransitionBody',
+        WORK_ORDER_INSTANCE_TRANSITION_OPTIONAL,
+    );
+    const transitionEventId = pickString(
+        body, 'transitionEventId',
+    );
+    if (transitionEventId === '') {
+        throw new ValidationError(
+            'WorkOrderTransitionBody.transitionEventId'
+            + ' must be non-empty',
+        );
+    }
+    const targetState = pickString(body, 'targetState');
+    if (targetState === '') {
+        throw new ValidationError(
+            'WorkOrderTransitionBody.targetState'
+            + ' must be non-empty',
+        );
+    }
+    const instanceId =
+        pickOptionalString(
+            body, 'instance_id',
+            'WorkOrderTransitionBody',
+        ) ?? null;
+    const recordTypeId =
+        pickOptionalString(
+            body, 'record_type_id',
+            'WorkOrderTransitionBody',
+        ) ?? null;
+    const valueBearing =
+        'set' in body || 'clear' in body;
+    let set: {
+        attribute_id: string;
+        value: string;
+    }[] = [];
+    let clear: string[] = [];
+    if (valueBearing) {
+        const delta = validateValueDelta(
+            body, 'WorkOrderTransitionBody',
+        );
+        set = delta.set;
+        clear = delta.clear;
+        if (set.length + clear.length === 0) {
+            throw new ValidationError(
+                'WorkOrderTransitionBody requires a'
+                + ' non-empty set or clear',
+            );
+        }
+    }
+    if (
+        valueBearing
+        && (instanceId === null
+            || recordTypeId === null)
+    ) {
+        throw new ValidationError(
+            'WorkOrderTransitionBody.instance_id and'
+            + ' .record_type_id are required with'
+            + ' set/clear',
+        );
+    }
+    if (
+        !valueBearing
+        && (instanceId !== null
+            || recordTypeId !== null)
+    ) {
+        throw new ValidationError(
+            'WorkOrderTransitionBody.instance_id and'
+            + ' .record_type_id are forbidden on a'
+            + ' pure move',
+        );
+    }
+    const release = parseTransitionRelease(body['release']);
+    const transitionAt = validateTimestampField(
+        body, 'transitionAt',
+        'WorkOrderTransitionBody',
+    );
+    return {
+        kind: 'instance',
+        transitionEventId, targetState,
+        instanceId, recordTypeId,
+        set, clear, release, transitionAt,
+    };
+}
+
+// Body gate for POST /work-orders/:id/transition (and the
+// below-facade seed tier). Dual-tolerant: `fieldValues`
+// key → legacy; else instance. The LIVE route dispatch
+// rejects fieldValues before this runs (Task 8 CUT).
+// Authorship of the transition event AND the release event
+// is stamped from the verified caller in the route, never
+// the body.
+export function validateWorkOrderTransitionBody(
+    body: Record<string, unknown>,
+): WorkOrderTransitionBody {
+    if ('fieldValues' in body) {
+        return validateWorkOrderLegacyTransitionBody(
+            body,
+        );
+    }
+    return validateWorkOrderInstanceTransitionBody(body);
 }
 
 export interface AIMemberCreateBody {
@@ -4178,6 +4347,44 @@ export function validateWorkOrderReleaseBody(
         body, 'releaseAt', 'WorkOrderReleaseBody',
     );
     return { releaseEventId, releaseAt };
+}
+
+const WORK_ORDER_BINDING_KEYS: readonly string[] = [
+    'instance_id', 'record_type_id',
+];
+
+export interface WorkOrderBindingBody {
+    readonly instanceId: string;
+    readonly recordTypeId: string;
+}
+
+// Gate for POST /work-orders/:id/binding. Two opaque ids only —
+// no timestamps, no event ids. The CURRENT bind derives from
+// the op-pair prefix (workOrderBindingFor); rebind is 409.
+export function validateWorkOrderBindingBody(
+    body: Record<string, unknown>,
+): WorkOrderBindingBody {
+    assertOnlyKeys(
+        body, WORK_ORDER_BINDING_KEYS,
+        'WorkOrderBindingBody',
+    );
+    const instanceId = pickString(body, 'instance_id');
+    if (instanceId === '') {
+        throw new ValidationError(
+            'WorkOrderBindingBody.instance_id'
+            + ' must be non-empty',
+        );
+    }
+    const recordTypeId = pickString(
+        body, 'record_type_id',
+    );
+    if (recordTypeId === '') {
+        throw new ValidationError(
+            'WorkOrderBindingBody.record_type_id'
+            + ' must be non-empty',
+        );
+    }
+    return { instanceId, recordTypeId };
 }
 
 export interface AIMemberEditBody {

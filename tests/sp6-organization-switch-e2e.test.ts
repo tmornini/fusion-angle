@@ -1,11 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -19,6 +15,7 @@ import {
     devToken,
     reachableToken,
 } from './token-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // End-to-end of the boot-scope + org-switch flow the browser
 // drives: enumerate reachable orgs, exchange a scoped token,
@@ -27,10 +24,7 @@ import {
 // hidden from org '2'.
 
 async function seeded(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 const idsOf = (rows: { id: string }[]): string[] =>

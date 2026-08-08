@@ -1,8 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    postMockDataLoad,
+    memoryDbAdapter,
+    type MemoryDbAdapter,
+} from '../api/db-memory.ts';
+import {
     postBootstrap,
 } from '../api/mock-data.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
@@ -11,12 +13,10 @@ import { deriveDefaultOrganization } from
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
+import { seededMockDb } from './mock-seed.ts';
 
-async function mockSeeded() {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await postMockDataLoad(db);
-    return db;
+async function mockSeeded(): Promise<MemoryDbAdapter> {
+    return seededMockDb();
 }
 
 // Phase Final Task 2: identity + membership + default-org

@@ -34,7 +34,6 @@ import {
 } from '../api/types.ts';
 
 const AT_CREATED = '2026-05-01T10:00:00.000000Z';
-const AT_FIRST = '2026-05-01T11:00:00.000000Z';
 
 async function seedSystemMember(
     db: MemoryDbAdapter,
@@ -108,11 +107,10 @@ async function seedWorkOrder(
         position: 0,
     });
     // Genesis transition via the named op (states/:id
-    // retired). fieldValues empty; no claim release.
+    // retired). pure-move instance shape; no claim release.
     await ctx.POST('work-orders/' + id + '/transition', {
         transitionEventId: 't-create-' + id,
         targetState: currentNodeId,
-        fieldValues: [],
         release: null,
         transitionAt: AT_CREATED,
     });
@@ -250,7 +248,7 @@ test(
         );
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(),
+            ctx, 'wo-1', new Map(), new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -294,7 +292,53 @@ test(
         });
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(),
+            ctx, 'wo-1', new Map(), new Map(),
+        );
+        assert.equal(out.length, 1);
+        assert.equal(out[0]!.kind, 'required');
+        if (out[0]!.kind !== 'required') return;
+        assert.equal(out[0]!.attributeName, 'Email');
+    },
+);
+
+test(
+    'validateRecordTransition reports every'
+    + ' required ref when storedValues is null'
+    + ' (unbound A3 mirror)',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedSystemMember(db);
+        const flowGraph = buildFlowGraph(
+            [
+                buildNode('n-create', [], {
+                    isCreate: true,
+                }),
+                buildNode('n-step', [{
+                    attributeId: 'a-1',
+                    mode: 'editable',
+                    isRequired: true,
+                }]),
+                buildNode('n-target'),
+            ],
+            [
+                buildEdge('e-1', 'n-create', 'n-step'),
+                buildEdge('e-2', 'n-step', 'n-target'),
+            ],
+        );
+        await seedWorkOrder(
+            db, 'wo-1', flowGraph, 'n-step',
+        );
+        await seedBinding(db, 'flow-1', 'rec-1');
+        await seedFlowLink(db, 'flow-1', 'wo-1');
+        await seedAttribute(db, 'a-1', 'rec-1', {
+            name: 'Email',
+        });
+        const ctx = createRequestContext(
+            db, await organizationToken(),
+        );
+        const out = await validateRecordTransition(
+            ctx, 'wo-1', new Map(), null,
         );
         assert.equal(out.length, 1);
         assert.equal(out[0]!.kind, 'required');
@@ -337,7 +381,7 @@ test(
         });
         const ctx = createRequestContext(db, await organizationToken());
         const out = await validateRecordTransition(
-            ctx, 'wo-1', new Map(),
+            ctx, 'wo-1', new Map(), new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -375,35 +419,19 @@ test(
         await seedWorkOrder(
             db, 'wo-1', flowGraph, 'n-step',
         );
-        const ctx = createRequestContext(db, await organizationToken());
-        // NAMED re-pin (Phase 15 Task 7): leaf PUT
-        // states/:id/field-values/:fvid retires; seed the
-        // stored field value through the transition fold —
-        // the ONLY live writer of state_field_values rows
-        // (postWorkOrderTransitionOp). Same wire-reachable
-        // POST the product uses; pair plane + row plane
-        // both land in one op.
-        await ctx.POST('work-orders/wo-1/transition', {
-            transitionEventId: 't-step',
-            targetState: 'n-step',
-            fieldValues: [{
-                id: 'fv-1',
-                fields: {
-                    state_event_id: 't-step',
-                    attribute_id: 'a-1',
-                    value: 'me@example.com',
-                },
-            }],
-            release: null,
-            transitionAt: AT_FIRST,
-        });
         await seedBinding(db, 'flow-1', 'rec-1');
         await seedFlowLink(db, 'flow-1', 'wo-1');
         await seedAttribute(db, 'a-1', 'rec-1', {
             name: 'Email',
         });
+        const ctx = createRequestContext(
+            db, await organizationToken(),
+        );
+        // Instance head is the SoT — pass storedValues
+        // directly; no history fold.
         const out = await validateRecordTransition(
             ctx, 'wo-1', new Map(),
+            new Map([['a-1', 'me@example.com']]),
         );
         assert.deepEqual(out, []);
     },
@@ -446,6 +474,7 @@ test(
         const out = await validateRecordTransition(
             ctx, 'wo-1',
             new Map([['a-1', 'ABC']]),
+            new Map(),
         );
         assert.deepEqual(out, []);
     },
@@ -493,6 +522,7 @@ test(
         const out = await validateRecordTransition(
             ctx, 'wo-1',
             new Map([['a-1', 'not-an-email']]),
+            new Map(),
         );
         assert.equal(out.length, 1);
         assert.equal(out[0]!.kind, 'regex');
@@ -524,7 +554,7 @@ test(
         const ctx = createRequestContext(db, await organizationToken());
         await assert.rejects(
             () => validateRecordTransition(
-                ctx, 'wo-1', new Map(),
+                ctx, 'wo-1', new Map(), new Map(),
             ),
             /current node not found/,
         );

@@ -14,12 +14,13 @@ import { seedAdminSchema } from './test-fixtures.ts';
 // the generic constructors replace the hand-written PUT
 // work-orders/:id scaffolding, never the sibling routes below,
 // but a gate-level regression could still shift these. A future
-// change to any of these fifteen statuses must re-derive the
+// change to any of these eighteen statuses must re-derive the
 // covenant deliberately, not by accident of refactoring. The
-// list is exactly 15 (2+2+3+3+3+2): PUT/DELETE work-orders;
+// list is exactly 18 (2+2+3+3+3+3+2): PUT/DELETE work-orders;
 // POST/DELETE work-orders/:id; GET/PUT/DELETE
 // work-orders/:id/claim; GET/PUT/DELETE
-// work-orders/:id/transition; POST/PUT/DELETE
+// work-orders/:id/transition; GET/PUT/DELETE
+// work-orders/:id/binding; POST/PUT/DELETE
 // flows/:id/work-orders; GET/POST flows/:id/work-orders/:woid
 // (its DELETE 405 is already pinned in
 // api-flows-verb-gaps.test.ts — left there, not duplicated
@@ -157,6 +158,36 @@ test('DELETE work-orders/:id/transition 405s (no delete'
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/work-orders/wo1/transition', token),
+    );
+    assert.equal(res.status, 405);
+});
+
+test('GET work-orders/:id/binding 405s (no get handler'
++ ' wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req('GET', '/work-orders/w1/binding', token),
+    );
+    assert.equal(res.status, 405);
+});
+
+test('PUT work-orders/:id/binding 405s (no put handler'
++ ' wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PUT', '/work-orders/w1/binding', token, {},
+    ));
+    assert.equal(res.status, 405);
+});
+
+test('DELETE work-orders/:id/binding 405s (no delete'
++ ' handler wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req('DELETE', '/work-orders/w1/binding', token),
     );
     assert.equal(res.status, 405);
 });

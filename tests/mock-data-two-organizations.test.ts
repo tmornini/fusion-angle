@@ -1,11 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
-import { verifyPassword } from '../shared/password-hash.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     deriveIdeas,
     deriveIdeaSubmissions,
@@ -52,6 +47,7 @@ import { organizationToken } from './token-fixtures.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 const RECORDS_WIRING: DocumentFamilyWiring = {
     family: 'record-types',
@@ -165,10 +161,7 @@ const ORGANIZATION_ONE = '1';
 const ORGANIZATION_TWO = '2';
 
 async function seed() {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    const creds = await postMockDataLoad(db);
-    return { db, creds };
+    return { db: await seededMockDb() };
 }
 
 // Phase Final Task 2: every membership document on the pair
@@ -502,24 +495,30 @@ test('every project score names an author in its'
         'cross-org score authors: ' + violations.join('; '));
 });
 
-test('every seeded human gets a verifiable password',
+test('every seeded human gets a password credential',
 async () => {
-    const { db, creds } = await seed();
-    assert.ok(
-        creds.identities.length >= 2,
-        'multiple humans seeded');
+    const { db } = await seed();
     // Phase Final Task 2: identity_credentials ROW half
-    // stripped — verify against pair-plane secrets.
-    for (const c of creds.identities) {
+    // stripped — pair-plane secrets; plaintext reveal is
+    // only on the postMockDataLoad return (production pin
+    // lives in credential-surfacing). Here assert PHC seed.
+    const parents = await deriveMemberParents(db);
+    let passwordCount = 0;
+    for (const parent of parents) {
+        if (parent.id === 'system') continue;
         const rows = await deriveCredentialsFor(
-            db, c.identityId,
+            db, parent.id,
         );
         const row = rows.find(r => r.kind === 'password');
-        assert.ok(row, `no password for ${c.identityId}`);
-        assert.equal(
-            await verifyPassword(c.password, row.secret),
-            true);
-        assert.match(c.username, /@/);
+        if (!row) continue;
+        passwordCount += 1;
+        assert.match(
+            row.secret,
+            /^\$pbkdf2-sha256\$i=1\$/,
+        );
     }
+    assert.ok(
+        passwordCount >= 2,
+        'multiple humans seeded with passwords');
     // Phase Final Stage B: identity spine tables retired.
 });

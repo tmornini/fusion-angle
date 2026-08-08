@@ -439,7 +439,13 @@ export interface StateEntity {
 export interface TransitionFieldValueEntity {
     id: Id;
     attribute_id: Id;
+    // Present on set rows (legacy + new-shape). New-shape
+    // clear rows omit the key at runtime (cleared: true);
+    // typed required so legacy consumers stay string-narrow.
     value: string;
+    // New-shape clear marker only; legacy rows never carry it
+    // so their wire bytes stay unchanged (JSON omits absent).
+    readonly cleared?: true;
 }
 
 // Work-order history row: a lifecycle StateEntity plus the
@@ -1282,6 +1288,9 @@ export interface WorkOrderEntity {
     display_id: string;
     flow_graph: Record<string, unknown>;
     position: number;
+    // GET embed when bound (absent when unbound).
+    instance_id?: Id;
+    record_type_id?: Id;
 }
 
 export interface FlowWorkOrderEntity {

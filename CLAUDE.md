@@ -15,14 +15,14 @@ when working with code in this repository.
 ./build dir/           # ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
 ./serve [port]         # Build + start HTTP server (default 8080)
-./measure              # Page-load benchmark (needs Chrome)
+./measure              # Full ceremony (record+budgets+25+viz)
 ./measure --help       # Show usage
 ./measure --check      # Fail if medians exceed budgets
-./measure --record     # Append history under measurements/
+./measure --record     # Append history (full registry only)
 ./measure --write-budgets  # mean+1.5σ budgets (full sweep)
 ./measure --budget-sigmas N  # σ multiplier (default 1.5)
 ./measure --pages a,b  # Subset of PAGE_REGISTRY keys
-./measure --runs N     # Runs per page (default 5)
+./measure --runs N     # Runs per page (default 25)
 ./measure --visualize  # History HTML from disk (no Chrome)
 ```
 
@@ -75,17 +75,26 @@ For what each test layer covers, see `## Testing`.
 
 `./measure` is a headless-Chrome page-load benchmark. It is
 **not** part of `./validate` — it needs Chrome and takes
-minutes (a full 29-page × 5-run sweep is several minutes).
+minutes (a full 29-page × 25-run ceremony is several
+minutes).
+
+**Bare `./measure`** is the full ceremony: `--record` +
+`--write-budgets` + `--runs 25` + `--visualize` over the
+full `PAGE_REGISTRY` (clean tree required). Explicit
+`./measure --runs N` alone is measure + report only
+(no history/budget write). `--record` and
+`--write-budgets` each require a full registry sweep
+(omit `--pages`).
 
 Run deliberately: before builds/releases; after adapter,
-derive, or presenter changes; at migration milestones with
-`--record`.
+derive, or presenter changes; at migration milestones
+(bare `./measure` or `--record` on a full sweep).
 
 Stats (median/min/max readyMs, phase medians, and
 `--write-budgets` mean+σ) drop the top and bottom 5% of
-samples (`floor(n×0.05)` per tail). Default `--runs 5`
-is too small to trim; use enough runs (e.g. 30) so the
-tails actually drop and σ stabilizes.
+samples (`floor(n×0.05)` per tail). Default `--runs 25`
+drops one sample per tail (`floor(25×0.05)=1`); smaller
+`n` (e.g. 5) trims nothing.
 
 Budgets live in `measurements/budgets.json` — per
 `PAGE_REGISTRY` page `readyMs` ceiling. Calibrate with
@@ -97,18 +106,21 @@ ceilings. Budgets are a **per-machine-class local dev
 gate**, not a CI absolute.
 
 History lives in `measurements/history.jsonl` —
-appended only by `--record`. Longitudinal record across
-the Postgres migration.
+appended only by `--record` (full registry only).
+Longitudinal record across the Postgres migration.
 
 `--visualize` regenerates `measurements/index.html` from
-committed history + budgets (self-contained HTML, gitignored).
-Bare `./measure --visualize` skips the clean-tree gate and
-Chrome. With a measure run, pass `--visualize` to regenerate
-after success; without `--record`, a note says that this run
-is not in history. Missing history or budgets is a hard fail.
-Not part of `./validate`. Phase rollup treats
+committed history + budgets (self-contained HTML,
+gitignored). Bare `./measure --visualize` skips the
+clean-tree gate and Chrome. Bare `./measure` (ceremony)
+regenerates viz after record. With an explicit measure
+run, pass `--visualize` to regenerate after success;
+without `--record`, a note says that this run is not in
+history. Missing history or budgets is a hard fail. Not
+part of `./validate`. Phase rollup treats
 `boot:page-init` as **residual** wall time after nested
-`fetch:*` / `render:*` (no double-count in the stacked bar).
+`fetch:*` / `render:*` (no double-count in the stacked
+bar).
 
 `--profile` prints per-ready API request counts (method +
 resource, id segments collapsed to `:id`) plus page-init
@@ -122,9 +134,11 @@ marks boot/fetch/render phases; one `page-performance` info
 log fires after ready (default log level `warn` keeps
 consoles quiet).
 
-Clean tree required (same as `./build` — measures committed
-bytes). Sandbox: `TMPDIR=/tmp/claude ./measure ...`. Chrome
-binary: `$CHROME`, or the macOS default Google Chrome path.
+Clean tree required for measure sweeps (same as `./build`
+— measures committed bytes); bare `--visualize` alone is
+exempt. Sandbox:
+`TMPDIR=/tmp/claude ./measure ...`. Chrome binary:
+`$CHROME`, or the macOS default Google Chrome path.
 
 Design:
 `docs/superpowers/specs/2026-07-12-page-
@@ -417,7 +431,7 @@ round-trip, in-browser ZIP, snapshot import-validation /
 quota / atomic-import, the
 memory + localStorage transaction backends, the tx runners
 and view, the commit batch route, api routing, navigation,
-mock-data validity (pair count 1494 / bootstrap 12 absolute;
+mock-data validity (pair count 1498 / bootstrap 12 absolute;
 the mock-data fingerprint file retired with the clients
 table), client registration facet + derive, the two-tier
 hazard predicate (`flow-graph-hazard.test.ts`), presenter

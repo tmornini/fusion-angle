@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
@@ -14,7 +11,6 @@ import type {
     ObjectiveEntity,
     ObjectiveRevisionEntity,
 } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
@@ -49,6 +45,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: objectives(+objective_revisions)
 // dual-write stripped. This file no longer compares derive
@@ -86,9 +83,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 const OBJECTIVES_TEST_WIRING: DocumentFamilyWiring = {

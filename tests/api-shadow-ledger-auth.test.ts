@@ -29,13 +29,16 @@ import {
     seedIdentityPii,
 } from './identity-fixtures.ts';
 
-// C1 discharge: the /authentication/{token,authorize} message
-// pairs carry live secrets in BOTH directions (a request's
-// password/code/refresh_token, a response's minted tokens), so
-// this file proves the shadow ledger never stores one — every
-// stored request/response row is REDACTED, and the two grant
-// routes' own domain guards (double-spend, reuse) — not a
-// stored-response replay — govern idempotency.
+// C1 discharge under the verbatim-storage contract: the
+// /authentication/{token,authorize} message pairs carry live
+// secrets in BOTH directions (a request's password/code/
+// refresh_token, a response's minted tokens) and store them
+// as wire bytes — accepted dev-tier plaintext ledger cost.
+// This file proves pair plumbing (counts, addresses, genesis
+// cols, domain-guard replays) and that live secrets DO land
+// in the ledger. The two grant routes' own domain guards
+// (double-spend, reuse) — not a stored-response replay —
+// govern idempotency.
 
 const BASE = 'http://localhost';
 const PASSWORD = 'hunter2-s3cret';
@@ -128,45 +131,12 @@ async function fullLoginFlow(db: GuardedDbAdapter): Promise<{
     return { code, ...grant };
 }
 
-test('no live secret survives into the ledger', async () => {
+test('live secrets land in the auth-flow ledger rows',
+async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const { code, access_token, refresh_token } =
         await fullLoginFlow(db);
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.ok(requests.length > 0);
-    const liveSecrets = [
-        PASSWORD, code, access_token, refresh_token,
-    ];
-    for (const row of [...requests, ...responses]) {
-        for (const secret of liveSecrets) {
-            assert.ok(
-                !row.message.includes(secret),
-                'ledger row ' + row.id
-                    + ' leaked a live secret',
-            );
-        }
-    }
-});
-
-// The PII strip arm's (gate 2) sibling pin: the live secret
-// pin above proves no HIGH-ENTROPY value survives; this proves
-// the LOW-entropy identifying value (the password-flow
-// username, an email) is likewise absent from every stored
-// AUTH-FLOW message — removed outright, not fingerprinted,
-// since a fingerprint over a low-entropy value is reversible.
-// Scoped to the authentication/* rows (message-redaction.ts's
-// own scope: only 'authentication/authorize' strips `username`)
-// — the fixture's OWN identities/:id/pii document (Phase 13
-// Task 8's seedIdentityPii) legitimately carries the email in
-// plaintext at a DIFFERENT address; that document is not this
-// pin's concern.
-test('no live username/email survives into the AUTH-FLOW'
-+ ' ledger rows', async () => {
-    const db = await dbWithPasswordUser();
-    await seedRootAdmin(db);
-    await fullLoginFlow(db);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     const authFlowRows = [...requests, ...responses].filter(
@@ -174,29 +144,42 @@ test('no live username/email survives into the AUTH-FLOW'
             || row.uri_prefix === '/authentication/token/',
     );
     assert.equal(authFlowRows.length, 4);
-    for (const row of authFlowRows) {
-        assert.ok(
-            !row.message.includes('demo@example.com'),
-            'ledger row ' + row.id + ' leaked the live email',
-        );
-    }
-});
-
-test('the password fingerprint is PBKDF2, not sha256',
-async () => {
-    const db = await dbWithPasswordUser();
-    await handleRequest(db, jsonPost(
-        'authentication/authorize', {
-            method: 'password', username: 'demo@example.com',
-            password: PASSWORD, client_id: 'web',
-        }));
-    const requests = await db.requests.getAll();
     const authorizeRequest = requests.find(
         r => r.uri_prefix === '/authentication/authorize/');
     assert.ok(authorizeRequest);
-    assert.match(
-        authorizeRequest!.message, /\$pbkdf2-sha256\$/);
-    assert.doesNotMatch(authorizeRequest!.message, /sha256:/);
+    assert.ok(
+        authorizeRequest!.message.includes(PASSWORD),
+        'authorize request missing live password',
+    );
+    assert.ok(
+        authorizeRequest!.message.includes('demo@example.com'),
+        'authorize request missing live email',
+    );
+    const authorizeResponse = responses.find(
+        r => r.uri_prefix === '/authentication/authorize/');
+    assert.ok(authorizeResponse);
+    assert.ok(
+        authorizeResponse!.message.includes(code),
+        'authorize response missing live code',
+    );
+    const tokenRequest = requests.find(
+        r => r.uri_prefix === '/authentication/token/');
+    assert.ok(tokenRequest);
+    assert.ok(
+        tokenRequest!.message.includes(code),
+        'token request missing live code',
+    );
+    const tokenResponse = responses.find(
+        r => r.uri_prefix === '/authentication/token/');
+    assert.ok(tokenResponse);
+    assert.ok(
+        tokenResponse!.message.includes(access_token),
+        'token response missing access_token',
+    );
+    assert.ok(
+        tokenResponse!.message.includes(refresh_token),
+        'token response missing refresh_token',
+    );
 });
 
 test('a full login flow keeps requests/responses balanced,'
@@ -315,7 +298,7 @@ async () => {
 });
 
 test('the wire response on a 2xx carries a Response-ID and'
-+ ' Date header derived from the stored (redacted) pair',
++ ' Date header derived from the stored pair',
 async () => {
     const db = await dbWithPasswordUser();
     const res = await handleRequest(db, jsonPost(
@@ -340,8 +323,8 @@ test('an unsupported grant_type stores no NEW pair beyond the'
     assert.equal((await db.requests.getAll()).length, 2);
 });
 
-test('a refresh grant stores its own redacted pair with no'
-+ ' live secrets', async () => {
+test('a refresh grant stores its own pair with live secrets',
+async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const first = await fullLoginFlow(db);
@@ -357,26 +340,32 @@ test('a refresh grant stores its own redacted pair with no'
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
-    // 11: the fixture's own pii + credential pairs (2, Phase 13
+    // 10: the fixture's own pii + credential pairs (2, Phase 13
     // Task 8) + seedRootAdmin's 2 fixture pairs + authorize +
     // token (the token hop's own event pair, Phase 13 Task 5,
-    // brings fullLoginFlow's count to 8) + refresh's own
+    // brings fullLoginFlow's count to 7) + refresh's own
     // operation pair + refresh's rotate-branch event pairs (2:
     // the retired root, the issued successor — Phase 13 Task 5).
     assert.equal(requests.length, 10);
-    const liveSecrets = [
-        first.refresh_token, rotated.access_token,
-        rotated.refresh_token,
-    ];
-    for (const row of [...requests, ...responses]) {
-        for (const secret of liveSecrets) {
-            assert.ok(!row.message.includes(secret));
-        }
-    }
+    const refreshRequest = requests.find(
+        r => r.uri_prefix === '/authentication/token/'
+            && r.message.includes(first.refresh_token),
+    );
+    assert.ok(refreshRequest);
+    const refreshResponse = responses.find(
+        r => r.id === refreshRequest!.id,
+    );
+    assert.ok(refreshResponse);
+    assert.ok(
+        refreshResponse!.message.includes(rotated.access_token),
+    );
+    assert.ok(
+        refreshResponse!.message.includes(rotated.refresh_token),
+    );
 });
 
-test('a token-exchange grant stores its own redacted pair'
-+ ' with no live secrets', async () => {
+test('a token-exchange grant stores its own pair with live'
++ ' secrets', async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const subjectToken = await devToken('current');
@@ -393,20 +382,27 @@ test('a token-exchange grant stores its own redacted pair'
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
-    // 7: the fixture's own pii + credential pairs (2, Phase 13
+    // 6: the fixture's own pii + credential pairs (2, Phase 13
     // Task 8) + seedRootAdmin's 2 fixture pairs + the exchange's
     // own event pair (Phase 13 Task 5: issueTokenPair's root
     // gains its own pair at the row's address) + its operation
     // pair.
     assert.equal(requests.length, 6);
-    const liveSecrets = [
-        subjectToken, body.access_token, body.refresh_token,
-    ];
-    for (const row of [...requests, ...responses]) {
-        for (const secret of liveSecrets) {
-            assert.ok(!row.message.includes(secret));
-        }
-    }
+    const exchangeRequest = requests.find(
+        r => r.uri_prefix === '/authentication/token/'
+            && r.message.includes(subjectToken),
+    );
+    assert.ok(exchangeRequest);
+    const exchangeResponse = responses.find(
+        r => r.id === exchangeRequest!.id,
+    );
+    assert.ok(exchangeResponse);
+    assert.ok(
+        exchangeResponse!.message.includes(body.access_token),
+    );
+    assert.ok(
+        exchangeResponse!.message.includes(body.refresh_token),
+    );
 });
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
@@ -450,8 +446,8 @@ async function seedMembershipPair(
 }
 
 
-test('a client_credentials grant stores its own redacted pair'
-+ ' with no live secrets', async () => {
+test('a client_credentials grant stores its own pair with live'
++ ' secrets', async () => {
     const db = await dbWithPasswordUser();
     await seedMembershipPair(db, 'm-svc', {
         organization_id: '1',
@@ -484,57 +480,29 @@ test('a client_credentials grant stores its own redacted pair'
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
-    // 7: dbWithPasswordUser's own pii + credential pairs (2,
-    // Phase 13 Task 8) + the fixture's own 
-    // membership pair (Phase 13 Task 1) + the registration-
-    // facet pair the fixture seeds (clients elimination)
-    // precede the token grant's own event pair (Phase 13
-    // Task 5: issueTokenPair's root gains its own pair at
-    // the row's address) plus its operation pair.
+    // 6: dbWithPasswordUser's own pii + credential pairs (2,
+    // Phase 13 Task 8) + the fixture's own membership pair
+    // (Phase 13 Task 1) + the registration-facet pair the
+    // fixture seeds (clients elimination) precede the token
+    // grant's own event pair (Phase 13 Task 5: issueTokenPair's
+    // root gains its own pair at the row's address) plus its
+    // operation pair.
     assert.equal(requests.length, 6);
-    const liveSecrets = [
-        assertion, body.access_token, body.refresh_token,
-    ];
-    for (const row of [...requests, ...responses]) {
-        for (const secret of liveSecrets) {
-            assert.ok(!row.message.includes(secret));
-        }
-    }
-});
-
-// The redactor applies ONE static high-entropy field list per
-// ROUTE (message-redaction.ts), not per grant_type — so a valid
-// authorization_code exchange carrying a stray, grant-irrelevant
-// `refresh_token` (never read by grantAuthorizationCode) must
-// still succeed exactly as it would without the stray field, and
-// the stray value must still redact cleanly rather than throw.
-test('a code exchange with a stray, grant-irrelevant non-string'
-+ ' refresh_token still succeeds and redacts the stray value',
-async () => {
-    const db = await dbWithPasswordUser();
-    await seedRootAdmin(db);
-    const authorizeRes = await handleRequest(db, jsonPost(
-        'authentication/authorize', {
-            method: 'password', username: 'demo@example.com',
-            password: PASSWORD, client_id: 'web',
-        }));
-    const { code } = await authorizeRes.json() as {
-        code: string;
-    };
-    const res = await handleRequest(db, jsonPost(
-        'authentication/token', {
-            grant_type: 'authorization_code', code,
-            client_id: 'web',
-            refresh_token: 999999,
-        }));
-    assert.equal(res.status, 200);
-    const requests = await db.requests.getAll();
-    const row = requests.find(
-        r => r.uri_prefix === '/authentication/token/');
-    assert.ok(row);
-    assert.ok(!row!.message.includes(':999999'));
-    assert.ok(row!.message.includes(
-        'sha256:' + await sha256Hex('999999')));
+    const credRequest = requests.find(
+        r => r.uri_prefix === '/authentication/token/'
+            && r.message.includes(assertion),
+    );
+    assert.ok(credRequest);
+    const credResponse = responses.find(
+        r => r.id === credRequest!.id,
+    );
+    assert.ok(credResponse);
+    assert.ok(
+        credResponse!.message.includes(body.access_token),
+    );
+    assert.ok(
+        credResponse!.message.includes(body.refresh_token),
+    );
 });
 
 // The dedicated arm's SUCCESS path falls through to the
@@ -558,7 +526,7 @@ test('a successful authentication/token POST posts a scoped'
 });
 
 test('an Authorization header sent alongside the token grant is'
-+ ' fingerprinted, never stored live', async () => {
++ ' stored verbatim', async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const authorizeRes = await handleRequest(db, jsonPost(
@@ -588,8 +556,7 @@ test('an Authorization header sent alongside the token grant is'
         r => r.uri_prefix === '/authentication/token/');
     assert.ok(row);
     assert.ok(
-        !row!.message.includes('some-stale-caller-token'));
-    assert.match(row!.message, /sha256:[0-9a-f]{64}/);
+        row!.message.includes('some-stale-caller-token'));
 });
 
 test('a reused (already-rotated-away) refresh token grant is a'

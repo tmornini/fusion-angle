@@ -69,16 +69,36 @@ export async function init(
     );
 
     const ctx = sessionContext();
-    let tuple: Awaited<
+    // Two distinct error bodies preserved via allSettled:
+    // idea chain vs objectives→defs chain.
+    type IdeaTuple = Awaited<
         ReturnType<typeof getIdea>
     >;
-    try {
-        tuple = await getIdea(ctx, ideaId);
-    } catch (err) {
+    type ObjectivesBundle = {
+        active: readonly ObjectiveEntity[];
+        defs: ReadonlyMap<
+            ObjectiveId, ObjectiveDefinition
+        >;
+    };
+    const [ideaResult, objectivesResult] =
+        await Promise.allSettled([
+            getIdea(ctx, ideaId),
+            (async (): Promise<ObjectivesBundle> => {
+                const active =
+                    await getActiveObjectives(ctx);
+                const defs =
+                    await getCurrentObjectiveDefinitions(
+                        ctx,
+                        active.map(o => o.id),
+                    );
+                return { active, defs };
+            })(),
+        ]);
+    if (ideaResult.status === 'rejected') {
         log.error(
             'getIdea failed',
             'ideas',
-            err,
+            ideaResult.reason,
         );
         setHtml(
             root,
@@ -96,23 +116,11 @@ export async function init(
         );
         return;
     }
-    let activeObjectives: readonly ObjectiveEntity[];
-    let defs: ReadonlyMap<
-        ObjectiveId, ObjectiveDefinition
-    >;
-    try {
-        activeObjectives =
-            await getActiveObjectives(ctx);
-        defs =
-            await getCurrentObjectiveDefinitions(
-                ctx,
-                activeObjectives.map(o => o.id),
-            );
-    } catch (err) {
+    if (objectivesResult.status === 'rejected') {
         log.error(
             'objectives load failed',
             'ideas',
-            err,
+            objectivesResult.reason,
         );
         setHtml(
             root,
@@ -130,6 +138,10 @@ export async function init(
         );
         return;
     }
+    const tuple: IdeaTuple = ideaResult.value;
+    const activeObjectives =
+        objectivesResult.value.active;
+    const defs = objectivesResult.value.defs;
 
     const presenter:
         IdeaConversionPresenter =

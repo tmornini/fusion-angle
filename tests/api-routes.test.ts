@@ -6,9 +6,9 @@ import { devToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
 import type { OrganizationEntity } from '../api/types.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Pin the collection routes that handleRequest
 // must serve. A new top-level resource is added
@@ -75,8 +75,7 @@ for (const route of COLLECTION_ROUTES) {
 test('GET /organizations self-fences to the caller\'s own'
 + ' memberships — the membership-filtered path, never the'
 + ' removed unfenced route table entry', async () => {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
+    const db = await seededMockDb();
     const singleOrganizationIdentityId = buildMembers()[0]!.id;
     const rows = await GET<OrganizationEntity[]>(
         db, 'organizations',

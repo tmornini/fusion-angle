@@ -25,6 +25,7 @@ import {
 } from './identity-fixtures.ts';
 import {
     postMembershipDocumentOp,
+    postWorkOrderTransitionOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
@@ -480,27 +481,44 @@ async function seedChain(
     // source after the states-address retirement (leaf pairs
     // and states/:id writes are gone). transitionEventId
     // keeps the se* ids the fence tests name.
-    const transition = await handleRequest(db, req(
-        'POST',
-        '/organizations/' + organization
-            + '/work-orders/wo' + s + '/transition',
-        await organizationToken(identity, organization),
-        {
-            transitionEventId: 'se' + s,
-            targetState: 'n-start',
-            fieldValues: [{
-                id: 'sfv' + s,
-                fields: {
-                    state_event_id: 'se' + s,
-                    attribute_id: 'x',
-                    value: 'v',
-                },
-            }],
-            release: null,
-            transitionAt: T8_AT,
-        },
-    ));
-    assert.equal(transition.status, 204);
+    // Task 8 CUT: legacy bag is below-gate (stored SFV truth).
+    const body: Record<string, unknown> = {
+        transitionEventId: 'se' + s,
+        targetState: 'n-start',
+        fieldValues: [{
+            id: 'sfv' + s,
+            fields: {
+                state_event_id: 'se' + s,
+                attribute_id: 'x',
+                value: 'v',
+            },
+        }],
+        release: null,
+        transitionAt: T8_AT,
+    };
+    const woId = 'wo' + s;
+    const pathSegments = [
+        'work-orders', woId, 'transition',
+    ];
+    const pattern = 'work-orders/:id/transition';
+    const pair = await formWritePair({
+        method: 'POST',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: pattern,
+        routeSegments: pattern.split('/'),
+        pathSegments,
+        headerFields: [],
+        body,
+        requesterIdentityId: identity,
+        requestAt: T8_AT,
+        organization,
+        responseStatus: 204,
+        responseBody: undefined,
+    });
+    await postWorkOrderTransitionOp(
+        db, woId, body, identity,
+        undefined, [], pair,
+    );
 }
 
 // Two full chains (A, B) plus the identity spine; `current` is

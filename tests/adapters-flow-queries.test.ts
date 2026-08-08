@@ -33,7 +33,6 @@ import type {
 import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { NODE_WIDTH } from '../web-app/app/flow-layout.ts';
 import {
     seedHumanMember,
@@ -41,6 +40,7 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -452,9 +452,7 @@ test(
     'getFlowGraph lays out an auto-layout flow whose'
     + ' stored positions are placeholders',
     async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await postMockDataLoad(db);
+        const db = await seededMockDb();
         const g = await getFlowGraph(
             createRequestContext(db, await devToken()),
             LAYOUT_TEST_FLOW_ID,

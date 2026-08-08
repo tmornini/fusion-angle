@@ -22,7 +22,7 @@ import {
     scanForRetiredKeys,
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 const LEGACY_RECORDS_PREFIX =
     '/organizations/1/records/';
@@ -294,9 +294,7 @@ test(
     'current mock seed export round-trips through'
     + ' both snapshot gates',
     async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await postMockDataLoad(db);
+        const db = await seededMockDb();
         const ctx = createRequestContext(
             db, await devToken(),
         );

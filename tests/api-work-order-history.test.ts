@@ -14,13 +14,19 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     type WorkOrderFlowGraph,
 } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
 import { buildWorkOrders } from
     '../api/mock-data/work-orders.ts';
+import { seededMockDb } from './mock-seed.ts';
+import {
+    postWorkOrderTransitionOp,
+} from '../api/routes.ts';
+import {
+    formWritePair,
+} from '../api/message-pair.ts';
 
 // GET work-orders/:id/history — Phase A1 of states-URI
 // elimination. Lifecycle events DESC (index 0 = current),
@@ -147,32 +153,47 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
     );
     assert.equal(created.status, 204);
 
-    const transition = await handleRequest(
-        db,
-        req(
-            'POST',
-            '/work-orders/' + WORK_ORDER_ID + '/transition',
-            DEV_TOKEN,
+    // Task 8 CUT: legacy fieldValues fold is below-gate
+    // stored-data seed (live wire rejects the key).
+    const transitionBody: Record<string, unknown> = {
+        transitionEventId: WORK_ORDER_ID + '-te1',
+        targetState: 'n-middle',
+        fieldValues: [
             {
-                transitionEventId: WORK_ORDER_ID + '-te1',
-                targetState: 'n-middle',
-                fieldValues: [
-                    {
-                        id: WORK_ORDER_ID + '-fv1',
-                        fields: {
-                            state_event_id:
-                                WORK_ORDER_ID + '-te1',
-                            attribute_id: 'attr-severity',
-                            value: 'high',
-                        },
-                    },
-                ],
-                release: null,
-                transitionAt: nowUtc(),
+                id: WORK_ORDER_ID + '-fv1',
+                fields: {
+                    state_event_id:
+                        WORK_ORDER_ID + '-te1',
+                    attribute_id: 'attr-severity',
+                    value: 'high',
+                },
             },
-        ),
+        ],
+        release: null,
+        transitionAt: nowUtc(),
+    };
+    const pathSegments = [
+        'work-orders', WORK_ORDER_ID, 'transition',
+    ];
+    const pattern = 'work-orders/:id/transition';
+    const pair = await formWritePair({
+        method: 'POST',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: pattern,
+        routeSegments: pattern.split('/'),
+        pathSegments,
+        headerFields: [],
+        body: transitionBody,
+        requesterIdentityId: 'current',
+        requestAt: nowUtc(),
+        organization: STARK_ORGANIZATION,
+        responseStatus: 204,
+        responseBody: undefined,
+    });
+    await postWorkOrderTransitionOp(
+        db, WORK_ORDER_ID, transitionBody,
+        'current', undefined, [], pair,
     );
-    assert.equal(transition.status, 204);
 
     const release = await handleRequest(
         db,
@@ -267,8 +288,7 @@ test(
 test(
     'foreign work order history → 403 honest body',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await seededMockDb();
         const foreignId = buildWorkOrders()[0]!.id;
         const tokenTwo = await organizationToken(
             'current', ORGANIZATION_TWO,
@@ -404,8 +424,7 @@ test(
 test(
     'GET work-orders/history org isolation: org B rows absent',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await seededMockDb();
 
         const starkId = 'wo-coll-hist-stark';
         const twoId = 'wo-coll-hist-two';

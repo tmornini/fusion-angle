@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
@@ -17,7 +14,6 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
@@ -33,6 +29,9 @@ import {
 import {
     postRecordDocumentOp,
 } from '../api/routes.ts';
+import {
+    appendLegacyTransition,
+} from './legacy-transition-fixture.ts';
 import {
     deriveFlowRecords,
     deriveFlowRecord,
@@ -51,12 +50,22 @@ import {
 import { l2cFlowId } from '../api/mock-data/lead-to-close-flow.ts';
 import { collectAttributeReferrers } from
     '../api/record-attribute-refs.ts';
+import {
+    stateFieldValuesFrom,
+} from '../api/derive-state-field-values.ts';
+import {
+    deriveInstanceHead,
+} from '../api/derive-record-instances.ts';
+import {
+    SEED_INSTANCE_ID,
+} from '../api/mock-data/seed-message-pairs.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { parseJson } from '../shared/http-message/json-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: records(+record_attributes+flow_records)
 // dual-write stripped. This file no longer compares derive vs
@@ -84,9 +93,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // -- test-side wiring mirrors (routes.ts's private rows) --------
@@ -1313,9 +1320,13 @@ async function transitionFieldValueCounts(
         if (request === undefined) continue;
         const decoded = decodeRequestMessage(request.message);
         if (decoded.method !== 'POST') continue;
-        const fieldValues = decoded.body['fieldValues'] as
-            readonly { fields: Record<string, unknown> }[];
-        for (const row of fieldValues) {
+        // Guard: new-shape transitions omit fieldValues; only
+        // legacy bags contribute to this SFV tally.
+        const fieldValues = decoded.body['fieldValues'];
+        if (!Array.isArray(fieldValues)) continue;
+        for (const row of fieldValues as readonly {
+            fields: Record<string, unknown>;
+        }[]) {
             const attributeId = pickString(
                 row.fields, 'attribute_id',
             );
@@ -1360,8 +1371,9 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
 + ' live, ledger-backed transition', async () => {
     const db = await seededDb();
 
-    // Seeded flagship WO: SFV folds into transition op
-    // bodies (states-address retirement Task 12) — 7 rows.
+    // Seeded flagship WO: value-bearing transitions migrate to
+    // instance-head SoT (Task 6) — legacy bags gone; instance
+    // head holds the seven-value union.
     const flagshipWorkOrderId = 'wg25b0R2gwy5kYPIhQB6cS';
     const flagshipAttributeIds = [
         '5JZ0LeKdPCa4QMtg1RsF1M', // Company Name
@@ -1377,24 +1389,61 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     const flagshipScan = await transitionFieldValueCounts(
         db, STARK_ORGANIZATION, flagshipWorkOrderId,
     );
-    assert.equal(flagshipScan.size, 7);
+    assert.equal(flagshipScan.size, 0);
+
+    const allRequests = await db.requests.getAll();
+    const allResponses = await db.responses.getAll();
+    const sfvRows = stateFieldValuesFrom(
+        allRequests, allResponses,
+    );
+    const flagshipSfvTally = new Map<string, number>();
+    for (const row of sfvRows) {
+        if (
+            !flagshipAttributeIds.includes(row.attribute_id)
+        ) {
+            continue;
+        }
+        flagshipSfvTally.set(
+            row.attribute_id,
+            (flagshipSfvTally.get(row.attribute_id) ?? 0)
+                + 1,
+        );
+    }
     for (const attributeId of flagshipAttributeIds) {
-        assert.equal(flagshipScan.get(attributeId), 1);
+        assert.equal(
+            flagshipSfvTally.get(attributeId) ?? 0, 0,
+        );
     }
 
-    // recordTypeId scopes the Task 7 instance leg (empty
-    // until Task 14 writes instances).
+    const head = await deriveInstanceHead(
+        db, STARK_ORGANIZATION, customerProfileRecordId,
+        SEED_INSTANCE_ID,
+    );
+    assert.ok(head !== undefined);
+    assert.equal(head!.values.length, 7);
+    for (const attributeId of flagshipAttributeIds) {
+        assert.ok(
+            head!.values.some(
+                (v) => v.attribute_id === attributeId,
+            ),
+            'instance head missing ' + attributeId,
+        );
+    }
+
     const flagshipReferrers = await collectAttributeReferrers(
         db, STARK_ORGANIZATION, flagshipAttributeIds,
-        'seed-type',
+        customerProfileRecordId,
     );
-    let flagshipTotal = 0;
     for (const attributeId of flagshipAttributeIds) {
         const referrers = flagshipReferrers.get(attributeId)!;
-        assert.equal(referrers.valueCount, 1);
-        flagshipTotal += referrers.valueCount;
+        assert.equal(referrers.valueCount, 0);
+        assert.ok(
+            referrers.instanceIds.includes(
+                SEED_INSTANCE_ID,
+            ),
+            'referrers miss instance for ' + attributeId,
+        );
     }
-    assert.equal(flagshipTotal, 7);
 
     // Live ledger-backed transition.
     const token = await organizationToken();
@@ -1428,9 +1477,10 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     ));
     assert.equal(created.status, 204);
 
-    const transition = await handleRequest(db, req(
-        'POST', '/work-orders/' + liveWorkOrderId + '/transition',
-        token, {
+    // Task 8 CUT: legacy fieldValues below the gate
+    // (live leg still seeds STORED SFV fold shape).
+    await appendLegacyTransition(
+        db, STARK_ORGANIZATION, liveWorkOrderId, {
             transitionEventId: liveWorkOrderId + '-te1',
             targetState: 'n-middle',
             fieldValues: [
@@ -1454,8 +1504,7 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
             release: null,
             transitionAt: nowUtc(),
         },
-    ));
-    assert.equal(transition.status, 204);
+    );
 
     const liveScan = await transitionFieldValueCounts(
         db, STARK_ORGANIZATION, liveWorkOrderId,

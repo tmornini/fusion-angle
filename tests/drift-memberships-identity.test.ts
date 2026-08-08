@@ -1,13 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import type { Id, MembershipEntity } from '../api/types.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     deriveMembershipsForIdentity,
     membershipExistsFor,
@@ -19,6 +15,7 @@ import {
 import { buildMembers } from '../api/mock-data/members.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: memberships dual-write stripped. This
 // file no longer compares derive vs row-plane oracles — the
@@ -52,9 +49,7 @@ function sortById<T extends { id: string }>(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // Every seeded identity that can hold a membership row: the 11

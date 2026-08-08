@@ -59,6 +59,7 @@ import {
 } from '../shared/ledger-reduction.ts';
 import {
     appendMessagePair,
+    putMessagePair,
     canonicalUriPrefix,
     formAuthPair,
     formTokenEventPair,
@@ -104,16 +105,15 @@ export type TokenResult =
     | {
         readonly ok: true;
         readonly response: TokenResponse;
-        // The just-appended AUTH pair's request hash — undefined
-        // only for exchangeBearerForOrganization's internal,
-        // seedless hop (never a real /authentication/token
-        // request, so it forms no AUTH pair; its issued root's
-        // OWN event pair still lands, Phase 13 Task 5, but this
-        // field tracks the auth-pair hash specifically). The
-        // dedicated gate arm (api.ts) always supplies a seed, so
-        // a result it sees always carries one — see
-        // storedPairResponse's sibling crash-loud idiom.
-        readonly requestHash: string | undefined;
+        // The just-stored AUTH pair's id — undefined only for
+        // exchangeBearerForOrganization's internal, seedless hop
+        // (never a real /authentication/token request, so it
+        // forms no AUTH pair; its issued root's OWN event pair
+        // still lands, Phase 13 Task 5, but this field tracks
+        // the auth-pair id specifically). The dedicated gate
+        // arm (api.ts) always supplies a seed, so a result it
+        // sees always carries one — resolved by getById.
+        readonly pairId: string | undefined;
     }
     | {
         readonly ok: false;
@@ -272,12 +272,12 @@ async function mintPair(
 // retires here — nothing has read identity_tokens rows since
 // Task 6). Used by grants that start a session without consuming
 // a single-use resource. All crypto (jti generation, mintPair's
-// HMAC signing, formAuthPair's and formTokenEventPair's
-// fingerprinting) runs PRE-tx; the root's own event pair (plus
-// the auth pair, when seeded) is this grant's only write, so it
-// rides ONE minimal transaction (the default-organization
-// no-change precedent) — a mid-write fault can never leave one
-// pair stored without the other. `seed` is undefined for
+// HMAC signing, formAuthPair's and formTokenEventPair's hashing)
+// runs PRE-tx; the root's own event pair (plus the auth pair,
+// when seeded) is this grant's only write, so it rides ONE
+// minimal transaction (the default-organization no-change
+// precedent) — a mid-write fault can never leave one pair stored
+// without the other. `seed` is undefined for
 // exchangeBearerForOrganization's internal, non-route hop (the
 // org-switch facade never was an /authentication/token request),
 // so that caller mints its chain root with no AUTH pair — exactly
@@ -296,7 +296,7 @@ async function issueTokenPair(
     organization?: Id,
 ): Promise<{
     readonly response: TokenResponse;
-    readonly requestHash: string | undefined;
+    readonly pairId: string | undefined;
 }> {
     const refreshJti = generateCryptoSafeBase62();
     const rootId = generateCryptoSafeBase62();
@@ -322,11 +322,11 @@ async function issueTokenPair(
         async (view) => {
             await appendMessagePair(view, eventPair);
             if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+                await putMessagePair(view, pair);
             }
         },
     );
-    return { response, requestHash: pair?.requestHash };
+    return { response, pairId: pair?.id };
 }
 
 // Both revocation controls the gate enforces, in ONE place so
@@ -552,7 +552,7 @@ export async function rotateRefreshJti(
                     }
                     if (provisional.plan.kind === 'rotate') {
                         if (pair !== undefined) {
-                            await appendMessagePair(view, pair);
+                            await putMessagePair(view, pair);
                         }
                         return {
                             kind: 'rotate' as const,
@@ -712,7 +712,7 @@ async function grantRefresh(
         adapter, verified.claims.jti, newJti, pair,
     );
     if (outcome.kind === 'rotate') {
-        return { ok: true, response, requestHash: pair.requestHash };
+        return { ok: true, response, pairId: pair.id };
     }
     return failure(HTTP_UNAUTHORIZED, 'refresh token reuse or unknown');
 }
@@ -796,7 +796,7 @@ async function grantTokenExchange(
     return {
         ok: true,
         response: issued.response,
-        requestHash: issued.requestHash,
+        pairId: issued.pairId,
     };
 }
 
@@ -884,7 +884,7 @@ async function grantClientCredentials(
     return {
         ok: true,
         response: issued.response,
-        requestHash: issued.requestHash,
+        pairId: issued.pairId,
     };
 }
 
@@ -894,10 +894,9 @@ async function grantClientCredentials(
 // pair-forming call site in this file already honors). It keys
 // the issued root's row id (and, by construction, that row's own
 // event pair's uri_id — formTokenEventPair derives uriId from the
-// id it is given) AND, prefixed 'sha256:', is the fingerprint
-// authorizeCodeIssuer below matches against the authorize response
-// family's stored (redacted) `code` field — one digest, both
-// halves of the guard.
+// id it is given). authorizeCodeIssuer matches the LIVE code
+// against the authorize response family's stored `code` field
+// (pairs are stored verbatim).
 export async function deriveAuthorizationCodeId(
     code: string,
 ): Promise<string> {
@@ -944,19 +943,19 @@ interface AuthorizeCodeIssuer {
 // pair down to a single latest one. Every stored pair at this
 // prefix is a genuine 2xx: authorizePassword forms a pair ONLY on
 // success (grant-first, pinned), so no status re-check is needed.
-// A miss — no stored pair's response `code` field fingerprints to
-// the presented code — returns null; the caller's 401 is
+// A miss — no stored pair's response `code` field equals the
+// presented code — returns null; the caller's 401 is
 // byte-identical whether the code was never issued or has already
 // been spent (authorizationCodeSpent decides that, second).
 async function authorizeCodeIssuer(
     adapter: DbAdapter,
-    codeFingerprint: string,
+    code: string,
 ): Promise<AuthorizeCodeIssuer | null> {
     const responses = await adapter.responses
         .getAllWhere('uri_prefix', AUTHORIZE_PREFIX);
     const matched = responses.find(
         (response) =>
-            decodedBodyOf(response.message).code === codeFingerprint,
+            decodedBodyOf(response.message).code === code,
     );
     if (matched === undefined) return null;
     const request = await adapter.requests.getById(matched.id);
@@ -1012,7 +1011,7 @@ export async function authorizationCodeSpent(
 // PRE-tx: authorizeCodeIssuer resolves (identity, client) from the
 // matched authorize pair, then authorizationCodeSpent fast-fails
 // an already-spent code — both before mintPair's HMAC signing or
-// formAuthPair/formTokenEventPair's fingerprinting run. Then ONE
+// formAuthPair/formTokenEventPair's hashing run. Then ONE
 // tx RE-RUNS the spend check on the OPEN VIEW: a concurrent
 // consumer may have won the race between the pre-tx read and
 // here, in which case this call aborts (401, mints nothing
@@ -1031,9 +1030,7 @@ async function grantAuthorizationCode(
         HTTP_UNAUTHORIZED, 'invalid or used authorization code',
     );
     const derivedId = await deriveAuthorizationCodeId(code);
-    const issuer = await authorizeCodeIssuer(
-        adapter, 'sha256:' + derivedId,
-    );
+    const issuer = await authorizeCodeIssuer(adapter, code);
     if (issuer === null) return invalid;
     if (
         msSinceUtc(issuer.issuedAt)
@@ -1114,12 +1111,12 @@ async function grantAuthorizationCode(
                 return false;
             }
             await appendMessagePair(view, eventPair);
-            await appendMessagePair(view, pair);
+            await putMessagePair(view, pair);
             return true;
         },
     );
     return consumed
-        ? { ok: true, response, requestHash: pair.requestHash }
+        ? { ok: true, response, pairId: pair.id }
         : invalid;
 }
 
@@ -1159,7 +1156,7 @@ export type AuthorizeResult =
     | {
         readonly ok: true;
         readonly response: AuthorizeResponse;
-        readonly requestHash: string;
+        readonly pairId: string;
     }
     | {
         readonly ok: false;
@@ -1224,10 +1221,8 @@ async function equalizeFailureTiming(
 // nothing — grant-first, no-op on failure. The code is recorded
 // PAIR-ONLY (Phase 13 Task 9: the row half retires here — nothing
 // has read authorization_codes rows since Task 7). The stored
-// request carries the PBKDF2-fingerprinted password and the
-// stored response the sha256-fingerprinted code
-// (redactAuthenticationRequest/Response, applied inside
-// formAuthPair) — never the live values.
+// pair holds the request and response verbatim (password, code,
+// and all) — accepted dev-tier plaintext ledger cost.
 async function authorizePassword(
     adapter: DbAdapter,
     body: Record<string, unknown>,
@@ -1279,10 +1274,10 @@ async function authorizePassword(
     await adapter.transaction(
         ['requests', 'responses'],
         async (view) => {
-            await appendMessagePair(view, pair);
+            await putMessagePair(view, pair);
         },
     );
-    return { ok: true, response, requestHash: pair.requestHash };
+    return { ok: true, response, pairId: pair.id };
 }
 
 // Interactive front door. The password loop is real; passkey,

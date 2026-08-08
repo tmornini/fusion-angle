@@ -11,7 +11,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { latestActionForJti } from '../api/identity-tokens.ts';
 import {
-    appendMessagePair, formAuthPair, responseFromStored,
+    putMessagePair, formAuthPair, responseFromStored,
 } from '../api/message-pair.ts';
 import type { AuthPairSeed } from '../api/message-pair.ts';
 import {
@@ -436,8 +436,8 @@ async function assertRootEventPair(
 // Below-facade pair formation, mirroring authorizePassword's OWN
 // storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
 // 's pre-tx lookup scans the '/authentication/authorize/' response
-// family for a stored pair whose (redacted) `code` field
-// fingerprints to the presented code, so a bare pair — the SAME
+// family for a stored pair whose `code` field equals the
+// presented code, so a bare pair — the SAME
 // shape a real login forms (Phase 13 Task 9: the authorization_
 // codes row half retired) — is all a seed needs.
 async function seedAuthorizationCodePair(
@@ -464,7 +464,7 @@ async function seedAuthorizationCodePair(
     const pair = await formAuthPair(
         seed, requestBody, identityId, 200, { code },
     );
-    await appendMessagePair(db, pair);
+    await putMessagePair(db, pair);
 }
 
 test('an authorization_code grant appends its root\'s own'

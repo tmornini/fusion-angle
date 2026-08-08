@@ -9,6 +9,7 @@ import type {
     EntityStore,
     StorageBackend,
     Tx,
+    TxMode,
     TxRunner,
 } from './db.ts';
 import type {
@@ -144,8 +145,23 @@ export class BackedDbAdapter
         tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R> {
+        return this.#transaction(tables, 'readwrite', fn);
+    }
+
+    async readTransaction<R>(
+        tables: readonly string[],
+        fn: (view: GuardedDbAdapter) => Promise<R>,
+    ): Promise<R> {
+        return this.#transaction(tables, 'readonly', fn);
+    }
+
+    #transaction<R>(
+        tables: readonly string[],
+        mode: TxMode,
+        fn: (view: GuardedDbAdapter) => Promise<R>,
+    ): Promise<R> {
         return this.#backend.transaction(
-            tables, 'readwrite',
+            tables, mode,
             (tx) => fn(this.#viewForTx(tx, tables)),
         );
     }
@@ -154,6 +170,17 @@ export class BackedDbAdapter
         tx: Tx,
         declaredTables: readonly string[],
     ): GuardedDbAdapter {
+        // Nested transaction / readTransaction both re-enter
+        // the open view: the outer mode is already fixed, so
+        // a nested read inside a write joins the write tx
+        // (read-your-writes). Tables must still be a subset.
+        const reenter = <R>(
+            tables: readonly string[],
+            fn: (view: GuardedDbAdapter) => Promise<R>,
+        ): Promise<R> => {
+            this.#assertSubset(tables, declaredTables);
+            return fn(view);
+        };
         const view: GuardedDbAdapter = {
             ...this.#buildStores(ambientRunner(tx)),
             initialize: () => this.initialize(),
@@ -167,10 +194,8 @@ export class BackedDbAdapter
                 this.putSnapshot(json),
             postNotification: (e) =>
                 this.postNotification(e),
-            transaction: (tables, fn) => {
-                this.#assertSubset(tables, declaredTables);
-                return fn(view);
-            },
+            transaction: reenter,
+            readTransaction: reenter,
         };
         return view;
     }

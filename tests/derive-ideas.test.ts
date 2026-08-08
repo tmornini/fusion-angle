@@ -1,18 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     deriveIdea,
     deriveIdeas,
     deriveIdeaStateHistory,
 } from '../api/derive-ideas.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 const BASE = 'http://localhost';
 const STARK_ORGANIZATION = '1';
@@ -34,9 +31,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 function ideaDocument(

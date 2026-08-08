@@ -100,7 +100,7 @@ function buildPresenter():
         );
 }
 
-async function rerender(): Promise<void> {
+async function rerenderShellOnly(): Promise<void> {
     if (!pageContainer) return;
     pageContainer.toggleAttribute(
         'data-page-editing',
@@ -110,11 +110,34 @@ async function rerender(): Promise<void> {
         pageContainer,
         buildPresenter().buildPage(),
     );
+}
+
+async function rerender(): Promise<void> {
+    await rerenderShellOnly();
     await renderObjectives();
 }
 
-async function renderObjectives(): Promise<void> {
-    const ctx = sessionContext();
+interface ObjectivesData {
+    active: Awaited<
+        ReturnType<typeof getActiveObjectives>
+    >;
+    archived: Awaited<
+        ReturnType<typeof getObjectives>
+    >;
+    defs: Awaited<
+        ReturnType<
+            typeof getCurrentObjectiveDefinitions
+        >
+    >;
+    archivedAt: Map<string, string>;
+    stateDetails: Awaited<
+        ReturnType<typeof getObjectiveStateDetails>
+    >;
+}
+
+async function fetchObjectivesData(
+    ctx: ReturnType<typeof sessionContext>,
+): Promise<ObjectivesData> {
     // One bulk trio read per load — drag-reorder echoes
     // each id's detail from this map (no per-drag GET).
     const [active, allObjs, archivedIds, stateDetails] =
@@ -133,10 +156,24 @@ async function renderObjectives(): Promise<void> {
             [...active, ...archived]
                 .map(o => o.id),
         );
-    const archivedAt = new Map<string, string>();
+    return {
+        active,
+        archived,
+        defs,
+        archivedAt: new Map<string, string>(),
+        stateDetails,
+    };
+}
+
+function paintObjectives(
+    data: ObjectivesData,
+): void {
     const presenter =
         new OrganizationObjectivesPresenter(
-            active, archived, defs, archivedAt,
+            data.active,
+            data.archived,
+            data.defs,
+            data.archivedAt,
         );
     const box = $('#objectives-box', document);
     if (!box) return;
@@ -146,6 +183,7 @@ async function renderObjectives(): Promise<void> {
         '[data-list="active"]', box,
     );
     if (!activeList) return;
+    const stateDetails = data.stateDetails;
     initDragReorder(
         activeList,
         '[data-objective-id]',
@@ -164,6 +202,13 @@ async function renderObjectives(): Promise<void> {
             );
         },
     );
+}
+
+async function renderObjectives(): Promise<void> {
+    const data = await fetchObjectivesData(
+        sessionContext(),
+    );
+    paintObjectives(data);
 }
 
 async function onObjectiveAction(
@@ -232,15 +277,23 @@ export async function init(): Promise<void> {
         buildSkeleton('detail', 4),
     );
 
-    let organization: Organization;
-    let stats: OrganizationStats;
-    try {
-        const ctx = sessionContext();
-        [organization, stats] = await Promise.all([
+    const ctx = sessionContext();
+    // Wave 1: org shell + objectives + sent invitations
+    // in parallel. Org-pair rejection takes precedence
+    // (403 notice / error body) before other failures.
+    const [
+        organizationPair, objectivesResult, sentResult,
+    ] = await Promise.allSettled([
+        Promise.all([
             getOrganization(ctx),
             getOrganizationStats(ctx),
-        ]);
-    } catch (err) {
+        ]),
+        fetchObjectivesData(ctx),
+        fetchSentInvitations(ctx),
+    ]);
+
+    if (organizationPair.status === 'rejected') {
+        const err = organizationPair.reason;
         if (err instanceof RequestError
             && err.status === HTTP_FORBIDDEN) {
             // The organization page is admin-only. A non-admin
@@ -278,12 +331,33 @@ export async function init(): Promise<void> {
         return;
     }
 
+    const [organization, stats] =
+        organizationPair.value;
     state = { kind: 'reading', organization, stats };
     subscribeObjectiveChanges(renderObjectives);
     subscribeInvitationChanges(
         () => void renderSentInvitations());
-    await rerender();
-    await renderSentInvitations();
+    // Shell render first (objectives box is empty shell);
+    // then paint the parallel-fetched side panels.
+    await rerenderShellOnly();
+    if (objectivesResult.status === 'fulfilled') {
+        paintObjectives(objectivesResult.value);
+    } else {
+        log.error(
+            'organization objectives load failed',
+            'organization',
+            objectivesResult.reason,
+        );
+    }
+    if (sentResult.status === 'fulfilled') {
+        paintSentInvitations(sentResult.value);
+    } else {
+        log.error(
+            'organization invitations load failed',
+            'organization',
+            sentResult.reason,
+        );
+    }
     $('#sent-invitations-list', document)
         ?.addEventListener(
             'click',
@@ -354,14 +428,29 @@ export async function init(): Promise<void> {
 // so a failure here is unexpected and surfaces loudly: the
 // boot path renders the page error state, refresh paths toast
 // through the global spine.
-async function renderSentInvitations(): Promise<void> {
+async function fetchSentInvitations(
+    ctx: ReturnType<typeof sessionContext>,
+) {
+    return getSentInvitations(ctx);
+}
+
+function paintSentInvitations(
+    sent: Awaited<
+        ReturnType<typeof getSentInvitations>
+    >,
+): void {
     const box = $('#sent-invitations-box', document);
     const list = $('#sent-invitations-list', document);
     if (!box || !list) return;
-    const sent = await getSentInvitations(
-        sessionContext());
     new SentInvitationsPresenter(sent).render(list);
     box.classList.remove('hidden');
+}
+
+async function renderSentInvitations(): Promise<void> {
+    const sent = await fetchSentInvitations(
+        sessionContext(),
+    );
+    paintSentInvitations(sent);
 }
 
 async function onSentInvitationClick(

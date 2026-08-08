@@ -38,6 +38,7 @@ import {
     type RequestContext,
     type WorkOrder,
     type TransitionEvent,
+    type Member,
 } from '../app/adapters/index.ts';
 import type { Id } from '../../api/types.ts';
 import {
@@ -71,27 +72,40 @@ export async function init(
         $('#archive-list', document);
 
     const ctx = sessionContext();
+    // One shared inbox fetch feeds both lists.
+    const rowsPromise = fetchInboxRows(ctx);
+    const listInits: Array<Promise<void>> = [];
     if (activeEl) {
-        await initActiveList(activeEl, ctx);
+        listInits.push(
+            initActiveList(activeEl, ctx, rowsPromise),
+        );
     }
     if (archiveEl) {
-        await initArchiveList(archiveEl, ctx);
+        listInits.push(
+            initArchiveList(
+                archiveEl, ctx, rowsPromise,
+            ),
+        );
     }
+    await Promise.all([
+        ...listInits,
+        initCreateDropdown(ctx),
+    ]);
 
     subscribeWorkOrderChanges(() => {
+        // One refetch, feed both lists.
+        const shared = fetchInboxRows(ctx);
         if (activeEl) {
             void rerenderInbox(
-                activeEl, 'active', ctx,
+                activeEl, 'active', ctx, shared,
             );
         }
         if (archiveEl) {
             void rerenderInbox(
-                archiveEl, 'archived', ctx,
+                archiveEl, 'archived', ctx, shared,
             );
         }
     });
-
-    await initCreateDropdown(ctx);
 }
 
 function emptyStateFor(
@@ -119,11 +133,15 @@ async function rerenderInbox(
     listEl: HTMLElement,
     mode: InboxMode,
     ctx: RequestContext,
+    rowsPromise?: Promise<InboxRows>,
 ): Promise<void> {
+    const rows = rowsPromise ?? fetchInboxRows(ctx);
     await loadInto({
         container: listEl,
         skeleton: buildSkeleton('card-list', 4),
-        fetch: () => loadInboxItems(mode, ctx),
+        fetch: () => rows.then(
+            r => buildItems(r, mode),
+        ),
         retry: init,
         emptyState: emptyStateFor(mode),
         onData: items => {
@@ -159,10 +177,18 @@ function renderTabs(): void {
         } Archive</span>`);
 }
 
-async function loadInboxItems(
-    mode: InboxMode,
+interface InboxRows {
+    workOrders: WorkOrder[];
+    transitionsByWo: Map<Id, TransitionEvent[]>;
+    activeClaimsByWo: Map<
+        Id, { memberId: Id; at: string }
+    >;
+    memberMap: Map<string, Member>;
+}
+
+async function fetchInboxRows(
     ctx: RequestContext,
-): Promise<InboxItem[]> {
+): Promise<InboxRows> {
     const [
         workOrders, histories, memberMap,
     ] = await Promise.all([
@@ -202,21 +228,46 @@ async function loadInboxItems(
             activeClaimsByWo.set(woId, claim);
         }
     }
+    return {
+        workOrders,
+        transitionsByWo,
+        activeClaimsByWo,
+        memberMap,
+    };
+}
+
+function buildItems(
+    rows: InboxRows,
+    mode: InboxMode,
+): InboxItem[] {
     return buildInboxItems(
-        workOrders, transitionsByWo,
-        activeClaimsByWo, memberMap, mode,
+        rows.workOrders,
+        rows.transitionsByWo,
+        rows.activeClaimsByWo,
+        rows.memberMap,
+        mode,
+    );
+}
+
+async function loadInboxItems(
+    mode: InboxMode,
+    ctx: RequestContext,
+): Promise<InboxItem[]> {
+    return buildItems(
+        await fetchInboxRows(ctx), mode,
     );
 }
 
 async function initActiveList(
     activeEl: HTMLElement,
     ctx: RequestContext,
+    rowsPromise: Promise<InboxRows>,
 ): Promise<void> {
     await loadInto({
         container: activeEl,
         skeleton: buildSkeleton('card-list', 4),
-        fetch: () => loadInboxItems(
-            'active', ctx,
+        fetch: () => rowsPromise.then(
+            r => buildItems(r, 'active'),
         ),
         retry: init,
         emptyState: emptyStateFor('active'),
@@ -277,13 +328,14 @@ function onActiveListLoaded(
 
 async function initArchiveList(
     archiveEl: HTMLElement,
-    ctx: RequestContext,
+    _ctx: RequestContext,
+    rowsPromise: Promise<InboxRows>,
 ): Promise<void> {
     await loadInto({
         container: archiveEl,
         skeleton: buildSkeleton('card-list', 4),
-        fetch: () => loadInboxItems(
-            'archived', ctx,
+        fetch: () => rowsPromise.then(
+            r => buildItems(r, 'archived'),
         ),
         retry: init,
         emptyState: emptyStateFor('archived'),

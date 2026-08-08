@@ -47,12 +47,13 @@ import {
 // from rejecting a head pair the live PUT legitimately formed.
 //
 // ONE shared readonly tx per call (Efficiency): both stores
-// read inside the SAME db.transaction(['requests', 'responses'],
-// ...) rather than two independent getAllWhere calls, each of
-// which would open its own transaction. One physical
-// transaction per derivation, mirroring api/derive-identity-
-// spine.ts's own closure — there it also closes a torn-read
-// hazard; organizations/:id is not a hard-delete zone, so here
+// read inside the SAME db.readTransaction(
+// ['requests', 'responses'], ...) rather than two independent
+// getAllWhere calls, each of which would open its own
+// transaction. One physical transaction per derivation,
+// mirroring api/derive-identity-spine.ts's own closure —
+// there it also closes a torn-read hazard;
+// organizations/:id is not a hard-delete zone, so here
 // it is simply the cheaper shape.
 //
 // Reads db.requests/db.responses ONLY;
@@ -79,7 +80,7 @@ function organizationEntityOf(
 export async function deriveOrganizations(
     db: DbAdapter,
 ): Promise<OrganizationEntity[]> {
-    return db.transaction(
+    return db.readTransaction(
         ['requests', 'responses'],
         async (view) => {
             const [requests, responses] = await Promise.all([
@@ -110,7 +111,7 @@ export async function deriveOrganization(
     db: DbAdapter,
     id: Id,
 ): Promise<OrganizationEntity> {
-    return db.transaction(
+    return db.readTransaction(
         ['requests', 'responses'],
         async (view) => {
             const [requests, responses] = await Promise.all([

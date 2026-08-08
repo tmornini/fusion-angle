@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
@@ -14,7 +11,6 @@ import type {
 } from '../api/types.ts';
 import { DEFAULT_LOCK_TIMEOUT } from
     '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { l2cProjectId } from '../api/mock-data/projects.ts';
 import {
@@ -31,6 +27,7 @@ import {
 } from '../api/derive-flows.ts';
 import { deriveProjectFlows } from
     '../api/derive-project-flows.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: flows(+graph relations+flow_versions)
 // dual-write stripped. This file no longer compares derive
@@ -67,9 +64,7 @@ function sortById<T extends { id: string }>(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 function flowFields(name: string) {

@@ -578,7 +578,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
-- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly two: `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 13; demo seed 1506). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread (now also covers the dead clients store). Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
+- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly two: `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 12; demo seed 1498). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread (now also covers the dead clients store). Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -1726,6 +1726,25 @@ designer "tag current" action lands.)
 - [ ] **WB10** A collapsible History section
   shows all transitions with from/to state
   names, user name, and relative timestamp.
+- [ ] **WB10a — Bind picker on an unbound WO.**
+  Open an unbound work order on a flow that has
+  a record-type join and at least one instance.
+  PASS: header shows an Unbound badge; a "Bind
+  instance" button is visible; clicking it opens
+  the bind-instance dialog listing instances for
+  the flow's record type (rows use
+  `data-instance-pick`, never `data-attribute-id`);
+  picking an instance POSTs
+  `work-orders/:id/binding` (204), the dialog
+  closes, and the screen re-presents with a bound
+  Instance badge and pre-filled values from the
+  instance head.
+- [ ] **WB10b — Disabled fields + bind prompt.**
+  On an unbound work order with current-node
+  attribute refs. PASS: every attribute input is
+  disabled/readonly with title "Bind an instance
+  before editing values"; the bind button from
+  WB10a is the path to enable editing.
 
 ### Workbox — Transitions
 
@@ -1772,23 +1791,29 @@ designer "tag current" action lands.)
 
 ### Workbox — Data Integrity
 
-- [ ] **WB16** After creating and transitioning
-  a work order, inspect `requests`/`responses` (or
-  derived `GET work-orders/:id/history`). PASS: the
-  work-order document pair head carries `display_id`
-  and `flow_graph` JSON; each transition is a
-  `work-orders/:id/transition` operation pair whose
-  body names the target node (base62) and folds
-  per-field values into `fieldValues: [{id,
-  fields}]` — no `states` or `state_field_values`
-  tables, and no leaf pairs. Derived history is
-  `(at, id)` DESC (index 0 = current) and shows one
-  non-claim event per transition with
-  `entity_id` = work-order id, `state` = target
-  node id, `member_id` = the actor, `at` =
-  RFC-3339 Zulu, plus inline
-  `field_values: [{id, attribute_id, value}]` on
-  transition rows (`[]` on claim/birth/release).
+- [ ] **WB16** After binding an instance and
+  transitioning with value changes, inspect
+  `requests`/`responses` (or derived
+  `GET work-orders/:id/history` and the instance
+  head). PASS: the work-order document pair head
+  carries `display_id` and `flow_graph` JSON; the
+  binding op is at `work-orders/:id/binding` with
+  `{instance_id, record_type_id}`; value-bearing
+  transitions are `work-orders/:id/transition` op
+  pairs whose body is the **instance shape**
+  (`targetState`, `instance_id`, `record_type_id`,
+  `set`/`clear` delta, `release`, `transitionAt` —
+  no `fieldValues` bag) and carry strong If-Match
+  against the instance etag; pure moves omit
+  `set`/`clear`/`instance_id`/`record_type_id` and
+  send no If-Match; a sibling instance revision
+  pair advances the head when the transition was
+  value-bearing. Derived WO history is `(at, id)`
+  DESC (index 0 = current) with one non-claim event
+  per transition (`entity_id` = work-order id,
+  `state` = target node id, `member_id` = actor,
+  `at` = RFC-3339 Zulu). Live form values come from
+  the instance head, not a history fold.
 - [ ] **WB17** Navigate away from the action
   screen and return. PASS: all data persists
   correctly across page navigation.
@@ -1812,12 +1837,32 @@ designer "tag current" action lands.)
   rows are `(at, id)` DESC (index 0 = current); each
   non-claim event has the immutable shape `{id, entity_id,
   state, member_id, at, field_values}`, with `state`
-  carrying the target node's base62 id and
-  `field_values` the transition fold
-  (`{id, attribute_id, value}` — no `state_event_id` on
-  the wire; the parent event already carries `id`).
-  Verify no app code path mutates an existing pair — the
-  message plane is append-only.
+  carrying the target node's base62 id. Live values live
+  on the instance head; history `field_values` may be
+  empty for new-shape transitions. Verify no app code
+  path mutates an existing pair — the message plane is
+  append-only.
+- [ ] **WB19a — Two-tab 412 on the action screen.**
+  Bind a work order to an instance. Open the action
+  screen in two tabs. In tab 2, change an instance
+  value via the records detail instance editor (or a
+  second transition) so the head etag advances. In
+  tab 1, edit a value and transition. PASS: tab 1
+  receives 412, re-GETs the instance, re-presents the
+  action screen with a conflict notice and a warning
+  toast ("This instance changed underneath you…"),
+  and does **not** auto-retry the transition.
+- [ ] **WB19b — Direct instance PATCH vs transition
+  412 convergence.** With a bound WO open on the
+  action screen, PATCH the same instance from the
+  record detail UI (save) so the head advances; then
+  attempt a value-bearing transition on the stale
+  action screen. PASS: same 412 recovery shape as
+  WB19a (re-present + warning toast). Conversely,
+  after a successful value-bearing transition, a
+  stale instance edit on record detail also 412s and
+  recovers — both writers share the instance etag
+  covenant.
 
 ### Workbox — All-See-All Visibility
 
@@ -2783,7 +2828,7 @@ Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fus
 
 - [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 3 object stores (2 tables in `TABLE_NAMES` — `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
-- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org. Absolute pair pin is **1506** balanced request/response pairs — single source of truth `EXPECTED_PAIR_COUNT` in `tests/mock-data-pairs.test.ts` (count `requests` length after seed; do not confuse with historical intermediate accounting notes that mention 1513).
+- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org. Absolute pair pin is **1498** balanced request/response pairs — single source of truth `EXPECTED_PAIR_COUNT` in `tests/mock-data-pairs.test.ts` (count `requests` length after seed; do not confuse with historical intermediate accounting notes that mention 1506 or 1513).
 - [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
 - [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct pairs concurrently (e.g. two lifecycle state changes). PASS: both pairs survive (count grows by 2) — the old localStorage clobber is gone.
 - [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).

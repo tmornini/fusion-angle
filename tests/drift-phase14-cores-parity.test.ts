@@ -1,12 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { invitationOpStateFor } from '../api/derive-invitations.ts';
 import {
     invitationLifecycleStatesFor,
@@ -18,6 +14,7 @@ import {
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // The Author gate 1 rule (e) pre-tx-vs-in-tx PARITY pins for the
 // three Phase 14 Task 1 cores (invitationOpStateFor,
@@ -57,9 +54,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 async function grant(

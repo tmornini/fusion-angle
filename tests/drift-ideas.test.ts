@@ -1,15 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
 } from '../api/db.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
@@ -21,6 +17,7 @@ import {
     deriveIdeaSubmissions,
     deriveIdeaStateHistory,
 } from '../api/derive-ideas.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: ideas(+idea_submissions) dual-write
 // stripped. This file no longer compares derive vs old-table
@@ -111,9 +108,7 @@ function wireIdeaGet(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 const SEEDED_IDEAS = buildIdeas().map((idea, index) => ({

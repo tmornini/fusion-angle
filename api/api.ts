@@ -24,7 +24,6 @@ import {
     canonicalUriPrefix,
     hoistedHeaderFields,
     responseFromStored,
-    wireHeadersFor,
     attachEtag,
     parseIfMatch,
     PAIR_WIRED_ROUTE_PATTERNS,
@@ -783,8 +782,7 @@ export async function handleRequest(
             // identical resend never reaches the handler and
             // posts no notification — nothing was written.
             // Skipped for REPLAY_EXEMPT_ROUTE_PATTERNS: those
-            // routes' own domain guard (or, from Task 3, their
-            // redacted stored body) makes serving the cached
+            // routes' own domain guard makes serving the cached
             // response wrong rather than merely redundant — see
             // message-pair.ts. ORDERING IS LOAD-BEARING: this
             // fast path runs BEFORE the locked four-outcome table
@@ -1229,8 +1227,6 @@ export async function handleRequest(
                 // token's subject) — so the grant forms its OWN
                 // pair, pre-tx, and appends it as the last act of
                 // its own domain transaction (authentication.ts).
-                let authWireHeaders: HeadersInit | undefined;
-                let result: unknown;
                 if (
                     routePattern === 'authentication/token'
                     || routePattern === 'authentication/authorize'
@@ -1261,52 +1257,62 @@ export async function handleRequest(
                     // postAuthorize (exchangeBearerForOrganization,
                     // the other grantTokenExchange caller, never
                     // reaches here — it is an internal facade
-                    // hop, not a route dispatch).
-                    if (dispatched.requestHash === undefined) {
+                    // hop, not a route dispatch). Auth pairs are
+                    // keyed by id (putMessagePair), not hash —
+                    // two identical logins each land a row.
+                    if (dispatched.pairId === undefined) {
                         throw new Error(
                             'authentication grant stored no'
                             + ' pair: ' + routePattern,
                         );
                     }
-                    const stored = await storedResponseFor(
-                        effective, dispatched.requestHash,
-                    );
-                    if (stored === undefined) {
-                        throw new Error(
-                            'wired write stored no pair: '
-                            + routePattern,
+                    const authStored = await effective.responses
+                        .getById(dispatched.pairId);
+                    // authentication/authorize mints an
+                    // authorization code, not a session — no UI
+                    // subscribes to it, so it posts nothing.
+                    // authentication/token mints the session
+                    // itself: decode the live response claims so
+                    // the identity-tokens page refreshes
+                    // cross-tab. Wire body comes from the stored
+                    // row (stored == wire under verbatim storage).
+                    if (routePattern === 'authentication/token') {
+                        const claims = decodeAccessToken(
+                            (dispatched.response as {
+                                access_token: string;
+                            }).access_token,
                         );
+                        adapter.postNotification({
+                            kind: 'scoped',
+                            identityIds: [claims.sub],
+                            organizationIds: [
+                                ...(claims.organizations ?? []),
+                            ],
+                        });
                     }
-                    // The ONE named exception where the wire
-                    // body (live tokens) differs from the stored
-                    // (redacted) body — the headers still derive
-                    // from the SAME stored row every other wired
-                    // write reads.
-                    result = dispatched.response;
-                    authWireHeaders = wireHeadersFor(stored);
-                } else {
-                    if (!matched.post) {
-                        return Response.json(
-                            {
-                                error:
-                                    'Method POST'
-                                    + ' not allowed'
-                                    + ' on '
-                                    + pathname,
-                            },
-                            { status: HTTP_METHOD_NOT_ALLOWED },
-                        );
-                    }
-                    result = await matched.post(
-                        effective,
-                        params,
-                        body!,
-                        actor,
-                        pair,
-                        organization,
-                        roles,
+                    return responseFromStored(authStored);
+                }
+                if (!matched.post) {
+                    return Response.json(
+                        {
+                            error:
+                                'Method POST'
+                                + ' not allowed'
+                                + ' on '
+                                + pathname,
+                        },
+                        { status: HTTP_METHOD_NOT_ALLOWED },
                     );
                 }
+                const result = await matched.post(
+                    effective,
+                    params,
+                    body!,
+                    actor,
+                    pair,
+                    organization,
+                    roles,
+                );
                 if (pair !== undefined) {
                     const stored = await storedResponseFor(
                         effective, pair.requestHash,
@@ -1323,44 +1329,16 @@ export async function handleRequest(
                     );
                     return responseFromStored(stored);
                 }
-                // authentication/authorize mints an
-                // authorization code, not a session — no UI
-                // subscribes to it, so it posts nothing.
-                // authentication/token mints the session
-                // itself: decode the freshly minted access
-                // token so the identity-tokens page refreshes
-                // cross-tab, the same case every other write
-                // reaches via the fenced organization.
-                if (routePattern === 'authentication/token') {
-                    const claims = decodeAccessToken(
-                        (result as { access_token: string })
-                            .access_token,
-                    );
-                    adapter.postNotification({
-                        kind: 'scoped',
-                        identityIds: [claims.sub],
-                        organizationIds: [
-                            ...(claims.organizations ?? []),
-                        ],
-                    });
-                } else if (
-                    routePattern !== 'authentication/authorize'
-                ) {
-                    postWriteNotification(
-                        adapter, routePattern, params,
-                        body, organization, actor,
-                    );
-                }
+                postWriteNotification(
+                    adapter, routePattern, params,
+                    body, organization, actor,
+                );
                 if (result === undefined) {
                     return new Response(null, {
                         status: HTTP_NO_CONTENT,
                     });
                 }
-                return authWireHeaders === undefined
-                    ? Response.json(result)
-                    : Response.json(
-                        result, { headers: authWireHeaders },
-                    );
+                return Response.json(result);
             }
             default:
                 return Response.json(
@@ -1712,8 +1690,15 @@ export async function POST<T>(
     payload: Record<string, unknown>,
     token: string,
     requestId?: string,
+    headerFields?: readonly (readonly [string, string])[],
 ): Promise<T> {
     await adapter.simulateLatency();
+    const headers = facadeHeaders(
+        token, requestId, true,
+    );
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
     return unwrapResponse<T>(
         await handleRequest(
             adapter,
@@ -1721,9 +1706,7 @@ export async function POST<T>(
                 `${BASE_URL}/${resource}`,
                 {
                     method: 'POST',
-                    headers: facadeHeaders(
-                        token, requestId, true,
-                    ),
+                    headers,
                     body: JSON.stringify(payload),
                 },
             ),

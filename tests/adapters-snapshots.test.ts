@@ -32,7 +32,6 @@ import {
     getSnapshot,
     putSnapshot,
     putSnapshotFromFile,
-    postMockDataLoad,
     deleteSchema,
     RETIRED_KEYS_PER_TABLE,
     RETIRED_STATE_VALUES_PER_ENTITY,
@@ -40,6 +39,7 @@ import {
     SnapshotTooLargeError,
     SnapshotIncompatibleError,
 } from '../web-app/app/adapters/snapshots.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Pin the snapshot round-trip on requests
 // (message-plane survivor). Snapshot rows carry id;
@@ -251,10 +251,12 @@ test('deleteSchema clears all table contents', async () => {
 });
 
 test(
-    'postMockDataLoad populates members on the pair plane',
+    'seeded mock populates members on the pair plane',
     async () => {
-        const { db, ctx } = await setup();
-        await postMockDataLoad(ctx);
+        const db = await seededMockDb();
+        const ctx = createRequestContext(
+            db, await devToken(),
+        );
         // Phase Final Task 2: members ROW half stripped —
         // directory lives on the pair plane.
         const rows = await ctx.GET<Array<{ id: string }>>(

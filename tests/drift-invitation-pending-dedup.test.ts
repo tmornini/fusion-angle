@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { pendingInvitationFor } from
     '../api/invitations-domain.ts';
 import { deriveInvitations } from
@@ -10,6 +8,7 @@ import { deriveInvitations } from
 import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: invitations ROW half stripped — the
 // row-plus-lifecycle dual-write oracle is retired.
@@ -39,8 +38,7 @@ function req(
 test('Step 0: pendingInvitationFor over live grant/decline/'
 + ' re-grant — declined-reinvite is the drift pin (pair plane)',
 async () => {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
+    const db = await seededMockDb();
     const admin = await organizationToken(
         'current', ORGANIZATION_TWO);
     const inviteeId = 'LhfaUUf4IumVsCSGB4xjdK'; // Sarah Chen

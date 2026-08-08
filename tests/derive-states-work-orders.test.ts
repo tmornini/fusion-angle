@@ -416,7 +416,6 @@ test('a transition, then a transition with release ends the'
         token, {
             transitionEventId: workOrderId + '-te1',
             targetState: 'n-middle',
-            fieldValues: [],
             release: null,
             transitionAt: '2026-05-02T00:00:01.000000Z',
         },
@@ -428,7 +427,6 @@ test('a transition, then a transition with release ends the'
         token, {
             transitionEventId: workOrderId + '-te2',
             targetState: 'n-finish',
-            fieldValues: [],
             release: {
                 id: workOrderId + '-rel1',
                 state: 'claim_released',
@@ -553,7 +551,6 @@ test('HYBRID: a bare document PUT plus a transition genesis'
         token, {
             transitionEventId: workOrderId + '-genesis',
             targetState: 'n-start',
-            fieldValues: [],
             release: null,
             transitionAt: AT,
         },

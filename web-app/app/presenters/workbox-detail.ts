@@ -38,13 +38,34 @@ const ATTRIBUTE_HTML_TYPE: Record<
     checkbox: { type: 'checkbox' },
 };
 
+// Unbound action-screen prompt on disabled fields.
+const UNBOUND_FIELD_TITLE =
+    'Bind an instance before editing values';
+
+export type WorkOrderBinding = {
+    readonly instanceId: string;
+    readonly recordTypeId: string;
+};
+
+export type InstancePickerItem = {
+    readonly id: string;
+    readonly fields: readonly {
+        readonly name: string;
+        readonly value: string;
+    }[];
+};
+
 export function buildAttributeInputHtml(
     ref: NodeAttribute,
     attribute: RecordAttribute,
+    value: string | null = null,
+    forceDisabled = false,
 ): SafeHtml {
     const id = attribute.id;
-    const isReadonly = ref.mode === 'readonly';
+    const isReadonly = ref.mode === 'readonly'
+        || forceDisabled;
     const requiredAttr = ref.isRequired
+        && !forceDisabled
         ? trusted('required')
         : html``;
     const readonlyAttr = isReadonly
@@ -53,6 +74,14 @@ export function buildAttributeInputHtml(
     const disabledAttr = isReadonly
         ? trusted('disabled')
         : html``;
+    const titleAttr = forceDisabled
+        ? trusted(
+            ' title="'
+            + escapeForHtml(UNBOUND_FIELD_TITLE)
+            + '"',
+        )
+        : html``;
+    const safeValue = value ?? '';
     if (attribute.attributeType === 'select') {
         const options = attribute.options;
         return html`<select
@@ -60,13 +89,17 @@ export function buildAttributeInputHtml(
             id="wo-attr-${id}"
             data-attribute-id="${id}"
             ${disabledAttr}
-            ${requiredAttr}>
+            ${requiredAttr}
+            ${titleAttr}>
             <option value="">
                 Select...
             </option>
             ${options.map(
                 o => html`<option
                     value="${o}"
+                    ${o === safeValue
+                        ? trusted('selected')
+                        : html``}
                     >${o}</option>`,
             )}
         </select>`;
@@ -81,8 +114,12 @@ export function buildAttributeInputHtml(
                         name="${id}"
                         value="${o}"
                         data-attribute-id="${id}"
+                        ${o === safeValue
+                            ? trusted('checked')
+                            : html``}
                         ${disabledAttr}
-                        ${requiredAttr} />
+                        ${requiredAttr}
+                        ${titleAttr} />
                     <span>${o}</span>
                 </label>`,
             )}
@@ -98,20 +135,28 @@ export function buildAttributeInputHtml(
         );
     }
     if (spec.type === 'checkbox') {
+        const checked = safeValue === 'true'
+            ? trusted('checked')
+            : html``;
         return html`<input
             type="checkbox"
             id="wo-attr-${id}"
             data-attribute-id="${id}"
+            ${checked}
             ${disabledAttr}
-            ${requiredAttr} />`;
+            ${requiredAttr}
+            ${titleAttr} />`;
     }
     return html`<input
         type="${spec.type}"
         class="input"
         id="wo-attr-${id}"
         data-attribute-id="${id}"
+        value="${safeValue}"
         ${readonlyAttr}
-        ${requiredAttr} />`;
+        ${disabledAttr}
+        ${requiredAttr}
+        ${titleAttr} />`;
 }
 
 export class WorkboxDetailPresenter {
@@ -126,6 +171,13 @@ export class WorkboxDetailPresenter {
     readonly #attributeMap: ReadonlyMap<
         string, RecordAttribute
     >;
+    readonly #instanceValues: ReadonlyMap<
+        string, string
+    > | null;
+    readonly #binding: WorkOrderBinding | null;
+    readonly #pickerItems:
+        readonly InstancePickerItem[];
+    readonly #conflictNotice: string | null;
 
     constructor(
         workOrder: WorkOrder,
@@ -143,10 +195,20 @@ export class WorkboxDetailPresenter {
         attributeMap: ReadonlyMap<
             string, RecordAttribute
         >,
+        instanceValues:
+            ReadonlyMap<string, string> | null,
+        binding: WorkOrderBinding | null,
+        pickerItems:
+            readonly InstancePickerItem[] = [],
+        conflictNotice: string | null = null,
     ) {
         this.#workOrder = workOrder;
         this.#flowGraph = workOrder.flowGraph;
         this.#attributeMap = attributeMap;
+        this.#instanceValues = instanceValues;
+        this.#binding = binding;
+        this.#pickerItems = pickerItems;
+        this.#conflictNotice = conflictNotice;
 
         const sorted = [...transitions]
             .sort(
@@ -212,6 +274,14 @@ export class WorkboxDetailPresenter {
         return this.#claim;
     }
 
+    binding(): WorkOrderBinding | null {
+        return this.#binding;
+    }
+
+    isBound(): boolean {
+        return this.#binding !== null;
+    }
+
     // Banner for a rejected transition: one line per
     // constraint the Record gate failed, named by its
     // attribute. The violations carry their own data;
@@ -265,6 +335,17 @@ export class WorkboxDetailPresenter {
                 Release Work Order
             </button>`;
 
+        const conflict = this.#conflictNotice
+            !== null
+            ? html`<p class="${
+                'work-order-conflict mb-4'
+                + ' text-sm'
+            }"
+                data-tone="warning"
+                role="status"
+                >${this.#conflictNotice}</p>`
+            : html``;
+
         return html`<div
             class="entity">
             <div id="work-order-header"
@@ -283,7 +364,8 @@ export class WorkboxDetailPresenter {
                         ${this.flowNameText()}
                     </h1>
                     <div class="flex
-                        items-center gap-3">
+                        items-center gap-3
+                        flex-wrap">
                         <span
                             class="badge
                                 badge-neutral">
@@ -297,16 +379,20 @@ export class WorkboxDetailPresenter {
                             ${this
                                 .#currentNodeName()}
                         </span>
+                        ${this.#bindingBadge()}
                     </div>
                 </div>
             </div>
 
+            ${conflict}
             ${fields}
             ${violationsSlot}
             ${transitions}
 
-            <div class="flex gap-3 mb-6">
+            <div class="flex gap-3 mb-6
+                flex-wrap">
                 ${unclaimBtn}
+                ${this.#bindButton()}
             </div>
 
             <details
@@ -335,7 +421,131 @@ export class WorkboxDetailPresenter {
                             )}
                 </div>
             </details>
+            ${this.#bindDialog()}
         </div>`;
+    }
+
+    #bindingBadge(): SafeHtml {
+        const bind = this.#binding;
+        if (bind === null) {
+            return html`<span
+                class="badge badge-warning"
+                data-binding="unbound">
+                Unbound
+            </span>`;
+        }
+        return html`<span
+            class="badge badge-success"
+            data-binding="bound"
+            title="${
+                'type ' + bind.recordTypeId
+            }">
+            Instance ${bind.instanceId}
+        </span>`;
+    }
+
+    #bindButton(): SafeHtml {
+        if (
+            this.isArchive()
+            || this.#binding !== null
+        ) {
+            return html``;
+        }
+        return html`<button
+            type="button"
+            class="btn btn-primary"
+            data-dialog-open="bind-instance">
+            Bind instance
+        </button>`;
+    }
+
+    #bindDialog(): SafeHtml {
+        if (
+            this.isArchive()
+            || this.#binding !== null
+        ) {
+            return html``;
+        }
+        const rows = this.#pickerItems.length === 0
+            ? html`<p class="text-muted">
+                No instances available.
+            </p>`
+            : html`<ul class="${
+                'bind-instance-list'
+            }">
+                ${this.#pickerItems.map(
+                    item => this.#pickerRow(item),
+                )}
+            </ul>`;
+        return html`<dialog
+            id="bind-instance-dialog"
+            class="dialog dialog-wide"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="${
+                'bind-instance-title'
+            }">
+            <div class="dialog-header">
+                <h3 class="dialog-title"
+                    id="bind-instance-title">
+                    Bind instance
+                </h3>
+                <p class="dialog-description">
+                    Choose an instance of the
+                    flow's record type for this
+                    work order.
+                </p>
+            </div>
+            <div class="py-4">
+                ${rows}
+            </div>
+            <div class="dialog-footer">
+                <button
+                    type="button"
+                    class="btn btn-outline"
+                    data-dialog-cancel="${
+                        'bind-instance'
+                    }">
+                    Cancel
+                </button>
+            </div>
+        </dialog>`;
+    }
+
+    #pickerRow(
+        item: InstancePickerItem,
+    ): SafeHtml {
+        const summary = item.fields.length === 0
+            ? html`<span class="text-muted">
+                (empty)
+            </span>`
+            : item.fields.map(
+                f => html`<span
+                    class="bind-instance-field">
+                    <span class="text-muted"
+                        >${f.name}</span>
+                    <span>${f.value}</span>
+                </span>`,
+            );
+        // data-instance-pick — NEVER data-attribute-id
+        // (collectAttributeValues scrapes the latter).
+        return html`<li>
+            <button
+                type="button"
+                class="${
+                    'btn btn-outline'
+                    + ' bind-instance-pick'
+                }"
+                data-instance-pick="${item.id}">
+                <span class="font-semibold"
+                    >${item.id}</span>
+                <span class="${
+                    'bind-instance-summary'
+                }">
+                    ${summary}
+                </span>
+            </button>
+        </li>`;
     }
 
     #buildAttributesCard(): SafeHtml {
@@ -458,6 +668,12 @@ export class WorkboxDetailPresenter {
     ): SafeHtml {
         const label = attribute.name
             + (ref.isRequired ? ' *' : '');
+        const headValue =
+            this.#instanceValues?.get(
+                attribute.id,
+            ) ?? null;
+        const forceDisabled =
+            this.#binding === null;
         if (
             attribute.attributeType === 'radio'
         ) {
@@ -468,7 +684,10 @@ export class WorkboxDetailPresenter {
                     class="label"
                     >${label}</legend>
                 ${buildAttributeInputHtml(
-                    ref, attribute,
+                    ref,
+                    attribute,
+                    headValue,
+                    forceDisabled,
                 )}
             </fieldset>`;
         }
@@ -478,7 +697,10 @@ export class WorkboxDetailPresenter {
                 for="wo-attr-${attribute.id}"
                 >${label}</label>
             ${buildAttributeInputHtml(
-                ref, attribute,
+                ref,
+                attribute,
+                headValue,
+                forceDisabled,
             )}
         </div>`;
     }

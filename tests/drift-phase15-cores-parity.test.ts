@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
@@ -12,7 +9,6 @@ import {
     TABLE_NAMES,
 } from '../api/db.ts';
 import { nowUtc } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     workOrderDocumentHeadFor,
     workOrderClaimHistoryFor,
@@ -22,6 +18,9 @@ import {
     deriveWorkOrderLifecycle,
     deriveMemberStates,
 } from '../api/derive-states.ts';
+import {
+    appendLegacyTransition,
+} from './legacy-transition-fixture.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     flowGraphBindingsFromPairs,
@@ -58,6 +57,7 @@ import {
 import {
     generateCryptoSafeBase62,
 } from '../shared/crypto-safe-base62.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase 15: view-safe derive cores (Task 1) + claim-gate
 // graph re-anchor pins (Task 2) + field-values visibility
@@ -87,9 +87,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 function workOrderFlowGraph(
@@ -488,7 +486,6 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
         {
             transitionEventId,
             targetState: 'n-finish',
-            fieldValues: [],
             release: null,
             transitionAt: nowUtc(),
         },
@@ -762,11 +759,21 @@ async () => {
             db, req('GET', '/work-orders/' + row.id, token),
         );
         assert.equal(getRes.status, 200);
-        const wire = await getRes.json();
+        // Wire GET attaches bind embeds (instance_id /
+        // record_type_id); document-head derive is bind-
+        // free — strip embeds before comparing heads.
+        const wire = await getRes.json() as Record<
+            string, unknown
+        >;
+        const {
+            instance_id: _i,
+            record_type_id: _r,
+            ...wireHead
+        } = wire;
         const derived = await workOrderDocumentHeadFor(
             db, STARK_ORGANIZATION, row.id,
         );
-        assert.deepEqual(derived, wire, row.id);
+        assert.deepEqual(derived, wireHead, row.id);
     }
     // Phase Final Stage B: work_orders table retired.
 });
@@ -1377,11 +1384,9 @@ async function transitionWithFieldValue(
     ));
     assert.equal(attrWrite.status, 200);
 
-    const transitioned = await handleRequest(db, req(
-        'POST',
-        '/work-orders/' + workOrderId + '/transition',
-        token,
-        {
+    // Task 8 CUT: legacy fieldValues below the gate.
+    await appendLegacyTransition(
+        db, STARK_ORGANIZATION, workOrderId, {
             transitionEventId,
             targetState: 'n-finish',
             fieldValues: [{
@@ -1395,8 +1400,7 @@ async function transitionWithFieldValue(
             release: null,
             transitionAt: nowUtc(),
         },
-    ));
-    assert.equal(transitioned.status, 204);
+    );
 }
 
 // Wire-shape pin (C4): GET work-orders/:id/history is

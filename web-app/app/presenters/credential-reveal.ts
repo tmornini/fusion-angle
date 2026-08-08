@@ -15,13 +15,14 @@ export function credentialsCopyText(
         .join('\n');
 }
 
-// One-time reveal of the freshly-seeded demo sign-ins. The
-// plaintext passwords live only here and in the surfacing
-// response — only their PBKDF2 hashes are stored. html``
-// escapes every interpolated value, so a hostile password
-// cannot inject markup; `trusted` is deliberately never used.
-// DEMO-ONLY: this panel and its in-band plaintext are deleted
-// at the server tier.
+// One-time reveal of the freshly-seeded demo sign-ins.
+// Domain credentials store only PBKDF2 hashes; once a user
+// logs in, the message plane also holds the password
+// verbatim (accepted dev-tier cost — see API.md §5.2).
+// html`` escapes every interpolated value, so a hostile
+// password cannot inject markup; `trusted` is deliberately
+// never used. DEMO-ONLY: this panel and its in-band
+// plaintext are deleted at the server tier.
 export function credentialRevealPanel(
     creds: SeededCredentials,
 ): SafeHtml {
@@ -48,8 +49,8 @@ export function credentialRevealPanel(
                 </button>
             </div>
             <p class="credential-reveal-note">
-                Shown once and never stored — copy them now,
-                they cannot be recovered.
+                Save your demo sign-ins — shown once; copy
+                them now.
             </p>
             <div class="credential-reveal-box">
                 ${lines}

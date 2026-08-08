@@ -39,9 +39,18 @@ import {
     nextPosition,
 } from '../drag-reorder-positions.ts';
 import {
-    validateRecordTransition,
+    recordTransitionViolationsFrom,
     RecordTransitionViolations,
 } from './record-transitions.ts';
+import {
+    getRecordInstance,
+} from './record-instances.ts';
+import {
+    getRecordAttributesByRecord,
+} from './record-attributes.ts';
+import {
+    getRecordForWorkOrder,
+} from './flow-records.ts';
 
 const workOrderChanges =
     createSubscriptionChannel();
@@ -82,9 +91,15 @@ export async function postWorkOrderCreation(
     ctx: RequestContext,
     input: WorkOrderCreationInput,
 ): Promise<void> {
-    const flow = await ctx.GET<FlowWithGraph>(
-        `flows/${input.flowId}`,
-    );
+    // Wave 1: flow + display id + existing list.
+    const [flow, displayId, existing] =
+        await Promise.all([
+            ctx.GET<FlowWithGraph>(
+                `flows/${input.flowId}`,
+            ),
+            generateDisplayId(input.workOrderId),
+            ctx.GET<WorkOrderEntity[]>('work-orders'),
+        ]);
     const readiness = validateFlowForCreation(flow);
     if (!readiness.ready) {
         throw new Error(
@@ -125,10 +140,6 @@ export async function postWorkOrderCreation(
     const postStartNodeId =
         postStartEdge.toNodeId;
 
-    const displayId =
-        await generateDisplayId(input.workOrderId);
-    const existing =
-        await ctx.GET<WorkOrderEntity[]>('work-orders');
     const position = nextPosition(
         existing.map(w => w.position),
     );
@@ -188,20 +199,63 @@ export interface WorkOrderTransitionInput {
     workOrderId: string;
     edgeId: string;
     values: Record<string, string>;
-    fieldValueIds: Record<string, string>;
+}
+
+// Diff form pending vs instance head into set/clear.
+// Unchanged values are OMITTED — sending them trips
+// all-or-nothing ACL on readonly-role attributes.
+// Blank pending where head is set → clear.
+function instanceDelta(
+    pending: Record<string, string>,
+    head: ReadonlyMap<string, string>,
+): {
+    set: { attribute_id: string; value: string }[];
+    clear: string[];
+} {
+    const set: {
+        attribute_id: string;
+        value: string;
+    }[] = [];
+    const clear: string[] = [];
+    for (const [attrId, value] of
+        Object.entries(pending)
+    ) {
+        const stored = head.get(attrId);
+        if (value === '') {
+            if (
+                stored !== undefined
+                && stored !== ''
+            ) {
+                clear.push(attrId);
+            }
+            continue;
+        }
+        if (value !== stored) {
+            set.push({
+                attribute_id: attrId,
+                value,
+            });
+        }
+    }
+    return { set, clear };
 }
 
 export async function postWorkOrderTransition(
     ctx: RequestContext,
     input: WorkOrderTransitionInput,
 ): Promise<void> {
-    const {
-        workOrderId, edgeId,
-        values, fieldValueIds,
-    } = input;
-    const wo = await ctx.GET<WorkOrderEntity>(
-        `work-orders/${workOrderId}`,
-    );
+    const { workOrderId, edgeId, values } = input;
+    // Wave 1: wo + history + record binding (all keyed
+    // by workOrderId). Pass history down so claim-release
+    // never re-fetches.
+    const [wo, history, recordId] =
+        await Promise.all([
+            ctx.GET<WorkOrderEntity>(
+                `work-orders/${workOrderId}`,
+            ),
+            getWorkOrderHistory(ctx, workOrderId),
+            getRecordForWorkOrder(ctx, workOrderId),
+        ]);
     const fg = validateWorkOrderFlowGraph(
         wo.flow_graph,
     );
@@ -215,16 +269,50 @@ export async function postWorkOrderTransition(
         );
     }
 
+    // Bound embed → one instance GET for head + etag.
+    // Unbound → null storedValues (A3 gate mirror).
+    const boundInstanceId = wo.instance_id;
+    const boundRecordTypeId = wo.record_type_id;
+    const needsInstance =
+        boundInstanceId !== undefined
+        && boundRecordTypeId !== undefined;
+    // Wave 2: instance head (if bound) ∥ attributes
+    // (if a record is bound to the flow).
+    const [instance, attributes] =
+        await Promise.all([
+            needsInstance
+                ? getRecordInstance(
+                    ctx,
+                    boundRecordTypeId!,
+                    boundInstanceId!,
+                )
+                : Promise.resolve(null),
+            recordId === null
+                ? Promise.resolve([])
+                : getRecordAttributesByRecord(
+                    ctx, recordId,
+                ),
+        ]);
+    const storedValues = instance === null
+        ? null
+        : instance.values;
+    const etag = instance === null
+        ? undefined
+        : instance.etag;
+
     const pendingValues = new Map(
         Object.entries(values),
     );
     // Current-node gate: form fields + requiredness
     // match the node the operator is leaving.
-    const violations = await
-        validateRecordTransition(
-            ctx,
+    const violations =
+        recordTransitionViolationsFrom(
             workOrderId,
+            fg,
+            history,
+            attributes,
             pendingValues,
+            storedValues,
         );
     if (violations.length > 0) {
         throw new RecordTransitionViolations(
@@ -232,39 +320,23 @@ export async function postWorkOrderTransition(
         );
     }
 
-    // Mint the transition event id client-side so a retry
-    // hits the same row; the field-value rows reference it.
-    const transitionEventId = generateCryptoSafeBase62();
+    const { set, clear } = storedValues === null
+        ? { set: [], clear: [] as string[] }
+        : instanceDelta(values, storedValues);
+    const valueBearing =
+        set.length + clear.length > 0;
 
-    const fieldValues = Object.entries(values).map(
-        ([attributeId, value]) => {
-            const id = fieldValueIds[attributeId];
-            if (id === undefined) {
-                throw new Error(
-                    'Missing fieldValueId for'
-                    + ' attribute ' + attributeId,
-                );
-            }
-            return {
-                id,
-                fields: {
-                    state_event_id: transitionEventId,
-                    attribute_id: attributeId,
-                    value,
-                },
-            };
-        },
-    );
+    // Mint the transition event id client-side so a
+    // retry hits the same row under message_hash.
+    const transitionEventId =
+        generateCryptoSafeBase62();
 
     // If a live claim exists for the work order, the
     // transition implicitly releases it — carry a
-    // 'claim_released' event the named POST writes atomically
-    // alongside the transition. The release event is authored
-    // server-side by the verified caller (actor). One
-    // per-id history read supplies the claim ledger.
-    const history = await getWorkOrderHistory(
-        ctx, workOrderId,
-    );
+    // 'claim_released' event the named POST writes
+    // atomically alongside the transition. The release
+    // event is authored server-side by the verified
+    // caller (actor). History was fetched in wave 1.
     const latestClaim = latestClaimEvent(
         history, workOrderId,
     );
@@ -277,6 +349,7 @@ export async function postWorkOrderTransition(
     // transition event before the release event, so
     // transitionAt < release.at must hold in the
     // at-ordered ledger (latest at = current state).
+    // Both mints stay await-free before POST.
     const transitionAt = nowUtc();
     const release = hasLiveClaim
         ? {
@@ -286,17 +359,61 @@ export async function postWorkOrderTransition(
         }
         : null;
 
+    const body: Record<string, unknown> = {
+        transitionEventId,
+        targetState: edge.toNodeId,
+        release,
+        transitionAt,
+    };
+
+    if (valueBearing) {
+        if (
+            boundInstanceId === undefined
+            || boundRecordTypeId === undefined
+            || etag === undefined
+        ) {
+            throw new Error(
+                'value-bearing transition requires'
+                + ' a bound instance head',
+            );
+        }
+        body['instance_id'] = boundInstanceId;
+        body['record_type_id'] = boundRecordTypeId;
+        body['set'] = set;
+        body['clear'] = clear;
+        // NO auto-retry on 412 — the page owns recovery.
+        await ctx.POSTWithHeaders(
+            `work-orders/${workOrderId}/transition`,
+            body,
+            [['If-Match', '"' + etag + '"']],
+        );
+    } else {
+        // Pure move: neither delta nor If-Match.
+        await ctx.POST(
+            `work-orders/${workOrderId}/transition`,
+            body,
+        );
+    }
+
+    workOrderChanges.notify();
+}
+
+// Bind a work order to one org-owned instance of one
+// record type. Claim-op adapter voice: mint nothing
+// client-side beyond the body; notify on success.
+export async function postWorkOrderBinding(
+    ctx: RequestContext,
+    workOrderId: string,
+    instanceId: string,
+    recordTypeId: string,
+): Promise<void> {
     await ctx.POST(
-        `work-orders/${workOrderId}/transition`,
+        `work-orders/${workOrderId}/binding`,
         {
-            transitionEventId,
-            targetState: edge.toNodeId,
-            fieldValues,
-            release,
-            transitionAt,
+            instance_id: instanceId,
+            record_type_id: recordTypeId,
         },
     );
-
     workOrderChanges.notify();
 }
 

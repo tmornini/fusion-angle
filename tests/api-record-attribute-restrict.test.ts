@@ -12,12 +12,25 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { TABLE_NAMES } from '../api/db.ts';
-import type { GraphEdge } from '../api/types.ts';
+import type {
+    GraphEdge,
+} from '../api/types.ts';
+import {
+    SYSTEM_MEMBER_ID,
+} from '../api/types.ts';
 import type { AttributeReferrers } from
     '../api/record-attribute-refs.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
+import {
+    postWorkOrderTransitionOp,
+} from '../api/routes.ts';
+import {
+    formWritePair,
+} from '../api/message-pair.ts';
+import { STARK_ORGANIZATION } from
+    '../api/mock-data/seed-constants.ts';
 
 // Destroying a record attribute is RESTRICT, not cascade:
 // while a state_field_values row names it or a live
@@ -278,8 +291,9 @@ test(
 
 // NAMED re-pin (Phase 15 Task 7): leaf PUT
 // states/:id/field-values/:fvid retires; seed a field-value
-// referrer through the transition fold — the ONLY live
-// writer of state_field_values (postWorkOrderTransitionOp).
+// referrer through the transition fold. Task 8 CUT: legacy
+// fieldValues appends stay below the gate (stored-data SFV
+// truth); the live wire rejects the key.
 async function seedFieldValueReferrer(
     db: MemoryDbAdapter,
     attributeId: string,
@@ -301,22 +315,41 @@ async function seedFieldValueReferrer(
         },
         DEV_TOKEN,
     );
-    await POST(
-        db, 'work-orders/wo-restrict-fv/transition', {
-            transitionEventId: 'te-restrict-1',
-            targetState: 'n-next',
-            fieldValues: [{
-                id: sfvId,
-                fields: {
-                    state_event_id: 'te-restrict-1',
-                    attribute_id: attributeId,
-                    value,
-                },
-            }],
-            release: null,
-            transitionAt: AT,
-        },
-        DEV_TOKEN,
+    const body: Record<string, unknown> = {
+        transitionEventId: 'te-restrict-1',
+        targetState: 'n-next',
+        fieldValues: [{
+            id: sfvId,
+            fields: {
+                state_event_id: 'te-restrict-1',
+                attribute_id: attributeId,
+                value,
+            },
+        }],
+        release: null,
+        transitionAt: AT,
+    };
+    const pathSegments = [
+        'work-orders', 'wo-restrict-fv', 'transition',
+    ];
+    const pattern = 'work-orders/:id/transition';
+    const pair = await formWritePair({
+        method: 'POST',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: pattern,
+        routeSegments: pattern.split('/'),
+        pathSegments,
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: AT,
+        organization: STARK_ORGANIZATION,
+        responseStatus: 204,
+        responseBody: undefined,
+    });
+    await postWorkOrderTransitionOp(
+        db, 'wo-restrict-fv', body, SYSTEM_MEMBER_ID,
+        undefined, [], pair,
     );
 }
 

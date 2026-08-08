@@ -112,10 +112,16 @@ import {
     humanMemberPiiSeedBody,
     bootstrapCurrentMemberPiiBody,
     identityCredentialSeedBody,
+    VALUE_BEARING_TRANSITION_EVENT_IDS,
+    SEED_INSTANCE_ID,
+    WO01_ID,
+    WO01_REVIEW_EVENT_ID,
+    WO01_COMPLETE_EVENT_ID,
 } from './mock-data/seed-message-pairs.ts';
 import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
+    INSTANCE_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
 } from './family-registry.ts';
@@ -736,23 +742,31 @@ async function postMockDataLoadIn(
         ),
         // States-address retirement Task 12: every historical
         // trace drives through the live transition op — body
-        // validates via validateWorkOrderTransitionBody, field
-        // values fold into the transition pair body (no leaf
-        // field-value pairs).
-        ...mockStateEvents.map(r =>
-            postWorkOrderTransitionOp(
-                adapter,
-                r.entity_id,
-                transitionSeedBody(r),
-                r.member_id,
-                requirePair(
-                    pairs,
-                    seedPairKey(
-                        'work-orders/:id/transition', r.id,
+        // validates via validateWorkOrderTransitionBody. WO-
+        // instance SoT Task 6: value-bearing WO01 events leave
+        // this loop (appended with the instance chain below).
+        ...mockStateEvents
+            .filter((r) =>
+                !VALUE_BEARING_TRANSITION_EVENT_IDS.has(
+                    r.id,
+                ))
+            .map(r =>
+                postWorkOrderTransitionOp(
+                    adapter,
+                    r.entity_id,
+                    transitionSeedBody(r),
+                    r.member_id,
+                    undefined,
+                    [],
+                    requirePair(
+                        pairs,
+                        seedPairKey(
+                            'work-orders/:id/transition',
+                            r.id,
+                        ),
                     ),
                 ),
             ),
-        ),
         // AI members start at 'active' on creation — same
         // single-event seeding as humans, driven through
         // postAiMemberCreationOp. POST /ai-members (and so
@@ -850,18 +864,58 @@ async function postMockDataLoadIn(
                 ),
             ),
         ),
-        ...leadToCloseData.stateEvents.map(r =>
-            postWorkOrderTransitionOp(
-                adapter,
-                r.entity_id,
-                transitionSeedBody(r),
-                r.member_id,
-                requirePair(
-                    pairs,
-                    seedPairKey(
-                        'work-orders/:id/transition', r.id,
+        ...leadToCloseData.stateEvents
+            .filter((r) =>
+                !VALUE_BEARING_TRANSITION_EVENT_IDS.has(
+                    r.id,
+                ))
+            .map(r =>
+                postWorkOrderTransitionOp(
+                    adapter,
+                    r.entity_id,
+                    transitionSeedBody(r),
+                    r.member_id,
+                    undefined,
+                    [],
+                    requirePair(
+                        pairs,
+                        seedPairKey(
+                            'work-orders/:id/transition',
+                            r.id,
+                        ),
                     ),
                 ),
+            ),
+        // WO-instance SoT Task 6: instance genesis + binding +
+        // Review/Complete new-shape ops and revision pairs.
+        // Append-only (below-facade) — same as every other
+        // seed pair write; chain formed pre-tx.
+        ...[
+            seedPairKey(
+                INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
+            ),
+            seedPairKey(
+                'work-orders/:id/binding', WO01_ID,
+            ),
+            seedPairKey(
+                'work-orders/:id/transition',
+                WO01_REVIEW_EVENT_ID,
+            ),
+            seedPairKey(
+                INSTANCE_DETAIL_PATTERN,
+                SEED_INSTANCE_ID + '-review',
+            ),
+            seedPairKey(
+                'work-orders/:id/transition',
+                WO01_COMPLETE_EVENT_ID,
+            ),
+            seedPairKey(
+                INSTANCE_DETAIL_PATTERN,
+                SEED_INSTANCE_ID + '-complete',
+            ),
+        ].map((key) =>
+            appendMessagePair(
+                adapter, requirePair(pairs, key),
             ),
         ),
         ...mockRecords.map((r, i) => {

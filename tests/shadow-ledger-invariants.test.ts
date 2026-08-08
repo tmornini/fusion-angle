@@ -3,10 +3,8 @@ import { deriveIdeaStateHistory } from
     '../api/derive-ideas.ts';
 import assert from 'node:assert/strict';
 import {
-    memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { handleRequest } from '../api/api.ts';
 import { sha256Hex } from '../shared/digest.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
@@ -19,6 +17,7 @@ import {
     storedWorkOrderFlowGraph,
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Standing shadow-ledger invariants (Task 5): properties every
 // requests/responses pair must hold REGARDLESS of which family
@@ -211,8 +210,7 @@ function createRecordBody(
 // additive) — five families beyond the seed's own, spanning
 // both seeded orgs.
 async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
+    const db = await seededMockDb();
     const org1Token = await organizationToken(
         'current', STARK_ORGANIZATION);
     const org2Token = await organizationToken(
@@ -395,27 +393,28 @@ test('every stored message, across every row of both'
     }
 });
 
-// End-to-end spot check on header redaction: a stored request
-// message must never carry a live bearer JWT. Every write in
+// End-to-end spot check on verbatim storage: every write in
 // the mixed batch above rode a real 'Authorization: Bearer'
-// header (organizationToken mints a real HMAC JWT), so this is
-// a genuine assertion over live traffic, not a vacuous pass
-// over headerless seed rows (mock-data seed pairs carry no
-// header fields at all — api/mock-data/seed-message-pairs.ts).
+// header (organizationToken mints a real HMAC JWT), so a live
+// bearer JWT MUST appear in stored request messages — pairs
+// hold the wire bytes. Mock-data seed pairs carry no header
+// fields (api/mock-data/seed-message-pairs.ts); the mixed
+// batch is the live-traffic half.
 const BEARER_JWT =
     /Bearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/;
 
-test('no stored request message leaks a live bearer JWT',
+test('stored request messages carry the live bearer JWT',
 async () => {
     const db = await seededWithMixedBatch();
     const requests = await db.requests.getAll();
     assert.ok(requests.length > 0);
-    for (const row of requests) {
-        assert.doesNotMatch(
-            row.message, BEARER_JWT,
-            'requests row ' + row.id + ' leaked a bearer JWT',
-        );
-    }
+    const withBearer = requests.filter(
+        row => BEARER_JWT.test(row.message),
+    );
+    assert.ok(
+        withBearer.length > 0,
+        'no stored request carried a bearer JWT',
+    );
 });
 
 const RFC3339_ZULU_MICROS =
@@ -456,8 +455,7 @@ test('every pair\'s envelope timestamps are RFC-3339 zulu'
 // present but semantically faithful to what was really written.
 test('a seeded idea\'s create-pair request reproduces its'
 + ' actual genesis row in states', async () => {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
+    const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
     const requests = await db.requests.getAll();
     const createRow = requests.find(

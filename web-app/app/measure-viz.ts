@@ -517,6 +517,82 @@ function vizClientScript(): string {
     });
     return entries;
   }
+  // keep in sync with trendLabelIndices
+  function trendLabelIndices(
+    sweeps, page, fromIndex, toIndex, maxLabels,
+  ) {
+    var max = maxLabels == null ? 8 : maxLabels;
+    var cands = [];
+    for (var i = 0; i < sweeps.length; i++) {
+      if (sweeps[i].pages[page] !== undefined) {
+        cands.push(i);
+      }
+    }
+    if (cands.length === 0) return [];
+    if (cands.length <= max) return cands;
+
+    var first = cands[0];
+    var last = cands[cands.length - 1];
+    var forced = new Set([first, last]);
+    if (cands.indexOf(fromIndex) !== -1) {
+      forced.add(fromIndex);
+    }
+    if (cands.indexOf(toIndex) !== -1) {
+      forced.add(toIndex);
+    }
+
+    if (forced.size >= max) {
+      if (max <= 1) return [first];
+      var out = new Set([first, last]);
+      var room = max - out.size;
+      var interiors = [];
+      if (
+        forced.has(fromIndex)
+        && fromIndex !== first
+        && fromIndex !== last
+      ) {
+        interiors.push(fromIndex);
+      }
+      if (
+        forced.has(toIndex)
+        && toIndex !== first
+        && toIndex !== last
+        && toIndex !== fromIndex
+      ) {
+        interiors.push(toIndex);
+      }
+      for (
+        var j = 0;
+        j < room && j < interiors.length;
+        j++
+      ) {
+        out.add(interiors[j]);
+      }
+      return Array.from(out).sort(function (a, b) {
+        return a - b;
+      });
+    }
+
+    var picked = new Set(forced);
+    if (max >= 2) {
+      for (var k = 0; k < max; k++) {
+        if (picked.size >= max) break;
+        var ci = Math.round(
+          (k * (cands.length - 1)) / (max - 1),
+        );
+        picked.add(cands[ci]);
+      }
+    }
+    if (picked.size < max) {
+      for (var c = 0; c < cands.length; c++) {
+        if (picked.size >= max) break;
+        picked.add(cands[c]);
+      }
+    }
+    return Array.from(picked).sort(function (a, b) {
+      return a - b;
+    });
+  }
   var MEASURE_BOOT_PAGE_INIT = 'boot:page-init';
   function phaseBucket(name) {
     if (name.indexOf('boot:') === 0) return 'boot';
@@ -791,11 +867,11 @@ function vizClientScript(): string {
       + '" fill="none" stroke="#6ea8fe" '
       + 'stroke-width="2"/>',
     );
-    for (var xi = 0; xi < sweeps.length; xi++) {
-      if (xi !== fromIndex && xi !== toIndex
-        && sweeps.length > 6 && xi % 2 === 1) {
-        continue;
-      }
+    var labelIdxs = trendLabelIndices(
+      sweeps, page, fromIndex, toIndex,
+    );
+    for (var li = 0; li < labelIdxs.length; li++) {
+      var xi = labelIdxs[li];
       parts.push(
         '<text x="' + xPos(xi) + '" y="' + (h - 12)
         + '" fill="#9aa6b2" font-size="9" '

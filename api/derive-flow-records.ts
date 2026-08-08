@@ -8,6 +8,10 @@ import {
     type DerivedDocument,
 } from './derive-documents.ts';
 import { missedReadError } from './derive-states.ts';
+import { deriveFlows } from './derive-flows.ts';
+import {
+    deriveFlowWorkOrders,
+} from './derive-flow-work-orders.ts';
 
 // The flow<->record join's own reshaping of the generic
 // message-plane reduction (derive-documents.ts) — the
@@ -116,4 +120,41 @@ export async function deriveFlowRecord(
         );
     }
     return flowRecordEntityOf(document);
+}
+
+// WO → owning flow → live flow↔type joins. Bounded per-flow
+// indexed reads (deriveFlows + deriveFlowWorkOrders +
+// deriveFlowRecords); in-tx safe (dbOrView). Null when no
+// live flow claims the work order via a join.
+export async function recordTypeIdsForWorkOrder(
+    dbOrView: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+): Promise<
+    { flowId: Id; recordTypeIds: Id[] } | null
+> {
+    const flows = await deriveFlows(
+        dbOrView, organization,
+    );
+    for (const flow of flows) {
+        const joins = await deriveFlowWorkOrders(
+            dbOrView, organization, flow.id,
+        );
+        const hit = joins.find(
+            (j) => j.work_order_id === workOrderId,
+        );
+        if (hit === undefined) {
+            continue;
+        }
+        const records = await deriveFlowRecords(
+            dbOrView, organization, flow.id,
+        );
+        return {
+            flowId: flow.id,
+            recordTypeIds: records.map(
+                (r) => r.record_id,
+            ),
+        };
+    }
+    return null;
 }

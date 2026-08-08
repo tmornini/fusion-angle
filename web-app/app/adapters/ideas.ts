@@ -136,15 +136,15 @@ function ideaStateDetailFromRow(
 export async function getIdeas(
     ctx: RequestContext,
 ): Promise<IdeaWithSubmitter[]> {
-    const rows = await getIdeaEntities(ctx);
-    const [
-        memberMap, submissions,
-    ] = await Promise.all([
+    // Wave 1: idea rows + member map (independent).
+    // Wave 2: submissions need the idea ids.
+    const [rows, memberMap] = await Promise.all([
+        getIdeaEntities(ctx),
         getMemberMap(ctx),
-        getIdeaSubmissionEntities(
-            ctx, rows.map(r => r.id),
-        ),
     ]);
+    const submissions = await getIdeaSubmissionEntities(
+        ctx, rows.map(r => r.id),
+    );
     const submissionMap = new Map(
         submissions.map(s => [s.idea_id, s]),
     );

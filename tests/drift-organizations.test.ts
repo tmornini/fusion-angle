@@ -8,7 +8,7 @@ import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { Id, OrganizationEntity } from '../api/types.ts';
-import { postMockDataLoad, postBootstrap } from
+import { postBootstrap } from
     '../api/mock-data.ts';
 import {
     deriveOrganizations,
@@ -25,6 +25,7 @@ import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import { mintAccessToken, TOKEN_AUDIENCE } from
     '../api/access-token.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: organizations dual-write stripped. This
 // file no longer compares derive vs old-table oracles — the
@@ -64,9 +65,7 @@ function sortById<T extends { id: string }>(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 async function bootstrappedDb(): Promise<MemoryDbAdapter> {

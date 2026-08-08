@@ -17,7 +17,7 @@ test('canonical JSON is stable across key permutations',
         target: '/ideas/42',
         fields: [
             { name: 'idempotency-key', value: 'k1' },
-            { name: 'authorization', value: 'sha256:x' },
+            { name: 'authorization', value: 'Bearer x' },
         ],
         body: { zebra: 1, alpha: { b: 2, a: 1 } },
     });
@@ -25,7 +25,7 @@ test('canonical JSON is stable across key permutations',
         method: 'PUT',
         target: '/ideas/42',
         fields: [
-            { name: 'authorization', value: 'sha256:x' },
+            { name: 'authorization', value: 'Bearer x' },
             { name: 'idempotency-key', value: 'k1' },
         ],
         body: { alpha: { a: 1, b: 2 }, zebra: 1 },

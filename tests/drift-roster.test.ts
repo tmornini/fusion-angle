@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
@@ -16,7 +13,6 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
@@ -53,6 +49,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: roster (members / human_members /
 // ai_members / memberships / invitations) dual-write stripped.
@@ -110,9 +107,7 @@ function sortById<T extends { id: string }>(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // -- test-side wiring mirrors (routes.ts's private rows, by ----

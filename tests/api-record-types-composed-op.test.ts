@@ -17,6 +17,7 @@ import {
 } from './test-fixtures.ts';
 import {
     postMembershipDocumentOp,
+    postWorkOrderTransitionOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
@@ -24,6 +25,8 @@ import {
     nowUtc,
     SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
+import { STARK_ORGANIZATION } from
+    '../api/mock-data/seed-constants.ts';
 
 // Nested composed POST .../record-types (Task 9): admin-only
 // create/edit bundle reusing flat postRecordWriteOp + nested
@@ -189,22 +192,43 @@ async function seedFieldValueReferrer(
         },
         token,
     );
-    await POST(
-        db, 'work-orders/wo-restrict-fv/transition', {
-            transitionEventId: 'te-restrict-1',
-            targetState: 'n-next',
-            fieldValues: [{
-                id: 'sfv-composed-1',
-                fields: {
-                    state_event_id: 'te-restrict-1',
-                    attribute_id: attributeId,
-                    value: 'High',
-                },
-            }],
-            release: null,
-            transitionAt: AT,
-        },
-        token,
+    // Task 8 CUT: legacy fieldValues is below-gate only
+    // (stored SFV referrer for RESTRICT; not the live wire).
+    const body: Record<string, unknown> = {
+        transitionEventId: 'te-restrict-1',
+        targetState: 'n-next',
+        fieldValues: [{
+            id: 'sfv-composed-1',
+            fields: {
+                state_event_id: 'te-restrict-1',
+                attribute_id: attributeId,
+                value: 'High',
+            },
+        }],
+        release: null,
+        transitionAt: AT,
+    };
+    const pathSegments = [
+        'work-orders', 'wo-restrict-fv', 'transition',
+    ];
+    const pattern = 'work-orders/:id/transition';
+    const pair = await formWritePair({
+        method: 'POST',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: pattern,
+        routeSegments: pattern.split('/'),
+        pathSegments,
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: AT,
+        organization: STARK_ORGANIZATION,
+        responseStatus: 204,
+        responseBody: undefined,
+    });
+    await postWorkOrderTransitionOp(
+        db, 'wo-restrict-fv', body, SYSTEM_MEMBER_ID,
+        undefined, [], pair,
     );
 }
 

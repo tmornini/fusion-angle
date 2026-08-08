@@ -4,14 +4,12 @@ import { deriveIdeaStateHistory } from
 import { deriveProjectStateHistory } from
     '../api/derive-projects.ts';
 import { strict as assert } from 'node:assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     getIdeas,
     getIdea,
@@ -30,6 +28,7 @@ import {
 import {
     seedHumanMember,
 } from './member-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // PUT/create body: no lifecycle trio — postIdeaCreation mints
 // state/stateAt/stateEventId. GET IdeaEntity carries the
@@ -413,9 +412,7 @@ test('deleted ideas are filtered from getIdeas', async () => {
 // co-member of their idea's org, in BOTH orgs.
 test('getIdeas resolves every seeded submitter in'
     + ' both orgs', async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await postMockDataLoad(db);
+    const db = await seededMockDb();
     for (const organization of ['1', '2']) {
         const ctx = createRequestContext(
             db, await organizationToken('current', organization));

@@ -103,12 +103,15 @@ export interface WorkOrder {
     displayId: string;
     flowGraph: WorkOrderFlowGraph;
     position: number;
+    // Optional bind embed from GET (absent when unbound).
+    instanceId?: Id;
+    recordTypeId?: Id;
 }
 
 function toWorkOrder(
     entity: WorkOrderEntity,
 ): WorkOrder {
-    return {
+    const out: WorkOrder = {
         id: entity.id,
         organizationId: entity.organization_id,
         displayId: entity.display_id,
@@ -117,6 +120,14 @@ function toWorkOrder(
         ),
         position: entity.position,
     };
+    if (
+        entity.instance_id !== undefined
+        && entity.record_type_id !== undefined
+    ) {
+        out.instanceId = entity.instance_id;
+        out.recordTypeId = entity.record_type_id;
+    }
+    return out;
 }
 
 /* ── Field values (from history) ─── */

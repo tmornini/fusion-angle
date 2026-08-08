@@ -1,9 +1,6 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
@@ -13,7 +10,6 @@ import {
     SYSTEM_MEMBER_ID,
     setClockForTest, resetClock,
 } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     deriveWorkOrderLifecycle,
     deriveMemberStates,
@@ -54,6 +50,7 @@ import { OBJECTIVE_SEEDS } from '../api/mock-data/objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // The E10 drift check (Phase 11 Task 6): the per-family parity
 // proof comparing OLD-plane states reads to the message-derived
@@ -104,9 +101,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // Claim-expiry legs advance the test clock (msSinceUtc seam);
@@ -612,7 +607,6 @@ test('case 4b: work-order live-write chain — birth-claimed'
         token, {
             transitionEventId: workOrderId + '-te1',
             targetState: 'n-middle',
-            fieldValues: [],
             release: null,
             transitionAt: nowUtc(),
         },
@@ -627,7 +621,6 @@ test('case 4b: work-order live-write chain — birth-claimed'
         token, {
             transitionEventId: workOrderId + '-te2',
             targetState: 'n-finish',
-            fieldValues: [],
             release: {
                 id: workOrderId + '-rel1',
                 state: 'claim_released',
@@ -743,7 +736,6 @@ async () => {
         token, {
             transitionEventId: workOrderId + '-genesis',
             targetState: 'n-start',
-            fieldValues: [],
             release: null,
             transitionAt: AT,
         },

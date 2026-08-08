@@ -15,12 +15,6 @@ import {
     messageHashOf,
     bodyEtagOf,
 } from './message-form.ts';
-import {
-    redactHeaderCredentials,
-    redactAuthenticationRequest,
-    redactAuthenticationResponse,
-    stripPiiRequest,
-} from './message-redaction.ts';
 import { validateIdentityTokenEntity } from './validators.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
@@ -58,7 +52,7 @@ export interface MessagePair {
     readonly uriPrefix: string;
     readonly uriId: string;
     readonly requesterIdentityId: Id;
-    readonly requestMessage: string;   // canonical, redacted
+    readonly requestMessage: string;   // canonical
     readonly requestHash: string;
     readonly responseStatus: number;
     readonly responseMessage: string;
@@ -173,21 +167,12 @@ export async function formWritePair(
         input.routePattern, input.body,
     );
     const uriId = createdId ?? address.uriId;
-    const requestModel =
-        await stripPiiRequest(
-            input.routePattern,
-            await redactAuthenticationRequest(
-                input.routePattern,
-                await redactHeaderCredentials(
-                    buildRequestModel({
-                        method: input.method,
-                        target: input.pathname,
-                        fields: input.headerFields,
-                        body: input.body,
-                    }),
-                ),
-            ),
-        );
+    const requestModel = buildRequestModel({
+        method: input.method,
+        target: input.pathname,
+        fields: input.headerFields,
+        body: input.body,
+    });
     const responseFields = [
         { name: RESPONSE_ID_FIELD, value: id },
         ...(input.headPairId === undefined ? [] : [{
@@ -199,15 +184,11 @@ export async function formWritePair(
             value: input.follows,
         }]),
     ];
-    const responseModel =
-        await redactAuthenticationResponse(
-            input.routePattern,
-            buildResponseModel({
-                status: input.responseStatus,
-                fields: responseFields,
-                body: input.responseBody,
-            }),
-        );
+    const responseModel = buildResponseModel({
+        status: input.responseStatus,
+        fields: responseFields,
+        body: input.responseBody,
+    });
     const requestMessage = canonicalJson(requestModel);
     const responseMessage = canonicalJson(responseModel);
     return {
@@ -282,13 +263,9 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
 // requesterIdentityId is the event's OWN identity_id (the
 // affected identity) — the NAMED convention for a write with no
 // authenticated actor in view at this depth (an internal grant,
-// a rotation, a chain revocation). NO new redaction arm: jti is
-// an identifier, not a bearer secret — the row plane already
-// stores it plaintext, and this route pattern is absent from
-// AUTHENTICATION_ROUTE_PATTERNS, so
-// redactAuthenticationRequest/Response (message-redaction.ts)
-// leave it untouched, exactly as the live wired PUT's own pairs
-// already do.
+// a rotation, a chain revocation). jti is an identifier, not a
+// bearer secret — stored plaintext as the live wired PUT's own
+// pairs already do.
 export async function formTokenEventPair(
     id: Id,
     event: Omit<IdentityTokenEntity, 'id'>,
@@ -405,6 +382,23 @@ export function ifMatchFromPair(
     return parseIfMatch(field.value);
 }
 
+// Raw If-Match header value from a formed pair —
+// undefined means ABSENT. Callers that must speak the
+// 428-vs-400 ladder themselves (transition op) need
+// absent distinguished from malformed;
+// ifMatchFromPair conflates them.
+export function rawIfMatchFromPair(
+    pair: MessagePair,
+): string | undefined {
+    const model = parseJson(
+        pair.requestMessage, defaultBodyRegistry(),
+    );
+    const field = model.fields.find(
+        (line) => line.name === IF_MATCH_HEADER,
+    );
+    return field?.value;
+}
+
 // Strong wire ETag for a document-pair response id.
 // Distinct from `responses.etag` (body sha256 column).
 export function strongEtagOf(pairId: string): string {
@@ -420,9 +414,8 @@ export function attachEtag(
 }
 
 // The header fields worth storing in a pair's request message:
-// enumerated explicitly (never hoisted blindly). `authorization`
-// is redacted downstream (message-redaction.ts); the rest are
-// stored verbatim.
+// enumerated explicitly (never hoisted blindly). Stored
+// verbatim, including `authorization`.
 const HOISTED_HEADER_NAMES: readonly string[] = [
     'authorization', 'content-type', 'idempotency-key',
     REQUEST_ID_HEADER, IF_RESPONSE_ID_HEADER,
@@ -519,23 +512,22 @@ export async function storedPairResponse(
     return responseFromStored(stored);
 }
 
-// In-tx append (row ops only, no crypto): skips silently if a
-// request with the same hash is already stored (the concurrent
-// -retry guard); otherwise puts both rows. The view parameter
-// is DbAdapter, NOT GuardedDbAdapter: route handlers receive
-// DbAdapter and their transaction callbacks are typed
-// (view: DbAdapter) — the fence spends the guard before
-// handlers run. The append needs only EntityStore
-// getAllWhere/put, both on the plain contract; GuardedDbAdapter
-// widens cleanly to DbAdapter, so the invitations/auth call
-// sites (which hold ctx.base) work unchanged.
-export async function appendMessagePair(
+// In-tx put by pair id (row ops only, no crypto): writes both
+// rows keyed by pair.id. Idempotent by id — a second put of the
+// same pair overwrites the same slots. Auth grant pairs use this
+// path so two byte-identical logins each land (their ids differ);
+// hash-keyed appendMessagePair would drop the second.
+// The view parameter is DbAdapter, NOT GuardedDbAdapter: route
+// handlers receive DbAdapter and their transaction callbacks are
+// typed (view: DbAdapter) — the fence spends the guard before
+// handlers run. The put needs only EntityStore put, on the plain
+// contract; GuardedDbAdapter widens cleanly to DbAdapter, so the
+// invitations/auth call sites (which hold ctx.base) work
+// unchanged.
+export async function putMessagePair(
     view: DbAdapter,
     pair: MessagePair,
 ): Promise<void> {
-    const replay = await view.requests
-        .getAllWhere('message_hash', pair.requestHash);
-    if (replay.length > 0) return;
     await view.requests.put(pair.id, {
         uri_prefix: pair.uriPrefix,
         uri_id: pair.uriId,
@@ -562,6 +554,19 @@ export async function appendMessagePair(
         ...(pair.follows === undefined
             ? {} : { follows: pair.follows }),
     });
+}
+
+// In-tx append (row ops only, no crypto): skips silently if a
+// request with the same hash is already stored (the concurrent
+// -retry guard); otherwise puts both rows via putMessagePair.
+export async function appendMessagePair(
+    view: DbAdapter,
+    pair: MessagePair,
+): Promise<void> {
+    const replay = await view.requests
+        .getAllWhere('message_hash', pair.requestHash);
+    if (replay.length > 0) return;
+    await putMessagePair(view, pair);
 }
 
 // The create-address override table: which body field names
@@ -658,6 +663,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'work-orders/:id/claim',
     'work-orders/:id/transition',
     'work-orders/:id/release',
+    'work-orders/:id/binding',
     'flows/:id/work-orders/:woid',
     // Flat records + record-attributes retired (Task 23).
     'flows/:id/records/:frid',
@@ -708,13 +714,18 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
 // rotation's guard is the 409 reuse check (rotateRefreshJti):
 // a resent rotation of an already-rotated-away jti must fail
 // again, not silently replay the first success. The two
-// /authentication/* grant routes join this set in Task 3 for a
-// DIFFERENT reason — their stored request/response rows are
-// redacted (message-redaction.ts strips the token material),
-// so the redacted stored body must never be handed back as a
-// live wire response. Grown family by family; never remove a
-// pattern without re-deriving why its domain guard (or
-// redaction) still makes the fast path safe to skip.
+// /authentication/* grant routes join this set for a related
+// reason: a stored authorize response holds a LIVE single-use
+// code (replay re-hands a possibly-spent credential and locks
+// out identical re-logins); a stored token response replayed
+// hands back stale/revoked tokens AND bypasses the rotation
+// reuse-detection and code double-spend guards, which only
+// fire when the handler re-runs. Auth pairs are also keyed by
+// id (putMessagePair), not hash, so two identical logins each
+// land — message_hash is no longer per-call-unique on these
+// routes. Grown family by family; never remove a pattern
+// without re-deriving why its domain guard still makes the
+// fast path safe to skip.
 export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
     new Set([
         'identity-tokens/:jti/rotation',

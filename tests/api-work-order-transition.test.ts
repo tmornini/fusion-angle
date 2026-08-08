@@ -16,19 +16,31 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
-import { nowUtc } from '../api/types.ts';
+import {
+    nowUtc,
+    SYSTEM_MEMBER_ID,
+    ValidationError,
+} from '../api/types.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import {
+    postWorkOrderTransitionOp,
+} from '../api/routes.ts';
+import {
+    formWritePair,
+} from '../api/message-pair.ts';
 
 // POST work-orders/:id/transition writes the transition state
 // event and an OPTIONAL claim-release event in ONE transaction.
-// Phase Final Task 2: state_field_values ROW half stripped —
-// field values ride the op pair body (pair-plane oracle via
-// workOrderHistoryFor inline fold). Authorship is the verified
-// caller (actor).
+// Task 8 CUT: live gate rejects fieldValues; pure-move
+// fixtures use the instance pure-move shape. Legacy
+// fieldValues appends/validation pin the below-facade tier
+// (stored-data truth; seed dual-tolerant). Spec W2 / plan
+// Task 8.
 
 const LOCK_TIMEOUT_SECONDS = 300;
+const TRANSITION_PATTERN = 'work-orders/:id/transition';
 
 function graphJson(): Record<string, unknown> {
     return {
@@ -62,6 +74,36 @@ function eventsFor(
     return workOrderLifecycleStatesFor(db, '1', 'wo1');
 }
 
+// Below-facade legacy append (organization === undefined).
+// Task 8: live gate rejects fieldValues; SFV/legacy fold
+// pins stay on the seed-tier dual-tolerant path.
+async function appendLegacyTransition(
+    db: MemoryDbAdapter,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const pathSegments = [
+        'work-orders', 'wo1', 'transition',
+    ];
+    const pair = await formWritePair({
+        method: 'POST',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: TRANSITION_PATTERN,
+        routeSegments: TRANSITION_PATTERN.split('/'),
+        pathSegments,
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: STARK_ORGANIZATION,
+        responseStatus: 204,
+        responseBody: undefined,
+    });
+    await postWorkOrderTransitionOp(
+        db, 'wo1', body, SYSTEM_MEMBER_ID,
+        undefined, [], pair,
+    );
+}
+
 test(
     'a transition writes the target state event authored'
     + ' by the actor',
@@ -71,7 +113,6 @@ test(
             db, 'work-orders/wo1/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
-                fieldValues: [],
                 release: null,
                 transitionAt: nowUtc(),
             },
@@ -84,6 +125,8 @@ test(
     },
 );
 
+// Spec W2 / Task 8: value-bearing legacy fold is stored-
+// data truth — append below the gate, not the live wire.
 test(
     'a transition folds field values onto the pair plane'
     + ' alongside the transition event',
@@ -113,25 +156,22 @@ test(
             },
             DEV_TOKEN,
         );
-        await POST(
-            db, 'work-orders/wo1/transition', {
-                transitionEventId: 'te1',
-                targetState: 'n-next',
-                fieldValues: [
-                    {
-                        id: 'fv-1',
-                        fields: {
-                            state_event_id: 'te1',
-                            attribute_id: 'attr-1',
-                            value: 'high',
-                        },
+        await appendLegacyTransition(db, {
+            transitionEventId: 'te1',
+            targetState: 'n-next',
+            fieldValues: [
+                {
+                    id: 'fv-1',
+                    fields: {
+                        state_event_id: 'te1',
+                        attribute_id: 'attr-1',
+                        value: 'high',
                     },
-                ],
-                release: null,
-                transitionAt: nowUtc(),
-            },
-            DEV_TOKEN,
-        );
+                },
+            ],
+            release: null,
+            transitionAt: nowUtc(),
+        });
         const events = await eventsFor(db);
         assert.equal(events.length, 1);
         assert.equal(events[0]!.state, 'n-next');
@@ -179,7 +219,6 @@ test(
             db, 'work-orders/wo1/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
-                fieldValues: [],
                 release: {
                     id: 'rel-1',
                     state: 'claim_released',
@@ -208,7 +247,6 @@ test(
             db, 'work-orders/wo1/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
-                fieldValues: [],
                 release: null,
                 transitionAt: nowUtc(),
             },
@@ -223,44 +261,42 @@ test(
     },
 );
 
+// Task 8: legacy fold validation remains on the below-
+// facade tier (gate rejects the fieldValues key first).
 test(
     'a field value missing attribute_id is a 400 and'
     + ' leaves zero events (gate re-homes store validation)',
     async () => {
         const db = await seededDb();
         // Phase Final Task 2: validateStateFieldValueEntity
-        // runs at the gate (no SFV put remains). A malformed
-        // fold 400s pre-tx — zero events, zero SFV pairs.
+        // runs in the dual-tolerant validator (no SFV put).
+        // A malformed fold 400s pre-tx — zero events.
         await assert.rejects(
-            () => POST(
-                db, 'work-orders/wo1/transition', {
-                    transitionEventId: 'te1',
-                    targetState: 'n-next',
-                    fieldValues: [
-                        {
-                            id: 'fv-1',
-                            fields: {
-                                state_event_id: 'te1',
-                                attribute_id: 'attr-1',
-                                value: 'high',
-                            },
+            () => appendLegacyTransition(db, {
+                transitionEventId: 'te1',
+                targetState: 'n-next',
+                fieldValues: [
+                    {
+                        id: 'fv-1',
+                        fields: {
+                            state_event_id: 'te1',
+                            attribute_id: 'attr-1',
+                            value: 'high',
                         },
-                        {
-                            id: 'fv-2',
-                            fields: {
-                                state_event_id: 'te1',
-                                value: 'low',
-                            },
+                    },
+                    {
+                        id: 'fv-2',
+                        fields: {
+                            state_event_id: 'te1',
+                            value: 'low',
                         },
-                    ],
-                    release: null,
-                    transitionAt: nowUtc(),
-                },
-                DEV_TOKEN,
-            ),
+                    },
+                ],
+                release: null,
+                transitionAt: nowUtc(),
+            }),
             (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 400,
+                err instanceof ValidationError,
         );
         const events = await eventsFor(db);
         assert.equal(events.length, 0);
@@ -285,8 +321,8 @@ test(
                 db, 'work-orders/wo1/transition', {
                     transitionEventId: 'te1',
                     targetState: 'n-next',
-                    fieldValues: [],
                     release: null,
+                    transitionAt: nowUtc(),
                     surprise: true,
                 },
                 DEV_TOKEN,
@@ -302,9 +338,9 @@ test(
 
 // Wire delta (4) — Phase 15 Task 3: a field value whose
 // state_event_id is not THIS transition's own
-// transitionEventId is rejected at the gate (400). The
-// shipped UI always sends the transaction's own id; only a
-// forged client observes this terminal.
+// transitionEventId is rejected. Task 8: pin stays on the
+// below-facade dual-tolerant validator (live gate retires
+// the key first).
 test(
     'a field value with a dangling state_event_id is a 400',
     async () => {
@@ -332,29 +368,24 @@ test(
             DEV_TOKEN,
         );
         await assert.rejects(
-            () => POST(
-                db, 'work-orders/wo1/transition', {
-                    transitionEventId: 'te1',
-                    targetState: 'n-next',
-                    fieldValues: [
-                        {
-                            id: 'fv-1',
-                            fields: {
-                                state_event_id: 'other-event',
-                                attribute_id: 'attr-1',
-                                value: 'high',
-                            },
+            () => appendLegacyTransition(db, {
+                transitionEventId: 'te1',
+                targetState: 'n-next',
+                fieldValues: [
+                    {
+                        id: 'fv-1',
+                        fields: {
+                            state_event_id: 'other-event',
+                            attribute_id: 'attr-1',
+                            value: 'high',
                         },
-                    ],
-                    release: null,
-                    transitionAt: nowUtc(),
-                },
-                DEV_TOKEN,
-            ),
+                    },
+                ],
+                release: null,
+                transitionAt: nowUtc(),
+            }),
             (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 400
-                && typeof err.message === 'string'
+                err instanceof ValidationError
                 && err.message.includes(
                     'state_event_id must equal'
                     + ' transitionEventId',
@@ -371,28 +402,23 @@ test(
     async () => {
         const db = await seededDb();
         await assert.rejects(
-            () => POST(
-                db, 'work-orders/wo1/transition', {
-                    transitionEventId: 'te1',
-                    targetState: 'n-next',
-                    fieldValues: [
-                        {
-                            id: 'fv-1',
-                            fields: {
-                                attribute_id: 'attr-1',
-                                value: 'high',
-                            },
+            () => appendLegacyTransition(db, {
+                transitionEventId: 'te1',
+                targetState: 'n-next',
+                fieldValues: [
+                    {
+                        id: 'fv-1',
+                        fields: {
+                            attribute_id: 'attr-1',
+                            value: 'high',
                         },
-                    ],
-                    release: null,
-                    transitionAt: nowUtc(),
-                },
-                DEV_TOKEN,
-            ),
+                    },
+                ],
+                release: null,
+                transitionAt: nowUtc(),
+            }),
             (err: unknown) =>
-                err instanceof RequestError
-                && err.status === 400
-                && typeof err.message === 'string'
+                err instanceof ValidationError
                 && err.message.includes(
                     'state_event_id must equal'
                     + ' transitionEventId',
@@ -414,7 +440,6 @@ test(
             db, 'work-orders/wo1/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
-                fieldValues: [],
                 release: null,
                 transitionAt: callerAt,
             },
@@ -450,7 +475,6 @@ test(
             db, 'work-orders/wo1/transition', {
                 transitionEventId: 'te1',
                 targetState: 'n-next',
-                fieldValues: [],
                 release: {
                     id: 'rel-1',
                     state: 'claim_released',

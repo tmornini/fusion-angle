@@ -371,8 +371,22 @@ Remaining seams — no client-tier mitigation exists:
   and every caller signature stay put.
 - **In-band credential reveal.** The mock-data seeder returns
   freshly-minted plaintext credentials in-band for a one-time
-  reveal (only PBKDF2 hashes are stored). Demo-only by design;
+  reveal. Domain credentials still store only PBKDF2 hashes;
+  the message plane itself is a separate concern (see
+  **Plaintext credential ledger** below). Demo-only by design;
   the in-band return is deleted at the server tier.
+- **Plaintext credential ledger.** Stored request/response
+  pairs hold the wire bytes verbatim — including every login's
+  password and username, every authorization code, every
+  access/refresh token, every `client_assertion`, and every
+  bearer `Authorization` header on every wired write.
+  `GET /snapshots/schema` (bearer-exempt, `BOOTSTRAP_ROUTES`)
+  exports the whole store, so any downloaded snapshot is a
+  plaintext credential dump. Accepted for the local demo tier;
+  re-gating the snapshot plane and/or re-masking the message
+  plane is a named precondition of the server split. Acting on
+  snapshot-export exposure is out of scope of the verbatim-
+  storage change itself.
 - **client_assertion jti replay.** JWS verification is real
   (below), but no ledger yet remembers a jti as spent, so a
   captured assertion replays until its `exp`. The replay
@@ -390,8 +404,10 @@ Remaining seams — no client-tier mitigation exists:
   exemption MUST be removed or re-gated the moment the
   Postgres server tier lands, when the browser becomes an
   untrusted client and an unauthenticated wipe of a populated
-  tenant store is catastrophic. Until then it is KNOWN and
-  accepted; do not re-raise it.
+  tenant store is catastrophic. Compounded by the plaintext
+  credential ledger above: an unauthenticated snapshot is a
+  full credential dump. Until then it is KNOWN and accepted;
+  do not re-raise it.
 - **Soft-optional PKCE on authorize.** `code_challenge` is
   optional at `/authentication/authorize`; when omitted,
   `grantAuthorizationCode` skips the verifier check so the
@@ -717,7 +733,7 @@ every verb on the shared event-append address; the
 clients elimination re-homes client config to the
 identities/:id/registration pair facet, deletes the last
 entity table, and retires rawReadRow; seed absolute at
-EXPECTED_PAIR_COUNT 1494 / bootstrap 12;
+EXPECTED_PAIR_COUNT 1498 / bootstrap 12;
 `simulateLatency` 4.
 
 ### Two claims (never collapse)

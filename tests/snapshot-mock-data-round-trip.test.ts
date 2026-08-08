@@ -6,8 +6,6 @@ globalThis.localStorage = {
 
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -22,6 +20,7 @@ import { deriveMemberParents } from '../api/derive-members.ts';
 import { deriveIdeas } from '../api/derive-ideas.ts';
 import { deriveProjects } from '../api/derive-projects.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // The snapshot a running app exports must re-import.
 // seed -> getSnapshot -> putSnapshot is the round trip
@@ -33,9 +32,7 @@ test(
     'a seeded snapshot re-imports and keeps an AI'
     + ' member name',
     async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await postMockDataLoad(db);
+        const db = await seededMockDb();
         const ctx = createRequestContext(
             db, await devToken(),
         );
@@ -105,9 +102,7 @@ test(
     'the snapshot round trip derives clean: every derived'
     + ' family reads back identical after wipe and reimport',
     async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        await postMockDataLoad(db);
+        const db = await seededMockDb();
         const ctx = createRequestContext(
             db, await devToken(),
         );

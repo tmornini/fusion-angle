@@ -303,7 +303,6 @@ test(
             'work-orders/' + woId + '/transition', {
                 transitionEventId: 'extra',
                 targetState: 'n-finish',
-                fieldValues: [],
                 release: null,
                 transitionAt: '2030-01-01T00:00:00.000000Z',
             },

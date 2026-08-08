@@ -17,7 +17,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    appendMessagePair, formAuthPair, formWritePair,
+    putMessagePair, formAuthPair, formWritePair,
 } from '../api/message-pair.ts';
 import type { AuthPairSeed } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
@@ -48,12 +48,10 @@ async function freshDb() {
 // Below-facade pair formation, mirroring authorizePassword's OWN
 // storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
 // 's pre-tx lookup scans the '/authentication/authorize/' response
-// family for a stored pair whose (redacted) `code` field
-// fingerprints to the presented code, so a bare pair — the SAME
-// shape a real login forms (Phase 13 Task 9: the authorization_
-// codes row half retired) — is all a seed needs. Every id/field
-// value stays IDENTICAL to the raw puts this replaces — only the
-// write mechanism changes.
+// family for a stored pair whose `code` field equals the presented
+// code, so a bare pair — the SAME shape a real login forms
+// (Phase 13 Task 9: the authorization_codes row half retired) —
+// is all a seed needs.
 async function seedAuthorizationCodePair(
     db: MemoryDbAdapter,
     code: string,
@@ -80,7 +78,7 @@ async function seedAuthorizationCodePair(
     const pair = await formAuthPair(
         seed, requestBody, identityId, 200, { code },
     );
-    await appendMessagePair(db, pair);
+    await putMessagePair(db, pair);
 }
 
 // Below-facade pair formation (the member-fixtures.ts idiom):

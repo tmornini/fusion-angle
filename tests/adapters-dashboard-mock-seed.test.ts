@@ -1,7 +1,5 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
 import { devToken } from './token-fixtures.ts';
@@ -12,7 +10,7 @@ import {
     buildObjectiveAggregates,
 } from
     '../web-app/app/adapters/project-scoring.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
+import { sharedMockDb } from './mock-seed.ts';
 
 // The mock seeder is deterministic; these values
 // are computed from the same hash the seeder runs.
@@ -22,9 +20,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 
 test('mock seed produces portfolio Impact baseline +50',
     async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await postMockDataLoad(db);
+        const db = await sharedMockDb();
         const ctx = createRequestContext(db, await devToken());
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges.find(
@@ -37,9 +33,7 @@ test('mock seed produces portfolio Impact baseline +50',
 
 test('mock seed produces per-objective baseline means',
     async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await postMockDataLoad(db);
+        const db = await sharedMockDb();
         const ctx = createRequestContext(db, await devToken());
         const aggs = buildObjectiveAggregates(
             await getObjectiveScoringInputs(ctx),

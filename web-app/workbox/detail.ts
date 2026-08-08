@@ -8,13 +8,21 @@ import {
 import {
     WorkboxDetailPresenter,
 } from '../app/presenters/index.ts';
-import { log } from '../app/logger.ts';
+import {
+    instanceListItems,
+    INSTANCE_CONFLICT_NOTICE,
+} from '../app/presenters/record-detail.ts';
+import { reportFault } from '../app/error-helpers.ts';
 import { showToast } from '../app/toast.ts';
 import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import { navigateTo } from '../app/core.ts';
+import {
+    navigateTo,
+    handleDialogClick,
+    closeDialog,
+} from '../app/core.ts';
 import {
     getWorkOrder,
     getWorkOrderHistory,
@@ -24,13 +32,14 @@ import {
     getMemberMap,
     postWorkOrderTransition,
     postWorkOrderClaim,
+    postWorkOrderBinding,
     deleteWorkOrderClaim,
     getCurrentHumanMember,
-    createRequestContext,
     sessionContext,
-    generateCryptoSafeBase62,
     getRecordForWorkOrder,
     getRecordAttributesByRecord,
+    getRecordInstance,
+    getRecordInstances,
     subscribeWorkOrderChanges,
     RecordTransitionViolations,
 } from '../app/adapters/index.ts';
@@ -39,7 +48,19 @@ import type {
 } from '../../api/types.ts';
 import type {
     RecordAttribute,
+    RequestContext,
 } from '../app/adapters/index.ts';
+import {
+    RequestError,
+    HTTP_PRECONDITION_FAILED,
+} from '../../api/api.ts';
+
+/* ── Module state ────────── */
+
+// Flow's record type for the unbound bind picker
+// (also equals the binding's type when bound).
+let heldRecordTypeId: string | null = null;
+let conflictNotice: string | null = null;
 
 /* ── Helpers ─────────────── */
 
@@ -86,40 +107,13 @@ function hasEmptyRequiredAttribute(
         });
 }
 
-// A violations failure renders in place — the panel names
-// each blocked rule. Any other fault logs and toasts.
-function reportTransitionFailure(
-    err: unknown,
-    violationsEl: HTMLElement | null,
-    detail: WorkboxDetailPresenter,
-): void {
-    if (
-        err instanceof RecordTransitionViolations
-    ) {
-        if (violationsEl) {
-            setHtml(
-                violationsEl,
-                detail.buildViolations(
-                    err.violations,
-                ),
-            );
-        }
-        return;
-    }
-    log.error(
-        'work order transition failed',
-        'workbox',
-        err,
-    );
-    showToast('Transition failed', 'error');
-}
-
 /* ── Event wiring ────────── */
 
 function initTransitionButtons(
     container: HTMLElement,
     detail: WorkboxDetailPresenter,
-    ctx: ReturnType<typeof createRequestContext>,
+    workOrderId: string,
+    memberId: string,
 ): void {
     const buttons = $$(
         '[data-edge-id]', container,
@@ -150,12 +144,6 @@ function initTransitionButtons(
                     );
                     return;
                 }
-                const fieldValueIds:
-                    Record<string, string> = {};
-                for (const fid of Object.keys(values)) {
-                    fieldValueIds[fid] =
-                        generateCryptoSafeBase62();
-                }
                 const violationsEl = $(
                     '#transition-violations',
                     container,
@@ -163,6 +151,10 @@ function initTransitionButtons(
                 if (violationsEl) {
                     setHtml(violationsEl, html``);
                 }
+                // One vessel per gesture: submit,
+                // 412 recovery GET, re-present share
+                // the same requestId (D8).
+                const ctx = sessionContext();
                 try {
                     await postWorkOrderTransition(
                         ctx,
@@ -171,12 +163,41 @@ function initTransitionButtons(
                                 detail.idValue(),
                             edgeId,
                             values,
-                            fieldValueIds,
                         },
                     );
                 } catch (err) {
-                    reportTransitionFailure(
-                        err, violationsEl, detail,
+                    if (
+                        err instanceof
+                            RecordTransitionViolations
+                    ) {
+                        if (violationsEl) {
+                            setHtml(
+                                violationsEl,
+                                detail.buildViolations(
+                                    err.violations,
+                                ),
+                            );
+                        }
+                        return;
+                    }
+                    if (
+                        err instanceof RequestError
+                        && err.status
+                            === HTTP_PRECONDITION_FAILED
+                    ) {
+                        await recoverFrom412(
+                            container,
+                            workOrderId,
+                            memberId,
+                            ctx,
+                        );
+                        return;
+                    }
+                    reportFault(
+                        ctx,
+                        'Work order transition'
+                        + ' failed',
+                        err,
                     );
                     return;
                 }
@@ -190,10 +211,38 @@ function initTransitionButtons(
     }
 }
 
+async function recoverFrom412(
+    container: HTMLElement,
+    workOrderId: string,
+    memberId: string,
+    ctx: RequestContext,
+): Promise<void> {
+    try {
+        conflictNotice = INSTANCE_CONFLICT_NOTICE;
+        const detail = await loadPresenter(
+            workOrderId,
+            Promise.resolve(memberId),
+            ctx,
+        );
+        renderDetail(
+            container, detail, workOrderId, memberId,
+        );
+        showToast(
+            INSTANCE_CONFLICT_NOTICE,
+            'warning',
+        );
+    } catch (regetErr) {
+        reportFault(
+            ctx,
+            'Failed to refresh work order',
+            regetErr,
+        );
+    }
+}
+
 function initUnclaimButton(
     container: HTMLElement,
     detail: WorkboxDetailPresenter,
-    ctx: ReturnType<typeof createRequestContext>,
 ): void {
     const btn = $(
         '#unclaim-btn', container,
@@ -205,21 +254,16 @@ function initUnclaimButton(
     btn.addEventListener(
         'click',
         async () => {
+            const ctx = sessionContext();
             try {
                 await deleteWorkOrderClaim(
                     ctx, workOrderId,
                 );
             } catch (err) {
-                log.error(
-                    'work order release'
-                    + ' failed',
-                    'workbox',
+                reportFault(
+                    ctx,
+                    'Failed to release work order',
                     err,
-                );
-                showToast(
-                    'Failed to release'
-                    + ' work order',
-                    'error',
                 );
                 return;
             }
@@ -232,18 +276,88 @@ function initUnclaimButton(
     );
 }
 
+function initBindPicker(
+    container: HTMLElement,
+    detail: WorkboxDetailPresenter,
+    workOrderId: string,
+    memberId: string,
+    recordTypeId: string | null,
+): void {
+    container.addEventListener('click', e => {
+        const target = e.target;
+        if (!(target instanceof Element)) return;
+        if (handleDialogClick(target, e)) return;
+    });
+
+    if (recordTypeId === null) return;
+    if (detail.isBound()) return;
+
+    const picks = $$(
+        '[data-instance-pick]', container,
+    );
+    for (const pick of picks) {
+        pick.addEventListener(
+            'click',
+            async () => {
+                const instanceId =
+                    getRequiredAttribute(
+                        pick,
+                        'data-instance-pick',
+                    );
+                const ctx = sessionContext();
+                try {
+                    await postWorkOrderBinding(
+                        ctx,
+                        workOrderId,
+                        instanceId,
+                        recordTypeId,
+                    );
+                } catch (err) {
+                    reportFault(
+                        ctx,
+                        'Failed to bind instance',
+                        err,
+                    );
+                    return;
+                }
+                closeDialog('bind-instance');
+                conflictNotice = null;
+                showToast(
+                    'Instance bound',
+                    'success',
+                );
+                await refreshDetail(
+                    container,
+                    workOrderId,
+                    memberId,
+                );
+            },
+        );
+    }
+}
+
 async function loadPresenter(
     workOrderId: string,
-    currentMemberId: string,
-    ctx: ReturnType<typeof createRequestContext>,
+    currentMemberIdPromise: Promise<string>,
+    ctx: RequestContext,
 ): Promise<WorkboxDetailPresenter> {
-    const workOrder =
-        await getWorkOrder(ctx, workOrderId);
+    // Wave 1: five independent reads (member id is a
+    // settled or in-flight promise from init).
+    const [
+        workOrder, history, memberMap, recordId,
+        currentMemberId,
+    ] = await Promise.all([
+        getWorkOrder(ctx, workOrderId),
+        getWorkOrderHistory(ctx, workOrderId),
+        getMemberMap(ctx),
+        getRecordForWorkOrder(ctx, workOrderId),
+        currentMemberIdPromise,
+    ]);
     // One per-id history read supplies transitions,
-    // field values, and the active claim (DESC wire;
-    // transitionEventsFromHistory sorts ASC).
-    const history =
-        await getWorkOrderHistory(ctx, workOrderId);
+    // historical field values, and the active claim
+    // (DESC wire; transitionEventsFromHistory sorts
+    // ASC). Live form values come from the instance
+    // head when bound.
     const transitions = transitionEventsFromHistory(
         workOrderId, history,
     );
@@ -252,22 +366,87 @@ async function loadPresenter(
     const activeClaim = activeClaimFromHistory(
         history, workOrder.flowGraph.lockTimeout,
     );
-    const [memberMap, recordId] =
+
+    const bound =
+        workOrder.instanceId !== undefined
+        && workOrder.recordTypeId !== undefined
+            ? {
+                instanceId: workOrder.instanceId,
+                recordTypeId:
+                    workOrder.recordTypeId,
+            }
+            : null;
+
+    // Wave 2: attributes ∥ instance head (or picker list).
+    const attributesPromise: Promise<
+        RecordAttribute[]
+    > = recordId === null
+        ? Promise.resolve([])
+        : getRecordAttributesByRecord(ctx, recordId);
+
+    type InstanceWave = {
+        instanceValues:
+            ReadonlyMap<string, string> | null;
+        pickerItems: readonly {
+            readonly id: string;
+            readonly fields: readonly {
+                readonly name: string;
+                readonly value: string;
+            }[];
+        }[];
+        heldTypeId: string | null;
+    };
+
+    const instanceWavePromise: Promise<InstanceWave> =
+        (async (): Promise<InstanceWave> => {
+            if (bound !== null) {
+                // ONE GET for {values, etag}.
+                const instance =
+                    await getRecordInstance(
+                        ctx,
+                        bound.recordTypeId,
+                        bound.instanceId,
+                    );
+                return {
+                    instanceValues: instance.values,
+                    pickerItems: [],
+                    heldTypeId: bound.recordTypeId,
+                };
+            }
+            if (recordId !== null) {
+                const attributes =
+                    await attributesPromise;
+                const instances =
+                    await getRecordInstances(
+                        ctx, recordId,
+                    );
+                return {
+                    instanceValues: null,
+                    pickerItems: instanceListItems(
+                        instances, attributes,
+                    ),
+                    heldTypeId: recordId,
+                };
+            }
+            return {
+                instanceValues: null,
+                pickerItems: [],
+                heldTypeId: recordId,
+            };
+        })();
+
+    const [attributes, instanceWave] =
         await Promise.all([
-            getMemberMap(ctx),
-            getRecordForWorkOrder(ctx, workOrderId),
+            attributesPromise,
+            instanceWavePromise,
         ]);
-    const attributes: RecordAttribute[] =
-        recordId === null
-            ? []
-            : await getRecordAttributesByRecord(
-                ctx, recordId,
-            );
     const attributeMap = new Map(
         attributes.map(
             a => [a.id, a] as const,
         ),
     );
+    heldRecordTypeId = instanceWave.heldTypeId;
+
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
@@ -276,6 +455,10 @@ async function loadPresenter(
         memberMap,
         currentMemberId,
         attributeMap,
+        instanceWave.instanceValues,
+        bound,
+        instanceWave.pickerItems,
+        conflictNotice,
     );
 }
 
@@ -284,7 +467,8 @@ async function loadPresenter(
 function renderDetail(
     container: HTMLElement,
     detail: WorkboxDetailPresenter,
-    ctx: ReturnType<typeof createRequestContext>,
+    workOrderId: string,
+    memberId: string,
 ): void {
     setHtml(container, detail.buildPage());
 
@@ -301,10 +485,18 @@ function renderDetail(
 
     if (!detail.isArchive()) {
         initTransitionButtons(
-            container, detail, ctx,
+            container,
+            detail,
+            workOrderId,
+            memberId,
         );
-        initUnclaimButton(
-            container, detail, ctx,
+        initUnclaimButton(container, detail);
+        initBindPicker(
+            container,
+            detail,
+            workOrderId,
+            memberId,
+            heldRecordTypeId,
         );
     }
 }
@@ -321,17 +513,21 @@ async function refreshDetail(
     let detail: WorkboxDetailPresenter;
     try {
         detail = await loadPresenter(
-            workOrderId, memberId, ctx,
+            workOrderId,
+            Promise.resolve(memberId),
+            ctx,
         );
     } catch (err) {
-        log.error(
-            'work order detail refresh failed',
-            'workbox',
+        reportFault(
+            ctx,
+            'Work order detail refresh failed',
             err,
         );
         return;
     }
-    renderDetail(container, detail, ctx);
+    renderDetail(
+        container, detail, workOrderId, memberId,
+    );
 }
 
 /* ── Init ────────────────── */
@@ -351,9 +547,12 @@ export async function init(
     if (!container) return;
 
     const ctx = sessionContext();
-    const memberRow =
-        await getCurrentHumanMember(ctx);
-    const memberId = memberRow.id;
+    // Start the member-id read immediately so wave 1
+    // of loadPresenter can join it (no unhandled-
+    // rejection window — consumed synchronously below).
+    const currentMemberIdPromise =
+        getCurrentHumanMember(ctx).then(m => m.id);
+    conflictNotice = null;
 
     await loadInto({
         container,
@@ -362,7 +561,7 @@ export async function init(
             let presenter =
                 await loadPresenter(
                     id,
-                    memberId,
+                    currentMemberIdPromise,
                     ctx,
                 );
             const claim =
@@ -376,18 +575,23 @@ export async function init(
                     ctx,
                     id,
                 );
+                // Reuse the settled member-id promise.
                 presenter =
                     await loadPresenter(
                         id,
-                        memberId,
+                        currentMemberIdPromise,
                         ctx,
                     );
             }
             return presenter;
         },
         retry: () => init(params),
-        onData: detail => {
-            renderDetail(container, detail, ctx);
+        onData: async detail => {
+            const memberId =
+                await currentMemberIdPromise;
+            renderDetail(
+                container, detail, id, memberId,
+            );
 
             // Subscribe after the claim-on-load path so
             // the initial notify does not double-render.

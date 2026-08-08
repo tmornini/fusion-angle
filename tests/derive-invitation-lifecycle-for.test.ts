@@ -1,11 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     deriveInvitationStates,
     invitationLifecycleStatesFor,
@@ -14,6 +10,7 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // The Phase 14 Task 1 core: invitationLifecycleStatesFor is the
 // ENTITY-SCOPED sibling of deriveInvitationStates — INDEXED
@@ -44,9 +41,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 async function grant(

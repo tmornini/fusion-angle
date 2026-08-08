@@ -375,6 +375,37 @@ test('postProjectBaselineScoring appends via GET scores',
         }
     });
 
+// Multi-score concurrent PUT: three rows land with
+// distinct ids and one shared `at` (minted once before
+// the fan-out).
+test(
+    'postProjectBaselineScoring lands 3 rows with'
+    + ' distinct ids and one shared at',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        await seedHumanMember(
+            db, 'current', 'Demo User',
+        );
+        const ctx = createRequestContext(
+            db, await devToken(),
+        );
+        await postProjectBaselineScoring(ctx, 'p1', [
+            { objectiveId: 'o1', score: 10 },
+            { objectiveId: 'o2', score: 20 },
+            { objectiveId: 'o3', score: 30 },
+        ]);
+        const rows = await getBaselineScoresForProject(
+            ctx, 'p1',
+        );
+        assert.equal(rows.length, 3);
+        const ids = new Set(rows.map(r => r.id));
+        assert.equal(ids.size, 3);
+        const ats = new Set(rows.map(r => r.at));
+        assert.equal(ats.size, 1);
+    },
+);
+
 test('postProjectActualMeasurement appends via GET scores',
     async () => {
         const db = memoryDbAdapter();

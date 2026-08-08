@@ -4,12 +4,15 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { POST, PUT, handleRequest } from '../api/api.ts';
+import { PUT, handleRequest } from '../api/api.ts';
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
-import { nowUtc } from '../api/types.ts';
+import {
+    nowUtc,
+    SYSTEM_MEMBER_ID,
+} from '../api/types.ts';
 import {
     deriveStateFieldValueReferrers,
 } from '../api/derive-state-field-values.ts';
@@ -17,6 +20,12 @@ import { workOrderHistoryFor } from
     '../api/derive-states.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import {
+    postWorkOrderTransitionOp,
+} from '../api/routes.ts';
+import {
+    formWritePair,
+} from '../api/message-pair.ts';
 
 // Phase Final Task 2: state_field_values dual-write stripped.
 // This file no longer compares derive vs row-plane oracles —
@@ -25,10 +34,12 @@ import { STARK_ORGANIZATION } from
 // assertions. Leaf PUT/DELETE routes retired Phase 15 Task 7;
 // GET states/:id/field-values retired (states-URI elimination
 // C4) — product reads fold field values on work-order
-// history. Live writes ride the transition fold only.
+// history. Task 8 CUT: legacy fieldValues appends stay
+// BELOW the gate (SFV census is STORED-data truth).
 
 const BASE = 'http://localhost';
 const LOCK_TIMEOUT_SECONDS = 300;
+const TRANSITION_PATTERN = 'work-orders/:id/transition';
 
 function req(
     method: string,
@@ -88,28 +99,54 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
+// Task 8: below-facade legacy append — SFV census pins
+// stored fold shape, not the retired live wire.
+async function appendLegacyTransition(
+    db: MemoryDbAdapter,
+    body: Record<string, unknown>,
+): Promise<void> {
+    const pathSegments = [
+        'work-orders', 'wo1', 'transition',
+    ];
+    const pair = await formWritePair({
+        method: 'POST',
+        pathname: '/' + pathSegments.join('/'),
+        routePattern: TRANSITION_PATTERN,
+        routeSegments: TRANSITION_PATTERN.split('/'),
+        pathSegments,
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: STARK_ORGANIZATION,
+        responseStatus: 204,
+        responseBody: undefined,
+    });
+    await postWorkOrderTransitionOp(
+        db, 'wo1', body, SYSTEM_MEMBER_ID,
+        undefined, [], pair,
+    );
+}
+
 test('RESTRICT: deriveStateFieldValueReferrers sees the'
 + ' transition fold; SFV row plane stays empty',
 async () => {
     const db = await seededDb();
 
-    await POST(
-        db, 'work-orders/wo1/transition', {
-            transitionEventId: 'te1',
-            targetState: 'n-next',
-            fieldValues: [{
-                id: 'fv-1',
-                fields: {
-                    state_event_id: 'te1',
-                    attribute_id: 'attr-1',
-                    value: 'high',
-                },
-            }],
-            release: null,
-            transitionAt: nowUtc(),
-        },
-        DEV_TOKEN,
-    );
+    await appendLegacyTransition(db, {
+        transitionEventId: 'te1',
+        targetState: 'n-next',
+        fieldValues: [{
+            id: 'fv-1',
+            fields: {
+                state_event_id: 'te1',
+                attribute_id: 'attr-1',
+                value: 'high',
+            },
+        }],
+        release: null,
+        transitionAt: nowUtc(),
+    });
 
     const derived =
         await deriveStateFieldValueReferrers(
@@ -128,23 +165,20 @@ test('GET work-orders/:id/history wire equals'
 + ' workOrderHistoryFor over a live fold',
 async () => {
     const db = await seededDb();
-    await POST(
-        db, 'work-orders/wo1/transition', {
-            transitionEventId: 'te1',
-            targetState: 'n-next',
-            fieldValues: [{
-                id: 'fv-1',
-                fields: {
-                    state_event_id: 'te1',
-                    attribute_id: 'attr-1',
-                    value: 'high',
-                },
-            }],
-            release: null,
-            transitionAt: nowUtc(),
-        },
-        DEV_TOKEN,
-    );
+    await appendLegacyTransition(db, {
+        transitionEventId: 'te1',
+        targetState: 'n-next',
+        fieldValues: [{
+            id: 'fv-1',
+            fields: {
+                state_event_id: 'te1',
+                attribute_id: 'attr-1',
+                value: 'high',
+            },
+        }],
+        release: null,
+        transitionAt: nowUtc(),
+    });
 
     const token = await organizationToken();
     const res = await handleRequest(
@@ -170,41 +204,38 @@ async () => {
 test('work-order history field_values are id-lex ordered'
 + ' after non-lex transition fold', async () => {
     const db = await seededDb();
-    await POST(
-        db, 'work-orders/wo1/transition', {
-            transitionEventId: 'te-lex',
-            targetState: 'n-next',
-            fieldValues: [
-                {
-                    id: 'fv-z',
-                    fields: {
-                        state_event_id: 'te-lex',
-                        attribute_id: 'attr-1',
-                        value: 'z',
-                    },
+    await appendLegacyTransition(db, {
+        transitionEventId: 'te-lex',
+        targetState: 'n-next',
+        fieldValues: [
+            {
+                id: 'fv-z',
+                fields: {
+                    state_event_id: 'te-lex',
+                    attribute_id: 'attr-1',
+                    value: 'z',
                 },
-                {
-                    id: 'fv-a',
-                    fields: {
-                        state_event_id: 'te-lex',
-                        attribute_id: 'attr-1',
-                        value: 'a',
-                    },
+            },
+            {
+                id: 'fv-a',
+                fields: {
+                    state_event_id: 'te-lex',
+                    attribute_id: 'attr-1',
+                    value: 'a',
                 },
-                {
-                    id: 'fv-m',
-                    fields: {
-                        state_event_id: 'te-lex',
-                        attribute_id: 'attr-1',
-                        value: 'm',
-                    },
+            },
+            {
+                id: 'fv-m',
+                fields: {
+                    state_event_id: 'te-lex',
+                    attribute_id: 'attr-1',
+                    value: 'm',
                 },
-            ],
-            release: null,
-            transitionAt: nowUtc(),
-        },
-        DEV_TOKEN,
-    );
+            },
+        ],
+        release: null,
+        transitionAt: nowUtc(),
+    });
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('GET', '/work-orders/wo1/history', token),

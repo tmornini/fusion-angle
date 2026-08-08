@@ -64,7 +64,12 @@ function transitionFieldValueCandidates(
         for (const transition of operationPairsAt(
             requests, responses, prefix,
         )) {
-            const fieldValues = transition.body['fieldValues'] as
+            // New-shape pairs (no fieldValues bag) contribute
+            // nothing to the legacy SFV census (RESTRICT legs
+            // untouched — history fold owns both shapes).
+            const raw = transition.body['fieldValues'];
+            if (raw === undefined) continue;
+            const fieldValues = raw as
                 readonly TransitionFieldValue[];
             for (const fieldValue of fieldValues) {
                 candidates.push({

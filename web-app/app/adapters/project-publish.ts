@@ -92,6 +92,14 @@ export async function postProjectApproval(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<void> {
+    const [entity, active, scoring] =
+        await Promise.all([
+            ctx.GET<ProjectEntity>(
+                `projects/${projectId}`,
+            ),
+            getActiveObjectives(ctx),
+            getProjectScoring(ctx, projectId),
+        ]);
     const {
         id: _id,
         organization_id: _org,
@@ -99,16 +107,10 @@ export async function postProjectApproval(
         state_at: _stateAt,
         state_event_id: _stateEventId,
         ...fields
-    } = await ctx.GET<ProjectEntity>(
-        `projects/${projectId}`,
-    );
+    } = entity;
     void _state;
     void _stateAt;
     void _stateEventId;
-    const [active, scoring] = await Promise.all([
-        getActiveObjectives(ctx),
-        getProjectScoring(ctx, projectId),
-    ]);
     const v = validateProjectForApproval(
         active, scoring.baseline,
     );
@@ -124,6 +126,12 @@ export async function postProjectArchival(
     ctx: RequestContext,
     projectId: Id,
 ): Promise<void> {
+    const [entity, scoring] = await Promise.all([
+        ctx.GET<ProjectEntity>(
+            `projects/${projectId}`,
+        ),
+        getProjectScoring(ctx, projectId),
+    ]);
     const {
         id: _id,
         organization_id: _org,
@@ -131,15 +139,10 @@ export async function postProjectArchival(
         state_at: _stateAt,
         state_event_id: _stateEventId,
         ...fields
-    } = await ctx.GET<ProjectEntity>(
-        `projects/${projectId}`,
-    );
+    } = entity;
     void _state;
     void _stateAt;
     void _stateEventId;
-    const scoring = await getProjectScoring(
-        ctx, projectId,
-    );
     const v = validateProjectForArchival(
         scoring.baseline, scoring.actual,
     );

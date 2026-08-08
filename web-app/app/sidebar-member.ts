@@ -38,10 +38,10 @@ interface SidebarMember {
 }
 
 async function getSidebarMember(
+    bootOrganizations:
+        readonly OrganizationEntity[] | null = null,
 ): Promise<SidebarMember> {
     const { sessionContext } = await import('./adapters');
-    const { getOrganizations } =
-        await import('./adapters/organizations.ts');
     const ctx = sessionContext();
     // The chip is the caller's own row, drawn from role-independent
     // sources: id + display name from the verified token
@@ -51,13 +51,24 @@ async function getSidebarMember(
     // org context (a 403), so the chip still renders its name
     // while the org line and switcher stay empty. Never call
     // activeOrganization here: it throws without an org claim.
-    let organizations: OrganizationEntity[] = [];
-    try {
-        organizations = await getOrganizations(ctx);
-    } catch (err) {
-        if (!(err instanceof RequestError
-            && err.status === HTTP_FORBIDDEN)) {
-            throw err;
+    // When boot already fetched organizations, pass them down
+    // (identity-scoped pre/post-exchange — no second GET).
+    // Self-fetch only for the null degraded edge.
+    let organizations: readonly OrganizationEntity[] = [];
+    if (bootOrganizations !== null) {
+        organizations = bootOrganizations;
+    } else {
+        try {
+            const { getOrganizations } =
+                await import(
+                    './adapters/organizations.ts'
+                );
+            organizations = await getOrganizations(ctx);
+        } catch (err) {
+            if (!(err instanceof RequestError
+                && err.status === HTTP_FORBIDDEN)) {
+                throw err;
+            }
         }
     }
     const activeOrganizationId =
@@ -79,8 +90,12 @@ async function getSidebarMember(
 }
 
 export async function mutateSidebarMember(
+    bootOrganizations:
+        readonly OrganizationEntity[] | null = null,
 ): Promise<void> {
-    const sidebarMember = await getSidebarMember();
+    const sidebarMember = await getSidebarMember(
+        bootOrganizations,
+    );
     const multiOrganization = shouldShowOrganizationSwitcher(
         sidebarMember.organizations,
     );

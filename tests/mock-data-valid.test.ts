@@ -1,10 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import { deriveMemberParents } from
@@ -77,6 +73,7 @@ import { l2cFlowId } from
     '../api/mock-data/lead-to-close-flow.ts';
 import type { WorkOrderEntity } from
     '../api/types.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Entity validators take Omit<T, 'id'> and reject an extra
 // "id" key, so strip the id before validating each row.
@@ -90,10 +87,7 @@ function withoutId(
 type Validator = (b: Record<string, unknown>) => unknown;
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // Each entry: table name, getAll fn, validator.

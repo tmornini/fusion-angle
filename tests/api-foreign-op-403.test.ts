@@ -173,6 +173,42 @@ test('foreign-org work-order release is 403', async () => {
     });
 });
 
+test('foreign-org work-order transition is 403', async () => {
+    const db = await twoOrganizationDb();
+    const tokenA = await organizationToken(
+        'current', ORGANIZATION_A,
+    );
+    const tokenB = await organizationToken(
+        'current', ORGANIZATION_B,
+    );
+    const created = await handleRequest(db, req(
+        'PUT', '/work-orders/wo-foreign-tx', tokenA, {
+            display_id: 'ijkl',
+            flow_graph: graphJson(),
+            position: 3,
+        },
+    ));
+    assert.equal(created.status, 200);
+
+    const foreign = await handleRequest(db, req(
+        'POST',
+        '/work-orders/wo-foreign-tx/transition',
+        tokenB,
+        {
+            transitionEventId: generateCryptoSafeBase62(),
+            targetState: 'n-next',
+            release: null,
+            transitionAt: nowUtc(),
+        },
+    ));
+    assert.equal(foreign.status, 403);
+    assert.deepEqual(await foreign.json(), {
+        error:
+            'forbidden: work_orders/wo-foreign-tx belongs'
+            + ' to a different organization',
+    });
+});
+
 test('foreign-org flow undo is 403', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken(

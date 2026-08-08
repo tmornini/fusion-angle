@@ -426,25 +426,24 @@ async function grantInvitation(
     const identityId = match.id;
     // The stored request body substitutes the resolved
     // identity_id for the raw email — a non-PII join reference
-    // the invitation row and document already store openly. The
-    // requestHash (below, via formWritePair) derives from this
-    // STORED body, and the whole stored plane keys request
-    // identity on it: the pre-tx fold (storedResponseFor), the
-    // in-tx dedup (appendMessagePair), and the final
-    // storedPairResponse read all key off it. A bare strip of
-    // `email` (message-redaction.ts's PII strip arm) would
-    // collapse two different invitees' grants — same minted
-    // invitationId/grantEventId/grantAt, different email — onto
-    // ONE hash, and the fold/dedup/final-read chain would then
-    // hand the SECOND caller the FIRST caller's stored response.
-    // Substituting identity_id restores hash distinctness by
-    // construction: a different invitee is a different stored
-    // body, hence a different hash; the SAME email still
-    // resolves to the SAME identity_id, so a genuine byte-
-    // identical retry still folds everywhere. The WIRE body is
-    // untouched (storage-only) — the same sanctioned stored !=
-    // wire class the auth pairs already ship (their stored
-    // bodies carry PBKDF2 fingerprints the wire never carried).
+    // the invitation row and document already store openly.
+    // deriveDocumentsAt builds document bodies from the STORED
+    // request message, and the invitations derive reads
+    // identity_id from that body; without this substitution the
+    // invitations plane throws on every derived row. The same
+    // substitution also restores hash distinctness on its own
+    // authority: the requestHash (below, via formWritePair)
+    // derives from this STORED body, and the whole stored plane
+    // keys request identity on it (pre-tx fold via
+    // storedResponseFor, in-tx dedup via appendMessagePair, and
+    // the final storedPairResponse read). Two different
+    // invitees — same minted invitationId/grantEventId/grantAt,
+    // different email — become different identity_id values and
+    // therefore different hashes; the SAME email still resolves
+    // to the SAME identity_id, so a genuine byte-identical
+    // retry still folds everywhere. The WIRE body is untouched
+    // (storage-only). This is the sole remaining stored != wire
+    // site on the write plane.
     const storedBody: Record<string, unknown> = { ...body };
     delete storedBody.email;
     storedBody.identity_id = identityId;

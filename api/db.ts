@@ -248,6 +248,15 @@ export interface DbAdapter extends DbLifecycle, DbStores {
         tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
+    // Pure-read sibling of `transaction`. IndexedDB can run
+    // concurrent readonly scopes; the memory tier still
+    // serializes for Node determinism. Nested
+    // `readTransaction` joins whatever mode is open so
+    // read-your-writes stays intact.
+    readTransaction<R>(
+        tables: readonly string[],
+        fn: (view: DbAdapter) => Promise<R>,
+    ): Promise<R>;
 }
 
 // The unfenced tier: same stores as DbAdapter. Phase Final
@@ -259,6 +268,10 @@ export interface GuardedDbAdapter
     extends DbLifecycle, DbStores
 {
     transaction<R>(
+        tables: readonly string[],
+        fn: (view: GuardedDbAdapter) => Promise<R>,
+    ): Promise<R>;
+    readTransaction<R>(
         tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
     ): Promise<R>;

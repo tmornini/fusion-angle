@@ -115,7 +115,6 @@ async function transitionWorkOrder(
     await ctx.POST(`work-orders/${workOrderId}/transition`, {
         transitionEventId: eventId,
         targetState,
-        fieldValues: [],
         release: null,
         transitionAt: at,
     });

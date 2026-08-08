@@ -29,7 +29,6 @@ import {
 } from '../app/core.ts';
 import {
     Project,
-    getProject,
     getProjectEntity,
     projectStateDetailFromRow,
     ProjectView,
@@ -127,22 +126,38 @@ const isFieldKey = makeFieldKeyValidator(FIELDS);
 // entity + state detail beside the view. Lifecycle trio is
 // stamped on the ProjectEntity GET row — map via
 // projectStateDetailFromRow; no second states hop.
-async function loadProjectView(
-    projectId: string,
-    ctx: RequestContext,
-): Promise<{
+interface ProjectDetailData {
     view: ProjectView;
     entity: ProjectEntity;
     detail: ProjectStateDetail;
-}> {
+    flows: FlowListItem[];
+    active: Awaited<
+        ReturnType<typeof getActiveObjectives>
+    >;
+    scoring: Awaited<
+        ReturnType<typeof getProjectScoring>
+    >;
+}
+
+async function loadProjectDetailData(
+    projectId: string,
+    ctx: RequestContext,
+): Promise<ProjectDetailData> {
+    // One wave: entity + objectives + scoring + flows
+    // + active. Drop the wrapper getProject (verbatim
+    // getProjectEntity + Project); pass view.stateValue().
     const [
         entity,
         objectives,
         scoring,
+        flows,
+        active,
     ] = await Promise.all([
         getProjectEntity(ctx, projectId),
         getObjectives(ctx),
         getProjectScoring(ctx, projectId),
+        getFlowsByProject(ctx, projectId),
+        getActiveObjectives(ctx),
     ]);
     const detail = projectStateDetailFromRow(entity);
     const view = new ProjectView(
@@ -151,7 +166,33 @@ async function loadProjectView(
         scoring.baseline,
         scoring.actual,
     );
-    return { view, entity, detail };
+    return {
+        view, entity, detail, flows, active, scoring,
+    };
+}
+
+async function refreshProjectDetail(
+): Promise<void> {
+    if (
+        !state
+        || !pageContainer
+        || currentProjectId === null
+    ) {
+        return;
+    }
+    const ctx = sessionContext();
+    const data = await loadProjectDetailData(
+        currentProjectId, ctx,
+    );
+    state = {
+        kind: 'reading',
+        view: data.view,
+        entity: data.entity,
+        detail: data.detail,
+        flows: data.flows,
+    };
+    rerender();
+    await paintActionBarAndObjectives(data);
 }
 
 function buildPresenter():
@@ -209,18 +250,12 @@ export async function init(
         container, buildSkeleton('detail', 4),
     );
 
-    let project: {
-        view: ProjectView;
-        entity: ProjectEntity;
-        detail: ProjectStateDetail;
-    };
-    let flows: FlowListItem[];
+    let data: ProjectDetailData;
     try {
         const ctx = sessionContext();
-        [project, flows] = await Promise.all([
-            loadProjectView(projectId, ctx),
-            getFlowsByProject(ctx, projectId),
-        ]);
+        data = await loadProjectDetailData(
+            projectId, ctx,
+        );
     } catch (err) {
         log.error(
             'project detail load failed',
@@ -246,72 +281,24 @@ export async function init(
 
     state = {
         kind: 'reading',
-        view: project.view,
-        entity: project.entity,
-        detail: project.detail,
-        flows,
+        view: data.view,
+        entity: data.entity,
+        detail: data.detail,
+        flows: data.flows,
     };
     buildPresenter().renderShell(container);
 
-    subscribeProjectChanges(async () => {
-        if (!state || !pageContainer) {
-            return;
-        }
-        const ctx = sessionContext();
-        const [upd, updFlows] =
-            await Promise.all([
-                loadProjectView(projectId, ctx),
-                getFlowsByProject(ctx, projectId),
-            ]);
-        state = {
-            kind: 'reading',
-            view: upd.view,
-            entity: upd.entity,
-            detail: upd.detail,
-            flows: updFlows,
-        };
-        rerender();
-        void renderActionBarAndObjectives();
-    });
+    subscribeProjectChanges(
+        () => void refreshProjectDetail(),
+    );
+    subscribeProjectScoreChanges(
+        () => void refreshProjectDetail(),
+    );
+    subscribeObjectiveChanges(
+        () => void refreshProjectDetail(),
+    );
 
-    subscribeProjectScoreChanges(async () => {
-        if (!state || !pageContainer) return;
-        const ctx = sessionContext();
-        const [upd, updFlows] =
-            await Promise.all([
-                loadProjectView(projectId, ctx),
-                getFlowsByProject(ctx, projectId),
-            ]);
-        state = {
-            kind: 'reading',
-            view: upd.view,
-            entity: upd.entity,
-            detail: upd.detail,
-            flows: updFlows,
-        };
-        rerender();
-        void renderActionBarAndObjectives();
-    });
-    subscribeObjectiveChanges(async () => {
-        if (!state || !pageContainer) return;
-        const ctx = sessionContext();
-        const [upd, updFlows] =
-            await Promise.all([
-                loadProjectView(projectId, ctx),
-                getFlowsByProject(ctx, projectId),
-            ]);
-        state = {
-            kind: 'reading',
-            view: upd.view,
-            entity: upd.entity,
-            detail: upd.detail,
-            flows: updFlows,
-        };
-        rerender();
-        void renderActionBarAndObjectives();
-    });
-
-    await renderActionBarAndObjectives();
+    await paintActionBarAndObjectives(data);
 
     const onActionClick = async (
         e: Event,
@@ -771,17 +758,19 @@ async function handleNewFlowSubmit(
     });
 }
 
-async function renderActionBarAndObjectives(
+// Paint the action bar + objectives section from already-
+// held rows. Only getCurrentObjectiveDefinitions is a
+// dependent follow-up fetch (needs active objective ids).
+async function paintActionBarAndObjectives(
+    data: Pick<
+        ProjectDetailData,
+        'view' | 'active' | 'scoring'
+    >,
 ): Promise<void> {
     const pid = currentProjectId;
     if (!pid) return;
     const ctx = sessionContext();
-    const [project, active, scoring] =
-        await Promise.all([
-            getProject(ctx, pid),
-            getActiveObjectives(ctx),
-            getProjectScoring(ctx, pid),
-        ]);
+    const { active, scoring, view } = data;
     const defs =
         await getCurrentObjectiveDefinitions(
             ctx, active.map(o => o.id),
@@ -805,8 +794,9 @@ async function renderActionBarAndObjectives(
         Array.from(defs.entries())
             .map(([id, def]) => [id, def.name]),
     );
+    const stateValue = view.stateValue();
     const actionBar = new ProjectActionBarPresenter(
-        pid, project.stateValue(),
+        pid, stateValue,
         approvalCheck, archivalCheck,
         objectiveNames,
     );
@@ -829,7 +819,7 @@ async function renderActionBarAndObjectives(
 
     const objSection = new ProjectObjectivesPresenter(
         active, defs, latestBaselines, latestActuals,
-        project.stateValue(),
+        stateValue,
     );
     const objEl =
         $('#project-objectives-section', document);
@@ -891,16 +881,21 @@ async function handleSaveObjectives(
         }
     });
     const ctx = sessionContext();
-    if (baselineMoves.length > 0) {
-        await postProjectBaselineScoring(
-            ctx, projectId, baselineMoves,
-        );
-    }
-    if (actualMoves.length > 0) {
-        await postProjectActualMeasurement(
-            ctx, projectId, actualMoves,
-        );
-    }
+    // Disjoint payloads; Promise.all keeps baselineAt <
+    // actualAt via the same-ms sequence counter when both
+    // fire in the same tick.
+    await Promise.all([
+        baselineMoves.length > 0
+            ? postProjectBaselineScoring(
+                ctx, projectId, baselineMoves,
+            )
+            : Promise.resolve(),
+        actualMoves.length > 0
+            ? postProjectActualMeasurement(
+                ctx, projectId, actualMoves,
+            )
+            : Promise.resolve(),
+    ]);
 }
 
 function openApproveConfirmation(): void {
@@ -933,20 +928,23 @@ async function openHistoryModal(
     ctx: RequestContext,
     projectId: string,
 ): Promise<void> {
-    const scoring = await getProjectScoring(
-        ctx, projectId,
-    );
+    // Wave 1: scoring + archivals + member map.
+    const [scoring, allArchivals, memberMap] =
+        await Promise.all([
+            getProjectScoring(ctx, projectId),
+            getObjectiveArchivalEvents(ctx),
+            getMemberMap(ctx),
+        ]);
     const baselineObjIds = new Set(
         scoring.baseline.map(b => b.objectiveId),
     );
     for (const a of scoring.actual) {
         baselineObjIds.add(a.objectiveId);
     }
-    const allArchivals =
-        await getObjectiveArchivalEvents(ctx);
     const archivals = allArchivals.filter(
         d => baselineObjIds.has(d.objectiveId),
     );
+    // Wave 2: revisions need the scoring-derived ids.
     const revsByObj =
         await getObjectiveRevisionsByObjective(
             ctx, Array.from(baselineObjIds),
@@ -975,7 +973,6 @@ async function openHistoryModal(
             description: eligible[0]!.description,
         };
     };
-    const memberMap = await getMemberMap(ctx);
     const presenter =
         new ProjectScoreHistoryPresenter(
             scoring.baseline, scoring.actual,

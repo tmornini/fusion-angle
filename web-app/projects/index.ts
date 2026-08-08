@@ -65,7 +65,18 @@ export async function init(): Promise<void> {
     await loadInto({
         container: listEl,
         skeleton: buildSkeleton('card-list', 4),
-        fetch: () => getProjects(ctx),
+        // Match the refresh idiom: projects + scores in
+        // one wave. Return Project[] so the empty-state
+        // arc still sees an empty list as empty.
+        fetch: async () => {
+            const [projects, scores] =
+                await Promise.all([
+                    getProjects(ctx),
+                    loadScoreMap(ctx),
+                ]);
+            scoreMap = scores;
+            return projects;
+        },
         retry: init,
         emptyState: {
             icon: iconFolderKanban(ICON_SIZE['2xl'], ''),
@@ -88,7 +99,10 @@ async function onProjectsLoaded(
     listEl: HTMLElement,
     ctx: ReturnType<typeof createRequestContext>,
 ): Promise<void> {
-    scoreMap = await loadScoreMap(ctx);
+    // scoreMap already filled by the boot fetch wave.
+    // ctx is retained for the drag-reorder / subscriber
+    // wiring below that still needs a live context.
+    void ctx;
 
     projectState =
         buildInitialProjectListState(projects);

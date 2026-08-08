@@ -1,10 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
 import { deriveIdentityPiiRows } from
@@ -17,6 +13,7 @@ import {
 } from '../api/invitations-domain.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase 15 gate 6 parity pins: the re-homes that close
 // Author gate 6 for the exit census.
@@ -48,9 +45,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // Phase Final Task 2: invitations ROW half stripped — the

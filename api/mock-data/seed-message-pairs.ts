@@ -139,7 +139,10 @@ import {
     formWritePair,
 } from '../message-pair.ts';
 import type { MessagePair } from '../message-pair.ts';
-import { HTTP_NO_CONTENT } from '../http-errors.ts';
+import {
+    HTTP_NO_CONTENT,
+    HTTP_OK,
+} from '../http-errors.ts';
 import {
     WRITE_RESPONSE_SPECS,
     flowCreateDocumentBody,
@@ -160,9 +163,13 @@ import {
 } from '../validators.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
+    INSTANCE_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../family-registry.ts';
+import {
+    mergeInstanceValues,
+} from '../derive-record-instances.ts';
 import {
     MOCK_SEED_TIMESTAMP,
     STARK_ORGANIZATION,
@@ -487,10 +494,11 @@ export const recordStateEvents: StateEntity[] = [
 // work order's own trace events — its Review transition's Data
 // Capture intake fields, plus one reviewer note on its Complete
 // transition. Attribute ids are customerProfileRecordId's Data
-// Capture / Review record-attribute ids (records.ts). States-
-// address retirement Task 12: no longer forms its own leaf
-// pairs — seedFieldValuesFor folds these into the parent
-// transition bodies' fieldValues (WO01 Review 6 + Complete 1).
+// Capture / Review record-attribute ids (records.ts). WO-instance
+// SoT (Task 6): WO01's two value-bearing transitions ride the
+// new-shape set[] + instance revision chain; seedSetFor maps
+// these rows (fv row ids retire — new-shape ids are attribute
+// ids). Other transitions keep legacy fieldValues forever.
 const fCompanyName = '5JZ0LeKdPCa4QMtg1RsF1M';
 const fEmail = 'nplTIh0qXNtAyoWSwRaBYe';
 const fPhone = 'kzHpMw9f1thq79VoBYeIX3';
@@ -499,46 +507,67 @@ const fRevenue = '0TyjQRcygn3DIyXTe6x1F6';
 const fEmployees = '8Z62tcRHBpwCRH1kBffx0G';
 const fReviewerNotes = 'AdQlKf43JV6yrhQbyskDkR';
 
+// WO01 Review / Complete event ids — the only value-bearing
+// seed transitions (formInstanceChainPairs + transitionSeedBody
+// value-branch). Dropped from the op-driven loop to avoid
+// double-append.
+export const WO01_REVIEW_EVENT_ID =
+    'eJEybxfXaf3sjwFilZnunU';
+export const WO01_COMPLETE_EVENT_ID =
+    'C2xb2bbjyHD11WfLayh8Om';
+export const VALUE_BEARING_TRANSITION_EVENT_IDS:
+    ReadonlySet<string> = new Set([
+        WO01_REVIEW_EVENT_ID,
+        WO01_COMPLETE_EVENT_ID,
+    ]);
+
+// Seeded Customer-Profile instance bound to WO01.
+export const SEED_INSTANCE_ID =
+    'inst01W001CustProfAcme1';
+export const SEED_RECORD_TYPE_ID =
+    customerProfileRecordId;
+export const WO01_ID = 'wg25b0R2gwy5kYPIhQB6cS';
+
 export const mockStateFieldValues: StateFieldValueEntity[] = [
     {
         id: '4izDJCuygAL7iqjeHdephl',
-        state_event_id: 'eJEybxfXaf3sjwFilZnunU',
+        state_event_id: WO01_REVIEW_EVENT_ID,
         attribute_id: fCompanyName,
         value: 'Acme Corp',
     },
     {
         id: 'NBmVbZMOWPSMZ11zhTpzEQ',
-        state_event_id: 'eJEybxfXaf3sjwFilZnunU',
+        state_event_id: WO01_REVIEW_EVENT_ID,
         attribute_id: fEmail,
         value: 'onboard@acme.com',
     },
     {
         id: 'lxSMfOtoXk89FTuxLj895r',
-        state_event_id: 'eJEybxfXaf3sjwFilZnunU',
+        state_event_id: WO01_REVIEW_EVENT_ID,
         attribute_id: fPhone,
         value: '+1-555-0100',
     },
     {
         id: 'F8Cagh2PlkwHakidXqGEXq',
-        state_event_id: 'eJEybxfXaf3sjwFilZnunU',
+        state_event_id: WO01_REVIEW_EVENT_ID,
         attribute_id: fIndustry,
         value: 'Technology',
     },
     {
         id: '57xrfe07Pqj38qvutRJk2N',
-        state_event_id: 'eJEybxfXaf3sjwFilZnunU',
+        state_event_id: WO01_REVIEW_EVENT_ID,
         attribute_id: fRevenue,
         value: '5000000',
     },
     {
         id: 'juYwNY2S35qCJqT3SAnwyW',
-        state_event_id: 'eJEybxfXaf3sjwFilZnunU',
+        state_event_id: WO01_REVIEW_EVENT_ID,
         attribute_id: fEmployees,
         value: '250',
     },
     {
         id: 'vtXOj3CjsGIYGlnds0FSJd',
-        state_event_id: 'C2xb2bbjyHD11WfLayh8Om',
+        state_event_id: WO01_COMPLETE_EVENT_ID,
         attribute_id: fReviewerNotes,
         value: 'Approved. Strong fit.',
     },
@@ -931,13 +960,27 @@ export function flowWorkOrderJoinSeedBody(
 
 // The live POST work-orders/:id/transition body this SAME
 // historical event would have carried: 1:1 field mapping, no
-// invention. fieldValues is empty except WO01's Review (6)
-// and Complete (1) events, which carry the folded old leaf
-// values; release is null — traces never released claims
-// (zero seeded claim events).
+// invention. Split: WO01's two value-bearing events (Review 6
+// + Complete 1) emit the NEW instance-head shape (set from
+// seedSetFor; fv row ids retire); every other transition keeps
+// the LEGACY fieldValues body forever (event fidelity; empty
+// bags on pure moves). release is null — traces never released
+// claims (zero seeded claim events).
 export function transitionSeedBody(
     event: StateEntity,
 ): Record<string, unknown> {
+    const set = seedSetFor(event.id);
+    if (set.length > 0) {
+        return {
+            transitionEventId: event.id,
+            targetState: event.state,
+            instance_id: SEED_INSTANCE_ID,
+            record_type_id: SEED_RECORD_TYPE_ID,
+            set,
+            release: null,
+            transitionAt: event.at,
+        };
+    }
     return {
         transitionEventId: event.id,
         targetState: event.state,
@@ -945,6 +988,20 @@ export function transitionSeedBody(
         release: null,
         transitionAt: event.at,
     };
+}
+
+// New-shape set rows: attribute_id + value only (no fv row
+// id). Source rows stay in mockStateFieldValues for one
+// construction voice with the legacy map.
+export function seedSetFor(
+    stateEventId: Id,
+): { attribute_id: string; value: string }[] {
+    return mockStateFieldValues
+        .filter((fv) => fv.state_event_id === stateEventId)
+        .map((fv) => ({
+            attribute_id: fv.attribute_id,
+            value: fv.value,
+        }));
 }
 
 function seedFieldValuesFor(
@@ -1668,13 +1725,23 @@ export function buildMockDataInvocations():
     // ops: the creation gate's exact-3 'claimed'-slot
     // semantics do not match historical traces (zero seeded
     // claim events; the in-flight fixtures are 2- and
-    // 3-event). WO01's Review/Complete events carry the folded
-    // field values (mockStateFieldValues below).
+    // 3-event). WO-instance SoT Task 6: WO01's two value-
+    // bearing events leave this loop — formInstanceChainPairs
+    // forms their NEW-shape ops + revision pairs (and the
+    // instance genesis + binding) so they are not double-
+    // appended.
     const traceEvents = [
         ...workOrderStateEvents,
         ...leadToCloseWorkload.stateEvents,
     ];
     for (const event of traceEvents) {
+        if (
+            VALUE_BEARING_TRANSITION_EVENT_IDS.has(
+                event.id,
+            )
+        ) {
+            continue;
+        }
         invocations.push({
             key: seedPairKey(
                 'work-orders/:id/transition', event.id,
@@ -2112,10 +2179,227 @@ async function formDefaultOrganizationSeedPair(
     });
 }
 
+// The instance chain cannot ride formSeedPair: its
+// revisions have predecessors (follows) and its head
+// depends on (at, id) order — so this pass mints
+// DISTINCT ascending requestAt values (a named
+// deviation from the seed's shared-arrival-moment
+// covenant) and forms sequentially, capturing each
+// pair id for the next link's follows. headerFields
+// stays [] for every link — the seed's no-bearer
+// carve-out extends to If-Match on seed revision pairs
+// (never hoist If-Match onto synthetic revisions; the
+// wire op pair's hoisted If-Match is what makes resends
+// distinct messages on the live path).
+export async function formInstanceChainPairs():
+    Promise<ReadonlyMap<string, MessagePair>>
+{
+    const events = buildWorkOrderStateEvents();
+    const review = events.find(
+        (event) => event.id === WO01_REVIEW_EVENT_ID,
+    )!;
+    const complete = events.find(
+        (event) => event.id === WO01_COMPLETE_EVENT_ID,
+    )!;
+    // Review at minus one hour — genesis + binding share
+    // this hour; instance revision requestAt values stay
+    // strictly ascending with their parent transitions.
+    const genesisAt = daysFromNow(-13, 13, 30);
+    const reviewAt = review.at;
+    const completeAt = complete.at;
+    const org = STARK_ORGANIZATION;
+    const typeId = SEED_RECORD_TYPE_ID;
+    const instanceId = SEED_INSTANCE_ID;
+    const woId = review.entity_id;
+    const instanceRouteSegments =
+        INSTANCE_DETAIL_PATTERN.split('/');
+    const instancePathSegments = [
+        'organizations', org,
+        'record-types', typeId,
+        'instances', instanceId,
+    ];
+    const instancePathname =
+        '/' + instancePathSegments.join('/');
+
+    const genesis = await formWritePair({
+        method: 'PUT',
+        pathname: instancePathname,
+        routePattern: INSTANCE_DETAIL_PATTERN,
+        routeSegments: instanceRouteSegments,
+        pathSegments: instancePathSegments,
+        headerFields: [],
+        body: { set: [] },
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: genesisAt,
+        organization: org,
+        responseStatus: HTTP_OK,
+        responseBody: {
+            id: instanceId,
+            organization_id: org,
+            record_type_id: typeId,
+            set: [],
+        },
+        headPairId: undefined,
+    });
+
+    const binding = await formWritePair({
+        method: 'POST',
+        pathname:
+            '/work-orders/' + woId + '/binding',
+        routePattern: 'work-orders/:id/binding',
+        routeSegments: [
+            'work-orders', ':id', 'binding',
+        ],
+        pathSegments: [
+            'work-orders', woId, 'binding',
+        ],
+        headerFields: [],
+        body: {
+            instance_id: instanceId,
+            record_type_id: typeId,
+        },
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: genesisAt,
+        organization: org,
+        responseStatus: HTTP_NO_CONTENT,
+        responseBody: undefined,
+        headPairId: undefined,
+    });
+
+    const reviewOp = await formWritePair({
+        method: 'POST',
+        pathname:
+            '/work-orders/' + woId + '/transition',
+        routePattern: 'work-orders/:id/transition',
+        routeSegments: [
+            'work-orders', ':id', 'transition',
+        ],
+        pathSegments: [
+            'work-orders', woId, 'transition',
+        ],
+        headerFields: [],
+        body: transitionSeedBody(review),
+        requesterIdentityId: review.member_id,
+        requestAt: reviewAt,
+        organization: org,
+        responseStatus: HTTP_NO_CONTENT,
+        responseBody: undefined,
+        headPairId: undefined,
+    });
+
+    const reviewSet = seedSetFor(review.id);
+    const reviewValues = mergeInstanceValues(
+        [], { set: reviewSet },
+    );
+    const reviewRevision = await formWritePair({
+        method: 'PUT',
+        pathname: instancePathname,
+        routePattern: INSTANCE_DETAIL_PATTERN,
+        routeSegments: instanceRouteSegments,
+        pathSegments: instancePathSegments,
+        headerFields: [],
+        body: { values: reviewValues },
+        requesterIdentityId: review.member_id,
+        requestAt: reviewAt,
+        organization: org,
+        responseStatus: HTTP_OK,
+        responseBody: {},
+        headPairId: undefined,
+        follows: genesis.id,
+    });
+
+    const completeOp = await formWritePair({
+        method: 'POST',
+        pathname:
+            '/work-orders/' + woId + '/transition',
+        routePattern: 'work-orders/:id/transition',
+        routeSegments: [
+            'work-orders', ':id', 'transition',
+        ],
+        pathSegments: [
+            'work-orders', woId, 'transition',
+        ],
+        headerFields: [],
+        body: transitionSeedBody(complete),
+        requesterIdentityId: complete.member_id,
+        requestAt: completeAt,
+        organization: org,
+        responseStatus: HTTP_NO_CONTENT,
+        responseBody: undefined,
+        headPairId: undefined,
+    });
+
+    const completeSet = seedSetFor(complete.id);
+    const completeValues = mergeInstanceValues(
+        reviewValues, { set: completeSet },
+    );
+    const completeRevision = await formWritePair({
+        method: 'PUT',
+        pathname: instancePathname,
+        routePattern: INSTANCE_DETAIL_PATTERN,
+        routeSegments: instanceRouteSegments,
+        pathSegments: instancePathSegments,
+        headerFields: [],
+        body: { values: completeValues },
+        requesterIdentityId: complete.member_id,
+        requestAt: completeAt,
+        organization: org,
+        responseStatus: HTTP_OK,
+        responseBody: {},
+        headPairId: undefined,
+        follows: reviewRevision.id,
+    });
+
+    const pairs = new Map<string, MessagePair>();
+    pairs.set(
+        seedPairKey(
+            INSTANCE_DETAIL_PATTERN, instanceId,
+        ),
+        genesis,
+    );
+    pairs.set(
+        seedPairKey(
+            'work-orders/:id/binding', woId,
+        ),
+        binding,
+    );
+    pairs.set(
+        seedPairKey(
+            'work-orders/:id/transition', review.id,
+        ),
+        reviewOp,
+    );
+    pairs.set(
+        seedPairKey(
+            INSTANCE_DETAIL_PATTERN,
+            instanceId + '-review',
+        ),
+        reviewRevision,
+    );
+    pairs.set(
+        seedPairKey(
+            'work-orders/:id/transition',
+            complete.id,
+        ),
+        completeOp,
+    );
+    pairs.set(
+        seedPairKey(
+            INSTANCE_DETAIL_PATTERN,
+            instanceId + '-complete',
+        ),
+        completeRevision,
+    );
+    return pairs;
+}
+
 // Pass 1 for postMockDataLoad: every op-invocation's pair,
 // formed BEFORE the seed's transaction opens. `requestAt` is
 // minted once by the caller (the seed's arrival moment) and
-// shared by every pair this seed forms.
+// shared by every pair this seed forms — except the instance
+// chain (formInstanceChainPairs), which mints its own
+// ascending requestAt values so instance-head order is
+// deterministic.
 export async function formMockDataMessagePairs(
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {
@@ -2138,6 +2422,13 @@ export async function formMockDataMessagePairs(
                 requestAt,
             ),
         );
+    }
+    // WO-instance SoT Task 6: instance genesis + binding +
+    // Review/Complete new-shape ops and revision pairs.
+    for (const [key, pair] of
+        await formInstanceChainPairs()
+    ) {
+        pairs.set(key, pair);
     }
     return pairs;
 }

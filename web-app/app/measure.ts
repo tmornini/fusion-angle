@@ -48,11 +48,14 @@ import {
     formatRequestProfileReport,
     type ApiRequestHit,
 } from './measure-profile-core.ts';
+import {
+    DEFAULT_RUNS,
+    finalizeMeasureCli,
+} from './measure-cli.ts';
 
 const execFile = promisify(execFileCb);
 
 const DEMO_EMAIL = 'demo@example.com';
-const DEFAULT_RUNS = 5;
 const DEFAULT_BUDGET_SIGMAS = 1.5;
 const CHROME_READY_MS = 15_000;
 const SEED_TIMEOUT_MS = 120_000;
@@ -101,39 +104,53 @@ function usageText(): string {
         '',
         'Page-load benchmark via headless Chrome + CDP.',
         'Stats drop the top and bottom 5% of samples',
-        '(floor(n×0.05) per tail; n < 20 keeps all).',
+        '(floor(n×0.05) per tail; n=25 drops one each).',
+        '',
+        'Bare ./measure is the full ceremony: --record',
+        '--write-budgets --runs 25 --visualize over the',
+        'full PAGE_REGISTRY (clean tree required).',
         '',
         'Options:',
         '  --check              Fail if medians exceed',
         '                       budgets',
         '  --record             Append a history line',
         '                       under measurements/',
+        '                       (full registry only;',
+        '                       omit --pages)',
         '  --write-budgets      Write mean+kσ budgets',
         '                       (full registry only)',
         '  --budget-sigmas N    σ multiplier for',
         '                       --write-budgets',
         `                       (default ${DEFAULT_BUDGET_SIGMAS})`,
         '  --pages a,b,c        Subset of PAGE_REGISTRY',
-        '                       keys',
+        '                       keys (not with --record',
+        '                       or --write-budgets)',
         '  --runs N             Runs per page',
         `                       (default ${DEFAULT_RUNS})`,
         '  --visualize          Write measurements/',
         '                       index.html from disk',
-        '                       history (bare = no',
+        '                       history (alone = no',
         '                       Chrome; with a run,',
         '                       regenerate after)',
-        '  --profile            Print API request counts',
-        '                       + page-init residual per',
-        '                       ready (default pages:',
-        '                       organization, workbox,',
-        '                       workbox-detail, projects;',
-        '                       default --runs 1)',
+        '  --profile            For each measured page, print',
+        '                       API request counts by route and',
+        '                       page-init time not spent in',
+        '                       fetch/render. If --pages is',
+        '                       omitted, uses organization,',
+        '                       workbox, workbox-detail,',
+        '                       projects. If --runs is',
+        '                       omitted, uses 1.',
         '  --help, -h           Show this help',
         '',
         'Examples:',
         '  ./measure',
-        '  ./measure --pages dashboard,ideas --runs 30',
-        '  ./measure --check --record --visualize',
+        '    (= --record --write-budgets --runs 25',
+        '     --visualize; full registry)',
+        '  ./measure --runs 5',
+        '    (measure + report only; no history write)',
+        '  ./measure --pages dashboard,ideas --runs 1',
+        '    (subset smoke; no --record)',
+        '  ./measure --check',
         '  ./measure --write-budgets --runs 30',
         '  ./measure --visualize',
         '  ./measure --profile',
@@ -238,34 +255,33 @@ function parseArgs(argv: string[]): ParseResult {
             message: `Unknown flag: ${a}`,
         };
     }
-    if (writeBudgets && pages !== null) {
-        return {
-            kind: 'error',
-            message:
-                '--write-budgets requires a full'
-                + ' registry sweep (omit --pages)',
-        };
-    }
-    // Profile defaults: heaviest page-init pages, one
-    // run (call counts are deterministic for a seed).
+    // Profile defaults before finalize so --profile is
+    // never treated as bare ceremony. Heaviest page-init
+    // pages, one run (counts deterministic for a seed).
     if (profile && pages === null) {
         pages = [...DEFAULT_PROFILE_PAGES];
     }
     if (profile && !runsExplicit) {
         runs = 1;
     }
+    const finalized = finalizeMeasureCli({
+        check,
+        record,
+        writeBudgets,
+        visualize,
+        profile,
+        pages,
+        runs,
+        runsExplicit,
+    });
+    if (finalized.kind === 'error') {
+        return finalized;
+    }
     return {
         kind: 'ok',
         cli: {
-            check,
-            record,
-            writeBudgets,
+            ...finalized.cli,
             budgetSigmas,
-            pages,
-            runs,
-            visualize,
-            profile,
-            runsExplicit,
         },
     };
 }

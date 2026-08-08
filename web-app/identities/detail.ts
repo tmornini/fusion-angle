@@ -50,23 +50,34 @@ async function loadIdentity(
     identityId: string,
 ): Promise<LoadedIdentity> {
     const ctx = sessionContext();
-    const identity =
-        await getIdentity(ctx, identityId);
-    const pii = await getMemberPii(ctx, identityId);
-    const service: ServiceFacet = identity.isService()
-        ? await getServiceFacet(ctx, identityId)
-        : { named: false };
-    const activeCredentialKinds = identity.isService()
-        ? (await getIdentityCredentialState(
-            ctx, identityId,
-        )).active
-        : [];
-    const registration: ClientRegistration =
-        identity.isService()
-            ? await getClientRegistration(ctx, identityId)
-            : { registered: false };
+    // Wave 1: identity + PII (all identities).
+    const [identity, pii] = await Promise.all([
+        getIdentity(ctx, identityId),
+        getMemberPii(ctx, identityId),
+    ]);
+    // Wave 2: service facets only when kind is service.
+    if (!identity.isService()) {
+        return {
+            identity,
+            pii,
+            service: { named: false },
+            activeCredentialKinds: [],
+            registration: { registered: false },
+        };
+    }
+    const [service, credentialState, registration] =
+        await Promise.all([
+            getServiceFacet(ctx, identityId),
+            getIdentityCredentialState(
+                ctx, identityId,
+            ),
+            getClientRegistration(ctx, identityId),
+        ]);
     return {
-        identity, pii, service, activeCredentialKinds,
+        identity,
+        pii,
+        service,
+        activeCredentialKinds: credentialState.active,
         registration,
     };
 }

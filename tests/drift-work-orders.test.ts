@@ -1,9 +1,6 @@
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
@@ -21,7 +18,6 @@ import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../api/types.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { canonicalUriPrefix } from '../api/message-pair.ts';
 import {
     documentPairsAt,
@@ -41,11 +37,15 @@ import { postWorkOrderDocumentOp } from '../api/routes.ts';
 import {
     latestClaimEvent,
 } from '../api/work-order-claims.ts';
+import {
+    appendLegacyTransition,
+} from './legacy-transition-fixture.ts';
 import { deriveFlowWorkOrders } from
     '../api/derive-flow-work-orders.ts';
 import {
     workOrderLifecycleStatesFor,
     workOrderHistoryFor,
+    workOrderBindingFor,
 } from '../api/derive-states.ts';
 import { buildWorkOrders } from '../api/mock-data/work-orders.ts';
 import {
@@ -66,6 +66,7 @@ import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: work_orders(+flow_work_orders+
 // state_field_values) dual-write stripped. This file no longer
@@ -106,9 +107,7 @@ afterEach(() => {
 });
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // A frozen work-order flow-graph snapshot, sized for the
@@ -182,20 +181,62 @@ const WORK_ORDERS_TEST_WIRING: DocumentFamilyWiring = {
 // `actor` argument entirely.
 const READER_ACTOR: Id = 'drift-reader';
 
+// Mirror the live list/detail GET attach (routes.ts): bind
+// keys ride the wire when present and stay ABSENT when not.
+async function withBindingEmbed(
+    db: DbAdapter,
+    organization: Id,
+    row: WorkOrderEntity,
+): Promise<WorkOrderEntity & {
+    instance_id?: string;
+    record_type_id?: string;
+}> {
+    const bind = await workOrderBindingFor(
+        db, organization, row.id,
+    );
+    if (bind === null) return row;
+    return {
+        ...row,
+        instance_id: bind.instanceId,
+        record_type_id: bind.recordTypeId,
+    };
+}
+
 async function derivedWorkOrders(
     db: DbAdapter, organization: Id,
-): Promise<WorkOrderEntity[]> {
-    return documentCollectionGetHandler(WORK_ORDERS_TEST_WIRING)(
+): Promise<(WorkOrderEntity & {
+    instance_id?: string;
+    record_type_id?: string;
+})[]> {
+    const rows = await documentCollectionGetHandler(
+        WORK_ORDERS_TEST_WIRING,
+    )(
         db, [], READER_ACTOR, organization,
-    ) as Promise<WorkOrderEntity[]>;
+    ) as WorkOrderEntity[];
+    const out: (WorkOrderEntity & {
+        instance_id?: string;
+        record_type_id?: string;
+    })[] = [];
+    for (const row of rows) {
+        out.push(
+            await withBindingEmbed(db, organization, row),
+        );
+    }
+    return out;
 }
 
 async function derivedWorkOrder(
     db: DbAdapter, organization: Id, id: Id,
-): Promise<WorkOrderEntity> {
-    return documentGetHandler(WORK_ORDERS_TEST_WIRING)(
+): Promise<WorkOrderEntity & {
+    instance_id?: string;
+    record_type_id?: string;
+}> {
+    const row = await documentGetHandler(
+        WORK_ORDERS_TEST_WIRING,
+    )(
         db, [id], READER_ACTOR, organization,
-    ) as Promise<WorkOrderEntity>;
+    ) as WorkOrderEntity;
+    return withBindingEmbed(db, organization, row);
 }
 
 // Every seeded work order's own id: the 45 hand-authored rows
@@ -469,9 +510,9 @@ async () => {
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Transition with 2+ field values, no release.
-    const transition1 = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/transition',
-        tokenA, {
+    // Task 8 CUT: legacy fieldValues below the gate.
+    await appendLegacyTransition(
+        db, STARK_ORGANIZATION, workOrderId, {
             transitionEventId: 'wo-drift-chain-1-te1',
             targetState: 'n-middle',
             fieldValues: [
@@ -495,8 +536,7 @@ async () => {
             release: null,
             transitionAt: nowUtc(),
         },
-    ));
-    assert.equal(transition1.status, 204);
+    );
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Transition WITH release — ends A's birth claim. Mint
@@ -510,7 +550,6 @@ async () => {
         tokenA, {
             transitionEventId: 'wo-drift-chain-1-te2',
             targetState: 'n-finish',
-            fieldValues: [],
             release: {
                 id: 'wo-drift-chain-1-rel1',
                 state: 'claim_released',
@@ -1073,19 +1112,26 @@ function applyTransitionPair(
         at: transitionAt,
     });
 
-    const fieldValues = transition.body['fieldValues'] as
-        readonly { id: string; fields: Record<string, unknown> }[];
-    for (const row of fieldValues) {
-        replayedFieldValues.push({
-            id: row.id,
-            state_event_id: pickString(
-                row.fields, 'state_event_id',
-            ),
-            attribute_id: pickString(
-                row.fields, 'attribute_id',
-            ),
-            value: pickString(row.fields, 'value'),
-        });
+    // Task 8 / Task 3: new-shape pure-moves omit fieldValues;
+    // only legacy bags contribute fold rows (A4 shape-disjoint).
+    const rawFieldValues = transition.body['fieldValues'];
+    if (Array.isArray(rawFieldValues)) {
+        const fieldValues = rawFieldValues as readonly {
+            id: string;
+            fields: Record<string, unknown>;
+        }[];
+        for (const row of fieldValues) {
+            replayedFieldValues.push({
+                id: row.id,
+                state_event_id: pickString(
+                    row.fields, 'state_event_id',
+                ),
+                attribute_id: pickString(
+                    row.fields, 'attribute_id',
+                ),
+                value: pickString(row.fields, 'value'),
+            });
+        }
     }
 
     const release = transition.body['release'];
@@ -1320,7 +1366,6 @@ async () => {
         tokenA, {
             transitionEventId: 'wo-drift-trace-1-te1',
             targetState: 'n-middle',
-            fieldValues: [],
             release: {
                 id: 'wo-drift-trace-1-rel1',
                 state: 'claim_released',
@@ -1415,10 +1460,10 @@ async () => {
     assert.equal(takeover.status, 204);
 
     // Leg 6: transition with values, by B.
+    // Task 8 CUT: legacy fieldValues below the gate.
     const withValuesAt = nowUtc();
-    const withValues = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/transition',
-        tokenB, {
+    await appendLegacyTransition(
+        db, STARK_ORGANIZATION, workOrderId, {
             transitionEventId: 'wo-drift-trace-1-te2',
             targetState: 'n-middle',
             fieldValues: [
@@ -1442,8 +1487,8 @@ async () => {
             release: null,
             transitionAt: withValuesAt,
         },
-    ));
-    assert.equal(withValues.status, 204);
+        { actor: 'current', requestAt: withValuesAt },
+    );
 
     // Leg 7: transition to finish by B — claim stays live so
     // Leg 8's named release op has a live claim to end
@@ -1454,7 +1499,6 @@ async () => {
         tokenB, {
             transitionEventId: 'wo-drift-trace-1-te3',
             targetState: 'n-finish',
-            fieldValues: [],
             release: null,
             transitionAt: finishTransitionAt,
         },

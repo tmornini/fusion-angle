@@ -8,12 +8,12 @@ import {
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     ORGANIZATION_TWO,
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { sharedMockDb } from './mock-seed.ts';
 
 // GET <family>/:id/history — Phase A3 of states-URI
 // elimination. Per trio family (ideas/projects/records/flows/
@@ -160,8 +160,7 @@ test(
 test(
     'GET ideas/:id/history foreign → 403 honest body',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await sharedMockDb();
         const list = await handleRequest(
             db,
             req(
@@ -331,8 +330,7 @@ test(
 test(
     'GET projects/:id/history foreign → 403 honest body',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await sharedMockDb();
         const list = await handleRequest(
             db,
             req(
@@ -469,8 +467,7 @@ test(
 test(
     'GET nested record-types/:id/history foreign → 403 honest body',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await sharedMockDb();
         const list = await handleRequest(
             db,
             req(
@@ -622,8 +619,7 @@ test(
 test(
     'GET flows/:id/history foreign → 403 honest body',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await sharedMockDb();
         const list = await handleRequest(
             db,
             req(
@@ -755,8 +751,7 @@ test(
 test(
     'GET objectives/:id/history foreign → 403 honest body',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await sharedMockDb();
         const list = await handleRequest(
             db,
             req(

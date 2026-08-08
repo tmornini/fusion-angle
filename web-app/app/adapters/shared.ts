@@ -102,6 +102,15 @@ export interface RequestContext {
         resource: string,
         body: Record<string, unknown>,
     ): Promise<T>;
+    // Sibling of POST that carries extra headers
+    // (If-Match on value-bearing transitions). Existing
+    // POST callers stay header-free.
+    POSTWithHeaders<T>(
+        resource: string,
+        body: Record<string, unknown>,
+        headerFields:
+            readonly (readonly [string, string])[],
+    ): Promise<T>;
 }
 
 // The recovery-free context: each verb runs directly on its
@@ -252,6 +261,19 @@ function makeRequestContext(
                 tok => httpPost<T>(
                     adapter, resource, body, tok,
                     requestId,
+                ));
+        },
+        POSTWithHeaders: <T>(
+            resource: string,
+            body: Record<string, unknown>,
+            headerFields:
+                readonly (readonly [string, string])[],
+        ) => {
+            recordApiRequest('POST', resource);
+            return run<T>(
+                tok => httpPost<T>(
+                    adapter, resource, body, tok,
+                    requestId, headerFields,
                 ));
         },
     };
@@ -455,15 +477,23 @@ async function rescopeToActiveOrganization(
     requestOrganization: Id | undefined,
 ): Promise<void> {
     const ctx = createRequestContext(adapter, flatToken);
-    const reachable =
-        (await getOrganizations(ctx)).map(o => o.id);
+    // Overlap independent rescope reads. Named delta: the
+    // default-org read now fires (and can surface errors)
+    // on the empty-membership corner path too.
+    const [
+        organizations, defaultOrganization,
+    ] = await Promise.all([
+        getOrganizations(ctx),
+        getIdentityDefaultOrganization(ctx),
+    ]);
+    const reachable = organizations.map(o => o.id);
     if (reachable.length === 0) {
         return;
     }
     const active = resolveActiveOrganization(
         reachable,
         requestOrganization ?? null,
-        await getIdentityDefaultOrganization(ctx),
+        defaultOrganization,
     );
     putSessionToken(
         await postOrganizationSessionExchange(ctx, flatToken, active));

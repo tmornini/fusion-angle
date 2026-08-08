@@ -117,9 +117,10 @@ Rules:
 
 | Invocation | Behavior |
 | --- | --- |
+| `./measure` | Full ceremony: record + write-budgets + runs 25 + visualize (full registry); viz regenerates after record. |
 | `./measure --visualize` | Early path: no clean-tree gate, no Chrome, no build/serve. Read history + budgets → write HTML → exit. |
 | `./measure … --visualize` | Existing measure flow; after a successful run, regenerate viz from **disk**. |
-| `./measure --record --visualize` | Append history, then viz includes the new line. |
+| `./measure --record --visualize` | Append history (full registry only), then viz includes the new line. |
 | Measure with `--visualize` but without `--record` | Viz from disk only; stdout one-line note that this run is not in history. |
 
 **Hard failures (exit 1, named paths):**
@@ -197,9 +198,11 @@ Generated HTML embeds one JSON document, e.g.:
 Client script checks `version`. Bump `version` when the
 DTO shape breaks consumers.
 
-Partial sweeps (history lines recorded with `--pages`)
-are allowed: union of page keys across sweeps; missing
-points are gaps in the trend — never invented.
+New partial records (`--record` with `--pages`) are
+**illegal** at the CLI (full registry only). The visualizer
+must still tolerate **legacy** partial lines: union of page
+keys across sweeps; missing points are gaps in the trend —
+never invented.
 
 Single-sweep history: compare selectors offer one sweep;
 pure core returns `null` for Δ; UI shows `n/a` (pin in
@@ -231,7 +234,7 @@ browser bundle (Node-only, tsconfig `exclude`).
 | Bad JSONL line | Exit 1 + line number |
 | No budgets | Exit 1 |
 | Page in sweep without budget | Render; N/A for budget ratio; last in budget% sort |
-| Partial page sets across sweeps | Gaps, no fill |
+| Legacy partial page sets across sweeps | Gaps, no fill (new partial records illegal at CLI) |
 | One sweep | Δ `null` / UI `n/a` (tested) |
 
 ## Sequencing (implementation commits)
@@ -265,8 +268,8 @@ One concern per commit; pure core green before generator.
   Chrome; produces `measurements/index.html`.
 - Open via `file://` or a trivial static server.
 - Missing budgets → exit 1.
-- `./measure --record --visualize` (full sweep when
-  willing): new history line appears in viz.
+- Bare `./measure` or `./measure --record --visualize`
+  (full registry): new history line appears in viz.
 - Measure with `--visualize` without `--record`: note on
   stdout; viz matches disk history only.
 - `./validate` green; `git status` does not show

@@ -1,9 +1,5 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
-import {
-    postMockDataLoad,
-} from '../api/mock-data.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
@@ -11,9 +7,9 @@ import { devToken } from './token-fixtures.ts';
 import {
     getFlowStats,
 } from '../web-app/app/adapters/flow-stats.ts';
-import { seedAdminSchema } from './test-fixtures.ts';
 import { now } from '../api/mock-data/seed-kit.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 const FLOW_NAME = 'Lead-to-Close';
 const EXPECTED_NODE_COUNT = 7;
@@ -25,9 +21,7 @@ const HOT_NODE_HEAT_MIN = 0.75;
 const COLD_WORKING_NODE_HEAT_MAX = 0.25;
 
 async function seededLeadToClose() {
-    const db = memoryDbAdapter();
-    await seedAdminSchema(db);
-    await postMockDataLoad(db);
+    const db = await seededMockDb();
     // Phase Final Task 2: flows row half stripped — resolve
     // the seed flow from the pair plane.
     const flows = await deriveFlows(db, '1');

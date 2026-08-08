@@ -1,11 +1,10 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { memoryDbAdapter } from '../api/db-memory.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildFlows } from '../api/mock-data/flows.ts';
 import { deriveFlow } from '../api/derive-flows.ts';
 import { asStoredGraph } from '../api/validators.ts';
 import type { StoredGraph } from '../api/types.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // buildFlows() seeds land on Stark (flowSeedBody stamps
 // organization_id: STARK_ORGANIZATION); seed-flow-org2 is a
@@ -40,9 +39,7 @@ function normalizeGraph(graph: StoredGraph): StoredGraph {
 test('seed pair-plane graph equals each flow\'s'
     + ' authored graph',
 async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await postMockDataLoad(db);
+    const db = await seededMockDb();
 
     for (const flow of buildFlows()) {
         const expected = asStoredGraph(

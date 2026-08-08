@@ -10,14 +10,27 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import {
+    devToken,
+    organizationToken,
+} from './token-fixtures.ts';
 import {
     postWorkOrderCreation,
     postWorkOrderTransition,
+    postWorkOrderBinding,
     postWorkOrderClaim,
     putWorkOrder,
 } from
 '../web-app/app/adapters/work-orders-mutations.ts';
+import {
+    putRecordInstance,
+    getRecordInstance,
+} from
+'../web-app/app/adapters/record-instances.ts';
+import {
+    postRecordChange,
+} from
+'../web-app/app/adapters/records.ts';
 import {
     getWorkOrder,
     getWorkOrderActiveClaim,
@@ -478,7 +491,6 @@ test(
             workOrderId: woId,
             edgeId: 'e2',
             values: {},
-            fieldValueIds: {},
         });
 
         const afterNode =
@@ -514,7 +526,6 @@ test(
             workOrderId: woId,
             edgeId: 'e2',
             values: {},
-            fieldValueIds: {},
         });
 
         const events =
@@ -545,10 +556,197 @@ test(
                     workOrderId: woId,
                     edgeId: 'no-such-edge',
                     values: {},
-                    fieldValueIds: {},
                 }),
             /Edge not found/,
         );
+    },
+);
+
+// Value-bearing instance-head transitions: seed a
+// record type + instance, join the flow, bind the
+// WO, then assert set/clear/omit and pure-move.
+const RT_ID = 'rt-wo-adapter';
+const ATTR_ID = 'attr-wo-adapter';
+const INST_ID = 'inst-wo-adapter';
+
+// Instance adapters need an org-scoped token
+// (activeOrganization on the vessel).
+async function setupScopedDb(): Promise<{
+    db: MemoryDbAdapter;
+    ctx: RequestContext;
+}> {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await seedHumanMember(
+        db, 'current', 'Demo Test',
+    );
+    const ctx = createRequestContext(
+        db, await organizationToken(),
+    );
+    return { db, ctx };
+}
+
+async function seedTypeInstanceAndJoin(
+    ctx: RequestContext,
+    flowId: string,
+    headValue: string = 'v0',
+): Promise<void> {
+    await postRecordChange(ctx, RT_ID, {
+        kind: 'create',
+        record: {
+            name: 'WO Adapter Type',
+            description: '',
+            position: 1,
+        },
+        attributes: [
+            {
+                id: ATTR_ID,
+                record_id: RT_ID,
+                name: 'Title',
+                attribute_type: 'text',
+                sort_order: 0,
+                options: [],
+                constraints: [],
+            },
+        ],
+        initialState: 'active',
+    });
+    await putRecordInstance(
+        ctx, RT_ID, INST_ID, [
+            {
+                attributeId: ATTR_ID,
+                value: headValue,
+            },
+        ],
+    );
+    await ctx.PUT(
+        'flows/' + flowId + '/records/fr-'
+        + flowId,
+        {
+            flow_id: flowId,
+            record_id: RT_ID,
+            at: nowUtc(),
+        },
+    );
+}
+
+test(
+    'postWorkOrderTransition value-bearing sets'
+    + ' only changed values on the instance head',
+    async () => {
+        const { db, ctx } = await setupScopedDb();
+        await seedFlow(db, 'f1', buildLinearGraph());
+        await seedTypeInstanceAndJoin(ctx, 'f1', 'v0');
+        const woId = await createWorkOrder(ctx, 'f1');
+        await postWorkOrderBinding(
+            ctx, woId, INST_ID, RT_ID,
+        );
+        await pause(2);
+
+        await postWorkOrderTransition(ctx, {
+            workOrderId: woId,
+            edgeId: 'e2',
+            // ATTR changed; no other keys → set only.
+            values: { [ATTR_ID]: 'v1' },
+        });
+
+        const head = await getRecordInstance(
+            ctx, RT_ID, INST_ID,
+        );
+        assert.equal(
+            head.values.get(ATTR_ID), 'v1',
+        );
+        assert.equal(
+            await getWorkOrderCurrentNodeId(
+                ctx, woId,
+            ),
+            'n-finish',
+        );
+    },
+);
+
+test(
+    'postWorkOrderTransition blank pending clears'
+    + ' a set head value',
+    async () => {
+        const { db, ctx } = await setupScopedDb();
+        await seedFlow(db, 'f1', buildLinearGraph());
+        await seedTypeInstanceAndJoin(ctx, 'f1', 'v0');
+        const woId = await createWorkOrder(ctx, 'f1');
+        await postWorkOrderBinding(
+            ctx, woId, INST_ID, RT_ID,
+        );
+        await pause(2);
+
+        await postWorkOrderTransition(ctx, {
+            workOrderId: woId,
+            edgeId: 'e2',
+            values: { [ATTR_ID]: '' },
+        });
+
+        const head = await getRecordInstance(
+            ctx, RT_ID, INST_ID,
+        );
+        assert.equal(
+            head.values.has(ATTR_ID), false,
+        );
+    },
+);
+
+test(
+    'postWorkOrderTransition pure move when'
+    + ' pending equals head omits set/clear',
+    async () => {
+        const { db, ctx } = await setupScopedDb();
+        await seedFlow(db, 'f1', buildLinearGraph());
+        await seedTypeInstanceAndJoin(ctx, 'f1', 'v0');
+        const woId = await createWorkOrder(ctx, 'f1');
+        await postWorkOrderBinding(
+            ctx, woId, INST_ID, RT_ID,
+        );
+        const before = await getRecordInstance(
+            ctx, RT_ID, INST_ID,
+        );
+        await pause(2);
+
+        // Unchanged values → pure move (no If-Match
+        // path; instance etag must not advance).
+        await postWorkOrderTransition(ctx, {
+            workOrderId: woId,
+            edgeId: 'e2',
+            values: { [ATTR_ID]: 'v0' },
+        });
+
+        const after = await getRecordInstance(
+            ctx, RT_ID, INST_ID,
+        );
+        assert.equal(after.etag, before.etag);
+        assert.equal(
+            after.values.get(ATTR_ID), 'v0',
+        );
+        assert.equal(
+            await getWorkOrderCurrentNodeId(
+                ctx, woId,
+            ),
+            'n-finish',
+        );
+    },
+);
+
+test(
+    'postWorkOrderBinding embeds instance on'
+    + ' the work-order GET',
+    async () => {
+        const { db, ctx } = await setupScopedDb();
+        await seedFlow(db, 'f1', buildLinearGraph());
+        await seedTypeInstanceAndJoin(ctx, 'f1');
+        const woId = await createWorkOrder(ctx, 'f1');
+        await postWorkOrderBinding(
+            ctx, woId, INST_ID, RT_ID,
+        );
+        const wo = await getWorkOrder(ctx, woId);
+        assert.equal(wo.instanceId, INST_ID);
+        assert.equal(wo.recordTypeId, RT_ID);
     },
 );
 
@@ -820,7 +1018,6 @@ test(
             workOrderId: woId,
             edgeId: 'e2',
             values: {},
-            fieldValueIds: {},
         });
 
         const allEvents =

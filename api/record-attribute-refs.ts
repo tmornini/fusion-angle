@@ -143,7 +143,7 @@ export async function collectAttributeReferrers(
     const bindings = await flowGraphBindingsFromPairs(
         view, boundOrganization,
     );
-    const fieldValuesByAttribute =
+    const sfvReferrersByAttribute =
         await deriveStateFieldValueReferrers(
             view, boundOrganization, attributeIds,
         );
@@ -156,7 +156,7 @@ export async function collectAttributeReferrers(
     const referrers = new Map<string, AttributeReferrers>();
     for (const attributeId of attributeIds) {
         const values =
-            fieldValuesByAttribute.get(attributeId) ?? [];
+            sfvReferrersByAttribute.get(attributeId) ?? [];
         // Latest action per flow_node_id among events for THIS
         // attribute — same tie-break as currentNodeAttributes:
         // equal-`at` 'removed' outranks 'added' (fail-closed).

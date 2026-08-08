@@ -210,6 +210,20 @@ function makePresenter(
             { memberId: Id; at: string } | null;
         currentMemberId?: string;
         attributes?: RecordAttribute[];
+        instanceValues?:
+            ReadonlyMap<string, string> | null;
+        binding?: {
+            instanceId: string;
+            recordTypeId: string;
+        } | null;
+        pickerItems?: readonly {
+            id: string;
+            fields: readonly {
+                name: string;
+                value: string;
+            }[];
+        }[];
+        conflictNotice?: string | null;
     } = {},
 ): WorkboxDetailPresenter {
     const graph = args.graph ?? makeFlowGraph();
@@ -219,6 +233,18 @@ function makePresenter(
         makeCreation(),
     ];
     const attributes = args.attributes ?? [];
+    // Default bound with empty head so existing
+    // attribute-input tests keep fields enabled.
+    const instanceValues =
+        args.instanceValues !== undefined
+            ? args.instanceValues
+            : new Map<string, string>();
+    const binding = args.binding !== undefined
+        ? args.binding
+        : {
+            instanceId: 'inst-1',
+            recordTypeId: 'rt-1',
+        };
     return new WorkboxDetailPresenter(
         workOrder,
         transitions,
@@ -227,6 +253,10 @@ function makePresenter(
         MEMBER_MAP,
         args.currentMemberId ?? 'p-1',
         makeAttributeMap(attributes),
+        instanceValues,
+        binding,
+        args.pickerItems ?? [],
+        args.conflictNotice ?? null,
     );
 }
 
@@ -251,6 +281,147 @@ test(
             out, /data-attribute-id="a-x"/,
         );
         assert.ok(!out.includes('required'));
+    },
+);
+
+test(
+    'buildAttributeInputHtml pre-fills value from'
+    + ' the instance head',
+    () => {
+        const ref = makeAttributeRef({
+            attributeId: 'a-x',
+        });
+        const attribute = makeAttribute({
+            id: 'a-x', attributeType: 'text',
+        });
+        const out = buildAttributeInputHtml(
+            ref, attribute, 'hello',
+        ).toString();
+        assert.match(out, /value="hello"/);
+    },
+);
+
+test(
+    'buildAttributeInputHtml force-disables with'
+    + ' bind prompt title when unbound',
+    () => {
+        const ref = makeAttributeRef();
+        const attribute = makeAttribute();
+        const out = buildAttributeInputHtml(
+            ref, attribute, null, true,
+        ).toString();
+        assert.match(out, /disabled/);
+        assert.ok(
+            out.includes(
+                'title="Bind an instance before'
+                + ' editing values"',
+            ),
+        );
+    },
+);
+
+test(
+    'buildPage pre-fills inputs from instance'
+    + ' values and shows a bound badge',
+    () => {
+        const attr = makeAttribute({
+            id: 'a-1',
+            name: 'Notes',
+            attributeType: 'text',
+        });
+        const graph = makeFlowGraph({
+            nodes: [
+                makeNode({
+                    id: 'n-1',
+                    name: 'Triage',
+                    attributes: [
+                        makeAttributeRef({
+                            attributeId: 'a-1',
+                        }),
+                    ],
+                }),
+            ],
+        });
+        const presenter = makePresenter({
+            graph,
+            attributes: [attr],
+            instanceValues: new Map([
+                ['a-1', 'from-head'],
+            ]),
+            binding: {
+                instanceId: 'inst-xyz',
+                recordTypeId: 'rt-cust',
+            },
+        });
+        const out = presenter.buildPage()
+            .toString();
+        assert.match(out, /value="from-head"/);
+        assert.match(out, /data-binding="bound"/);
+        assert.match(out, /Instance inst-xyz/);
+        assert.match(out, /title="type rt-cust"/);
+    },
+);
+
+test(
+    'buildPage unbound disables fields, shows'
+    + ' bind prompt and picker button',
+    () => {
+        const attr = makeAttribute({
+            id: 'a-1',
+            name: 'Notes',
+            attributeType: 'text',
+        });
+        const graph = makeFlowGraph({
+            nodes: [
+                makeNode({
+                    id: 'n-1',
+                    name: 'Triage',
+                    attributes: [
+                        makeAttributeRef({
+                            attributeId: 'a-1',
+                        }),
+                    ],
+                }),
+            ],
+        });
+        const presenter = makePresenter({
+            graph,
+            attributes: [attr],
+            instanceValues: null,
+            binding: null,
+            pickerItems: [{
+                id: 'inst-a',
+                fields: [
+                    {
+                        name: 'Notes',
+                        value: 'x',
+                    },
+                ],
+            }],
+        });
+        const out = presenter.buildPage()
+            .toString();
+        assert.match(
+            out, /data-binding="unbound"/,
+        );
+        assert.match(
+            out, /data-dialog-open="bind-instance"/,
+        );
+        assert.match(
+            out, /id="bind-instance-dialog"/,
+        );
+        assert.match(
+            out, /data-instance-pick="inst-a"/,
+        );
+        assert.ok(
+            !out.includes('data-attribute-id="inst'),
+        );
+        // Fields disabled with bind title.
+        assert.match(out, /disabled/);
+        assert.match(
+            out,
+            /Bind an instance before editing/,
+        );
     },
 );
 

@@ -52,32 +52,36 @@ export async function init(
     );
 
     const ctx = sessionContext();
-    await loadInto({
-        container,
-        skeleton: buildSkeleton('card-grid', 3),
-        fetch: () => getDashboardGauges(ctx),
-        retry: () => init(),
-        onData: async gauges => {
-            const rendered = gauges.map(
-                g => new GaugePresenter(g)
-                    .render(),
-            );
-            setHtml(
-                container,
-                html`${rendered}`,
-            );
+    // Gauges and objective aggregates are independent —
+    // join both before ready. Inputs→defs inside aggregates
+    // stays serial (genuine dependency).
+    await Promise.all([
+        loadInto({
+            container,
+            skeleton: buildSkeleton('card-grid', 3),
+            fetch: () => getDashboardGauges(ctx),
+            retry: () => init(),
+            onData: gauges => {
+                const rendered = gauges.map(
+                    g => new GaugePresenter(g)
+                        .render(),
+                );
+                setHtml(
+                    container,
+                    html`${rendered}`,
+                );
 
-            subscribeProjectScoreChanges(
-                renderObjectiveAggregates,
-            );
-            subscribeObjectiveChanges(
-                renderObjectiveAggregates,
-            );
-            subscribeProjectChanges(
-                renderObjectiveAggregates,
-            );
-
-            await renderObjectiveAggregates();
-        },
-    });
+                subscribeProjectScoreChanges(
+                    renderObjectiveAggregates,
+                );
+                subscribeObjectiveChanges(
+                    renderObjectiveAggregates,
+                );
+                subscribeProjectChanges(
+                    renderObjectiveAggregates,
+                );
+            },
+        }),
+        renderObjectiveAggregates(),
+    ]);
 }

@@ -410,3 +410,88 @@ export function buildPayload(
         sweeps,
     };
 }
+
+/**
+ * Sweep indices that should draw SHA ticks on a trend
+ * chart for `page`. Only indices where the page has a
+ * sample are candidates. Always keeps first/last
+ * candidate; includes from/to only when sampled; thins
+ * by even spacing when over maxLabels (default 8).
+ */
+export function trendLabelIndices(
+    sweeps: HistoryLine[],
+    page: string,
+    fromIndex: number,
+    toIndex: number,
+    maxLabels?: number,
+): number[] {
+    const max = maxLabels ?? 8;
+    const cands: number[] = [];
+    for (let i = 0; i < sweeps.length; i++) {
+        if (sweeps[i]?.pages[page] !== undefined) {
+            cands.push(i);
+        }
+    }
+    if (cands.length === 0) return [];
+    if (cands.length <= max) return cands;
+
+    const first = cands[0]!;
+    const last = cands[cands.length - 1]!;
+    const forced = new Set<number>([first, last]);
+    if (cands.includes(fromIndex)) {
+        forced.add(fromIndex);
+    }
+    if (cands.includes(toIndex)) {
+        forced.add(toIndex);
+    }
+
+    if (forced.size >= max) {
+        // Cap at max: first/last always; then from, to.
+        if (max <= 1) return [first];
+        const out = new Set<number>([first, last]);
+        const room = max - out.size;
+        const interiors: number[] = [];
+        if (
+            forced.has(fromIndex)
+            && fromIndex !== first
+            && fromIndex !== last
+        ) {
+            interiors.push(fromIndex);
+        }
+        if (
+            forced.has(toIndex)
+            && toIndex !== first
+            && toIndex !== last
+            && toIndex !== fromIndex
+        ) {
+            interiors.push(toIndex);
+        }
+        for (
+            let i = 0;
+            i < room && i < interiors.length;
+            i++
+        ) {
+            out.add(interiors[i]!);
+        }
+        return [...out].sort((a, b) => a - b);
+    }
+
+    const picked = new Set<number>(forced);
+    if (max >= 2) {
+        for (let k = 0; k < max; k++) {
+            if (picked.size >= max) break;
+            const ci = Math.round(
+                (k * (cands.length - 1)) / (max - 1),
+            );
+            picked.add(cands[ci]!);
+        }
+    }
+    // Even spacing can collide; fill gaps if under max.
+    if (picked.size < max) {
+        for (const c of cands) {
+            if (picked.size >= max) break;
+            picked.add(c);
+        }
+    }
+    return [...picked].sort((a, b) => a - b);
+}

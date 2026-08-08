@@ -52,11 +52,11 @@ import {
 // deriveDocumentsAt's request/response match fails and a LIVE
 // identity spuriously 404s. Both pii derives below close this by
 // reading requests AND responses inside ONE shared readonly
-// db.transaction(['requests', 'responses'], ...) — greenfield
-// code, closed at zero cost. No other facet in this module is a
-// delete zone, so none of the other reads need this — Promise.all
-// outside a transaction (the deriveMembers/deriveInvitations
-// precedent) is sufficient for them.
+// db.readTransaction(['requests', 'responses'], ...) —
+// greenfield code, closed at zero cost. No other facet in this
+// module is a delete zone, so none of the other reads need this
+// — Promise.all outside a transaction (the deriveMembers/
+// deriveInvitations precedent) is sufficient for them.
 //
 // Role-grants RETIRED: membership `type` bakes claim roles at
 // mint; Gate-16 response-body deviation deleted with the family.
@@ -109,7 +109,7 @@ function piiEntityOf(
 export async function deriveIdentityPiiRows(
     db: DbAdapter,
 ): Promise<IdentityPiiEntity[]> {
-    return db.transaction(
+    return db.readTransaction(
         ['requests', 'responses'],
         async (view) => {
             const [requests, responses] = await Promise.all([
@@ -150,7 +150,7 @@ export async function deriveIdentityPii(
     id: Id,
 ): Promise<IdentityPiiEntity> {
     const prefix = piiPrefixFor(id);
-    return db.transaction(
+    return db.readTransaction(
         ['requests', 'responses'],
         async (view) => {
             const [requests, responses] = await Promise.all([

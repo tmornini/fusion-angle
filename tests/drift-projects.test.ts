@@ -1,15 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
     ForeignOrganizationError,
 } from '../api/db.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { buildProjects } from '../api/mock-data/projects.ts';
 import {
     secondOrganizationProjectId,
@@ -25,6 +21,7 @@ import {
     deriveProjects,
     deriveProjectStateHistory,
 } from '../api/derive-projects.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: projects(+project_flows+scores)
 // dual-write stripped. This file no longer compares derive
@@ -121,9 +118,7 @@ function wireProjectGet(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 // Every seeded project's own id, paired with the org the seed

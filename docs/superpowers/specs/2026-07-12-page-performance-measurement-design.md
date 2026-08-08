@@ -147,9 +147,10 @@ unit-tested:
    scraped ids.
 8. **Sweep.** For every `PAGE_REGISTRY` page (import under
    Node — side-effect-free; 29 pages today, never hardcoded),
-   load N times (default 5). Navigate, await `page:ready` via
-   `Runtime.evaluate`, harvest measures + navigation timing as
-   JSON. Bounded timeout → loud failure naming the page.
+   load N times (default 25). Navigate, await `page:ready`
+   via `Runtime.evaluate`, harvest measures + navigation
+   timing as JSON. Bounded timeout → loud failure naming
+   the page.
 9. **Report.** Page × min / median / max `readyMs` + phase
    medians, as a table.
 
@@ -157,13 +158,19 @@ unit-tested:
 
 | Flag | Effect |
 | --- | --- |
-| (none) | Measure + report only |
+| (none) | Full ceremony: `--record` + `--write-budgets` + `--runs 25` + `--visualize` (full registry) |
 | `--check` | Fail if any median readyMs exceeds budget |
-| `--record` | Append one JSONL history line |
-| `--pages a,b,c` | Restrict to named registry keys |
-| `--runs N` | Override default run count (5) |
+| `--record` | Append one JSONL history line (full registry only; omit `--pages`) |
+| `--write-budgets` | Write mean+kσ budgets (full registry only) |
+| `--pages a,b,c` | Restrict to named registry keys (not with `--record` / `--write-budgets`) |
+| `--runs N` | Override default run count (25) |
+| `--visualize` | Regenerate history HTML from disk |
 
-Bare `./measure` = measure + report only.
+Bare `./measure` = record + write-budgets + runs 25 +
+visualize over the full registry (clean tree). Explicit
+`./measure --runs N` alone is measure + report only.
+With `n=25`, 5% trim drops `floor(25×0.05)=1` sample per
+tail.
 
 #### Cleanup
 
@@ -206,7 +213,7 @@ Appended ONLY by `--record`. One line per recorded sweep:
     "cpuModel": "...",
     "cpuCount": 0
   },
-  "runs": 5,
+  "runs": 25,
   "pages": {
     "<key>": {
       "readyMs": 0,
@@ -263,8 +270,11 @@ harness lands.
   the page name.
 - `./measure --check` exits 1 when a budget is deliberately
   lowered below a measured median; exits 0 when budgets hold.
-- `./measure --record` appends exactly one JSONL line; bare
-  `./measure` does not touch history.
+- `./measure --record` (full registry) appends exactly one
+  JSONL line; bare `./measure` is the full ceremony and
+  does append history + rewrite budgets + visualize.
+- `./measure --record --pages …` exits 1 (partial record
+  illegal).
 - Missing budget / orphan budget both fail `--check`.
 - Cleanup leaves no orphan Chrome or python server processes.
 

@@ -28,7 +28,11 @@ export const MEASURE_BOOT_PAGE_INIT =
     'boot:page-init';
 export const MEASURE_PAGE_READY = 'page:ready';
 
-/** Boot phases harvested by recordPageReady, in order. */
+/** Boot phases harvested by recordPageReady, in order.
+ *  Sidebar chrome, command palette, and page-init may
+ *  overlap on the wall clock after the boot parallelization;
+ *  readyMs (page:ready) is the only summable truth — do not
+ *  add phase medians expecting wall time. */
 export const BOOT_PHASE_MEASURE_NAMES = [
     MEASURE_BOOT_DB_OPEN,
     MEASURE_BOOT_SCHEMA_GATE,

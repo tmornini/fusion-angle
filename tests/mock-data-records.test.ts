@@ -4,12 +4,7 @@ import {
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
-import { postMockDataLoad } from
-    '../api/mock-data.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import {
     asWorkOrderFlowGraph,
 } from '../api/validators.ts';
@@ -37,15 +32,13 @@ import {
     STARK_ORGANIZATION,
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: records(+attributes+flow_records) seed
 // row halves stripped — assertions ride the pair plane.
 
 async function seeded(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 const RECORDS_WIRING: DocumentFamilyWiring = {

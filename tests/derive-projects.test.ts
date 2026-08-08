@@ -1,17 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-    memoryDbAdapter,
-    type MemoryDbAdapter,
-} from '../api/db-memory.ts';
+import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import { organizationToken } from './token-fixtures.ts';
 import {
     deriveProject,
     deriveProjects,
     deriveProjectStateHistory,
 } from '../api/derive-projects.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // The projects sibling of tests/derive-ideas.test.ts: unit-level
 // lifecycle-reduction guarantees that tests/drift-projects.test.ts
@@ -37,9 +34,7 @@ function req(
 }
 
 async function seededDb(): Promise<MemoryDbAdapter> {
-    const db = memoryDbAdapter();
-    await postMockDataLoad(db);
-    return db;
+    return seededMockDb();
 }
 
 function projectDocument(

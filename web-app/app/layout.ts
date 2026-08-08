@@ -26,6 +26,9 @@ import {
 } from './invitations-indicator.ts';
 import { navigateTo } from './navigation.ts';
 import { sessionContext } from './adapters/shared.ts';
+import type {
+    OrganizationEntity,
+} from '../../api/types.ts';
 import {
     sessionIsOrganizationScoped,
     sessionIsAuthenticated,
@@ -88,6 +91,8 @@ function initSignOut(): void {
 
 async function initSidebarLayout(
     hasSchema: boolean,
+    bootOrganizations:
+        readonly OrganizationEntity[] | null = null,
 ): Promise<void> {
     initActiveNavItem();
     initSidebar();
@@ -111,7 +116,7 @@ async function initSidebarLayout(
         // suppressing the others; rejections are logged, never
         // swallowed.
         const widgets: Array<Promise<void>> = [
-            mutateSidebarMember(),
+            mutateSidebarMember(bootOrganizations),
             mutateInvitationsBell(),
         ];
         if (sessionIsOrganizationScoped()) {

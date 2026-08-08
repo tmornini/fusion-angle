@@ -8,10 +8,10 @@ import {
 import { DEV_TOKEN, organizationToken } from
     './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
-import { postMockDataLoad } from '../api/mock-data.ts';
 import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
+import { seededMockDb } from './mock-seed.ts';
 
 // GET objectives/history — Phase A5 collection history.
 // Org-prefix scoped bulk StateEntity rows (no field_values),
@@ -204,8 +204,7 @@ test(
     'GET objectives/history org isolation: org B rows'
     + ' absent',
     async () => {
-        const db = memoryDbAdapter();
-        await postMockDataLoad(db);
+        const db = await seededMockDb();
 
         const starkId = 'obj-coll-hist-stark';
         const twoId = 'obj-coll-hist-two';

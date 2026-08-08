@@ -155,3 +155,63 @@ test(
         );
     },
 );
+
+test(
+    'reads work through readTransaction',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        await db.responses.put('s1', aResponse);
+        const seen = await db.readTransaction(
+            ['responses'],
+            (view) => view.responses.getAll(),
+        );
+        assert.equal(seen.length, 1);
+        assert.equal(seen[0]!.id, 's1');
+    },
+);
+
+test(
+    'a put through readTransaction rejects',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        await assert.rejects(
+            () => db.readTransaction(
+                ['responses'],
+                (view) => view.responses.put(
+                    's1', aResponse,
+                ),
+            ),
+            /readonly transaction/,
+        );
+        assert.deepEqual(
+            await db.responses.getAll(), [],
+        );
+    },
+);
+
+test(
+    'nested readTransaction inside transaction re-enters',
+    async () => {
+        const db = memoryDbAdapter();
+        await db.postSchemaCreation();
+        const seen = await db.transaction(
+            ['responses', 'requests'],
+            async (view) => {
+                await view.responses.put('s1', aResponse);
+                // Nested read joins the open write tx so the
+                // uncommitted put is visible (read-your-writes).
+                return view.readTransaction(
+                    ['responses'],
+                    (inner) => inner.responses.getAll(),
+                );
+            },
+        );
+        assert.equal(seen.length, 1);
+        assert.equal(seen[0]!.id, 's1');
+        assert.equal(
+            (await db.responses.getById('s1')).id, 's1',
+        );
+    },
+);

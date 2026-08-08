@@ -105,7 +105,7 @@ view — omits it.
 
 The append-only ledgers every pair-wired HTTP write appends
 into. Seeded demo data forms pairs pre-tx (`formSeedPair`);
-`EXPECTED_PAIR_COUNT` 1494 / bootstrap 12 is absolute.
+`EXPECTED_PAIR_COUNT` 1498 / bootstrap 12 is absolute.
 Global-spine (pass-through), NOT org-fenced at the store:
 tenancy lives IN `uri_prefix`, enforced at the route gate
 and the write authorizer
@@ -191,6 +191,21 @@ DELETE-shaped response pair excluded from the head by
 `deriveDocumentsAt`, exactly like every other document
 family's DELETE — there is no row to splice, since there was
 never a row to begin with.
+
+### Work-order instance binding (pair-plane only, no table)
+
+`work-orders/:id/binding` is a named operation family with
+no backing table: `POST` appends a binding op pair at
+`/work-orders/:id/binding/`. The CURRENT bind derives from
+the WO's own binding op-pair prefix — latest `(at, id)`
+wins (claim-op derive precedent). WO GET embeds
+`instance_id` + `record_type_id` at read time (never a
+document field). Transition-driven value writes append
+instance **revision** pairs at the instance's own
+canonical address
+(`organizations/:org/record-types/:type/instances/:id`) —
+the bind itself writes no instance revision. See
+API.md §3.34 / §3.19.
 
 Post-Phase-Final, ideas, projects, flows (including
 graphDelta/revivals for graph lifecycle), work orders,
