@@ -1,7 +1,7 @@
 // Node-only generator for ./measure --visualize.
 // Reads history + budgets from disk; embeds a versioned
-// payload in self-contained Layout B HTML. Excluded from
-// browser tsc (Node APIs).
+// payload in self-contained dashboard + page HTML.
+// Excluded from browser tsc (Node APIs).
 
 import {
     existsSync,
@@ -137,6 +137,7 @@ function vizCss(): string {
   --render: #c678dd;
   --other: #9aa6b2;
   --budget: #56b6c2;
+  --band: rgba(110, 168, 254, 0.18);
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
@@ -154,12 +155,30 @@ header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 header h1 {
   font-size: 1rem;
   font-weight: 600;
   margin: 0;
-  margin-right: auto;
+}
+.crumb {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.crumb a, .crumb button.linkish {
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+}
+.crumb a:hover, .crumb button.linkish:hover {
+  text-decoration: underline;
 }
 header label {
   font-size: 0.8rem;
@@ -168,16 +187,76 @@ header label {
   gap: 6px;
   align-items: center;
 }
-header select {
+header select, header button.tool {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+header button.tool:hover {
+  border-color: var(--accent);
 }
 .summary {
   font-size: 0.8rem;
   color: var(--muted);
+  margin-right: auto;
+}
+.view-system, .view-page { display: none; }
+.view-system.active, .view-page.active {
+  display: block;
+}
+.dash {
+  padding: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  min-width: 120px;
+  flex: 1 1 120px;
+}
+.metric .label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.metric .value {
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+.dash-section {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+.dash-section h2 {
+  font-size: 0.9rem;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 800px) {
+  .dash-grid { grid-template-columns: 1fr; }
 }
 .layout {
   display: grid;
@@ -238,39 +317,70 @@ header select {
   text-align: right;
   white-space: nowrap;
 }
-.kpi-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+.metric-row.page-metrics {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-}
-.kpi {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 12px;
-  min-width: 120px;
-}
-.kpi .label {
-  font-size: 0.7rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.kpi .value {
-  font-size: 1.1rem;
-  font-variant-numeric: tabular-nums;
-  margin-top: 2px;
+  margin: 0;
 }
 .panel-body { padding: 16px; flex: 1; }
+.chart-wrap {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
 .trend-svg {
   width: 100%;
   height: 260px;
-  background: var(--panel);
+  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
+  display: block;
 }
+.point-hit { cursor: pointer; fill: transparent; }
+.point-vis { pointer-events: none; }
+.sel-band { fill: var(--band); pointer-events: none; }
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  background: #1c2433;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  max-width: 240px;
+  display: none;
+}
+.tooltip.show { display: block; }
+.tooltip .t-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 0;
+}
+.tooltip .t-k { color: var(--muted); }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.table th, .table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.table th {
+  color: var(--muted);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+.table th:hover { color: var(--text); }
+.table tr[data-page] { cursor: pointer; }
+.table tr[data-page]:hover { background: #1a2030; }
 .bar-stack {
   display: flex;
   height: 28px;
@@ -321,6 +431,13 @@ header select {
   background: var(--budget);
 }
 .budget-fill.over { background: var(--bad); }
+.counts {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
 `.replace(/^\n/, '');
 }
 
@@ -328,50 +445,95 @@ function vizBodyMarkup(): string {
     return `
 <header>
   <h1>Measure history</h1>
+  <nav class="crumb" id="crumb" aria-label="Breadcrumb">
+  </nav>
   <span class="summary" id="summary"></span>
-  <label>From
-    <select id="from-sel"
-      aria-label="Compare from sweep"></select>
+  <label>Start
+    <select id="start-sel"
+      aria-label="Window start sweep"></select>
   </label>
-  <label>To
-    <select id="to-sel"
-      aria-label="Compare to sweep"></select>
+  <label>End
+    <select id="end-sel"
+      aria-label="Window end sweep"></select>
   </label>
+  <button type="button" class="tool" id="reset-window">
+    Reset window
+  </button>
 </header>
-<div class="layout">
-  <section class="rank" aria-label="Page rank">
-    <div class="tabs" role="tablist"
-      aria-label="Rank sort">
-      <button type="button" role="tab" data-sort="ready"
-        aria-selected="true">ready</button>
-      <button type="button" role="tab" data-sort="delta"
-        aria-selected="false">Δ</button>
-      <button type="button" role="tab" data-sort="budget"
-        aria-selected="false">budget%</button>
+<div id="tooltip" class="tooltip" role="tooltip"></div>
+<div class="view-system" id="view-system">
+  <div class="dash">
+    <div class="metric-row" id="sys-metrics"></div>
+    <section class="dash-section">
+      <h2>System ready (mean of page medians)</h2>
+      <div id="sys-trend"></div>
+    </section>
+    <div class="dash-grid">
+      <section class="dash-section">
+        <h2>Biggest regressions</h2>
+        <div id="sys-regress"></div>
+      </section>
+      <section class="dash-section">
+        <h2>Biggest wins</h2>
+        <div id="sys-wins"></div>
+      </section>
     </div>
-    <div class="rank-list" id="rank-list" role="listbox"
-      aria-label="Pages"></div>
-  </section>
-  <section class="focus" aria-label="Page focus">
-    <div class="tabs" role="tablist"
-      aria-label="Focus mode">
-      <button type="button" role="tab" data-mode="trend"
-        aria-selected="true">trend</button>
-      <button type="button" role="tab" data-mode="phase"
-        aria-selected="false">phase</button>
-      <button type="button" role="tab" data-mode="budget"
-        aria-selected="false">budget</button>
-    </div>
-    <div class="kpi-row" id="kpis"></div>
-    <div class="panel-body" id="focus-body"></div>
-  </section>
+    <section class="dash-section">
+      <h2>Budget pressure</h2>
+      <div id="sys-budget"></div>
+    </section>
+    <section class="dash-section">
+      <h2>Phase mix at end</h2>
+      <div id="sys-phase"></div>
+    </section>
+    <section class="dash-section">
+      <h2>All pages</h2>
+      <div id="sys-all"></div>
+    </section>
+  </div>
+</div>
+<div class="view-page" id="view-page">
+  <div class="layout">
+    <section class="rank" aria-label="Page rank">
+      <div class="tabs" role="tablist"
+        aria-label="Rank sort">
+        <button type="button" role="tab"
+          data-sort="ready"
+          aria-selected="true">ready</button>
+        <button type="button" role="tab"
+          data-sort="delta"
+          aria-selected="false">Δ</button>
+        <button type="button" role="tab"
+          data-sort="budget"
+          aria-selected="false">budget%</button>
+      </div>
+      <div class="rank-list" id="rank-list"
+        role="listbox" aria-label="Pages"></div>
+    </section>
+    <section class="focus" aria-label="Page focus">
+      <div class="tabs" role="tablist"
+        aria-label="Focus mode">
+        <button type="button" role="tab"
+          data-mode="trend"
+          aria-selected="true">trend</button>
+        <button type="button" role="tab"
+          data-mode="phase"
+          aria-selected="false">phase</button>
+        <button type="button" role="tab"
+          data-mode="budget"
+          aria-selected="false">budget</button>
+      </div>
+      <div class="metric-row page-metrics"
+        id="page-metrics"></div>
+      <div class="panel-body" id="focus-body"></div>
+    </section>
+  </div>
 </div>
 `.replace(/^\n/, '');
 }
 
 function vizClientScript(): string {
     // Client reimplements rank/format to match pure core.
-    // sameSweep → deltaMs null; desc sorts with nulls last.
     const ver = String(VIZ_PAYLOAD_VERSION);
     return `
 (function () {
@@ -386,12 +548,15 @@ function vizClientScript(): string {
   }
   var sweeps = payload.sweeps;
   var budgets = payload.budgets;
-  var fromIndex = payload.compareDefault.fromIndex;
-  var toIndex = payload.compareDefault.toIndex;
+  var startIndex = payload.compareDefault.fromIndex;
+  var endIndex = payload.compareDefault.toIndex;
   var sort = 'ready';
   var mode = 'trend';
+  var view = 'system';
   var focused = null;
   var MINUS = '\\u2212';
+  var tip = document.getElementById('tooltip');
+  var drag = null;
 
   function trimNum(n, maxDecimals) {
     if (Number.isInteger(n)) return String(n);
@@ -443,6 +608,10 @@ function vizClientScript(): string {
     if (ms < 0) return MINUS + body;
     return body;
   }
+  function formatUtc(at) {
+    if (!at || at.length < 19) return String(at || '');
+    return at.slice(0, 19).replace('T', ' ') + ' UTC';
+  }
   function pageKeysUnion() {
     var set = {};
     for (var s = 0; s < sweeps.length; s++) {
@@ -457,7 +626,6 @@ function vizClientScript(): string {
     }
     return Object.keys(set).sort();
   }
-  /** Descending; nulls always last (matches core). */
   function cmpNumDescNullLast(a, b) {
     if (a === null && b === null) return 0;
     if (a === null) return 1;
@@ -467,9 +635,9 @@ function vizClientScript(): string {
     return 0;
   }
   function rankPages() {
-    var from = sweeps[fromIndex];
-    var to = sweeps[toIndex];
-    var sameSweep = fromIndex === toIndex;
+    var from = sweeps[startIndex];
+    var to = sweeps[endIndex];
+    var sameSweep = startIndex === endIndex;
     var keys = pageKeysUnion();
     var entries = keys.map(function (page) {
       var toReady = to.pages[page]
@@ -518,81 +686,92 @@ function vizClientScript(): string {
     });
     return entries;
   }
-  // keep in sync with trendLabelIndices
-  function trendLabelIndices(
-    sweeps, page, fromIndex, toIndex, maxLabels,
-  ) {
-    var max = maxLabels == null ? 8 : maxLabels;
-    var cands = [];
-    for (var i = 0; i < sweeps.length; i++) {
-      if (sweeps[i].pages[page] !== undefined) {
-        cands.push(i);
-      }
+  function meanReadyMs(sweep) {
+    var pages = Object.keys(sweep.pages);
+    if (!pages.length) return null;
+    var sum = 0;
+    for (var i = 0; i < pages.length; i++) {
+      sum += sweep.pages[pages[i]].readyMs;
     }
-    if (cands.length === 0) return [];
-    if (cands.length <= max) return cands;
-
-    var first = cands[0];
-    var last = cands[cands.length - 1];
-    var forced = new Set([first, last]);
-    if (cands.indexOf(fromIndex) !== -1) {
-      forced.add(fromIndex);
-    }
-    if (cands.indexOf(toIndex) !== -1) {
-      forced.add(toIndex);
-    }
-
-    if (forced.size >= max) {
-      if (max <= 1) return [first];
-      var out = new Set([first, last]);
-      var room = max - out.size;
-      var interiors = [];
-      if (
-        forced.has(fromIndex)
-        && fromIndex !== first
-        && fromIndex !== last
-      ) {
-        interiors.push(fromIndex);
+    return sum / pages.length;
+  }
+  function systemReadySeries() {
+    var out = [];
+    for (var i = startIndex; i <= endIndex; i++) {
+      var s = sweeps[i];
+      if (!s) continue;
+      var keys = Object.keys(s.pages);
+      if (!keys.length) continue;
+      var sum = 0;
+      for (var j = 0; j < keys.length; j++) {
+        sum += s.pages[keys[j]].readyMs;
       }
-      if (
-        forced.has(toIndex)
-        && toIndex !== first
-        && toIndex !== last
-        && toIndex !== fromIndex
-      ) {
-        interiors.push(toIndex);
-      }
-      for (
-        var j = 0;
-        j < room && j < interiors.length;
-        j++
-      ) {
-        out.add(interiors[j]);
-      }
-      return Array.from(out).sort(function (a, b) {
-        return a - b;
+      out.push({
+        index: i,
+        meanMs: sum / keys.length,
+        sampleCount: keys.length,
       });
     }
-
-    var picked = new Set(forced);
-    if (max >= 2) {
-      for (var k = 0; k < max; k++) {
-        if (picked.size >= max) break;
-        var ci = Math.round(
-          (k * (cands.length - 1)) / (max - 1),
-        );
-        picked.add(cands[ci]);
+    return out;
+  }
+  function systemDeltaMs() {
+    if (startIndex === endIndex) return null;
+    var a = meanReadyMs(sweeps[startIndex]);
+    var b = meanReadyMs(sweeps[endIndex]);
+    if (a === null || b === null) return null;
+    return b - a;
+  }
+  function budgetPressure() {
+    var to = sweeps[endIndex];
+    var pages = pageKeysUnion();
+    var over = 0;
+    var within = 0;
+    var unknown = 0;
+    var rows = [];
+    for (var i = 0; i < pages.length; i++) {
+      var page = pages[i];
+      var readyMs = to.pages[page]
+        ? to.pages[page].readyMs
+        : undefined;
+      var budgetMs = budgets[page]
+        ? budgets[page].readyMs
+        : undefined;
+      if (
+        readyMs === undefined
+        || budgetMs === undefined
+      ) {
+        unknown += 1;
+        rows.push({
+          page: page,
+          readyMs: readyMs === undefined
+            ? null : readyMs,
+          budgetMs: budgetMs === undefined
+            ? null : budgetMs,
+          budgetPct: null,
+        });
+        continue;
       }
+      var pct = readyMs / budgetMs;
+      if (readyMs > budgetMs) over += 1;
+      else within += 1;
+      rows.push({
+        page: page,
+        readyMs: readyMs,
+        budgetMs: budgetMs,
+        budgetPct: pct,
+      });
     }
-    if (picked.size < max) {
-      for (var c = 0; c < cands.length; c++) {
-        if (picked.size >= max) break;
-        picked.add(cands[c]);
-      }
-    }
-    return Array.from(picked).sort(function (a, b) {
-      return a - b;
+    rows.sort(function (a, b) {
+      return cmpNumDescNullLast(
+        a.budgetPct, b.budgetPct,
+      );
     });
+    return {
+      over: over,
+      within: within,
+      unknown: unknown,
+      rows: rows,
+    };
   }
   var MEASURE_BOOT_PAGE_INIT = 'boot:page-init';
   function phaseBucket(name) {
@@ -601,8 +780,6 @@ function vizClientScript(): string {
     if (name.indexOf('render:') === 0) return 'render';
     return 'other';
   }
-  // Residual page-init: wall minus nested fetch/render
-  // so the stacked bar does not double-count.
   function residualPageInitMs(phases) {
     var pageInit = phases[MEASURE_BOOT_PAGE_INIT];
     if (pageInit === undefined) return undefined;
@@ -645,7 +822,6 @@ function vizClientScript(): string {
         name: name, ms: raw, bucket: bucket,
       });
     }
-    // Longest duration first; name break for stability.
     list.sort(function (a, b) {
       if (a.ms > b.ms) return -1;
       if (a.ms < b.ms) return 1;
@@ -655,34 +831,685 @@ function vizClientScript(): string {
     });
     return { buckets: buckets, phases: list };
   }
+  function meanPhaseBuckets() {
+    var to = sweeps[endIndex];
+    var keys = Object.keys(to.pages);
+    var empty = {
+      boot: 0, fetch: 0, render: 0, other: 0,
+    };
+    if (!keys.length) return empty;
+    var boot = 0;
+    var fetch = 0;
+    var render = 0;
+    var other = 0;
+    for (var i = 0; i < keys.length; i++) {
+      var r = rollupPhases(to.pages[keys[i]].phases);
+      boot += r.buckets.boot;
+      fetch += r.buckets.fetch;
+      render += r.buckets.render;
+      other += r.buckets.other;
+    }
+    var n = keys.length;
+    return {
+      boot: boot / n,
+      fetch: fetch / n,
+      render: render / n,
+      other: other / n,
+    };
+  }
+  function systemMetrics() {
+    var pressure = budgetPressure();
+    var pcts = [];
+    for (var i = 0; i < pressure.rows.length; i++) {
+      if (pressure.rows[i].budgetPct !== null) {
+        pcts.push(pressure.rows[i].budgetPct);
+      }
+    }
+    var budgetP50 = null;
+    if (pcts.length) {
+      pcts.sort(function (a, b) { return a - b; });
+      var mid = Math.floor(pcts.length / 2);
+      if (pcts.length % 2 === 1) {
+        budgetP50 = pcts[mid];
+      } else {
+        budgetP50 =
+          (pcts[mid - 1] + pcts[mid]) / 2;
+      }
+    }
+    return {
+      sweepsInWindow: endIndex - startIndex + 1,
+      totalSweeps: sweeps.length,
+      pageCount: pageKeysUnion().length,
+      meanReadyMs: meanReadyMs(sweeps[endIndex]),
+      systemDeltaMs: systemDeltaMs(),
+      overBudget: pressure.over,
+      budgetP50: budgetP50,
+    };
+  }
+  function trendLabelIndices(page, maxLabels) {
+    var max = maxLabels == null ? 8 : maxLabels;
+    var cands = [];
+    for (var i = startIndex; i <= endIndex; i++) {
+      if (
+        page === null
+        || sweeps[i].pages[page] !== undefined
+      ) {
+        if (page === null) {
+          var keys = Object.keys(sweeps[i].pages);
+          if (!keys.length) continue;
+        }
+        cands.push(i);
+      }
+    }
+    if (cands.length === 0) return [];
+    if (cands.length <= max) return cands;
+    var first = cands[0];
+    var last = cands[cands.length - 1];
+    var picked = new Set([first, last]);
+    if (max >= 2) {
+      for (var k = 0; k < max; k++) {
+        if (picked.size >= max) break;
+        var ci = Math.round(
+          (k * (cands.length - 1)) / (max - 1),
+        );
+        picked.add(cands[ci]);
+      }
+    }
+    return Array.from(picked).sort(function (a, b) {
+      return a - b;
+    });
+  }
   function sweepLabel(i) {
     var s = sweeps[i];
     var at = s.at.slice(0, 19).replace('T', ' ');
     return at + ' · ' + s.sha;
   }
+  function hideTip() {
+    tip.className = 'tooltip';
+    tip.innerHTML = '';
+  }
+  function showTip(ev, lines) {
+    var html = '';
+    for (var i = 0; i < lines.length; i++) {
+      html += '<div class="t-row"><span class="t-k">'
+        + lines[i][0]
+        + '</span><span>'
+        + lines[i][1]
+        + '</span></div>';
+    }
+    tip.innerHTML = html;
+    tip.className = 'tooltip show';
+    var x = ev.clientX + 12;
+    var y = ev.clientY + 12;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }
+  function setWindow(a, b) {
+    var lo = Math.min(a, b);
+    var hi = Math.max(a, b);
+    if (lo === startIndex && hi === endIndex) return;
+    startIndex = lo;
+    endIndex = hi;
+    fillSelectors();
+    renderAll();
+  }
   function fillSelectors() {
-    var fromSel = document.getElementById('from-sel');
-    var toSel = document.getElementById('to-sel');
-    fromSel.innerHTML = '';
-    toSel.innerHTML = '';
+    var startSel = document.getElementById('start-sel');
+    var endSel = document.getElementById('end-sel');
+    startSel.innerHTML = '';
+    endSel.innerHTML = '';
     for (var i = 0; i < sweeps.length; i++) {
       var o1 = document.createElement('option');
       o1.value = String(i);
       o1.textContent = sweepLabel(i);
-      if (i === fromIndex) o1.selected = true;
-      fromSel.appendChild(o1);
+      if (i === startIndex) o1.selected = true;
+      startSel.appendChild(o1);
       var o2 = document.createElement('option');
       o2.value = String(i);
       o2.textContent = sweepLabel(i);
-      if (i === toIndex) o2.selected = true;
-      toSel.appendChild(o2);
+      if (i === endIndex) o2.selected = true;
+      endSel.appendChild(o2);
     }
   }
   function renderSummary() {
+    var end = sweeps[endIndex];
+    var m = end.machine || {};
+    var machine = (m.platform || '')
+      + '/' + (m.arch || '')
+      + ' · ' + (m.cpuModel || '');
     document.getElementById('summary').textContent =
       sweeps.length + ' sweep'
       + (sweeps.length === 1 ? '' : 's')
-      + ' · payload v' + payload.version;
+      + ' · payload v' + payload.version
+      + ' · ' + machine;
+  }
+  function renderCrumb() {
+    var el = document.getElementById('crumb');
+    if (view === 'system') {
+      el.innerHTML = '<span>System</span>';
+      return;
+    }
+    el.innerHTML =
+      '<button type="button" class="linkish"'
+      + ' id="to-system">System</button>'
+      + ' / <span>' + (focused || '') + '</span>';
+    var btn = document.getElementById('to-system');
+    if (btn) {
+      btn.addEventListener('click', function () {
+        goSystem();
+      });
+    }
+  }
+  function goSystem() {
+    view = 'system';
+    location.hash = '#/';
+    renderAll();
+  }
+  function goPage(page) {
+    focused = page;
+    view = 'page';
+    location.hash = '#/page/' + encodeURIComponent(page);
+    renderAll();
+  }
+  function readHash() {
+    var h = location.hash || '#/';
+    if (h.indexOf('#/page/') === 0) {
+      var key = decodeURIComponent(h.slice(7));
+      var keys = pageKeysUnion();
+      if (keys.indexOf(key) !== -1) {
+        focused = key;
+        view = 'page';
+        return;
+      }
+    }
+    view = 'system';
+  }
+  function metricCard(label, value, extraClass) {
+    return '<div class="metric'
+      + (extraClass ? ' ' + extraClass : '')
+      + '"><div class="label">' + label
+      + '</div><div class="value">' + value
+      + '</div></div>';
+  }
+  function bindPageClicks(root) {
+    var rows = root.querySelectorAll('[data-page]');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].addEventListener('click', function (ev) {
+        var p = ev.currentTarget.getAttribute(
+          'data-page',
+        );
+        if (p) goPage(p);
+      });
+    }
+  }
+  function renderMovers(el, entries, positive) {
+    var rows = [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e.deltaMs === null) continue;
+      if (positive && e.deltaMs <= 0) continue;
+      if (!positive && e.deltaMs >= 0) continue;
+      rows.push(e);
+      if (rows.length >= 8) break;
+    }
+    if (!rows.length) {
+      el.innerHTML =
+        '<p class="muted">None in this window.</p>';
+      return;
+    }
+    var html = '<table class="table"><thead><tr>'
+      + '<th>Page</th><th>Δ</th><th>Ready</th>'
+      + '</tr></thead><tbody>';
+    for (var j = 0; j < rows.length; j++) {
+      var r = rows[j];
+      var dc = r.deltaMs > 0
+        ? 'delta-pos'
+        : 'delta-neg';
+      html += '<tr data-page="' + r.page + '">'
+        + '<td>' + r.page + '</td>'
+        + '<td class="' + dc + '">'
+        + formatDurationPerf(r.deltaMs, true)
+        + '</td><td>'
+        + (r.readyMs === null
+          ? 'n/a'
+          : formatDurationPerf(r.readyMs, false))
+        + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+    bindPageClicks(el);
+  }
+  function renderSysMetrics() {
+    var m = systemMetrics();
+    var ready = m.meanReadyMs === null
+      ? 'n/a'
+      : formatDurationPerf(m.meanReadyMs, false);
+    var delta = m.systemDeltaMs === null
+      ? 'n/a'
+      : formatDurationPerf(m.systemDeltaMs, true);
+    var dClass = '';
+    if (m.systemDeltaMs !== null && m.systemDeltaMs > 0) {
+      dClass = 'delta-pos';
+    } else if (
+      m.systemDeltaMs !== null
+      && m.systemDeltaMs < 0
+    ) {
+      dClass = 'delta-neg';
+    }
+    var p50 = m.budgetP50 === null
+      ? 'n/a'
+      : (Math.round(m.budgetP50 * 1000) / 10) + '%';
+    var el = document.getElementById('sys-metrics');
+    el.innerHTML =
+      metricCard(
+        'Sweeps',
+        m.sweepsInWindow + ' / ' + m.totalSweeps,
+      )
+      + metricCard('Pages', String(m.pageCount))
+      + metricCard('Mean ready', ready)
+      + metricCard('System Δ', delta, dClass)
+      + metricCard('Over budget', String(m.overBudget))
+      + metricCard('Budget p50', p50);
+  }
+  function buildTrendSvg(points, opts) {
+    // points: {index, y, tipLines[]}
+    // opts: {budgetMs?}
+    if (!points.length) {
+      return '<p class="muted">No samples in window.'
+        + '</p>';
+    }
+    var ys = points.map(function (p) { return p.y; });
+    var unitVals = ys.slice();
+    if (opts.budgetMs != null) {
+      unitVals.push(opts.budgetMs);
+    }
+    var unit = pickAxisUnit(unitVals);
+    var w = 640;
+    var h = 260;
+    var padL = 56;
+    var padR = 16;
+    var padT = 16;
+    var padB = 36;
+    var plotW = w - padL - padR;
+    var plotH = h - padT - padB;
+    var yMax = Math.max.apply(null, unitVals);
+    if (yMax <= 0) yMax = 1;
+    var span = endIndex - startIndex;
+    function xPos(idx) {
+      if (span === 0) return padL + plotW / 2;
+      return padL
+        + ((idx - startIndex) / span) * plotW;
+    }
+    function yPos(ms) {
+      var v = toAxis(ms, unit);
+      var vmax = toAxis(yMax, unit);
+      return padT + plotH - (v / vmax) * plotH;
+    }
+    var parts = [];
+    parts.push(
+      '<div class="chart-wrap">'
+      + '<svg class="trend-svg" viewBox="0 0 '
+      + w + ' ' + h
+      + '" role="img" aria-label="Ready trend">',
+    );
+    for (var t = 0; t < 5; t++) {
+      var frac = t / 4;
+      var msTick = yMax * (1 - frac);
+      var y = padT + plotH * frac;
+      parts.push(
+        '<line x1="' + padL + '" x2="' + (w - padR)
+        + '" y1="' + y + '" y2="' + y
+        + '" stroke="#2a3140"/>',
+      );
+      parts.push(
+        '<text x="' + (padL - 6) + '" y="' + (y + 4)
+        + '" fill="#9aa6b2" font-size="10" '
+        + 'text-anchor="end">'
+        + formatAxisTick(msTick, unit) + '</text>',
+      );
+    }
+    if (opts.budgetMs != null) {
+      var by = yPos(opts.budgetMs);
+      parts.push(
+        '<line x1="' + padL + '" x2="' + (w - padR)
+        + '" y1="' + by + '" y2="' + by
+        + '" stroke="#56b6c2" '
+        + 'stroke-dasharray="4 3"/>',
+      );
+    }
+    parts.push(
+      '<rect class="sel-band" id="sel-band" x="0" y="'
+      + padT + '" width="0" height="' + plotH
+      + '" visibility="hidden"/>',
+    );
+    var d = '';
+    for (var j = 0; j < points.length; j++) {
+      var pt = points[j];
+      var px = xPos(pt.index);
+      var py = yPos(pt.y);
+      d += (j === 0 ? 'M' : 'L') + px + ' ' + py + ' ';
+      parts.push(
+        '<circle class="point-vis" cx="' + px
+        + '" cy="' + py
+        + '" r="3.5" fill="#6ea8fe"/>',
+      );
+      parts.push(
+        '<circle class="point-hit" cx="' + px
+        + '" cy="' + py + '" r="10" data-index="'
+        + pt.index + '" data-tip="'
+        + encodeURIComponent(JSON.stringify(pt.tipLines))
+        + '"/>',
+      );
+    }
+    parts.push(
+      '<path d="' + d
+      + '" fill="none" stroke="#6ea8fe" '
+      + 'stroke-width="2"/>',
+    );
+    var labelIdxs = opts.labelIndices || [];
+    for (var li = 0; li < labelIdxs.length; li++) {
+      var xi = labelIdxs[li];
+      parts.push(
+        '<text x="' + xPos(xi) + '" y="' + (h - 12)
+        + '" fill="#9aa6b2" font-size="9" '
+        + 'text-anchor="middle">'
+        + sweeps[xi].sha + '</text>',
+      );
+    }
+    parts.push('</svg></div>');
+    return parts.join('');
+  }
+  function wireTrend(root) {
+    var hits = root.querySelectorAll('.point-hit');
+    for (var i = 0; i < hits.length; i++) {
+      (function (el) {
+        el.addEventListener('pointerenter', function (ev) {
+          if (drag) return;
+          var lines = JSON.parse(
+            decodeURIComponent(
+              el.getAttribute('data-tip'),
+            ),
+          );
+          showTip(ev, lines);
+        });
+        el.addEventListener('pointermove', function (ev) {
+          if (drag) return;
+          var lines = JSON.parse(
+            decodeURIComponent(
+              el.getAttribute('data-tip'),
+            ),
+          );
+          showTip(ev, lines);
+        });
+        el.addEventListener('pointerleave', function () {
+          if (!drag) hideTip();
+        });
+        el.addEventListener('pointerdown', function (ev) {
+          ev.preventDefault();
+          hideTip();
+          var idx = Number(el.getAttribute('data-index'));
+          drag = {
+            anchor: idx,
+            current: idx,
+            svg: root.querySelector('svg'),
+            band: root.querySelector('#sel-band'),
+          };
+          el.setPointerCapture(ev.pointerId);
+          updateBand();
+        });
+        el.addEventListener('pointermove', function (ev) {
+          if (!drag) return;
+          var nearest = nearestIndex(ev, root);
+          if (nearest !== null) {
+            drag.current = nearest;
+            updateBand();
+          }
+        });
+        el.addEventListener('pointerup', function (ev) {
+          if (!drag) return;
+          var a = drag.anchor;
+          var b = drag.current;
+          drag = null;
+          var band = root.querySelector('#sel-band');
+          if (band) {
+            band.setAttribute('visibility', 'hidden');
+          }
+          if (a !== b) setWindow(a, b);
+        });
+      })(hits[i]);
+    }
+  }
+  function nearestIndex(ev, root) {
+    var svg = root.querySelector('svg');
+    if (!svg) return null;
+    var rect = svg.getBoundingClientRect();
+    var vb = svg.viewBox.baseVal;
+    var scaleX = vb.width / rect.width;
+    var mx = (ev.clientX - rect.left) * scaleX;
+    var padL = 56;
+    var padR = 16;
+    var plotW = vb.width - padL - padR;
+    var span = endIndex - startIndex;
+    var hits = root.querySelectorAll('.point-hit');
+    var best = null;
+    var bestD = Infinity;
+    for (var i = 0; i < hits.length; i++) {
+      var idx = Number(
+        hits[i].getAttribute('data-index'),
+      );
+      var cx = span === 0
+        ? padL + plotW / 2
+        : padL + ((idx - startIndex) / span) * plotW;
+      var d = Math.abs(cx - mx);
+      if (d < bestD) {
+        bestD = d;
+        best = idx;
+      }
+    }
+    return best;
+  }
+  function updateBand() {
+    if (!drag || !drag.band || !drag.svg) return;
+    var vb = drag.svg.viewBox.baseVal;
+    var padL = 56;
+    var padR = 16;
+    var plotW = vb.width - padL - padR;
+    var span = endIndex - startIndex;
+    function xPos(idx) {
+      if (span === 0) return padL + plotW / 2;
+      return padL
+        + ((idx - startIndex) / span) * plotW;
+    }
+    var x0 = xPos(drag.anchor);
+    var x1 = xPos(drag.current);
+    var lo = Math.min(x0, x1);
+    var hi = Math.max(x0, x1);
+    drag.band.setAttribute('x', String(lo));
+    drag.band.setAttribute('width', String(hi - lo));
+    drag.band.setAttribute('visibility', 'visible');
+  }
+  function renderSysTrend() {
+    var el = document.getElementById('sys-trend');
+    var series = systemReadySeries();
+    var nPages = pageKeysUnion().length;
+    var points = series.map(function (p) {
+      var s = sweeps[p.index];
+      return {
+        index: p.index,
+        y: p.meanMs,
+        tipLines: [
+          ['SHA', s.sha],
+          ['Date', formatUtc(s.at)],
+          [
+            'Mean',
+            formatDurationPerf(p.meanMs, false),
+          ],
+          ['Runs', String(s.runs) + ' runs'],
+          [
+            'Pages',
+            p.sampleCount + ' / ' + nPages,
+          ],
+        ],
+      };
+    });
+    el.innerHTML = buildTrendSvg(points, {
+      labelIndices: trendLabelIndices(null, 8),
+    })
+      + '<p class="muted">Mean of page medians. '
+      + 'Drag point→point to set window. '
+      + 'No system budget line.</p>';
+    wireTrend(el);
+  }
+  function renderSysBudget() {
+    var el = document.getElementById('sys-budget');
+    var p = budgetPressure();
+    var html = '<div class="counts">'
+      + '<span>Over: <strong class="delta-pos">'
+      + p.over + '</strong></span>'
+      + '<span>Within: <strong class="delta-neg">'
+      + p.within + '</strong></span>'
+      + '<span>Unknown: <strong>'
+      + p.unknown + '</strong></span></div>';
+    html += '<table class="table"><thead><tr>'
+      + '<th>Page</th><th>Ready</th><th>Budget</th>'
+      + '<th>%</th></tr></thead><tbody>';
+    var n = Math.min(10, p.rows.length);
+    for (var i = 0; i < n; i++) {
+      var r = p.rows[i];
+      var pct = r.budgetPct === null
+        ? 'n/a'
+        : (Math.round(r.budgetPct * 1000) / 10) + '%';
+      html += '<tr data-page="' + r.page + '">'
+        + '<td>' + r.page + '</td><td>'
+        + (r.readyMs === null
+          ? 'n/a'
+          : formatDurationPerf(r.readyMs, false))
+        + '</td><td>'
+        + (r.budgetMs === null
+          ? 'n/a'
+          : formatDurationPerf(r.budgetMs, false))
+        + '</td><td>' + pct + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+    bindPageClicks(el);
+  }
+  function renderSysPhase() {
+    var el = document.getElementById('sys-phase');
+    var b = meanPhaseBuckets();
+    var total = b.boot + b.fetch + b.render + b.other;
+    function seg(name, ms, color) {
+      if (ms <= 0 || total <= 0) return '';
+      var pct = (ms / total) * 100;
+      return '<div class="bar-seg" style="width:'
+        + pct + '%;background:' + color
+        + '"></div>';
+    }
+    var html = '<div class="legend">'
+      + '<span><span class="swatch" style="'
+      + 'background:var(--boot)"></span>boot '
+      + formatDurationPerf(b.boot, false)
+      + '</span>'
+      + '<span><span class="swatch" style="'
+      + 'background:var(--fetch)"></span>fetch '
+      + formatDurationPerf(b.fetch, false)
+      + '</span>'
+      + '<span><span class="swatch" style="'
+      + 'background:var(--render)"></span>render '
+      + formatDurationPerf(b.render, false)
+      + '</span>'
+      + '<span><span class="swatch" style="'
+      + 'background:var(--other)"></span>other '
+      + formatDurationPerf(b.other, false)
+      + '</span></div>';
+    html += '<div class="bar-stack">'
+      + seg('boot', b.boot, 'var(--boot)')
+      + seg('fetch', b.fetch, 'var(--fetch)')
+      + seg('render', b.render, 'var(--render)')
+      + seg('other', b.other, 'var(--other)')
+      + '</div>';
+    html += '<p class="muted">Mean phase mix across pages '
+      + 'at end sweep (page-init residual).</p>';
+    el.innerHTML = html;
+  }
+  function renderSysAll() {
+    var el = document.getElementById('sys-all');
+    var entries = rankPages();
+    var html = '<table class="table"><thead><tr>'
+      + '<th data-col="ready">Page</th>'
+      + '<th data-col="ready">Ready</th>'
+      + '<th data-col="delta">Δ</th>'
+      + '<th data-col="budget">Budget%</th>'
+      + '</tr></thead><tbody>';
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      var dc = '';
+      if (e.deltaMs !== null && e.deltaMs > 0) {
+        dc = 'delta-pos';
+      } else if (e.deltaMs !== null && e.deltaMs < 0) {
+        dc = 'delta-neg';
+      }
+      var pct = e.budgetPct === null
+        ? 'n/a'
+        : (Math.round(e.budgetPct * 1000) / 10) + '%';
+      html += '<tr data-page="' + e.page + '">'
+        + '<td>' + e.page + '</td><td>'
+        + (e.readyMs === null
+          ? 'n/a'
+          : formatDurationPerf(e.readyMs, false))
+        + '</td><td class="' + dc + '">'
+        + (e.deltaMs === null
+          ? 'n/a'
+          : formatDurationPerf(e.deltaMs, true))
+        + '</td><td>' + pct + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    el.innerHTML = html;
+    bindPageClicks(el);
+    var ths = el.querySelectorAll('th[data-col]');
+    for (var t = 0; t < ths.length; t++) {
+      ths[t].addEventListener('click', function (ev) {
+        sort = ev.currentTarget.getAttribute('data-col');
+        renderSysAll();
+        syncSortTabs();
+      });
+    }
+  }
+  function syncSortTabs() {
+    document.querySelectorAll('[data-sort]').forEach(
+      function (b) {
+        b.setAttribute(
+          'aria-selected',
+          b.getAttribute('data-sort') === sort
+            ? 'true'
+            : 'false',
+        );
+      },
+    );
+  }
+  function renderSystem() {
+    renderSysMetrics();
+    renderSysTrend();
+    var entries = rankPages();
+    renderMovers(
+      document.getElementById('sys-regress'),
+      entries,
+      true,
+    );
+    // Most improved first (most negative Δ).
+    var wins = entries.slice().filter(function (e) {
+      return e.deltaMs !== null && e.deltaMs < 0;
+    }).sort(function (a, b) {
+      return a.deltaMs - b.deltaMs;
+    });
+    renderMovers(
+      document.getElementById('sys-wins'),
+      wins,
+      false,
+    );
+    renderSysBudget();
+    renderSysPhase();
+    renderSysAll();
   }
   function metaFor(entry) {
     if (sort === 'ready') {
@@ -721,8 +1548,7 @@ function vizClientScript(): string {
         + '<span class="rank-meta">'
         + metaFor(e) + '</span>';
       row.addEventListener('click', function (ev) {
-        focused = ev.currentTarget.dataset.page;
-        renderAll();
+        goPage(ev.currentTarget.dataset.page);
       });
       list.appendChild(row);
     }
@@ -736,9 +1562,9 @@ function vizClientScript(): string {
     }
     return entries[0] || null;
   }
-  function renderKpis() {
+  function renderPageMetrics() {
     var e = currentEntry();
-    var el = document.getElementById('kpis');
+    var el = document.getElementById('page-metrics');
     if (!e) {
       el.innerHTML = '';
       return;
@@ -757,150 +1583,71 @@ function vizClientScript(): string {
         : (Math.round(e.budgetPct * 1000) / 10) + '%';
     var deltaClass = '';
     if (e.deltaMs !== null && e.deltaMs > 0) {
-      deltaClass = ' delta-pos';
+      deltaClass = 'delta-pos';
     } else if (e.deltaMs !== null && e.deltaMs < 0) {
-      deltaClass = ' delta-neg';
+      deltaClass = 'delta-neg';
     }
     el.innerHTML =
-      '<div class="kpi"><div class="label">Page</div>'
-      + '<div class="value">' + e.page
-      + '</div></div>'
-      + '<div class="kpi"><div class="label">'
-      + 'Latest ready</div>'
-      + '<div class="value">' + ready
-      + '</div></div>'
-      + '<div class="kpi"><div class="label">'
-      + 'Δ from→to</div>'
-      + '<div class="value' + deltaClass + '">'
-      + delta + '</div></div>'
-      + '<div class="kpi"><div class="label">'
-      + 'Budget</div>'
-      + '<div class="value">' + budget
-      + '</div></div>';
+      metricCard('Page', e.page)
+      + metricCard('End ready', ready)
+      + metricCard('Δ start→end', delta, deltaClass)
+      + metricCard('Budget', budget);
   }
   function renderTrend() {
     var body = document.getElementById('focus-body');
     var page = focused;
-    var xs = [];
-    var ys = [];
-    for (var i = 0; i < sweeps.length; i++) {
+    var points = [];
+    for (var i = startIndex; i <= endIndex; i++) {
       var p = sweeps[i].pages[page];
       if (!p) continue;
-      xs.push(i);
-      ys.push(p.readyMs);
+      var s = sweeps[i];
+      points.push({
+        index: i,
+        y: p.readyMs,
+        tipLines: [
+          ['SHA', s.sha],
+          ['Date', formatUtc(s.at)],
+          [
+            'Ready',
+            formatDurationPerf(p.readyMs, false),
+          ],
+          ['Runs', String(s.runs) + ' runs'],
+        ],
+      });
     }
-    if (!ys.length) {
+    if (!points.length) {
       body.innerHTML =
-        '<p class="muted">No samples for this page.</p>';
+        '<p class="muted">No samples for this page '
+        + 'in the window.</p>';
       return;
     }
     var budget = budgets[page]
       ? budgets[page].readyMs
       : null;
-    var unitVals = ys.slice();
-    if (budget !== null) unitVals.push(budget);
-    var unit = pickAxisUnit(unitVals);
-    var w = 640;
-    var h = 260;
-    var padL = 56;
-    var padR = 16;
-    var padT = 16;
-    var padB = 36;
-    var plotW = w - padL - padR;
-    var plotH = h - padT - padB;
-    var yMax = Math.max.apply(null, unitVals);
-    if (yMax <= 0) yMax = 1;
-    function xPos(idx) {
-      if (sweeps.length === 1) {
-        return padL + plotW / 2;
-      }
-      return padL
-        + (idx / (sweeps.length - 1)) * plotW;
-    }
-    function yPos(ms) {
-      var v = toAxis(ms, unit);
-      var vmax = toAxis(yMax, unit);
-      return padT + plotH - (v / vmax) * plotH;
-    }
-    var parts = [];
-    parts.push(
-      '<svg class="trend-svg" viewBox="0 0 '
-      + w + ' ' + h
-      + '" role="img" aria-label="Ready trend">',
-    );
-    for (var t = 0; t < 5; t++) {
-      var frac = t / 4;
-      var msTick = yMax * (1 - frac);
-      var y = padT + plotH * frac;
-      parts.push(
-        '<line x1="' + padL + '" x2="' + (w - padR)
-        + '" y1="' + y + '" y2="' + y
-        + '" stroke="#2a3140"/>',
-      );
-      parts.push(
-        '<text x="' + (padL - 6) + '" y="' + (y + 4)
-        + '" fill="#9aa6b2" font-size="10" '
-        + 'text-anchor="end">'
-        + formatAxisTick(msTick, unit) + '</text>',
-      );
-    }
+    var html = buildTrendSvg(points, {
+      budgetMs: budget,
+      labelIndices: trendLabelIndices(page, 8),
+    });
     if (budget !== null) {
-      var by = yPos(budget);
-      parts.push(
-        '<line x1="' + padL + '" x2="' + (w - padR)
-        + '" y1="' + by + '" y2="' + by
-        + '" stroke="#56b6c2" '
-        + 'stroke-dasharray="4 3"/>',
-      );
-    }
-    var d = '';
-    for (var j = 0; j < xs.length; j++) {
-      var px = xPos(xs[j]);
-      var py = yPos(ys[j]);
-      d += (j === 0 ? 'M' : 'L') + px + ' ' + py + ' ';
-      parts.push(
-        '<circle cx="' + px + '" cy="' + py
-        + '" r="3.5" fill="#6ea8fe"/>',
-      );
-    }
-    parts.push(
-      '<path d="' + d
-      + '" fill="none" stroke="#6ea8fe" '
-      + 'stroke-width="2"/>',
-    );
-    var labelIdxs = trendLabelIndices(
-      sweeps, page, fromIndex, toIndex,
-    );
-    for (var li = 0; li < labelIdxs.length; li++) {
-      var xi = labelIdxs[li];
-      parts.push(
-        '<text x="' + xPos(xi) + '" y="' + (h - 12)
-        + '" fill="#9aa6b2" font-size="9" '
-        + 'text-anchor="middle">'
-        + sweeps[xi].sha + '</text>',
-      );
-    }
-    parts.push('</svg>');
-    if (budget !== null) {
-      parts.push(
+      html +=
         '<p class="muted">Dashed line = budget ceiling ('
-        + formatDurationPerf(budget, false) + ').</p>',
-      );
+        + formatDurationPerf(budget, false) + ').</p>';
     }
-    parts.push(
+    html +=
       '<p class="muted">Gaps mean the page was absent '
-      + 'from that sweep (partial --pages).</p>',
-    );
-    body.innerHTML = parts.join('');
+      + 'from that sweep. Drag point→point to set '
+      + 'window.</p>';
+    body.innerHTML = html;
+    wireTrend(body);
   }
   function renderPhase() {
     var body = document.getElementById('focus-body');
-    var to = sweeps[toIndex];
+    var to = sweeps[endIndex];
     var pageData = to.pages[focused];
     if (!pageData) {
       body.innerHTML =
         '<p class="muted">No phase data in the '
-        + '<strong>to</strong> sweep for this page.</p>';
+        + '<strong>end</strong> sweep for this page.</p>';
       return;
     }
     var r = rollupPhases(pageData.phases);
@@ -912,7 +1659,7 @@ function vizClientScript(): string {
       var pct = (ms / total) * 100;
       return '<div class="bar-seg" style="width:'
         + pct + '%;background:' + color
-        + '" title="' + name + '"></div>';
+        + '"></div>';
     }
     var html = '';
     html += '<div class="legend">'
@@ -1012,24 +1759,37 @@ function vizClientScript(): string {
     else if (mode === 'phase') renderPhase();
     else renderBudget();
   }
+  function renderViews() {
+    var sys = document.getElementById('view-system');
+    var pg = document.getElementById('view-page');
+    if (view === 'system') {
+      sys.className = 'view-system active';
+      pg.className = 'view-page';
+      renderSystem();
+    } else {
+      sys.className = 'view-system';
+      pg.className = 'view-page active';
+      renderRank();
+      renderPageMetrics();
+      renderFocus();
+    }
+  }
   function renderAll() {
     renderSummary();
-    renderRank();
-    renderKpis();
-    renderFocus();
+    renderCrumb();
+    renderViews();
   }
   document.querySelectorAll('[data-sort]').forEach(
     function (btn) {
       btn.addEventListener('click', function () {
         sort = btn.getAttribute('data-sort');
-        document.querySelectorAll('[data-sort]')
-          .forEach(function (b) {
-            b.setAttribute(
-              'aria-selected',
-              b === btn ? 'true' : 'false',
-            );
-          });
-        renderAll();
+        syncSortTabs();
+        if (view === 'page') {
+          renderRank();
+          renderPageMetrics();
+        } else {
+          renderSystem();
+        }
       });
     },
   );
@@ -1044,25 +1804,43 @@ function vizClientScript(): string {
               b === btn ? 'true' : 'false',
             );
           });
-        renderFocus();
+        if (view === 'page') renderFocus();
       });
     },
   );
-  document.getElementById('from-sel').addEventListener(
+  document.getElementById('start-sel').addEventListener(
     'change',
     function (ev) {
-      fromIndex = Number(ev.target.value);
+      var v = Number(ev.target.value);
+      if (v > endIndex) endIndex = v;
+      startIndex = v;
+      fillSelectors();
       renderAll();
     },
   );
-  document.getElementById('to-sel').addEventListener(
+  document.getElementById('end-sel').addEventListener(
     'change',
     function (ev) {
-      toIndex = Number(ev.target.value);
+      var v = Number(ev.target.value);
+      if (v < startIndex) startIndex = v;
+      endIndex = v;
+      fillSelectors();
       renderAll();
     },
   );
+  document.getElementById('reset-window')
+    .addEventListener('click', function () {
+      startIndex = 0;
+      endIndex = sweeps.length - 1;
+      fillSelectors();
+      renderAll();
+    });
+  window.addEventListener('hashchange', function () {
+    readHash();
+    renderAll();
+  });
   fillSelectors();
+  readHash();
   renderAll();
 })();
 `.replace(/^\n/, '');

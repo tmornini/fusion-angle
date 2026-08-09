@@ -495,3 +495,290 @@ export function trendLabelIndices(
     }
     return [...picked].sort((a, b) => a - b);
 }
+
+// --- page-set helpers (history surgery) ---
+
+export function pageKeySet(sweep: HistoryLine): string[] {
+    return Object.keys(sweep.pages).sort();
+}
+
+/**
+ * Mode of page key sets across sweeps (sorted key join).
+ * Ties break lexicographically on the joined key string
+ * so the result is stable. Empty sweeps → [].
+ */
+export function dominantPageKeySet(
+    sweeps: HistoryLine[],
+): string[] {
+    if (sweeps.length === 0) return [];
+    const counts = new Map<string, number>();
+    const sets = new Map<string, string[]>();
+    for (const s of sweeps) {
+        const keys = pageKeySet(s);
+        const sig = keys.join('\0');
+        counts.set(sig, (counts.get(sig) ?? 0) + 1);
+        sets.set(sig, keys);
+    }
+    let bestSig = '';
+    let bestCount = -1;
+    for (const [sig, n] of counts) {
+        if (
+            n > bestCount
+            || (n === bestCount && sig < bestSig)
+        ) {
+            bestCount = n;
+            bestSig = sig;
+        }
+    }
+    return sets.get(bestSig) ?? [];
+}
+
+/**
+ * Keep only sweeps whose page key set equals `keys`
+ * (same members; order independent via pageKeySet sort).
+ */
+export function filterFullRegistrySweeps(
+    sweeps: HistoryLine[],
+    keys: string[],
+): HistoryLine[] {
+    const want = keys.slice().sort().join('\0');
+    return sweeps.filter((s) => {
+        return pageKeySet(s).join('\0') === want;
+    });
+}
+
+// --- system aggregates ---
+
+export function meanReadyMs(
+    sweep: HistoryLine,
+): number | null {
+    const pages = Object.values(sweep.pages);
+    if (pages.length === 0) return null;
+    let sum = 0;
+    for (const p of pages) {
+        sum += p.readyMs;
+    }
+    return sum / pages.length;
+}
+
+export type SystemReadyPoint = {
+    index: number;
+    meanMs: number;
+    sampleCount: number;
+};
+
+export function systemReadySeries(
+    sweeps: HistoryLine[],
+    startIndex: number,
+    endIndex: number,
+): SystemReadyPoint[] {
+    const out: SystemReadyPoint[] = [];
+    const lo = Math.max(0, startIndex);
+    const hi = Math.min(sweeps.length - 1, endIndex);
+    for (let i = lo; i <= hi; i++) {
+        const s = sweeps[i];
+        if (s === undefined) continue;
+        const pages = Object.values(s.pages);
+        if (pages.length === 0) continue;
+        let sum = 0;
+        for (const p of pages) {
+            sum += p.readyMs;
+        }
+        out.push({
+            index: i,
+            meanMs: sum / pages.length,
+            sampleCount: pages.length,
+        });
+    }
+    return out;
+}
+
+export function systemDeltaMs(
+    sweeps: HistoryLine[],
+    startIndex: number,
+    endIndex: number,
+): number | null {
+    if (startIndex === endIndex) return null;
+    const from = sweeps[startIndex];
+    const to = sweeps[endIndex];
+    if (from === undefined || to === undefined) {
+        return null;
+    }
+    const a = meanReadyMs(from);
+    const b = meanReadyMs(to);
+    if (a === null || b === null) return null;
+    return b - a;
+}
+
+export type BudgetPressureRow = {
+    page: string;
+    readyMs: number | null;
+    budgetMs: number | null;
+    budgetPct: number | null;
+};
+
+export type BudgetPressure = {
+    over: number;
+    within: number;
+    unknown: number;
+    rows: BudgetPressureRow[];
+};
+
+export function budgetPressure(
+    sweeps: HistoryLine[],
+    budgets: Budgets,
+    endIndex: number,
+): BudgetPressure {
+    const to = sweeps[endIndex];
+    if (to === undefined) {
+        return {
+            over: 0,
+            within: 0,
+            unknown: 0,
+            rows: [],
+        };
+    }
+    const pages = pageKeysUnion(sweeps);
+    let over = 0;
+    let within = 0;
+    let unknown = 0;
+    const rows: BudgetPressureRow[] = [];
+    for (const page of pages) {
+        const readyMs = to.pages[page]?.readyMs;
+        const budgetMs = budgets[page]?.readyMs;
+        if (
+            readyMs === undefined
+            || budgetMs === undefined
+        ) {
+            unknown += 1;
+            rows.push({
+                page,
+                readyMs: readyMs === undefined
+                    ? null
+                    : readyMs,
+                budgetMs: budgetMs === undefined
+                    ? null
+                    : budgetMs,
+                budgetPct: null,
+            });
+            continue;
+        }
+        const pct = budgetRatio(readyMs, budgetMs);
+        if (readyMs > budgetMs) {
+            over += 1;
+        } else {
+            within += 1;
+        }
+        rows.push({
+            page,
+            readyMs,
+            budgetMs,
+            budgetPct: pct,
+        });
+    }
+    rows.sort((a, b) => {
+        return cmpNumDescNullLast(
+            a.budgetPct, b.budgetPct,
+        );
+    });
+    return { over, within, unknown, rows };
+}
+
+export type MeanPhaseBuckets = {
+    boot: number;
+    fetch: number;
+    render: number;
+    other: number;
+};
+
+export function meanPhaseBuckets(
+    sweeps: HistoryLine[],
+    endIndex: number,
+): MeanPhaseBuckets {
+    const empty = {
+        boot: 0, fetch: 0, render: 0, other: 0,
+    };
+    const to = sweeps[endIndex];
+    if (to === undefined) return empty;
+    const pageEntries = Object.values(to.pages);
+    if (pageEntries.length === 0) return empty;
+    let boot = 0;
+    let fetch = 0;
+    let render = 0;
+    let other = 0;
+    for (const p of pageEntries) {
+        const r = rollupPhases(p.phases);
+        boot += r.buckets.boot;
+        fetch += r.buckets.fetch;
+        render += r.buckets.render;
+        other += r.buckets.other;
+    }
+    const n = pageEntries.length;
+    return {
+        boot: boot / n,
+        fetch: fetch / n,
+        render: render / n,
+        other: other / n,
+    };
+}
+
+export type SystemMetrics = {
+    sweepsInWindow: number;
+    totalSweeps: number;
+    pageCount: number;
+    meanReadyMs: number | null;
+    systemDeltaMs: number | null;
+    overBudget: number;
+    budgetP50: number | null;
+};
+
+export function systemMetrics(
+    sweeps: HistoryLine[],
+    budgets: Budgets,
+    startIndex: number,
+    endIndex: number,
+): SystemMetrics {
+    const totalSweeps = sweeps.length;
+    const lo = Math.min(startIndex, endIndex);
+    const hi = Math.max(startIndex, endIndex);
+    const sweepsInWindow = totalSweeps === 0
+        ? 0
+        : hi - lo + 1;
+    const pageCount = pageKeysUnion(sweeps).length;
+    const endSweep = sweeps[endIndex];
+    const meanReady = endSweep === undefined
+        ? null
+        : meanReadyMs(endSweep);
+    const delta = systemDeltaMs(
+        sweeps, startIndex, endIndex,
+    );
+    const pressure = budgetPressure(
+        sweeps, budgets, endIndex,
+    );
+    const pcts: number[] = [];
+    for (const row of pressure.rows) {
+        if (row.budgetPct !== null) {
+            pcts.push(row.budgetPct);
+        }
+    }
+    let budgetP50: number | null = null;
+    if (pcts.length > 0) {
+        const sorted = pcts.slice().sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        if (sorted.length % 2 === 1) {
+            budgetP50 = sorted[mid]!;
+        } else {
+            budgetP50 =
+                (sorted[mid - 1]! + sorted[mid]!) / 2;
+        }
+    }
+    return {
+        sweepsInWindow,
+        totalSweeps,
+        pageCount,
+        meanReadyMs: meanReady,
+        systemDeltaMs: delta,
+        overBudget: pressure.over,
+        budgetP50,
+    };
+}

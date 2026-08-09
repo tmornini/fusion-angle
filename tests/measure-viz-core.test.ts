@@ -17,6 +17,15 @@ import {
     rankPages,
     buildPayload,
     trendLabelIndices,
+    pageKeySet,
+    dominantPageKeySet,
+    filterFullRegistrySweeps,
+    meanReadyMs,
+    systemReadySeries,
+    systemDeltaMs,
+    budgetPressure,
+    meanPhaseBuckets,
+    systemMetrics,
     MEASURE_BOOT_PAGE_INIT,
     VIZ_PAYLOAD_VERSION,
 } from '../web-app/app/measure-viz-core.ts';
@@ -575,4 +584,202 @@ test('not-found shaped fixture labels the peak', () => {
         'idx 6 must not be labeled for not-found',
     );
     assert.ok(!labels.includes(7));
+});
+
+// --- page-set / surgery helpers ---
+
+test('pageKeySet returns sorted keys', () => {
+    const s = sampleSweep('t', {
+        zebra: { readyMs: 1, phases: {} },
+        alpha: { readyMs: 2, phases: {} },
+    });
+    assert.deepEqual(pageKeySet(s), ['alpha', 'zebra']);
+});
+
+test('dominantPageKeySet picks mode by frequency', () => {
+    const full = {
+        a: { readyMs: 1, phases: {} },
+        b: { readyMs: 2, phases: {} },
+    };
+    const partial = {
+        a: { readyMs: 1, phases: {} },
+    };
+    const sweeps = [
+        sampleSweep('t0', full),
+        sampleSweep('t1', full),
+        sampleSweep('t2', partial),
+    ];
+    assert.deepEqual(
+        dominantPageKeySet(sweeps),
+        ['a', 'b'],
+    );
+});
+
+test('filterFullRegistrySweeps drops unequal sets', () => {
+    const keys = ['a', 'b'];
+    const full = {
+        a: { readyMs: 10, phases: {} },
+        b: { readyMs: 20, phases: {} },
+    };
+    const partial = {
+        a: { readyMs: 10, phases: {} },
+    };
+    const extra = {
+        a: { readyMs: 10, phases: {} },
+        b: { readyMs: 20, phases: {} },
+        c: { readyMs: 30, phases: {} },
+    };
+    const sweeps = [
+        sampleSweep('t0', full),
+        sampleSweep('t1', partial),
+        sampleSweep('t2', full),
+        sampleSweep('t3', extra),
+    ];
+    const kept = filterFullRegistrySweeps(sweeps, keys);
+    assert.equal(kept.length, 2);
+    assert.equal(kept[0]!.at, 't0');
+    assert.equal(kept[1]!.at, 't2');
+});
+
+// --- system aggregates ---
+
+test('meanReadyMs averages present pages only', () => {
+    const s = sampleSweep('t', {
+        a: { readyMs: 100, phases: {} },
+        b: { readyMs: 200, phases: {} },
+    });
+    assert.equal(meanReadyMs(s), 150);
+});
+
+test('meanReadyMs null when no pages', () => {
+    assert.equal(
+        meanReadyMs(sampleSweep('t', {})),
+        null,
+    );
+});
+
+test('systemReadySeries window and sampleCount', () => {
+    const sweeps = [
+        sampleSweep('t0', {
+            a: { readyMs: 100, phases: {} },
+            b: { readyMs: 200, phases: {} },
+        }),
+        sampleSweep('t1', {
+            a: { readyMs: 300, phases: {} },
+        }),
+        sampleSweep('t2', {
+            a: { readyMs: 400, phases: {} },
+            b: { readyMs: 600, phases: {} },
+        }),
+    ];
+    const series = systemReadySeries(sweeps, 0, 2);
+    assert.equal(series.length, 3);
+    assert.deepEqual(series[0], {
+        index: 0,
+        meanMs: 150,
+        sampleCount: 2,
+    });
+    assert.deepEqual(series[1], {
+        index: 1,
+        meanMs: 300,
+        sampleCount: 1,
+    });
+    assert.deepEqual(series[2], {
+        index: 2,
+        meanMs: 500,
+        sampleCount: 2,
+    });
+    const mid = systemReadySeries(sweeps, 1, 1);
+    assert.equal(mid.length, 1);
+    assert.equal(mid[0]!.index, 1);
+});
+
+test('systemDeltaMs end minus start means', () => {
+    const sweeps = [
+        sampleSweep('t0', {
+            a: { readyMs: 100, phases: {} },
+            b: { readyMs: 200, phases: {} },
+        }),
+        sampleSweep('t1', {
+            a: { readyMs: 400, phases: {} },
+            b: { readyMs: 600, phases: {} },
+        }),
+    ];
+    // 500 - 150 = 350
+    assert.equal(systemDeltaMs(sweeps, 0, 1), 350);
+    assert.equal(systemDeltaMs(sweeps, 0, 0), null);
+});
+
+test('budgetPressure counts over within unknown', () => {
+    const sweeps = [
+        sampleSweep('t0', {
+            a: { readyMs: 150, phases: {} },
+            b: { readyMs: 50, phases: {} },
+            c: { readyMs: 80, phases: {} },
+        }),
+    ];
+    const budgets = {
+        a: { readyMs: 100 },
+        b: { readyMs: 100 },
+        // c missing budget → unknown
+    };
+    const r = budgetPressure(sweeps, budgets, 0);
+    assert.equal(r.over, 1);
+    assert.equal(r.within, 1);
+    assert.equal(r.unknown, 1);
+    assert.equal(r.rows[0]!.page, 'a');
+    assert.ok(r.rows[0]!.budgetPct! > 1);
+});
+
+test('meanPhaseBuckets averages rollups at end', () => {
+    const sweeps = [
+        sampleSweep('t0', {
+            a: {
+                readyMs: 100,
+                phases: {
+                    'boot:x': 10,
+                    'fetch:y': 20,
+                    'render:z': 30,
+                },
+            },
+            b: {
+                readyMs: 200,
+                phases: {
+                    'boot:x': 30,
+                    'fetch:y': 40,
+                    'render:z': 50,
+                },
+            },
+        }),
+    ];
+    const buckets = meanPhaseBuckets(sweeps, 0);
+    assert.equal(buckets.boot, 20);
+    assert.equal(buckets.fetch, 30);
+    assert.equal(buckets.render, 40);
+    assert.equal(buckets.other, 0);
+});
+
+test('systemMetrics composes window metrics', () => {
+    const sweeps = [
+        sampleSweep('t0', {
+            a: { readyMs: 100, phases: {} },
+            b: { readyMs: 200, phases: {} },
+        }),
+        sampleSweep('t1', {
+            a: { readyMs: 300, phases: {} },
+            b: { readyMs: 500, phases: {} },
+        }),
+    ];
+    const budgets = {
+        a: { readyMs: 250 },
+        b: { readyMs: 400 },
+    };
+    const m = systemMetrics(sweeps, budgets, 0, 1);
+    assert.equal(m.sweepsInWindow, 2);
+    assert.equal(m.totalSweeps, 2);
+    assert.equal(m.pageCount, 2);
+    assert.equal(m.meanReadyMs, 400);
+    assert.equal(m.systemDeltaMs, 250);
+    assert.equal(m.overBudget, 2);
+    assert.ok(m.budgetP50 !== null);
 });
