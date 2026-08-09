@@ -201,3 +201,14 @@
     font-size: 1.125rem;
     font-weight: var(--font-weight-bold);
 }
+
+/* List projected-impact cell: tone on strong */
+.projected-impact-cell strong[data-tone="success"] {
+    color: hsl(var(--success));
+}
+.projected-impact-cell strong[data-tone="error"] {
+    color: hsl(var(--destructive));
+}
+.projected-impact-cell strong[data-tone="muted"] {
+    color: hsl(var(--muted-foreground));
+}

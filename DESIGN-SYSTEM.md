@@ -27,9 +27,36 @@ matching token from `tokens.css`:
 | `blue-800` | `217 42% 22%` | Headlines |
 | `blue-900` | `217 45% 15%` | **Primary text** |
 
+### Yellow Scale
+| Token | HSL | Usage |
+|-------|-----|-------|
+| `yellow-50` | `48 80% 96%` | Light backgrounds |
+| `yellow-100` | `48 85% 90%` | Soft accents |
+| `yellow-200` | `48 90% 80%` | Soft fills |
+| `yellow-300` | `48 95% 65%` | Mid accents |
+| `yellow-400` | `48 98% 55%` | **Primary yellow** |
+| `yellow-500` | `45 95% 48%` | Hover / gradient end |
+| `yellow-600` | `40 90% 42%` | Active / pressed |
+
+`--accent` aliases `yellow-400`; `--accent-foreground`
+is `blue-900` (both in `tokens.css`).
+
 ### Neutral Grays (Blue-tinted)
 All grays are derived from blue tones for brand cohesion.
 **Never use pure black (#000)**.
+
+| Token | HSL | Usage |
+|-------|-----|-------|
+| `gray-50` | `220 20% 98%` | App background (light) |
+| `gray-100` | `220 18% 96%` | Subtle surfaces |
+| `gray-200` | `218 16% 91%` | Borders, muted fills |
+| `gray-300` | `217 14% 82%` | Strong borders |
+| `gray-400` | `217 12% 65%` | Muted icons/text |
+| `gray-500` | `217 10% 50%` | Mid neutrals |
+| `gray-600` | `217 12% 40%` | Secondary text |
+| `gray-700` | `217 14% 30%` | Strong secondary |
+| `gray-800` | `217 16% 22%` | Dark surfaces |
+| `gray-900` | `217 20% 15%` | Darkest surfaces/text |
 
 ## 2. Typography System
 
@@ -65,8 +92,16 @@ All grays are derived from blue tones for brand cohesion.
 |--------|------------|--------|------|-------|
 | Success | `success-soft` | `success-border` | `success-text` | Approved |
 | Warning | `warning-soft` | `warning-border` | `warning-text` | Pending  |
+| Danger | — | — | `danger` | Hazard, not-ready |
 | Error | `error-soft` | `error-border` | `error-text` | Rejected, failed |
 | Info | `info-soft` | `info-border` | `info-text` | Informational |
+
+`danger` is a solid accent only (no soft/border/text
+trio). Escalation above warning for flow hazard chrome
+(`.flow-node-danger`, `.flow-stats-node-danger`) and
+workbox `.not-ready-icon`. Theme values: light
+`0 80% 45%`, dark `0 75% 60%`. See also
+`[data-level="danger"]` below.
 
 ### Contrast Ratios
 
@@ -85,10 +120,12 @@ relative luminance); every pair clears the 4.5:1 AA floor.
 
 Components apply semantic variants through `data-*` attributes
 on a base class rather than distinct class names. Presenters
-emit the attribute value; the attribute selectors in the
-`components-*.css` files bind it to the matching token set.
-The TypeScript enum returned by `toneFor*()` / `levelFor*()`
-helpers and the CSS selectors share a single source of truth.
+emit the attribute value; attribute selectors in
+`components-*.css` and some `pages-*.css` files bind it to
+the matching token set.
+Helpers such as `toneForScore()` / `levelForUsage()` return
+tone and level strings aligned by convention with the CSS
+selectors — not a shared TypeScript enum or generated SSOT.
 
 ```html
 <div class="icon-box" data-tone="success">…</div>
@@ -100,8 +137,12 @@ helpers and the CSS selectors share a single source of truth.
 `error`, `info`, `muted`.
 Applied to: `.pill`, `.icon-box`, `.icon-box-lg`,
 `.legend-dot`, `.btn-outline`, `.gauge-card`, `.ds-soft-btn`,
-`.ds-soft-row`, `.spark-tip-change`, and
-`.score-history-table td` (score cells, via `toneForScore`).
+`.ds-soft-row`, `.spark-tip-change`,
+`.score-history-table td` (score cells, via `toneForScore`),
+`.work-order-conflict`, and `.record-instance-conflict`.
+Not every class binds every tone — e.g. `.pill` is only
+`success|warning|error`; conflict classes bind `warning`
+only; `.icon-box` / `.icon-box-lg` take the full set.
 
 **`[data-level]` values**: `normal`, `warning`, `danger`.
 Applied to: `.progress-bar` fill regions.
@@ -130,6 +171,7 @@ inline-style strings.
 | `space-2` | 0.5rem | 8px |
 | `space-3` | 0.75rem | 12px |
 | `space-4` | 1rem | 16px |
+| `space-5` | 1.25rem | 20px |
 | `space-6` | 1.5rem | 24px |
 | `space-8` | 2rem | 32px |
 | `space-12` | 3rem | 48px |
@@ -154,6 +196,12 @@ inline-style strings.
 | `ghost` | Minimal UI, icons | Icon buttons |
 | `destructive` | Dangerous actions | "Delete" |
 | `success` | Positive actions | "Approve" |
+| `accent` | Gradient accent (`btn-accent`) | Landing CTA |
+| `hero` | Gradient hero (`btn-hero`) | Ideas/records CTA |
+| `outline-hero` | Hero outline (`btn-outline-hero`) | Landing secondary |
+| `outline-light` | Light outline (`btn-outline-light`) | On dark chrome |
+| `outline-error` | Error outline (`btn-outline-error`) | Destructive alt |
+| `link` | Inline link button (`.link`) | Text navigation |
 
 #### Sizes
 | Size | Height | Usage |
@@ -273,11 +321,11 @@ radius. Three types, all rendered with the unified
 `hsl(var(--primary))`, Create `hsl(var(--success))`, and
 Archive `hsl(var(--error))`:
 
-| Type    | Port             | Draggable |
-|---------|------------------|-----------|
-| Create  | When unconnected | Yes       |
-| Archive | When unconnected | Yes       |
-| Regular | Right side       | Yes       |
+| Type    | Port                                    | Draggable |
+|---------|-----------------------------------------|-----------|
+| Create  | When unconnected                        | Yes       |
+| Archive | When unconnected                        | Yes       |
+| Regular | Default right-center; else max free gap | Yes       |
 
 A Create or Archive node shows a port only while it has no
 connections (`canShowPort`); a connected special node hides it.
@@ -435,6 +483,10 @@ mode. Toggle is persisted to `localStorage` and respects
 | `fast` | 150ms | Hover, focus |
 | `normal` | 200ms | Transitions |
 | `slow` | 300ms | Modals, drawers |
+| `progress` | 300ms | Progress bar width |
+| `shimmer` | 1.5s | Loading shimmer |
+| `pulse` | 2s | Gauge draw pulse |
+| `spin-slow` | 3s | Slow spinner |
 
 ### Easing
 - **Default**: `cubic-bezier(0.4, 0, 0.2, 1)` - Most transitions
@@ -457,7 +509,8 @@ mode. Toggle is persisted to `localStorage` and respects
 
 ### Icon Sizing
 Sizes are a named tier scale — `ICON_SIZE` in `icons.ts` —
-sharing the tier names of the `--text-*` typography tokens.
+extending the `--text-*` typography tier names (adds
+`5xl` / `6xl` beyond `--text-4xl`).
 The `IconFn` size argument is typed `IconSize`, so a call
 passing an off-scale pixel value fails the type-check.
 
@@ -525,10 +578,31 @@ passing an off-scale pixel value fails the type-check.
 ## 12. CSS Architecture
 
 Source lives in `web-app/app/styles/`. Single source of truth —
-no raw style strings except dynamic CSS custom properties
-(`style="--…"`). CSP allows `style-src-attr 'unsafe-inline'`
-for those data-driven attributes; colors stay in the design
-system.
+no raw style strings except:
+
+1. **Dynamic per-element values.** CSS custom properties
+   (`style="--…"`) for progress widths, heat intensity, and
+   similar data-driven chrome.
+2. **Bootstrap fallbacks.** `database-init.ts`
+   `handleDatabaseError` uses raw CSS when tokens or
+   component classes may not load (file-header comment).
+
+CSP allows `style-src-attr 'unsafe-inline'` for those
+data-driven attributes; colors stay in the design system
+except the bootstrap error UI.
+
+### Page-content widths
+
+Named by the kind of work the page supports, not by
+measurement (`tokens.css`). Helpers in
+`components-layout-helpers.css` set `max-width` and
+horizontal auto-margins:
+
+| Class | Token | Value | Kind of work |
+|-------|-------|-------|--------------|
+| `.entity` | `--width-entity` | 48rem | Entity detail/forms |
+| `.overview` | `--width-overview` | 64rem | Mid-width overviews |
+| `.workspace` | `--width-workspace` | 96rem | Full workspace lists |
 
 ### Cascade order
 

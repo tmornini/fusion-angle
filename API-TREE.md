@@ -1,34 +1,36 @@
-Take a look at this URI schema.
+URI tree of the HTTP surface; source of record is api/routes.ts (the route table), api/api.ts (handleRequest pre-match + facades), api/invitations-domain.ts (the invitation sub-router), and api/organization-requests.ts (the org/default-org sub-routers).
 
-Please analyze how this fits into the applications's state needs, what verbs need to be implemented, what's missing, etc.
-
-Know that every entity will be kept in a backend structured in this way: ~/.claude/plans/go-to-church-binary-stonebraker.md.
-
-That mechanism will replace the existing ledger's and common states system by moving said state into each message stored message.
-
-└─|─ /invitations/ • RECONCILED: derived view, but NOT a registered family — the permanent side channel (Author gate 2); grant/accept synthesize PUT-shaped document pairs off the route table, rows derive from PUT-method document heads at /invitations/ and state from op-address pair presence (accepted/declined/revoked/pending), the facade's 404-only verb regime preserved — Phase 15 gate 6 re-homes grant email onto deriveIdentityPiiRows and pendingInvitationFor/loadInvitation onto deriveInvitations (no live invitations-table decision read) — see the roster seam FLIPPED 2026-07-06 block + Phase 15 FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
+└─|─ /invitations/ • RECONCILED: derived view, but NOT a registered family — the permanent side channel (Author gate 2); grant/accept synthesize PUT-shaped document pairs off the route table, rows derive from PUT-method document heads at /invitations/ and state from op-address pair presence (accepted/declined/revoked/pending), the facade's 404-only verb regime preserved — Phase 15 gate 6 re-homes grant email onto deriveIdentityPiiRows and pendingInvitationFor/loadInvitation onto deriveInvitations (no live invitations-table decision read) — see the roster seam FLIPPED 2026-07-06 block + Phase 15 FLIPPED
   |  └── :id
 └─|─ /memberships/ • RECONCILED: shipped as the EIGHTH registered family (organizationNested:true, 'stateless' — a pure join relation, no lifecycle), collection + entity GETs served by the generic document handlers, DELETE a marked tombstone; the members/human-members/ai-members derive-on-read directory is realized over this ∩ the ninth-through-eleventh global-plane member families — see the same block (Author gate 1)
   |  └── :id
-└─|─ work-orders/ • derived view over org-nested canonical storage
+└─|─ /members/ • RECONCILED: ninth registered family, GLOBAL plane (organizationNested:false, lifecycle:'trio'); GET collection org-fenced via memberships join; GET|PUT members/:id document; GET members/:id/history (global miss → 404)
+  |  └── :id
+  |      └── /history
+└─|─ /ai-members/ • RECONCILED: tenth registered family, GLOBAL plane (detail facet, 'stateless'); GET collection; GET|PUT :id document; POST collection create + POST :id edit (admin)
+  |  └── :id
+└─|─ /human-members/ • RECONCILED: eleventh registered family, GLOBAL plane (detail facet, 'stateless'); GET collection; GET :id; POST collection create + POST :id edit (admin); NO live PUT on :id (wiring/seed only)
+  |  └── :id
+└─|─ /current-member • RECONCILED: GET actor's own member parent (global plane; deriveMemberParent)
+└─|─ /identity-pii • RECONCILED: GET collection roster (fenced via membership pair plane over deriveIdentityPiiRows) — distinct from nested identities/:id/pii
+└─|─ work-orders/ • RECONCILED: registered org-nested document family (organizationNested:true, concurrency:'simple', lifecycle:'stateless' — flat wire; storage uri_prefix nests org), collection + entity GETs with optional binding enrichment (instance_id + record_type_id), PUT via documentPutHandler, POST create, named ops claim/transition/release/binding; no DELETE
   |  └── :id/
   |      └── claim                            • RECONCILED: claim graph head from workOrderDocumentHeadFor (Phase 15 Task 2); contention 409 + nonexistent-WO 404 + foreign-WO 403 held — see Phase 15 FLIPPED + honest HTTP status covenant
-  |      └── transition                       • TARGET-STATE (this stack): post-Phase-2 body (instance_id + record_type_id + set/clear); If-Match preconditions bound instance head (named RFC 9110 §13.1.1 deviation); op + revision one-tx; legacy fieldValues key → 400 at the gate; pure moves carry neither If-Match nor asserts — see API.md §3.19
+  |      └── transition                       • RECONCILED: POST work-orders/:id/transition — post-Phase-2 body (instance_id + record_type_id + set/clear); If-Match preconditions bound instance head (named RFC 9110 §13.1.1 deviation); op + revision one-tx; legacy fieldValues key → 400 at the gate; pure moves carry neither If-Match nor asserts — see API.md §3.19
   |      └── release                          • RECONCILED: POST work-orders/:id/release — named unclaim op, 204, read-decide-append, replayed at derive; foreign-WO 403; nonexistent-WO 404
-  |      └── binding                          • TARGET-STATE (this stack): named bind op — member-tier POST; current bind derived from op pairs (claim precedent); rebind 409; WO GET embeds instance_id + record_type_id — see API.md §3.34
+  |      └── binding                          • RECONCILED: POST work-orders/:id/binding — named bind op, member-tier POST; current bind derived from op pairs (claim precedent); rebind 409; WO GET embeds instance_id + record_type_id — see API.md §3.34
 └─|─ /identities/
-  |  └── :id                                   • default-organization is an attribute of the identity itself
-  |      └─|─ /credentials                     • all of them, single document
+  |  └── :id
+  |      └─|─ /default-org                     • RECONCILED: GET|PUT side channel (api/organization-requests.ts) — self-only tree-ownership gate; pair-plane ledger at /identities/:id/default-org/; PUT appends only when org changes and membership holds
+  |      └─|─ /credentials                     • RECONCILED: collection GET returns rows[]; not a singleton document
+  |      |  └── :cid                           • GET|PUT per-credential document at identities/:id/credentials/:cid
   |      └─|─ /notifications                   • TARGET-STATE: postgres LISTEN/NOTIFY for all changes to identity
-  |      └─|─ /pii                             • full physical removal from the DB required, i.e. physical delete, all others: Delete-At: header
+  |      └─|─ /pii                             • GET|PUT|DELETE nested document; full physical removal from the DB required, i.e. physical delete (sole hard-delete zone; no Delete-At header)
   |      └─|─ /registration                    • RECONCILED (clients retirement): client registration facet — single-slot PUT-overwrite document (grant_types, redirect_uris, jwks, aud, status), admin-realm writes, kind-'service' gate; grantClientCredentials derives it pre-token (bearer-exempt precedent); DELETE tombstone = deregistration
   |      └─|─ /role-grants                     • RETIRED (membership type + claim roles)
-  |      └─|─ /third-party-identity-providers  • all of them, single document
-  |      └─|─ /token-revocations               • RECONCILED: shipped FLAT, not nested here — GET|PUT /identity-token-revocations/:id (GLOBAL-plane, no organization_id), the answer WAS "PUT/GET"; GET stays admin-only, PUT widened to member-tier SELF-target only at WP8 (Phase 13 Task 8) — a member may revoke its own chain, naming another identity still requires admin — see the Auth RECONCILED 2026-07-06 block, go-to-church-peaceful-castle.md §Phases 3…N
-  |      └─|─ /memberships/                    • /memberships/ with forced and/or filtered identity
-  |      └─|─ /organizations/                  • /organizations/ with forced and/or filtered identity
-  |      └─|─ /work-orders/                    • /work-orders/ with forced and/or filtered identity
-  |      └─|─ /tokens/                         • RECONCILED: shipped FLAT, not nested here — GET /identity-tokens, GET|PUT /identity-tokens/:id, POST /identity-tokens/:jti/rotation, POST /identity-tokens/:jti/revocation; both GETs derive from the pair plane (Phase 13 Task 6), PUT is pair-only and rotation/revocation append event pairs only (Task 5) — Phase 13 Task 9 retired the identity_tokens row store outright (alongside authorization_codes) — see the Auth RECONCILED 2026-07-06 block, go-to-church-peaceful-castle.md §Phases 3…N
+  |      └─|─ /third-party-identity-providers  • RECONCILED: shipped FLAT as GET identity-providers + GET|PUT identity-providers/:id (GLOBAL multi-document event ledger); not nested under identities/:id and not a singleton — name third-party-* retired
+  |      └─|─ /token-revocations               • RECONCILED: shipped FLAT, not nested here — GET|PUT /identity-token-revocations/:id (GLOBAL-plane, no organization_id), the answer WAS "PUT/GET"; GET stays admin-only, PUT widened to member-tier SELF-target only at WP8 (Phase 13 Task 8) — a member may revoke its own chain, naming another identity still requires admin — see the Auth RECONCILED 2026-07-06 block
+  |      └─|─ /tokens/                         • RECONCILED: shipped FLAT, not nested here — GET /identity-tokens, GET|PUT /identity-tokens/:id, POST /identity-tokens/:jti/rotation, POST /identity-tokens/:jti/revocation; both GETs derive from the pair plane (Phase 13 Task 6), PUT is pair-only and rotation/revocation append event pairs only (Task 5) — Phase 13 Task 9 retired the identity_tokens row store outright (alongside authorization_codes) — see the Auth RECONCILED 2026-07-06 block
   |        |  └── :id
   |        |      ├── /rotation                • is this a POST? — YES, see the /tokens/ RECONCILED note above
   |        |      └── /revocation              • is this a POST? — YES, see the /tokens/ RECONCILED note above
@@ -38,19 +40,35 @@ That mechanism will replace the existing ledger's and common states system by mo
 └─|─ /organizations/
   |  └─|─ :id
   |    |  └── /notifications                  • TARGET-STATE: postgres LISTEN/NOTIFY for all changes to organization
-  |    |  └── /objectives                     • RECONCILED: shipped as per-objective documents at objectives/:id (the seventh registered family, 'simple' + lifecycle 'trio' — genesis at create, archive/reactivate via the document PUT), collection served by the generic document handler over per-entity heads, revision history as per-objective message history at objectives/:id/revisions/, NOT a single org document — see the objectives FLIPPED 2026-07-05 block + states-address retirement, go-to-church-peaceful-castle.md §Phased sequence (Author gates 1/3)
+  |    |  └── /objectives                     • RECONCILED: shipped as per-objective documents at objectives/:id (the seventh registered family, 'simple' + lifecycle 'trio' — genesis at create, archive/reactivate via the document PUT), collection served by the generic document handler over per-entity heads, NOT a single org document — see the objectives FLIPPED 2026-07-05 block + states-address retirement (Author gates 1/3)
+  |    |      └── :id
+  |    |          └── /revisions/
+  |    |              └── :rid                • RECONCILED: objectives/:id/revisions — GET collection under objective; PUT leaf only (bespoke deriveObjectiveRevisions)
   |    |  └── /flows/
   |    |      └── :id
-  |    |          └── /undo                    • RECONCILED: undo-as-replay (Phase 14 Task 8) — body shrinks to {eventId, at}, both still client-minted; the restore target resolves SERVER-SIDE pre-tx by replaying this flow's OWN flows/:id document-pair history against its OWN undo operation-pair history (stack+pointer, cursor keyed by the undo pairs' stored REQUEST at, never the response at); graphDelta/revivals are now SERVER-computed (SIDECAR-KEEP: the wire SHAPE persists, the client is never told the target to diff against); flow_versions consume/publish stopped (Phase 14), routes RETIRED (Phase 15 Task 7, router 404), TABLE DELETED (Phase Final) — see Phase 14/15/Final FLIPPED, go-to-church-peaceful-castle.md §Phases 3…N
+  |    |          └── /undo                    • RECONCILED: undo-as-replay (Phase 14 Task 8) — body shrinks to {eventId, at}, both still client-minted; the restore target resolves SERVER-SIDE pre-tx by replaying this flow's OWN flows/:id document-pair history against its OWN undo operation-pair history (stack+pointer, cursor keyed by the undo pairs' stored REQUEST at, never the response at); graphDelta/revivals are now SERVER-computed (SIDECAR-KEEP: the wire SHAPE persists, the client is never told the target to diff against); flow_versions consume/publish stopped (Phase 14), routes RETIRED (Phase 15 Task 7, router 404), TABLE DELETED (Phase Final) — see Phase 14/15/Final FLIPPED
   |    |          └── /versions/               • RECONCILED: RETIRED + DELETED — Phase 15 Task 7 router-404'd GET|POST /flows/:id/versions and GET|PUT|DELETE /flows/:id/versions/:vid; Phase Final DELETED the flow_versions table with the rest of the row plane
-  |    |          └── /tags/                   • RECONCILED: flow tags (Phase 14 Task 9) — GET|PUT|DELETE flows/:id/tags/:name, SIMPLE class (the locked four-outcome table is structurally MOOT here — isLockedWrite exact-matches flows/:id, never this 4-segment address); the codebase's FIRST document family with NO backing table at all, derived entirely from the pair plane — flow_response_id (one flow document pair's own pinned response id) is the tag's only body field; DELETE is a marked tombstone, no row to splice; post-Phase-Final every family shares this no-table posture — see .superpowers/sdd/progress.md
+  |    |          └── /tags/                   • RECONCILED: flow tags (Phase 14 Task 9) — GET|PUT|DELETE flows/:id/tags/:name, SIMPLE class (the locked four-outcome table is structurally MOOT here — isLockedWrite exact-matches flows/:id, never this 4-segment address); the codebase's FIRST document family with NO backing table at all, derived entirely from the pair plane — flow_response_id (one flow document pair's own pinned response id) is the tag's only body field; DELETE is a marked tombstone, no row to splice; post-Phase-Final every family shares this no-table posture
   |    |              └── :name
+  |    |          └── /work-orders/
+  |    |              └── :woid               • RECONCILED: flows/:id/work-orders — flow↔work-order join; GET collection; PUT leaf (bespoke deriveFlowWorkOrders)
+  |    |          └── /records/
+  |    |              └── :frid               • RECONCILED: flows/:id/records — flow↔record-type binding; GET collection + GET|PUT|DELETE leaf (bespoke deriveFlowRecords)
   |    |  └── /ideas/
   |    |      └── :id
+  |    |          └── /conversion             • RECONCILED: POST ideas/:id/conversion — promote idea→project (+ baseline score pairs) in one tx
+  |    |          └── /submissions/
+  |    |              └── :sid                • RECONCILED: ideas/:id/submissions — GET collection under idea; PUT leaf only
   |    |  └── /memberships/                   • canonical storage (tenancy covenant)
   |    |  └── /projects/
   |    |      └── :id
-  |    |          └── /scores                 • RECONCILED: NOT built — no consumer; the baseline and actual scores are shipped as per-row documents at projects/:id/objective-baseline-scores and objective-actual-scores, each flipped via a bespoke per-parent derive module — see the same block (Author gate 2)
+  |    |          └── /flows/
+  |    |              └── :pfid               • RECONCILED: projects/:id/flows — project↔flow join; GET collection; PUT leaf (bespoke deriveProjectFlows)
+  |    |          └── /scores                 • RECONCILED: NOT built as /scores — no consumer; live score documents are the sibling objective-*-scores leaves below
+  |    |          └── /objective-baseline-scores/
+  |    |              └── :sid                • RECONCILED: projects/:id/objective-baseline-scores — GET collection under project; PUT leaf (bespoke deriveBaselineScores)
+  |    |          └── /objective-actual-scores/
+  |    |              └── :sid                • RECONCILED: projects/:id/objective-actual-scores — GET collection under project; PUT leaf (bespoke deriveActualScores)
   |    |  └── /record-types/                  • RECONCILED (org-nested record-types wave): nested-primary wire = storage; NO dual-wire /records facade; in-table match BEFORE facade (dispatch inversion); path org must match fenced claim else 403 (no auto-exchange); member READ / admin MUTATION on schema; flat /records and /record-attributes RETIRED (router 404; snapshot retired-prefix scan rejects legacy uri_prefix) — see API.md §2.8 / §5.7 / §5.20
   |    |      └── :record-type-id
   |    |          └── /history                • lifecycle-trio history (member GET; one of the nine lifecycle registrations)
@@ -59,7 +77,7 @@ That mechanism will replace the existing ledger's and common states system by mo
   |    |          └── /instances/
   |    |              └── :instance-id        • RECONCILED: first-class data rows; member path-tier + per-attribute ACL; PUT create-only (409 if address spent, including tombstone); PATCH If-Match required (428 missing / 412 stale); DELETE tombstone-wins + placement RESTRICT (non-terminal bound WO → 409 describeReferrers voice; W5 no-abandon residual); GET projects by read ACL + strong ETag header (list rows embed etag field); full-state revision heads store {values}; wire PATCH is operation-plane set/clear — see API.md §5.20
   |    |                  └── /history        • value-revision chain (NOT a tenth lifecycle clone): {at, etag, values} DESC, projected by caller's CURRENT read ACL — the one value-history registration beside the nine lifecycle GETs
-  |    |  └── /work-orders/                   • canonical storage
+  |    |  └── /work-orders/                   • storage uri_prefix nests org (flat wire is top-level work-orders/ above)
   \    \
    \    \- organization membership authz realm
     \- administration authz realm

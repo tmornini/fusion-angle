@@ -60,9 +60,10 @@ recorded as that node's id (a base62 token), distinct in
 shape from the closed claim alphabet
 (`'claimed'`, `'claim_released'`, `'claim_expired'`) on
 the same `entity_id`. The states log carries both families;
-`adapters/state-events.ts` partitions them with
+`adapters/work-orders-queries.ts` partitions them with
 `isClaimState` (a closed-set test over the claim alphabet,
-defined in `api/work-order-claims.ts`). The
+defined in `api/work-order-claims.ts`) and exports the
+`TransitionEvent` shape. The
 mermaid parser does not translate either: a legacy `.mmd`
 file that names its special nodes `[Start]` / `[End]`
 imports with those literal names, surfacing the staleness
@@ -97,11 +98,14 @@ pair-plane only — see [ARCHITECTURE.md](ARCHITECTURE.md)
 write semantics. `getFlowGraph` reads through `ctx.GET` and
 parses the returned graph into the domain `FlowGraph`.
 `flow-mutations.ts` builds a client-minted save delta
-(node/edge upserts, `'deleted'` removals, member/attribute
-ledger events). Undo resolves its restore target from the
-flow's own document-pair history (server-side); reviving a
-previously removed node/edge id posts a `'restored'` event
-so the tombstoned id reappears.
+(node/edge upserts, `deletions: GraphDeletion[]`
+(eventId/entityId/at), member/attribute `'added'`|
+`'removed'` ledger events). Lifecycle `'deleted'`/
+`'restored'` are derived from deletions/revivals, not
+delta action tokens. Undo resolves its restore target from
+the flow's own document-pair history (server-side); reviving
+a previously removed node/edge id posts a `'restored'`
+event so the tombstoned id reappears.
 
 Hazards are two-tier and shared across the designer +
 stats canvases via the pure predicate
@@ -132,10 +136,10 @@ dropdown. The picker renders two sections: READY
 (clickable, carries `data-flow-id`) and NOT READY
 (disabled, no-entry icon, "N nodes need attention"
 subtitle, no `data-flow-id` so the click handler ignores
-it). `postWorkOrderCreation` re-runs
-`validateFlowForCreation` server-side and throws if the
+it). The client adapter `postWorkOrderCreation` re-runs
+`validateFlowForCreation` and throws before POST if the
 picker was somehow bypassed — defense in depth at the
-boundary.
+client boundary.
 
 The workbox shows every active and archived work order
 to every user; there is no per-user visibility filter.
@@ -169,10 +173,11 @@ icons). Node positions, though, do *not* come from the
 renderer:
 `getFlowGraph` runs `flow-graph-layout.ts`'s
 `withRenderableLayout`, which lays a flow out
-(`computeLayout`) whenever it is `is_auto_layout` or its
-stored positions are degenerate — so the stats renderer
-and the designer both start from real coordinates, not
-the persisted (0,0) placeholders. `runFlowLayout` /
+(`computeLayout`) whenever domain `isAutoLayout` is set
+(wire `is_auto_layout` on FlowWithGraph) or its stored
+positions are degenerate — so the stats renderer and the
+designer both start from real coordinates, not the
+persisted (0,0) placeholders. `runFlowLayout` /
 `runLayoutFromInputs` is the one `computeLayout` wrapper,
 shared by `getFlowGraph`, the designer's `applyAutoLayout`,
 and `flow-export`'s mermaid-import path.
@@ -202,6 +207,8 @@ widget ("Most-traveled paths") — tying control to canvas. The
 aggregate logic lives in the pure module
 `flow-stats-aggregate.ts` (`buildFlowStats(input) → model`);
 it consumes the universal `TransitionEvent[]` shape exported
-from `adapters/state-events.ts` — derived from the states
-log, not from any retired event table. The I/O wrapper is
-`adapters/flow-stats.ts`'s `getFlowStats(ctx, flowId)`.
+from `adapters/work-orders-queries.ts` — derived from
+work-order history (`GET work-orders/history` and per-id
+history on the pair-plane lifecycle), not from any retired
+event table. The I/O wrapper is `adapters/flow-stats.ts`'s
+`getFlowStats(ctx, flowId, nowMs)`.

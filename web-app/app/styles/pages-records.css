@@ -1,3 +1,5 @@
+/* Records: attribute rows, instance editor, conflict banner. */
+
 .record-attribute-row {
     display: grid;
     grid-template-columns:
@@ -6,7 +8,7 @@
     gap: 0.75rem;
     padding: 0.5rem 0;
     border-bottom: 1px solid
-        hsl(var(--color-border));
+        hsl(var(--border));
 }
 
 .record-attribute-row:last-child {
@@ -21,7 +23,7 @@
     gap: 0.5rem;
     padding: 0.5rem 0;
     border-bottom: 1px solid
-        hsl(var(--color-border));
+        hsl(var(--border));
 }
 
 .record-attribute-pending-row {
@@ -61,7 +63,7 @@
 
 .flow-attribute-fieldset {
     border: 1px solid
-        hsl(var(--color-border));
+        hsl(var(--border));
     border-radius: 0.5rem;
     padding: 0.75rem;
     margin-bottom: 0.75rem;
@@ -114,7 +116,7 @@
     gap: 1rem;
     padding: 0.5rem 0;
     border-bottom: 1px solid
-        hsl(var(--color-border));
+        hsl(var(--border));
 }
 
 .record-instance-row:last-child {

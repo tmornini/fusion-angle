@@ -6,7 +6,7 @@ and execution.
 
 ## Modules
 
-- **Ideas** — submit, score, and review innovation ideas
+- **Ideas** — submit, review, and promote innovation ideas
 - **Flow** — process documentation, flow management, and per-node
   throughput heat map (`flows/stats`)
 - **Projects** — track approved ideas through execution
@@ -16,10 +16,10 @@ and execution.
   a flow
 - **Identities** — people and service identities, their external
   provider links, and access tokens
-- **Account** — organization settings, users, and billing;
+- **Account** — organization settings, members, and billing;
   members join by email invitation (accept creates the
   membership; an admin may revoke a pending invite)
-- **DB Admin** — database management
+- **Snapshots** — database management
   (wipe, reload, upload/download snapshots)
 
 The demo is multi-organization: loading mock data seeds two

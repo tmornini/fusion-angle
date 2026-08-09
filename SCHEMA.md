@@ -14,17 +14,24 @@ record is the **message plane** — the append-only
 `requests` / `responses` pair tables. The tables are listed
 in `api/db.ts` as `TABLE_NAMES` (the authoritative count:
 two). Each table is an IndexedDB object store
-(`keyPath: 'id'`) in the `fusion-ai` database; the simulated
-backends key the same tables as `fusion-ai:tableName`. All
-rows have a text `id` primary key. Column types: TEXT
-(string), INTEGER (number), REAL (float), BOOLEAN (see
-below). Document-body composites (arrays and objects —
-`strengths`, `team_dimensions`, `options`, `constraints`,
-`graph`, `graphDelta`, `revivals`, `flow_graph`) store as
-native nested JSON on the wire and in the pair body, never
-as JSON-encoded strings. All columns are NOT NULL —
-entity validation on creation ensures every field is
-present.
+(`keyPath: 'id'`) in the `fusion-ai` database; the
+localStorage simulated backend keys the same tables as
+`fusion-ai:tableName`; memory uses an in-process Map of
+bare table names. All rows have a text `id` primary key.
+Column types match
+`RequestEntity` / `ResponseEntity`: TEXT (string) and
+INTEGER (`status`). Document-body composites (arrays and
+objects — `strengths`, `team_dimensions`, `options`,
+`constraints`, `graph`, `graphDelta`, `revivals`,
+`flow_graph`) store as native nested JSON on the wire and
+in the pair body, never as JSON-encoded strings. Required
+columns are NOT NULL — entity validation on creation
+ensures every required field is present. `follows` /
+`supersedes` are optional-by-absence (never `null`, never
+`''`); see responses below and
+`RESPONSE_OPTIONAL_BODY_KEYS` in `api/validators.ts`.
+`serializeValue` (`api/storage-serialize.ts`) rejects
+null/undefined on present keys only.
 
 Every domain family (ideas, projects, flows, work orders,
 record-types / attributes / instances, objectives, roster,
@@ -62,12 +69,13 @@ fractionless stamps fails import loudly; the documented
 recovery is re-seeding (Settings → mock data) or
 re-exporting from a current build.
 
-**Boolean storage:** BOOLEAN columns are typed as `boolean`
-in TypeScript (`api/types.ts`) and persist NATIVELY — there
-is no `0`|`1` transform. The one storage-edge transform is
-the NOT-NULL gate in `api/storage-serialize.ts`
-(`serializeValue`), which every backend applies so a write
-with a null/undefined field throws rather than persisting.
+**Boolean storage:** domain / document-body booleans are
+typed as `boolean` in TypeScript (`api/types.ts`) and
+persist NATIVELY in pair JSON — there is no `0`|`1`
+transform. The one storage-edge transform is the NOT-NULL
+gate in `api/storage-serialize.ts` (`serializeValue`),
+which every backend applies so a write with a
+null/undefined field throws rather than persisting.
 
 **Timestamp convention:** TEXT columns storing timestamps
 use RFC-3339 Zulu format (e.g.,
@@ -83,9 +91,12 @@ plane (`api/derive-states.ts`). `'deleted'` is a state event
 value on that plane, not a table flag. Document families mark
 DELETE as a tombstone pair excluded from the head by
 `deriveDocumentsAt` — there is no row to splice. The sole
-physical hard-delete is PII erasure (`identity_pii` pairs +
-related credentials), which remains a real splice of the
-message plane. History tables and the old `EntityStore` /
+physical hard-delete is PII erasure
+(`identities/:id/pii` via `replacePiiSlot` — pair splice +
+bodyless erasure tombstone), which remains a real splice
+of the message plane. Credentials and registration stay
+append-only / tombstone; they never enter the hard-delete
+zone. History tables and the old `EntityStore` /
 `StateStore` tombstone filter are GONE (Phase Final Task 5).
 The `states/:id` event-append address is retired with every
 verb on it — router 404.
@@ -110,6 +121,7 @@ Global-spine (pass-through), NOT org-fenced at the store:
 tenancy lives IN `uri_prefix`, enforced at the route gate
 and the write authorizer
 (`api/write-authorizer.ts` via
+`resolveGlobalOwner`, which may fall back to
 `resolveOwningOrganization`).
 
 ### requests
@@ -154,13 +166,13 @@ is rejected by `validateResponseEntity` as invalid.
 | uri_id | TEXT | Resource id, or `''` for a collection |
 | at | TEXT | RFC-3339 Zulu — envelope metadata |
 | status | INTEGER | HTTP status, 100..599 |
-| etag | TEXT | Body content-address (sha256 of message) |
+| etag | TEXT | sha256 of body bytes (or empty; `bodyEtagOf`) |
 | message_hash | TEXT | sha256 hex digest of `message` |
 | message | TEXT | The canonical stored HTTP message |
 | follows | TEXT | ABSENT unless this follows a prior pair |
 | supersedes | TEXT | ABSENT unless this supersedes a pair |
 
-`responses.etag` is storage-only content-addressing —
+`responses.etag` is storage-only body content-addressing —
 **unrelated to the wire ETag** on instance
 GET/PUT/PATCH (wire ETag = head pair response id; see
 API.md §5.4.1 / §5.20). Implementers must not conflate
@@ -210,10 +222,12 @@ API.md §3.34 / §3.19.
 Post-Phase-Final, ideas, projects, flows (including
 graphDelta/revivals for graph lifecycle), work orders,
 record-types / attributes / instances, objectives,
-memberships, invitations, identities, organizations, role
-grants, and the rest share this no-table posture: each is
-a URI-addressed pair family with a derive module
-(`api/derive-*.ts`) and no row store.
+memberships, invitations, identities, organizations, and
+the rest share this no-table posture: each is a
+URI-addressed pair family with a derive module
+(`api/derive-*.ts`) and no row store. Roles bake from
+membership `type` at mint; the role-grants family is
+RETIRED (no live pair family and no route).
 
 ### Record types, attributes & instances (pair-plane only)
 

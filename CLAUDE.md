@@ -24,11 +24,13 @@ when working with code in this repository.
 ./measure --pages a,b  # Subset of PAGE_REGISTRY keys
 ./measure --runs N     # Runs per page (default 25)
 ./measure --visualize  # History HTML from disk (no Chrome)
+./measure --profile    # API counts + residual (default 4 pages, 1 run)
 ```
 
-**Commit before building.** `./build` requires a clean
-working directory. Run `./validate` to catch type errors
-and lint issues; commit; then build.
+**Commit before building.** `./build` and `./serve`
+(which runs `./build`) require a clean working directory.
+Run `./validate` to catch type errors and lint issues;
+commit; then build or serve.
 
 For local test-as-you-go:
 
@@ -56,14 +58,24 @@ tools can drive the page normally.
 ### Validate semantics
 
 `./validate` runs `tsc --noEmit` (type checking), then
-`./test` (automated tests against pure modules and the
-`api/`, `adapters/`, and `presenters/` layers, via `node
---test --strip-types tests/*.test.ts`), then enforces a
+`./test` (two passes: `TZ=UTC` on `tests/*.test.ts`, then
+`TZ=Pacific/Honolulu` on `tests/tz/*.test.ts`; the main
+glob is non-recursive so it excludes `tests/tz/`; covers
+pure modules and the `api/`, `adapters/`, and `presenters/`
+layers via `node --test --strip-types`), then enforces a
 78-character maximum line length on all `.ts`, `.html`, and
-`.css` files (excluding `compose.ts`) and on every `.md`
-file at the repo root except [TEST-PLAN.md](TEST-PLAN.md)
-and [API-TREE.md](API-TREE.md) — both exempted because their
-entries are meant to scan as one self-contained line. Finally
+`.css` files (excluding `compose.ts`), on every `.md` file
+at the repo root except [TEST-PLAN.md](TEST-PLAN.md) and
+[API-TREE.md](API-TREE.md) — both exempted because their
+entries are meant to scan as one self-contained line — and
+on the root scripts `build`, `serve`, `test`, `validate`,
+and `generate-schema-svg`. It then rejects the `org`
+abbreviation in identifiers under `api/`, `web-app/`,
+`tests/`, and `shared/` (`.ts`/`.html`/`.css`; `compose.ts`
+exempt) — forms matching `org[A-Z]`, camel/Pascal
+`…Org…`/`Org…`/`…Orgs…`/`Orgs…`, `_ORG` (word-end or
+`_`/`digit` after), and `ORG_`/`ORG`+digit fail; prose,
+URLs, and CSS class names may keep the short form. Finally
 it runs the
 `generate-schema-svg --check` gate, which fails on
 `SCHEMA.svg` drift from the schema of record (`api/db.ts` +
@@ -157,8 +169,9 @@ dashboard-design.md`.
 
 Target: **ES2024** · Strict mode with
 `noUncheckedIndexedAccess`. Config at
-`web-app/app/tsconfig.json`. The `compose.ts` and
-`generate-schema-svg.ts` build scripts are excluded from
+`web-app/app/tsconfig.json`. The `compose.ts`,
+`generate-schema-svg.ts`, `measure.ts`, and
+`measure-viz.ts` Node entrypoints are excluded from
 type checking (they run in Node).
 
 ## Architecture
@@ -174,8 +187,9 @@ is HTTP-only.
 ### Key Layers
 
 - **HTML Composition.** `web-app/app/compose.ts` assembles
-  `components-layout.html` + `component-*.html` + each page's
-  `index.html` into composed standalones in a temp build dir.
+  `components-layout.html` + `component-*.html` + each
+  registry page's `{sourceDir}/{sourceFile}.html` into
+  composed standalones in a temp build dir.
   Standalone pages skip the layout wrap but still have their
   `{{PAGE_CSS_LINKS}}` placeholder filled from `cssBundles`
   before they are written.
@@ -204,13 +218,15 @@ is HTTP-only.
   only as message-pair events now — `identity_tokens` and
   `authorization_codes` are RETIRED tables (Phase 13 Task 9);
   the `identity_token_revocations` ledger and PBKDF2 password
-  hashing back the gate too. Every per-request check —
-  revocation, the tenancy fence, roles — derives fresh from
-  the pair plane, never a snapshot the token claim itself
-  carries. The HMAC key is client-shipped, so isolation is
-  demo-grade until the server tier. The snapshot plane
-  (`BOOTSTRAP_ROUTES`) is intentionally auth-free dev-tier —
-  removed or re-gated when the Postgres server tier lands; see
+  hashing back the gate too. Membership, roles, and
+  revocation ride claim snapshots (NAMED COVENANT: bite
+  at next mint/refresh/exchange or access TTL ≤ 15 min),
+  not live pair-plane re-reads. Ownership and default-org
+  fences stay pair-plane. The HMAC key is client-shipped,
+  so isolation is demo-grade until the server tier. The
+  snapshot plane (`BOOTSTRAP_ROUTES`) is intentionally
+  auth-free dev-tier — removed or re-gated when the
+  Postgres server tier lands; see
   [ARCHITECTURE.md](ARCHITECTURE.md) § Server-tier deploy
   blockers.
 - **Tenancy.** Every authenticated request runs org-scoped
@@ -221,9 +237,9 @@ is HTTP-only.
   Surviving stores are global; tenancy rides `uri_prefix`.
   A flat (un-exchanged) token resolves its org via
   `identityDefaultOrganization`: the identity's SET default
-  org (`identity_default_organizations` ledger, latest
-  wins), else its PRIMARY membership org, else a 403 — there
-  is no global default. Membership and roles come from
+  org (pair-plane `/identities/:id/default-org/` ledger,
+  latest wins), else its PRIMARY membership org, else a
+  403 — there is no global default. Membership and roles come from
   access-token claims (baked at mint from membership
   `type`; gate projects for the fenced org). NAMED
   COVENANT: de-membership / demotion / revocation bite at
@@ -239,11 +255,12 @@ is HTTP-only.
   topology oracle. `organizations` is the tenant root;
   `memberships` joins identity↔org; the members roster is
   derived. A membership pair is created when an invitee
-  ACCEPTS an invitation (the only live membership write;
+  ACCEPTS an invitation (the product path;
   `web-app/app/adapters/invitations.ts` + the `invitations`
   facade) — accept stamps the INVITATION's org, not the
-  caller's active org. Per-org roles via
-  `currentRolesForInOrganization`. See
+  caller's active org. Live PUT/DELETE `memberships/:id`
+  also remain on the pair plane. Per-org roles via
+  `projectClaimRolesForOrganization`. See
   [SCHEMA.md](SCHEMA.md) / [ARCHITECTURE.md](ARCHITECTURE.md).
 - **Data.** REST-style API (`api/`) over IndexedDB. Adapters
   in `web-app/app/adapters/` shape pages from pair-plane
@@ -279,7 +296,8 @@ is HTTP-only.
   `SafeHtml`.
 - **Database.** IndexedDB (`api/backend-indexeddb.ts`): one
   object store per table (`keyPath: 'id'`) plus a `__schema__`
-  marker store, at version 1. `TABLE_NAMES` is two:
+  marker store, created on first open via unversioned
+  `indexedDB.open(DB_NAME)`. `TABLE_NAMES` is two:
   `requests`, `responses` — the pure message plane, both on
   `HistoryEntityStore`. Every store op crosses the
   `StorageBackend` transaction seam (`api/db.ts`) — a real
@@ -317,6 +335,9 @@ All styling lives in `web-app/app/styles/`. Do not use inline
 2. **Bootstrap fallbacks.** `database-init.ts` uses these
    for error UI before CSS may have loaded; marked with a
    file-header comment.
+3. **Measure-viz HTML.** `measure-viz.ts` writes the self-
+   contained history dashboard with inline bar widths and
+   swatch backgrounds (no app CSS cascade).
 
 The variant pattern is `data-tone` / `data-level` attributes on
 a base class. The TS enum and the CSS attribute selector share
@@ -385,13 +406,16 @@ validators, plus the auth/authz/tenancy spine:
 mint/verify), `authorization.ts` (per-org roles), the
 pair-plane org fence (`fenceRequest` / `ctx.base` —
 `db-organization-scoped` / `store-organization-scoped`
-DELETED with Phase Final), and the identity/organizations/
-memberships stores.
+DELETED with Phase Final), and pair-plane identity
+derives (`derive-identity-spine.ts`,
+`derive-organizations.ts`,
+`derive-memberships.ts`).
 `shared/` — code that crosses the client/server chasm, imported
 by both `api/` and `web-app/`: the HTTP wire schema
 (`http-message/`, with its own `types.ts`) plus pure cross-chasm
 utilities (`base64url.ts`, `crypto-safe-base62.ts`,
-`password-hash.ts`, `ledger-reduction.ts`, `error-helpers.ts`).
+`digest.ts`, `password-hash.ts`, `ledger-reduction.ts`,
+`error-helpers.ts`).
 The dependency is one-way: `shared/` NEVER imports `api/`.
 `web-app/app/` — all source (TypeScript + CSS), with
 subdirectories `adapters/` (data-access + platform shims, both
@@ -457,10 +481,13 @@ elimination pins: `api-work-order-history.test.ts` (per-id
 `api-members-history.test.ts`,
 `api-objective-history.test.ts` (bulk). Phase Final adds
 the write authorizer pin
-(`api-write-authorizer.test.ts`); store/decorator
-unit tests and dual-write shadow-ledger row oracles
-retired with their subjects. Honest HTTP status covenant
-pins: `api-unauthenticated-route-ordering.test.ts` (401
+(`api-write-authorizer.test.ts`); organization-scoped
+store/decorator tests and dual-write shadow-ledger row
+oracles retired with their subjects; HistoryEntityStore
+validation tests remain
+(`tests/store-entity-validation.test.ts`). Honest HTTP
+status covenant pins:
+`api-unauthenticated-route-ordering.test.ts` (401
 before 404), foreign-org 403 body pins across
 fence/isolation/drift suites, work-order history
 foreign/absent miss postures. See `tests/` for the
@@ -581,16 +608,17 @@ apply to it (RED is the audit's first finding).
   verb on the retired shared event-append address and
   flat `/records` / `/record-attributes` is router 404;
   `stateEventCollisionFromPairs` is gone. The `states`
-  table, `StateStore`, and `EntityStore` are DELETED
-  (Phase Final). Document DELETE is a marked tombstone
-  pair; the sole physical hard-delete is PII erasure on
-  the message plane.
+  table and `StateStore` class are DELETED (Phase Final);
+  `EntityStore` remains as the store interface implemented
+  by `HistoryEntityStore` on the message plane. Document
+  DELETE is a marked tombstone pair; the sole physical
+  hard-delete is PII erasure on the message plane.
 - **Cross-tab writes are safe (lost-update hazard closed).**
   IndexedDB gives each tab its own connection to one shared
   database, and a pair append is an O(1) `objectStore.put`
   per row on `requests`/`responses` — concurrent tabs both
-  survive (verified in-browser; H8 app-wide write queue is
-  the accepted single-user cost). A successful write posts a
+  survive (verified in-browser; no app-wide write queue —
+  per-flow `enqueueFlowSave` only). A successful write posts a
   scoped `NotificationEvent` (organization/identity ids, or
   a full-refresh event) over a `BroadcastChannel`
   (`adapters/broadcast-channel.ts`); a subscriber refreshes

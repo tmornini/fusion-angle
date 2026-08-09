@@ -72,9 +72,9 @@ function buildShadowBox(
     </div>`;
 }
 
-const FLOW_BLUE = '#4B6CA1';
-const FLOW_WARN = '#d97706';
-const FLOW_GREEN = '#16a34a';
+const FLOW_BLUE = 'hsl(var(--primary))';
+const FLOW_WARN = 'hsl(var(--warning))';
+const FLOW_GREEN = 'hsl(var(--success))';
 
 const NW = 140;
 const NH = 56;

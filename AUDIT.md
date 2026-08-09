@@ -54,9 +54,8 @@ is the verdict delivered without reading the code.
    Faith — ≈60 sections, derived by grep each run, never from a
    stored list, not even one kept in this file. Record the
    header facts and the KNOWN-list count m (§ Security: KNOWN
-   vs NEW). Run `./validate` (sandbox form per CLAUDE.md
-   § Sandbox invocation) THREE times — and once more under the
-   hunt fan-out's concurrent load, if agents are already
+   vs NEW). Run `./validate` THREE times — and once more under
+   the hunt fan-out's concurrent load, if agents are already
    dispatched. Report the modal verdict AND any test whose
    pass/fail varies across runs: a load-sensitive test is a
    *false prophet* (Office of Verification), finding #1 under

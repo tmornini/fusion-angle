@@ -1,21 +1,23 @@
 # Fusion AI — Test Plan
 
-> **Encoding:** `- [ ]` = pending, `- [ ]` = PASS, `- [FAIL]` = failure (add note)
+> **Encoding:** `- [ ]` = pending (not yet executed). Run outcomes are recorded as words in the Summary (PASS / FAIL / BLOCKED / DEFERRED / DRIFT), not by flipping the checkbox. Optional inline annotation: `- [FAIL]` with a note for a failed case.
 
 ### How to invoke
 
 When the user says "run the test plan", the agent:
 
-1. Reads this document's `### Protocol` section (six-phase
-   protocol, mutation domains, MCP limitations) — required
-   context, not optional reference.
+1. Reads this document's `### Protocol` section — required
+   context, not optional reference. Default parallel path
+   is **Per-origin parallel run — validated operational
+   recipe** (below). The six-phase subsection is a
+   SUPERSEDED historical appendix only.
 2. Executes section **AT** as a fail-fast gate; any AT
    failure aborts the run before A1's build.
 3. Executes A1–A5 preflight; on success spawns the
-   six-phase parallel protocol (Phase 1 serial data setup,
-   Phase 2 seven concurrent agents, Phase 3 cross-cutting
-   alone, Phase 4 snapshot lifecycle alone, Phase 5
-   teardown). Or runs serially if `--serial` is requested.
+   **per-origin** parallel recipe (one origin/port per
+   agent; each agent self-seeds; fan-out by section —
+   see "Per-origin parallel run — validated operational
+   recipe"). Or runs serially if `--serial` is requested.
 4. Emits the run summary in the canonical format
    documented at the bottom of this file (`## Summary
    Format`). The summary is the conversational artifact;
@@ -36,7 +38,7 @@ serial agent, all seven Phase 2 agents, the Phase 3
 cross-cutting agent, and the Phase 4 snapshot-lifecycle
 agent — MUST begin its turn by invoking the
 `church-of-code:church-of-code` skill via the Skill tool
-and reading `CHURCH-OF-CODE-small-context.md` in full.
+and reading `CHURCH-OF-CODE-medium-context.md` in full.
 Subagents inherit no scripture and read no CLAUDE.md by
 default (see CLAUDE.md § Subagents). The orchestrator's
 dispatch prompt MUST embed this requirement as the first
@@ -53,7 +55,9 @@ This plan covers **UI behavior** — anything that requires a browser
 DOM, CSS, gestures, or visual rendering. Pure transitions,
 adapter behavior, and HTTP-style API routing are now covered by
 the **automated test suite** (`./validate` runs them; the suite
-also runs standalone via `node --test --strip-types tests/*.test.ts`).
+also runs standalone via `./test`, which pins `TZ=UTC` on
+`tests/*.test.ts` then `TZ=Pacific/Honolulu` on
+`tests/tz/*.test.ts`).
 See `CLAUDE.md` section `## Testing` for the inventory of
 automated test files and what each covers.
 
@@ -68,14 +72,15 @@ flow-edit business logic and the connection-validation rules
 `performAddAttributeRef` / `performRemoveAttributeRef` / `performUndo` /
 `performRedo`, including no-edge-to-a-start-node, none-from-an-
 end-node, no-duplicate-edge, start-node-single-outgoing, and the
-lock/noop/commit-error branches); the flow version and query
+lock/noop/commit-error branches); the flow publish/readiness and query
 adapters (`tests/adapters-flow-publish.test.ts`,
 `tests/adapters-flow-queries.test.ts`); the workbox inbox
 aggregation (`tests/workbox-inbox.test.ts`); the mermaid round-trip
 (`tests/mermaid.test.ts`); the in-browser ZIP (`tests/zip-guards.test.ts`);
-snapshot import-validation, quota pre-flight, and wipe-on-fail
-(`tests/snapshot-import-validation.test.ts`,
-`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`,
+snapshot import-validation, quota pre-flight, and atomic
+import/rollback (`tests/snapshot-import-validation.test.ts`,
+`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`
+(filename legacy; now atomic-rollback),
 `tests/db-localstorage-compression.test.ts`); every data adapter
 (`tests/adapters-*.test.ts`); navigation
 (`tests/navigation.test.ts`); mock-data validity
@@ -97,8 +102,10 @@ one of two modes:
   `cd /tmp/fusion-test/ && python3 -m http.server 8080`. Run
   sections in document order.
 - **Parallel (Claude Code agents)**:
-  `TMPDIR=/tmp/claude ./build --no-zip ~/Desktop/fusion-test/`
-  then `cd ~/Desktop/fusion-test/ && python3 -m http.server 8080`.
+  `TMPDIR=/tmp/claude ./build --no-zip /tmp/claude/fusion-test/`
+  once, then one static server per agent on its own port, all
+  serving that dir: `python3 -m http.server <port> --directory
+  /tmp/claude/fusion-test` (see the validated operational recipe).
 
 #### Six-phase parallel protocol
 
@@ -131,7 +138,8 @@ time budgets while keeping per-entity mutation domains disjoint:
    - Agent-F — Flows (includes hazard severity, flow-publish
      gate)
    - Agent-F2 — Workbox (includes Create-Work-Order picker
-     READY / NOT READY split) + Records (section R)
+     READY / NOT READY split) + Records (section R) + Flow
+     Statistics (FS1–FS9, read-only)
    - Agent-G — Admin (Members page, Member detail (human + AI),
      Identities (list + detail + providers + tokens),
      Organization, Snapshots, Billing). The retired Teams /
@@ -198,24 +206,27 @@ timing rather than asserting exact pair counts.
 
 Post-Phase-Final + states-address retirement: every
 lifecycle-backed surface (workbox inbox, flow-stats,
-dashboard, members roster, idea/project/record/objective
-state badges + history views) reads family-scoped and
-collection history from the message ledger. Nine GET
-registrations, wire `(at, id)` DESC (index 0 = current):
-per-entity `GET ideas|projects|records|flows|objectives|
+dashboard, members roster, idea/project/record-type/
+objective state badges + history views) reads family-
+scoped and collection history from the message ledger.
+Nine lifecycle GET registrations + one value-history,
+wire `(at, id)` DESC (index 0 = current): per-entity
+`GET ideas|projects|record-types|flows|objectives|
 members|work-orders/:id/history`, plus bulk
 `GET work-orders/history` and `GET objectives/history`
-(bulk always 200 arrays). Work-order history folds
-`field_values` inline on each transition event; claim/
-birth/release rows carry `[]`. Ideas / projects / records
-/ objectives / members GET rows embed the lifecycle trio
-(`state`, `state_at`, `state_event_id`) — no separate
-state-detail fetch. There is no `states` table and no
-shared event-append write address. Lifecycle writes are
-document-trio PUTs
-(ideas/projects/records/flows/objectives/members) and named
-ops (work-order create/claim/transition/release,
-invitations). The ownership authorizer
+(bulk always 200 arrays), plus instance value-history at
+`GET .../record-types/:type/instances/:id/history`.
+Work-order history folds `field_values` inline on each
+transition event; claim/birth/release rows carry `[]`.
+Ideas / projects / record-types / objectives / members
+GET rows embed the lifecycle trio (`state`, `state_at`,
+`state_event_id`) — no separate state-detail fetch.
+There is no `states` table and no shared event-append
+write address. Lifecycle writes are document-trio PUTs
+(ideas/projects/record-types/flows/objectives/members)
+and named ops (work-order create/claim/transition/release,
+invitations); instance values ride PUT genesis / PATCH
+If-Match / DELETE tombstone. The ownership authorizer
 (`resolveOwningOrganization`) makes a foreign org's
 `entity_id` 403 on per-entity family history (members
 global miss is 404). Also closed: WP1 and the records
@@ -449,12 +460,13 @@ lockups — seven sections fanned out at once, none wedged.
   Click by the coordinates seen in a screenshot, never by
   `getBoundingClientRect` (its larger CSS-px values miss).
 - **List pages populate slowly (5–14s)**: org-scoped list
-  reads re-derive each entity's lifecycle from the full
-  `states` log, so cards can take 5–14s to paint (Flows is
-  slowest). Wait ≥14s and assert the container's
-  `childCount` / `data-*-card` count — never an early
-  screenshot, which shows a skeleton or blank mid-render and
-  reads as a false "empty list".
+  reads re-derive each entity's lifecycle from the
+  message-plane pair ledger (`requests`/`responses`), so
+  cards can take 5–14s to paint (Flows is slowest). Wait
+  ≥14s and assert the container's `childCount` /
+  `data-*-card` count — never an early screenshot, which
+  shows a skeleton or blank mid-render and reads as a
+  false "empty list".
 - **First post-reload mouse click often only focuses**: a
   page's `init()` wires button handlers asynchronously, so a
   click landing before init merely focuses the control with
@@ -498,7 +510,7 @@ last (they wipe the database). See `CLAUDE.md` section
 | D. Core: Ideas Workflow | 38 |
 | E. Core: Projects | 12 |
 | F. Tools | 77 |
-| F2. Workbox | 26 |
+| F2. Workbox | 31 |
 | FS. Flow Statistics | 9 |
 | G. Admin Pages | 45 |
 | H. Reference & System | 2 |
@@ -507,7 +519,7 @@ last (they wipe the database). See `CLAUDE.md` section
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
 | L. IndexedDB Persistence Tier | 9 |
-| **Total** | **399** |
+| **Total** | **404** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -516,13 +528,13 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |     2656 |
-| Browser regression     |      399 |
-| **Combined TOTAL**     | **3055** |
+| CLI automated tests    |     3014 |
+| Browser regression     |      404 |
+| **Combined TOTAL**     | **3418** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
-suite (2648 main + 8 tz after flow-version residue delete);
+suite (3006 main + 8 tz);
 the number grows as tests land in either glob. Browser count =
 the per-section table above. Update both numbers when either
 side changes.
@@ -540,8 +552,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 3048, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (3048).
+`PASS = 3418, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (3418).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -555,7 +567,7 @@ run before A1's build. The single canonical invocation is
 
 - [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
 - [ ] **AT2** Run `./test` (delegates to `TZ=UTC node --test --strip-types tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts` for the timezone suite). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0` for both suites.
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files, and the build scripts, then the `generate-schema-svg --check` SCHEMA.svg-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script.
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files except `TEST-PLAN.md` and `API-TREE.md`, and the root scripts `build`, `serve`, `test`, `validate`, and `generate-schema-svg`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
 
 ---
 
@@ -600,10 +612,10 @@ on. Run these in order.
   Member creates an IDENTITY + member detail row but no
   membership/org binding — that binding now arrives only
   via the invitation flow (V1/V4). So a freshly Added
-  human is NOT yet in the org roster derived from
-  `memberships`; the Members-list grouping you see here
-  is the page's own member listing, not the membership
-  roster. New-identity auto-membership on creation is
+  human does NOT appear on the Members list, which is
+  membership-joined via `deriveMembers` (a parent row
+  shows only when its identity holds a membership for
+  this org). New-identity auto-membership on creation is
   DEFERRED, so this gap is EXPECTED, not a failure.
 - [ ] **AA6** Repeat for all 10 humans: Sarah Chen, Mike
   Thompson, Jessica Park, David Martinez, Emily Rodriguez
@@ -625,9 +637,10 @@ on. Run these in order.
   form appears. Fill Name, pick a Model, fill
   Description and Skill Focus. PASS: Create is blocked
   until a Model is chosen; once chosen, click Create →
-  toast confirms and the AI is written to `ai_members`;
-  like a freshly Added human it binds no membership, so it
-  does NOT appear in the roster.
+  toast confirms and the AI is written as a pair-plane
+  AI member document (POST `ai-members`); like a freshly
+  Added human it binds no membership, so it does NOT
+  appear in the roster.
   Repeat for 4 AIs matching mock data (Claude Opus 4.8,
   Claude Sonnet 4.6, GPT-5.5, Grok 4.3).
 
@@ -691,8 +704,8 @@ on. Run these in order.
 - [ ] **AA18** On Ideas list, filter by "In Review". Click idea #1. PASS: navigates to idea detail with Send Back / Approve buttons in the header next to Edit.
 - [ ] **AA19** Click "Approve". PASS: idea status changes to approved, confirmation shown.
 - [ ] **AA20** Approve idea #4 as well (it was submitted for review in AA16). Leave others in their current status. PASS: statuses match mock data (2 approved, rest in_review/active).
-- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time (days), Cost, Success Criteria) — there is no Impact field — plus a Scores box holding one required baseline slider per active objective.
-- [ ] **AA22** Fill the 4 required fields (Project Name, Time (days), Cost, Success Criteria) and drag every objective baseline slider in the Scores box. PASS: Create Project stays disabled until all required fields AND all baselines are set, then enables; clicking it navigates to project detail for the new project (the baselines commit atomically with project creation).
+- [ ] **AA21** Navigate to approved idea #1. Click "Convert". PASS: conversion form loads with 4 required fields (Project Name, Time with a "days" input suffix, Cost, Success Criteria) — there is no Impact field — plus a Scores box holding one required baseline slider per active objective.
+- [ ] **AA22** Fill the 4 required fields (Project Name, Time with a "days" input suffix, Cost, Success Criteria) and drag every objective baseline slider in the Scores box. PASS: Create Project stays disabled until all required fields AND all baselines are set, then enables; clicking it navigates to project detail for the new project (the baselines commit atomically with project creation).
 - [ ] **AA22a** On the Convert form before scoring, every baseline slider in the Scores box reads as pending, not zero: the slider is dimmed (~50% opacity) and its value shows an em-dash "—" in muted text (unscored is genuine absence — no score row is written — not a measured 0). PASS: dragging a slider clears only that row's pending styling (full opacity, a signed value such as "+51", a green check by the label) while untouched rows stay dimmed, and Create Project stays disabled until all four objectives are scored.
 - [ ] **AA23** On project detail, click "Edit". Set fields (title, description, status, start date, end date, cost baseline) to match mock data. Save. PASS: project data persists. (Impact is no longer a directly-editable field — it is derived read-only from the objective baseline scores.)
 - [ ] **AA24** Approve remaining ideas (7, 8, 9, 10) from Ideas list (filter by "In Review"), then convert all 6 approved ideas to projects. PASS: Projects list shows all 6 with correct status and progress.
@@ -711,15 +724,17 @@ on. Run these in order.
   badge "Approve to add flows" instead of
   the button, and empty state reads "Flow
   creation limited to approved projects only".
-- [ ] **AA26** Click "New Flow". PASS: navigates
-  to the flow designer page. The SVG canvas
-  shows two nodes: "Create" (start, top-left with
-  green border) and "Archive" (end, bottom-right
-  with red 3-px border) connected by no edges.
-  Toolbar shows Undo, Redo, Zoom −/+, Copy Mermaid,
-  Export ZIP, and Delete (trash icon); the header above
-  the canvas hosts the Locked, Auto Layout, and Auto
-  Fit switches. Changes auto-save
+- [ ] **AA26** Click "New Flow". PASS: a "New Flow"
+  dialog opens with a Flow Name input and Create/
+  Cancel buttons. Enter a name and click Create.
+  PASS: navigates to the flow designer page. The SVG
+  canvas shows two nodes: "Create" (start, top-left
+  with green border) and "Archive" (end,
+  bottom-right with red 3-px border) connected by
+  no edges. Toolbar shows Undo, Redo, Zoom −/+,
+  Copy Mermaid, Export ZIP, and Delete (trash icon);
+  the header above the canvas hosts the Locked, Auto
+  Layout, and Auto Fit switches. Changes auto-save
   (no explicit Save button).
 - [ ] **AA27** Drag the port circle on the start
   node into empty canvas past 20 pixels. PASS:
@@ -890,7 +905,7 @@ on. Run these in order.
 - [ ] **B8** Enter `test@example.com`, password `123`. PASS: "Password must be at least 6 characters" error on password.
 - [ ] **B9** Enter the seeded admin credentials (`demo@example.com` + the password revealed at seed time), click "Sign in". PASS: button shows spinner briefly, then navigates to `dashboard/index.html`. Auto-login is retired, so an unseeded credential is rejected with "Invalid email or password.".
 - [ ] **B10** Click the "Sign up" button (positioned next to the static "Don't have an account?" label — the label is not itself the toggle; the adjacent button is). PASS: switches to Sign Up mode — title changes to "Get started", "Company name (optional)" field appears, submit reads "Create account" with an SVG arrow icon (not a literal "→" character).
-- [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click "Create account →". PASS: toast "Sign-up is coming soon — sign in with a seeded account." appears, the form flips to **Sign In** mode (title "Welcome back"), and NO navigation occurs — the demo no longer mock-establishes a session (real sign-up is SP-6; minting a bare mock with no refresh token would bounce on reload and could admit anyone to the seeded admin's data).
+- [ ] **B11** Fill valid email + password (≥6 chars) in Sign Up mode, click the "Create account" submit control (SVG arrow icon, not a literal "→"). PASS: toast "Sign-up is coming soon — sign in with a seeded account." appears, the form flips to **Sign In** mode (title "Welcome back"), and NO navigation occurs — the demo no longer mock-establishes a session (real sign-up is SP-6; minting a bare mock with no refresh token would bounce on reload and could admit anyone to the seeded admin's data).
 
 ### Auth Validation Edge Cases
 
@@ -948,9 +963,11 @@ on. Run these in order.
   linked to it has been removed); humans and AIs
   both live on the Members page.)
 - [ ] **C3** Header shows search bar, company
-  stats ("Stark Industries · N Ideas ·
-  M Projects · K Flows" — the counts track the
-  current working data and change as you create
+  stats as structured tiles (org name as a
+  `header-stat-label`, then per-stat value +
+  Ideas / Projects / Flows labels separated by
+  `header-stat-divider` dividers — the counts track
+  the current working data and change as you create
   or convert, so don't assert exact numbers),
   and theme toggle. PASS: elements visible and
   styled. The old "Good {morning/afternoon/
@@ -961,19 +978,21 @@ on. Run these in order.
   bell may appear at the top bar — see V3.)
 - [ ] **C4** Dashboard renders 4 surfaces in order: three
   visually-equivalent arc-gauge cards (Time and Cost are
-  ratio arc-gauges — a single ratio-filled semicircle; Impact
-  is a bipolar arc — left/right split from a center apex; all
-  three share the same card chrome) and a full-width Aggregate
-  Objectives box below. PASS: all 4 render with baseline and
-  current values; the Time and Cost cards each show a ratio
-  arc and the Impact card shows a bipolar arc; the Objectives
-  box shows one row per objective, each with a small bipolar
-  arc gauge and a sparkline trendline.
+  ratio arc-gauges — dual concentric semicircles: outer
+  baseline track + inner actual fill; Impact is a bipolar
+  arc — left/right split from a center apex; all three
+  share the same card chrome) and a full-width Objectives
+  box below (card title "Objectives"). PASS: all 4 render
+  with baseline and current values; the Time and Cost cards
+  each show dual concentric ratio arcs and the Impact card
+  shows a bipolar arc; the Objectives box shows one row per
+  objective, each with a small bipolar arc gauge and a
+  sparkline trendline.
 - [ ] **C5** Sidebar navigation links all function correctly. PASS: clicking a sidebar link navigates to the expected page.
 - [ ] **C6** Scroll the page. PASS: sidebar stays fixed, main content scrolls independently.
 - [ ] **C7** Check that seed data populates all 4 dashboard
-  surfaces (three arc-gauge cards + Aggregate Objectives
-  box). PASS: no "No data" empty states on a fresh
+  surfaces (three arc-gauge cards + Objectives box). PASS:
+  no "No data" empty states on a fresh
   mock-data load against the Phase 1 baseline. NOTE: the
   mock seed now spans TWO orgs (Stark Industries + Wayne
   Enterprises; the demo admin belongs to both) and the
@@ -996,12 +1015,12 @@ on. Run these in order.
 
 - [ ] **D1** Navigate to `ideas/`. PASS: list shows the active org's ideas as cards (≈6 for Stark on the mock seed — the list is org-scoped, so this is a tolerant lower bound, not the global 11; note the org-scoped reads can take 5–8s to paint, so wait for the cards before asserting empty), each with a drag-handle grip, title, status badge, and (for approved ideas) a Convert button. Ideas represent the problem-and-proposed-solution shape and do not carry time/cost/impact estimates; those fields live on projects created by conversion.
 - [ ] **D2** Each idea row shows a lifecycle status badge (Active, In Review, Approved, Promoted, Sent Back, or Archived); an active idea missing a required field also shows a single "Incomplete" readiness pill (warning tone) derived from required-field presence — ready ideas and non-active ideas show no pill. PASS: the status badge always renders, and the Incomplete pill appears only on active, not-ready ideas.
-- [ ] **D3** Click an idea row/title. PASS: navigates to the idea's detail or scoring page with the correct `ideaId` parameter.
+- [ ] **D3** Click an idea row/title. PASS: navigates to `ideas/detail.html?ideaId=<id>` (idea-detail) with the correct `ideaId` parameter.
 - [ ] **D4** "New Idea" or "Create Idea" button is visible. PASS: clicking it navigates to `ideas/create.html`.
 
 ### Idea Create Form (`ideas/create.html`)
 
-- [ ] **D5** Page loads showing a single-page form with six conversationally-labeled fields: "Give your idea a clear title" (Title), "What problem does this solve?" (Problem Statement), "Who will benefit from this?" (Target Users), "How would you solve this?" (Proposed Solution), "What outcome do you expect?" (Expected Outcome), "How would you measure success?" (Success Metrics). The parenthetical identity is the field id; the prompt is the visible label. PASS: all six fields visible.
+- [ ] **D5** Page loads showing a single-page form with six conversationally-labeled fields: "Give your idea a clear title" (Title), "What problem does this solve?" (Problem Statement), "Who will benefit from this?" (Target Users), "How would you solve this?" (Proposed Solution), "What outcome do you expect?" (Expected Outcome), "How would you measure success?" (Success Metrics). Parentheticals are conceptual field names (draft keys: title, problemStatement, targetUsers, proposedSolution, expectedOutcome, successMetrics), not DOM field ids; the prompt is the visible label. DOM ids for selectors: `idea-create-field-title|problem|target|solution|outcome|metrics`. PASS: all six fields visible.
 - [ ] **D6** "Submit Idea" button is disabled when any required field is empty. PASS: button is visually disabled and not clickable.
 - [ ] **D7** Fill in all required fields (Title,
   Problem Statement, Proposed Solution,
@@ -1040,14 +1059,14 @@ on. Run these in order.
 
 ### Idea Convert (`ideas/convert.html`)
 
-- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 4 required fields: Project Name, Time (days), Cost, Success Criteria (it maps to the project description). There is no Impact field. A Scores box renders one required baseline slider per active objective. Sticky sidebar shows the idea summary (Title, Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics). Source of truth: `REQUIRED_FIELDS` in `web-app/app/presenters/idea-conversion.ts`.
+- [ ] **D22** Navigate to `ideas/convert.html?ideaId=<id>` for a convertible idea. PASS: page loads with conversion form showing 4 required fields: Project Name, Time (label "Time", unit "days" as the input suffix; field key `time-days`), Cost, Success Criteria (it maps to the project description). There is no Impact field. A Scores box renders one required baseline slider per active objective. Sticky sidebar shows the idea summary (Title, Problem Statement, Target Users, Proposed Solution, Expected Outcome, Success Metrics). Source of truth: `REQUIRED_FIELDS` in `web-app/app/presenters/idea-conversion.ts`.
 - [ ] **D23** With required fields empty, "Create Project" is disabled and the progress bar shows 0/N where N = 4 + one per active objective (e.g. 0/8 with 4 objectives). Fill fields and drag baseline sliders one at a time. PASS: the bar increments with each required field AND each baseline, checkmarks appear next to completed items, and the button enables only when all required fields AND all baselines are set. Success Criteria is required — filling it advances the bar.
 - [ ] **D24** Fill every required field and baseline (the progress bar reaches its max, e.g. 8/8), click "Create Project". PASS: navigates to project detail page for the newly created project. The source idea's lifecycle state becomes `promoted` (list badge label **Promoted**, not "Approved") — convert is a promotion, not a re-approve.
 
 ### Idea Status Filtering (`ideas/index.html`)
 
 - [ ] **D25** Navigate to `ideas/index.html`. PASS: status badges appear showing each status present in the data (e.g., Active, In Review, Approved).
-- [ ] **D26** Click a status badge. PASS: list filters to show only ideas with that status, badge is highlighted, others are dimmed, count updates.
+- [ ] **D26** Click a status badge. PASS: list filters to show only ideas with that status, badge is highlighted (`aria-pressed="true"`), others are dimmed (`data-dimmed="true"`); badges carry label + icon only (no per-badge count).
 - [ ] **D27** Click the same badge again. PASS: filter clears, all ideas shown, all badges at full opacity.
 - [ ] **D28** Click a different badge. PASS: filter switches to the new status.
 
@@ -1087,7 +1106,7 @@ on. Run these in order.
 - [ ] **E2** Click a status filter badge (e.g. "Approved"). PASS: project list filters to show only projects with that status. Click the same badge again. PASS: full list returns.
 - [ ] **E3** Click a project row. PASS: navigates to `projects/detail.html?projectId=<id>`.
 
-### Project Detail (`projects/detail.html?projectId=1`)
+### Project Detail (`projects/detail.html?projectId=<id>`)
 
 - [ ] **E4** Page loads with project summary
   card (description, dates, progress bar) and
@@ -1342,8 +1361,10 @@ opens and renders.)
 - [ ] **F28** Select an edge, click the Delete
   (trash) button in toolbar. PASS: edge is
   removed from the canvas.
-- [ ] **F29** Click "Zoom +" and "Zoom -" in
-  toolbar. PASS: canvas zooms in and out smoothly.
+- [ ] **F29** Click the Zoom in and Zoom out
+  toolbar controls (icon-only buttons;
+  `title` / `aria-label` "Zoom in" / "Zoom out").
+  PASS: canvas zooms in and out smoothly.
   Toggle the Auto Fit header switch on. PASS:
   canvas adjusts to show all nodes.
 - [ ] **F30** Edit a node name via the properties
@@ -1367,12 +1388,12 @@ algorithm, redo's in-memory stack, exhaustion as a graceful
 no-op, and the 412-retry-then-fresh-resolve on a save racing
 an undo are covered by `tests/flow-undo-cursor.test.ts` and
 `tests/flow-operations.test.ts` (`performUndo` /
-`performRedo`). `flow_versions` no longer receives any write
-on this path — Phase 15 Task 7 RETIRED the versions routes
-(router 404); the table remains until Phase Final. The cases
-below verify the toolbar buttons, the keyboard shortcuts,
-the disabled states, and that the canvas re-renders after
-each step.)
+`performRedo`). `flow_versions` routes were RETIRED
+(Phase 15 Task 7; router 404) and the table is DELETED
+(Phase Final); undo walks the flow's own document-pair
+history only. The cases below verify the toolbar buttons,
+the keyboard shortcuts, the disabled states, and that the
+canvas re-renders after each step.)
 
 - [ ] **F32** After adding a state, click the Undo
   toolbar button. PASS: the state and its
@@ -1453,12 +1474,14 @@ each step.)
   source), `flow.json` (graph with node positions), `sidecar.json`,
   and a human-readable `flow.txt`. (ZIP read/write correctness is covered
   by `tests/zip-guards.test.ts`.)
-- [ ] **F43** On `flows/index.html` click "Import Flow", select a
-  `.mmd` file previously exported from a known flow, choose a
-  project, and submit. PASS: the imported flow opens in the designer
-  and renders nodes, edges, and attributes. (Structural fidelity of the
-  mermaid round-trip is covered by `tests/mermaid.test.ts`; this
-  case verifies the import dialog and that the designer opens on the
+- [ ] **F43** On `flows/index.html` click "Import Flow", choose a
+  project, click "Choose File", and select a `.mmd` file previously
+  exported from a known flow — selecting the file imports it
+  directly (no separate submit/confirm button; same shape as F5).
+  PASS: the imported flow opens in the designer and renders nodes,
+  edges, and attributes. (Structural fidelity of the mermaid
+  round-trip is covered by `tests/mermaid.test.ts`; this case
+  verifies the import dialog and that the designer opens on the
   imported flow.)
 - [ ] **F44** Repeat F43 with a `.zip` archive. PASS: the imported
   flow renders with node positions preserved (not auto-laid-out).
@@ -1586,8 +1609,10 @@ designer "tag current" action lands.)
   to open the properties panel. In the "Attributes"
   fieldset, click the "+ Add Attribute…" dropdown. PASS:
   the picker lists available record attributes
-  pre-defined in the bound Record (the picker is
-  populated from `record_attributes`).
+  pre-defined on the bound record-type (loaded via
+  `getRecordAttributesByRecord` from the nested
+  `record-types/:id/attributes` collection on the pair
+  plane).
   (Regression for the captured-presenter bug in the
   attribute-picker handler: this exact click used to do
   nothing because the handler closed over a presenter
@@ -1656,7 +1681,8 @@ designer "tag current" action lands.)
 - [ ] **WB1** Navigate to `workbox/`. PASS:
   page shows "Workbox" title, subtitle "Your
   work order inbox", Active/Archive tabs, and
-  a "+ Create Work Order" button.
+  a "Create Work Order" button (plus icon +
+  label; mobile short label "Create").
 - [ ] **WB2** With no work orders, the Active
   tab shows an empty state with mail icon and
   "No Active Work Orders Yet" message. The mock
@@ -1850,7 +1876,8 @@ designer "tag current" action lands.)
   tab 1, edit a value and transition. PASS: tab 1
   receives 412, re-GETs the instance, re-presents the
   action screen with a conflict notice and a warning
-  toast ("This instance changed underneath you…"),
+  toast ("This instance changed underneath you —
+  values refreshed; re-apply your edit"),
   and does **not** auto-retry the transition.
 - [ ] **WB19b — Direct instance PATCH vs transition
   412 convergence.** With a bound WO open on the
@@ -1872,11 +1899,12 @@ per-user visibility filter.
 
 - [ ] **WB20** As the demo user, navigate to `workbox/`.
   Active tab. PASS: every active (non-completed,
-  non-claimed-by-other) work order is listed regardless
-  of its current node's `memberIds` — including nodes
-  assigned only to AI members and nodes with zero
-  members (which carry the danger badge in the designer
-  but are still visible in the inbox).
+  unclaimed — any claimer hides the row, including the
+  current user's own claim) work order is listed
+  regardless of its current node's `memberIds` —
+  including nodes assigned only to AI members and nodes
+  with zero members (which carry the danger badge in the
+  designer but are still visible in the inbox).
 - [ ] **WB21** Switch to the Archive tab. PASS: every
   completed work order is listed regardless of which
   member(s) the final transition referenced.
@@ -1924,7 +1952,7 @@ the claude-in-chrome MCP.
   a value like `8.5m` / `2.1d` on regular nodes.
 - [ ] **FS4** Hover a node → a read-only stat card pops near
   it with: % of flow time, avg/median/p90 durations, visits /
-  distinct WOs / WIP, ~N/wk throughput, loop-back rate, clan
+  distinct WOs / Here now, ~N/wk throughput, loop-back rate, clan
   size + active producers, top producer (name + % of clan avg
   + % of node's work, with "(not in current clan)" iff
   applicable). For a branch node, `next` shows the per-edge
@@ -2069,11 +2097,12 @@ the claude-in-chrome MCP.
   member chip is now the only "click → profile"
   affordance. Source: `web-app/app/sidebar-member.ts`.)
 - [ ] **G13** Type in the search input. PASS: filters the
-  list by name (and description) in real-time; AI
-  members no longer match on provider/model (accepted
-  regression). Click the Humans filter chip. PASS: only the
-  HUMANS group is visible. Click AIs. PASS: only the AIs
-  group is visible. Click All. PASS: both groups return.
+  list in real-time — human members match on name, email,
+  title, or department; AI members match on name or
+  description (not provider/model). Click the Humans
+  filter chip. PASS: only the HUMANS group is visible.
+  Click AIs. PASS: only the AIs group is visible. Click
+  All. PASS: both groups return.
 - [ ] **G14** Click `+ Add Member`. PASS: dialog opens with
   the Kind toggle defaulting to Human, the Human form
   visible, and the AI form hidden. Switch the toggle to
@@ -2092,7 +2121,8 @@ the claude-in-chrome MCP.
   pulldown on its placeholder and click Create. PASS: a
   toast "Model is required" fires and no POST happens.
   Pick a Model, fill the other AI fields, click Create.
-  PASS: toast confirms and the AI is written to `ai_members`;
+  PASS: toast confirms and the AI is written as a
+  pair-plane AI member document (POST `ai-members`);
   it does NOT appear in the roster, as auto-membership is
   deferred (same as G14).
 
@@ -2171,7 +2201,8 @@ the claude-in-chrome MCP.
   org and Stark. Accept is idempotent — a re-accept is a 204
   no-op, no duplicate membership. Source:
   `postInvitationAcceptance`, `acceptInvitation` (atomic
-  `memberships.put` + `states.postEvent` 'accepted' event).
+  memberships/:id document pair + invitations/:id/acceptance
+  op pair via `appendMessagePair`).
 - [ ] **V5 — Decline appends declined, writes no membership**
   As an invitee with a fresh pending invitation, on
   `invitations/` click Decline. PASS: an "Invitation declined"
@@ -2255,10 +2286,10 @@ the claude-in-chrome MCP.
 - [ ] **G24a** Click Edit. PASS: identity fields become
   inputs (Name text, Model pulldown grouped by provider
   with the current model pre-selected, Description
-  textarea, Skill Focus textarea); there is no Auth Token
-  field. Change Description and Skill Focus, click Save.
-  PASS: toast "AI member saved"; on reopen the edits
-  persist.
+  textarea, State select `#ai-state` over MEMBER_STATES,
+  Skill Focus textarea); there is no Auth Token field.
+  Change Description and Skill Focus, click Save. PASS:
+  toast "AI member saved"; on reopen the edits persist.
 - [ ] **G24b** Click Edit again, pick a different Model
   from the pulldown, click Save. PASS: toast "AI member
   saved"; on reopen the read view shows the new model as
@@ -2274,8 +2305,8 @@ the claude-in-chrome MCP.
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
-- [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the "Tokens — Refresh-token chains for this identity" page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
-- [ ] **G26** Navigate to `identity-providers/index.html?identityId=current` (or the identity's "Providers" link). PASS: the "Identity Providers — External sign-in links for this identity" page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded `current` logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
+- [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the page title is "Tokens" with muted subtitle "Refresh-token chains for this identity"; the page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
+- [ ] **G26** Navigate to `identity-providers/index.html?identityId=current` (or the identity's "Providers" link). PASS: the page title is "Identity Providers" with muted subtitle "External sign-in links for this identity"; the page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded `current` logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
 
 ### Snapshots (`snapshots/`) — Phase 4 (Run These Last)
 
@@ -2311,7 +2342,7 @@ restored data.)
   Dashboard renders with zeroed-out metrics (empty
   database except for the required bootstrap seed). Empty
   bootstrap seeds only org `'1'` (Stark Industries) as
-  **13 message pairs** (absolute) covering System + Tony
+  **12 message pairs** (absolute) covering System + Tony
   Stark identity/PII/credentials/membership/role-grant/
   organization/state events — derived reads, not entity
   tables. NOTE: pristine seeds NO Records. Source of
@@ -2322,9 +2353,9 @@ restored data.)
   survivors); no object stores outside that list (plus
   `__schema__`) appear on a post-Final origin (pre-Final
   orphans may linger inert — gate 6).
-- [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — Stark's 6 ideas are back (the seed plants 11 ideas total, split across both orgs via `assignOrg`; the org fence shows only the active org's).
+- [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — Stark's 6 ideas are back (the seed plants 11 ideas total, split across both orgs via `assignOrganization`; the org fence shows only the active org's).
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
-- [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrgSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
+- [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
 
 ### Snapshot & User Lifecycle — Error/Edge Cases
 
@@ -2495,8 +2526,10 @@ domain delta:
   (archive/reactivate ride the document body lifecycle
   trio — no shared `states` log; revision history is
   message-plane pairs at `objectives/:id/revisions/`)
-- Agent-E adds: `project_objective_baseline_scores`,
-  `project_objective_actual_scores`
+- Agent-E adds: `projects/:id/objective-baseline-scores`
+  and `projects/:id/objective-actual-scores` (pair-plane;
+  adapters `postProjectBaselineScoring` /
+  `postProjectActualMeasurement`)
 - Agent-CH stays read-only
 
 ### K1–K6 — Organization Objectives box (Agent-G, Phase 2)
@@ -2562,10 +2595,13 @@ unscored→score→approve path you need a project created
 WITHOUT baselines (converted when no objectives existed, or
 seeded directly).
 
-**K9.** Open a `submitted` project; confirm the action bar
-shows Edit plus the review actions (Approve / Decline / Send
-back) and no View history (it appears only once approved or
-archived), and the objective rows' baseline sliders are
+**K9.** Open a `submitted` project; confirm the header
+actions slot shows Edit (`#project-edit-btn` in
+`.project-actions-slot`) and the review action bar
+(`#project-review-actions` / `.action-bar`) shows Approve /
+Decline / Send back and no View history (View history
+appears only once approved or archived in the lifecycle
+action bar), and the objective rows' baseline sliders are
 editable inline (baseline editing is open across the
 pre-approval states submitted/under_review/sent_back).
 
@@ -2612,8 +2648,8 @@ View history (once approved) shows the negative score.
 
 **K18.** "No-payload" save: with no slider moved off its
 `data-initial-value`, the `Save` button stays disabled and
-no new rows are written to the
-`project_objective_baseline_scores` store (count
+no new baseline-score pairs are written under
+`projects/.../objective-baseline-scores` (pair count
 unchanged via console).
 
 ### K19–K23 — Inline actual measurement + Archive (Agent-E)
@@ -2661,8 +2697,8 @@ ranked by impact" workflow we designed.
 
 **K27.** Open dashboard; PASS if four surfaces render: three
 arc-gauge cards sharing one card shell (Time and Cost are ratio
-arc-gauges; Impact is a bipolar arc) and an Aggregate Objectives
-box (full-width row below).
+arc-gauges; Impact is a bipolar arc) and an Objectives box
+(full-width row below; card title "Objectives").
 
 **K28.** Inspect the Impact gauge. PASS if:
 - The arc has muted background visible at all values
@@ -2674,8 +2710,8 @@ box (full-width row below).
   area (thinner / different opacity)
 
 **K29.** From another tab, log a measurement on an approved
-project. PASS if the Aggregate Objectives box updates within
-~1 second (BroadcastChannel + scoreChanges propagation); the
+project. PASS if the Objectives box updates within
+~1 second (BroadcastChannel `fusion-ai:data` + `subscribeProjectScoreChanges`); the
 three arc-gauge cards refresh only on full page load.
 
 ### K30 + K7 — Project history modal & temporal name resolution (Agent-E)
@@ -2718,17 +2754,19 @@ panel, and the property-test gate.
 
 Owner agent: Agent-F2 (Phase 2). The property-test gate
 (R13–R14a) rides Agent-F2's own work orders, and the record
-CRUD adds `records`, `record_attributes`, `flow_records` to
-its mutation domain — disjoint from every other agent, so no
-write-domain collision.
+CRUD mutates pair-plane document/join families —
+`record-types` (+ nested attributes), `flows/:id/records`
+bindings, and `record-types/:id/instances` — disjoint from
+every other agent, so no write-domain collision.
 
 - [ ] **R1** Sidebar shows a Records entry; click navigates
   to `records/`. PASS: under the active org (Stark, org 1)
-  the list renders the Customer Profile Record; Project
-  Brief is seeded under org 2 and is correctly hidden here.
-- [ ] **R2** Click "+ Add Record" → navigates to a create
-  page (`records/create.html`) with Name and Description
-  fields (not a dialog). Type values, click Create.
+  the list renders Customer Profile; Project Brief is
+  seeded under org 2 and is correctly hidden here.
+- [ ] **R2** Click "Add Record" (desktop) / "New Record"
+  (mobile) → navigates to a create page
+  (`records/create.html`) with Name and Description
+  fields (not a dialog). Type values, click "Create Record".
   PASS: new Record appears at the bottom of the list and the
   app navigates to its detail page.
 - [ ] **R3** Open Customer Profile detail. PASS: read mode
@@ -2847,7 +2885,7 @@ Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fus
 ## Summary Format
 
 The run produces a single conversational summary in the
-following format. This is the contract `## How to invoke`
+following format. This is the contract `### How to invoke`
 references. The doc itself is NOT mutated by the run.
 
 ```
@@ -2869,14 +2907,14 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Preflight     | A1–A5             |    5 |       0 |    0 |
 | Phase-1       | AA1–AA43+subs     |    X |       Y |    Z |
 | Agent-B       | B1–B29 (less B23–B24) | 27 |       0 |    0 |
-| Agent-CH      | C1–C7 + H1–H2     |    9 |       0 |    0 |
+| Agent-CH      | C1–C7 + H1–H2 + K27–K29 | 12 |       0 |    0 |
 | Agent-D       | D1–D37            |    X |       Y |    Z |
-| Agent-E       | E1–E11 + E10a     |   12 |       0 |    0 |
-| Agent-F       | F1–F77 + FS1–FS9  |    X |       Y |    Z |
-| Agent-F2      | WB1–WB22 + subs, R1–R21 | X |    0 |    0 |
-| Agent-G       | G9–14,19–26,36–46 |    X |       0 |    0 |
+| Agent-E       | E1–E11 + E10a + K7,K9–K26,K30 | 32 | 0 | 0 |
+| Agent-F       | F1–F77            |    X |       Y |    Z |
+| Agent-F2      | WB1–WB22 + subs, FS1–FS9, R1–R21 | X |    0 |    0 |
+| Agent-G       | G9–14,19–26,36–46 + K1–K6 | X | 0 | 0 |
 | Phase-3       | I1–I30            |    X |       Y |    Z |
-| Phase-4       | G30–G35 + L1–L9   |    X |       0 |    0 |
+| Phase-4       | G30–G35 + L1–L9 + K8 | X |       0 |    0 |
 | Teardown      | J1–J3             |    3 |       0 |    0 |
 
 ## BLOCKED detail (known MCP limitations — NOT failures)

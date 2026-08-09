@@ -69,7 +69,8 @@ relationship.
 
 The **route is the single divorce point**. `GET flows/:id`
 AND `GET flows` (list) reassemble `FlowWithGraph` from the
-pair plane (`= FlowEntity & { graph }` — the read DTO).
+pair plane (`= FlowEntity & { graph; hasUndoHistory }`
+— the read DTO).
 Freeze, work-order creation, stats, the member-hazard
 reader, and export all derive for free because they read
 through `ctx.GET`; the client `getFlowGraph` adapter is
@@ -123,23 +124,21 @@ create-only (409 if address spent); PATCH If-Match
 (428 / 412); DELETE tombstone-wins. See API.md §2.8 /
 §5.4.1 / §5.20.
 
-The property-test gate at work-order transitions
-(phase 1 — dual-model window still live):
-`validateRecordTransition(ctx, workOrderId, pendingValues)`
-resolves the work order's CURRENT node from the ledger,
-walks that node's attribute refs → type attributes,
-gathers stored values from the work-order history fold
-(`getWorkOrderHistory` → inline `field_values` on each
-transition event), overlays pending values from the form,
-and runs requiredness + `validateAttributeValue`. The gate
-matches the workbox action screen (current-node fields
-only). Returns aggregated `ConstraintViolation[]`.
+The property-test gate at work-order transitions:
+`validateRecordTransition(ctx, workOrderId, pendingValues,
+storedValues)` resolves the work order's CURRENT node from
+the history fold (`getWorkOrderHistory` →
+`currentNodeIdFromHistory`), walks that node's attribute
+refs → type attributes, takes stored values from the bound
+instance head (`instance.values`, or `null` when unbound),
+overlays pending values from the form, and runs
+requiredness + `validateAttributeValue`. The gate matches
+the workbox action screen (current-node fields only).
+Returns aggregated `ConstraintViolation[]`.
 `postWorkOrderTransition` throws
 `RecordTransitionViolations` on non-empty results; the
 workbox page module catches the typed error and surfaces
-the violations banner. Phase 2 (separate stack) flips
-SoT to the bound instance and places UNIQUE on
-`(work_order_id, instance_id)`.
+the violations banner.
 
 The pure constraint runner is `record-constraints.ts`
 (`validateAttributeValue`, `formatViolation`) — the gate
@@ -199,16 +198,17 @@ not on the very next request. Revocation ledger checks
 remain on mint/refresh/exchange only. Two covenants bound
 the vessel: it never carries the bearer token
 (authentication reads the header from the raw Request, so
-the vessel stays loggable), and route handlers keep their
-`(adapter, params, body)` contract — the route table is the
-chosen boundary where the vessel hands the base adapter to
-the handler, keeping handlers transport-free.
+the vessel stays loggable), and route handlers stay
+transport-free — the route table is the boundary where the
+vessel hands `ctx.base` plus fenced claim projection into
+live handler arities (`GetHandler`: adapter, params, actor,
+organization, roles; write handlers add payload + pair).
 
 **Write-time cross-tenant authorizer.** Pair addresses are
 per-org namespaced (`canonicalUriPrefix` from the VERIFIED
-claim). A foreign-id PUT/DELETE on an org-scoped family
-must 403 (never invent a genesis in the caller's own
-namespace). `writeAuthorizerFor` /
+claim). A foreign-id PUT/DELETE/PATCH on an org-scoped
+family must 403 (never invent a genesis in the caller's
+own namespace). `writeAuthorizerFor` /
 `assertWritableInOrganization`
 (`api/write-authorizer.ts`) resolve ownership via
 `resolveGlobalOwner` before the handler runs: owner-null →
@@ -227,9 +227,11 @@ org on writes, and 404'd foreign ids;
 wrapped org-owned stores; `ParentScopedEntityStore` /
 `ParentScopedStateStore` (`store-parent-scoped.ts`) resolved
 leaf ownership through already-fenced parents. Phase Final
-Stage B deleted those three decorator modules with
-`EntityStore` and `StateStore`. The pair plane + write
-authorizer is the as-built successor.
+Stage B deleted those three decorator modules and the
+`StateStore` class; `EntityStore` remains as the store
+interface implemented by `HistoryEntityStore` on the
+message plane (`requests`/`responses` only). The pair
+plane + write authorizer is the as-built successor.
 
 ### Multitenancy model
 
@@ -254,11 +256,13 @@ identity_id, at) is GLOBAL spine, pass-through, NOT
 org-fenced: the invitee must read an invitation to an org it
 is not yet in, so the row cannot hide behind the org fence.
 Its lifecycle is event-sourced on the pair plane under the
-alphabet {pending, accepted, declined, revoked}, keyed to
-the invitation id (op-pair presence at grant / accept /
-decline / revoke addresses); current status is the LATEST
-event, derived and never mutated — the invitation document
-persists as audit through every transition.
+alphabet {pending, accepted, declined, revoked}. State is
+pending when the invitation document head exists and no
+terminal op-pair is present; terminal ops are pair-plane
+addresses invitations/:id/{acceptance,decline,revocation}/
+mapping to accepted|declined|revoked. Current status is the
+LATEST event, derived and never mutated — the invitation
+document persists as audit through every transition.
 
 Grant (admin) appends `pending`. Accept (invitee) appends
 `accepted` AND writes the real `memberships` row in the SAME
@@ -316,15 +320,15 @@ keeps facade behavior; regression surface is
 
 ### Boot + org-switcher
 
-`core.ts::scopeBootToActiveOrg` always scopes the session
-before first render: enumerate reachable orgs →
-`resolveActiveOrg` (the persisted
-`fusion-ai:active-organization-id`, else
-the identity's default org if reachable, else the first
-reachable) → `postOrgSessionExchange` → install the scoped
-token. The
-sidebar org-switcher (`web-app/app/org-switcher.ts`) renders
-its `<select>` only at ≥2 reachable orgs and re-scopes via a
+`core.ts::scopeBootToActiveOrganization` always scopes the
+session before first render: enumerate reachable orgs →
+`resolveActiveOrganization` (the persisted
+`fusion-ai:active-organization-id`, else the identity's
+default org if reachable, else the first reachable) →
+`postOrganizationSessionExchange` → install the scoped
+token. The sidebar org-switcher
+(`web-app/app/organization-switcher.ts`) renders its
+`<select>` only at ≥2 reachable orgs and re-scopes via a
 FULL reload (boot re-exchanges from the persisted id, so no
 mixed-org view survives the switch).
 
@@ -452,14 +456,12 @@ re-verified by the automated suite:
   (`web-app/app/core.ts`).
 - **Route policy tiers** (`ROUTE_POLICY`,
   `api/authorization.ts`): `admin` everywhere plus a real
-  `member` tier on the content surfaces; identity, credential,
-  membership, and snapshot surfaces stay admin-only,
-  deny-by-default.
-- **De-membership latency** (`fenceRequest`,
-  `api/request-auth.ts`): every fenced request re-derives
-  membership from the ledger, so revoking a membership stops
-  access on the NEXT request — the token's 15-minute org
-  claim no longer rides out its TTL.
+  `member` tier on the content surfaces; identities,
+  credentials, providers, memberships, and snapshots stay
+  admin-only (deny-by-default). Member-tier carve-outs:
+  `identity-tokens` POST (rotation/revocation) and
+  `identity-token-revocations` PUT (self logout-everywhere;
+  write authorizer keeps the write self-only).
 
 ## API Layer (`/api`)
 
@@ -468,9 +470,10 @@ handlers, currently running in-browser. Code that crosses the
 client/server chasm lives one level out in `shared/` (a sibling
 of `api/` and `web-app/`): the HTTP wire schema (`http-message/`,
 its own `types.ts`) plus pure cross-chasm utilities
-(`base64url.ts`, `crypto-safe-base62.ts`, `password-hash.ts`,
-`ledger-reduction.ts`, `error-helpers.ts`). Both `api/` and
-`web-app/` import `shared/`; `shared/` NEVER imports `api/`.
+(`base64url.ts`, `crypto-safe-base62.ts`, `digest.ts`,
+`password-hash.ts`, `ledger-reduction.ts`,
+`error-helpers.ts`). Both `api/` and `web-app/` import
+`shared/`; `shared/` NEVER imports `api/`.
 
 `api/types.ts` (domain types + shared aliases — `MemberId`,
 `MemberEntity` parent + `Member` union (`HumanMember` /
@@ -498,13 +501,15 @@ document families plus the surviving state routes),
 The `DbAdapter` interface is the migration seam to Postgres.
 
 Phase Final deleted every entity table and the dual-write
-row halves. `EntityStore`, `StateStore`, and the three
-scoping decorators are GONE. IndexedDB's own open is
-UNVERSIONED, so an origin that already has a database never
-re-runs `onupgradeneeded`: an EXISTING pre-Final origin keeps
-dropped stores as harmless, unread orphans (gate 6 residual
-— see SCHEMA.md § Orphan stores); only `deleteSchema` (a
-full database delete) clears them on IndexedDB.
+row halves. `StateStore` and the three scoping decorators
+are GONE; `EntityStore` remains as the store interface
+implemented by `HistoryEntityStore`. IndexedDB's own open
+is UNVERSIONED, so an origin that already has a database
+never re-runs `onupgradeneeded`: an EXISTING pre-Final
+origin keeps dropped stores as harmless, unread orphans
+(gate 6 residual — see SCHEMA.md § Orphan stores); only
+`deleteSchema` (a full database delete) clears them on
+IndexedDB.
 
 `web-app/app/adapters/init.ts` wires the production IndexedDB
 adapter singleton (`initAdapter()` / `getDbAdapter()`); the
@@ -597,8 +602,9 @@ by drift/parity tests.
 New Phase 14 cores riding this shape: `invitationOpStateFor`
 + `invitationLifecycleStatesFor` (`derive-invitations.ts` /
 `derive-states.ts`, entity-scoped siblings of the
-whole-ledger `invitationOpStates`/`deriveStatesFor`, wired
-into `pendingInvitationFor`/`currentInvitationState`);
+whole-ledger `invitationOpStates` /
+`deriveInvitationStates`, wired into
+`pendingInvitationFor`/`currentInvitationState`);
 `workOrderClaimHistoryFor` (`derive-states.ts`, pair-plane
 claim history — op pairs only: create/claim/transition/
 release; the shared event-append arm is retired with the
@@ -725,9 +731,9 @@ Phase 15 re-anchored every remaining production decision
 read onto the pair plane and retired four zero-caller
 route families (DELETE NOTHING held through Phase 15).
 **Phase Final DELETED the residual.** Dual-write row
-halves stripped (Stage A); doomed tables +
-`EntityStore` / `StateStore` + the three scoping
-decorators deleted (Stage B); `clients` re-pointed to
+halves stripped (Stage A); doomed tables + `StateStore`
++ the three scoping decorators deleted (Stage B);
+`EntityStore` remains as the interface on
 `HistoryEntityStore`; states-address retirement deletes
 every verb on the shared event-append address; the
 clients elimination re-homes client config to the
@@ -770,26 +776,33 @@ EXPECTED_PAIR_COUNT 1498 / bootstrap 12;
 
 ### Successor derives (as-built)
 
-All view-accepting (`dbOrView`), entity-scoped where the
-address family allows, opening no nested transaction:
+Mixed shapes — not every successor is `dbOrView`-safe or
+free of nested transactions:
 
-- `workOrderDocumentHeadFor` — claim-gate `flow_graph` head
-- `workOrderHistoryFor` /
-  `deriveWorkOrderHistories` — per-id and bulk work-order
-  history with inline `field_values`
+- `workOrderDocumentHeadFor` — claim-gate `flow_graph`
+  head (`dbOrView`, no nested tx)
+- `workOrderHistoryFor` — per-id work-order history with
+  inline `field_values` (takes plain `db`; no nested tx
+  of its own)
+- `deriveWorkOrderHistories` — bulk work-order history
+  with inline `field_values` (takes plain `db`; opens
+  `readTransaction`)
 - `deriveObjectiveHistories` — bulk objective history
-- `documentStateHistoryHandler` — shared DESC wrapper for
-  trio-family per-id history
+  (takes plain `db`)
+- `documentStateHistoryHandler` — shared DESC GetHandler
+  factory for trio-family per-id history
 - `stateEventVisibilityFor` — 3-tier ownership probe
   (orphan | visible | hidden) for RESTRICT / related
-  fences; consumers throw 403/404 rather than folding to
-  empty
+  fences (`dbOrView`); consumers throw 403/404 rather
+  than folding to empty
 - `resolveGlobalOwner` — global-existence probe for
-  403-vs-404 decisions (write authorizer + read miss paths)
+  403-vs-404 decisions (write authorizer + read miss
+  paths; takes plain `db`)
 - `resolveOwningOrganization` — ownership for per-entity
-  family history misses (narrower allowlist)
-- `flowGraphBindingsFromPairs` — RESTRICT graph legs from
-  graphDelta
+  family history misses (narrower allowlist; takes plain
+  `db`)
+- `flowGraphBindingsFromPairs` — RESTRICT graph legs
+  from graphDelta (`dbOrView`)
 
 ### Gate 6 re-homes + survivors
 
@@ -892,7 +905,8 @@ Editable detail views split into two presenters: a read presenter
 shape). The page module owns a `PageState` discriminated union
 (`{kind: 'reading'} | {kind: 'editing', draft}`) and constructs
 the appropriate one per render. This pattern applies to `Idea`,
-`HumanMember`, `AIMember`, and `ProjectDetail`. The
+`HumanMember`, `AIMember`, `ProjectDetail`, `Organization`,
+and `RecordDetail`. The
 `member-detail` page module reads `member.kind` and dispatches
 to the right pair: `HumanMemberDetailPresenter` /
 `HumanMemberDetailEditPresenter` for humans,
@@ -901,9 +915,12 @@ AIs (the AI edit presenter renders a provider-grouped model
 pulldown and a skill-focus textarea; no token field).
 
 `presenters/index.ts` is the barrel; page modules import from
-`'../app/presenters/index.ts'`. `WorkboxDetailPresenter` uses a public
-`buildPage()` orchestrating private `#build*` helpers; the rest
-expose `build*` directly.
+`'../app/presenters/index.ts'`. Public `buildPage()`
+orchestrators: `WorkboxDetailPresenter` (private `#build*`
+helpers), `OrganizationPresenter` /
+`OrganizationEditPresenter`, and `RecordDetailPresenter` /
+`RecordDetailEditPresenter`. Other presenters expose
+`build*` helpers directly.
 
 `FlowStatsPresenter` (`web-app/app/presenters/flow-stats.ts`) is
 the read-only counterpart to `FlowDesignerPresenter`. It exposes
@@ -935,10 +952,12 @@ import { navigateTo, openDialog, closeDialog } from '../app/core.ts';
 from `'../app/core'`. The `adapters/` directory retains
 its barrel re-export (`adapters/index.ts`).
 
-**Page modules never import from `api/api.ts`** — all data
-access (reads and writes) goes through the adapter layer
-(`adapters/`). Only adapter modules import from the API
-layer directly.
+**Page modules never call transport verbs from
+`api/api.ts`** — all data access (reads and writes) goes
+through the adapter layer (`adapters/`). Pages may import
+error/status symbols (`RequestError`, `HTTP_*`) and other
+non-I/O types from the API layer; only adapters invoke the
+verbs.
 
 ## Naming Conventions
 
@@ -947,10 +966,11 @@ layer directly.
 - `toneFor*` / `levelFor*` — return string enums consumed as
   `data-tone` / `data-level` attribute values (replaces older
   `styleFor*` inline-style pattern)
-- `assert*` — validators in `api/types.ts` and
-  `api/validators.ts` that take a raw value and return a typed
-  value or throw. The `is*` type-guards remain for legitimate
-  type-narrowing call sites.
+- `assert*` — validators at the gate that take a raw value
+  and return a typed value or throw: `api/types.ts`,
+  `api/validators.ts`, `api/attribute-acl.ts`, and
+  `api/write-authorizer.ts`. The `is*` type-guards remain for
+  legitimate type-narrowing call sites.
 - Adapter reads are two-tier, named by what they return:
   the **domain noun** read returns the domain object
   (`getProject` → `Project`); where a raw stored-shape read
@@ -960,12 +980,13 @@ layer directly.
 
 ## Adapter Conventions
 
-- **Member domain split.** Members are one parent table
-  (`members`: id, type) plus per-kind detail tables
-  sharing the id (`human_members`, `ai_members`).
-  `adapters/members.ts` composes humans (parent +
-  `human_members` detail); `adapters/ai-members.ts`
-  composes AIs (parent + `ai_members` detail).
+- **Member domain split.** Members are one parent
+  document family (`members`: id, type) plus per-kind
+  detail families sharing the id (`human-members`,
+  `ai-members`) on the pair plane — wire resources, not
+  storage tables. `adapters/members.ts` composes humans
+  (parent + `human-members` detail); `adapters/ai-members.ts`
+  composes AIs (parent + `ai-members` detail).
   `adapters/members-union.ts` is the
   union seam: `getMembers` is the roster (humans + AIs,
   never `'system'`); `getMemberMap` additionally resolves
@@ -981,35 +1002,44 @@ layer directly.
   `DISPLAY_ABSENT`. Do not use magic strings like `'Unknown'`.
 - **`RequestContext` is the only I/O surface.** Every data-
   access adapter takes `ctx: RequestContext` first and uses
-  `ctx.GET/PUT/PATCH/DELETE/POST/commit`. The standalone
-  verb exports in `api/api.ts` are the transport `ctx`
-  delegates to — adapters never import them directly.
-  `ctx.PATCH` is platform-wide (instances are the first
-  live consumer; `*WithEtag` variants return the strong
-  ETag for If-Match). Each verb dispatches its own request
-  with its own per-op transactions: two awaited reads on
-  one ctx are NOT a snapshot — a write (same tab or
-  cross-tab) can land between them.
+  `ctx.GET/PUT/PATCH/DELETE/POST` (plus `*WithEtag` /
+  `POSTWithHeaders` where callers need the ETag or headers).
+  The standalone verb exports in `api/api.ts` are the
+  transport `ctx` delegates to — only `adapters/shared.ts`
+  (RequestContext factory) imports them; other adapters
+  use `ctx.*` only. `ctx.PATCH` is platform-wide (instances
+  are the first live consumer; `*WithEtag` variants return
+  the strong ETag for If-Match). Each verb dispatches its
+  own request with its own per-op transactions: two awaited
+  reads on one ctx are NOT a snapshot — a write (same tab
+  or cross-tab) can land between them.
 - **Platform-shim vs data-access adapters share `adapters/`.**
   Data-access adapters (`ideas.ts`, `flow-queries.ts`, etc.)
   fetch entity data through `ctx`. Platform shims
   (`clipboard.ts`, `viewport.ts`, `location.ts`, etc.)
   wrap browser primitives behind adapters the app owns.
 - **`getFlowStats(ctx, flowId)`.** Resolves the work-order
-  set via the `flow_work_orders` join table (its `flow_id`
-  column), since the frozen `flow_graph` carries no flow id
-  of its own. Returns `{ model, graph }` so the page derives
+  set via GET `flows/:id/work-orders` (pair-plane join
+  documents with derived `flow_id` / `work_order_id`),
+  since the frozen `flow_graph` carries no flow id of its
+  own. Returns `{ model, graph }` so the page derives
   the canvas viewBox from real laid-out coordinates —
   `getFlowGraph` runs `computeLayout` for `is_auto_layout`
   or degenerate flows.
-- **Mutation adapters return `Promise<void>`.**
+- **Mutation adapters return `Promise<void>` by default.**
   Change-awareness flows through notification channels (e.g.,
   `ideaChanges.notify()`), never through return values —
   callers tell the channel rather than branch on a result.
-  Instance mutations that must round-trip an ETag are the
-  named exception (`putRecordInstance` /
-  `patchRecordInstance` return `RecordInstance` with
-  `etag`).
+  Named non-void exceptions: `putRecordInstance` /
+  `patchRecordInstance` return `{ etag: string }`;
+  `postInvitationGrant` → `InvitationGrantOutcome`;
+  `postMockDataLoad` / `postBootstrap` → `SeededCredentials`;
+  `postSessionRefresh` / `postPasswordLogin` →
+  `SessionCredentials` (login may be `null`);
+  `postOrganizationSessionExchange` → `string`;
+  `postFlowFromBackup` → `string`;
+  `postFlowFromMermaid` / `postFlowFromZip` →
+  `{ flowId, warnings }`.
 - **Records adapters.** `adapters/records.ts` owns record-
   type lifecycle over nested
   `organizations/:org/record-types[...]` (CRUD +
@@ -1028,8 +1058,10 @@ layer directly.
   seam (`getRecordForFlow`, `getFlowSummariesForRecord`,
   `getWorkOrdersForRecord`) — wire still
   `flows/:id/records`.
-  `adapters/record-transitions.ts` orchestrates the
-  property-test gate via `validateRecordTransition`;
+  `adapters/record-transitions.ts` exposes the shared pure
+  gate `recordTransitionViolationsFrom` plus the adapter
+  fetch+gate helper `validateRecordTransition`.
   `postWorkOrderTransition`
-  (`adapters/work-orders-mutations.ts`) runs that gate and
-  throws `RecordTransitionViolations` on a non-empty result.
+  (`adapters/work-orders-mutations.ts`) calls
+  `recordTransitionViolationsFrom` and throws
+  `RecordTransitionViolations` on a non-empty result.
