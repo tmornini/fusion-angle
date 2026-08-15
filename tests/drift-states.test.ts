@@ -22,7 +22,7 @@ import {
     documentPairsAt,
 } from '../api/derive-documents.ts';
 import {
-    canonicalUriPrefix,
+    canonicalUriCollection,
 } from '../api/message-pair.ts';
 import { deriveIdeaStateHistory } from
     '../api/derive-ideas.ts';
@@ -51,6 +51,9 @@ import { organizationToken } from './token-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // The E10 drift check (Phase 11 Task 6): the per-family parity
 // proof comparing OLD-plane states reads to the message-derived
@@ -89,14 +92,13 @@ function req(
     body?: unknown,
     headers?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-            ...(headers ?? {}),
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        headers,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -297,7 +299,7 @@ async () => {
         woSeen += woWire.length;
 
         const objRes = await handleRequest(db, req(
-            'GET', '/objectives/history', token,
+            'GET', '/objectives/versions', token,
         ));
         assert.equal(objRes.status, 200);
         const objWire = await objRes.json() as {
@@ -378,9 +380,12 @@ test('case 2: GET <family>/:id/history parity — one entity'
         const token = await organizationToken(
             'current', STARK_ORGANIZATION,
         );
+        const suffix = family === 'work-order'
+            ? '/history'
+            : '/versions';
         const res = await handleRequest(db, req(
             'GET',
-            '/' + routeFamily + '/' + id + '/history',
+            '/' + routeFamily + '/' + id + suffix,
             token,
         ));
         assert.equal(res.status, 200, family);
@@ -455,8 +460,8 @@ test('case 2: GET <family>/:id/history parity — one entity'
 // retired with the address — the own/foreign/deleted legs
 // ride document trios.
 test('case 3: the fence\'s legs — own-org history visible,'
-+ ' foreign history 403 (the leak case), and a DELETED'
-+ ' foreign entity stays fenced (tombstone-immune owner)',
++ ' foreign history 404 (miss at this address), and a'
++ ' DELETED foreign entity still names its owner',
 async () => {
     const db = await seededDb();
     const tokenStark = await organizationToken(
@@ -477,11 +482,11 @@ async () => {
         'PUT', '/ideas/' + foreignIdeaId, tokenOrg2,
         ideaDocument('Foreign', foreignIdeaId + '-genesis', AT),
     ));
-    assert.equal(foreignCreated.status, 200);
+    assert.equal(foreignCreated.status, 201);
 
     // The DELETED-entity leg: org 2 tombstones its OWN idea —
     // pair plane is IMMUNE to deleted filter, so owner still
-    // resolves and STARK stays 403 on history.
+    // resolves. STARK history is a miss at this address.
     const foreignDeleted = await handleRequest(db, req(
         'PUT', '/ideas/' + foreignIdeaId, tokenOrg2,
         ideaDocument(
@@ -491,11 +496,11 @@ async () => {
             'deleted',
         ),
     ));
-    assert.equal(foreignDeleted.status, 200);
+    assert.equal(foreignDeleted.status, 201);
 
     // Own history 200 with genesis.
     const ownRes = await handleRequest(db, req(
-        'GET', '/ideas/' + ownIdeaId + '/history', tokenStark,
+        'GET', '/ideas/' + ownIdeaId + '/versions', tokenStark,
     ));
     assert.equal(ownRes.status, 200);
     const ownWire = await ownRes.json() as { id: string }[];
@@ -503,14 +508,14 @@ async () => {
         ownWire.some((r) => r.id === ownIdeaId + '-genesis'),
     );
 
-    // Foreign history from STARK → 403; owner still org 2
+    // Foreign history from STARK → 404; owner still org 2
     // after tombstone.
     const foreignRes = await handleRequest(db, req(
         'GET',
-        '/ideas/' + foreignIdeaId + '/history',
+        '/ideas/' + foreignIdeaId + '/versions',
         tokenStark,
     ));
-    assert.equal(foreignRes.status, 403);
+    assert.equal(foreignRes.status, 404);
     assert.equal(
         await resolveOwningOrganization(
             db, foreignIdeaId, STARK_ORGANIZATION,
@@ -521,7 +526,7 @@ async () => {
     // Org 2 still sees its own genesis + delete on history.
     const org2Res = await handleRequest(db, req(
         'GET',
-        '/ideas/' + foreignIdeaId + '/history',
+        '/ideas/' + foreignIdeaId + '/versions',
         tokenOrg2,
     ));
     assert.equal(org2Res.status, 200);
@@ -537,11 +542,11 @@ async () => {
         ),
     );
 
-    // STARK idea absent from org 2 history read (403).
+    // STARK idea absent from org 2 history read (404).
     const ownFromOrg2 = await handleRequest(db, req(
-        'GET', '/ideas/' + ownIdeaId + '/history', tokenOrg2,
+        'GET', '/ideas/' + ownIdeaId + '/versions', tokenOrg2,
     ));
-    assert.equal(ownFromOrg2.status, 403);
+    assert.equal(ownFromOrg2.status, 404);
 });
 
 // ---- case 4: the WO lifecycle legs (Task 4) ---------------------
@@ -599,7 +604,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const transition1 = await handleRequest(db, req(
@@ -611,7 +616,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             transitionAt: nowUtc(),
         },
     ));
-    assert.equal(transition1.status, 204);
+    assert.equal(transition1.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const transition2At = nowUtc();
@@ -629,7 +634,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             transitionAt: transition2At,
         },
     ));
-    assert.equal(transition2.status, 204);
+    assert.equal(transition2.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // The MOVING lock_timeout case: an entity PUT shrinks
@@ -643,7 +648,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             position: 2,
         },
     ));
-    assert.equal(entityPut.status, 200);
+    assert.equal(entityPut.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const freshClaimAt = nowUtc();
@@ -655,7 +660,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: freshClaimAt,
         },
     ));
-    assert.equal(freshClaim.status, 204);
+    assert.equal(freshClaim.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // An idempotent re-claim by the SAME actor, milliseconds
@@ -674,7 +679,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: repeatClaimAt,
         },
     ));
-    assert.equal(repeatClaim.status, 204);
+    assert.equal(repeatClaim.status, 201);
     const afterRepeat = await assertHistoryParity(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -698,7 +703,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
             expireAt: takeoverExpireAt,
         },
     ));
-    assert.equal(takeover.status, 204);
+    assert.equal(takeover.status, 201);
     const finalHistory = await assertHistoryParity(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -728,7 +733,7 @@ async () => {
             position: 1,
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 
     const genesis = await handleRequest(db, req(
         'POST',
@@ -740,7 +745,7 @@ async () => {
             transitionAt: AT,
         },
     ));
-    assert.equal(genesis.status, 204);
+    assert.equal(genesis.status, 201);
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
@@ -751,7 +756,7 @@ async () => {
             expireAt: claimAt,
         },
     ));
-    assert.equal(claim.status, 204);
+    assert.equal(claim.status, 201);
 
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
@@ -804,7 +809,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     const claimAt = nowUtc();
@@ -816,7 +821,7 @@ async () => {
             expireAt: claimAt,
         },
     ));
-    assert.equal(claim.status, 204);
+    assert.equal(claim.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
     // The named release: web-app/app/adapters/work-orders-
@@ -833,7 +838,7 @@ async () => {
             releaseAt,
         },
     ));
-    assert.equal(released.status, 204);
+    assert.equal(released.status, 201);
     const afterRelease = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -859,7 +864,7 @@ async () => {
             expireAt: reclaimAt,
         },
     ));
-    assert.equal(reclaimed.status, 204);
+    assert.equal(reclaimed.status, 201);
 
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
@@ -914,7 +919,7 @@ async () => {
             },
         },
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     const headId = await headResponseId(db, token, flowId);
     const deleteAt = '2026-02-02T00:00:00.000000Z';
@@ -933,9 +938,13 @@ async () => {
             },
             revivals: [],
         },
-        { 'if-match': '"' + headId + '"' },
+        { 'if-match': (
+            await handleRequest(
+                db, req('GET', '/flows/' + flowId, token),
+            )
+        ).headers.get('ETag')! },
     ));
-    assert.equal(deleted.status, 200);
+    assert.equal(deleted.status, 201);
 
     const undoAt = '2026-02-03T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
@@ -944,14 +953,14 @@ async () => {
             at: undoAt,
         },
     ));
-    assert.equal(undone.status, 204);
+    assert.equal(undone.status, 201);
 
-    const prefix = canonicalUriPrefix(
+    const prefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/flows/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const pairs = documentPairsAt(
         requests, responses, prefix,
@@ -1025,7 +1034,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(acceptGrant.status, 200);
+    assert.equal(acceptGrant.status, 201);
     const accept = await handleRequest(db, req(
         'POST',
         '/invitations/drift-states-inv-accept/acceptance',
@@ -1035,7 +1044,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             acceptAt: '2026-03-01T00:00:00.000001Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assert.equal(accept.status, 201);
     const acceptDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'drift-states-inv-accept',
     );
@@ -1059,7 +1068,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(declineGrant.status, 200);
+    assert.equal(declineGrant.status, 201);
     const decline = await handleRequest(db, req(
         'POST',
         '/invitations/drift-states-inv-decline/decline',
@@ -1068,7 +1077,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             declineAt: '2026-03-02T00:00:00.000001Z',
         },
     ));
-    assert.equal(decline.status, 204);
+    assert.equal(decline.status, 201);
     const declineDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'drift-states-inv-decline',
     );
@@ -1093,7 +1102,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             grantAt: '2026-03-03T00:00:00.000000Z',
         },
     ));
-    assert.equal(revokeGrant.status, 200);
+    assert.equal(revokeGrant.status, 201);
     const revoke = await handleRequest(db, req(
         'POST',
         '/invitations/drift-states-inv-revoke/revocation',
@@ -1102,7 +1111,7 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
             revokeAt: '2026-03-03T00:00:00.000001Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assert.equal(revoke.status, 201);
     const revokeDerived = await assertHistoryParity(
         db, STARK_ORGANIZATION, 'drift-states-inv-revoke',
     );
@@ -1165,7 +1174,7 @@ async () => {
             '2026-04-01T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 200);
+    assert.equal(created.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, ideaId);
 
     const transitioned = await handleRequest(db, req(
@@ -1177,7 +1186,7 @@ async () => {
             state: 'in_review',
         },
     ));
-    assert.equal(transitioned.status, 200);
+    assert.equal(transitioned.status, 201);
     const derived = await assertHistoryParity(
         db, STARK_ORGANIZATION, ideaId,
     );
@@ -1206,7 +1215,7 @@ async () => {
             initialStateAt: '2026-04-03T00:00:00.000000Z',
         },
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
     // A membership so the write authorizer resolves this org-less
     // identity to STARK, not an orphan.
     const membership = await handleRequest(db, req(
@@ -1216,7 +1225,7 @@ async () => {
         type: 'member', at: AT,
         },
     ));
-    assert.equal(membership.status, 200);
+    assert.equal(membership.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, aiMemberId);
 
     // Archive/reactivate ride PUT /members/:id with the trio.
@@ -1230,7 +1239,7 @@ async () => {
             state_event_id: aiMemberId + '-archive',
         },
     ));
-    assert.equal(archived.status, 200);
+    assert.equal(archived.status, 201);
     const afterArchive = await assertDerivedHistory(
         db, STARK_ORGANIZATION, aiMemberId,
     );
@@ -1247,7 +1256,7 @@ async () => {
             state_event_id: aiMemberId + '-reactivate',
         },
     ));
-    assert.equal(reactivated.status, 200);
+    assert.equal(reactivated.status, 201);
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, aiMemberId,
     );
@@ -1281,7 +1290,7 @@ async () => {
             state_event_id: objectiveId + '-drift-archive',
         },
     ));
-    assert.equal(archived.status, 200);
+    assert.equal(archived.status, 201);
     const afterArchive = await assertDerivedHistory(
         db, STARK_ORGANIZATION, objectiveId,
     );
@@ -1298,7 +1307,7 @@ async () => {
             state_event_id: objectiveId + '-drift-reactivate',
         },
     ));
-    assert.equal(reactivated.status, 200);
+    assert.equal(reactivated.status, 201);
     const derived = await assertDerivedHistory(
         db, STARK_ORGANIZATION, objectiveId,
     );
@@ -1328,7 +1337,7 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
             state_event_id: recordId + '-genesis',
         },
     ));
-    assert.equal(genesis.status, 200);
+    assert.equal(genesis.status, 201);
 
     const skewed = await handleRequest(db, req(
         'PUT', typePath, token, {
@@ -1338,7 +1347,7 @@ test('case 7d: genesis-wins-under-skew — a clock-skewed'
             state_event_id: recordId + '-skewed',
         },
     ));
-    assert.equal(skewed.status, 200);
+    assert.equal(skewed.status, 201);
 
     const derived = await assertHistoryParity(
         db, STARK_ORGANIZATION, recordId,
@@ -1366,7 +1375,7 @@ test('case 8: the tombstone-fix interaction — a FENCED cross-org'
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(foreignCreated.status, 200);
+    assert.equal(foreignCreated.status, 201);
 
     // A STARK admin attempts to inject via the retired
     // states/:id address naming the FOREIGN idea — router

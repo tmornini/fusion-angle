@@ -5,13 +5,12 @@ import { resolveGlobalOwner } from './derive-states.ts';
 import { RECORD_TYPE_DETAIL_PATTERN } from
     './family-registry.ts';
 
-// Pre-write ownership authorizer on the pair plane. Without
-// it, a foreign-id PUT would genesis in the caller's own
-// namespace (pair plane is per-org namespaced). Resolves the
-// document's owner BEFORE the handler runs:
-// owner-null → genesis proceeds; foreign →
-// ForeignOrganizationError (HTTP 403 — the honest covenant;
-// existence of opaque high-entropy ids is accepted).
+// Pre-write ownership authorizer on the pair plane. Probes
+// THIS route's collection, not any row with this id. Same
+// id at two collections is two documents. owner-null
+// (never written at this address) → genesis proceeds;
+// this address has a live PUT the caller may not have →
+// ForeignOrganizationError (HTTP 403).
 //
 // Designed ONCE at the gate/op seam (api.ts consults
 // writeAuthorizerFor; assertWritableInOrganization is the
@@ -80,7 +79,7 @@ export async function assertWritableInOrganization(
     table: string,
 ): Promise<void> {
     const owner = await resolveGlobalOwner(
-        db, entityId, organization,
+        db, entityId, organization, table,
     );
     if (owner !== null && owner !== organization) {
         throw new ForeignOrganizationError(table, entityId);

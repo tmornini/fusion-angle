@@ -21,6 +21,7 @@ import {
     formWritePair,
     IF_MATCH_HEADER,
     strongEtagOf,
+    HEX64,
     type MessagePair,
 } from '../api/message-pair.ts';
 import {
@@ -33,6 +34,9 @@ import {
     instancesUriPrefix,
     deriveInstanceHead,
 } from '../api/derive-record-instances.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // POST work-orders/:id/transition — instance-head shape
 // (Task 4 dual-accept; Task 8 gate cut). Value-bearing
@@ -71,16 +75,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-            ...(extraHeaders ?? {}),
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -109,7 +110,7 @@ async function membershipPair(
             [membershipId], body, SYSTEM_MEMBER_ID,
             organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -126,7 +127,7 @@ async function instancePairCount(
         ORGANIZATION, TYPE_ID,
     );
     const responses = await db.responses.getAllWhere(
-        'uri_prefix', prefix,
+        'uri_collection', prefix,
     );
     return responses.filter(
         (r) => r.uri_id === INSTANCE_ID,
@@ -274,7 +275,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -290,7 +291,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/flows/' + FLOW_ID + '/work-orders/' + fwoId,
@@ -301,7 +302,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 200);
+    assert.equal(join.status, 201);
 }
 
 async function seedLiveType(
@@ -318,7 +319,7 @@ async function seedLiveType(
             state_event_id: TYPE_ID + '-genesis',
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedAttribute(
@@ -330,7 +331,7 @@ async function seedAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + '/' + attrId, token, body,
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedWritableText(
@@ -359,10 +360,10 @@ async function seedInstance(
     ],
 ): Promise<string> {
     const put = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, token,
+        'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     return put.headers.get('ETag')!;
 }
 
@@ -381,7 +382,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function bindInstance(
@@ -400,7 +401,7 @@ async function bindInstance(
             record_type_id: recordTypeId,
         },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 }
 
 async function seededBound(): Promise<{
@@ -577,7 +578,7 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     const stale = await handleRequest(db, req(
         'POST', TRANSITION, adminToken,
         valueBody({
@@ -615,7 +616,7 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     const get = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, adminToken,
     ));
@@ -630,10 +631,12 @@ async () => {
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert.ok(head !== undefined);
-    assert.equal(
-        get.headers.get('ETag'),
-        strongEtagOf(head.pairId),
+    const getEtag = get.headers.get('ETag');
+    assert.ok(
+        getEtag !== null
+        && HEX64.test(getEtag.slice(1, -1)),
     );
+    assert.notEqual(getEtag, strongEtagOf(head.pairId));
     assert.notEqual(
         get.headers.get('ETag'),
         etag,
@@ -811,7 +814,7 @@ async () => {
         write_roles: ['ops'],
     });
     const put = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, adminToken, {
+        'PATCH', INSTANCE_DETAIL, adminToken, {
             set: [
                 {
                     attribute_id: ATTR_ID,
@@ -824,7 +827,8 @@ async () => {
             ],
         },
     ));
-    // PUT create-only — re-PUT may 409; use PATCH.
+    // Instance already live from seed — PATCH create
+    // is 428; GET + If-Match PATCH to set the lock.
     let headEtag = put.headers.get('ETag');
     if (put.status !== 200) {
         const get = await handleRequest(db, req(
@@ -842,7 +846,7 @@ async () => {
             },
             { [IF_MATCH_HEADER]: headEtag! },
         ));
-        assert.equal(patch.status, 200);
+        assert.equal(patch.status, 201);
         headEtag = patch.headers.get('ETag');
     }
     const res = await handleRequest(db, req(
@@ -889,7 +893,7 @@ async () => {
         }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 });
 
 // --- 6. constraints ---
@@ -935,7 +939,7 @@ async () => {
         valueBody({ eventId: 'te-tx-2' }),
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     assert.equal(
         await requestCount(db),
         before + 2,
@@ -1002,7 +1006,7 @@ async () => {
     ]);
     assert.deepEqual(
         [a.status, b.status].sort(),
-        [204, 412],
+        [201, 412],
     );
     assert.equal(
         await instancePairCount(db),
@@ -1033,14 +1037,14 @@ async () => {
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     const afterFirst = await instancePairCount(db);
     const afterFirstReq = await requestCount(db);
     const replay = await handleRequest(db, req(
         'POST', TRANSITION, adminToken, body,
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(replay.status, 204);
+    assert.equal(replay.status, 201);
     assert.equal(
         await instancePairCount(db),
         afterFirst,

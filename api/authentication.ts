@@ -27,12 +27,12 @@ import {
     type IdentityCredentialEntity,
     type IdentityPiiEntity,
 } from './types.ts';
-import { pickString } from './validators.ts';
-import { HttpMessage } from '../shared/http-message/http-message.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
 import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
+    pickString,
+    validateIdentityCredentialEntity,
+} from './validators.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import {
     planRotation,
     isTokenRevoked,
@@ -60,10 +60,12 @@ import {
 import {
     appendMessagePair,
     putMessagePair,
-    canonicalUriPrefix,
+    canonicalUriCollection,
     formAuthPair,
     formTokenEventPair,
+    formWritePair,
 } from './message-pair.ts';
+import { messageStore } from './message-store.ts';
 import type { MessagePair, AuthPairSeed } from './message-pair.ts';
 import { deriveMembershipsForIdentity } from
     './derive-memberships.ts';
@@ -85,6 +87,7 @@ import {
     HTTP_FORBIDDEN,
     HTTP_NOT_IMPLEMENTED,
 } from './http-errors.ts';
+import { isServerTier } from './request-auth.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an
@@ -96,7 +99,6 @@ import {
 
 export interface TokenResponse {
     readonly access_token: string;
-    readonly refresh_token: string;
     readonly token_type: 'Bearer';
     readonly expires_in: number;
 }
@@ -105,6 +107,9 @@ export type TokenResult =
     | {
         readonly ok: true;
         readonly response: TokenResponse;
+        // Minted refresh JWT — send-time Set-Cookie only.
+        // Never serialized into the stored pair / wire JSON.
+        readonly refreshToken: string;
         // The just-stored AUTH pair's id — undefined only for
         // exchangeBearerForOrganization's internal, seedless hop
         // (never a real /authentication/token request, so it
@@ -125,9 +130,98 @@ function failure(status: number, error: string): TokenResult {
     return { ok: false, status, error };
 }
 
+// Grant 401s: named class on the wire; reason stays on the
+// TokenResult / AuthorizeResult for logs at the HTTP arm.
+export function wireGrantError(error: string): string {
+    if (error.startsWith('invalid client_assertion')) {
+        return 'invalid_client';
+    }
+    if (
+        error === 'invalid credentials'
+        || error === 'invalid or used authorization code'
+        || error === 'invalid_grant'
+    ) {
+        return 'invalid_grant';
+    }
+    return error;
+}
+
 const ACCESS_TTL_SECONDS = 15 * 60;
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
+
+const REFRESH_COOKIE_NAME = 'refresh_token';
+const REFRESH_COOKIE_PATH = '/authentication';
+
+// Secure follows the public URL. Off only when that origin
+// is http://localhost (local HTTP exception).
+function refreshCookieIsSecure(request: Request): boolean {
+    const url = new URL(request.url);
+    return !(
+        url.protocol === 'http:'
+        && url.hostname === 'localhost'
+    );
+}
+
+function refreshCookieAttributes(
+    request: Request,
+    extra: readonly string[],
+): string {
+    const parts = [
+        'HttpOnly',
+        'SameSite=Strict',
+        'Path=' + REFRESH_COOKIE_PATH,
+        ...extra,
+    ];
+    if (refreshCookieIsSecure(request)) {
+        parts.push('Secure');
+    }
+    return parts.join('; ');
+}
+
+export function refreshSetCookie(
+    refreshToken: string,
+    request: Request,
+): string {
+    return REFRESH_COOKIE_NAME + '=' + refreshToken
+        + '; ' + refreshCookieAttributes(request, []);
+}
+
+export function refreshClearCookie(
+    request: Request,
+): string {
+    return REFRESH_COOKIE_NAME + '=; '
+        + refreshCookieAttributes(request, ['Max-Age=0']);
+}
+
+export function refreshTokenFromCookieHeader(
+    header: string | null,
+): string {
+    if (header === null || header === '') {
+        return '';
+    }
+    for (const part of header.split(';')) {
+        const trimmed = part.trim();
+        const eq = trimmed.indexOf('=');
+        if (eq <= 0) continue;
+        const name = trimmed.slice(0, eq).trim();
+        if (name !== REFRESH_COOKIE_NAME) continue;
+        return trimmed.slice(eq + 1).trim();
+    }
+    return '';
+}
+
+export function attachSetCookie(
+    response: Response,
+    cookie: string,
+): Response {
+    const headers = new Headers(response.headers);
+    headers.append('Set-Cookie', cookie);
+    return new Response(response.body, {
+        status: response.status,
+        headers,
+    });
+}
 
 // A token's display name = the identity's PII name when present,
 // else the id (a presentation transform at the call site — a
@@ -241,7 +335,10 @@ async function mintPair(
         organizations?: readonly Id[];
         roles?: readonly string[];
     },
-): Promise<TokenResponse> {
+): Promise<{
+    readonly response: TokenResponse;
+    readonly refreshToken: string;
+}> {
     const iat = nowEpochSeconds();
     const roles = scope?.roles ?? [];
     const accessToken = await mintAccessToken({
@@ -260,10 +357,12 @@ async function mintPair(
         ttlSeconds: REFRESH_TTL_SECONDS, jti: refreshJti,
     });
     return {
-        access_token: accessToken,
-        refresh_token: refreshToken,
-        token_type: 'Bearer',
-        expires_in: ACCESS_TTL_SECONDS,
+        response: {
+            access_token: accessToken,
+            token_type: 'Bearer',
+            expires_in: ACCESS_TTL_SECONDS,
+        },
+        refreshToken,
     };
 }
 
@@ -296,6 +395,7 @@ async function issueTokenPair(
     organization?: Id,
 ): Promise<{
     readonly response: TokenResponse;
+    readonly refreshToken: string;
     readonly pairId: string | undefined;
 }> {
     const refreshJti = generateCryptoSafeBase62();
@@ -305,18 +405,27 @@ async function issueTokenPair(
     const organizations =
         await subjectOrganizations(adapter, identityId);
     const roles = await subjectRoles(adapter, identityId);
-    const response = await mintPair(identityId, name, refreshJti, act, {
+    const minted = await mintPair(identityId, name, refreshJti, act, {
         ...(organization ? { organization } : {}),
         organizations,
         roles,
     });
+    const response = minted.response;
     const pair = seed === undefined
         ? undefined
-        : await formAuthPair(seed, body, identityId, HTTP_OK, response);
+        : await formAuthPair(
+            seed, body, identityId, HTTP_OK, response,
+        );
+    // Copy the envelope id: hoisted header when the client
+    // sent one, else formAuthPair's named mint. Seedless
+    // exchange has no AUTH pair — mint one id for the
+    // event pair alone.
+    const operationId = pair?.operationId
+        ?? generateCryptoSafeBase62();
     const eventPair = await formTokenEventPair(rootId, {
         jti: refreshJti, identity_id: identityId,
         action: 'issued', chain_id: chainId, at,
-    });
+    }, operationId);
     await adapter.transaction(
         ['requests', 'responses'],
         async (view) => {
@@ -326,7 +435,11 @@ async function issueTokenPair(
             }
         },
     );
-    return { response, pairId: pair?.id };
+    return {
+        response,
+        refreshToken: minted.refreshToken,
+        pairId: pair?.id,
+    };
 }
 
 // Both revocation controls the gate enforces, in ONE place so
@@ -413,12 +526,16 @@ interface TokenEventWrite {
 
 async function formTokenEventWrites(
     appends: readonly Omit<IdentityTokenEntity, 'id'>[],
+    operationId: string,
 ): Promise<TokenEventWrite[]> {
     const writes: TokenEventWrite[] = [];
     for (const event of appends) {
         const id = generateCryptoSafeBase62();
         writes.push({
-            event, pair: await formTokenEventPair(id, event),
+            event,
+            pair: await formTokenEventPair(
+                id, event, operationId,
+            ),
         });
     }
     return writes;
@@ -475,6 +592,7 @@ async function planRotationAttempt(
     adapter: DbAdapter,
     presentedJti: string,
     newJti: string,
+    operationId: string,
 ): Promise<{
     readonly plan: RotationPlan;
     readonly writes: readonly TokenEventWrite[];
@@ -484,7 +602,12 @@ async function planRotationAttempt(
     );
     const plan = planRotation(rows, presentedJti, newJti, nowUtc());
     const appends = plan.kind === 'unknown' ? [] : plan.appends;
-    return { plan, writes: await formTokenEventWrites(appends) };
+    return {
+        plan,
+        writes: await formTokenEventWrites(
+            appends, operationId,
+        ),
+    };
 }
 
 // Read the token ledger, plan the rotation, and append its
@@ -520,13 +643,15 @@ export async function rotateRefreshJti(
     newJti: string,
     pair?: MessagePair,
 ): Promise<RotationOutcome> {
+    const operationId = pair?.operationId
+        ?? generateCryptoSafeBase62();
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
         attempt++
     ) {
         const provisional = await planRotationAttempt(
-            adapter, presentedJti, newJti,
+            adapter, presentedJti, newJti, operationId,
         );
         try {
             return await adapter.transaction(
@@ -578,6 +703,7 @@ export async function rotateRefreshJti(
 async function planRevocationAttempt(
     adapter: DbAdapter,
     jti: string,
+    operationId: string,
 ): Promise<{
     readonly writes: readonly TokenEventWrite[];
 }> {
@@ -586,7 +712,11 @@ async function planRevocationAttempt(
     const appends = chainId === null || identityId === null
         ? []
         : revocationAppends(rows, chainId, identityId, nowUtc());
-    return { writes: await formTokenEventWrites(appends) };
+    return {
+        writes: await formTokenEventWrites(
+            appends, operationId,
+        ),
+    };
 }
 
 // Revoke every jti in the chain `jti` belongs to (logging out
@@ -615,13 +745,15 @@ export async function revokeTokenChain(
     jti: string,
     pair?: MessagePair,
 ): Promise<void> {
+    const operationId = pair?.operationId
+        ?? generateCryptoSafeBase62();
     for (
         let attempt = 0;
         attempt < MAX_TOKEN_WRITE_ATTEMPTS;
         attempt++
     ) {
         const provisional = await planRevocationAttempt(
-            adapter, jti,
+            adapter, jti, operationId,
         );
         try {
             await adapter.transaction(
@@ -677,10 +809,15 @@ async function grantRefresh(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthPairSeed,
+    cookieHeader?: string | null,
 ): Promise<TokenResult> {
-    const token = typeof body.refresh_token === 'string'
+    const fromCookie = refreshTokenFromCookieHeader(
+        cookieHeader ?? null,
+    );
+    const fromBody = typeof body.refresh_token === 'string'
         ? body.refresh_token
         : '';
+    const token = fromCookie !== '' ? fromCookie : fromBody;
     const now = nowEpochSeconds();
     const verified = await verifyAccessToken(token, now);
     if (!verified.valid) {
@@ -701,10 +838,11 @@ async function grantRefresh(
         adapter, verified.claims.sub);
     const roles = await subjectRoles(
         adapter, verified.claims.sub);
-    const response = await mintPair(
+    const minted = await mintPair(
         verified.claims.sub, name, newJti,
         undefined, { organizations, roles },
     );
+    const response = minted.response;
     const pair = await formAuthPair(
         seed, body, verified.claims.sub, HTTP_OK, response,
     );
@@ -712,7 +850,12 @@ async function grantRefresh(
         adapter, verified.claims.jti, newJti, pair,
     );
     if (outcome.kind === 'rotate') {
-        return { ok: true, response, pairId: pair.id };
+        return {
+            ok: true,
+            response,
+            refreshToken: minted.refreshToken,
+            pairId: pair.id,
+        };
     }
     return failure(HTTP_UNAUTHORIZED, 'refresh token reuse or unknown');
 }
@@ -796,6 +939,7 @@ async function grantTokenExchange(
     return {
         ok: true,
         response: issued.response,
+        refreshToken: issued.refreshToken,
         pairId: issued.pairId,
     };
 }
@@ -826,9 +970,10 @@ export async function exchangeBearerForOrganization(
 // authenticates as itself. The client_assertion is REALLY
 // verified — JWS signature against the client's registered
 // JWKS (RS256/ES256, WebCrypto) plus the RFC 7523 claim
-// checks, in api/client-assertion.ts. The remaining seam is
-// jti replay tracking (server tier). The token's sub is the
-// client id (a service principal).
+// checks, in api/client-assertion.ts. A spent-jti ticket
+// rides the same transaction as the grant and token-event
+// pairs — replay is 401 invalid_grant, nothing minted.
+// The token's sub is the client id (a service principal).
 async function grantClientCredentials(
     adapter: DbAdapter,
     body: Record<string, unknown>,
@@ -877,15 +1022,83 @@ async function grantClientCredentials(
             'invalid client_assertion: ' + verdict.reason,
         );
     }
-    const name = await nameFor(adapter, clientId);
-    const issued = await issueTokenPair(
-        adapter, clientId, name, body, seed,
+    const replay: TokenResult = failure(
+        HTTP_UNAUTHORIZED, 'invalid_grant',
     );
-    return {
-        ok: true,
-        response: issued.response,
-        pairId: issued.pairId,
-    };
+    const name = await nameFor(adapter, clientId);
+    const refreshJti = generateCryptoSafeBase62();
+    const rootId = generateCryptoSafeBase62();
+    const chainId = generateCryptoSafeBase62();
+    const at = nowUtc();
+    const organizations =
+        await subjectOrganizations(adapter, clientId);
+    const roles = await subjectRoles(adapter, clientId);
+    const minted = await mintPair(
+        clientId, name, refreshJti, undefined,
+        { organizations, roles },
+    );
+    const response = minted.response;
+    const pair = await formAuthPair(
+        seed, body, clientId, HTTP_OK, response,
+    );
+    const eventPair = await formTokenEventPair(rootId, {
+        jti: refreshJti, identity_id: clientId,
+        action: 'issued', chain_id: chainId, at,
+    }, pair.operationId);
+    const ticketBody = { exp: verdict.exp };
+    const ticketPair = await formWritePair({
+        method: 'PUT',
+        pathname: '/authentication/assertion-jtis/'
+            + verdict.jti,
+        routePattern:
+            'authentication/assertion-jtis/:jti',
+        routeSegments: [
+            'authentication', 'assertion-jtis', ':jti',
+        ],
+        pathSegments: [
+            'authentication', 'assertion-jtis',
+            verdict.jti,
+        ],
+        headerFields: [],
+        body: ticketBody,
+        requesterIdentityId: clientId,
+        requestAt: at,
+        organization: undefined,
+        responseStatus: HTTP_OK,
+        responseBody: ticketBody,
+        operationId: pair.operationId,
+    });
+    const consumed = await adapter.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            const locks = view.writeLocks;
+            if (locks !== undefined) {
+                await locks.lockAddress(
+                    '/authentication/assertion-jtis/',
+                    verdict.jti,
+                );
+            }
+            const existing = await messageStore(view).get(
+                '/authentication/assertion-jtis/',
+                verdict.jti,
+            );
+            if (existing !== undefined) {
+                return false;
+            }
+            await putMessagePair(view, ticketPair);
+            await appendMessagePair(view, eventPair);
+            await putMessagePair(view, pair);
+            return true;
+        },
+    );
+    return consumed
+        ? {
+            ok: true,
+            response,
+            refreshToken: minted.refreshToken,
+            pairId: pair.id,
+        }
+        : replay;
 }
 
 // GATE 3 — KEY-BY-ANCHOR (Phase 13 Task 7): the presented code's
@@ -904,9 +1117,9 @@ export async function deriveAuthorizationCodeId(
 }
 
 const AUTHORIZE_PREFIX =
-    canonicalUriPrefix(undefined, '/authentication/authorize/');
+    canonicalUriCollection(undefined, '/authentication/authorize/');
 const IDENTITY_TOKENS_EVENT_PREFIX =
-    canonicalUriPrefix(undefined, '/identity-tokens/');
+    canonicalUriCollection(undefined, '/identity-tokens/');
 
 // A stored message's JSON body — the ONE local decode this file
 // needs for both the request and response side of the authorize
@@ -917,7 +1130,7 @@ const IDENTITY_TOKENS_EVENT_PREFIX =
 // IX) rather than forcing a shared extraction across three
 // unrelated modules for a task that touches only this one.
 function decodedBodyOf(message: string): Record<string, unknown> {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     const body = HttpMessage.fromModel(model).body();
     return body.exists()
         ? JSON.parse(body.toText()) as Record<string, unknown>
@@ -952,7 +1165,7 @@ async function authorizeCodeIssuer(
     code: string,
 ): Promise<AuthorizeCodeIssuer | null> {
     const responses = await adapter.responses
-        .getAllWhere('uri_prefix', AUTHORIZE_PREFIX);
+        .getAllWhere('uri_collection', AUTHORIZE_PREFIX);
     const matched = responses.find(
         (response) =>
             decodedBodyOf(response.message).code === code,
@@ -998,11 +1211,10 @@ export async function authorizationCodeSpent(
     dbOrView: DbAdapter,
     derivedId: Id,
 ): Promise<boolean> {
-    const rows = await dbOrView.requests
-        .getAllWhere('uri_id', derivedId);
-    return rows.some(
-        (row) => row.uri_prefix === IDENTITY_TOKENS_EVENT_PREFIX,
+    const rows = await dbOrView.requests.getAllWhere(
+        'uri_collection', IDENTITY_TOKENS_EVENT_PREFIX,
     );
+    return rows.some((row) => row.uri_id === derivedId);
 }
 
 // authorization_code grant: consume an ISSUED code, then issue a
@@ -1087,10 +1299,11 @@ async function grantAuthorizationCode(
     // grantTokenExchange's own act:{sub: actor}. sub stays
     // the user; issuer.clientId is already verified equal to
     // the redeeming client_id above.
-    const response = await mintPair(
+    const minted = await mintPair(
         issuer.identityId, name, refreshJti,
         { sub: issuer.clientId }, { organizations, roles },
     );
+    const response = minted.response;
     const pair = await formAuthPair(
         seed, body, issuer.identityId, HTTP_OK, response,
     );
@@ -1103,7 +1316,7 @@ async function grantAuthorizationCode(
     const eventPair = await formTokenEventPair(rootId, {
         jti: refreshJti, identity_id: issuer.identityId,
         action: 'issued', chain_id: chainId, at,
-    });
+    }, pair.operationId);
     const consumed = await adapter.transaction(
         ['requests', 'responses'],
         async (view) => {
@@ -1116,7 +1329,12 @@ async function grantAuthorizationCode(
         },
     );
     return consumed
-        ? { ok: true, response, pairId: pair.id }
+        ? {
+            ok: true,
+            response,
+            refreshToken: minted.refreshToken,
+            pairId: pair.id,
+        }
         : invalid;
 }
 
@@ -1128,6 +1346,7 @@ export async function postToken(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthPairSeed,
+    cookieHeader?: string | null,
 ): Promise<TokenResult> {
     const grantType = typeof body.grant_type === 'string'
         ? body.grant_type
@@ -1136,7 +1355,9 @@ export async function postToken(
         case 'authorization_code':
             return grantAuthorizationCode(adapter, body, seed);
         case 'refresh':
-            return grantRefresh(adapter, body, seed);
+            return grantRefresh(
+                adapter, body, seed, cookieHeader,
+            );
         case 'token-exchange':
             return grantTokenExchange(adapter, body, seed);
         case 'client_credentials':
@@ -1216,18 +1437,38 @@ async function equalizeFailureTiming(
 }
 
 // The password loop: verify username + password, and on success
-// issue an authorization code bound to (identity, client). Every
-// failure returns the SAME 401 (no user enumeration) and appends
-// nothing — grant-first, no-op on failure. The code is recorded
-// PAIR-ONLY (Phase 13 Task 9: the row half retires here — nothing
-// has read authorization_codes rows since Task 7). The stored
-// pair holds the request and response verbatim (password, code,
-// and all) — accepted dev-tier plaintext ledger cost.
+// issue an authorization code bound to (identity, client). The
+// server ZIP rejects a request that lacks S256 before the
+// credential check — a 400 request fault, no pair. The browser
+// ZIP keeps the soft path. Every credential failure returns the
+// SAME 401 (no user enumeration) and appends nothing —
+// grant-first, no-op on failure. The code is recorded PAIR-ONLY
+// (Phase 13 Task 9: the row half retires here — nothing has
+// read authorization_codes rows since Task 7). The stored pair
+// holds the request and response verbatim (password, code, and
+// all) — accepted dev-tier plaintext ledger cost.
 async function authorizePassword(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthPairSeed,
 ): Promise<AuthorizeResult> {
+    if (isServerTier()) {
+        const challenge =
+            typeof body.code_challenge === 'string'
+                ? body.code_challenge
+                : '';
+        const method =
+            typeof body.code_challenge_method === 'string'
+                ? body.code_challenge_method
+                : '';
+        if (challenge === '' || method !== 'S256') {
+            return {
+                ok: false,
+                status: HTTP_BAD_REQUEST,
+                error: 'S256 code_challenge is required',
+            };
+        }
+    }
     const username = typeof body.username === 'string'
         ? body.username
         : '';
@@ -1271,9 +1512,55 @@ async function authorizePassword(
     const pair = await formAuthPair(
         seed, body, identityId, HTTP_OK, response,
     );
+    let rehashPair: MessagePair | undefined;
+    if (
+        isServerTier()
+        && secret.startsWith('$pbkdf2-sha256$')
+    ) {
+        const at = nowUtc();
+        const cid = generateCryptoSafeBase62();
+        const hashed = await hashPassword(password);
+        const credBody: Record<string, unknown> = {
+            identity_id: identityId,
+            kind: 'password',
+            status: 'set',
+            secret: hashed,
+            at,
+        };
+        rehashPair = await formWritePair({
+            method: 'PUT',
+            pathname: '/identities/' + identityId
+                + '/credentials/' + cid,
+            routePattern:
+                'identities/:id/credentials/:cid',
+            routeSegments: [
+                'identities', ':id', 'credentials', ':cid',
+            ],
+            pathSegments: [
+                'identities', identityId,
+                'credentials', cid,
+            ],
+            headerFields: [],
+            body: credBody,
+            requesterIdentityId: identityId,
+            requestAt: at,
+            organization: undefined,
+            responseStatus: HTTP_OK,
+            responseBody: {
+                id: cid,
+                ...validateIdentityCredentialEntity(
+                    credBody,
+                ),
+            },
+            operationId: pair.operationId,
+        });
+    }
     await adapter.transaction(
         ['requests', 'responses'],
         async (view) => {
+            if (rehashPair !== undefined) {
+                await appendMessagePair(view, rehashPair);
+            }
             await putMessagePair(view, pair);
         },
     );

@@ -12,10 +12,11 @@ import {
     ICON_SIZE,
     iconPersonPlus, iconSend,
 } from '../app/icons.ts';
+import { navigateTo } from '../app/navigation.ts';
+import { trimStrings } from '../app/format.ts';
 import {
     handleDialogClick, closeDialog,
-    navigateTo, trimStrings,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     sessionContext,
     getIdentityRoster,

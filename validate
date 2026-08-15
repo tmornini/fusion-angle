@@ -10,7 +10,7 @@ AWK_LINT='length > 78 {
 }'
 
 LONG_LINES=$( {
-    find api web-app tests shared -type f \
+    find api web-app tests shared server -type f \
         \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
         ! -path 'web-app/app/compose.ts' \
         -exec awk "$AWK_LINT" {} +
@@ -18,7 +18,8 @@ LONG_LINES=$( {
         ! -name 'TEST-PLAN.md' \
         ! -name 'API-TREE.md' \
         -exec awk "$AWK_LINT" {} +
-    awk "$AWK_LINT" build serve test validate generate-schema-svg
+    awk "$AWK_LINT" build serve test test-postgres \
+        validate generate-schema-svg
 } )
 
 if [ -n "$LONG_LINES" ]; then
@@ -30,7 +31,7 @@ fi
 # Reject the `org` abbreviation in identifiers; use `organization`.
 # Prose, URLs (w3.org), and CSS class names may keep the short form.
 ORG_ABBREV=$(
-    find api web-app tests shared -type f \
+    find api web-app tests shared server -type f \
         \( -name '*.ts' -o -name '*.html' -o -name '*.css' \) \
         ! -path 'web-app/app/compose.ts' -print0 \
     | xargs -0 perl -ne '

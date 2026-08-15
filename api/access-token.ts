@@ -1,67 +1,60 @@
 import {
     base64UrlEncode,
-    base64UrlDecode,
     bytesToBase64Url,
     base64UrlToBytes,
 } from '../shared/base64url.ts';
 import type { Id } from './types.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
+import {
+    decodeAccessToken,
+    type AccessTokenClaims,
+} from '../shared/access-token-decode.ts';
 
-// The resolved principal — the verified subject of a request.
-// Distinct from the storage `Identity` ({id,kind}): this is
-// the token's claim view. `roles` are `{type}:{organization_id}`
-// claims baked at mint from memberships; the gate projects
-// them for the fenced org. `name` is a display copy.
-export interface Principal {
-    readonly id: Id;
-    readonly roles: readonly string[];
-    readonly name: string;
-    // SP-2 tenant scope: set once from the token's `org`
-    // claim; absent for an unscoped single-org principal.
-    readonly organization?: Id;
-    // The reachable set, from the token's `orgs` claim — every
-    // org this identity is a member of (enumerate without a
-    // round-trip). The active `organization` is one of these.
-    readonly organizations?: readonly Id[];
-}
-
-// The JWT claim contract. `aud` names the origin the token is
-// for — verifyAccessToken now ENFORCES the single audience
-// (TOKEN_AUDIENCE); per-client multi-audience validation via
-// the registration facet is SP-5. `cnf` is the DPoP
-// confirmation (SP-5 binds the key — present in the contract,
-// unenforced now); `jti` is the unique token id
-// (reuse-detection: SP-5); `act` is the RFC 8693 delegation
-// actor (token-exchange shapes sub = the subject and act.sub
-// = the acting party). `org` is the SP-2 tenant scope, present
-// only on an org-exchanged token; its absence is an unscoped
-// single-org caller. `orgs` is the reachable set — every org
-// the subject is a member of, from the membership ledger at
-// mint time.
-export interface AccessTokenClaims {
-    readonly sub: Id;
-    readonly roles: readonly string[];
-    readonly name: string;
-    readonly aud: string;
-    readonly cnf?: { readonly jkt: string };
-    readonly act?: { readonly sub: Id };
-    readonly organization?: Id;
-    readonly organizations?: readonly Id[];
-    readonly iat: number;
-    readonly nbf: number;
-    readonly exp: number;
-    readonly jti: string;
-}
-
-export const ANONYMOUS_ID: Id = 'anonymous';
+export {
+    ANONYMOUS_ID,
+    decodeAccessToken,
+    principalFromClaims,
+    principalFromToken,
+} from '../shared/access-token-decode.ts';
+export type {
+    AccessTokenClaims,
+    Principal,
+} from '../shared/access-token-decode.ts';
 
 export const TOKEN_AUDIENCE = 'fusion-ai-web';
 const SIGNING_KEY_ID = 'dev-co-located';
 
-// The HMAC secret. CLIENT-SHIPPED CONSTANT — the one thing the
-// server tier relocates (see the seam note below).
+// The HMAC secret. CLIENT-SHIPPED CONSTANT — the browser
+// ZIP keeps this until the yank. Mint/verify read
+// JWT_HMAC_SIGNING_KEY from process env when present.
+// The server path must supply that env (no default).
+// Never log the material.
 const SIGNING_KEY_MATERIAL =
     'dev-co-located-hmac-secret-frozen-wire-format';
+
+function processEnvJwtHmacSigningKey():
+    string | undefined {
+    const runtime = globalThis as {
+        process?: {
+            env?: Record<string, string | undefined>;
+        };
+    };
+    const key = runtime.process?.env?.[
+        'JWT_HMAC_SIGNING_KEY'
+    ];
+    if (typeof key === 'string' && key !== '') {
+        return key;
+    }
+    return undefined;
+}
+
+function hmacSigningKeyMaterial(): string {
+    const fromEnv = processEnvJwtHmacSigningKey();
+    if (fromEnv !== undefined) {
+        return fromEnv;
+    }
+    return SIGNING_KEY_MATERIAL;
+}
 
 interface AccessTokenHeader {
     readonly alg: 'HS256';
@@ -104,7 +97,9 @@ function signingKey(): Promise<CryptoKey> {
     if (signingKeyHandle === undefined) {
         signingKeyHandle = crypto.subtle.importKey(
             'raw',
-            new TextEncoder().encode(SIGNING_KEY_MATERIAL),
+            new TextEncoder().encode(
+                hmacSigningKeyMaterial(),
+            ),
             { name: 'HMAC', hash: 'SHA-256' },
             false,
             ['sign', 'verify'],
@@ -184,84 +179,6 @@ export async function mintAccessToken(
     return signingInput + '.' + signature;
 }
 
-function hasClaimShape(
-    value: unknown,
-): value is AccessTokenClaims {
-    if (typeof value !== 'object' || value === null) {
-        return false;
-    }
-    const c = value as Record<string, unknown>;
-    if (c.act !== undefined) {
-        if (typeof c.act !== 'object' || c.act === null) {
-            return false;
-        }
-        if (typeof (c.act as { sub?: unknown }).sub
-            !== 'string') {
-            return false;
-        }
-    }
-    if (c.organization !== undefined && typeof c.organization !== 'string') {
-        return false;
-    }
-    if (c.organizations !== undefined) {
-        if (!Array.isArray(c.organizations)
-            || c.organizations.some(o => typeof o !== 'string')) {
-            return false;
-        }
-    }
-    if (!Array.isArray(c.roles)
-        || c.roles.some(r => typeof r !== 'string')) {
-        return false;
-    }
-    return typeof c.sub === 'string'
-        && typeof c.name === 'string'
-        && typeof c.aud === 'string'
-        && typeof c.iat === 'number'
-        && typeof c.nbf === 'number'
-        && typeof c.exp === 'number'
-        && typeof c.jti === 'string';
-}
-
-export function decodeAccessToken(
-    token: string,
-): AccessTokenClaims {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-        throw new Error(
-            'malformed token: expected 3 segments',
-        );
-    }
-    const claims = JSON.parse(
-        base64UrlDecode(parts[1]!),
-    ) as unknown;
-    if (!hasClaimShape(claims)) {
-        throw new Error('malformed token: bad claim shape');
-    }
-    return claims;
-}
-
-// The one claims→principal projection. Callers that already
-// hold VERIFIED claims (the request gate) project directly —
-// re-decoding the raw token would revisit verification's work.
-export function principalFromClaims(
-    claims: AccessTokenClaims,
-): Principal {
-    return {
-        id: claims.sub,
-        roles: claims.roles,
-        name: claims.name,
-        ...(claims.organization ? { organization: claims.organization } : {}),
-        ...(claims.organizations
-            ? { organizations: claims.organizations } : {}),
-    };
-}
-
-export function principalFromToken(
-    token: string,
-): Principal {
-    return principalFromClaims(decodeAccessToken(token));
-}
-
 export type VerifyResult =
     | { readonly valid: true; readonly claims: AccessTokenClaims }
     | { readonly valid: false; readonly reason: string };
@@ -283,16 +200,15 @@ export async function verifyAccessToken(
     }
     let claims: AccessTokenClaims;
     try {
-        const parsed = JSON.parse(
-            base64UrlDecode(parts[1]!),
-        ) as unknown;
-        if (!hasClaimShape(parsed)) {
+        claims = decodeAccessToken(token);
+    } catch (error) {
+        if (error instanceof Error
+            && error.message
+                === 'malformed token: bad claim shape') {
             return {
                 valid: false, reason: 'bad claim shape',
             };
         }
-        claims = parsed;
-    } catch {
         return { valid: false, reason: 'unparseable claims' };
     }
     if (claims.aud !== TOKEN_AUDIENCE) {

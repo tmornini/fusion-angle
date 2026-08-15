@@ -8,6 +8,9 @@ import { handleRequest } from '../api/api.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Pins the CURRENT status of every deliberate flows-family
 // verb gap, through handleRequest, so the third-family
@@ -26,14 +29,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 

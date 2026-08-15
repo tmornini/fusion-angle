@@ -24,6 +24,9 @@ import {
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Nested attributes surface under record-types (Task 7):
 // member GET (ACL arrays visible), admin PUT create/replace,
@@ -69,16 +72,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-            ...(extraHeaders ?? {}),
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -109,7 +109,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -171,7 +171,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 test('GET .../attributes under live type → 200 []',
@@ -206,7 +206,7 @@ async () => {
     const put = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const echo = await put.json() as AttributeWireRow;
     assert.deepEqual(echo, {
         id: ATTR_ID,
@@ -244,7 +244,7 @@ async () => {
     const first = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const second = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore({
             name: 'Renamed',
@@ -261,7 +261,7 @@ async () => {
     const first = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const second = await handleRequest(db, req(
         'PUT', ATTR_DETAIL, adminToken, attrCore({
             name: 'Renamed',
@@ -269,7 +269,7 @@ async () => {
             write_roles: ['admin'],
         }),
     ));
-    assert.equal(second.status, 200);
+    assert.equal(second.status, 201);
     const echo = await second.json() as AttributeWireRow;
     assert.equal(echo.name, 'Renamed');
     assert.deepEqual(echo.read_roles, ['admin']);
@@ -298,7 +298,7 @@ async () => {
             write_roles: ['admin'],
         }),
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const get = await handleRequest(db, req(
         'GET', ATTR_DETAIL, memberToken,
     ));
@@ -395,7 +395,7 @@ async () => {
             },
         },
     ));
-    assert.equal(flowCreate.status, 204);
+    assert.equal(flowCreate.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
@@ -432,7 +432,7 @@ async () => {
         }),
     ));
     const putInst = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, memberToken, {
+        'PATCH', INSTANCE_DETAIL, memberToken, {
             set: [
                 {
                     attribute_id: ATTR_ID,
@@ -441,7 +441,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInst.status, 200);
+    assert.equal(putInst.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
@@ -478,7 +478,7 @@ async () => {
         }),
     ));
     const putInst = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, memberToken, {
+        'PATCH', INSTANCE_DETAIL, memberToken, {
             set: [
                 {
                     attribute_id: ATTR_ID,
@@ -487,14 +487,14 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInst.status, 200);
+    assert.equal(putInst.status, 201);
     const etag = putInst.headers.get('ETag')!;
     const clear = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { clear: [ATTR_ID] },
         { [IF_MATCH_HEADER]: etag },
     ));
-    assert.equal(clear.status, 200);
+    assert.equal(clear.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', ATTR_DETAIL, adminToken,
     ));
@@ -518,7 +518,7 @@ async () => {
         }),
     ));
     const putInst = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, memberToken, {
+        'PATCH', INSTANCE_DETAIL, memberToken, {
             set: [
                 {
                     attribute_id: ATTR_ID,
@@ -527,7 +527,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInst.status, 200);
+    assert.equal(putInst.status, 201);
     const requestsBefore = await db.requests.getAll();
     const responsesBefore = await db.responses.getAll();
     const edit = await handleRequest(db, req(

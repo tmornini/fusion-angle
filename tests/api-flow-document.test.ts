@@ -1,6 +1,9 @@
 import { test } from 'node:test';
-import { deriveFlowStateHistory } from
-    '../api/derive-flows.ts';
+import {
+    deriveFlowStateHistory,
+    flowEntityOf,
+    flowStoredEntityOf,
+} from '../api/derive-flows.ts';
 import {
     documentPairsAt,
 } from '../api/derive-documents.ts';
@@ -18,17 +21,18 @@ import {
 } from '../api/validators.ts';
 import {
     headPairIdAt,
-    canonicalUriPrefix,
+    canonicalUriCollection,
     strongEtagOf,
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
+    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+} from './http-fixtures.ts';
+import { messageStore } from '../api/message-store.ts';
 
 // The flows-specific below-gate op + locked-class e2e coverage
 // for Task 3's document PUT (the generic locked arm itself is
@@ -45,14 +49,13 @@ function req(
     body?: unknown,
     headers?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-            ...(headers ?? {}),
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        headers,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -164,7 +167,7 @@ async function headEtag(
     return raw!;
 }
 
-// Decode a stored request row's canonical message back into its
+// Decode a stored request row's serializeWire message back into its
 // method + body — the SAME decode derive-documents.ts's private
 // requestMethodOf/requestBodyOf perform, reconstructed here
 // read-only for wire-level assertions (this file never imports
@@ -173,7 +176,7 @@ function decodeRequestMessage(message: string): {
     readonly method: string;
     readonly body: Record<string, unknown>;
 } {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     if (model.startLine.kind !== 'request') {
         throw new Error(
             'stored message carries no request line',
@@ -212,7 +215,7 @@ test('postFlowDocumentOp returns the entity, exactly one'
     const create = await handleRequest(db, req(
         'PUT', '/flows/flow-op-1', token, createBody,
     ));
-    assert.equal(create.status, 200);
+    assert.equal(create.status, 201);
     const headId = create.headers.get('Response-ID')!;
     const update = await handleRequest(db, req(
         'PUT', '/flows/flow-op-1', token,
@@ -232,9 +235,9 @@ test('postFlowDocumentOp returns the entity, exactly one'
                 }],
             },
         }),
-        { 'if-match': strongEtagOf(headId) },
+        { 'if-match': await headEtag(db, token, 'flow-op-1') },
     ));
-    assert.equal(update.status, 200);
+    assert.equal(update.status, 201);
     const wire = await update.json() as { name: string };
     assert.equal(wire.name, 'Renamed');
     const events = await deriveFlowStateHistory(db, '1', 'flow-op-1');
@@ -282,7 +285,7 @@ test('postFlowDocumentOp with revivals posts the restored'
     const create = await handleRequest(db, req(
         'PUT', '/flows/flow-op-2', token, createBody,
     ));
-    assert.equal(create.status, 200);
+    assert.equal(create.status, 201);
     const headId = create.headers.get('Response-ID')!;
     const update = await handleRequest(db, req(
         'PUT', '/flows/flow-op-2', token,
@@ -296,15 +299,15 @@ test('postFlowDocumentOp with revivals posts the restored'
                 },
             ],
         },
-        { 'if-match': strongEtagOf(headId) },
+        { 'if-match': await headEtag(db, token, 'flow-op-2') },
     ));
-    assert.equal(update.status, 200);
+    assert.equal(update.status, 201);
     // SIDECAR-KEEP (C3): pin graphDelta.deletions / revivals
     // on the flow document pairs — no bulk states derive.
-    const prefix = canonicalUriPrefix('1', '/flows/');
+    const prefix = canonicalUriCollection('1', '/flows/');
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const pairs = documentPairsAt(
         requests, responses, prefix,
@@ -388,11 +391,14 @@ async () => {
         documentBody('No Match', 'flow-if-match-428-a'),
     ));
     assert.equal(res.status, 428);
-    assert.equal(
-        (await res.json()).error,
-        'If-Match is required to PUT /flows/'
-        + 'flow-if-match-428',
-    );
+    const body = await res.json() as {
+        name: string;
+        error?: string;
+    };
+    assert.equal(body.error, undefined);
+    assert.equal(body.name, 'Fresh Flow');
+    assert.ok(res.headers.get('ETag'));
+    assert.ok(res.headers.get('Date'));
 });
 
 test('locked PUT with a malformed If-Match is 400',
@@ -423,14 +429,17 @@ async () => {
     const res = await handleRequest(db, req(
         'PUT', '/flows/flow-if-match-412', token,
         documentBody('Stale Match', 'flow-if-match-412-a'),
-        { 'if-match': '"zzzzzzzzzzzzzzzzzzzzzz"' },
+        { 'if-match': '"' + 'b'.repeat(64) + '"' },
     ));
     assert.equal(res.status, 412);
-    assert.equal(
-        (await res.json()).error,
-        'If-Match does not match the current document at '
-        + '/flows/flow-if-match-412',
-    );
+    const body = await res.json() as {
+        name: string;
+        error?: string;
+    };
+    assert.equal(body.error, undefined);
+    assert.equal(body.name, 'Fresh Flow');
+    assert.ok(res.headers.get('ETag'));
+    assert.ok(res.headers.get('Date'));
 });
 
 test('locked PUT with If-Match and no head is 412',
@@ -440,7 +449,7 @@ async () => {
     const res = await handleRequest(db, req(
         'PUT', '/flows/flow-if-match-none', token,
         documentBody('Ghost', 'flow-if-match-none-a'),
-        { 'if-match': '"zzzzzzzzzzzzzzzzzzzzzz"' },
+        { 'if-match': '"' + 'b'.repeat(64) + '"' },
     ));
     assert.equal(res.status, 412);
     assert.equal(
@@ -457,11 +466,13 @@ test('e2e: a byte-identical resend converges (one event, one'
     await createFlow(db, token, 'flow-locked-3');
     const headId = await headResponseId(db, token, 'flow-locked-3');
     const body = documentBody('Resend', 'flow-locked-3-a');
-    const headers = { 'if-match': strongEtagOf(headId) };
+    const headers = {
+        'if-match': await headEtag(db, token, 'flow-locked-3'),
+    };
     const first = await handleRequest(db, req(
         'PUT', '/flows/flow-locked-3', token, body, headers,
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     const eventsAfterFirst =
         await deriveFlowStateHistory(db, '1', 'flow-locked-3');
@@ -470,8 +481,14 @@ test('e2e: a byte-identical resend converges (one event, one'
     const second = await handleRequest(db, req(
         'PUT', '/flows/flow-locked-3', token, body, headers,
     ));
-    assert.equal(second.status, 200);
+    assert.equal(second.status, 201);
     assert.equal(second.headers.get('Response-ID'), firstId);
+    const stored = await db.responses.getById(firstId!);
+    assert.ok(stored !== undefined);
+    assert.equal(
+        second.headers.get('ETag'),
+        strongEtagOf(stored.version),
+    );
     const eventsAfterSecond =
         await deriveFlowStateHistory(db, '1', 'flow-locked-3');
     assert.equal(
@@ -485,7 +502,8 @@ test('e2e: a byte-identical resend converges (one event, one'
 
 test('e2e: a save without If-Match on an existing flow'
 + ' 428s; with the stale echo 412s; with the fresh echo'
-+ ' succeeds and the stored response carries Follows',
++ ' succeeds and the stored response carries no predecessor'
++ ' header',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -501,17 +519,20 @@ async () => {
     const staleEcho = await handleRequest(db, req(
         'PUT', '/flows/flow-locked-1', token,
         documentBody('Stale Echo', 'flow-locked-1-b'),
-        { 'if-match': strongEtagOf('not-the-real-head') },
+        { 'if-match': '"' + 'b'.repeat(64) + '"' },
     ));
     assert.equal(staleEcho.status, 412);
 
     const fresh = await handleRequest(db, req(
         'PUT', '/flows/flow-locked-1', token,
         documentBody('Fresh Echo', 'flow-locked-1-c'),
-        { 'if-match': strongEtagOf(headId) },
+        { 'if-match': await headEtag(
+            db, token, 'flow-locked-1',
+        ) },
     ));
-    assert.equal(fresh.status, 200);
-    assert.equal(fresh.headers.get('Follows'), headId);
+    assert.equal(fresh.status, 201);
+    assert.equal(fresh.headers.get('Follows'), null);
+    assert.equal(fresh.headers.get('Supersedes'), null);
 });
 
 // Task 5: create's own 204 operation pair and its synthesized
@@ -536,10 +557,12 @@ async () => {
     assert.ok(headId);
     assert.notEqual(headId, createdId);
     const etag = await headEtag(db, token, 'flow-locked-2');
-    assert.equal(etag, strongEtagOf(headId));
+    const stored = await db.responses.getById(headId);
+    assert.ok(stored !== undefined);
+    assert.equal(etag, strongEtagOf(stored.version));
     const requests = await db.requests.getAll();
     const atAddress = requests.filter(
-        r => r.uri_prefix === '/organizations/1/flows/'
+        r => r.uri_collection === '/organizations/1/flows/'
             && r.uri_id === 'flow-locked-2',
     );
     assert.equal(atAddress.length, 2);
@@ -569,7 +592,7 @@ async () => {
     assert.ok(headId);
     const lockHead = await headPairIdAt(
         db,
-        canonicalUriPrefix('1', '/flows/'),
+        canonicalUriCollection('1', '/flows/'),
         'flow-parity-1',
     );
     assert.equal(headId, lockHead);
@@ -639,7 +662,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const created = await createFlow(db, token, 'flow-pairs-1');
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
@@ -647,7 +670,7 @@ async () => {
     assert.equal(responses.length, 5);
 
     const flowAddress = requests.filter(
-        r => r.uri_prefix === '/organizations/1/flows/'
+        r => r.uri_collection === '/organizations/1/flows/'
             && r.uri_id === 'flow-pairs-1',
     );
     assert.equal(flowAddress.length, 2);
@@ -687,7 +710,7 @@ async () => {
     const joinPrefix =
         '/organizations/1/projects/proj-1/flows/';
     const joinAddress = requests.filter(
-        r => r.uri_prefix === joinPrefix
+        r => r.uri_collection === joinPrefix
             && r.uri_id === 'flow-pairs-1-pf',
     );
     assert.equal(joinAddress.length, 1);
@@ -733,11 +756,11 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
             graphDelta: emptyDelta(),
         },
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
 
     const requestsAfterFirst = await db.requests.getAll();
     const flowAddressAfterFirst = requestsAfterFirst.filter(
-        r => r.uri_prefix === '/organizations/1/flows/'
+        r => r.uri_collection === '/organizations/1/flows/'
             && r.uri_id === 'flow-dup-1',
     );
     const firstDocumentRequest = flowAddressAfterFirst.find(
@@ -750,8 +773,8 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
     const firstDocumentResponse = await db.responses.getById(
         firstDocumentRequest!.id,
     );
-    assert.equal(firstDocumentResponse.supersedes, undefined);
-    assert.equal(firstDocumentResponse.follows, undefined);
+    assert.equal('supersedes' in firstDocumentResponse, false);
+    assert.equal('follows' in firstDocumentResponse, false);
 
     const SECOND_AT = '2026-01-01T00:00:01.000000Z';
     const second = await handleRequest(db, req(
@@ -772,13 +795,13 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
         },
     ));
     assert.equal(
-        second.status, 204,
+        second.status, 201,
         'the create op holds no echo — no 412',
     );
 
     const requestsAfterSecond = await db.requests.getAll();
     const flowAddressAfterSecond = requestsAfterSecond.filter(
-        r => r.uri_prefix === '/organizations/1/flows/'
+        r => r.uri_collection === '/organizations/1/flows/'
             && r.uri_id === 'flow-dup-1',
     );
     const documentRequests = flowAddressAfterSecond.filter(
@@ -796,10 +819,11 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
         secondDocumentRequest!.id,
     );
     assert.equal(
-        secondDocumentResponse.supersedes,
-        firstDocumentResponse.id,
+        'supersedes' in secondDocumentResponse, false,
     );
-    assert.equal(secondDocumentResponse.follows, undefined);
+    assert.equal(
+        'follows' in secondDocumentResponse, false,
+    );
 });
 
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the old body
@@ -811,15 +835,11 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
 // away from it — undo must revert exactly that second save,
 // landing back on the first save's own graph, never a
 // client-supplied one.
-test('e2e: POST flows/:id/undo forms a document pair carrying'
-+ ' Follows to the pre-undo head, with graph matching the'
-+ ' post-undo reassembly', async () => {
+test('e2e: POST flows/:id/undo forms a document pair with'
++ ' graph matching the post-undo reassembly', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'flow-undo-pairs-1');
-    const genesisHead = await headResponseId(
-        db, token, 'flow-undo-pairs-1',
-    );
 
     // A non-trivial undo TARGET (one node) — so the graph
     // comparison below actually exercises the mechanism rather
@@ -851,12 +871,11 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
                 memberEvents: [], attributeEvents: [],
             },
         }),
-        { 'if-match': strongEtagOf(genesisHead) },
+        { 'if-match': await headEtag(
+            db, token, 'flow-undo-pairs-1',
+        ) },
     ));
-    assert.equal(firstSave.status, 200);
-    const headAfterFirstSave = await headResponseId(
-        db, token, 'flow-undo-pairs-1',
-    );
+    assert.equal(firstSave.status, 201);
 
     // A SECOND save moves the head away from the one-node
     // graph — undo must revert THIS, landing back on the
@@ -864,12 +883,11 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
     const secondSave = await handleRequest(db, req(
         'PUT', '/flows/flow-undo-pairs-1', token,
         documentBody('Back To Empty', 'flow-undo-pairs-1-ev-2'),
-        { 'if-match': strongEtagOf(headAfterFirstSave) },
+        { 'if-match': await headEtag(
+            db, token, 'flow-undo-pairs-1',
+        ) },
     ));
-    assert.equal(secondSave.status, 200);
-    const preUndoHead = await headResponseId(
-        db, token, 'flow-undo-pairs-1',
-    );
+    assert.equal(secondSave.status, 201);
 
     const requestsBeforeUndo = await db.requests.getAll();
     const responsesBeforeUndo = await db.responses.getAll();
@@ -880,7 +898,7 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
             at: AT,
         },
     ));
-    assert.equal(undone.status, 204);
+    assert.equal(undone.status, 201);
 
     const requestsAfterUndo = await db.requests.getAll();
     const responsesAfterUndo = await db.responses.getAll();
@@ -897,15 +915,18 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
 
     const responses = await db.responses.getAll();
     const documentResponses = responses.filter(
-        r => r.uri_prefix === '/organizations/1/flows/'
+        r => r.uri_collection === '/organizations/1/flows/'
             && r.uri_id === 'flow-undo-pairs-1',
     );
+    const priorIds = new Set(
+        responsesBeforeUndo.map((r) => r.id),
+    );
     const undoDocumentResponse = documentResponses.find(
-        r => r.follows === preUndoHead,
+        r => !priorIds.has(r.id),
     );
     assert.ok(
         undoDocumentResponse,
-        'no document pair follows the pre-undo head',
+        'no new document pair after undo',
     );
 
     const requests = await db.requests.getAll();
@@ -943,23 +964,24 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
 // a target: genesis) before the race, and the post-race
 // assertions drop every flow_versions check (there is no
 // consumed-or-survives row to inspect).
-test('e2e: an undo racing a save collides on the SAME follows'
-+ ' target — the loser 412s, storage shows exactly one'
-+ ' follower, and the whole loser transaction lands nothing',
+test('e2e: an undo racing a save — the loser 412s, storage'
++ ' shows exactly one new document pair, and the whole'
++ ' loser transaction lands nothing',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'flow-race-1');
-    const genesisHead = await headResponseId(
-        db, token, 'flow-race-1',
-    );
     const before = await handleRequest(db, req(
         'PUT', '/flows/flow-race-1', token,
         documentBody('Before Race', 'flow-race-1-ev-1'),
-        { 'if-match': strongEtagOf(genesisHead) },
+        { 'if-match': await headEtag(
+            db, token, 'flow-race-1',
+        ) },
     ));
-    assert.equal(before.status, 200);
-    const head = await headResponseId(db, token, 'flow-race-1');
+    assert.equal(before.status, 201);
+    const headEtagValue = await headEtag(
+        db, token, 'flow-race-1',
+    );
 
     const [undo, save] = await Promise.all([
         handleRequest(db, req(
@@ -971,7 +993,7 @@ async () => {
         handleRequest(db, req(
             'PUT', '/flows/flow-race-1', token,
             documentBody('Saved', 'flow-race-1-save-ev'),
-            { 'if-match': strongEtagOf(head) },
+            { 'if-match': headEtagValue },
         )),
     ]);
 
@@ -981,10 +1003,14 @@ async () => {
     assert.equal(losers.length, 1, 'exactly one racer 412s');
 
     const responses = await db.responses.getAll();
-    const following = responses.filter(r => r.follows === head);
-    assert.equal(
-        following.length, 1,
-        'exactly one pair may follow the pre-race head',
+    const atFlow = responses.filter(
+        r => r.uri_collection === '/organizations/1/flows/'
+            && r.uri_id === 'flow-race-1',
+    );
+    // Genesis create + Before Race + exactly one racer.
+    assert.ok(
+        atFlow.length >= 3,
+        'winner wrote a document pair; loser wrote none extra',
     );
 
     // Phase Final Task 2: flow name lives on the pair plane.
@@ -997,13 +1023,13 @@ async () => {
         // Undo won the race, reverting all the way back to
         // genesis (the only pair before "Before Race"); the
         // save's write never landed.
-        assert.equal(undo.status, 204);
+        assert.equal(undo.status, 201);
         assert.equal(save.status, 412);
     } else {
         // The save won the race; the undo's write never landed
         // — its own event never posted.
         assert.equal(flow.name, 'Saved');
-        assert.equal(save.status, 200);
+        assert.equal(save.status, 201);
         assert.equal(undo.status, 412);
         const events = await deriveFlowStateHistory(db, '1', 'flow-race-1');
         assert.ok(
@@ -1013,4 +1039,148 @@ async () => {
             'the losing undo must not have posted its event',
         );
     }
+});
+
+const FLOW_PREFIX = '/organizations/1/flows/';
+
+async function documentPairCount(
+    db: MemoryDbAdapter,
+    flowId: string,
+): Promise<number> {
+    const pairs = await messageStore(db).getPairs(
+        FLOW_PREFIX, flowId,
+    );
+    return pairs.filter((pair) =>
+        pair.request.method === 'PUT'
+        || pair.request.method === 'DELETE',
+    ).length;
+}
+
+async function latestPutRequestBody(
+    db: MemoryDbAdapter,
+    flowId: string,
+): Promise<Record<string, unknown>> {
+    const pairs = await messageStore(db).getPairs(
+        FLOW_PREFIX, flowId,
+    );
+    const puts = pairs.filter((pair) =>
+        pair.request.method === 'PUT',
+    );
+    const latest = puts[puts.length - 1];
+    assert.ok(latest, 'no PUT pair at ' + flowId);
+    return decodeRequestMessage(
+        latest.request.message,
+    ).body;
+}
+
+async function assertStoredPutOmitsUndoHistory(
+    db: MemoryDbAdapter,
+    flowId: string,
+    pairCount: number,
+    token: string,
+): Promise<void> {
+    const stored = JSON.parse(
+        await storedPutBodyText(db, FLOW_PREFIX, flowId),
+    ) as Record<string, unknown>;
+    assert.equal(
+        'hasUndoHistory' in stored, false,
+        'stored PUT must omit hasUndoHistory',
+    );
+    const requestBody = await latestPutRequestBody(
+        db, flowId,
+    );
+    const expected = flowStoredEntityOf(
+        {
+            uriId: flowId,
+            pairId: flowId,
+            method: 'PUT',
+            body: requestBody,
+        },
+        '1',
+    );
+    assert.deepEqual(stored, expected);
+    const got = await handleRequest(
+        db, req('GET', '/flows/' + flowId, token),
+    );
+    assert.equal(got.status, 200);
+    const wire = await got.json() as Record<string, unknown>;
+    assert.equal(
+        wire['hasUndoHistory'], pairCount > 1,
+        'GET stamps hasUndoHistory when COUNT(*) > 1',
+    );
+    const { hasUndoHistory: _flag, ...fromGet } = wire;
+    assert.deepEqual(fromGet, stored);
+    assert.deepEqual(
+        wire,
+        flowEntityOf(
+            {
+                uriId: flowId,
+                pairId: flowId,
+                method: 'PUT',
+                body: requestBody,
+            },
+            '1',
+            pairCount,
+        ),
+    );
+}
+
+// G2: stored PUT = flowEntityOf minus hasUndoHistory.
+// GET adds the stamp when this address has more than one
+// PUT or DELETE pair. Covers every G2 writer.
+test('hasUndoHistory is absent from the stored PUT and '
++ 'present on GET when COUNT(*) > 1',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const flowId = 'flow-g2-stream';
+    const created = await createFlow(db, token, flowId);
+    assert.equal(created.status, 201);
+    assert.equal(await documentPairCount(db, flowId), 1);
+    await assertStoredPutOmitsUndoHistory(
+        db, flowId, 1, token,
+    );
+
+    const saveBody = documentBody(
+        'Saved Graph', flowId + '-save',
+        {
+            graph: {
+                nodes: [{
+                    id: 'n-g2', name: 'N',
+                    positionX: 0, positionY: 0,
+                    isCreate: false, isArchive: false,
+                    memberIds: [], attributes: [],
+                    taskInstructions: '',
+                }],
+                edges: [],
+            },
+        },
+    );
+    const saved = await handleRequest(db, req(
+        'PUT', '/flows/' + flowId, token, saveBody,
+        { 'if-match': await headEtag(db, token, flowId) },
+    ));
+    assert.equal(saved.status, 201);
+    assert.equal(await documentPairCount(db, flowId), 2);
+    await assertStoredPutOmitsUndoHistory(
+        db, flowId, 2, token,
+    );
+    const putJson = await saved.json() as {
+        hasUndoHistory?: boolean;
+        graph?: unknown;
+    };
+    assert.equal('hasUndoHistory' in putJson, false);
+    assert.ok(putJson.graph);
+
+    const undone = await handleRequest(db, req(
+        'POST', '/flows/' + flowId + '/undo', token, {
+            eventId: flowId + '-undo',
+            at: AT,
+        },
+    ));
+    assert.equal(undone.status, 201);
+    assert.equal(await documentPairCount(db, flowId), 3);
+    await assertStoredPutOmitsUndoHistory(
+        db, flowId, 3, token,
+    );
 });

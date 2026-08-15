@@ -31,38 +31,42 @@ const LEGACY_RECORD_ATTRIBUTES_PREFIX =
 const LIVE_FLOW_RECORDS_PREFIX =
     '/organizations/1/flows/f1/records/';
 
-function requestRow(uriPrefix: string) {
+function requestRow(uriCollection: string) {
     return {
         id: 'rq1',
-        uri_prefix: uriPrefix,
+        uri_collection: uriCollection,
         uri_id: '42',
         at: '2026-01-01T00:00:00.000000Z',
         requester_identity_id: 'current',
         message_hash: 'a'.repeat(64),
-        message: '{"kind":"request"}',
+        message:
+            'PUT /organizations/1/ideas/42'
+            + ' HTTP/1.1\r\n\r\n',
+        method: 'PUT',
+        operation_id: '0123456789ABCDEFGHIJKL',
     };
 }
 
-function responseRow(uriPrefix: string) {
+function responseRow(uriCollection: string) {
     return {
         id: 'rs1',
-        uri_prefix: uriPrefix,
+        uri_collection: uriCollection,
         uri_id: '42',
         at: '2026-01-01T00:00:00.000000Z',
-        status: 200,
-        etag: 'e'.repeat(64),
-        message_hash: 'b'.repeat(64),
-        message: '{"kind":"response"}',
+        version: 'e'.repeat(64),
+        message:
+            'HTTP/1.1 204 No Content\r\n\r\n',
+        operation_id: '0123456789ABCDEFGHIJKL',
     };
 }
 
 function snapshotJson(
     table: 'requests' | 'responses',
-    uriPrefix: string,
+    uriCollection: string,
 ): string {
     const row = table === 'requests'
-        ? requestRow(uriPrefix)
-        : responseRow(uriPrefix);
+        ? requestRow(uriCollection)
+        : responseRow(uriCollection);
     return JSON.stringify({ [table]: [row] });
 }
 
@@ -70,7 +74,7 @@ function snapshotJson(
 
 test(
     'parseAndValidateSnapshot rejects requests row with'
-    + ' retired flat records uri_prefix via'
+    + ' retired flat records uri_collection via'
     + ' ValidationError',
     () => {
         const json = snapshotJson(
@@ -90,7 +94,7 @@ test(
 
 test(
     'parseAndValidateSnapshot rejects responses row with'
-    + ' retired flat records uri_prefix via'
+    + ' retired flat records uri_collection via'
     + ' ValidationError',
     () => {
         const json = snapshotJson(
@@ -120,8 +124,8 @@ test(
         assert.ok(rows);
         assert.equal(rows.length, 1);
         assert.equal(
-            (rows[0] as { uri_prefix: string })
-                .uri_prefix,
+            (rows[0] as { uri_collection: string })
+                .uri_collection,
             LIVE_FLOW_RECORDS_PREFIX,
         );
     },
@@ -129,7 +133,7 @@ test(
 
 test(
     'parseAndValidateSnapshot rejects requests row with'
-    + ' retired flat record-attributes uri_prefix via'
+    + ' retired flat record-attributes uri_collection via'
     + ' ValidationError',
     () => {
         const json = snapshotJson(
@@ -149,7 +153,7 @@ test(
 
 test(
     'parseAndValidateSnapshot rejects responses row with'
-    + ' retired flat record-attributes uri_prefix via'
+    + ' retired flat record-attributes uri_collection via'
     + ' ValidationError',
     () => {
         const json = snapshotJson(
@@ -213,7 +217,7 @@ test(
 // -- Client pre-flight: scanForRetiredKeys / putSnapshot
 
 test(
-    'scanForRetiredKeys lists legacy records uri_prefix'
+    'scanForRetiredKeys lists legacy records uri_collection'
     + ' on requests',
     () => {
         const findings = scanForRetiredKeys({
@@ -223,7 +227,7 @@ test(
         });
         assert.ok(
             findings.includes(
-                'requests[].uri_prefix='
+                'requests[].uri_collection='
                 + LEGACY_RECORDS_PREFIX,
             ),
         );
@@ -245,7 +249,7 @@ test(
 
 test(
     'scanForRetiredKeys lists legacy record-attributes'
-    + ' uri_prefix on requests',
+    + ' uri_collection on requests',
     () => {
         const findings = scanForRetiredKeys({
             requests: [
@@ -256,7 +260,7 @@ test(
         });
         assert.ok(
             findings.includes(
-                'requests[].uri_prefix='
+                'requests[].uri_collection='
                 + LEGACY_RECORD_ATTRIBUTES_PREFIX,
             ),
         );
@@ -281,7 +285,7 @@ test(
                 err instanceof
                     SnapshotIncompatibleError
                 && err.retired.includes(
-                    'requests[].uri_prefix='
+                    'requests[].uri_collection='
                     + LEGACY_RECORDS_PREFIX,
                 ),
         );

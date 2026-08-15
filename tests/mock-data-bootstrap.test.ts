@@ -32,8 +32,8 @@ test('pristine bootstrap seeds no Records', async () => {
     // flow_records joins (…/flows/:id/records/).
     const requests = await db.requests.getAll();
     const recordFamily = requests.filter((r) =>
-        r.uri_prefix.includes('/records/')
-        || r.uri_prefix.includes('/record-attributes/')
+        r.uri_collection.includes('/records/')
+        || r.uri_collection.includes('/record-attributes/')
     );
     assert.equal(
         recordFamily.length, 0,

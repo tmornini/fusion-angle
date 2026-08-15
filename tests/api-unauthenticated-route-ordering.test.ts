@@ -19,7 +19,7 @@ test('no token + unknown path → 401', async () => {
     );
     assert.equal(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /missing bearer token/);
+    assert.equal(body.error, 'invalid_token');
 });
 
 test('no token + unknown nested path → 401', async () => {
@@ -31,7 +31,7 @@ test('no token + unknown nested path → 401', async () => {
     );
     assert.equal(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /missing bearer token/);
+    assert.equal(body.error, 'invalid_token');
 });
 
 test('bearer-exempt snapshot route stays auth-free',

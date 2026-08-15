@@ -3,8 +3,9 @@
 // Excluded from browser tsc; uses Node APIs + global WebSocket.
 //
 // Flow: optional bare --visualize (disk only) → clean-tree
-// gate → build → serve → Chrome → seed → login →
-// detail-URL discovery → N-run sweep → report → optional
+// gate → (build → python serve → snapshots seed) or
+// --base-url origin → Chrome → login → detail-URL
+// discovery → N-run sweep → report → optional
 // --check / --record / --visualize. Cleanup always in
 // finally.
 
@@ -44,19 +45,18 @@ import {
 } from './measure-core.ts';
 import { generateMeasureViz } from './measure-viz.ts';
 import {
-    DEFAULT_PROFILE_PAGES,
     formatRequestProfileReport,
     type ApiRequestHit,
 } from './measure-profile-core.ts';
 import {
     DEFAULT_RUNS,
-    finalizeMeasureCli,
+    DEFAULT_BUDGET_SIGMAS,
+    parseMeasureArgv,
 } from './measure-cli.ts';
 
 const execFile = promisify(execFileCb);
 
 const DEMO_EMAIL = 'demo@example.com';
-const DEFAULT_BUDGET_SIGMAS = 1.5;
 const CHROME_READY_MS = 15_000;
 const SEED_TIMEOUT_MS = 120_000;
 const LOGIN_TIMEOUT_MS = 60_000;
@@ -78,25 +78,6 @@ const DETAIL_FROM_LIST: Record<string, string> = {
 };
 
 // ── CLI ──────
-
-type Cli = {
-    check: boolean;
-    record: boolean;
-    writeBudgets: boolean;
-    budgetSigmas: number;
-    pages: string[] | null;
-    runs: number;
-    visualize: boolean;
-    /** API request-count profile after each ready. */
-    profile: boolean;
-    /** True when --runs was present on argv. */
-    runsExplicit: boolean;
-};
-
-type ParseResult =
-    | { kind: 'ok'; cli: Cli }
-    | { kind: 'help' }
-    | { kind: 'error'; message: string };
 
 function usageText(): string {
     return [
@@ -142,6 +123,14 @@ function usageText(): string {
         '                       workbox, workbox-detail,',
         '                       projects. If --runs is',
         '                       omitted, uses 1.',
+        '  --base-url URL       Hit this origin instead',
+        '                       of building and spawning',
+        '                       python http.server.',
+        '                       Skips snapshots seed.',
+        '  --password SECRET    Auth password when',
+        '                       --base-url is set.',
+        '                       MEASURE_PASSWORD also',
+        '                       accepted.',
         '  --help, -h           Show this help',
         '',
         'Examples:',
@@ -157,135 +146,11 @@ function usageText(): string {
         '  ./measure --visualize',
         '  ./measure --profile',
         '  ./measure --profile --pages ideas,dashboard',
+        '  ./measure --record --write-budgets',
+        '    --base-url http://127.0.0.1:8080',
+        '    --password "$MEASURE_PASSWORD"',
         '',
     ].join('\n');
-}
-
-function parseArgs(argv: string[]): ParseResult {
-    let check = false;
-    let record = false;
-    let writeBudgets = false;
-    let budgetSigmas = DEFAULT_BUDGET_SIGMAS;
-    let pages: string[] | null = null;
-    let runs = DEFAULT_RUNS;
-    let visualize = false;
-    let profile = false;
-    let runsExplicit = false;
-    for (let i = 0; i < argv.length; i++) {
-        const a = argv[i]!;
-        if (a === '--help' || a === '-h') {
-            return { kind: 'help' };
-        }
-        if (a === '--check') {
-            check = true;
-            continue;
-        }
-        if (a === '--record') {
-            record = true;
-            continue;
-        }
-        if (a === '--write-budgets') {
-            writeBudgets = true;
-            continue;
-        }
-        if (a === '--visualize') {
-            visualize = true;
-            continue;
-        }
-        if (a === '--profile') {
-            profile = true;
-            continue;
-        }
-        if (a === '--budget-sigmas') {
-            const v = argv[++i];
-            if (
-                v === undefined
-                || !Number.isFinite(Number(v))
-                || Number(v) < 0
-            ) {
-                return {
-                    kind: 'error',
-                    message:
-                        '--budget-sigmas requires a'
-                        + ' non-negative number',
-                };
-            }
-            budgetSigmas = Number(v);
-            continue;
-        }
-        if (a === '--pages') {
-            const v = argv[++i];
-            if (v === undefined || v.length === 0) {
-                return {
-                    kind: 'error',
-                    message:
-                        '--pages requires a'
-                        + ' comma-separated list of'
-                        + ' registry keys',
-                };
-            }
-            pages = v.split(',')
-                .map((s) => s.trim())
-                .filter((s) => s.length > 0);
-            if (pages.length === 0) {
-                return {
-                    kind: 'error',
-                    message: '--pages list is empty',
-                };
-            }
-            continue;
-        }
-        if (a === '--runs') {
-            const v = argv[++i];
-            if (
-                v === undefined
-                || !/^[1-9]\d*$/.test(v)
-            ) {
-                return {
-                    kind: 'error',
-                    message:
-                        '--runs requires a positive'
-                        + ' integer',
-                };
-            }
-            runs = Number(v);
-            runsExplicit = true;
-            continue;
-        }
-        return {
-            kind: 'error',
-            message: `Unknown flag: ${a}`,
-        };
-    }
-    // Profile defaults before finalize so --profile is
-    // never treated as bare ceremony. Heaviest page-init
-    // pages, one run (counts deterministic for a seed).
-    if (profile && pages === null) {
-        pages = [...DEFAULT_PROFILE_PAGES];
-    }
-    if (profile && !runsExplicit) {
-        runs = 1;
-    }
-    const finalized = finalizeMeasureCli({
-        check,
-        record,
-        writeBudgets,
-        visualize,
-        profile,
-        pages,
-        runs,
-        runsExplicit,
-    });
-    if (finalized.kind === 'error') {
-        return finalized;
-    }
-    return {
-        kind: 'ok',
-        cli: {
-            ...finalized.cli,
-            budgetSigmas,
-        },
-    };
 }
 
 // ── Small utils ──────
@@ -1096,7 +961,10 @@ async function measurePage(
 // ── Main ──────
 
 async function main(): Promise<void> {
-    const parsed = parseArgs(process.argv.slice(2));
+    const parsed = parseMeasureArgv(
+        process.argv.slice(2),
+        process.env,
+    );
     if (parsed.kind === 'help') {
         process.stdout.write(usageText());
         return;
@@ -1119,7 +987,8 @@ async function main(): Promise<void> {
         && !cli.writeBudgets
         && !cli.profile
         && cli.pages === null
-        && !cli.runsExplicit;
+        && !cli.runsExplicit
+        && cli.baseUrl === null;
 
     if (visualizeOnly) {
         const out = generateMeasureViz(repoRoot);
@@ -1171,9 +1040,10 @@ async function main(): Promise<void> {
     }
 
     const root = tmpRoot();
-    const buildDir = mkdtempSync(
-        join(root, 'fusion-measure.'),
-    );
+    const useOrigin = cli.baseUrl !== null;
+    const buildDir = useOrigin
+        ? null
+        : mkdtempSync(join(root, 'fusion-measure.'));
     const chromeDir = mkdtempSync(
         join(root, 'fusion-measure-chrome.'),
     );
@@ -1183,79 +1053,104 @@ async function main(): Promise<void> {
     let cdp: CdpClient | null = null;
 
     try {
-        // 1. Build
-        process.stderr.write(
-            `Building to ${buildDir}/ …\n`,
-        );
-        try {
-            await execFile(
-                './build',
-                ['--no-zip', buildDir + '/'],
-                {
-                    cwd: repoRoot,
-                    maxBuffer: 16 * 1024 * 1024,
+        let baseUrl: string;
+        if (cli.baseUrl !== null) {
+            baseUrl = cli.baseUrl;
+            process.stderr.write(
+                `Using origin ${baseUrl} …\n`,
+            );
+            await pollUntil(
+                `origin ${baseUrl}`,
+                10_000,
+                async () => {
+                    try {
+                        const res = await fetch(
+                            baseUrl + '/',
+                        );
+                        return res.ok
+                            || res.status === 404
+                            ? true
+                            : null;
+                    } catch {
+                        return null;
+                    }
                 },
             );
-        } catch (err: unknown) {
-            const e = err as {
-                message?: string;
-                stderr?: string | Buffer;
-                stdout?: string | Buffer;
-            };
-            const stderr = e.stderr
-                ? String(e.stderr).trim()
-                : '';
-            const stdout = e.stdout
-                ? String(e.stdout).trim()
-                : '';
-            throw new Error(
-                'Build failed'
-                + (stderr ? `: ${stderr}` : '')
-                + (stdout && !stderr
-                    ? `: ${stdout}`
-                    : '')
-                + (!stderr && !stdout
-                    ? `: ${e.message ?? err}`
-                    : ''),
+        } else {
+            // 1. Build
+            process.stderr.write(
+                `Building to ${buildDir}/ …\n`,
+            );
+            try {
+                await execFile(
+                    './build',
+                    ['--no-zip', buildDir + '/'],
+                    {
+                        cwd: repoRoot,
+                        maxBuffer: 16 * 1024 * 1024,
+                    },
+                );
+            } catch (err: unknown) {
+                const e = err as {
+                    message?: string;
+                    stderr?: string | Buffer;
+                    stdout?: string | Buffer;
+                };
+                const stderr = e.stderr
+                    ? String(e.stderr).trim()
+                    : '';
+                const stdout = e.stdout
+                    ? String(e.stdout).trim()
+                    : '';
+                throw new Error(
+                    'Build failed'
+                    + (stderr ? `: ${stderr}` : '')
+                    + (stdout && !stderr
+                        ? `: ${stdout}`
+                        : '')
+                    + (!stderr && !stdout
+                        ? `: ${e.message ?? err}`
+                        : ''),
+                );
+            }
+
+            // 2. Serve
+            const port = await freePort();
+            baseUrl = `http://127.0.0.1:${port}`;
+            serverProc = spawn(
+                'python3',
+                [
+                    '-m',
+                    'http.server',
+                    String(port),
+                    '--directory',
+                    buildDir,
+                ],
+                {
+                    stdio: 'ignore',
+                    detached: true,
+                },
+            );
+            serverProc.unref();
+            // Wait until the server accepts connections.
+            await pollUntil(
+                `http.server on port ${port}`,
+                10_000,
+                async () => {
+                    try {
+                        const res = await fetch(
+                            baseUrl + '/',
+                        );
+                        return res.ok
+                            || res.status === 404
+                            ? true
+                            : null;
+                    } catch {
+                        return null;
+                    }
+                },
             );
         }
-
-        // 2. Serve
-        const port = await freePort();
-        const baseUrl =
-            `http://127.0.0.1:${port}`;
-        serverProc = spawn(
-            'python3',
-            [
-                '-m',
-                'http.server',
-                String(port),
-                '--directory',
-                buildDir,
-            ],
-            {
-                stdio: 'ignore',
-                detached: true,
-            },
-        );
-        serverProc.unref();
-        // Wait until the server accepts connections.
-        await pollUntil(
-            `http.server on port ${port}`,
-            10_000,
-            async () => {
-                try {
-                    const res = await fetch(
-                        baseUrl + '/',
-                    );
-                    return res.ok || res.status === 404
-                        ? true
-                        : null;
-                } catch {
-                    return null;
-                }
-            },
-        );
 
         // 3. Launch Chrome
         process.stderr.write(
@@ -1288,13 +1183,25 @@ async function main(): Promise<void> {
         await cdp.send('Page.enable');
         await cdp.send('Runtime.enable');
 
-        // 4. Seed
-        process.stderr.write(
-            'Seeding mock data …\n',
-        );
-        const password = await seedMockData(
-            cdp, baseUrl,
-        );
+        // 4. Seed (browser ZIP only). Server first-light
+        // seeds below HTTP; login uses --password.
+        let password: string;
+        if (cli.baseUrl !== null) {
+            if (cli.password === null) {
+                throw new Error(
+                    '--base-url requires --password'
+                    + ' or MEASURE_PASSWORD',
+                );
+            }
+            password = cli.password;
+        } else {
+            process.stderr.write(
+                'Seeding mock data …\n',
+            );
+            password = await seedMockData(
+                cdp, baseUrl,
+            );
+        }
 
         // 5. Login
         process.stderr.write(
@@ -1556,13 +1463,15 @@ async function main(): Promise<void> {
         }
         killProcessTree(chromeProc);
         killProcessTree(serverProc);
-        try {
-            rmSync(buildDir, {
-                recursive: true,
-                force: true,
-            });
-        } catch {
-            // best-effort
+        if (buildDir !== null) {
+            try {
+                rmSync(buildDir, {
+                    recursive: true,
+                    force: true,
+                });
+            } catch {
+                // best-effort
+            }
         }
         try {
             rmSync(chromeDir, {

@@ -23,12 +23,16 @@ function installShim(): Map<string, string> {
 // Pin the localStorage write surface on requests
 // (message-plane survivor with string fields).
 const baseRequest = {
-    uri_prefix: '/organizations/1/ideas/',
+    uri_collection: '/organizations/1/ideas/',
     uri_id: '42',
     at: '2026-01-01T00:00:00.000000Z',
     requester_identity_id: 'current',
     message_hash: 'a'.repeat(64),
-    message: '{"kind":"request"}',
+    message:
+        'PUT /organizations/1/ideas/42'
+        + ' HTTP/1.1\r\n\r\n',
+    method: 'PUT',
+    operation_id: '0123456789ABCDEFGHIJKL',
 };
 
 // Writes are plain JSON since the F-080 measurement
@@ -133,12 +137,16 @@ test(
         const adapter = localStorageDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.requests.put('r1', {
-            uri_prefix: '/organizations/1/ideas/',
+            uri_collection: '/organizations/1/ideas/',
             uri_id: '42',
             at: '2026-01-01T00:00:00.000000Z',
             requester_identity_id: 'current',
             message_hash: 'a'.repeat(64),
-            message: '{"kind":"request"}',
+            message:
+                'PUT /organizations/1/ideas/42'
+                + ' HTTP/1.1\r\n\r\n',
+            method: 'PUT',
+            operation_id: '0123456789ABCDEFGHIJKL',
         });
         const stored = map.get(KEY_PREFIX + 'requests');
         assert.ok(stored, 'expected stored requests value');

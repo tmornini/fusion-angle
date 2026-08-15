@@ -31,6 +31,7 @@ import {
 } from '../api/message-pair.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // Destroying a record attribute is RESTRICT, not cascade:
 // while a state_field_values row names it or a live
@@ -346,6 +347,7 @@ async function seedFieldValueReferrer(
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
         db, 'wo-restrict-fv', body, SYSTEM_MEMBER_ID,

@@ -4,7 +4,6 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
-    ForeignOrganizationError,
 } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type {
@@ -18,7 +17,7 @@ import {
     MS_PER_SECOND, nowUtc,
     setClockForTest, resetClock,
 } from '../api/types.ts';
-import { canonicalUriPrefix } from '../api/message-pair.ts';
+import { canonicalUriCollection } from '../api/message-pair.ts';
 import {
     documentPairsAt,
     type DocumentPair,
@@ -61,12 +60,12 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     generateCryptoSafeBase62,
 } from '../shared/crypto-safe-base62.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
-import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: work_orders(+flow_work_orders+
 // state_field_values) dual-write stripped. This file no longer
@@ -83,13 +82,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -282,7 +280,7 @@ test('seeded GET /work-orders wire equals derived collection,'
 
 // -- 2. org-2 empty collection + foreign-org 404 --------------
 
-test('org-2 carries no work orders; a foreign-org GET 403s'
+test('org-2 carries no work orders; a foreign-org GET 404s'
 + ' on wire and on derive', async () => {
     const db = await seededDb();
     const tokenTwo = await organizationToken(
@@ -299,18 +297,17 @@ test('org-2 carries no work orders; a foreign-org GET 403s'
 
     const foreignId = SEEDED_WORK_ORDER_IDS[0]!;
     const expectedMessage =
-        'forbidden: work_orders/' + foreignId
-        + ' belongs to a different organization';
+        'Not found: work_orders/' + foreignId;
     const res = await handleRequest(
         db, req('GET', '/work-orders/' + foreignId, tokenTwo),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
     const body = await res.json() as { error: string };
     assert.equal(body.error, expectedMessage);
     await assert.rejects(
         () => derivedWorkOrder(db, ORGANIZATION_TWO, foreignId),
         (err: unknown) =>
-            err instanceof ForeignOrganizationError
+            err instanceof EntityNotFoundError
             && err.message === expectedMessage,
     );
 });
@@ -506,7 +503,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Transition with 2+ field values, no release.
@@ -558,7 +555,7 @@ async () => {
             transitionAt: transition2At,
         },
     ));
-    assert.equal(transition2.status, 204);
+    assert.equal(transition2.status, 201);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Entity PUT: a position bump. Its own body's flow_graph
@@ -569,8 +566,8 @@ async () => {
     // round-tripped response — two independently re-encoded
     // values, not the same in-memory literal.
     const storedCreatePostRow = (await db.requests.getAllWhere(
-        'uri_prefix',
-        canonicalUriPrefix(STARK_ORGANIZATION, '/work-orders/'),
+        'uri_collection',
+        canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.uri_id === workOrderId
             && decodeRequestMessage(r.message).method === 'POST',
@@ -586,7 +583,7 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(entityPut.status, 200);
+    assert.equal(entityPut.status, 201);
     const putBody = await entityPut.json() as {
         flow_graph: Record<string, unknown>;
     };
@@ -604,7 +601,7 @@ async () => {
             expireAt: claimFreshAt,
         },
     ));
-    assert.equal(claimFresh.status, 204);
+    assert.equal(claimFresh.status, 201);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Repeat-claim by A — idempotent no-op: the pair appends,
@@ -624,7 +621,7 @@ async () => {
             expireAt: claimRepeatAt,
         },
     ));
-    assert.equal(claimRepeat.status, 204);
+    assert.equal(claimRepeat.status, 201);
     assert.equal(
         0 /* states table retired */,
         beforeRepeat,
@@ -662,7 +659,7 @@ async () => {
             releaseAt: nowUtc(),
         },
     ));
-    assert.equal(unclaim.status, 204);
+    assert.equal(unclaim.status, 201);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // The full chain: create(3) + transition1(1) +
@@ -710,7 +707,7 @@ test('duplicate-create: two creates, same work-order id, fresh'
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
 
     const second = await handleRequest(db, req(
         'POST', '/work-orders', token,
@@ -734,7 +731,7 @@ test('duplicate-create: two creates, same work-order id, fresh'
     ));
     // The create op holds no echo of its own — a duplicate
     // create succeeds outright, never 412ing.
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
 
     const entityRes = await handleRequest(
         db, req('GET', '/work-orders/' + workOrderId, token),
@@ -793,7 +790,7 @@ async () => {
             position: 1,
         },
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     assert.ok(firstId);
 
@@ -804,8 +801,8 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(second.status, 200);
-    assert.equal(second.headers.get('Supersedes'), firstId);
+    assert.equal(second.status, 201);
+    assert.equal(second.headers.get('Supersedes'), null);
 
     const getRes = await handleRequest(
         db, req('GET', '/work-orders/' + workOrderId, token),
@@ -856,17 +853,17 @@ async () => {
             '2026-05-03T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
-    const prefix = canonicalUriPrefix(
+    const prefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/work-orders/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const atAddress = requests.filter(
-        (r) => r.uri_prefix === prefix
+        (r) => r.uri_collection === prefix
             && r.uri_id === workOrderId,
     );
     // Both an operation (POST, 204) pair and a document (PUT)
@@ -901,7 +898,7 @@ function decodeRequestMessage(message: string): {
     readonly method: string;
     readonly body: Record<string, unknown>;
 } {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     if (model.startLine.kind !== 'request') {
         throw new Error(
             'stored message carries no request line',
@@ -959,18 +956,16 @@ function atIdCompare(
 function allPairsAt(
     requests: readonly RequestEntity[],
     responses: readonly ResponseEntity[],
-    uriPrefix: string,
+    uriCollection: string,
 ): AnyPair[] {
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
     );
     const pairs: AnyPair[] = [];
     for (const response of responses) {
-        if (
-            response.uri_prefix !== uriPrefix
-            || response.status < 200
-            || response.status > 299
-        ) continue;
+        if (response.uri_collection !== uriCollection) {
+            continue;
+        }
         const request = requestById.get(response.id);
         if (request === undefined) continue;
         const decoded = decodeRequestMessage(request.message);
@@ -1195,12 +1190,12 @@ async function replayWorkOrderStates(
     organization: string,
     workOrderId: string,
 ): Promise<ReplayResult> {
-    const woPrefix = canonicalUriPrefix(
+    const woPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
     const [woRequests, woResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', woPrefix),
-        db.responses.getAllWhere('uri_prefix', woPrefix),
+        db.requests.getAllWhere('uri_collection', woPrefix),
+        db.responses.getAllWhere('uri_collection', woPrefix),
     ]);
     const allWoPairs = allPairsAt(woRequests, woResponses, woPrefix);
     const createPair = allWoPairs.find(
@@ -1215,44 +1210,44 @@ async function replayWorkOrderStates(
         woRequests, woResponses, woPrefix,
     ).filter((pair) => pair.uriId === workOrderId);
 
-    const claimPrefix = canonicalUriPrefix(
+    const claimPrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
     const [claimRequests, claimResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', claimPrefix),
-        db.responses.getAllWhere('uri_prefix', claimPrefix),
+        db.requests.getAllWhere('uri_collection', claimPrefix),
+        db.responses.getAllWhere('uri_collection', claimPrefix),
     ]);
     const claimPairs = allPairsAt(
         claimRequests, claimResponses, claimPrefix,
     ).filter((p) => p.method === 'POST');
 
-    const releasePrefix = canonicalUriPrefix(
+    const releasePrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/release/',
     );
     const [releaseRequests, releaseResponses] =
         await Promise.all([
             db.requests.getAllWhere(
-                'uri_prefix', releasePrefix,
+                'uri_collection', releasePrefix,
             ),
             db.responses.getAllWhere(
-                'uri_prefix', releasePrefix,
+                'uri_collection', releasePrefix,
             ),
         ]);
     const releasePairs = allPairsAt(
         releaseRequests, releaseResponses, releasePrefix,
     ).filter((p) => p.method === 'POST');
 
-    const transitionPrefix = canonicalUriPrefix(
+    const transitionPrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
     const [
         transitionRequests, transitionResponses,
     ] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', transitionPrefix),
-        db.responses.getAllWhere('uri_prefix', transitionPrefix),
+        db.requests.getAllWhere('uri_collection', transitionPrefix),
+        db.responses.getAllWhere('uri_collection', transitionPrefix),
     ]);
     const transitionPairs = allPairsAt(
         transitionRequests, transitionResponses,
@@ -1353,7 +1348,7 @@ async () => {
             nowUtc(),
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     // Leg 2: release — a transition carrying release, ending
     // A's birth claim (distinct from leg 8's named release
@@ -1374,7 +1369,7 @@ async () => {
             transitionAt: releaseTransitionAt,
         },
     ));
-    assert.equal(release.status, 204);
+    assert.equal(release.status, 201);
 
     // The entity PUT: position bump, flow_graph held CONSTANT
     // (case 5's named invariant) — LOCKTIMEOUT SOURCING is
@@ -1386,8 +1381,8 @@ async () => {
     // literal — so a canonical-JSON regression that mangled
     // either differently would be caught.
     const storedCreatePostRow = (await db.requests.getAllWhere(
-        'uri_prefix',
-        canonicalUriPrefix(STARK_ORGANIZATION, '/work-orders/'),
+        'uri_collection',
+        canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.uri_id === workOrderId
             && decodeRequestMessage(r.message).method === 'POST',
@@ -1403,7 +1398,7 @@ async () => {
             position: 2,
         },
     ));
-    assert.equal(entityPut.status, 200);
+    assert.equal(entityPut.status, 201);
     const putBody = await entityPut.json() as {
         flow_graph: Record<string, unknown>;
     };
@@ -1420,7 +1415,7 @@ async () => {
             expireAt: reclaimAt,
         },
     ));
-    assert.equal(reclaim.status, 204);
+    assert.equal(reclaim.status, 201);
 
     // Leg 4: idempotent re-claim by A — fires milliseconds after
     // leg 3, well within the tiny lockTimeout, same actor — 0
@@ -1435,7 +1430,7 @@ async () => {
             expireAt: idempotentAt,
         },
     ));
-    assert.equal(idempotent.status, 204);
+    assert.equal(idempotent.status, 201);
 
     // Advance the test clock past the tiny lockTimeout so leg
     // 3's claim genuinely reads as expired to the LIVE route's
@@ -1457,7 +1452,7 @@ async () => {
             expireAt: takeoverExpireAt,
         },
     ));
-    assert.equal(takeover.status, 204);
+    assert.equal(takeover.status, 201);
 
     // Leg 6: transition with values, by B.
     // Task 8 CUT: legacy fieldValues below the gate.
@@ -1503,7 +1498,7 @@ async () => {
             transitionAt: finishTransitionAt,
         },
     ));
-    assert.equal(finish.status, 204);
+    assert.equal(finish.status, 201);
 
     // Leg 8: unclaim via POST work-orders/:id/release
     // (deleteWorkOrderClaim's wire path), by A.
@@ -1516,7 +1511,7 @@ async () => {
             releaseAt: nowUtc(),
         },
     ));
-    assert.equal(unclaim.status, 204);
+    assert.equal(unclaim.status, 201);
 
     const replay = await replayWorkOrderStates(
         db, STARK_ORGANIZATION, workOrderId,
@@ -1602,7 +1597,7 @@ test('same-join-id retry: two different work-order creates '
             '2026-05-03T00:00:00.000000Z',
         ),
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
 
     // A DIFFERENT work order, a DIFFERENT operation (fresh event
     // ids) — not a byte-identical resend, which would replay via
@@ -1627,18 +1622,18 @@ test('same-join-id retry: two different work-order creates '
             '2026-05-03T00:00:01.000000Z',
         ),
     ));
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
 
-    const joinPrefix = canonicalUriPrefix(
+    const joinPrefix = canonicalUriCollection(
         STARK_ORGANIZATION,
         '/flows/' + flowId + '/work-orders/',
     );
     const joinResponses = (await db.responses.getAllWhere(
         'uri_id', sharedFwoId,
-    )).filter((row) => row.uri_prefix === joinPrefix);
+    )).filter((row) => row.uri_collection === joinPrefix);
     assert.equal(joinResponses.length, 2);
     for (const response of joinResponses) {
-        assert.equal(response.supersedes, undefined);
-        assert.equal(response.follows, undefined);
+        assert.equal('supersedes' in response, false);
+        assert.equal('follows' in response, false);
     }
 });

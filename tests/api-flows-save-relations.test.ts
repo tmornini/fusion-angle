@@ -512,7 +512,7 @@ test(
             working.nodes, working.edges,
         ));
         const events = await ctx.GET<StateEntity[]>(
-            'flows/' + flowId + '/history',
+            'flows/' + flowId + '/versions',
         );
         // Family history is DESC — current first.
         assert.deepEqual(

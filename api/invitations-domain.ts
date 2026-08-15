@@ -16,12 +16,12 @@ import {
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
-    HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
     HTTP_CONFLICT,
 } from './http-errors.ts';
 import {
     authenticateRequest,
+    unauthorizedBearerResponse,
     parseObjectBody,
 } from './request-auth.ts';
 import {
@@ -32,17 +32,15 @@ import {
     pickString,
     validateTimestampField,
 } from './validators.ts';
-import { messageAddress } from './message-address.ts';
 import {
     formWritePair,
-    headPairIdAt,
     storedResponseFor,
     appendMessagePair,
-    createdEntityUriId,
-    canonicalUriPrefix,
-    responseFromStored,
+    sendWriteResponse,
     hoistedHeaderFields,
     storedPairResponse,
+    requireOperationId,
+    OPERATION_ID_HEADER,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentPairFor } from './routes.ts';
@@ -133,8 +131,12 @@ export async function invitationsRequest(
     const authed =
         await authenticateRequest(ctx, request);
     if (typeof authed === 'string') {
-        return errorJson(authed, HTTP_UNAUTHORIZED);
+        return unauthorizedBearerResponse(authed);
     }
+    const denied = requireOperationId(
+        request, ctx.method, false,
+    );
+    if (denied !== undefined) return denied;
     const method = ctx.method;
     if (segments.length === 1) {
         if (method === 'GET') {
@@ -467,13 +469,14 @@ async function grantInvitation(
         };
     const routeSegments = ['invitations'];
     const pathSegments = ['invitations'];
-    const address = messageAddress(routeSegments, pathSegments);
-    const canonicalPrefix =
-        canonicalUriPrefix(undefined, address.uriPrefix);
-    const uriId = createdEntityUriId('invitations', storedBody)
-        ?? address.uriId;
-    const headPairId = await headPairIdAt(
-        ctx.base, canonicalPrefix, uriId);
+    const operationId = request.headers.get(
+        OPERATION_ID_HEADER,
+    );
+    if (operationId === null || operationId === '') {
+        throw new Error(
+            'Operation-ID missing after require',
+        );
+    }
     const pair = await formWritePair({
         method: 'POST', pathname: '/invitations',
         routePattern: 'invitations',
@@ -482,15 +485,15 @@ async function grantInvitation(
         body: storedBody, requesterIdentityId: ctx.principal.id,
         requestAt: ctx.requestAt, organization: undefined,
         responseStatus: HTTP_OK, responseBody,
-        headPairId,
+        operationId,
     });
     const replay = await storedResponseFor(
         ctx.base, pair.requestHash);
     if (replay !== undefined) {
-        return responseFromStored(replay);
+        return sendWriteResponse(replay, 'POST', true);
     }
     // The invitation DOCUMENT pair (Phase 8 Task 6): PUT-shaped,
-    // at the SAME (uriPrefix, uriId) as the operation pair above
+    // at the SAME (uriCollection, uriId) as the operation pair above
     // — the entity minus id, so the wire NEVER carries the
     // invitee's email (the invitee is already resolved to
     // identity_id above; the document stores only the
@@ -523,7 +526,7 @@ async function grantInvitation(
             organization: undefined,
             responseStatus: HTTP_OK,
             responseBody: { id: invitationId, ...documentBody },
-            headPairId,
+            operationId,
         })
         : undefined;
     // The member/pending checks and the write run in ONE transaction so
@@ -569,7 +572,8 @@ async function grantInvitation(
         });
     }
     return storedPairResponse(
-        ctx.base, pair.requestHash, 'grantInvitation');
+        ctx.base, pair.requestHash, 'grantInvitation',
+        'POST');
 }
 
 type GrantOutcome =
@@ -641,7 +645,7 @@ export async function pendingInvitationFor(
 }
 
 // Form an operation-addressed pair for an invitation sub-route
-// (acceptance/decline/revocation): uriPrefix
+// (acceptance/decline/revocation): uriCollection
 // '/invitations/<id>/<op>/', uriId '' — no head-read, so it
 // never chains. A repeat op (a no-op re-accept/re-decline/
 // re-revoke) still gets its OWN genesis pair at that same
@@ -654,6 +658,14 @@ async function formInvitationOpPair(
     invitationId: Id,
     op: string,
 ): Promise<MessagePair> {
+    const operationId = request.headers.get(
+        OPERATION_ID_HEADER,
+    );
+    if (operationId === null || operationId === '') {
+        throw new Error(
+            'Operation-ID missing after require',
+        );
+    }
     return formWritePair({
         method: 'POST',
         pathname: '/invitations/' + invitationId + '/' + op,
@@ -665,7 +677,7 @@ async function formInvitationOpPair(
         requestAt: ctx.requestAt, organization: undefined,
         responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId,
     });
 }
 
@@ -725,7 +737,7 @@ async function acceptInvitation(
     const replay = await storedResponseFor(
         ctx.base, pair.requestHash);
     if (replay !== undefined) {
-        return responseFromStored(replay);
+        return sendWriteResponse(replay, 'POST', true);
     }
     // The memberships DOCUMENT pair (Phase 8 Task 6, the B2
     // closure — the third memberships writer to join the
@@ -756,6 +768,7 @@ async function acceptInvitation(
             requesterIdentityId: ctx.principal.id,
             requestAt: ctx.requestAt,
             organization: inv.organization_id,
+            operationId: pair.operationId,
         },
     );
     // The pending check rides INSIDE the write transaction so a
@@ -802,7 +815,8 @@ async function acceptInvitation(
         });
     }
     return storedPairResponse(
-        ctx.base, pair.requestHash, 'acceptInvitation');
+        ctx.base, pair.requestHash, 'acceptInvitation',
+        'POST');
 }
 
 // Decline: the invitee appends 'declined'. No membership is
@@ -850,7 +864,7 @@ async function declineInvitation(
     const replay = await storedResponseFor(
         ctx.base, pair.requestHash);
     if (replay !== undefined) {
-        return responseFromStored(replay);
+        return sendWriteResponse(replay, 'POST', true);
     }
     let conflict = false;
     let noOp = false;
@@ -879,7 +893,8 @@ async function declineInvitation(
         });
     }
     return storedPairResponse(
-        ctx.base, pair.requestHash, 'declineInvitation');
+        ctx.base, pair.requestHash, 'declineInvitation',
+        'POST');
 }
 
 // Revoke: an admin of the invitation's org cancels a pending
@@ -930,7 +945,7 @@ async function revokeInvitation(
     const replay = await storedResponseFor(
         ctx.base, pair.requestHash);
     if (replay !== undefined) {
-        return responseFromStored(replay);
+        return sendWriteResponse(replay, 'POST', true);
     }
     let conflict = false;
     let noOp = false;
@@ -959,7 +974,8 @@ async function revokeInvitation(
         });
     }
     return storedPairResponse(
-        ctx.base, pair.requestHash, 'revokeInvitation');
+        ctx.base, pair.requestHash, 'revokeInvitation',
+        'POST');
 }
 
 // Read one invitation by id from the pair plane, or null when

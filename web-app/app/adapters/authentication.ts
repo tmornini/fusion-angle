@@ -1,8 +1,14 @@
 import type { RequestContext } from './shared.ts';
-import { UnauthorizedError } from '../../../api/api.ts';
+import { UnauthorizedError } from '../../../api/http-errors.ts';
 import type {
     SessionCredentials,
 } from './session-credentials.ts';
+import { isCookieSession } from './session-credentials.ts';
+import { generateCryptoSafeBase62 } from
+    '../../../shared/crypto-safe-base62.ts';
+import { sha256Bytes } from '../../../shared/digest.ts';
+import { bytesToBase64Url } from
+    '../../../shared/base64url.ts';
 
 // The OAuth client id this web app authenticates as.
 const WEB_CLIENT_ID = 'web-app';
@@ -27,6 +33,10 @@ export async function postPasswordLogin(
     username: string,
     password: string,
 ): Promise<SessionCredentials | null> {
+    const verifier = generateCryptoSafeBase62();
+    const challenge = bytesToBase64Url(
+        await sha256Bytes(verifier),
+    );
     let code: string;
     try {
         code = (await ctx.POST<{ code: string }>(
@@ -35,6 +45,8 @@ export async function postPasswordLogin(
                 username,
                 password,
                 client_id: WEB_CLIENT_ID,
+                code_challenge: challenge,
+                code_challenge_method: 'S256',
             })).code;
     } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -44,16 +56,17 @@ export async function postPasswordLogin(
     }
     let grant: {
         access_token: string;
-        refresh_token: string;
+        refresh_token?: string;
     };
     try {
         grant = await ctx.POST<{
             access_token: string;
-            refresh_token: string;
+            refresh_token?: string;
         }>('authentication/token', {
             grant_type: 'authorization_code',
             code,
             client_id: WEB_CLIENT_ID,
+            code_verifier: verifier,
         });
     } catch (err) {
         if (err instanceof UnauthorizedError) {
@@ -63,6 +76,8 @@ export async function postPasswordLogin(
     }
     return {
         accessToken: grant.access_token,
-        refreshToken: grant.refresh_token,
+        refreshToken: isCookieSession()
+            ? ''
+            : (grant.refresh_token ?? ''),
     };
 }

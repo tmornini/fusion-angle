@@ -107,7 +107,8 @@ const MEMBER_VERBS: Readonly<
     '/objectives': ['GET', 'PUT', 'POST'],
     '/objectives/:id/revisions': ['GET', 'PUT'],
     '/flows': ['GET', 'PUT', 'POST'],
-    // /flows/:id/versions RETIRED (Phase 15 Task 7).
+    // GET /flows/:id/versions is pair-chain (member GET
+    // rides '/flows'). Writes stay unwired (405).
     '/flows/:id/work-orders': ['GET', 'PUT'],
     '/flows/:id/records': ['GET', 'PUT', 'DELETE'],
     '/flows/:id/tags': ['GET', 'PUT', 'DELETE'],
@@ -117,9 +118,10 @@ const MEMBER_VERBS: Readonly<
     // wildcard). Schema mutations stay admin by absence —
     // flat /records and /record-attributes retired (Task 23).
     '/organizations/:id/record-types': ['GET'],
-    // Nested instances (Task 15): member create/patch/
-    // delete + GET. Path-tier only — field ACL is the
-    // write authorizer for set/clear contents.
+    // Nested instances: member PATCH create/update,
+    // DELETE, GET. PUT stays listed so public PUT
+    // 405s (Task 20) instead of 403ing at policy.
+    // Path-tier only — field ACL gates set/clear.
     '/organizations/:id/record-types/:tid/instances':
         ['GET', 'PUT', 'PATCH', 'DELETE'],
     // Nested field-values collection RETIRED (states-URI

@@ -27,6 +27,9 @@ import {
 } from '../api/types.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Nested composed POST .../record-types (Task 9): admin-only
 // create/edit bundle reusing flat postRecordWriteOp + nested
@@ -50,15 +53,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -89,7 +89,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -225,6 +225,7 @@ async function seedFieldValueReferrer(
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
         db, 'wo-restrict-fv', body, SYSTEM_MEMBER_ID,
@@ -241,7 +242,7 @@ async () => {
         'POST', COLLECTION, adminToken,
         createBody(TYPE_ID, ATTR_ID, 'Composed'),
     ));
-    assert.equal(post.status, 204);
+    assert.equal(post.status, 201);
 
     const typeGet = await handleRequest(db, req(
         'GET', DETAIL, adminToken,
@@ -277,11 +278,7 @@ async () => {
     assert.equal(attrRow.record_type_id, TYPE_ID);
     assert.equal(attrRow.name, 'Priority');
 
-    const responses = await db.responses.getAll();
     const requests = await db.requests.getAll();
-    const responseById = new Map(
-        responses.map(r => [r.id, r]),
-    );
     const typePrefix =
         '/organizations/' + ORGANIZATION
         + '/record-types/';
@@ -290,22 +287,22 @@ async () => {
 
     const opPair = requests.find(
         r => r.uri_id === TYPE_ID
-            && r.uri_prefix === typePrefix
-            && responseById.get(r.id)?.status === 204,
+            && r.uri_collection === typePrefix
+            && r.method === 'POST',
     );
     assert.ok(opPair, 'operation pair missing');
 
     const documentPair = requests.find(
         r => r.uri_id === TYPE_ID
-            && r.uri_prefix === typePrefix
-            && responseById.get(r.id)?.status === 200,
+            && r.uri_collection === typePrefix
+            && r.method === 'PUT',
     );
     assert.ok(documentPair, 'document pair missing');
 
     const attrPair = requests.find(
         r => r.uri_id === ATTR_ID
-            && r.uri_prefix === attrPrefix
-            && responseById.get(r.id)?.status === 200,
+            && r.uri_collection === attrPrefix
+            && r.method === 'PUT',
     );
     assert.ok(attrPair, 'attribute pair missing');
 });
@@ -318,7 +315,7 @@ async () => {
         'POST', COLLECTION, adminToken,
         createBody(TYPE_ID, ATTR_ID, 'Asset'),
     ));
-    assert.equal(create.status, 204);
+    assert.equal(create.status, 201);
     await seedFieldValueReferrer(
         db, adminToken, ATTR_ID,
     );
@@ -379,7 +376,7 @@ async () => {
     const post = await handleRequest(db, req(
         'POST', COLLECTION, adminToken, body,
     ));
-    assert.equal(post.status, 204);
+    assert.equal(post.status, 201);
     const typeGet = await handleRequest(db, req(
         'GET', DETAIL, adminToken,
     ));

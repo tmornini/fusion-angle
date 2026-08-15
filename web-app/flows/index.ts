@@ -15,12 +15,12 @@ import {
     ICON_SIZE,
     iconGitBranch,
 } from '../app/icons.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
-    navigateTo,
     openDialog,
     closeDialog,
     handleDialogClick,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     sessionContext,
     getProjects,

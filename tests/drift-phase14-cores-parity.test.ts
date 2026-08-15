@@ -15,6 +15,9 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // The Author gate 1 rule (e) pre-tx-vs-in-tx PARITY pins for the
 // three Phase 14 Task 1 cores (invitationOpStateFor,
@@ -43,13 +46,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -73,7 +75,7 @@ async function grant(
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
 }
 
 // -- invitationOpStateFor --------------------------------------
@@ -95,7 +97,7 @@ test('invitationOpStateFor: byte-identical pre-tx (the plain'
             acceptAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assert.equal(accept.status, 201);
 
     // Phase Final Task 2: memberships ROW half stripped from
     // acceptInvitation's tx list.
@@ -139,7 +141,7 @@ test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
             revokeAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assert.equal(revoke.status, 201);
 
     const revokeTxTables = ['requests', 'responses'];
     const preTx = await invitationLifecycleStatesFor(db, id);
@@ -239,7 +241,7 @@ test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
             states: ['n-start', 'n-middle', 'claimed'],
         },
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
     const claimTxTables = [
@@ -305,7 +307,7 @@ test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
             states: ['n-start', 'n-middle', 'claimed'],
         },
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
     const claimTxTables = [

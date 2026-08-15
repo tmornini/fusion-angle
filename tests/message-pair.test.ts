@@ -1,13 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { sha256Hex } from '../shared/digest.ts';
+import { requestMessageHash } from '../api/message-form.ts';
 import {
     formWritePair,
     headPairIdAt,
     storedResponseFor,
     appendMessagePair,
 } from '../api/message-pair.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const INPUT = {
     method: 'PUT',
@@ -22,14 +24,14 @@ const INPUT = {
     organization: '1',
     responseStatus: 204,
     responseBody: undefined,
-    headPairId: undefined,
+    operationId: TEST_OPERATION_ID,
 } as const;
 
 test('an org-owned pair stores at the org-nested prefix',
 async () => {
     const pair = await formWritePair({ ...INPUT });
     assert.equal(
-        pair.uriPrefix, '/organizations/1/ideas/',
+        pair.uriCollection, '/organizations/1/ideas/',
     );
 });
 
@@ -42,9 +44,10 @@ async () => {
         routeSegments: ['identities', ':id', 'pii'],
         pathSegments: ['identities', 'ada', 'pii'],
         organization: '1',
+        operationId: TEST_OPERATION_ID,
     });
     assert.equal(
-        pair.uriPrefix, '/identities/ada/pii/',
+        pair.uriCollection, '/identities/ada/pii/',
     );
 });
 
@@ -75,9 +78,10 @@ async () => {
             options: [],
             constraints: [],
         },
+        operationId: TEST_OPERATION_ID,
     });
     assert.equal(
-        pair.uriPrefix,
+        pair.uriCollection,
         '/organizations/1/record-types/'
         + typeId + '/attributes/',
     );
@@ -99,9 +103,10 @@ async () => {
             'organizations', '1',
             'record-types', 'r1',
         ],
+        operationId: TEST_OPERATION_ID,
     });
     assert.equal(
-        pair.uriPrefix,
+        pair.uriCollection,
         '/organizations/1/record-types/',
     );
 });
@@ -110,18 +115,17 @@ test('a formed pair binds request and response by one id',
 async () => {
     const pair = await formWritePair({ ...INPUT });
     assert.equal(
-        pair.uriPrefix, '/organizations/1/ideas/',
+        pair.uriCollection, '/organizations/1/ideas/',
     );
     assert.equal(pair.uriId, '42');
     assert.equal(
         pair.requestHash,
-        await sha256Hex(pair.requestMessage),
+        await requestMessageHash(pair.requestMessage),
     );
     assert.equal(
         pair.responseHash,
-        await sha256Hex(pair.responseMessage),
+        await requestMessageHash(pair.responseMessage),
     );
-    assert.equal(pair.supersedes, undefined);
 });
 
 test('the event at rides the body byte-exact; the arrival '
@@ -132,15 +136,25 @@ test('the event at rides the body byte-exact; the arrival '
     assert.equal(pair.requestAt, INPUT.requestAt);
 });
 
-test('a supersedes fold changes the response hash',
+test('formed response has no follows or supersedes',
 async () => {
-    const genesis = await formWritePair({ ...INPUT });
-    const displaced = await formWritePair(
-        { ...INPUT, headPairId: 'prior-pair' },
+    const pair = await formWritePair({
+        ...INPUT,
+        operationId: TEST_OPERATION_ID,
+    });
+    assert.equal(
+        'follows' in pair, false,
     );
-    assert.equal(displaced.supersedes, 'prior-pair');
-    assert.notEqual(
-        genesis.responseHash, displaced.responseHash,
+    assert.equal(
+        'supersedes' in pair, false,
+    );
+    const model = parseWire(pair.responseMessage);
+    assert.equal(
+        model.fields.some(
+            (f) => f.name === 'follows'
+                || f.name === 'supersedes',
+        ),
+        false,
     );
 });
 

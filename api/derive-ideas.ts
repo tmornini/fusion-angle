@@ -6,8 +6,12 @@ import type {
     IdeaSubmissionEntity,
     StateEntity,
 } from './types.ts';
-import { pickString, pickNumber } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import {
+    pickString, pickNumber,
+    validateIdeaSubmissionEntity,
+} from './validators.ts';
+import { canonicalUriCollection } from './message-pair.ts';
+import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
     documentPairsAt,
@@ -20,6 +24,8 @@ import {
     type DerivedDocument,
     type DocumentPair,
 } from './derive-documents.ts';
+import { liveHeadId, messageStore } from
+    './message-store.ts';
 
 // Ideas' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
@@ -32,14 +38,14 @@ import {
 const IDEAS_TABLE = 'ideas';
 
 function ideasUriPrefix(organization: Id): string {
-    return canonicalUriPrefix(organization, '/ideas/');
+    return canonicalUriCollection(organization, '/ideas/');
 }
 
 function submissionsUriPrefix(
     organization: Id,
     ideaId: Id,
 ): string {
-    return canonicalUriPrefix(
+    return canonicalUriCollection(
         organization, '/ideas/' + ideaId + '/submissions/',
     );
 }
@@ -95,8 +101,8 @@ async function fetchIdeaPairs(
     readonly pairs: readonly DocumentPair[];
 }> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     return {
         documents: deriveDocumentsAt(requests, responses, prefix),
@@ -104,10 +110,11 @@ async function fetchIdeaPairs(
     };
 }
 
-// id-lex ordered (the IndexedDB reference), deleted-filtered —
-// the head lifecycle state 'deleted' excludes an idea exactly as
-// EntityStore's states-log tombstone filter does today (archived
-// ideas are NOT filtered here; ideaIsVisible does that downstream,
+// Oldest live head (at, id) first via getCollection,
+// deleted-filtered — the head lifecycle state 'deleted'
+// excludes an idea exactly as EntityStore's states-log
+// tombstone filter does today (archived ideas are NOT
+// filtered here; ideaIsVisible does that downstream,
 // untouched).
 export async function deriveIdeas(
     db: DbAdapter,
@@ -124,7 +131,7 @@ export async function deriveIdeas(
             list.push(pair);
         }
     }
-    const ideas: IdeaEntity[] = [];
+    const byId = new Map<Id, IdeaEntity>();
     for (const [ideaId, document] of documents) {
         const history = stateHistoryFrom(
             documentLifecycleEvents(
@@ -138,11 +145,18 @@ export async function deriveIdeas(
         // After DELETED filter history is non-empty for every
         // live trio document (genesis always mints an event).
         const current = currentLifecycleEvent(history)!;
-        ideas.push(
+        byId.set(
+            ideaId,
             ideaEntityOf(document, organization, current),
         );
     }
-    return ideas.sort(byIdAscending);
+    const live = await messageStore(db).getCollection(prefix);
+    const ideas: IdeaEntity[] = [];
+    for (const entity of live) {
+        const row = byId.get(liveHeadId(entity));
+        if (row !== undefined) ideas.push(row);
+    }
+    return ideas;
 }
 
 export async function deriveIdea(
@@ -173,6 +187,19 @@ export async function deriveIdea(
     return ideaEntityOf(document, organization, current);
 }
 
+// G6: GET derive is the stored PUT. id-first via
+// validateIdeaSubmissionEntity (withoutId first).
+export function ideaSubmissionEntityOf(
+    document: DerivedDocument,
+): IdeaSubmissionEntity {
+    return {
+        id: document.uriId,
+        ...validateIdeaSubmissionEntity(
+            withoutId(document.body),
+        ),
+    };
+}
+
 export async function deriveIdeaSubmissions(
     db: DbAdapter,
     organization: Id,
@@ -180,18 +207,13 @@ export async function deriveIdeaSubmissions(
 ): Promise<IdeaSubmissionEntity[]> {
     const prefix = submissionsUriPrefix(organization, ideaId);
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const documents = deriveDocumentsAt(requests, responses, prefix);
     const submissions: IdeaSubmissionEntity[] = [];
-    for (const [submissionId, document] of documents) {
-        submissions.push({
-            id: submissionId,
-            idea_id: pickString(document.body, 'idea_id'),
-            member_id: pickString(document.body, 'member_id'),
-            at: pickString(document.body, 'at'),
-        });
+    for (const document of documents.values()) {
+        submissions.push(ideaSubmissionEntityOf(document));
     }
     return submissions.sort(byIdAscending);
 }

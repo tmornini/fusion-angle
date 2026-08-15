@@ -7,11 +7,11 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
-    navigateTo,
     handleDialogClick,
     closeDialog,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     sessionContext,
     getRecordModel,

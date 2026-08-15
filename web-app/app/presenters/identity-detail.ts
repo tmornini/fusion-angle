@@ -2,7 +2,7 @@ import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
 import { mutateSlot } from '../dom.ts';
-import { initials } from '../core.ts';
+import { initials } from '../format.ts';
 import { displayText } from '../format.ts';
 import {
     ICON_SIZE,

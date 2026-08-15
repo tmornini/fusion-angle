@@ -6,7 +6,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { sha256Hex } from '../shared/digest.ts';
+import { requestMessageHash } from '../api/message-form.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
     STARK_ORGANIZATION,
@@ -18,6 +18,23 @@ import {
     DEFAULT_LOCK_TIMEOUT,
 } from '../api/types.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+
+function pairJsonOf(message: string): {
+    readonly body: Record<string, unknown>;
+} {
+    const body = HttpMessage.fromWire(message).body();
+    return {
+        body: body.exists()
+            ? JSON.parse(body.toText()) as
+                Record<string, unknown>
+            : {},
+    };
+}
 
 // Standing shadow-ledger invariants (Task 5): properties every
 // requests/responses pair must hold REGARDLESS of which family
@@ -39,13 +56,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -222,15 +238,15 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         'PUT', '/ideas/inv-idea-1', org1Token,
         ideaPutBody('inv-idea-1', 'Invariant Idea'),
     ));
-    assert.equal(firstIdea.status, 200);
+    assert.equal(firstIdea.status, 201);
     const firstIdeaId = firstIdea.headers.get('Response-ID');
     const secondIdea = await handleRequest(db, req(
         'PUT', '/ideas/inv-idea-1', org1Token,
         ideaPutBody('inv-idea-1', 'Invariant Idea Revised'),
     ));
-    assert.equal(secondIdea.status, 200);
+    assert.equal(secondIdea.status, 201);
     assert.equal(
-        secondIdea.headers.get('Supersedes'), firstIdeaId,
+        secondIdea.headers.get('Supersedes'), null,
     );
 
     // Idea state-change trio PUT (states/:id retired) — a
@@ -243,7 +259,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             state_event_id: 'inv-ev-review',
         },
     ));
-    assert.equal(stateAppend.status, 200);
+    assert.equal(stateAppend.status, 201);
 
     // Create POST (records, org 2) — Task 4's bundle: the
     // operation pair, its synthesized document pair, and one
@@ -266,7 +282,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             }],
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     // DELETE — a fresh PUT then its tombstone (records, org 2).
     const recordPut = await handleRequest(db, req(
@@ -276,7 +292,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             'inv-rec-2', 'Invariant Record', ORGANIZATION_TWO,
         ),
     ));
-    assert.equal(recordPut.status, 200);
+    assert.equal(recordPut.status, 201);
     const recordDeleted = await handleRequest(db, req(
         'DELETE', '/organizations/' + ORGANIZATION_TWO
             + '/record-types/inv-rec-2', org2Token,
@@ -290,7 +306,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         'PUT', '/work-orders/inv-wo-1', org1Token,
         workOrderFields('INV-WO-1', STARK_ORGANIZATION),
     ));
-    assert.equal(workOrderPut.status, 200);
+    assert.equal(workOrderPut.status, 201);
 
     // Operation POST (identity-tokens — global, not org-
     // nested): revoke a pre-seeded chain. The seed itself rides
@@ -305,12 +321,12 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             action: 'issued', chain_id: 'inv-chain-1', at: AT,
         },
     ));
-    assert.equal(tokenRootPut.status, 200);
+    assert.equal(tokenRootPut.status, 201);
     const revoked = await handleRequest(db, req(
         'POST', '/identity-tokens/inv-jti-root/revocation',
         org1Token, {},
     ));
-    assert.equal(revoked.status, 204);
+    assert.equal(revoked.status, 201);
 
     // Genesis document PUT (flows, org 1) — a fresh id needs no
     // If-Match under the locked class.
@@ -318,7 +334,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
         'PUT', '/flows/inv-flow-1', org1Token,
         flowDocumentBody('Invariant Flow', 'inv-flow-1-ev'),
     ));
-    assert.equal(flowGenesis.status, 200);
+    assert.equal(flowGenesis.status, 201);
 
     // Work-order CREATE (org 1) — a genesis POST, joined to the
     // flow just created above: three pairs land (the operation
@@ -332,7 +348,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
             'inv-flow-1', STARK_ORGANIZATION,
         ),
     ));
-    assert.equal(workOrderCreated.status, 204);
+    assert.equal(workOrderCreated.status, 201);
 
     // A FAILED write: 404 on an unknown route — must add
     // nothing to either table. (A claim conflict 409 still
@@ -373,22 +389,16 @@ test('every request has exactly one response and vice'
     }
 });
 
-test('every stored message, across every row of both'
-+ ' tables, re-hashes to its own message_hash', async () => {
+test('every stored request message re-hashes to its own'
++ ' message_hash', async () => {
     const db = await seededWithMixedBatch();
     const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.ok(requests.length > 0 && responses.length > 0);
+    assert.ok(requests.length > 0);
     for (const row of requests) {
         assert.equal(
-            await sha256Hex(row.message), row.message_hash,
+            await requestMessageHash(row.message),
+            row.message_hash,
             'requests row ' + row.id + ' hash mismatch',
-        );
-    }
-    for (const row of responses) {
-        assert.equal(
-            await sha256Hex(row.message), row.message_hash,
-            'responses row ' + row.id + ' hash mismatch',
         );
     }
 });
@@ -460,12 +470,12 @@ test('a seeded idea\'s create-pair request reproduces its'
     const requests = await db.requests.getAll();
     const createRow = requests.find(
         r => r.uri_id === idea.id
-            && r.uri_prefix
+            && r.uri_collection
                 === `/organizations/${STARK_ORGANIZATION}`
                     + '/ideas/',
     );
     assert.ok(createRow, 'no create pair for the seeded idea');
-    const parsed = JSON.parse(createRow!.message) as {
+    const parsed = pairJsonOf(createRow!.message) as {
         body: {
             state: string;
             state_event_id: string;

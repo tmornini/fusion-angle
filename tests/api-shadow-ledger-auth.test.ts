@@ -8,7 +8,7 @@ import { BackedDbAdapter } from '../api/db-backed.ts';
 import { MemoryStorageBackend } from '../api/backend-memory.ts';
 import type { GuardedDbAdapter } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
-import { sha256Hex } from '../shared/digest.ts';
+import { requestMessageHash } from '../api/message-form.ts';
 import { hashPassword } from '../shared/password-hash.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import { devToken } from './token-fixtures.ts';
@@ -28,6 +28,11 @@ import {
     seedIdentityCredential,
     seedIdentityPii,
 } from './identity-fixtures.ts';
+import {
+    TEST_OPERATION_ID,
+    refreshTokenFromSetCookie,
+    setCookieHeader,
+} from './http-fixtures.ts';
 
 // C1 discharge under the verbatim-storage contract: the
 // /authentication/{token,authorize} message pairs carry live
@@ -114,7 +119,7 @@ async function fullLoginFlow(db: GuardedDbAdapter): Promise<{
             method: 'password', username: 'demo@example.com',
             password: PASSWORD, client_id: 'web',
         }));
-    assert.equal(authorizeRes.status, 200);
+    assert.equal(authorizeRes.status, 201);
     const { code } = await authorizeRes.json() as {
         code: string;
     };
@@ -123,12 +128,15 @@ async function fullLoginFlow(db: GuardedDbAdapter): Promise<{
             grant_type: 'authorization_code', code,
             client_id: 'web',
         }));
-    assert.equal(tokenRes.status, 200);
+    assert.equal(tokenRes.status, 201);
     const grant = await tokenRes.json() as {
         access_token: string;
-        refresh_token: string;
     };
-    return { code, ...grant };
+    return {
+        code,
+        access_token: grant.access_token,
+        refresh_token: refreshTokenFromSetCookie(tokenRes),
+    };
 }
 
 test('live secrets land in the auth-flow ledger rows',
@@ -140,12 +148,12 @@ async () => {
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     const authFlowRows = [...requests, ...responses].filter(
-        row => row.uri_prefix === '/authentication/authorize/'
-            || row.uri_prefix === '/authentication/token/',
+        row => row.uri_collection === '/authentication/authorize/'
+            || row.uri_collection === '/authentication/token/',
     );
     assert.equal(authFlowRows.length, 4);
     const authorizeRequest = requests.find(
-        r => r.uri_prefix === '/authentication/authorize/');
+        r => r.uri_collection === '/authentication/authorize/');
     assert.ok(authorizeRequest);
     assert.ok(
         authorizeRequest!.message.includes(PASSWORD),
@@ -156,29 +164,30 @@ async () => {
         'authorize request missing live email',
     );
     const authorizeResponse = responses.find(
-        r => r.uri_prefix === '/authentication/authorize/');
+        r => r.uri_collection === '/authentication/authorize/');
     assert.ok(authorizeResponse);
     assert.ok(
         authorizeResponse!.message.includes(code),
         'authorize response missing live code',
     );
     const tokenRequest = requests.find(
-        r => r.uri_prefix === '/authentication/token/');
+        r => r.uri_collection === '/authentication/token/');
     assert.ok(tokenRequest);
     assert.ok(
         tokenRequest!.message.includes(code),
         'token request missing live code',
     );
     const tokenResponse = responses.find(
-        r => r.uri_prefix === '/authentication/token/');
+        r => r.uri_collection === '/authentication/token/');
     assert.ok(tokenResponse);
     assert.ok(
         tokenResponse!.message.includes(access_token),
         'token response missing access_token',
     );
-    assert.ok(
+    assert.equal(
         tokenResponse!.message.includes(refresh_token),
-        'token response missing refresh_token',
+        false,
+        'token stored JSON must omit refresh_token',
     );
 });
 
@@ -200,15 +209,15 @@ test('a full login flow keeps requests/responses balanced,'
     // instead, so it alone carries a non-empty uri_id in this
     // slice. Indices 4–5 are authorize + token.
     const authHops = requests.slice(4).filter(
-        row => row.uri_prefix === '/authentication/authorize/'
-            || row.uri_prefix === '/authentication/token/',
+        row => row.uri_collection === '/authentication/authorize/'
+            || row.uri_collection === '/authentication/token/',
     );
     assert.equal(authHops.length, 2);
     for (const row of authHops) {
         assert.equal(row.uri_id, '');
     }
     const tokenEventRequest = requests.slice(4).find(
-        row => row.uri_prefix === '/identity-tokens/',
+        row => row.uri_collection === '/identity-tokens/',
     );
     assert.ok(tokenEventRequest);
     assert.notEqual(tokenEventRequest!.uri_id, '');
@@ -216,29 +225,25 @@ test('a full login flow keeps requests/responses balanced,'
     // pins: the two AUTH hops stay operation-addressed, the token
     // grant's row event response carries its OWN row's (non-
     // empty) uri_id — a request/response pair shares one `id`
-    // AND one (uri_prefix, uri_id) address (appendMessagePair),
+    // AND one (uri_collection, uri_id) address (appendMessagePair),
     // so this is the identical classification, re-applied.
     const responseAuthHops = responses.slice(4).filter(
-        row => row.uri_prefix === '/authentication/authorize/'
-            || row.uri_prefix === '/authentication/token/',
+        row => row.uri_collection === '/authentication/authorize/'
+            || row.uri_collection === '/authentication/token/',
     );
     assert.equal(responseAuthHops.length, 2);
     for (const row of responseAuthHops) {
         assert.equal(row.uri_id, '');
     }
     const tokenEventResponse = responses.slice(4).find(
-        row => row.uri_prefix === '/identity-tokens/',
+        row => row.uri_collection === '/identity-tokens/',
     );
     assert.ok(tokenEventResponse);
     assert.notEqual(tokenEventResponse!.uri_id, '');
-    // supersedes/follows are RESPONSE-row columns (ResponseEntity,
-    // api/types.ts) — a genesis pair (no predecessor) leaves BOTH
-    // absent on every one of these rows, auth hop or token event
-    // alike; header absence on the wire mirrors column absence
-    // here (message-pair.ts's wireHeadersFor).
+    // Response rows carry no predecessor columns.
     for (const row of responses.slice(5)) {
-        assert.equal(row.supersedes, undefined);
-        assert.equal(row.follows, undefined);
+        assert.equal('supersedes' in row, false);
+        assert.equal('follows' in row, false);
     }
 });
 
@@ -248,11 +253,8 @@ test('stored messages verify against their hashes', async () => {
     await fullLoginFlow(db);
     for (const row of await db.requests.getAll()) {
         assert.equal(
-            await sha256Hex(row.message), row.message_hash);
-    }
-    for (const row of await db.responses.getAll()) {
-        assert.equal(
-            await sha256Hex(row.message), row.message_hash);
+            await requestMessageHash(row.message),
+            row.message_hash);
     }
 });
 
@@ -306,7 +308,7 @@ async () => {
             method: 'password', username: 'demo@example.com',
             password: PASSWORD, client_id: 'web',
         }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     assert.ok(res.headers.get('Response-ID'));
     assert.ok(res.headers.get('Date'));
 });
@@ -333,9 +335,13 @@ async () => {
             grant_type: 'refresh',
             refresh_token: first.refresh_token,
         }));
-    assert.equal(res.status, 200);
-    const rotated = await res.json() as {
-        access_token: string; refresh_token: string;
+    assert.equal(res.status, 201);
+    const rotatedJson = await res.json() as {
+        access_token: string;
+    };
+    const rotated = {
+        access_token: rotatedJson.access_token,
+        refresh_token: refreshTokenFromSetCookie(res),
     };
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
@@ -348,7 +354,7 @@ async () => {
     // the retired root, the issued successor — Phase 13 Task 5).
     assert.equal(requests.length, 10);
     const refreshRequest = requests.find(
-        r => r.uri_prefix === '/authentication/token/'
+        r => r.uri_collection === '/authentication/token/'
             && r.message.includes(first.refresh_token),
     );
     assert.ok(refreshRequest);
@@ -359,8 +365,9 @@ async () => {
     assert.ok(
         refreshResponse!.message.includes(rotated.access_token),
     );
-    assert.ok(
+    assert.equal(
         refreshResponse!.message.includes(rotated.refresh_token),
+        false,
     );
 });
 
@@ -375,10 +382,13 @@ test('a token-exchange grant stores its own pair with live'
             subject_token: subjectToken,
             actor_token: subjectToken,
         }));
-    assert.equal(res.status, 200);
-    const body = await res.json() as {
-        access_token: string; refresh_token: string;
+    assert.equal(res.status, 201);
+    const bodyJson = await res.json() as {
+        access_token: string;
+        refresh_token?: unknown;
     };
+    assert.equal(bodyJson.refresh_token, undefined);
+    assert.equal(setCookieHeader(res), '');
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
@@ -389,7 +399,7 @@ test('a token-exchange grant stores its own pair with live'
     // pair.
     assert.equal(requests.length, 6);
     const exchangeRequest = requests.find(
-        r => r.uri_prefix === '/authentication/token/'
+        r => r.uri_collection === '/authentication/token/'
             && r.message.includes(subjectToken),
     );
     assert.ok(exchangeRequest);
@@ -398,10 +408,13 @@ test('a token-exchange grant stores its own pair with live'
     );
     assert.ok(exchangeResponse);
     assert.ok(
-        exchangeResponse!.message.includes(body.access_token),
+        exchangeResponse!.message.includes(
+            bodyJson.access_token,
+        ),
     );
-    assert.ok(
-        exchangeResponse!.message.includes(body.refresh_token),
+    assert.equal(
+        exchangeResponse!.message.includes('refresh_token'),
+        false,
     );
 });
 
@@ -438,7 +451,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -473,23 +486,27 @@ test('a client_credentials grant stores its own pair with live'
             client_id: 'svc-client',
             client_assertion: assertion,
         }));
-    assert.equal(res.status, 200);
-    const body = await res.json() as {
-        access_token: string; refresh_token: string;
+    assert.equal(res.status, 201);
+    const bodyJson = await res.json() as {
+        access_token: string;
+    };
+    const body = {
+        access_token: bodyJson.access_token,
+        refresh_token: refreshTokenFromSetCookie(res),
     };
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
-    // 6: dbWithPasswordUser's own pii + credential pairs (2,
+    // 7: dbWithPasswordUser's own pii + credential pairs (2,
     // Phase 13 Task 8) + the fixture's own membership pair
     // (Phase 13 Task 1) + the registration-facet pair the
     // fixture seeds (clients elimination) precede the token
-    // grant's own event pair (Phase 13 Task 5: issueTokenPair's
-    // root gains its own pair at the row's address) plus its
-    // operation pair.
-    assert.equal(requests.length, 6);
+    // grant's spent-jti ticket, its own event pair (Phase 13
+    // Task 5: the issued root's pair at the row's address),
+    // and its operation pair.
+    assert.equal(requests.length, 7);
     const credRequest = requests.find(
-        r => r.uri_prefix === '/authentication/token/'
+        r => r.uri_collection === '/authentication/token/'
             && r.message.includes(assertion),
     );
     assert.ok(credRequest);
@@ -500,8 +517,9 @@ test('a client_credentials grant stores its own pair with live'
     assert.ok(
         credResponse!.message.includes(body.access_token),
     );
-    assert.ok(
+    assert.equal(
         credResponse!.message.includes(body.refresh_token),
+        false,
     );
 });
 
@@ -550,10 +568,10 @@ test('an Authorization header sent alongside the token grant is'
         }),
     });
     const res = await handleRequest(db, req);
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const row = requests.find(
-        r => r.uri_prefix === '/authentication/token/');
+        r => r.uri_collection === '/authentication/token/');
     assert.ok(row);
     assert.ok(
         row!.message.includes('some-stale-caller-token'));
@@ -573,7 +591,7 @@ test('a reused (already-rotated-away) refresh token grant is a'
     }));
     const before = (await db.requests.getAll()).length;
     const opPairsBefore = (await db.requests.getAll()).filter(
-        r => r.uri_prefix === '/authentication/token/'
+        r => r.uri_collection === '/authentication/token/'
             && r.uri_id === '',
     ).length;
     // Same reasoning as the double-spent-code test above: a
@@ -590,7 +608,7 @@ test('a reused (already-rotated-away) refresh token grant is a'
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
     const opPairsAfter = requests.filter(
-        r => r.uri_prefix === '/authentication/token/'
+        r => r.uri_collection === '/authentication/token/'
             && r.uri_id === '',
     ).length;
     assert.equal(

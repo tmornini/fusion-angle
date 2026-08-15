@@ -14,7 +14,7 @@ import {
     ICON_SIZE,
     iconArrowRight, iconLoader,
 } from '../app/icons.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
     getIdea,
     getProjectEntities,

@@ -2,7 +2,10 @@ import type {
     RequestEntity,
     ResponseEntity,
 } from './types.ts';
-import type { NotificationPost } from './notifications.ts';
+import type {
+    NotificationEvent,
+    NotificationPost,
+} from './notifications.ts';
 
 export class EntityNotFoundError {
     readonly message: string;
@@ -154,6 +157,39 @@ export interface Tx {
     ): Promise<void>;
     delete(table: string, id: string): Promise<void>;
     clear(table: string): Promise<void>;
+    // Postgres write coordination. Other backends omit
+    // these; callers treat absence as a no-op.
+    lock?(label: string): Promise<void>;
+    lockShared?(label: string): Promise<void>;
+    lockHead?(id: string): Promise<void>;
+    latestPutDelete?(
+        collection: string,
+        uriId: string,
+    ): Promise<{
+        readonly id: string;
+        readonly method: string;
+    } | null>;
+    notify?(event: NotificationEvent): Promise<void>;
+    stampSchemaMarker?(): Promise<void>;
+}
+
+export interface WriteLocks {
+    lockImportExclusive(): Promise<void>;
+    lockImportShared(): Promise<void>;
+    lockDedup(hash: string): Promise<void>;
+    lockAddress(
+        collection: string,
+        uriId: string,
+    ): Promise<void>;
+    lockHead(id: string): Promise<void>;
+    latestPutDelete(
+        collection: string,
+        uriId: string,
+    ): Promise<{
+        readonly id: string;
+        readonly method: string;
+    } | null>;
+    notify(event: NotificationEvent): Promise<void>;
 }
 
 // The byte-level seam. Store classes compose a backend
@@ -177,6 +213,10 @@ export interface StorageBackend {
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
     deleteSchema(): Promise<void>;
+    exportSnapshot?(): Promise<string>;
+    importSnapshot?(
+        tables: Map<string, { id: string }[]>,
+    ): Promise<void>;
 }
 
 // How a store reaches storage. Standalone, a store opens a
@@ -236,6 +276,7 @@ export interface DbLifecycle {
     // both the open-tx view (#viewForTx) and plain adapters
     // type-check.
     postNotification: NotificationPost;
+    readonly writeLocks?: WriteLocks;
 }
 
 export interface DbAdapter extends DbLifecycle, DbStores {
@@ -329,10 +370,13 @@ export function uniqueColumns(
 // collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
-    requests: ['uri_prefix', 'uri_id', 'message_hash'],
+    requests: [
+        'uri_collection', 'message_hash',
+        'operation_id',
+    ],
     responses: [
-        'uri_prefix',
-        'uri_id',
-        { column: 'follows', unique: true },
+        'uri_collection',
+        'operation_id',
+        'version',
     ],
 };

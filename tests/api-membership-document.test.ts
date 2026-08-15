@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { PUT } from '../api/api.ts';
+import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -13,7 +13,10 @@ import {
     validateMembershipDocumentBody,
     validateMembershipEntity,
 } from '../api/validators.ts';
-import { postMembershipDocumentOp } from '../api/routes.ts';
+import {
+    postMembershipDocumentOp,
+    membershipDocumentEntityOf,
+} from '../api/routes.ts';
 import {
     formWritePair,
     appendMessagePair,
@@ -22,6 +25,11 @@ import {
     documentFamilyWiring,
     documentGetHandler,
 } from '../api/document-family.ts';
+import {
+    TEST_OPERATION_ID,
+    apiRequest,
+    storedPutBodyText,
+} from './http-fixtures.ts';
 
 // Phase 8 Task 2 (eighth family, 'stateless'): PUT
 // /memberships/:id takes the entity's OWN fields only — no
@@ -122,7 +130,7 @@ async () => {
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     // Phase Final Task 2: memberships ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
@@ -173,7 +181,6 @@ async function putDocumentPair(
     id: string,
     body: Record<string, unknown>,
     requestAt: string,
-    headPairId?: string,
 ): Promise<string> {
     const pair = await formWritePair({
         method: 'PUT',
@@ -186,7 +193,7 @@ async function putDocumentPair(
         requestAt,
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -199,7 +206,6 @@ async function deleteDocumentPair(
     db: MemoryDbAdapter,
     id: string,
     requestAt: string,
-    headPairId?: string,
 ): Promise<void> {
     const pair = await formWritePair({
         method: 'DELETE',
@@ -212,7 +218,7 @@ async function deleteDocumentPair(
         requestAt,
         organization: '1',
         responseStatus: 204, responseBody: undefined,
-        headPairId,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -247,7 +253,7 @@ async () => {
     );
     const secondResponse =
         await db.responses.getById(secondId);
-    assert.equal(secondResponse.supersedes, firstId);
+    assert.equal('supersedes' in secondResponse, false);
 
     const headAfterSecond = await documentGetHandler(wiring)(
         db, ['ms-chain-1'], 'current', '1',
@@ -286,5 +292,41 @@ test('a DELETE-head derives absent through the generic'
             );
             return true;
         },
+    );
+});
+
+test('stored PUT body equals membershipDocumentEntityOf',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'ms-g3-stream';
+    const body = documentFields();
+    const put = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/memberships/' + id,
+            token: DEV_TOKEN,
+            body,
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.equal(put.status, 201);
+    const stored = JSON.parse(
+        await storedPutBodyText(
+            db, '/organizations/1/memberships/', id,
+        ),
+    );
+    assert.deepEqual(
+        stored,
+        membershipDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body,
+            },
+            '1',
+        ),
     );
 });

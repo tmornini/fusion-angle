@@ -14,6 +14,10 @@ import {
 import type { IdeaStateDetail } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
+    withLifecycleTrio,
+    withLifecycleTrios,
+} from './shared.ts';
+import {
     getCurrentHumanMember,
 } from './members.ts';
 import {
@@ -55,15 +59,19 @@ export {
 export async function getIdeaEntities(
     ctx: RequestContext,
 ): Promise<IdeaEntity[]> {
-    return ctx.GET<IdeaEntity[]>('ideas');
+    return withLifecycleTrios(
+        ctx, 'ideas',
+        await ctx.GET<IdeaEntity[]>('ideas'),
+    );
 }
 
 export async function getIdeaEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<IdeaEntity> {
-    return ctx.GET<IdeaEntity>(
-        `ideas/${id}`,
+    return withLifecycleTrio(
+        ctx, 'ideas',
+        await ctx.GET<IdeaEntity>(`ideas/${id}`),
     );
 }
 

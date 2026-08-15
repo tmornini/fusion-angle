@@ -7,7 +7,7 @@ import {
     loadInto,
 } from '../app/loading-states.ts';
 import { ICON_SIZE, iconFolderKanban } from '../app/icons.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
     createRequestContext,
     sessionContext,

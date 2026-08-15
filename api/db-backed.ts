@@ -11,7 +11,10 @@ import type {
     Tx,
     TxMode,
     TxRunner,
+    WriteLocks,
 } from './db.ts';
+import { SNAPSHOT_IMPORT_LOCK_NAME } from
+    './advisory-lock.ts';
 import type {
     RequestEntity,
     ResponseEntity,
@@ -100,6 +103,9 @@ export class BackedDbAdapter
     }
 
     async getSnapshot(): Promise<string> {
+        if (this.#backend.exportSnapshot !== undefined) {
+            return this.#backend.exportSnapshot();
+        }
         const obj = await this.#backend.transaction(
             TABLE_NAMES, 'readonly',
             async (tx) => {
@@ -121,8 +127,14 @@ export class BackedDbAdapter
         // (rollback). On IndexedDB the whole flush is a
         // genuine atomic commit; localStorage's multi-key
         // flush is not OS-atomic on a mid-write quota error.
+        // Postgres takes the exclusive import lock and
+        // stamps schema_marker in that same transaction.
         const validated = parseAndValidateSnapshot(json);
         await this.#backend.ensureTables(TABLE_NAMES);
+        if (this.#backend.importSnapshot !== undefined) {
+            await this.#backend.importSnapshot(validated);
+            return;
+        }
         await this.#backend.transaction(
             TABLE_NAMES, 'readwrite',
             async (tx) => {
@@ -181,6 +193,7 @@ export class BackedDbAdapter
             this.#assertSubset(tables, declaredTables);
             return fn(view);
         };
+        const locks = writeLocksOf(tx);
         const view: GuardedDbAdapter = {
             ...this.#buildStores(ambientRunner(tx)),
             initialize: () => this.initialize(),
@@ -194,6 +207,9 @@ export class BackedDbAdapter
                 this.putSnapshot(json),
             postNotification: (e) =>
                 this.postNotification(e),
+            ...(locks === undefined
+                ? {}
+                : { writeLocks: locks }),
             transaction: reenter,
             readTransaction: reenter,
         };
@@ -225,4 +241,36 @@ export class BackedDbAdapter
             ),
         };
     }
+}
+
+function writeLocksOf(tx: Tx): WriteLocks | undefined {
+    const lock = tx.lock;
+    const lockShared = tx.lockShared;
+    const lockHead = tx.lockHead;
+    const latestPutDelete = tx.latestPutDelete;
+    const notify = tx.notify;
+    if (
+        lock === undefined
+        || lockShared === undefined
+        || lockHead === undefined
+        || latestPutDelete === undefined
+        || notify === undefined
+    ) {
+        return undefined;
+    }
+    return {
+        lockImportExclusive: () =>
+            lock(SNAPSHOT_IMPORT_LOCK_NAME),
+        lockImportShared: () =>
+            lockShared(SNAPSHOT_IMPORT_LOCK_NAME),
+        lockDedup: (hash) =>
+            lock('fusion.dedup.' + hash),
+        lockAddress: (collection, uriId) =>
+            lock(
+                'fusion.address.' + collection + uriId,
+            ),
+        lockHead,
+        latestPutDelete,
+        notify,
+    };
 }

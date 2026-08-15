@@ -1,7 +1,7 @@
 import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
-import { formatDateTime } from '../core.ts';
+import { formatDateTime } from '../format.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 import { mutedEmptyNote } from './empty-note.ts';
 import type {

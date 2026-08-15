@@ -4,12 +4,14 @@ import {
     mintAccessToken,
     TOKEN_AUDIENCE,
     verifyAccessToken,
-    principalFromToken,
-    principalFromClaims,
-    decodeAccessToken,
     latestRevocationAt,
     revokedThroughSeconds,
 } from '../api/access-token.ts';
+import {
+    principalFromToken,
+    principalFromClaims,
+    decodeAccessToken,
+} from '../shared/access-token-decode.ts';
 import { base64UrlEncode } from '../shared/base64url.ts';
 
 async function token(over: Partial<{
@@ -60,6 +62,19 @@ test('rejects a tampered signature', async () => {
     assert.equal(
         (await verifyAccessToken(bad, 1_700_000_100)).valid,
         false);
+});
+
+test('decodeAccessToken does not verify the signature',
+async () => {
+    const t = await token();
+    const cut = t.lastIndexOf('.') + 1;
+    const unsigned = t.slice(0, cut) + 'XXXX';
+    const claims = decodeAccessToken(unsigned);
+    assert.equal(claims.sub, 'current');
+    const r = await verifyAccessToken(
+        unsigned, 1_700_000_100);
+    assert.equal(r.valid, false);
+    assert.equal(!r.valid && r.reason, 'bad signature');
 });
 
 test('rejects a tampered body — the real MAC binds it',

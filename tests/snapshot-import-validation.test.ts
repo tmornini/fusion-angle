@@ -179,13 +179,18 @@ test(
             requests: [
                 {
                     id: 'u1',
-                    uri_prefix:
+                    uri_collection:
                         '/organizations/1/ideas/',
                     uri_id: '42',
                     at: '2026-01-01T00:00:00.000000Z',
                     requester_identity_id: 'current',
                     message_hash: 'a'.repeat(64),
-                    message: '{"kind":"request"}',
+                    message:
+                        'PUT /organizations/1/ideas/42'
+                        + ' HTTP/1.1\r\n\r\n',
+                    method: 'PUT',
+                    operation_id:
+                        '0123456789ABCDEFGHIJKL',
                     rogue_field: 'invalid',
                 },
             ],
@@ -206,13 +211,13 @@ test(
         const json = JSON.stringify({
             responses: [{
                 id: 'o1',
-                uri_prefix: '/organizations/1/ideas/',
+                uri_collection: '/organizations/1/ideas/',
                 uri_id: '42',
                 at: '2026-01-01T00:00:00.000000Z',
-                status: 200,
-                etag: 'e'.repeat(64),
-                message_hash: 'b'.repeat(64),
-                message: '{"kind":"response"}',
+                version: 'e'.repeat(64),
+                message:
+                    'HTTP/1.1 204 No Content\r\n\r\n',
+                operation_id: '0123456789ABCDEFGHIJKL',
                 rogue_field: 'invalid',
             }],
         });
@@ -233,12 +238,16 @@ test(
         const json = JSON.stringify({
             requests: [{
                 id: 'o1',
-                uri_prefix: '/organizations/1/ideas/',
+                uri_collection: '/organizations/1/ideas/',
                 uri_id: '42',
                 at: '2026-01-01T00:00:00.000000Z',
                 requester_identity_id: 'current',
                 message_hash: 'a'.repeat(64),
-                message: '{"kind":"request"}',
+                message:
+                    'PUT /organizations/1/ideas/42'
+                    + ' HTTP/1.1\r\n\r\n',
+                method: 'PUT',
+                operation_id: '0123456789ABCDEFGHIJKL',
             }],
         });
         await adapter.putSnapshot(json);
@@ -259,13 +268,18 @@ test(
             requests: [
                 {
                     id: 'u1',
-                    uri_prefix:
+                    uri_collection:
                         '/organizations/1/ideas/',
                     uri_id: '42',
                     at: '2026-01-01T00:00:00.000000Z',
                     requester_identity_id: 'current',
                     message_hash: 'a'.repeat(64),
-                    message: '{"kind":"request"}',
+                    message:
+                        'PUT /organizations/1/ideas/42'
+                        + ' HTTP/1.1\r\n\r\n',
+                    method: 'PUT',
+                    operation_id:
+                        '0123456789ABCDEFGHIJKL',
                 },
             ],
         });
@@ -330,12 +344,16 @@ test(
             localStorageDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.requests.put('u1', {
-            uri_prefix: '/organizations/1/ideas/',
+            uri_collection: '/organizations/1/ideas/',
             uri_id: '42',
             at: '2026-01-01T00:00:00.000000Z',
             requester_identity_id: 'current',
             message_hash: 'a'.repeat(64),
-            message: '{"kind":"request"}',
+            message:
+                'PUT /organizations/1/ideas/42'
+                + ' HTTP/1.1\r\n\r\n',
+            method: 'PUT',
+            operation_id: '0123456789ABCDEFGHIJKL',
         });
         await adapter.postSchemaCreation();
         const requests =
@@ -360,12 +378,16 @@ test(
         // Pin export surface on requests
         // (message-plane survivor).
         await adapter.requests.put('m1', {
-            uri_prefix: '/organizations/1/ideas/',
+            uri_collection: '/organizations/1/ideas/',
             uri_id: '42',
             at: '2026-01-01T00:00:00.000000Z',
             requester_identity_id: 'current',
             message_hash: 'a'.repeat(64),
-            message: '{"kind":"request"}',
+            message:
+                'PUT /organizations/1/ideas/42'
+                + ' HTTP/1.1\r\n\r\n',
+            method: 'PUT',
+            operation_id: '0123456789ABCDEFGHIJKL',
         });
         const json =
             await adapter.getSnapshot();

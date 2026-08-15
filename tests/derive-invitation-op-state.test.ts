@@ -10,10 +10,13 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // The Phase 14 Task 1 core: invitationOpStateFor is the ENTITY-
 // SCOPED sibling of the whole-ledger-scanning (private)
-// invitationOpStates — three indexed getAllWhere('uri_prefix',
+// invitationOpStates — three indexed getAllWhere('uri_collection',
 // ...) reads (one per op kind) instead of a db.requests.getAll()
 // walk. This file proves it correct against the ROW-PLANE
 // (states table) currentInvitationState reproduces, over three
@@ -29,13 +32,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -86,7 +88,7 @@ async function grant(
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
 }
 
 test('invitationOpStateFor: pending (granted, unanswered)'
@@ -121,7 +123,7 @@ test('invitationOpStateFor: accepted derives \'accepted\','
             acceptAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assert.equal(accept.status, 201);
 
     assert.equal(await invitationOpStateFor(db, id), 'accepted');
     assert.equal(
@@ -145,7 +147,7 @@ test('invitationOpStateFor: declined derives \'declined\','
             declineAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
+    assert.equal(decline.status, 201);
 
     assert.equal(await invitationOpStateFor(db, id), 'declined');
     assert.equal(
@@ -168,7 +170,7 @@ test('invitationOpStateFor: revoked derives \'revoked\','
             revokeAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assert.equal(revoke.status, 201);
 
     assert.equal(await invitationOpStateFor(db, id), 'revoked');
     assert.equal(

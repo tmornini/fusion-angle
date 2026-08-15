@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, InvitationState } from './types.ts';
 import { pickString } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { canonicalUriCollection } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
@@ -20,7 +20,7 @@ import {
 // api/invitations-domain.ts's formInvitationOpPair).
 //
 // E13 FULL-SCAN NAMED CLASS: no index can serve "every request
-// whose uri_prefix has the shape /invitations/<id>/<op>/" for an
+// whose uri_collection has the shape /invitations/<id>/<op>/" for an
 // arbitrary id, so invitationOpStates below reads db.requests.
 // getAll() — ONE full table scan, regardless of how many
 // invitations exist. Grown alongside every future full-ledger
@@ -33,7 +33,7 @@ import {
 // succeed; a conflict appends nothing), never re-derived here —
 // an id can accumulate repeat pairs of only ONE op kind.
 
-const INVITATIONS_PREFIX = canonicalUriPrefix(
+const INVITATIONS_PREFIX = canonicalUriCollection(
     undefined, '/invitations/',
 );
 
@@ -68,7 +68,7 @@ async function invitationOpStates(
 ): Promise<Map<Id, InvitationState>> {
     const states = new Map<Id, InvitationState>();
     for (const request of await db.requests.getAll()) {
-        const match = OP_ADDRESS_PATTERN.exec(request.uri_prefix);
+        const match = OP_ADDRESS_PATTERN.exec(request.uri_collection);
         if (match === null) continue;
         const state = OP_STATES[match[2]!];
         if (state === undefined) continue;
@@ -80,7 +80,7 @@ async function invitationOpStates(
 // ENTITY-SCOPED sibling of invitationOpStates above (Phase 14
 // Task 1): the SAME OP_STATES mutual-exclusivity covenant,
 // restricted to ONE known invitation id via three INDEXED
-// getAllWhere('uri_prefix', ...) reads (one per op kind) rather
+// getAllWhere('uri_collection', ...) reads (one per op kind) rather
 // than the whole-ledger db.requests.getAll() invitationOpStates
 // needs to DISCOVER every invitation's own op prefix out of an
 // unknown set of ids. dbOrView-shaped and opens no nested
@@ -97,11 +97,11 @@ export async function invitationOpStateFor(
     id: Id,
 ): Promise<InvitationState | undefined> {
     for (const op of INVITATION_OP_KINDS) {
-        const prefix = canonicalUriPrefix(
+        const prefix = canonicalUriCollection(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
         const rows = await dbOrView.requests.getAllWhere(
-            'uri_prefix', prefix,
+            'uri_collection', prefix,
         );
         if (rows.length > 0) return OP_STATES[op];
     }
@@ -115,9 +115,9 @@ export async function deriveInvitations(
     db: DbAdapter,
 ): Promise<DerivedInvitationRow[]> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', INVITATIONS_PREFIX),
+        db.requests.getAllWhere('uri_collection', INVITATIONS_PREFIX),
         db.responses.getAllWhere(
-            'uri_prefix', INVITATIONS_PREFIX,
+            'uri_collection', INVITATIONS_PREFIX,
         ),
     ]);
     const documents = deriveDocumentsAt(

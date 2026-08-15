@@ -68,7 +68,7 @@ resolves a request in this order:
    `fenceRequest` (resolve the org once; memberships and
    roles ride token claims — NAMED ≤15-min covenant, not
    live ledger reads; the base adapter is unchanged —
-   tenancy rides `uri_prefix`, not an org-scoped decorator)
+   tenancy rides `uri_collection`, not an org-scoped decorator)
    → **nested path-org fence** (after fence, before
    authorize: for `organizations/...` other than bare
    `organizations/:id`, path org must equal the fenced
@@ -493,7 +493,7 @@ Org-scoped document PUT/DELETE hit the write authorizer
 403s rather than genesis-ing in the caller's namespace;
 genuine absence still 404s (or genesis on PUT).
 Surviving stores are global (`requests` /
-`responses`); tenancy rides `uri_prefix`. There is no
+`responses`); tenancy rides `uri_collection`. There is no
 org-scoped adapter.
 
 The intra-org shared event-append escape hatch is
@@ -678,7 +678,7 @@ like every prior bundle.**
   `/human-members/:id`) would use: the family's own
   `createBodyIdField` override collapses the bare
   `POST /ai-members` (or `/human-members`) onto the entity
-  address's own (uriPrefix, uriId) — the flows/objectives
+  address's own (uriCollection, uriId) — the flows/objectives
   precedent (§3.12/§3.21). For an edit, the address IS the entity
   address already — `POST /ai-members/:id` / `/human-members/:id`
   were already pair-wired there.
@@ -1131,7 +1131,7 @@ pair and a fence organization — a below-facade caller
 - **The operation pair** — the gate's own, at the SAME address a
   live genesis `PUT /flows/:id` would use: `createdEntityUriId`'s
   override collapses `POST /flows` onto `flows/:id`'s own
-  (uriPrefix, uriId), so the two verbs chain against one address.
+  (uriCollection, uriId), so the two verbs chain against one address.
 - **The document pair** — PUT-shaped, at `flows/:id`'s own
   address, body `flowCreateDocumentBody(b)` (the flow's own five
   fields, the initial-state trio, the reduced graph via
@@ -1619,7 +1619,7 @@ below-facade caller (`api/mock-data.ts`) skips all three:
 - **The operation pair** — the gate's own, at the SAME address a
   live genesis `PUT /objectives/:id` would use:
   `createdEntityUriId`'s override collapses `POST /objectives`
-  onto `objectives/:id`'s own (uriPrefix, uriId), so the two
+  onto `objectives/:id`'s own (uriCollection, uriId), so the two
   verbs chain against one address.
 - **The document pair** — PUT-shaped, at `objectives/:id`'s own
   address, body `objectiveDocumentBodyOf(b)` (the create body's
@@ -2679,7 +2679,7 @@ family, whose entity carries no such field at all. The fix: the
 constructor now consults
 `familyRegistration(wiring.family)?.organizationNested` and
 OMITS the `organization_id` line entirely when it is `false` —
-mirroring `canonicalUriPrefix`'s own registration-first pattern
+mirroring `canonicalUriCollection`'s own registration-first pattern
 (`message-pair.ts`). Two pre-existing, untouched pins are the
 regression proof this fix is byte-safe both ways: "PUT
 members/:id appends its pair..." and "PUT ai-members/:id
@@ -2758,7 +2758,7 @@ holds (no `route()` / wiring).
 `grantInvitation` forms its existing operation pair (POST,
 `/invitations/`, `uriId` = the client-minted `invitationId`) as
 before; on the 'fresh' outcome ONLY it ALSO forms a PUT-shaped
-invitation DOCUMENT pair at the SAME `(uriPrefix, uriId)` —
+invitation DOCUMENT pair at the SAME `(uriCollection, uriId)` —
 body `{organization_id, identity_id, at}`, the entity minus
 `id`, so the wire NEVER carries the invitee's email (already
 resolved to `identity_id` at the gate). There is no live PUT
@@ -2779,7 +2779,7 @@ appends nothing, unchanged.
 **Accept: the B2 closure — the third memberships writer joins
 the document plane.** `acceptInvitation` forms a PUT-shaped
 MEMBERSHIPS document pair pre-tx — address =
-`canonicalUriPrefix(inv.organization_id, '/memberships/')`
+`canonicalUriCollection(inv.organization_id, '/memberships/')`
 (the INVITATION's org, never the caller's active org, mirroring
 the domain write's own organization choice), `uriId` = the
 caller's own `membershipId`, body `{organization_id:
@@ -2819,7 +2819,7 @@ op-address PAIR PRESENCE instead — 'accepted' iff any
 `/invitations/<id>/acceptance/` pair exists for the id,
 likewise 'declined'/'revoked', else 'pending'. This is the E13
 FULL-SCAN NAMED CLASS: no index serves "every request whose
-`uri_prefix` has the shape `/invitations/<id>/<op>/`" for an
+`uri_collection` has the shape `/invitations/<id>/<op>/`" for an
 arbitrary id, so this ONE reduction reads `db.requests.getAll()`
 in full, regardless of invitation count; its measured cost is
 recorded at the Task 9 CLI leg, not here. Mutual exclusivity of
@@ -2865,7 +2865,7 @@ existing primitive).
 
 **The single-slot register.** Every write at the address —
 PUT or DELETE — enumerates whatever pair(s) currently occupy it
-by ONE scan (`requests.getAllWhere('uri_prefix', ...)`), deletes
+by ONE scan (`requests.getAllWhere('uri_collection', ...)`), deletes
 THAT id-set from BOTH tables, then appends its own pair. A PUT
 leaves a PUT pair (the PII document); a DELETE leaves a DELETE
 pair (a bodyless erasure tombstone — evidence of erasure without
@@ -3454,7 +3454,7 @@ reads the SAME identity-keyed address
 `/identities/:id/default-org/`, the eventId riding a FABRICATED
 trailing `:eventId` path segment no real URL carries (the live
 PUT's `eventId` is a BODY key) — via a TARGETED
-`requests`/`responses.getAllWhere('uri_prefix', prefix)` pair, never
+`requests`/`responses.getAllWhere('uri_collection', prefix)` pair, never
 a full-ledger scan, and maps each 2xx pair
 (`documentPairsAt`, `api/derive-documents.ts`) to an
 `IdentityDefaultOrganizationEntity`-shaped row: `id` is the pair's

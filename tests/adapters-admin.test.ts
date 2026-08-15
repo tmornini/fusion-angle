@@ -33,6 +33,7 @@ import {
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 function buildProject(
     id: string,
@@ -161,7 +162,7 @@ async function seedMembership(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, '1',
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,

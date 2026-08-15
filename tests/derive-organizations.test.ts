@@ -8,12 +8,17 @@ import { handleRequest } from '../api/api.ts';
 import { EntityNotFoundError } from '../api/db.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
+import {
     seedAdminSchema,
     organizationRow,
 } from './test-fixtures.ts';
 import {
     deriveOrganization,
     deriveOrganizations,
+    organizationEntityOf,
 } from '../api/derive-organizations.ts';
 
 // Phase Final Task 2: organizations dual-write stripped. This
@@ -30,13 +35,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -63,7 +67,7 @@ test('deriveOrganization mirrors the PUT wire body exactly',
 async () => {
     const db = await freshDb();
     const res = await putOrganization(db, 'org-a', 'Acme');
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const wire = await res.json();
     const derived = await deriveOrganization(db, 'org-a');
     assert.deepEqual(derived, wire);
@@ -77,8 +81,8 @@ test('deriveOrganizations mirrors every PUT wire body,'
     // more heads — derive is id-lex over the full set.
     const beta = await putOrganization(db, 'org-b', 'Beta');
     const alpha = await putOrganization(db, 'org-a', 'Alpha');
-    assert.equal(beta.status, 200);
-    assert.equal(alpha.status, 200);
+    assert.equal(beta.status, 201);
+    assert.equal(alpha.status, 201);
     const derived = await deriveOrganizations(db);
     assert.deepEqual(
         derived.map((o) => o.id),
@@ -118,7 +122,7 @@ test('a second live PUT supersedes the first; derive sees the'
     const firstId = first.headers.get('Response-ID');
     assert.ok(firstId);
     const second = await putOrganization(db, 'org-c', 'Second');
-    assert.equal(second.headers.get('Supersedes'), firstId);
+    assert.equal(second.headers.get('Supersedes'), null);
 
     const derived = await deriveOrganization(db, 'org-c');
     assert.equal(derived.name, 'Second');
@@ -143,7 +147,7 @@ async () => {
     // seedAdminSchema forms 2 pairs (role-grants retired);
     // this PUT is the 3rd.
     assert.equal(requests.length, 3);
-    assert.equal(requests[2]!.uri_prefix, '/organizations/');
+    assert.equal(requests[2]!.uri_collection, '/organizations/');
     assert.equal(requests[2]!.uri_id, 'org-d');
 
     const derived = await deriveOrganization(db, 'org-d');
@@ -160,7 +164,7 @@ test('a PUT whose body echoes id round-trips through'
         'PUT', '/organizations/org-echo', DEV_TOKEN,
         { id: 'org-echo', ...organizationRow('Echo') },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const wire = await res.json();
 
     const derived = await deriveOrganization(db, 'org-echo');
@@ -171,4 +175,30 @@ test('a PUT whose body echoes id round-trips through'
         all.find((org) => org.id === 'org-echo'), wire,
     );
     // Phase Final Stage B: organizations table retired.
+});
+
+// G3: stored PUT = organizationEntityOf (id-last). GET wins.
+// The id-first writer pin is deleted — writer matches GET.
+test('stored PUT body equals organizationEntityOf id-last',
+async () => {
+    const db = await freshDb();
+    const id = 'org-g3';
+    const fields = organizationRow('Streamed');
+    const put = await putOrganization(db, id, 'Streamed');
+    assert.equal(put.status, 201);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/organizations/', id),
+    );
+    const expected = organizationEntityOf({
+        uriId: id,
+        pairId: id,
+        method: 'PUT',
+        body: fields,
+    });
+    assert.equal(Object.keys(expected).at(-1), 'id');
+    assert.deepEqual(stored, expected);
+    const derived = await deriveOrganization(db, id);
+    assert.deepEqual(stored, derived);
+    const wire = await put.json();
+    assert.deepEqual(stored, wire);
 });

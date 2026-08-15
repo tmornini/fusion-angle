@@ -7,6 +7,7 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -28,7 +29,9 @@ async function deleteMembership(
         db, new Request(`${BASE}/memberships/${id}`, {
             method: 'DELETE',
             headers: {
-                'Authorization': 'Bearer ' + await organizationToken(),
+                'Authorization': 'Bearer '
+                    + await organizationToken(),
+                'operation-id': TEST_OPERATION_ID,
             },
         }));
     assert.equal(res.status, 204);
@@ -43,6 +46,7 @@ function putDefaultOrganization(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
+                'operation-id': TEST_OPERATION_ID,
             },
             body: JSON.stringify({
                 organization_id: organization,
@@ -93,7 +97,7 @@ async () => {
         await devToken(), 'current', '1',
         '2020-01-02T00:00:00.000000Z',
     ));
-    assert.equal(pin.status, 204);
+    assert.equal(pin.status, 201);
     await deleteMembership(db, 'test-membership-current');
     const res = await handleRequest(
         db, req('/members', await devToken()));

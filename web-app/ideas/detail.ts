@@ -20,12 +20,12 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { navigateTo } from '../app/navigation.ts';
+import { trimStrings } from '../app/format.ts';
 import {
-    navigateTo,
-    trimStrings,
     closeDialog,
     handleDialogClick,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     getIdea,
     postIdeaStateChange,

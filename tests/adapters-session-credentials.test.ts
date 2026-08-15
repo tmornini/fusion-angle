@@ -26,7 +26,12 @@ import {
     putSessionCredentials,
     deleteSessionCredentials,
     SessionCredentialsCorruptError,
+    setCookieSession,
 } from '../web-app/app/adapters/session-credentials.ts';
+import {
+    getSessionToken,
+    putSessionToken,
+} from '../web-app/app/adapters/session-token.ts';
 import { STORAGE_KEY_AUTHORIZATION } from
     '../web-app/app/storage-keys.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
@@ -119,4 +124,42 @@ test('a failed credential write propagates, not swallowed',
         }),
         /disk full/);
     localStorage.setItem = original;
+});
+
+test('cookie-session stores access in memory, not localStorage',
+async () => {
+    localStorage.clear();
+    setCookieSession(true);
+    try {
+        const access = await devToken();
+        putSessionCredentials({
+            accessToken: access,
+            refreshToken: await organizationToken(),
+        });
+        assert.equal(
+            localStorage.getItem(KEY), null);
+        assert.equal(getSessionCredentials(), null);
+        assert.equal(getSessionToken(), access);
+        deleteSessionCredentials();
+        assert.throws(() => getSessionToken());
+    } finally {
+        setCookieSession(false);
+    }
+});
+
+test('cookie-session put does not write refresh_token',
+async () => {
+    localStorage.clear();
+    putSessionToken(await devToken());
+    setCookieSession(true);
+    try {
+        putSessionCredentials({
+            accessToken: await organizationToken(),
+            refreshToken: await devToken(),
+        });
+        assert.equal(
+            localStorage.getItem(KEY), null);
+    } finally {
+        setCookieSession(false);
+    }
 });

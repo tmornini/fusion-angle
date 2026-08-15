@@ -20,6 +20,7 @@ import {
 } from '../api/message-pair.ts';
 import type { AuthPairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
+import { refreshTokenFromSetCookie } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -75,7 +76,11 @@ async function issuePair(db: MemoryDbAdapter): Promise<{
                 client_id: 'web',
             }),
         }));
-    return res.json();
+    const body = await res.json() as { access_token: string };
+    return {
+        access_token: body.access_token,
+        refresh_token: refreshTokenFromSetCookie(res),
+    };
 }
 
 test('a live refresh token rotates to a usable pair',

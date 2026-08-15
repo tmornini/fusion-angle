@@ -19,13 +19,14 @@ import {
     type MessagePair,
 } from '../api/message-pair.ts';
 import { SYSTEM_MEMBER_ID, nowUtc } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
-// Phase Final Task 1(e): pass-first pins for the pre-write
-// ownership authorizer. Foreign-id PUT 404 per family class;
-// foreign-id DELETE 404 (records/:id, memberships/:id);
-// genesis (owner-null) unaffected. Wire body is the same
-// EntityNotFoundError shape OrganizationScopedEntityStore
-// #assertMine already throws today.
+// Pre-write authorizer: probe this address. Same id at two
+// collections is two documents. Foreign-id PUT geneses here;
+// foreign-id DELETE never-written here is 404; genesis
+// (owner-null) is unaffected.
 
 const BASE = 'http://localhost';
 const ORGANIZATION_A = '1';
@@ -37,13 +38,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -90,7 +90,7 @@ async function membershipPair(
             [membershipId], body, SYSTEM_MEMBER_ID,
             organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -115,7 +115,7 @@ async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('foreign-id PUT ideas/:id 403s with forbidden body',
+test('foreign-id PUT ideas/:id geneses at this address',
 async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
@@ -124,19 +124,33 @@ async () => {
         'PUT', '/ideas/idea-a', tokenA,
         ideaDocument('A-owned', 'ev-idea-a'),
     ));
-    assert.equal(created.status, 200);
+    assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'PUT', '/ideas/idea-a', tokenB,
         ideaDocument('stolen', 'ev-steal'),
     ));
-    assert.equal(foreign.status, 403);
-    const body = await foreign.json() as { error: string };
-    assert.equal(
-        body.error,
-        'forbidden: ideas/idea-a belongs to a different'
-        + ' organization',
-    );
+    assert.equal(foreign.status, 201);
+    const gotB = await handleRequest(db, req(
+        'GET', '/ideas/idea-a', tokenB,
+    ));
+    assert.equal(gotB.status, 200);
+    const wireB = await gotB.json() as {
+        title: string;
+        organization_id: string;
+    };
+    assert.equal(wireB.title, 'stolen');
+    assert.equal(wireB.organization_id, ORGANIZATION_B);
+    const gotA = await handleRequest(db, req(
+        'GET', '/ideas/idea-a', tokenA,
+    ));
+    assert.equal(gotA.status, 200);
+    const wireA = await gotA.json() as {
+        title: string;
+        organization_id: string;
+    };
+    assert.equal(wireA.title, 'A-owned');
+    assert.equal(wireA.organization_id, ORGANIZATION_A);
 });
 
 test('genesis PUT ideas/:id in the caller org is unaffected',
@@ -147,7 +161,7 @@ async () => {
         'PUT', '/ideas/idea-b-genesis', tokenB,
         ideaDocument('B-new', 'ev-idea-b'),
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     // Phase Final Task 2: ideas row half stripped — org stamp
     // rides WRITE_RESPONSE_SPECS / derive GET, not the row.
     const getRes = await handleRequest(db, req(
@@ -160,7 +174,8 @@ async () => {
     assert.equal(wire.organization_id, ORGANIZATION_B);
 });
 
-test('foreign-id DELETE nested record-types 403s', async () => {
+test('foreign-id DELETE nested record-types is 204',
+async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
@@ -183,7 +198,7 @@ test('foreign-id DELETE nested record-types 403s', async () => {
             initialStateAt: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'DELETE',
@@ -191,9 +206,9 @@ test('foreign-id DELETE nested record-types 403s', async () => {
             + '/record-types/rec-a',
         tokenB,
     ));
-    // Path org B with type owned by A: org-match or
-    // ownership fence — either 403.
-    assert.equal(foreign.status, 403);
+    // Never written at B's record-types address: 404,
+    // nothing stored. A's document is untouched.
+    assert.equal(foreign.status, 404);
     const still = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION_A
@@ -205,7 +220,7 @@ test('foreign-id DELETE nested record-types 403s', async () => {
     assert.equal(row.name, 'A record');
 });
 
-test('foreign-id DELETE memberships/:id 403s', async () => {
+test('foreign-id DELETE memberships/:id is 204', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
@@ -218,18 +233,12 @@ test('foreign-id DELETE memberships/:id 403s', async () => {
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(created.status, 200);
+    assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'DELETE', '/memberships/m-other-a', tokenB,
     ));
-    assert.equal(foreign.status, 403);
-    const body = await foreign.json() as { error: string };
-    assert.equal(
-        body.error,
-        'forbidden: memberships/m-other-a belongs to a'
-        + ' different organization',
-    );
+    assert.equal(foreign.status, 404);
     // Phase Final Task 2: memberships ROW half stripped —
     // surviving document is on the pair plane under org A.
     const stillThere = await handleRequest(db, req(
@@ -243,7 +252,7 @@ test('foreign-id DELETE memberships/:id 403s', async () => {
     // Phase Final Stage B: roster tables retired.
 });
 
-test('foreign-id PUT projects/:id 403s (second family class)',
+test('foreign-id PUT projects/:id geneses at this address',
 async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
@@ -264,7 +273,7 @@ async () => {
     const created = await handleRequest(db, req(
         'PUT', '/projects/proj-a', tokenA, projectBody,
     ));
-    assert.equal(created.status, 200);
+    assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'PUT', '/projects/proj-a', tokenB, {
@@ -273,11 +282,25 @@ async () => {
             state_event_id: 'ev-steal-proj',
         },
     ));
-    assert.equal(foreign.status, 403);
-    const body = await foreign.json() as { error: string };
-    assert.equal(
-        body.error,
-        'forbidden: projects/proj-a belongs to a different'
-        + ' organization',
-    );
+    assert.equal(foreign.status, 201);
+    const gotB = await handleRequest(db, req(
+        'GET', '/projects/proj-a', tokenB,
+    ));
+    assert.equal(gotB.status, 200);
+    const wireB = await gotB.json() as {
+        title: string;
+        organization_id: string;
+    };
+    assert.equal(wireB.title, 'stolen');
+    assert.equal(wireB.organization_id, ORGANIZATION_B);
+    const gotA = await handleRequest(db, req(
+        'GET', '/projects/proj-a', tokenA,
+    ));
+    assert.equal(gotA.status, 200);
+    const wireA = await gotA.json() as {
+        title: string;
+        organization_id: string;
+    };
+    assert.equal(wireA.title, 'A project');
+    assert.equal(wireA.organization_id, ORGANIZATION_A);
 });

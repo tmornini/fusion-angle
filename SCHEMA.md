@@ -19,17 +19,17 @@ localStorage simulated backend keys the same tables as
 `fusion-ai:tableName`; memory uses an in-process Map of
 bare table names. All rows have a text `id` primary key.
 Column types match
-`RequestEntity` / `ResponseEntity`: TEXT (string) and
-INTEGER (`status`). Document-body composites (arrays and
+`RequestEntity` / `ResponseEntity`: TEXT (string).
+`method` and `operation_id` are TEXT
+on the request row; `operation_id` is TEXT on the
+response row (same value as the request). Document-body
+composites (arrays and
 objects — `strengths`, `team_dimensions`, `options`,
 `constraints`, `graph`, `graphDelta`, `revivals`,
 `flow_graph`) store as native nested JSON on the wire and
 in the pair body, never as JSON-encoded strings. Required
 columns are NOT NULL — entity validation on creation
-ensures every required field is present. `follows` /
-`supersedes` are optional-by-absence (never `null`, never
-`''`); see responses below and
-`RESPONSE_OPTIONAL_BODY_KEYS` in `api/validators.ts`.
+ensures every required field is present.
 `serializeValue` (`api/storage-serialize.ts`) rejects
 null/undefined on present keys only.
 
@@ -118,7 +118,7 @@ The append-only ledgers every pair-wired HTTP write appends
 into. Seeded demo data forms pairs pre-tx (`formSeedPair`);
 `EXPECTED_PAIR_COUNT` 1498 / bootstrap 12 is absolute.
 Global-spine (pass-through), NOT org-fenced at the store:
-tenancy lives IN `uri_prefix`, enforced at the route gate
+tenancy lives IN `uri_collection`, enforced at the route gate
 and the write authorizer
 (`api/write-authorizer.ts` via
 `resolveGlobalOwner`, which may fall back to
@@ -127,7 +127,7 @@ and the write authorizer
 ### requests
 
 One row per stored canonical HTTP request message. The
-message text IS the row; `uri_prefix` (retains its trailing
+message text IS the row; `uri_collection` (retains its trailing
 `/`) and `uri_id` (empty string for a collection request) are
 addressing metadata, and `message_hash` is an index over the
 sha256 digest (`shared/digest.ts` `sha256Hex`) of `message`
@@ -137,50 +137,59 @@ metadata only, not a domain timestamp inside the message.
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY — shared with the paired response |
-| uri_prefix | TEXT | Collection URI, trailing `/` kept |
+| uri_collection | TEXT | Collection URI, trailing `/` kept |
 | uri_id | TEXT | Resource id, or `''` for a collection |
 | at | TEXT | RFC-3339 Zulu — envelope metadata |
 | requester_identity_id | TEXT | identity id of the requester |
 | message_hash | TEXT | sha256 hex digest of `message` |
 | message | TEXT | The canonical stored HTTP message |
+| method | TEXT | HTTP method, `^[A-Z]+$`. No GET rows |
+| operation_id | TEXT | 22-char id. Same on the paired response |
+
+Public PUT/PATCH/POST/DELETE send header `Operation-ID`
+(22-char id). Missing or malformed → 400. The server
+never mints this header for a public write. GET may
+send it; it is ignored. Seed `formSeedPair` mints one
+id per envelope and copies it onto inner PUTs.
 
 Validator: `validateRequestEntity` (`api/validators.ts`).
-Secondary indexes: `uri_prefix`, `uri_id`, `message_hash`
+Secondary indexes: `uri_collection`,
+`message_hash`, `operation_id`
 (`api/db.ts` `TABLE_INDEXES`).
 
 ### responses
 
 The paired response: `id` equals the request's `id` (one
-UUID per pair, never a foreign key of its own). `follows` /
-`supersedes` are ABSENT KEYS when the write had no
-predecessor — never `null`, never `''`. Absence-of-key IS
-absence-of-event, and IndexedDB skips absent keys when
-indexing, which is the partial-unique-index semantics the
-two-PUT-classes design requires; a `null` value for either
-is rejected by `validateResponseEntity` as invalid.
+UUID per pair, never a foreign key of its own).
 
 | Column | Type | Notes |
 |--------|------|-------|
 | id | TEXT | PRIMARY KEY — equals the request's id |
-| uri_prefix | TEXT | Collection URI, trailing `/` kept |
+| uri_collection | TEXT | Collection URI, trailing `/` kept |
 | uri_id | TEXT | Resource id, or `''` for a collection |
 | at | TEXT | RFC-3339 Zulu — envelope metadata |
-| status | INTEGER | HTTP status, 100..599 |
-| etag | TEXT | sha256 of body bytes (or empty; `bodyEtagOf`) |
-| message_hash | TEXT | sha256 hex digest of `message` |
-| message | TEXT | The canonical stored HTTP message |
-| follows | TEXT | ABSENT unless this follows a prior pair |
-| supersedes | TEXT | ABSENT unless this supersedes a pair |
+| version | TEXT | 64-hex `documentVersion` of body octets |
+| message | TEXT | The stored HTTP message (`serializeWire`) |
+| operation_id | TEXT | 22-char id. Same value as the request |
 
-`responses.etag` is storage-only body content-addressing —
-**unrelated to the wire ETag** on instance
-GET/PUT/PATCH (wire ETag = head pair response id; see
-API.md §5.4.1 / §5.20). Implementers must not conflate
-them.
+`responses.version` is the document revision token
+(unconditional / genesis: sha256 of response body octets;
+later: sha256 of body octets || matched 64-hex). Wire
+`ETag` / `If-Match` are that same token for documents.
+Instance GET advertises `documentVersion` of the
+projected body (not stored). Pair `id` stays
+`Response-ID` (locator). DELETE `version` is sha256 of
+the stored 204 wire (`Date:` omitted). No `Version:`
+header.
+
+Write HTTP responses add `Operation-ID` at send time
+from this column. It is not stored on the GET-shaped
+response blob.
 
 Validator: `validateResponseEntity` (`api/validators.ts`).
-Secondary indexes: `uri_prefix`, `uri_id`, and the unique
-`follows` index (`api/db.ts` `TABLE_INDEXES`).
+Secondary indexes: `uri_collection`,
+`operation_id`, `version`
+(`api/db.ts` `TABLE_INDEXES`).
 
 ## Derived document families (no table)
 
@@ -262,8 +271,10 @@ Org-nested wire = storage (no dual-wire flat `/records`):
   412). DELETE tombstone-wins. Value-revision history
   at `.../instances/:id/history` is **not** a lifecycle-
   trio clone. Derive:
-  `api/derive-record-instances.ts`. Wire ETag = head
-  response id (unrelated to `responses.etag` column).
+  `api/derive-record-instances.ts`. Wire ETag is
+  `documentVersion` of the projected body; stored
+  `version` is `documentVersion` of the full stored
+  body. The two differ by definition.
 
 Snapshot import rejects retired flat prefixes
 `/organizations/:org/records/` and

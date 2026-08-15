@@ -3,7 +3,7 @@ import {
 } from '../safe-html.ts';
 import {
     displayText,
-} from '../core.ts';
+} from '../format.ts';
 import {
     ICON_SIZE,
     iconDollarSign,

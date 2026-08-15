@@ -20,13 +20,13 @@ import {
 } from '../app/loading-states.ts';
 import { setHtml } from '../app/safe-html.ts';
 import { log } from '../app/logger.ts';
+import { navigateTo } from '../app/navigation.ts';
+import { trimStrings } from '../app/format.ts';
 import {
-    navigateTo,
-    trimStrings,
     openDialog,
     closeDialog,
     handleDialogClick,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     Project,
     getProjectEntity,

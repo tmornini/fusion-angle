@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type { Id, OrganizationEntity } from './types.ts';
 import { validateOrganizationEntity } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { canonicalUriCollection } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -19,7 +19,7 @@ import {
 //
 // GLOBAL plane, like members/ai-members/human-members/
 // identities: organizations IS the tenant root, so it is never
-// itself organization-nested — canonicalUriPrefix(undefined,
+// itself organization-nested — canonicalUriCollection(undefined,
 // '/organizations/') resolves the SAME flat prefix whether or
 // not the family is registered (ORGANIZATION_NESTED_FIRST_
 // SEGMENTS's fallback in message-pair.ts and the eventual
@@ -34,17 +34,19 @@ import {
 // .successBody already runs (api/routes.ts; pair-plane only
 // since Phase Final Task 2 retired the organizations ROW) —
 // so the derived shape is byte-identical to the STORED wire
-// body, id-LAST, never id-first. Reusing the validator rather
-// than re-listing its six field names here is the DRY choice:
-// ORGANIZATION_BODY_KEYS (validators.ts) stays the one place
-// that vocabulary lives. withoutId strips a stray `id` FIRST
-// — the fetch-edit-PUT client pattern echoes the GET body's
-// own `id` right back into the PUT payload, and the STORED
-// request body is the raw wire body, echoed id and all
-// (formWritePair stores the caller's body verbatim;
-// successBody's withoutId(body) strips it before validating).
-// Mirroring that same strip here is what keeps assertOnlyKeys
-// from rejecting a head pair the live PUT legitimately formed.
+// body, id-LAST, never id-first. GET wins: the writer emits
+// this mapper, not the older id-first stamp. Reusing the
+// validator rather than re-listing its six field names here
+// is the DRY choice: ORGANIZATION_BODY_KEYS (validators.ts)
+// stays the one place that vocabulary lives. withoutId
+// strips a stray `id` FIRST — the fetch-edit-PUT client
+// pattern echoes the GET body's own `id` right back into
+// the PUT payload, and the STORED request body is the raw
+// wire body, echoed id and all (formWritePair stores the
+// caller's body verbatim; successBody's withoutId(body)
+// strips it before validating). Mirroring that same strip
+// here is what keeps assertOnlyKeys from rejecting a head
+// pair the live PUT legitimately formed.
 //
 // ONE shared readonly tx per call (Efficiency): both stores
 // read inside the SAME db.readTransaction(
@@ -64,9 +66,9 @@ import {
 const ORGANIZATIONS_TABLE = 'organizations';
 
 const ORGANIZATIONS_PREFIX =
-    canonicalUriPrefix(undefined, '/organizations/');
+    canonicalUriCollection(undefined, '/organizations/');
 
-function organizationEntityOf(
+export function organizationEntityOf(
     document: DerivedDocument,
 ): OrganizationEntity {
     return {
@@ -85,10 +87,10 @@ export async function deriveOrganizations(
         async (view) => {
             const [requests, responses] = await Promise.all([
                 view.requests.getAllWhere(
-                    'uri_prefix', ORGANIZATIONS_PREFIX,
+                    'uri_collection', ORGANIZATIONS_PREFIX,
                 ),
                 view.responses.getAllWhere(
-                    'uri_prefix', ORGANIZATIONS_PREFIX,
+                    'uri_collection', ORGANIZATIONS_PREFIX,
                 ),
             ]);
             const documents = deriveDocumentsAt(
@@ -116,10 +118,10 @@ export async function deriveOrganization(
         async (view) => {
             const [requests, responses] = await Promise.all([
                 view.requests.getAllWhere(
-                    'uri_prefix', ORGANIZATIONS_PREFIX,
+                    'uri_collection', ORGANIZATIONS_PREFIX,
                 ),
                 view.responses.getAllWhere(
-                    'uri_prefix', ORGANIZATIONS_PREFIX,
+                    'uri_collection', ORGANIZATIONS_PREFIX,
                 ),
             ]);
             const document = deriveDocumentsAt(

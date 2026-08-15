@@ -6,6 +6,11 @@ import {
     byIdAscending,
     type DocumentPair,
 } from './derive-documents.ts';
+import {
+    documentVersion,
+    jsonBodyOctets,
+} from './message-form.ts';
+import { ifMatchFromMessage } from './message-pair.ts';
 
 // Instance derive surface — full-state heads (R5 / Task 14).
 // NO fold. Each revision pair stores the COMPLETE value map
@@ -26,12 +31,61 @@ export interface InstanceRevision {
     readonly at: string;
     readonly pairId: string;
     readonly values: readonly InstanceValue[];
+    readonly version: string;
 }
 
 export interface InstanceHead {
     readonly id: string;
-    readonly pairId: string;      // wire ETag source
+    readonly pairId: string;      // latch pair id
     readonly values: readonly InstanceValue[];
+}
+
+export function instanceGetBody(
+    id: string,
+    organizationId: string,
+    recordTypeId: string,
+    values: readonly InstanceValue[],
+): Record<string, unknown> {
+    return {
+        id,
+        organization_id: organizationId,
+        record_type_id: recordTypeId,
+        values,
+    };
+}
+
+export function projectionOmitsStored(
+    stored: readonly InstanceValue[],
+    projected: readonly InstanceValue[],
+): boolean {
+    if (projected.length !== stored.length) {
+        return true;
+    }
+    const visible = new Set(
+        projected.map((row) => row.attribute_id),
+    );
+    return stored.some(
+        (row) => !visible.has(row.attribute_id),
+    );
+}
+
+export async function instanceParentEtag(
+    db: DbAdapter,
+    pairId: string,
+): Promise<string | undefined> {
+    const request = await db.requests.getById(pairId);
+    if (request === undefined) return undefined;
+    return ifMatchFromMessage(request.message);
+}
+
+export function advertisedInstanceEtag(
+    projectedBody: unknown,
+    matchedEtag?: string,
+): Promise<string> {
+    return documentVersion(
+        jsonBodyOctets(projectedBody),
+        matchedEtag,
+    );
 }
 
 export function instancesUriPrefix(
@@ -122,8 +176,8 @@ async function fetchInstancePairs(
         organization, recordTypeId,
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     return documentPairsAt(requests, responses, prefix);
 }
@@ -142,8 +196,8 @@ export async function deriveInstanceHead(
         organization, recordTypeId,
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const document = deriveDocumentsAt(
         requests, responses, prefix,
@@ -166,8 +220,8 @@ export async function deriveInstanceCollection(
         organization, recordTypeId,
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const documents = deriveDocumentsAt(
         requests, responses, prefix,
@@ -204,6 +258,7 @@ export async function deriveInstanceRevisions(
             at: pair.at,
             pairId: pair.id,
             values: revisionValuesOf(pair.body),
+            version: pair.version,
         });
     }
     return revisions;

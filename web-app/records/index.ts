@@ -10,7 +10,7 @@ import {
     ICON_SIZE,
     iconPlus, iconDatabase,
 } from '../app/icons.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import { createPageAbort } from '../app/page-lifecycle.ts';
 import {
     sessionContext,

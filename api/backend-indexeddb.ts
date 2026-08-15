@@ -213,8 +213,8 @@ function indexedDbTx(
                     // resolve it from the declared unique
                     // columns. If a table ever declares two,
                     // this resolver must disambiguate by
-                    // probing — today responses.follows is
-                    // the only one.
+                    // probing — no unique column is declared
+                    // today.
                     const column =
                         uniqueColumns(table)[0] ?? 'id';
                     throw new UniqueConstraintError(

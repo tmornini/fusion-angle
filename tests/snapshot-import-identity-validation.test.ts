@@ -47,33 +47,38 @@ const VALID_ROWS: Record<
 > = {
     requests: {
         id: 'rq1',
-        uri_prefix: '/organizations/1/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '42',
         at: '2026-01-01T00:00:00.000000Z',
         requester_identity_id: 'current',
         message_hash: 'a'.repeat(64),
-        message: '{"kind":"request"}',
+        message:
+            'PUT /organizations/1/ideas/42'
+            + ' HTTP/1.1\r\n\r\n',
+        method: 'PUT',
+        operation_id: '0123456789ABCDEFGHIJKL',
     },
     responses: {
         id: 'rs1',
-        uri_prefix: '/organizations/1/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '42',
         at: '2026-01-01T00:00:00.000000Z',
-        status: 200,
-        etag: 'e'.repeat(64),
-        message_hash: 'b'.repeat(64),
-        message: '{"kind":"response"}',
+        version: 'e'.repeat(64),
+        message:
+            'HTTP/1.1 204 No Content\r\n\r\n',
+        operation_id: '0123456789ABCDEFGHIJKL',
     },
 };
 
 // One value-level malformation per table — the shape a
-// real corrupt seed produces (bad enum / bad timestamp /
-// unknown key), spread over the valid row.
+// real corrupt seed produces (bad enum / bad method /
+// unknown key), spread over the valid row. Bad `at`
+// width is pinned in snapshot-pre-break.test.ts.
 const BAD_OVERRIDE: Record<
     string, Record<string, unknown>
 > = {
-    requests: { at: 'not-a-timestamp' },
-    responses: { status: 9999 },
+    requests: { method: 'put' },
+    responses: { version: 'not-a-digest' },
 };
 
 for (const [table, valid] of Object.entries(VALID_ROWS)) {

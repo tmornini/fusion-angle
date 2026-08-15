@@ -45,10 +45,10 @@ export async function collectRecordTypeReferrers(
     const [instanceRequests, instanceResponses] =
         await Promise.all([
             view.requests.getAllWhere(
-                'uri_prefix', instancesPrefix,
+                'uri_collection', instancesPrefix,
             ),
             view.responses.getAllWhere(
-                'uri_prefix', instancesPrefix,
+                'uri_collection', instancesPrefix,
             ),
         ]);
     const instanceHeads = deriveDocumentsAt(

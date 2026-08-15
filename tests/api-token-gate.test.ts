@@ -33,7 +33,7 @@ async () => {
         db, new Request(`${BASE}/members`));
     assert.equal(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /missing bearer token/);
+    assert.equal(body.error, 'invalid_token');
 });
 
 test('protected route accepts a valid token', async () => {
@@ -46,14 +46,14 @@ test('rejects an expired token', async () => {
     const db = await freshDb();
     await assert.rejects(
         async () => GET(db, 'members', await expiredToken()),
-        /expired/);
+        /invalid_token/);
 });
 
 test('rejects a not-yet-valid token', async () => {
     const db = await freshDb();
     await assert.rejects(
         async () => GET(db, 'members', await notYetValidToken()),
-        /not yet valid/);
+        /invalid_token/);
 });
 
 test('rejects the anonymous principal on a protected route',
@@ -66,7 +66,7 @@ async () => {
         jti: 'anon',
     });
     await assert.rejects(
-        () => GET(db, 'members', anon), /anonymous/);
+        () => GET(db, 'members', anon), /invalid_token/);
 });
 
 // Public routes are exempt: even an anonymous token (which a

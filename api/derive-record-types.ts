@@ -9,11 +9,12 @@ import {
     stateHistoryFrom,
     currentDocumentState,
     currentLifecycleEvent,
-    byIdAscending,
     DELETED_STATE,
     type DerivedDocument,
     type DocumentPair,
 } from './derive-documents.ts';
+import { liveHeadId, messageStore } from
+    './message-store.ts';
 
 // Org-nested record-types derive surface, plus the folded
 // flat-records history helper (formerly derive-records.ts).
@@ -42,7 +43,7 @@ export function recordTypesUriPrefix(
         + '/record-types/';
 }
 
-function recordTypeEntityOf(
+export function recordTypeEntityOf(
     document: DerivedDocument,
     organization: Id,
     current: StateEntity,
@@ -68,8 +69,8 @@ async function fetchRecordTypePairs(
     readonly pairs: readonly DocumentPair[];
 }> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     return {
         documents: deriveDocumentsAt(
@@ -97,7 +98,7 @@ export async function deriveRecordTypeCollection(
             list.push(pair);
         }
     }
-    const rows: RecordTypeWireRow[] = [];
+    const byId = new Map<Id, RecordTypeWireRow>();
     for (const [id, document] of documents) {
         const history = stateHistoryFrom(
             documentLifecycleEvents(
@@ -109,13 +110,20 @@ export async function deriveRecordTypeCollection(
             continue;
         }
         const current = currentLifecycleEvent(history)!;
-        rows.push(
+        byId.set(
+            id,
             recordTypeEntityOf(
                 document, organization, current,
             ),
         );
     }
-    return rows.sort(byIdAscending);
+    const live = await messageStore(db).getCollection(prefix);
+    const rows: RecordTypeWireRow[] = [];
+    for (const entity of live) {
+        const row = byId.get(liveHeadId(entity));
+        if (row !== undefined) rows.push(row);
+    }
+    return rows;
 }
 
 export async function deriveRecordTypeEntity(
@@ -180,7 +188,7 @@ export async function requireRecordTypeExists(
 // nested type history walk (same prefix, same reduction).
 // Call sites that still name deriveRecordStateHistory
 // (adapters, drift pins) keep compiling; wire history is
-// RECORD_TYPE_HISTORY_PATTERN only after Task 23.
+// RECORD_TYPE_VERSIONS_PATTERN only after Task 23.
 export async function deriveRecordStateHistory(
     db: DbAdapter,
     organization: Id,

@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type { Id, IdentityTokenEntity } from './types.ts';
 import { validateIdentityTokenEntity } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { canonicalUriCollection } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
@@ -31,29 +31,17 @@ import {
 // exactly the hazard api/routes.ts's own NOT-FLIPPED comment named
 // before this task retired it.
 //
-// THE KEY-ORDER SUBTLETY (Step 0, this task's brief): the STORED
-// ROW is id-LAST — HistoryEntityStore#put's own `{
-// ...this.#validate(body), id }` spread — jti, identity_id,
-// action, chain_id, at, id, in validateIdentityTokenEntity's own
-// return-literal order. The derive-organizations.ts precedent
-// (organizationEntityOf) applies verbatim: identityTokenEntityOf
-// re-runs the pair's own REQUEST body (document.body —
-// deriveDocumentsAt reads db.requests, never db.responses, for
-// the document itself) through validateIdentityTokenEntity and
-// appends `id` LAST — NOT the id-FIRST spread api/routes.ts's
-// WRITE_RESPONSE_SPECS['identity-tokens/:id'].successBody forms.
-// That id-first shape answers a different question (what the
-// ledger's own STORED RESPONSE message records), never what a
-// live GET returns — api/message-pair.ts's formTokenEventPair
-// carries the SAME split: its request body is the bare event
-// (Omit<IdentityTokenEntity, 'id'>), its stored response body is
-// `{id, ...validateIdentityTokenEntity(body)}`. withoutId FIRST,
-// always (the organizationEntityOf / deriveMembershipsForIdentity
+// THE KEY-ORDER SUBTLETY: the derived row is id-LAST —
+// validateIdentityTokenEntity's return-literal order plus `id`.
+// G4: GET wins. WRITE_RESPONSE_SPECS['identity-tokens/:id']
+// and formTokenEventPair emit this mapper, not the older
+// id-first stamp. withoutId FIRST, always (the
+// organizationEntityOf / deriveMembershipsForIdentity
 // precedent): a synthesized event pair's request body never
-// carries a stray id, but a below-facade PUT could, and stripping
-// unconditionally costs nothing. tests/drift-identity-tokens.
-// test.ts pins both the positive (id-last) shape and the NEGATIVE
-// counter-example (an id-first spread is NOT byte-identical).
+// carries a stray id, but a below-facade PUT could, and
+// stripping unconditionally costs nothing.
+// tests/drift-identity-tokens.test.ts pins stored PUT =
+// identityTokenEntityOf.
 //
 // EVENT-APPEND, not document-class (api/routes.ts's own route
 // comment): every row id is a fresh generateCryptoSafeBase62()
@@ -94,9 +82,9 @@ import {
 const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 
 const IDENTITY_TOKENS_PREFIX =
-    canonicalUriPrefix(undefined, '/identity-tokens/');
+    canonicalUriCollection(undefined, '/identity-tokens/');
 
-function identityTokenEntityOf(
+export function identityTokenEntityOf(
     document: DerivedDocument,
 ): IdentityTokenEntity {
     return {
@@ -110,10 +98,10 @@ async function fetchIdentityTokenDocuments(
 ): Promise<Map<string, DerivedDocument>> {
     const [requests, responses] = await Promise.all([
         dbOrView.requests.getAllWhere(
-            'uri_prefix', IDENTITY_TOKENS_PREFIX,
+            'uri_collection', IDENTITY_TOKENS_PREFIX,
         ),
         dbOrView.responses.getAllWhere(
-            'uri_prefix', IDENTITY_TOKENS_PREFIX,
+            'uri_collection', IDENTITY_TOKENS_PREFIX,
         ),
     ]);
     return deriveDocumentsAt(

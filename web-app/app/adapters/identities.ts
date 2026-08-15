@@ -13,7 +13,7 @@ import {
 import {
     RequestError,
     HTTP_NOT_FOUND,
-} from '../../../api/api.ts';
+} from '../../../api/http-errors.ts';
 import { hashPassword } from '../../../shared/password-hash.ts';
 import type { RequestContext } from './shared.ts';
 import {

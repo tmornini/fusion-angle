@@ -8,8 +8,11 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
-// GET members/:id/history — Phase A4 of states-URI
+// GET members/:id/versions — Phase A4 of states-URI
 // elimination. Re-homes the api-actor-from-token authorship
 // covenant: PUT members/:id archive stamps actor as
 // member_id on the history event. Global-family miss posture:
@@ -32,16 +35,12 @@ function req(
     token?: string,
     body?: unknown,
 ): Request {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-    };
-    if (token !== undefined) {
-        headers['Authorization'] = 'Bearer ' + token;
-    }
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers,
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -66,7 +65,7 @@ function assertDesc(rows: HistoryEvent[]): void {
 }
 
 test(
-    'GET members/:id/history: archive authored by token',
+    'GET members/:id/versions: archive authored by token',
     async () => {
         const db = await freshDb();
         await seedHumanMember(db, 'current', 'Demo');
@@ -84,12 +83,12 @@ test(
                 },
             ),
         );
-        assert.equal(put.status, 200);
+        assert.equal(put.status, 201);
         const res = await handleRequest(
             db,
             req(
                 'GET',
-                '/members/current/history',
+                '/members/current/versions',
                 DEV_TOKEN,
             ),
         );
@@ -108,14 +107,14 @@ test(
 );
 
 test(
-    'GET members/:id/history absent → 404',
+    'GET members/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
         const res = await handleRequest(
             db,
             req(
                 'GET',
-                '/members/no-such-member/history',
+                '/members/no-such-member/versions',
                 DEV_TOKEN,
             ),
         );

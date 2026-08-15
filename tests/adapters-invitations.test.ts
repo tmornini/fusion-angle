@@ -18,8 +18,10 @@ import {
 } from '../api/validators.ts';
 import {
     createRequestContext,
+    type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 import {
@@ -31,12 +33,19 @@ import {
     getSentInvitations,
 } from '../web-app/app/adapters/invitations.ts';
 import {
+    setCookieSession,
+} from '../web-app/app/adapters/session-credentials.ts';
+import {
+    getSessionToken,
+    deleteSessionToken,
+} from '../web-app/app/adapters/session-token.ts';
+import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
     formWritePair,
-    canonicalUriPrefix,
+    canonicalUriCollection,
 } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { deriveInvitations } from
@@ -85,7 +94,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -176,12 +185,12 @@ async function deriveMembershipsAll(db: DbAdapter) {
         at: string;
     }> = [];
     for (const organization of organizations) {
-        const prefix = canonicalUriPrefix(
+        const prefix = canonicalUriCollection(
             organization.id, '/memberships/',
         );
         const [requests, responses] = await Promise.all([
-            db.requests.getAllWhere('uri_prefix', prefix),
-            db.responses.getAllWhere('uri_prefix', prefix),
+            db.requests.getAllWhere('uri_collection', prefix),
+            db.responses.getAllWhere('uri_collection', prefix),
         ]);
         for (const document of deriveDocumentsAt(
             requests, responses, prefix,
@@ -234,7 +243,10 @@ async function eraseIdentityPii(
         `http://localhost/identities/${target}/pii`,
         {
             method: 'DELETE',
-            headers: { 'Authorization': 'Bearer ' + token },
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'operation-id': TEST_OPERATION_ID,
+            },
         },
     ));
     assert.equal(response.status, 204);
@@ -685,4 +697,43 @@ test('a repeated revoke posts no notification', async () => {
     assert.equal(posted.length, 2);   // grant, revoke
     await postInvitationRevocation(tony, inv.id);
     assert.equal(posted.length, 2);
+});
+
+test('cookie-session accept remints via refresh POST',
+async () => {
+    setCookieSession(true);
+    try {
+        const { db } = await ctxFor('current', '2');
+        const tony = await ctxOn(db, 'current', '2');
+        await postInvitationGrant(tony, 'sarah@x.com');
+        const inv = (await deriveInvitations(db))[0]!;
+        const sarah = await ctxOn(db, 'sarah', '1');
+        const refreshBodies: unknown[] = [];
+        const recording: RequestContext = {
+            ...sarah,
+            POST: async <T>(
+                resource: string,
+                body: Record<string, unknown>,
+            ): Promise<T> => {
+                if (resource === 'authentication/token') {
+                    refreshBodies.push(body);
+                    return {
+                        access_token: 'reminted-access',
+                        token_type: 'Bearer',
+                        expires_in: 900,
+                    } as T;
+                }
+                return sarah.POST(resource, body);
+            },
+        };
+        await postInvitationAcceptance(recording, inv.id);
+        assert.equal(refreshBodies.length, 1);
+        assert.deepEqual(refreshBodies[0], {
+            grant_type: 'refresh',
+        });
+        assert.equal(getSessionToken(), 'reminted-access');
+    } finally {
+        setCookieSession(false);
+        deleteSessionToken();
+    }
 });

@@ -9,6 +9,14 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
+import {
+    humanMemberDocumentEntityOf,
+    identityDocumentEntityOf,
+} from '../api/routes.ts';
 
 const BASE = 'http://localhost';
 const MEMBER = 'walt';
@@ -46,14 +54,12 @@ function req(
     method: string, path: string, token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -98,12 +104,12 @@ test(
         // Phase Final Stage B: identity spine tables retired.
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
-        // surviving /history.
+        // surviving /versions.
         const history = await GET<{
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'members/w1/history', DEV_TOKEN);
+        }[]>(db, 'members/w1/versions', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
         assert.equal(current.state, 'active');
@@ -195,7 +201,7 @@ test(
                 initialStateEventId: 'ev-1',
                 initialStateAt: '2099-01-01T00:00:00.000000Z',
             }));
-        assert.equal(create.status, 204);
+        assert.equal(create.status, 201);
         const edit = await handleRequest(adminDb, req(
             'POST', '/human-members/w1', DEV_TOKEN, {
                 detail: detail(),
@@ -203,7 +209,7 @@ test(
                 stateAt: '2099-01-01T00:00:00.000000Z',
                 stateEventId: 'ev-1',
             }));
-        assert.equal(edit.status, 204);
+        assert.equal(edit.status, 201);
 
         const memberDb = memoryDbAdapter();
         await memberDb.postSchemaCreation();
@@ -236,3 +242,82 @@ test(
         );
     },
 );
+
+test('human create stores humanMemberDocumentEntityOf '
++ 'and identityDocumentEntityOf', async () => {
+    const db = await freshDb();
+    const id = 'h-g3-create';
+    const fields = detail();
+    await POST(db, 'human-members', {
+        id,
+        detail: fields,
+        initialState: 'active',
+        initialStateEventId: 'ev-g3',
+        initialStateAt: '2099-01-01T00:00:00.000000Z',
+    }, DEV_TOKEN);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/human-members/', id),
+    );
+    assert.deepEqual(
+        stored,
+        humanMemberDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body: fields,
+            },
+            '',
+        ),
+    );
+    const identityStored = JSON.parse(
+        await storedPutBodyText(db, '/identities/', id),
+    );
+    assert.deepEqual(
+        identityStored,
+        identityDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body: { kind: 'person' },
+            },
+            '',
+        ),
+    );
+});
+
+test('human edit stores humanMemberDocumentEntityOf',
+async () => {
+    const db = await freshDb();
+    const id = 'h-g3-edit';
+    await POST(db, 'human-members', {
+        id,
+        detail: detail(),
+        initialState: 'active',
+        initialStateEventId: 'ev-g3',
+        initialStateAt: '2099-01-01T00:00:00.000000Z',
+    }, DEV_TOKEN);
+    const fields = { ...detail(), title: 'Director' };
+    await POST(db, 'human-members/' + id, {
+        detail: fields,
+        state: 'active',
+        stateAt: '2099-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-g3',
+    }, DEV_TOKEN);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/human-members/', id),
+    );
+    assert.deepEqual(
+        stored,
+        humanMemberDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body: fields,
+            },
+            '',
+        ),
+    );
+});

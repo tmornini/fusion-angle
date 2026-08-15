@@ -29,8 +29,7 @@ export interface PageEntry {
     // Auth-gated by default: a page is exempt only when this is
     // explicitly false (mirrors requiresSchema). The boot gate
     // reads `requiresAuth !== false`, so the 23 app pages that
-    // omit it inherit true; only the public surface and the
-    // pre-auth bootstrap plane opt out.
+    // omit it inherit true; only the public surface opts out.
     requiresAuth?: boolean;
     cssBundles?: string[];
     loader: () => Promise<{
@@ -327,7 +326,7 @@ export const PAGE_REGISTRY: Record<
         keywords:
             'data export import wipe',
         requiresSchema: false,
-        requiresAuth: false,
+        requiresAuth: true,
         cssBundles: ['pages-snapshots'],
         loader: () => import('../snapshots/index'),
     },

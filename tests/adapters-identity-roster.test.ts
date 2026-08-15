@@ -25,6 +25,7 @@ import {
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 async function setup() {
     const db = memoryDbAdapter();
@@ -119,7 +120,7 @@ async () => {
         responseBody: spec.successBody?.(
             ['s2'], detail, SYSTEM_MEMBER_ID, undefined,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postAiMemberDocumentOp(
         db, 's2', detail, SYSTEM_MEMBER_ID, pair,

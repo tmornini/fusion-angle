@@ -5,10 +5,10 @@ import { log } from '../app/logger.ts';
 import {
     buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
-    navigateTo, openDialog, closeDialog,
-    handleDialogClick,
-} from '../app/core.ts';
+    openDialog, closeDialog, handleDialogClick,
+} from '../app/dialog.ts';
 import {
     sessionContext,
     getIdentity,

@@ -15,6 +15,7 @@ import { captureConsole } from './console-capture.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -199,6 +200,8 @@ test(
                             'application/json',
                         'Authorization':
                             'Bearer ' + DEV_TOKEN,
+                        'operation-id':
+                            TEST_OPERATION_ID,
                     },
                     body: '{not valid json',
                 },
@@ -317,6 +320,8 @@ test(
                                 'application/json',
                             'Authorization':
                                 'Bearer ' + DEV_TOKEN,
+                            'operation-id':
+                                TEST_OPERATION_ID,
                         },
                         body: raw,
                     },

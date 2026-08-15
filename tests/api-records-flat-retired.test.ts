@@ -7,6 +7,9 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Task 23 pins: flat records + record-attributes wire is
 // gone. Authenticated flat GET → 404; unauthenticated → 401
@@ -22,18 +25,12 @@ function req(
     token?: string,
     body?: unknown,
 ): Request {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-    };
-    if (token !== undefined) {
-        headers['Authorization'] = 'Bearer ' + token;
-    }
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers,
-        ...(body === undefined
-            ? {}
-            : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 

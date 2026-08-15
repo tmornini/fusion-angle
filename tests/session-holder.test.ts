@@ -69,3 +69,9 @@ test('an empty reachable set has none', async () => {
     assert.equal(sessionHasReachableOrganization(), false);
     deleteSessionToken();
 });
+
+test('unseeded session predicates are false', () => {
+    deleteSessionToken();
+    assert.equal(sessionIsOrganizationScoped(), false);
+    assert.equal(sessionHasReachableOrganization(), false);
+});

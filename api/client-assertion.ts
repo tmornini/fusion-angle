@@ -4,9 +4,8 @@
 // the two registered asymmetric algorithms in broad service
 // use; symmetric algorithms are refused outright so a stolen
 // JWKS can never sign (the classic alg-confusion attack).
-// The one seam left for the server tier is jti replay
-// tracking: every assertion verifies fresh against the
-// registered key, but nothing yet remembers a jti as spent.
+// jti is required (^[A-Za-z0-9_-]+$); replay spend is the
+// grant's job, not this verifier's.
 
 import {
     base64UrlDecode,
@@ -17,7 +16,7 @@ import type {
 } from './types.ts';
 
 export type ClientAssertionResult =
-    | { valid: true }
+    | { valid: true; jti: string; exp: number }
     | { valid: false; reason: string };
 
 function fail(reason: string): ClientAssertionResult {
@@ -85,7 +84,8 @@ function parseJsonSegment(
 // id (the client authenticates as itself); aud must match the
 // client's registered audience — config of record on the
 // client row; exp is REQUIRED and in the future; nbf, when
-// present, must have arrived.
+// present, must have arrived; jti is REQUIRED and
+// ^[A-Za-z0-9_-]+$.
 function claimsFault(
     claims: Record<string, unknown>,
     client: ClientRegistrationEntity,
@@ -116,6 +116,13 @@ function claimsFault(
         if (nowSeconds < nbf) {
             return 'assertion is not yet valid';
         }
+    }
+    const jti = claims['jti'];
+    if (
+        typeof jti !== 'string'
+        || !/^[A-Za-z0-9_-]+$/.test(jti)
+    ) {
+        return 'assertion jti is required';
     }
     return null;
 }
@@ -234,7 +241,11 @@ export async function verifyClientAssertion(
         if (await signatureVerifies(
             jwk, profile, signature, signedData,
         )) {
-            return { valid: true };
+            return {
+                valid: true,
+                jti: claims['jti'] as string,
+                exp: claims['exp'] as number,
+            };
         }
     }
     return fail('assertion signature does not verify');

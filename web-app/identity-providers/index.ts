@@ -4,7 +4,7 @@ import {
 import {
     buildSkeleton, loadInto,
 } from '../app/loading-states.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import { ICON_SIZE, iconArrowLeft } from '../app/icons.ts';
 import {
     sessionContext,

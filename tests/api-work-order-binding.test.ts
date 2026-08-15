@@ -27,6 +27,9 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
 } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // POST work-orders/:id/binding — bind WO ↔ instance.
 // Ladder order is the covenant's (fence → body → instance →
@@ -66,16 +69,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-            ...(extraHeaders ?? {}),
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -104,7 +104,7 @@ async function membershipPair(
             [membershipId], body, SYSTEM_MEMBER_ID,
             organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -185,7 +185,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -201,7 +201,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/flows/' + FLOW_ID + '/work-orders/' + fwoId,
@@ -212,7 +212,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 200);
+    assert.equal(join.status, 201);
 }
 
 async function seedLiveType(
@@ -233,7 +233,7 @@ async function seedLiveType(
             state_event_id: typeId + '-genesis',
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedAttribute(
@@ -251,7 +251,7 @@ async function seedAttribute(
             write_roles: [...DEFAULT_ATTRIBUTE_ACL_ROLES],
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedInstance(
@@ -261,7 +261,7 @@ async function seedInstance(
 ): Promise<void> {
     const path = INSTANCES + '/' + instanceId;
     const put = await handleRequest(db, req(
-        'PUT', path, token, {
+        'PATCH', path, token, {
             set: [
                 {
                     attribute_id: ATTR_ID,
@@ -270,7 +270,7 @@ async function seedInstance(
             ],
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedFlowTypeJoin(
@@ -290,7 +290,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seededDb(): Promise<{
@@ -320,20 +320,19 @@ async function seededDb(): Promise<{
     return { db, token, tokenB };
 }
 
-// 1. foreign-WO bind + malformed body → 403 (fence first)
-test('foreign-WO bind with malformed body → 403'
-+ ' (fence before body)',
+// 1. foreign-WO bind + malformed body → 404 (miss first)
+test('foreign-WO bind with malformed body → 404'
++ ' (miss before body)',
 async () => {
     const { db, tokenB } = await seededDb();
     const res = await handleRequest(db, req(
         'POST', BINDING, tokenB,
         { not_a_key: true },
     ));
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
     assert.deepEqual(await res.json(), {
         error:
-            'forbidden: work_orders/' + WO_ID
-            + ' belongs to a different organization',
+            'Not found: work_orders/' + WO_ID,
     });
 });
 
@@ -426,7 +425,7 @@ async () => {
             state_event_id: typeIdB + '-genesis',
         },
     ));
-    assert.equal(putTypeB.status, 200);
+    assert.equal(putTypeB.status, 201);
     const putAttrB = await handleRequest(db, req(
         'PUT',
         typeB + '/attributes/' + ATTR_ID,
@@ -445,10 +444,10 @@ async () => {
             ],
         },
     ));
-    assert.equal(putAttrB.status, 200);
+    assert.equal(putAttrB.status, 201);
     const foreignInst = 'inst-foreign-b';
     const putInstB = await handleRequest(db, req(
-        'PUT',
+        'PATCH',
         typeB + '/instances/' + foreignInst,
         tokenB,
         {
@@ -460,7 +459,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(putInstB.status, 200);
+    assert.equal(putInstB.status, 201);
     // Bind under org A with the foreign instance id + the
     // org-A joined type — head resolves under fenced org
     // only, so foreign is absent 404 (no oracle).
@@ -501,10 +500,10 @@ async () => {
             ],
         },
     ));
-    assert.equal(attr.status, 200);
+    assert.equal(attr.status, 201);
     const otherInst = 'inst-bind-other';
     const inst = await handleRequest(db, req(
-        'PUT',
+        'PATCH',
         '/organizations/' + ORGANIZATION
         + '/record-types/' + TYPE_OTHER
         + '/instances/' + otherInst,
@@ -518,7 +517,7 @@ async () => {
             ],
         },
     ));
-    assert.equal(inst.status, 200);
+    assert.equal(inst.status, 201);
     const res = await handleRequest(db, req(
         'POST', BINDING, token,
         bindBody(otherInst, TYPE_OTHER),
@@ -539,7 +538,7 @@ async () => {
     const res = await handleRequest(db, req(
         'POST', BINDING, token, bindBody(),
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 
     const detail = await handleRequest(db, req(
         'GET', '/work-orders/' + WO_ID, token,
@@ -584,12 +583,12 @@ async () => {
     const first = await handleRequest(db, req(
         'POST', BINDING, token, bindBody(),
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     const before = await pairCount(db);
     const second = await handleRequest(db, req(
         'POST', BINDING, token, bindBody(),
     ));
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
     assert.equal(await pairCount(db), before);
 });
 
@@ -601,7 +600,7 @@ async () => {
     const first = await handleRequest(db, req(
         'POST', BINDING, token, bindBody(),
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     const res = await handleRequest(db, req(
         'POST', BINDING, token,
         bindBody(INSTANCE_2, TYPE_ID),

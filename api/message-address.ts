@@ -1,5 +1,5 @@
 // Resolves a matched route into the message plane's
-// (uri_prefix, uri_id) address. The route pattern — not
+// (uri_collection, uri_id) address. The route pattern — not
 // string inspection — decides whether the last segment is
 // an individual id: exactly when the pattern's final
 // segment is a :param. The prefix always keeps its trailing
@@ -7,7 +7,7 @@
 // uri_id (a structural key, not an absence sentinel — see
 // the spec's two-table key).
 export interface MessageAddress {
-    readonly uriPrefix: string;
+    readonly uriCollection: string;
     readonly uriId: string;
 }
 
@@ -30,7 +30,7 @@ export function messageAddress(
         ? pathSegments[pathSegments.length - 1]!
         : '';
     return {
-        uriPrefix: '/' + prefixSegments.join('/') + '/',
+        uriCollection: '/' + prefixSegments.join('/') + '/',
         uriId,
     };
 }

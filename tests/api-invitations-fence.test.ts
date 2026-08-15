@@ -27,13 +27,16 @@ import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
-import { canonicalUriPrefix } from '../api/message-pair.ts';
+import { canonicalUriCollection } from '../api/message-pair.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
 import {
     validateMembershipEntity,
 } from '../api/validators.ts';
 import { withoutId } from '../api/document-family.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: memberships on the pair plane.
 async function allMemberships(db: MemoryDbAdapter) {
@@ -46,12 +49,12 @@ async function allMemberships(db: MemoryDbAdapter) {
         at: string;
     }> = [];
     for (const organization of organizations) {
-        const prefix = canonicalUriPrefix(
+        const prefix = canonicalUriCollection(
             organization.id, '/memberships/',
         );
         const [requests, responses] = await Promise.all([
-            db.requests.getAllWhere('uri_prefix', prefix),
-            db.responses.getAllWhere('uri_prefix', prefix),
+            db.requests.getAllWhere('uri_collection', prefix),
+            db.responses.getAllWhere('uri_collection', prefix),
         ]);
         for (const document of deriveDocumentsAt(
             requests, responses, prefix,
@@ -103,7 +106,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -116,13 +119,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -200,7 +202,7 @@ async function person(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMemberDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -224,7 +226,7 @@ async function grantSarahToWayne(
             grantEventId: 'ev-grant',
             grantAt: AT,
         }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     return (await deriveInvitations(db))[0]!.id;
 }
 
@@ -279,7 +281,7 @@ test('a pending invitee is absent from the roster', async () => {
             membershipId: 'ms-sarah', acceptEventId: 'ev-acc',
             acceptAt: AT,
         }));
-    assert.equal(acc.status, 204);
+    assert.equal(acc.status, 201);
     const after = await rosterIds(db);
     assert.ok(after.has('sarah'));
 });
@@ -359,10 +361,10 @@ async () => {
     const tok = await organizationToken('current', '2');
     const r1 = await handleRequest(
         db, req('POST', '/invitations', tok, body));
-    assert.equal(r1.status, 200);
+    assert.equal(r1.status, 201);
     const r2 = await handleRequest(
         db, req('POST', '/invitations', tok, body));
-    assert.equal(r2.status, 200);
+    assert.equal(r2.status, 201);
     assert.equal((await deriveInvitations(db)).length, 1);
     assert.equal(
         (await invitationLifecycleStatesFor(db, 'inv-idem')).length, 1,
@@ -402,11 +404,11 @@ async () => {
     const a1 = await handleRequest(db, req(
         'POST', '/invitations/inv-ai/acceptance',
         sTok, accBody));
-    assert.equal(a1.status, 204);
+    assert.equal(a1.status, 201);
     const a2 = await handleRequest(db, req(
         'POST', '/invitations/inv-ai/acceptance',
         sTok, accBody));
-    assert.equal(a2.status, 204);
+    assert.equal(a2.status, 201);
     assert.equal(
         (await invitationLifecycleStatesFor(db, 'inv-ai')).length, 2,
     );
@@ -445,11 +447,11 @@ async () => {
     const d1 = await handleRequest(db, req(
         'POST', '/invitations/inv-di/decline',
         sTok, decBody));
-    assert.equal(d1.status, 204);
+    assert.equal(d1.status, 201);
     const d2 = await handleRequest(db, req(
         'POST', '/invitations/inv-di/decline',
         sTok, decBody));
-    assert.equal(d2.status, 204);
+    assert.equal(d2.status, 201);
     assert.equal(
         (await invitationLifecycleStatesFor(db, 'inv-di')).length, 2,
     );
@@ -486,11 +488,11 @@ async () => {
     const r1 = await handleRequest(db, req(
         'POST', '/invitations/inv-ri/revocation',
         tok, revBody));
-    assert.equal(r1.status, 204);
+    assert.equal(r1.status, 201);
     const r2 = await handleRequest(db, req(
         'POST', '/invitations/inv-ri/revocation',
         tok, revBody));
-    assert.equal(r2.status, 204);
+    assert.equal(r2.status, 201);
     assert.equal(
         (await invitationLifecycleStatesFor(db, 'inv-ri')).length, 2,
     );
@@ -686,7 +688,7 @@ test('a removed member who re-accepts gets a no-op — not a'
             acceptEventId: 'ev-acc-removed',
             acceptAt: '2026-01-01T00:00:01.000000Z',
         }));
-    assert.equal(accept.status, 204);
+    assert.equal(accept.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', '/memberships/ms-sarah-removed',
         await organizationToken('current', '2')));
@@ -700,7 +702,7 @@ test('a removed member who re-accepts gets a no-op — not a'
             acceptEventId: 'ev-acc-again',
             acceptAt: '2026-01-01T00:00:02.000000Z',
         }));
-    assert.equal(reaccept.status, 204);
+    assert.equal(reaccept.status, 201);
     const sarahInWayne = (await allMemberships(db))
         .filter(m => m.identity_id === 'sarah'
             && m.organization_id === '2');

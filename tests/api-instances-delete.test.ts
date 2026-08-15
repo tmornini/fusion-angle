@@ -41,6 +41,9 @@ import {
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Instance DELETE — tombstone posture (Task 18 / R4 / R9).
 // Absent → missedReadError; live OR already-tombstoned →
@@ -61,7 +64,7 @@ const ATTRS = TYPE_DETAIL + '/attributes';
 const INSTANCES = TYPE_DETAIL + '/instances';
 const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
 // History route is Task 19 — pin only if registered.
-const INSTANCE_HISTORY = INSTANCE_DETAIL + '/history';
+const INSTANCE_HISTORY = INSTANCE_DETAIL + '/versions';
 
 function req(
     method: string,
@@ -70,16 +73,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-            ...(extraHeaders ?? {}),
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -110,7 +110,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -159,7 +159,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function putAttribute(
@@ -171,7 +171,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + '/' + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedWritableTextAttr(
@@ -198,7 +198,7 @@ async function putInstance(
     }[],
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, token,
+        'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
 }
@@ -210,7 +210,7 @@ async function countInstancePairs(
         ORGANIZATION, TYPE_ID,
     );
     const responses = await db.responses.getAllWhere(
-        'uri_prefix', prefix,
+        'uri_collection', prefix,
     );
     return responses.filter(
         (r) => r.uri_id === INSTANCE_ID,
@@ -224,8 +224,8 @@ async function countDeletePairs(
         ORGANIZATION, TYPE_ID,
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     return documentPairsAt(
         requests, responses, prefix,
@@ -236,8 +236,8 @@ async function countDeletePairs(
 }
 
 test('DELETE live instance → 204; then collection omit, '
-+ 'detail 404, PATCH 404, PUT 409, second DELETE appends '
-+ 'tombstone (R4)',
++ 'detail 404, PATCH+pin 404, PATCH no pin 409, second '
++ 'DELETE appends tombstone (R4)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -246,7 +246,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const before = await countInstancePairs(db);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
@@ -292,7 +292,11 @@ async () => {
     const patch = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
-        { [IF_MATCH_HEADER]: '"ghost"' },
+        {
+            [IF_MATCH_HEADER]:
+                '"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"',
+        },
     ));
     assert.equal(patch.status, 404);
     assert.deepEqual(await patch.json(), {
@@ -301,7 +305,7 @@ async () => {
     });
 
     const putAgain = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, memberToken,
+        'PATCH', INSTANCE_DETAIL, memberToken,
         {
             set: [
                 {
@@ -318,7 +322,7 @@ async () => {
     });
 
     // New bytes: different Authorization → not a replay.
-    // R4: append a SECOND tombstone pair.
+    // Already-gone DELETE is 204 and does not append.
     const pairsBeforeSecond = await countInstancePairs(db);
     const deletesBefore = await countDeletePairs(db);
     const del2 = await handleRequest(db, req(
@@ -327,12 +331,12 @@ async () => {
     assert.equal(del2.status, 204);
     assert.equal(
         await countInstancePairs(db),
-        pairsBeforeSecond + 1,
-        'second DELETE appends new tombstone pair',
+        pairsBeforeSecond,
+        'already-gone DELETE does not append',
     );
     assert.equal(
         await countDeletePairs(db),
-        deletesBefore + 1,
+        deletesBefore,
     );
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
@@ -350,8 +354,7 @@ async () => {
     ));
     assert.equal(res.status, 404);
     assert.deepEqual(await res.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
+        error: 'Not found: ' + INSTANCE_DETAIL,
     });
     assert.equal(await countInstancePairs(db), 0);
 });
@@ -396,7 +399,7 @@ async () => {
         write_roles: [],
     });
     const put = await putInstance(db, memberToken, []);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
@@ -413,7 +416,7 @@ async () => {
         await adminDb();
     await putLiveType(db, adminToken);
     const put = await putInstance(db, memberToken, []);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
         undefined,
@@ -439,7 +442,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'live' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const h0 = parseIfMatch(put.headers.get('ETag')!)!;
     const patchBody = {
         set: [
@@ -478,7 +481,7 @@ async () => {
             set: patchBody.set,
             clear: [],
         },
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     // Concurrent DELETE tombstones the address.
     const del = await handleRequest(db, req(

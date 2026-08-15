@@ -2,6 +2,7 @@ import {
     mintAccessToken,
     TOKEN_AUDIENCE,
 } from '../api/access-token.ts';
+import '../web-app/app/adapters/in-page-facade.ts';
 
 // Default membership type for fixture tokens: `current` is
 // the root admin; every other subject is a plain member.

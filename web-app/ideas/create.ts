@@ -5,7 +5,7 @@ import {
 import {
     setHtml,
 } from '../app/safe-html.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
     sessionContext,
     getIdeaEntities,

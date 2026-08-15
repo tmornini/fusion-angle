@@ -59,10 +59,10 @@ test(
         assert.equal(record.name, 'Quarterly Renewals');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
-        // surviving /history.
+        // surviving /versions.
         const history = await GET<{
             state: string;
-        }[]>(db, 'organizations/1/record-types/rec-1/history', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-1/versions', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         const attrs = await GET<unknown[]>(
@@ -103,7 +103,7 @@ test(
         const history = await GET<{
             state: string;
             member_id: string;
-        }[]>(db, 'organizations/1/record-types/rec-2/history', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-2/versions', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         assert.equal(
@@ -163,7 +163,7 @@ test(
             record.description, 'updated',
         );
         const history = await GET<unknown[]>(
-            db, 'organizations/1/record-types/rec-1/history', DEV_TOKEN,
+            db, 'organizations/1/record-types/rec-1/versions', DEV_TOKEN,
         );
         assert.equal(
             history.length, 1,
@@ -518,7 +518,7 @@ test(
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'organizations/1/record-types/rec-at/history', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-at/versions', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
         assert.equal(current.state, 'active');

@@ -13,6 +13,7 @@ import {
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -69,7 +70,7 @@ async function seedMembership(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -97,6 +98,7 @@ function putDefaultOrganization(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
+                'operation-id': TEST_OPERATION_ID,
             },
             body: JSON.stringify(payload),
         });
@@ -117,7 +119,7 @@ test('PUT default-org sets it and GET returns it', async () => {
         db, putDefaultOrganization(
             token, 'current', '1', 'ev-set-1', EVENT_AT,
         ));
-    assert.equal(put.status, 204);
+    assert.equal(put.status, 201);
     const got = await handleRequest(
         db, getDefaultOrganization(token, 'current'));
     assert.equal(got.status, 200);
@@ -205,7 +207,7 @@ test('PUT persists the caller-supplied eventId as the'
         db, putDefaultOrganization(
             token, 'current', '1', 'caller-id-1', EVENT_AT,
         ));
-    assert.equal(put.status, 204);
+    assert.equal(put.status, 201);
     // Phase Final Task 2: row half stripped — pair plane.
     const { deriveDefaultOrganization } = await import(
         '../api/derive-default-organization.ts'
@@ -230,9 +232,9 @@ async () => {
         token, 'current', '1', 'caller-id-2', EVENT_AT,
     );
     const r1 = await handleRequest(db, req1);
-    assert.equal(r1.status, 204);
+    assert.equal(r1.status, 201);
     const r2 = await handleRequest(db, req2);
-    assert.equal(r2.status, 204);
+    assert.equal(r2.status, 201);
     const { deriveDefaultOrganization } = await import(
         '../api/derive-default-organization.ts'
     );

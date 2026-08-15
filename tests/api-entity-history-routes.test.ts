@@ -13,12 +13,16 @@ import {
     STARK_ORGANIZATION,
 } from '../api/mock-data/seed-constants.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
+import { parseIfMatch } from '../api/message-pair.ts';
 import { sharedMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
-// GET <family>/:id/history — Phase A3 of states-URI
+// GET <family>/:id/versions — Phase A3 of states-URI
 // elimination. Per trio family (ideas/projects/records/flows/
 // objectives): document-PUT lifecycle → 200 DESC current-first;
-// foreign → 403 honest family body; absent → 404. Shared
+// foreign miss at this address → 404; absent → 404. Shared
 // handler builder wraps derive*StateHistory (ASC) with DESC +
 // missedReadError. Org-nested facade rides free for one leg.
 
@@ -30,6 +34,7 @@ interface HistoryEvent {
     state: string;
     member_id: string;
     at: string;
+    version?: string;
 }
 
 function req(
@@ -39,17 +44,13 @@ function req(
     body?: unknown,
     headers?: Record<string, string>,
 ): Request {
-    const h: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(headers ?? {}),
-    };
-    if (token !== undefined) {
-        h['Authorization'] = 'Bearer ' + token;
-    }
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: h,
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        headers,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -114,7 +115,7 @@ async function seedIdeaLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 200);
+    assert.equal(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -129,18 +130,124 @@ async function seedIdeaLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 200);
+    assert.equal(t.status, 201);
+}
+
+function versionOf(res: Response): string {
+    const tag = parseIfMatch(res.headers.get('ETag') ?? '');
+    assert.ok(tag !== undefined, 'PUT must advertise ETag');
+    return tag;
 }
 
 test(
-    'GET ideas/:id/history: 200 DESC current-first',
+    'GET ideas/:id/versions 200 DESC; /history 404; '
+    + '/versions/:version serves that revision',
+    async () => {
+        const db = await freshDb();
+        const id = 'idea-versions-1';
+        const genesis = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/ideas/' + id,
+                DEV_TOKEN,
+                ideaBody(
+                    'Hist Idea',
+                    'active',
+                    '2026-03-01T00:00:00.000000Z',
+                    id + '-ev1',
+                ),
+            ),
+        );
+        assert.equal(genesis.status, 201);
+        const v1 = versionOf(genesis);
+        const later = await handleRequest(
+            db,
+            req(
+                'PUT',
+                '/ideas/' + id,
+                DEV_TOKEN,
+                ideaBody(
+                    'Hist Idea Revised',
+                    'in_review',
+                    '2026-03-02T00:00:00.000000Z',
+                    id + '-ev2',
+                ),
+            ),
+        );
+        assert.equal(later.status, 201);
+        const v2 = versionOf(later);
+        assert.notEqual(v1, v2);
+
+        const index = await handleRequest(
+            db,
+            req('GET', '/ideas/' + id + '/versions', DEV_TOKEN),
+        );
+        assert.equal(index.status, 200);
+        const rows = await index.json() as HistoryEvent[];
+        assert.equal(rows.length, 2);
+        assert.equal(rows[0]!.id, id + '-ev2');
+        assert.equal(rows[0]!.state, 'in_review');
+        assert.equal(rows[0]!.version, v2);
+        assert.equal(rows[1]!.id, id + '-ev1');
+        assert.equal(rows[1]!.state, 'active');
+        assert.equal(rows[1]!.version, v1);
+        assertDesc(rows);
+
+        const retired = await handleRequest(
+            db,
+            req('GET', '/ideas/' + id + '/history', DEV_TOKEN),
+        );
+        assert.equal(retired.status, 404);
+
+        const first = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/ideas/' + id + '/versions/' + v1,
+                DEV_TOKEN,
+            ),
+        );
+        assert.equal(first.status, 200);
+        const firstBody = await first.json() as {
+            id: string;
+            title: string;
+            state: string;
+        };
+        assert.equal(firstBody.id, id);
+        assert.equal(firstBody.title, 'Hist Idea');
+        assert.equal(firstBody.state, 'active');
+        assert.equal(versionOf(first), v1);
+
+        const second = await handleRequest(
+            db,
+            req(
+                'GET',
+                '/ideas/' + id + '/versions/' + v2,
+                DEV_TOKEN,
+            ),
+        );
+        assert.equal(second.status, 200);
+        const secondBody = await second.json() as {
+            id: string;
+            title: string;
+            state: string;
+        };
+        assert.equal(secondBody.title, 'Hist Idea Revised');
+        assert.equal(secondBody.state, 'in_review');
+        assert.equal(versionOf(second), v2);
+    },
+);
+
+test(
+    'GET ideas/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
         const id = 'idea-hist-1';
         await seedIdeaLifecycle(db, id, DEV_TOKEN);
         const res = await handleRequest(
             db,
-            req('GET', '/ideas/' + id + '/history', DEV_TOKEN),
+            req('GET', '/ideas/' + id + '/versions', DEV_TOKEN),
         );
         assert.equal(res.status, 200);
         const rows = await res.json() as HistoryEvent[];
@@ -158,7 +265,7 @@ test(
 );
 
 test(
-    'GET ideas/:id/history foreign → 403 honest body',
+    'GET ideas/:id/versions foreign → 404 at this address',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -178,16 +285,15 @@ test(
             db,
             req(
                 'GET',
-                '/ideas/' + foreign.id + '/history',
+                '/ideas/' + foreign.id + '/versions',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 403);
+        assert.equal(res.status, 404);
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'forbidden: ideas/' + foreign.id
-                + ' belongs to a different organization',
+            'Not found: ideas/' + foreign.id,
         );
         assert.equal(
             STARK_ORGANIZATION !== ORGANIZATION_TWO,
@@ -197,7 +303,7 @@ test(
 );
 
 test(
-    'GET ideas/:id/history absent → 404',
+    'GET ideas/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
         const missing = 'no-such-idea';
@@ -205,7 +311,7 @@ test(
             db,
             req(
                 'GET',
-                '/ideas/' + missing + '/history',
+                '/ideas/' + missing + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -219,7 +325,7 @@ test(
 );
 
 test(
-    'org-nested facade /organizations/:org/ideas/:id/history'
+    'org-nested facade /organizations/:org/ideas/:id/versions'
     + ' rides free',
     async () => {
         const db = await freshDb();
@@ -230,7 +336,7 @@ test(
             req(
                 'GET',
                 '/organizations/' + STARK_ORGANIZATION
-                    + '/ideas/' + id + '/history',
+                    + '/ideas/' + id + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -284,7 +390,7 @@ async function seedProjectLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 200);
+    assert.equal(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -299,11 +405,11 @@ async function seedProjectLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 200);
+    assert.equal(t.status, 201);
 }
 
 test(
-    'GET projects/:id/history: 200 DESC current-first',
+    'GET projects/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
         const id = 'project-hist-1';
@@ -312,7 +418,7 @@ test(
             db,
             req(
                 'GET',
-                '/projects/' + id + '/history',
+                '/projects/' + id + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -328,7 +434,7 @@ test(
 );
 
 test(
-    'GET projects/:id/history foreign → 403 honest body',
+    'GET projects/:id/versions foreign → 404 at this address',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -348,22 +454,21 @@ test(
             db,
             req(
                 'GET',
-                '/projects/' + foreign.id + '/history',
+                '/projects/' + foreign.id + '/versions',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 403);
+        assert.equal(res.status, 404);
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'forbidden: projects/' + foreign.id
-                + ' belongs to a different organization',
+            'Not found: projects/' + foreign.id,
         );
     },
 );
 
 test(
-    'GET projects/:id/history absent → 404',
+    'GET projects/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
         const missing = 'no-such-project';
@@ -371,7 +476,7 @@ test(
             db,
             req(
                 'GET',
-                '/projects/' + missing + '/history',
+                '/projects/' + missing + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -421,7 +526,7 @@ async function seedRecordLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 200);
+    assert.equal(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -436,11 +541,11 @@ async function seedRecordLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 200);
+    assert.equal(t.status, 201);
 }
 
 test(
-    'GET nested record-types/:id/history: 200 DESC current-first',
+    'GET nested record-types/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
         const id = 'record-hist-1';
@@ -449,7 +554,7 @@ test(
             db,
             req(
                 'GET',
-                '/organizations/1/record-types/' + id + '/history',
+                '/organizations/1/record-types/' + id + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -465,7 +570,7 @@ test(
 );
 
 test(
-    'GET nested record-types/:id/history foreign → 403 honest body',
+    'GET nested record-types/:id/versions foreign → 404',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -486,22 +591,21 @@ test(
             db,
             req(
                 'GET',
-                '/organizations/1/record-types/' + foreign.id + '/history',
+                '/organizations/1/record-types/' + foreign.id + '/versions',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 403);
+        assert.equal(res.status, 404);
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'forbidden: record_types/' + foreign.id
-                + ' belongs to a different organization',
+            'Not found: record_types/' + foreign.id,
         );
     },
 );
 
 test(
-    'GET nested record-types/:id/history absent → 404',
+    'GET nested record-types/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
         const missing = 'no-such-record';
@@ -509,7 +613,7 @@ test(
             db,
             req(
                 'GET',
-                '/organizations/1/record-types/' + missing + '/history',
+                '/organizations/1/record-types/' + missing + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -570,7 +674,7 @@ async function seedFlowLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 200);
+    assert.equal(g.status, 201);
     const headId = g.headers.get('Response-ID');
     assert.ok(headId !== null);
     const t = await handleRequest(
@@ -585,14 +689,19 @@ async function seedFlowLifecycle(
                 '2026-03-02T00:00:00.000000Z',
                 id + '-ev2',
             ),
-            { 'if-match': '"' + headId! + '"' },
+            { 'if-match': (
+                await handleRequest(
+                    db,
+                    req('GET', '/flows/' + id, token),
+                )
+            ).headers.get('ETag')! },
         ),
     );
-    assert.equal(t.status, 200);
+    assert.equal(t.status, 201);
 }
 
 test(
-    'GET flows/:id/history: 200 DESC current-first',
+    'GET flows/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
         const id = 'flow-hist-1';
@@ -601,7 +710,7 @@ test(
             db,
             req(
                 'GET',
-                '/flows/' + id + '/history',
+                '/flows/' + id + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -617,7 +726,7 @@ test(
 );
 
 test(
-    'GET flows/:id/history foreign → 403 honest body',
+    'GET flows/:id/versions foreign → 404 at this address',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -637,22 +746,21 @@ test(
             db,
             req(
                 'GET',
-                '/flows/' + foreign.id + '/history',
+                '/flows/' + foreign.id + '/versions',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 403);
+        assert.equal(res.status, 404);
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'forbidden: flows/' + foreign.id
-                + ' belongs to a different organization',
+            'Not found: flows/' + foreign.id,
         );
     },
 );
 
 test(
-    'GET flows/:id/history absent → 404',
+    'GET flows/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
         const missing = 'no-such-flow';
@@ -660,7 +768,7 @@ test(
             db,
             req(
                 'GET',
-                '/flows/' + missing + '/history',
+                '/flows/' + missing + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -706,7 +814,7 @@ async function seedObjectiveLifecycle(
             ),
         ),
     );
-    assert.equal(g.status, 200);
+    assert.equal(g.status, 201);
     const t = await handleRequest(
         db,
         req(
@@ -720,11 +828,11 @@ async function seedObjectiveLifecycle(
             ),
         ),
     );
-    assert.equal(t.status, 200);
+    assert.equal(t.status, 201);
 }
 
 test(
-    'GET objectives/:id/history: 200 DESC current-first',
+    'GET objectives/:id/versions: 200 DESC current-first',
     async () => {
         const db = await freshDb();
         const id = 'objective-hist-1';
@@ -733,7 +841,7 @@ test(
             db,
             req(
                 'GET',
-                '/objectives/' + id + '/history',
+                '/objectives/' + id + '/versions',
                 DEV_TOKEN,
             ),
         );
@@ -749,7 +857,7 @@ test(
 );
 
 test(
-    'GET objectives/:id/history foreign → 403 honest body',
+    'GET objectives/:id/versions foreign → 404 at this address',
     async () => {
         const db = await sharedMockDb();
         const list = await handleRequest(
@@ -769,22 +877,21 @@ test(
             db,
             req(
                 'GET',
-                '/objectives/' + foreign.id + '/history',
+                '/objectives/' + foreign.id + '/versions',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(res.status, 403);
+        assert.equal(res.status, 404);
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'forbidden: objectives/' + foreign.id
-                + ' belongs to a different organization',
+            'Not found: objectives/' + foreign.id,
         );
     },
 );
 
 test(
-    'GET objectives/:id/history absent → 404',
+    'GET objectives/:id/versions absent → 404',
     async () => {
         const db = await freshDb();
         const missing = 'no-such-objective';
@@ -792,7 +899,7 @@ test(
             db,
             req(
                 'GET',
-                '/objectives/' + missing + '/history',
+                '/objectives/' + missing + '/versions',
                 DEV_TOKEN,
             ),
         );

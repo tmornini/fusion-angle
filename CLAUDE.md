@@ -234,8 +234,9 @@ is HTTP-only.
   with organization, live memberships, and roles from the
   VERIFIED token claim (never the path); handlers receive
   `ctx.base` — there is no `organizationScopedAdapter`.
-  Surviving stores are global; tenancy rides `uri_prefix`.
-  A flat (un-exchanged) token resolves its org via
+  Surviving stores are global; tenancy rides
+  `uri_collection`. A flat (un-exchanged) token
+  resolves its org via
   `identityDefaultOrganization`: the identity's SET default
   org (pair-plane `/identities/:id/default-org/` ledger,
   latest wins), else its PRIMARY membership org, else a

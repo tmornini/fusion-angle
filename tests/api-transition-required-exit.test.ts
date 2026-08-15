@@ -27,6 +27,9 @@ import {
     DEFAULT_LOCK_TIMEOUT,
     nowUtc,
 } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // POST work-orders/:id/transition — W10 required-at-exit
 // gate (Task 9). Gate tier only: every transition leaving
@@ -68,16 +71,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-            ...(extraHeaders ?? {}),
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -106,7 +106,7 @@ async function membershipPair(
             [membershipId], body, SYSTEM_MEMBER_ID,
             organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -296,7 +296,7 @@ async function seedFlow(
             },
         },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 }
 
 async function seedWorkOrder(
@@ -313,7 +313,7 @@ async function seedWorkOrder(
             position: 1,
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
         '/flows/' + FLOW_ID + '/work-orders/' + fwoId,
@@ -324,7 +324,7 @@ async function seedWorkOrder(
             at: AT,
         },
     ));
-    assert.equal(join.status, 200);
+    assert.equal(join.status, 201);
 }
 
 async function seedLiveType(
@@ -341,7 +341,7 @@ async function seedLiveType(
             state_event_id: TYPE_ID + '-genesis',
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedAttribute(
@@ -353,7 +353,7 @@ async function seedAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + '/' + attrId, token, body,
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedWritableText(
@@ -380,10 +380,10 @@ async function seedInstance(
     }[] = [],
 ): Promise<string> {
     const put = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, token,
+        'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     return put.headers.get('ETag')!;
 }
 
@@ -402,7 +402,7 @@ async function seedFlowTypeJoin(
             at: AT,
         },
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function bindInstance(
@@ -419,7 +419,7 @@ async function bindInstance(
             record_type_id: TYPE_ID,
         },
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 }
 
 // Place the WO on n-step by leaving n-create (no required).
@@ -435,7 +435,7 @@ async function placeOnStep(
         token,
         pureMoveBody(eventId, 'n-step'),
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 }
 
 async function baseSeed(): Promise<{
@@ -504,7 +504,7 @@ test(
             'POST', TRANSITION, adminToken,
             pureMoveBody('te-ok', 'n-target'),
         ));
-        assert.equal(res.status, 204);
+        assert.equal(res.status, 201);
     },
 );
 
@@ -566,7 +566,7 @@ test(
             }),
             { [IF_MATCH_HEADER]: etag },
         ));
-        assert.equal(res.status, 204);
+        assert.equal(res.status, 201);
     },
 );
 
@@ -626,7 +626,7 @@ test(
             'POST', TRANSITION_FREE, adminToken,
             pureMoveBody('te-free', 'n-free'),
         ));
-        assert.equal(res.status, 204);
+        assert.equal(res.status, 201);
     },
 );
 

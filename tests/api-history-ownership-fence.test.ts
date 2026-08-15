@@ -13,13 +13,17 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
-// Family-history ownership fence. Own-org history is 200 with
-// the document-trio genesis; foreign ownership is 403 with an
-// honest body. Full per-family fence coverage lives in
-// api-entity-history-routes.test.ts. Per-family write-
-// write authorizer pins live in api-write-authorizer.
-// Unknown-route 404 (writes-nothing) lives in api.test.ts.
+// Family-history ownership fence. Own-org history is 200
+// with the document-trio genesis; a miss at this address
+// is 404. 403 only when this address has a live PUT the
+// caller may not have. Full per-family coverage lives in
+// api-entity-history-routes.test.ts. Write-authorizer
+// pins live in api-write-authorizer. Unknown-route 404
+// lives in api.test.ts.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -30,13 +34,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -67,7 +70,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -103,14 +106,14 @@ async function seed(): Promise<{
             state_event_id: 'idea-a-genesis',
         },
     ));
-    assert.equal(idea.status, 200);
+    assert.equal(idea.status, 201);
     return { db, token };
 }
 
-test('GET /ideas/:id/history is 200', async () => {
+test('GET /ideas/:id/versions is 200', async () => {
     const { db, token } = await seed();
     const res = await handleRequest(db, req(
-        'GET', '/ideas/idea-a/history', token,
+        'GET', '/ideas/idea-a/versions', token,
     ));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
@@ -120,8 +123,8 @@ test('GET /ideas/:id/history is 200', async () => {
     );
 });
 
-test('GET /ideas/:id/history fences foreign ownership'
-+ ' (403 with forbidden body)',
+test('GET /ideas/:id/versions foreign miss is 404'
++ ' at this address',
 async () => {
     const { db, token } = await seed();
     await seedOrganizationDocument(db, 'B', 'Beta');
@@ -146,17 +149,15 @@ async () => {
             state_event_id: 'idea-b-genesis',
         },
     ));
-    assert.equal(foreignIdea.status, 200);
+    assert.equal(foreignIdea.status, 201);
     const res = await handleRequest(db, req(
-        'GET', '/ideas/idea-b/history', token,
+        'GET', '/ideas/idea-b/versions', token,
     ));
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
     assert.deepEqual(
         await res.json(),
         {
-            error:
-                'forbidden: ideas/idea-b belongs to'
-                + ' a different organization',
+            error: 'Not found: ideas/idea-b',
         },
     );
 });

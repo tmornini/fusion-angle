@@ -7,6 +7,9 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Pins deliberate verb gaps on nested record-types so Task 9's
 // composed POST cannot silently inherit an accidental handler.
@@ -15,7 +18,7 @@ import { seedAdminSchema } from './test-fixtures.ts';
 const BASE = 'http://localhost';
 const COLLECTION = '/organizations/1/record-types';
 const DETAIL = COLLECTION + '/rt-1';
-const HISTORY = DETAIL + '/history';
+const HISTORY = DETAIL + '/versions';
 
 function req(
     method: string,
@@ -23,14 +26,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -70,7 +71,7 @@ test('POST .../record-types/:id 405s (no post handler '
     assert.equal(res.status, 405);
 });
 
-test('PUT .../record-types/:id/history 405s (no put '
+test('PUT .../record-types/:id/versions 405s (no put '
 + 'handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -80,7 +81,7 @@ test('PUT .../record-types/:id/history 405s (no put '
     assert.equal(res.status, 405);
 });
 
-test('POST .../record-types/:id/history 405s (no post '
+test('POST .../record-types/:id/versions 405s (no post '
 + 'handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -90,7 +91,7 @@ test('POST .../record-types/:id/history 405s (no post '
     assert.equal(res.status, 405);
 });
 
-test('DELETE .../record-types/:id/history 405s (no '
+test('DELETE .../record-types/:id/versions 405s (no '
 + 'delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();

@@ -21,6 +21,9 @@ import {
 } from '../api/family-registry.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Task 2 (Decision 7's trio fold, the fifth family): PUT
 // records/:id becomes a document PUT — the entity's own fields
@@ -43,13 +46,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -151,7 +153,7 @@ async () => {
         requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     const written = await postRecordDocumentOp(
         db, 'rec-1', body, 'current', pair,
@@ -197,7 +199,7 @@ async () => {
         requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
         db, 'rec-2', firstBody, 'current', firstPair,
@@ -237,7 +239,7 @@ test('postRecordDocumentOp with a fresh trio posts a'
         requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
         db, 'rec-3', firstBody, 'current', firstPair,
@@ -259,7 +261,7 @@ test('postRecordDocumentOp with a fresh trio posts a'
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: firstPair.id,
+        operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
         db, 'rec-3', secondBody, 'current', secondPair,
@@ -342,27 +344,28 @@ async function storedPairAt(
         organization: '1',
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     return {
         request: {
             id: pair.id,
-            uri_prefix: pair.uriPrefix,
+            uri_collection: pair.uriCollection,
             uri_id: pair.uriId,
             at,
             requester_identity_id: pair.requesterIdentityId,
             message_hash: pair.requestHash,
             message: pair.requestMessage,
+            method: pair.method,
+            operation_id: pair.operationId,
         },
         response: {
             id: pair.id,
-            uri_prefix: pair.uriPrefix,
+            uri_collection: pair.uriCollection,
             uri_id: pair.uriId,
             at,
-            status: pair.responseStatus,
-            etag: pair.responseEtag,
-            message_hash: pair.responseHash,
+            version: pair.responseEtag,
             message: pair.responseMessage,
+            operation_id: pair.operationId,
         },
     };
 }

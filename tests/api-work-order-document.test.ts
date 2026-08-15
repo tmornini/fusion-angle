@@ -21,11 +21,11 @@ import {
 } from '../api/validators.ts';
 import { postWorkOrderDocumentOp } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Phase 5 Task 2 (fourth-family, 'stateless' evidence): PUT
 // /work-orders/:id takes the entity's OWN fields only — no
@@ -149,7 +149,7 @@ test('postWorkOrderDocumentOp returns the entity and the'
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     const written = await postWorkOrderDocumentOp(
         db, 'wo-doc-op-1', body, 'current', pair,
@@ -202,13 +202,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`http://localhost${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -263,7 +262,7 @@ function workOrderCreateBody(
     };
 }
 
-// Decode a stored request row's canonical message back into
+// Decode a stored request row's serializeWire message back into
 // its method + body — the SAME decode
 // tests/api-flow-document.test.ts's own decodeRequestMessage
 // performs, reconstructed here read-only (each test file is
@@ -272,7 +271,7 @@ function decodeRequestMessage(message: string): {
     readonly method: string;
     readonly body: Record<string, unknown>;
 } {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     if (model.startLine.kind !== 'request') {
         throw new Error(
             'stored message carries no request line',
@@ -299,7 +298,7 @@ function documentRowAt(
     excludeId?: string,
 ): RequestEntity | undefined {
     return requests.find(
-        r => r.uri_prefix === prefix
+        r => r.uri_collection === prefix
             && r.uri_id === uriId
             && r.id !== excludeId
             && decodeRequestMessage(r.message).method === 'PUT',
@@ -316,7 +315,7 @@ test('a work-order create appends a PUT-shaped document pair'
         'POST', '/work-orders', DEV_TOKEN,
         workOrderCreateBody('wo-c1', 'wo-c1-fwo', 'flow-c1'),
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, 5);
@@ -355,7 +354,7 @@ async () => {
         'POST', '/work-orders', DEV_TOKEN,
         workOrderCreateBody('wo-c2', 'wo-c2-fwo-a', 'flow-c2'),
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     const firstDocumentRow = documentRowAt(
         await db.requests.getAll(), ENTITY_PREFIX, 'wo-c2',
     );
@@ -370,7 +369,7 @@ async () => {
             'wo-c2', 'wo-c2-fwo-b', 'flow-c2', 'wo-c2-revised',
         ),
     ));
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
     const secondDocumentRow = documentRowAt(
         await db.requests.getAll(), ENTITY_PREFIX, 'wo-c2',
         firstDocumentId,
@@ -380,23 +379,22 @@ async () => {
         secondDocumentRow!.id,
     );
     assert.equal(
-        secondDocumentResponse.supersedes, firstDocumentId,
+        'supersedes' in secondDocumentResponse, false,
     );
 
     for (const response of await db.responses.getAll()) {
-        assert.equal(response.follows, undefined);
+        assert.equal('follows' in response, false);
     }
 });
 
 test('a duplicate work-order create\'s own OPERATION pair'
-+ ' also records Supersedes == the first DOCUMENT pair\'s'
-+ ' id', async () => {
++ ' stores no predecessor column', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
         'POST', '/work-orders', DEV_TOKEN,
         workOrderCreateBody('wo-c3', 'wo-c3-fwo-a', 'flow-c3'),
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     const firstDocumentRow = documentRowAt(
         await db.requests.getAll(), ENTITY_PREFIX, 'wo-c3',
     );
@@ -407,14 +405,14 @@ test('a duplicate work-order create\'s own OPERATION pair'
         'POST', '/work-orders', DEV_TOKEN,
         workOrderCreateBody('wo-c3', 'wo-c3-fwo-b', 'flow-c3'),
     ));
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
     const secondOperationId = second.headers.get('Response-ID');
     assert.ok(secondOperationId);
     const secondOperationResponse = await db.responses.getById(
         secondOperationId!,
     );
     assert.equal(
-        secondOperationResponse.supersedes, firstDocumentId,
+        'supersedes' in secondOperationResponse, false,
     );
 });
 
@@ -431,7 +429,7 @@ test('a work-order create ignores a raw colliding states'
             'wo-c4-survives', flowWorkOrderId, 'flow-c4',
         ),
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     // 2 seed pairs (org+membership) + 3 create pairs.
     assert.equal((await db.requests.getAll()).length, 5);
     assert.equal((await db.responses.getAll()).length, 5);

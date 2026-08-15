@@ -13,6 +13,7 @@ import {
     assertMemberState,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
+import { withLifecycleTrio } from './shared.ts';
 import { getMemberPii } from './identities.ts';
 import {
     generateCryptoSafeBase62,
@@ -174,7 +175,7 @@ export async function getHumanMember(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMember> {
-    const [parent, detail, pii] =
+    const [parentRaw, detail, pii] =
         await Promise.all([
             ctx.GET<MemberEntity>(`members/${id}`),
             ctx.GET<HumanMemberEntity>(
@@ -182,6 +183,9 @@ export async function getHumanMember(
             ),
             getMemberPii(ctx, id),
         ]);
+    const parent = await withLifecycleTrio(
+        ctx, 'members', parentRaw,
+    );
     return new HumanMember(
         parent, detail, pii,
         memberStateDetailFromRow(parent),

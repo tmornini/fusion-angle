@@ -5,7 +5,8 @@ import type {
     ProjectObjectiveActualScoreEntity,
 } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { canonicalUriCollection } from './message-pair.ts';
+import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
@@ -43,19 +44,14 @@ function scoresUriPrefix(
     projectId: Id,
     segment: string,
 ): string {
-    return canonicalUriPrefix(
+    return canonicalUriCollection(
         organization, '/projects/' + projectId + '/' + segment + '/',
     );
 }
 
-// The shared five-field shape both ProjectObjectiveBaselineScore
-// Entity and ProjectObjectiveActualScoreEntity carry — a true
-// byte-twin, picked explicitly (pickString/pickNumber) rather
-// than a body spread, id FIRST, the seven-sibling entityOf
-// convention: a leaked operation-pair body reaching this
-// construction would throw loudly (the method-filter's defense-
-// in-depth) rather than silently mis-derive.
-function scoreEntityOf(document: DerivedDocument): {
+// G6: GET derive is the stored PUT. Shared five-field
+// shape (baseline and actual are byte-twins), id FIRST.
+export function scoreEntityOf(document: DerivedDocument): {
     id: Id;
     project_id: Id;
     objective_id: Id;
@@ -63,7 +59,7 @@ function scoreEntityOf(document: DerivedDocument): {
     member_id: Id;
     at: string;
 } {
-    const body = document.body;
+    const body = withoutId(document.body);
     return {
         id: document.uriId,
         project_id: pickString(body, 'project_id'),
@@ -82,8 +78,8 @@ async function fetchScoreDocuments(
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = scoresUriPrefix(organization, projectId, segment);
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     return deriveDocumentsAt(requests, responses, prefix);
 }

@@ -25,7 +25,8 @@ test('a 401 through a verb is an UnauthorizedError', async () => {
             assert.ok(err instanceof UnauthorizedError);
             assert.ok(err instanceof Error);
             assert.match(
-                (err as UnauthorizedError).reason, /expired/);
+                (err as UnauthorizedError).reason,
+                /invalid_token/);
             return true;
         });
 });

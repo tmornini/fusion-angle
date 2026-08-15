@@ -13,6 +13,7 @@ import {
     type MessagePair,
 } from '../api/message-pair.ts';
 import { deriveOrganizations } from '../api/derive-organizations.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // Below-facade pair formation for the membership write below:
 // every row rides the SAME exported api/routes.ts op a live PUT
@@ -89,7 +90,7 @@ export async function seedOrganizationDocument(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         // Phase Final Task 2: organizations ROW half stripped.
@@ -127,7 +128,7 @@ async function membershipDocumentPair(
             [membershipId], body, SYSTEM_MEMBER_ID,
             ROOT_ADMIN_ORGANIZATION,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 

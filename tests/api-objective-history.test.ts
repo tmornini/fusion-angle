@@ -12,8 +12,11 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
-// GET objectives/history — Phase A5 collection history.
+// GET objectives/versions — Phase A5 collection history.
 // Org-prefix scoped bulk StateEntity rows (no field_values),
 // (at, id) DESC overall. Always 200 array. Route order is
 // load-bearing: literal `history` must win over
@@ -35,16 +38,12 @@ function req(
     token?: string,
     body?: unknown,
 ): Request {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-    };
-    if (token !== undefined) {
-        headers['Authorization'] = 'Bearer ' + token;
-    }
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers,
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -80,11 +79,11 @@ async function putObjective(
             ),
         ),
     );
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
 }
 
 test(
-    'GET objectives/history: archive/reactivate/re-archive'
+    'GET objectives/versions: archive/reactivate/re-archive'
     + ' keeps both archived events; (at, id) DESC',
     async () => {
         const db = memoryDbAdapter();
@@ -110,7 +109,7 @@ test(
 
         const res = await handleRequest(
             db,
-            req('GET', '/objectives/history', DEV_TOKEN),
+            req('GET', '/objectives/versions', DEV_TOKEN),
         );
         assert.equal(res.status, 200);
         const rows = await res.json() as HistoryEvent[];
@@ -147,7 +146,7 @@ test(
 );
 
 test(
-    'GET objectives/history: literal history wins over'
+    'GET objectives/versions: literal history wins over'
     + ' :id; real id still resolves entity; empty → 200 []',
     async () => {
         const db = memoryDbAdapter();
@@ -160,7 +159,7 @@ test(
 
         const collection = await handleRequest(
             db,
-            req('GET', '/objectives/history', DEV_TOKEN),
+            req('GET', '/objectives/versions', DEV_TOKEN),
         );
         assert.equal(collection.status, 200);
         const rows =
@@ -193,7 +192,7 @@ test(
         await seedAdminSchema(emptyDb);
         const empty = await handleRequest(
             emptyDb,
-            req('GET', '/objectives/history', DEV_TOKEN),
+            req('GET', '/objectives/versions', DEV_TOKEN),
         );
         assert.equal(empty.status, 200);
         assert.deepEqual(await empty.json(), []);
@@ -201,7 +200,7 @@ test(
 );
 
 test(
-    'GET objectives/history org isolation: org B rows'
+    'GET objectives/versions org isolation: org B rows'
     + ' absent',
     async () => {
         const db = await seededMockDb();
@@ -223,7 +222,7 @@ test(
 
         const starkRes = await handleRequest(
             db,
-            req('GET', '/objectives/history', DEV_TOKEN),
+            req('GET', '/objectives/versions', DEV_TOKEN),
         );
         assert.equal(starkRes.status, 200);
         const starkRows =
@@ -236,7 +235,7 @@ test(
 
         const twoRes = await handleRequest(
             db,
-            req('GET', '/objectives/history', tokenTwo),
+            req('GET', '/objectives/versions', tokenTwo),
         );
         assert.equal(twoRes.status, 200);
         const twoRows =

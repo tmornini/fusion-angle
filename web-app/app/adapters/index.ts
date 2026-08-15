@@ -9,7 +9,7 @@ export {
 } from '../../../api/db.ts';
 export {
     UnauthorizedError,
-} from '../../../api/api.ts';
+} from '../../../api/http-errors.ts';
 export * from './shared.ts';
 export * from './dashboard.ts';
 export * from './ideas.ts';

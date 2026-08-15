@@ -69,6 +69,7 @@ import {
 } from './provider-models.ts';
 import { extractErrorMessage } from '../shared/error-helpers.ts';
 import { ValidationError } from './types.ts';
+import { HEX64 } from './message-form.ts';
 
 export function parseOrThrow(
     raw: string,
@@ -543,8 +544,8 @@ export function pickStringNumberRecord(
 // yields undefined, so the caller omits the property from
 // the validated result (key absence models "none"); a
 // PRESENT `null` is the Sin of Null and is rejected outright.
-// An empty string is likewise rejected — non-empty per the
-// follows/supersedes spec these fields serve.
+// An empty string is likewise rejected — presence of the
+// key demands a non-empty string.
 export function pickOptionalString(
     body: Record<string, unknown>,
     key: string,
@@ -673,11 +674,9 @@ export function validateEnumField<E extends string>(
 // here because each shape must be
 // enumerated case-by-case.
 
-// `optional` names keys that MAY appear but need not — the
-// follows/supersedes shape (absent is the only valid "none",
-// so they are never in `expected`). Every existing caller
-// omits the 4th argument, so the accepted set collapses to
-// `expected` and behavior is unchanged for them.
+// `optional` names keys that MAY appear but need not.
+// Every existing caller omits the 4th argument, so the
+// accepted set collapses to `expected`.
 export function assertOnlyKeys(
     body: Record<string, unknown>,
     expected: readonly string[],
@@ -2276,14 +2275,18 @@ export function validateActualScoreEntity(
 
 // The two message-plane ledgers (Phase 0 of the
 // message-as-state migration): one row per stored HTTP
-// request/response. `message_hash` is the sha256 digest
-// (`shared/digest.ts` sha256Hex) of `message`, hex-encoded
-// lowercase.
+// request/response. Request `message_hash` is the sha256
+// digest (`shared/digest.ts` sha256Hex) of `message`,
+// hex-encoded lowercase. The response row has no hash
+// column and no status column.
 const MESSAGE_HASH = /^[0-9a-f]{64}$/;
 
+const HTTP_METHOD = /^[A-Z]+$/;
+const OPERATION_ID = /^[0-9A-Za-z]{22}$/;
+
 const REQUEST_BODY_KEYS: readonly string[] = [
-    'uri_prefix', 'uri_id', 'at', 'requester_identity_id',
-    'message_hash', 'message',
+    'uri_collection', 'uri_id', 'at', 'requester_identity_id',
+    'message_hash', 'message', 'method', 'operation_id',
 ];
 
 export function validateRequestEntity(
@@ -2292,10 +2295,10 @@ export function validateRequestEntity(
     assertOnlyKeys(
         body, REQUEST_BODY_KEYS, 'RequestEntity',
     );
-    const uriPrefix = pickString(body, 'uri_prefix');
-    if (!uriPrefix.endsWith('/')) {
+    const uriCollection = pickString(body, 'uri_collection');
+    if (!uriCollection.endsWith('/')) {
         throw new ValidationError(
-            'RequestEntity.uri_prefix must end with "/"',
+            'RequestEntity.uri_collection must end with "/"',
         );
     }
     const messageHash = pickString(body, 'message_hash');
@@ -2308,8 +2311,21 @@ export function validateRequestEntity(
     const at = validateTimestampField(
         body, 'at', 'RequestEntity',
     );
+    const method = pickString(body, 'method');
+    if (!HTTP_METHOD.test(method)) {
+        throw new ValidationError(
+            'RequestEntity.method must match ^[A-Z]+$',
+        );
+    }
+    const operationId = pickString(body, 'operation_id');
+    if (!OPERATION_ID.test(operationId)) {
+        throw new ValidationError(
+            'RequestEntity.operation_id must be a 22-'
+            + 'character id',
+        );
+    }
     return {
-        uri_prefix: uriPrefix,
+        uri_collection: uriCollection,
         uri_id: pickString(body, 'uri_id'),
         at,
         requester_identity_id: pickString(
@@ -2317,20 +2333,14 @@ export function validateRequestEntity(
         ),
         message_hash: messageHash,
         message: pickString(body, 'message'),
+        method,
+        operation_id: operationId,
     };
 }
 
 const RESPONSE_BODY_KEYS: readonly string[] = [
-    'uri_prefix', 'uri_id', 'at', 'status', 'etag',
-    'message_hash', 'message',
-];
-
-// follows/supersedes are the only optional keys in the
-// codebase: present only when the write had a predecessor.
-// assertOnlyKeys's 4th argument admits them without requiring
-// them — absence is the sole valid "none" (Sin of Null).
-const RESPONSE_OPTIONAL_BODY_KEYS: readonly string[] = [
-    'follows', 'supersedes',
+    'uri_collection', 'uri_id', 'at', 'version',
+    'message', 'operation_id',
 ];
 
 export function validateResponseEntity(
@@ -2338,51 +2348,37 @@ export function validateResponseEntity(
 ): Omit<ResponseEntity, 'id'> {
     assertOnlyKeys(
         body, RESPONSE_BODY_KEYS, 'ResponseEntity',
-        RESPONSE_OPTIONAL_BODY_KEYS,
     );
-    const uriPrefix = pickString(body, 'uri_prefix');
-    if (!uriPrefix.endsWith('/')) {
+    const uriCollection = pickString(body, 'uri_collection');
+    if (!uriCollection.endsWith('/')) {
         throw new ValidationError(
-            'ResponseEntity.uri_prefix must end with "/"',
+            'ResponseEntity.uri_collection must end with "/"',
         );
     }
-    const status = pickNumber(body, 'status');
-    if (
-        !Number.isInteger(status)
-        || status < 100 || status > 599
-    ) {
+    const version = pickString(body, 'version');
+    if (!HEX64.test(version)) {
         throw new ValidationError(
-            'ResponseEntity.status must be an integer in'
-            + ' 100..599',
-        );
-    }
-    const messageHash = pickString(body, 'message_hash');
-    if (!MESSAGE_HASH.test(messageHash)) {
-        throw new ValidationError(
-            'ResponseEntity.message_hash must be a 64-'
-            + 'character lowercase hex sha256 digest',
+            'ResponseEntity.version must be a 64-'
+            + 'character lowercase hex digest',
         );
     }
     const at = validateTimestampField(
         body, 'at', 'ResponseEntity',
     );
-    const follows = pickOptionalString(
-        body, 'follows', 'ResponseEntity',
-    );
-    const supersedes = pickOptionalString(
-        body, 'supersedes', 'ResponseEntity',
-    );
+    const operationId = pickString(body, 'operation_id');
+    if (!OPERATION_ID.test(operationId)) {
+        throw new ValidationError(
+            'ResponseEntity.operation_id must be a 22-'
+            + 'character id',
+        );
+    }
     return {
-        uri_prefix: uriPrefix,
+        uri_collection: uriCollection,
         uri_id: pickString(body, 'uri_id'),
         at,
-        status,
-        etag: pickString(body, 'etag'),
-        message_hash: messageHash,
+        version,
         message: pickString(body, 'message'),
-        ...(follows !== undefined ? { follows } : {}),
-        ...(supersedes !== undefined
-            ? { supersedes } : {}),
+        operation_id: operationId,
     };
 }
 
@@ -2398,7 +2394,9 @@ export function validateStateEntity(
 ): Omit<StateEntity, 'id'> {
     assertOnlyKeys(
         body, STATE_ENTITY_KEYS, 'StateEntity',
+        ['version'],
     );
+    const version = body['version'];
     return {
         entity_id: pickString(
             body, 'entity_id',
@@ -2410,6 +2408,9 @@ export function validateStateEntity(
         at: validateTimestampField(
             body, 'at', 'StateEntity',
         ),
+        ...(typeof version === 'string'
+            ? { version }
+            : {}),
     };
 }
 
@@ -2480,11 +2481,11 @@ export interface RecordDocumentBody {
 // gate is the sole entity-shape check for the document PUT
 // (validateRecordEntity REQUIRES organization_id, which this
 // body never carries pre-stamp). Name non-empty re-homes here.
-// Instance PUT genesis body (Task 15 create-only). Wire
-// carries exactly {set}; clear is PATCH-only (Task 17).
-// Empty string values rejected at the body gate (G9);
-// type/constraint conformance is validateInstanceValues
-// after ACL.
+// Instance PATCH create body (Task 20). Wire carries
+// exactly {set}; [] legal. clear is update-only — on
+// create it is an unexpected key. Empty string values
+// rejected at the body gate (G9); type/constraint
+// conformance is validateInstanceValues after ACL.
 export interface InstancePutBody {
     readonly set: {
         readonly attribute_id: string;

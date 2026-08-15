@@ -3,7 +3,7 @@ import {
     bindEnterToClick,
 } from '../app/dom.ts';
 import { showToast } from '../app/toast.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
     sessionContext,
     getRecordEntities,

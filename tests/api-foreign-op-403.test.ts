@@ -22,11 +22,13 @@ import { SYSTEM_MEMBER_ID, nowUtc } from '../api/types.ts';
 import {
     generateCryptoSafeBase62,
 } from '../shared/crypto-safe-base62.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
-// New foreign-op 403 pins (HTTP status covenant): work-order
-// claim/release and flow undo were untested for foreign-org
-// callers. The write authorizer never covers these POSTs; the miss
-// path probe is the only guard.
+// Foreign-op miss pins: work-order claim/release/transition
+// and flow undo. The write authorizer never covers these
+// POSTs; a miss at this address is 404.
 
 const BASE = 'http://localhost';
 const ORGANIZATION_A = '1';
@@ -40,14 +42,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-            ...extraHeaders,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -76,7 +77,7 @@ async function membershipPair(
             [membershipId], body, SYSTEM_MEMBER_ID,
             organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -108,7 +109,7 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-test('foreign-org work-order claim is 403', async () => {
+test('foreign-org work-order claim is 404', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'current', ORGANIZATION_A,
@@ -123,7 +124,7 @@ test('foreign-org work-order claim is 403', async () => {
             position: 1,
         },
     ));
-    assert.equal(created.status, 200);
+    assert.equal(created.status, 201);
 
     const claimAt = nowUtc();
     const foreign = await handleRequest(db, req(
@@ -134,15 +135,14 @@ test('foreign-org work-order claim is 403', async () => {
             expireAt: claimAt,
         },
     ));
-    assert.equal(foreign.status, 403);
+    assert.equal(foreign.status, 404);
     assert.deepEqual(await foreign.json(), {
         error:
-            'forbidden: work_orders/wo-foreign-claim belongs'
-            + ' to a different organization',
+            'Not found: work_orders/wo-foreign-claim',
     });
 });
 
-test('foreign-org work-order release is 403', async () => {
+test('foreign-org work-order release is 404', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'current', ORGANIZATION_A,
@@ -157,7 +157,7 @@ test('foreign-org work-order release is 403', async () => {
             position: 2,
         },
     ));
-    assert.equal(created.status, 200);
+    assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'POST', '/work-orders/wo-foreign-rel/release', tokenB, {
@@ -165,15 +165,14 @@ test('foreign-org work-order release is 403', async () => {
             releaseAt: nowUtc(),
         },
     ));
-    assert.equal(foreign.status, 403);
+    assert.equal(foreign.status, 404);
     assert.deepEqual(await foreign.json(), {
         error:
-            'forbidden: work_orders/wo-foreign-rel belongs'
-            + ' to a different organization',
+            'Not found: work_orders/wo-foreign-rel',
     });
 });
 
-test('foreign-org work-order transition is 403', async () => {
+test('foreign-org work-order transition is 404', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'current', ORGANIZATION_A,
@@ -188,7 +187,7 @@ test('foreign-org work-order transition is 403', async () => {
             position: 3,
         },
     ));
-    assert.equal(created.status, 200);
+    assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
         'POST',
@@ -201,15 +200,14 @@ test('foreign-org work-order transition is 403', async () => {
             transitionAt: nowUtc(),
         },
     ));
-    assert.equal(foreign.status, 403);
+    assert.equal(foreign.status, 404);
     assert.deepEqual(await foreign.json(), {
         error:
-            'forbidden: work_orders/wo-foreign-tx belongs'
-            + ' to a different organization',
+            'Not found: work_orders/wo-foreign-tx',
     });
 });
 
-test('foreign-org flow undo is 403', async () => {
+test('foreign-org flow undo is 404', async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken(
         'current', ORGANIZATION_A,
@@ -243,7 +241,7 @@ test('foreign-org flow undo is 403', async () => {
         },
     ));
     assert.ok(
-        created.status === 204 || created.status === 200,
+        created.status === 201 || created.status === 201,
         'flow create status ' + created.status,
     );
 
@@ -253,11 +251,9 @@ test('foreign-org flow undo is 403', async () => {
             at: AT,
         },
     ));
-    assert.equal(foreign.status, 403);
+    assert.equal(foreign.status, 404);
     assert.deepEqual(await foreign.json(), {
-        error:
-            'forbidden: flows/flow-foreign-undo belongs to a'
-            + ' different organization',
+        error: 'Not found: flows/flow-foreign-undo',
     });
 });
 

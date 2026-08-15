@@ -12,6 +12,8 @@ import {
 } from '../../../api/types.ts';
 import {
     type RequestContext,
+    withLifecycleTrio,
+    withLifecycleTrios,
 } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -39,14 +41,22 @@ export function notifyObjectiveChange(): void {
 export async function getObjectives(
     ctx: RequestContext,
 ): Promise<ObjectiveEntity[]> {
-    return ctx.GET<ObjectiveEntity[]>('objectives');
+    return withLifecycleTrios(
+        ctx, 'objectives',
+        await ctx.GET<ObjectiveEntity[]>('objectives'),
+    );
 }
 
 export async function getObjective(
     ctx: RequestContext,
     id: ObjectiveId,
 ): Promise<ObjectiveEntity> {
-    return ctx.GET<ObjectiveEntity>(`objectives/${id}`);
+    return withLifecycleTrio(
+        ctx, 'objectives',
+        await ctx.GET<ObjectiveEntity>(
+            `objectives/${id}`,
+        ),
+    );
 }
 
 // Lifecycle-current trio is stamped on the ObjectiveEntity
@@ -93,13 +103,13 @@ export async function getArchivedObjectiveIds(
     );
 }
 
-// Org-scoped bulk lifecycle history (GET objectives/history)
+// Org-scoped bulk lifecycle versions (GET objectives/versions)
 // — StateEntity rows, (at, id) DESC overall. Source for the
 // project score-history archival stream.
 export async function getObjectiveHistories(
     ctx: RequestContext,
 ): Promise<StateEntity[]> {
-    return ctx.GET<StateEntity[]>('objectives/history');
+    return ctx.GET<StateEntity[]>('objectives/versions');
 }
 
 export interface ObjectiveArchivalEvent {

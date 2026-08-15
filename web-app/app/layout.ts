@@ -32,7 +32,7 @@ import type {
 import {
     sessionIsOrganizationScoped,
     sessionIsAuthenticated,
-} from './adapters/init.ts';
+} from './adapters/session-token.ts';
 import {
     postSessionLogout,
 } from './adapters/session-logout.ts';

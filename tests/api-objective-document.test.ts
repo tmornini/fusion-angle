@@ -24,6 +24,10 @@ import {
     documentFamilyWiring,
     documentGetHandler,
 } from '../api/document-family.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
 
 // Objectives are the FIFTH lifecycle-trio family (states-
 // address retirement): PUT /objectives/:id carries the
@@ -44,14 +48,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -159,14 +161,14 @@ test('PUT objectives/:id accepts the lifecycle trio and'
             state_event_id: 'obj-trio-1-ev1',
         },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const wire = await res.json() as Record<string, unknown>;
     assert.equal(wire.id, 'obj-trio-1');
     assert.equal(wire.organization_id, '1');
     assert.equal(wire.position, 7);
-    assert.ok(!('state' in wire));
-    assert.ok(!('state_at' in wire));
-    assert.ok(!('state_event_id' in wire));
+    assert.equal(wire.state, 'active');
+    assert.ok('state_at' in wire);
+    assert.equal(wire.state_event_id, 'obj-trio-1-ev1');
 });
 
 test('PUT objectives/:id without the trio is 400',
@@ -219,7 +221,7 @@ async () => {
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     // Phase Final Task 2: objectives ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
@@ -280,7 +282,7 @@ async function putDocumentPair(
         requestAt: at,
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -304,7 +306,7 @@ async function deleteDocumentPair(
         requestAt: at,
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -374,4 +376,57 @@ test('a DELETE-head derives absent through the generic'
             return true;
         },
     );
+});
+
+test('stored PUT body equals objectiveDocumentEntityOf of'
++ ' the same chain', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await organizationToken();
+    const id = 'obj-g1-stream';
+    const at = '2026-01-01T00:00:00.000000Z';
+    const ev = 'ev-g1';
+    const put = await handleRequest(db, req(
+        'PUT', '/objectives/' + id, token,
+        documentFields(3, 'active', at, ev),
+    ));
+    assert.equal(put.status, 201);
+    const prefix = '/organizations/1/objectives/';
+    const stored = JSON.parse(
+        await storedPutBodyText(db, prefix, id),
+    );
+    const expected = {
+        id,
+        organization_id: '1',
+        position: 3,
+        state: 'active',
+        state_at: at,
+        state_event_id: ev,
+    };
+    assert.deepEqual(stored, expected);
+    const wiring = documentFamilyWiring('objectives')!;
+    const derived = await documentGetHandler(wiring)(
+        db, [id], 'current', '1',
+    );
+    assert.deepEqual(stored, derived);
+    const skewed = await handleRequest(db, req(
+        'PUT', '/objectives/' + id, token,
+        documentFields(
+            99, 'archived',
+            '2020-01-01T00:00:00.000000Z', 'ev-g1-skew',
+        ),
+    ));
+    assert.equal(skewed.status, 201);
+    const afterSkew = JSON.parse(
+        await storedPutBodyText(db, prefix, id),
+    );
+    assert.deepEqual(
+        afterSkew,
+        await documentGetHandler(wiring)(
+            db, [id], 'current', '1',
+        ),
+    );
+    assert.equal(afterSkew.state, 'active');
+    assert.equal(afterSkew.state_event_id, ev);
+    assert.equal(afterSkew.position, 99);
 });

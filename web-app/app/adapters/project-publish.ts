@@ -1,10 +1,10 @@
 import type {
-    ProjectEntity,
     Id,
     ObjectiveEntity,
     ObjectiveId,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
+import { getProjectEntity } from './projects.ts';
 import type { ValidationResult } from './validation.ts';
 import { getActiveObjectives } from './objectives.ts';
 import {
@@ -94,9 +94,7 @@ export async function postProjectApproval(
 ): Promise<void> {
     const [entity, active, scoring] =
         await Promise.all([
-            ctx.GET<ProjectEntity>(
-                `projects/${projectId}`,
-            ),
+            getProjectEntity(ctx, projectId),
             getActiveObjectives(ctx),
             getProjectScoring(ctx, projectId),
         ]);
@@ -127,9 +125,7 @@ export async function postProjectArchival(
     projectId: Id,
 ): Promise<void> {
     const [entity, scoring] = await Promise.all([
-        ctx.GET<ProjectEntity>(
-            `projects/${projectId}`,
-        ),
+        getProjectEntity(ctx, projectId),
         getProjectScoring(ctx, projectId),
     ]);
     const {

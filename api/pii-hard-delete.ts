@@ -22,7 +22,7 @@ import { appendMessagePair } from './message-pair.ts';
 //
 // THE SINGLE-AUTHORITATIVE-ID-SET RULE (a binding verification
 // finding): the pairs occupying the slot are enumerated by ONE
-// scan — `requests.getAllWhere('uri_prefix', ...)` — and THAT
+// scan — `requests.getAllWhere('uri_collection', ...)` — and THAT
 // id-set alone is deleted from BOTH tables. `responses` is NEVER
 // re-scanned independently and trusted to agree: two independent
 // scans could disagree (a pre-existing torn pair, a mid-flight
@@ -64,11 +64,11 @@ import { appendMessagePair } from './message-pair.ts';
 // behavior differs, confined to genuine concurrency.
 export async function replacePiiSlot(
     view: DbAdapter,
-    uriPrefix: string,
+    uriCollection: string,
     pair: MessagePair,
 ): Promise<void> {
     const prior = await view.requests
-        .getAllWhere('uri_prefix', uriPrefix);
+        .getAllWhere('uri_collection', uriCollection);
     for (const row of prior) {
         await view.requests.delete(row.id);
         await view.responses.delete(row.id);

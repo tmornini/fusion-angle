@@ -4,15 +4,23 @@ import {
     validateIdentityProviderEntity,
 } from '../api/validators.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import { handleRequest } from '../api/api.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import {
     getProvidersFor,
 } from '../web-app/app/adapters/identity-providers.ts';
 import { seedIdentityProvider } from './identity-fixtures.ts';
+import {
+    deriveIdentityProvider,
+    identityProviderEntityOf,
+} from '../api/derive-identity-spine.ts';
+import {
+    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+} from './http-fixtures.ts';
 
 async function adminCtx() {
     const db = memoryDbAdapter();
@@ -86,4 +94,37 @@ async () => {
     });
     assert.deepEqual(
         await getProvidersFor(ctx, 'p2'), ['google']);
+});
+
+// G4: stored PUT = identityProviderEntityOf (GET derive).
+test('stored PUT body equals identityProviderEntityOf',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'ip-g4';
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/identity-providers/' + id,
+        token: DEV_TOKEN,
+        body: goodRow,
+        operationId: TEST_OPERATION_ID,
+    }));
+    assert.equal(put.status, 201);
+    const stored = JSON.parse(
+        await storedPutBodyText(
+            db, '/identity-providers/', id,
+        ),
+    );
+    const expected = identityProviderEntityOf({
+        uriId: id,
+        pairId: id,
+        method: 'PUT',
+        body: goodRow,
+    });
+    assert.equal(Object.keys(expected)[0], 'id');
+    assert.deepEqual(stored, expected);
+    assert.deepEqual(
+        stored, await deriveIdentityProvider(db, id),
+    );
+    assert.deepEqual(stored, await put.json());
 });

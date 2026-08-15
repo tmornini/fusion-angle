@@ -45,7 +45,9 @@ for (const alg of ['RS256', 'ES256'] as const) {
         const verdict = await verifyClientAssertion(
             assertion, clientWith(signer.jwks), NOW,
         );
-        assert.deepEqual(verdict, { valid: true });
+        assert.deepEqual(verdict, {
+            valid: true, jti: 'assert-1', exp: NOW + 300,
+        });
     });
 
     test(`a ${alg} signature from an unregistered key`
@@ -118,6 +120,27 @@ test('a missing exp is refused', async () => {
     assert.equal(verdict.valid, false);
 });
 
+test('a missing jti is refused', async () => {
+    const signer = await makeAssertionSigner('RS256');
+    const { jti: _jti, ...rest } = freshClaims();
+    const assertion = await signer.sign(rest);
+    const verdict = await verifyClientAssertion(
+        assertion, clientWith(signer.jwks), NOW,
+    );
+    assert.equal(verdict.valid, false);
+});
+
+test('a malformed jti is refused', async () => {
+    const signer = await makeAssertionSigner('RS256');
+    const assertion = await signer.sign({
+        ...freshClaims(), jti: 'bad jti!',
+    });
+    const verdict = await verifyClientAssertion(
+        assertion, clientWith(signer.jwks), NOW,
+    );
+    assert.equal(verdict.valid, false);
+});
+
 test('a future nbf is refused', async () => {
     const signer = await makeAssertionSigner('RS256');
     const assertion = await signer.sign({
@@ -158,7 +181,9 @@ async () => {
     const verdict = await verifyClientAssertion(
         assertion, clientWith(signer.jwks), NOW,
     );
-    assert.deepEqual(verdict, { valid: true });
+    assert.deepEqual(verdict, {
+        valid: true, jti: 'assert-1', exp: NOW + 300,
+    });
 });
 
 test('an unknown kid matches no registered key',

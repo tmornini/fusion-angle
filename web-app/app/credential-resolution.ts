@@ -1,4 +1,5 @@
-import { decodeAccessToken } from '../../api/access-token.ts';
+import { decodeAccessToken } from
+    '../../shared/access-token-decode.ts';
 import type {
     SessionCredentials,
 } from './adapters/session-credentials.ts';

@@ -12,7 +12,7 @@ import {
 } from './list-choreography.ts';
 import {
     displayText, formatDateTime,
-} from '../core.ts';
+} from '../format.ts';
 import { buildPageUrl } from '../navigation.ts';
 import {
     type IconSize,

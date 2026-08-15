@@ -5,7 +5,7 @@ import { mutateSlot } from '../dom.ts';
 import {
     makeFieldKeyValidator,
 } from '../field-key-validator.ts';
-import { initials } from '../core.ts';
+import { initials } from '../format.ts';
 import { displayText } from '../format.ts';
 import {
     ICON_SIZE,

@@ -1,7 +1,8 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, FlowWorkOrderEntity } from './types.ts';
-import { pickString } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { validateFlowWorkOrderEntity } from './validators.ts';
+import { canonicalUriCollection } from './message-pair.ts';
+import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
@@ -31,26 +32,22 @@ function flowWorkOrdersUriPrefix(
     organization: Id,
     flowId: Id,
 ): string {
-    return canonicalUriPrefix(
+    return canonicalUriCollection(
         organization, '/flows/' + flowId + '/work-orders/',
     );
 }
 
-// The derived entity: the head document's body's own three
-// fields plus `id` from the uriId — a join row carries no
-// organization_id of its own (flow_work_orders is parent-scoped
-// off the flow, never org-stamped directly), so unlike
-// workOrderDocumentEntityOf there is nothing to stamp from the
-// derivation's own organization parameter here.
-function flowWorkOrderEntityOf(
+// G6: GET derive is the stored PUT. id-first via
+// validateFlowWorkOrderEntity (withoutId first). A join
+// row carries no organization_id of its own.
+export function flowWorkOrderEntityOf(
     document: DerivedDocument,
 ): FlowWorkOrderEntity {
-    const body = document.body;
     return {
         id: document.uriId,
-        flow_id: pickString(body, 'flow_id'),
-        work_order_id: pickString(body, 'work_order_id'),
-        at: pickString(body, 'at'),
+        ...validateFlowWorkOrderEntity(
+            withoutId(document.body),
+        ),
     };
 }
 
@@ -65,8 +62,8 @@ export async function deriveFlowWorkOrders(
 ): Promise<FlowWorkOrderEntity[]> {
     const prefix = flowWorkOrdersUriPrefix(organization, flowId);
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const documents = deriveDocumentsAt(
         requests, responses, prefix,

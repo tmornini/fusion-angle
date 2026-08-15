@@ -13,6 +13,13 @@ import {
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
+import {
+    apiRequest, TEST_OPERATION_ID, storedPutBodyText,
+} from './http-fixtures.ts';
+import {
+    deriveTokenRevocation,
+    tokenRevocationEntityOf,
+} from '../api/derive-identity-spine.ts';
 
 // WP8 (Phase 13 Task 8) — the phase's ONE sanctioned
 // authorization-widening wire delta: MEMBER_VERBS widens PUT
@@ -35,14 +42,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -64,7 +69,7 @@ async () => {
         'PUT', '/identity-token-revocations/self-rev-1', token,
         { identity_id: 'member1', at },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     assert.deepEqual(await res.json(), {
         id: 'self-rev-1', identity_id: 'member1', at,
     });
@@ -81,16 +86,41 @@ async () => {
     // Phase Final Stage B: identity spine tables retired.
     const requests = await db.requests.getAll();
     const own = requests.find(
-        r => r.uri_prefix === '/identity-token-revocations/'
+        r => r.uri_collection === '/identity-token-revocations/'
             && r.uri_id === 'self-rev-1',
     );
     assert.ok(own);
     const responses = await db.responses.getAll();
     const ownResponse = responses.find(
-        r => r.uri_prefix === '/identity-token-revocations/'
+        r => r.uri_collection === '/identity-token-revocations/'
             && r.uri_id === 'self-rev-1',
     );
     assert.ok(ownResponse);
+});
+
+test('logout-everywhere success clears the refresh cookie',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken('member1');
+    const res = await handleRequest(db, req(
+        'PUT', '/identity-token-revocations/self-rev-cookie',
+        token,
+        {
+            identity_id: 'member1',
+            at: '2026-01-01T00:00:00.000000Z',
+        },
+    ));
+    assert.equal(res.status, 201);
+    const cookies = typeof res.headers.getSetCookie
+        === 'function'
+        ? res.headers.getSetCookie()
+        : [res.headers.get('Set-Cookie') ?? ''];
+    const cookie = cookies.join('\n');
+    assert.match(cookie, /refresh_token=/);
+    assert.match(cookie, /Max-Age=0/);
+    assert.match(cookie, /HttpOnly/i);
+    assert.match(cookie, /Path=\/authentication/);
+    assert.match(cookie, /SameSite=Strict/i);
 });
 
 test("a member's self-revoke: ACCESS still works until exp"
@@ -109,7 +139,7 @@ async () => {
             at: '2021-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     // Access token still admits member-tier GET.
     const still = await handleRequest(
         db, req('GET', '/members', memberToken),
@@ -148,6 +178,40 @@ test('a member PUT identity-token-revocations/:id naming'
     );
 });
 
+// G4: stored PUT = tokenRevocationEntityOf (GET derive).
+test('stored PUT body equals tokenRevocationEntityOf',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken('current');
+    const id = 'rev-g4';
+    const fields = {
+        identity_id: 'member1',
+        at: '2026-01-01T00:00:00.000000Z',
+    };
+    const put = await handleRequest(db, req(
+        'PUT', '/identity-token-revocations/' + id,
+        token, fields,
+    ));
+    assert.equal(put.status, 201);
+    const stored = JSON.parse(
+        await storedPutBodyText(
+            db, '/identity-token-revocations/', id,
+        ),
+    );
+    const expected = tokenRevocationEntityOf({
+        uriId: id,
+        pairId: id,
+        method: 'PUT',
+        body: fields,
+    });
+    assert.equal(Object.keys(expected)[0], 'id');
+    assert.deepEqual(stored, expected);
+    assert.deepEqual(
+        stored, await deriveTokenRevocation(db, id),
+    );
+    assert.deepEqual(stored, await put.json());
+});
+
 test('the admin path is unchanged: an admin PUT'
 + ' identity-token-revocations/:id naming ANOTHER identity'
 + ' still succeeds 2xx', async () => {
@@ -159,7 +223,7 @@ test('the admin path is unchanged: an admin PUT'
         adminToken,
         { identity_id: 'member1', at },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     assert.deepEqual(await res.json(), {
         id: 'admin-rev-1', identity_id: 'member1', at,
     });

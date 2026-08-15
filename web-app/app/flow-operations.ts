@@ -15,7 +15,7 @@ import {
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../../api/api.ts';
+} from '../../api/http-errors.ts';
 import {
     putFlow,
     enqueueFlowSave,
@@ -669,9 +669,9 @@ const MAX_UNDO_ATTEMPTS = 3;
 
 // Drive POST /flows/:id/undo with its own jittered 412-absorb:
 // the undo op's synthesized document pair takes the LOCKED
-// family's follows slot, so a save racing this undo for the SAME
-// head 412s the whole transaction (the responses.follows unique
-// index — message-pair.ts). Undo-as-replay (Phase 14 Task 8)
+// family's lock head, so a save racing this undo for the SAME
+// head 412s the whole transaction (the in-tx head re-read).
+// Undo-as-replay (Phase 14 Task 8)
 // resolves the restore target SERVER-SIDE from the pair plane
 // (api/derive-flows.ts's resolveFlowUndoTarget), so this loop
 // carries no baseline of its own — a 412 just means the head

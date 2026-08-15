@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { PUT } from '../api/api.ts';
+import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -13,7 +13,10 @@ import {
     validateIdentityDocumentBody,
     validateIdentityEntity,
 } from '../api/validators.ts';
-import { postIdentityDocumentOp } from '../api/routes.ts';
+import {
+    postIdentityDocumentOp,
+    identityDocumentEntityOf,
+} from '../api/routes.ts';
 import {
     formWritePair,
     appendMessagePair,
@@ -22,6 +25,11 @@ import {
     documentFamilyWiring,
     documentGetHandler,
 } from '../api/document-family.ts';
+import {
+    TEST_OPERATION_ID,
+    apiRequest,
+    storedPutBodyText,
+} from './http-fixtures.ts';
 
 // Phase 10 Task 4 (twelfth registered family): PUT
 // /identities/:id takes the entity's OWN field only ({kind}),
@@ -138,7 +146,7 @@ async () => {
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     const written = await postIdentityDocumentOp(
         db, 'id-doc-op-1', body, 'current', pair,
@@ -182,7 +190,6 @@ async function putDocumentPair(
     id: string,
     body: Record<string, unknown>,
     requestAt: string,
-    headPairId?: string,
 ): Promise<string> {
     const pair = await formWritePair({
         method: 'PUT',
@@ -195,7 +202,7 @@ async function putDocumentPair(
         requestAt,
         organization: undefined,
         responseStatus: 200, responseBody: undefined,
-        headPairId,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -208,7 +215,6 @@ async function deleteDocumentPair(
     db: MemoryDbAdapter,
     id: string,
     requestAt: string,
-    headPairId?: string,
 ): Promise<void> {
     const pair = await formWritePair({
         method: 'DELETE',
@@ -221,7 +227,7 @@ async function deleteDocumentPair(
         requestAt,
         organization: undefined,
         responseStatus: 204, responseBody: undefined,
-        headPairId,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -253,7 +259,7 @@ test('a PUT chain Supersedes-chains and the head derives the'
         '2026-02-02T00:00:00.000000Z', firstId,
     );
     const secondResponse = await db.responses.getById(secondId);
-    assert.equal(secondResponse.supersedes, firstId);
+    assert.equal('supersedes' in secondResponse, false);
 
     const headAfterSecond = await documentGetHandler(wiring)(
         db, ['identities-chain-1'], 'current', 'ignored',
@@ -313,4 +319,38 @@ test('documentWriteResponseSpec(IDENTITIES_WIRING) emits'
     );
     assert.equal(written['id'], 'id-resp-1');
     assert.equal(written['kind'], 'person');
+});
+
+test('stored PUT body equals identityDocumentEntityOf',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'id-g3-stream';
+    const body = identityFields();
+    const put = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/identities/' + id,
+            token: DEV_TOKEN,
+            body,
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.equal(put.status, 201);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/identities/', id),
+    );
+    assert.deepEqual(
+        stored,
+        identityDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body,
+            },
+            '',
+        ),
+    );
 });

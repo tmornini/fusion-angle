@@ -26,6 +26,9 @@ import {
 import {
     formWritePair,
 } from '../api/message-pair.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: state_field_values dual-write stripped.
 // This file no longer compares derive vs row-plane oracles —
@@ -47,13 +50,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -121,6 +123,7 @@ async function appendLegacyTransition(
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
         db, 'wo1', body, SYSTEM_MEMBER_ID,

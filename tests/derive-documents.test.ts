@@ -6,6 +6,7 @@ import {
 } from '../api/derive-documents.ts';
 import { formWritePair } from '../api/message-pair.ts';
 import type { RequestEntity, ResponseEntity } from '../api/types.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -33,27 +34,28 @@ async function storedPairAt(
         organization: '1',
         responseStatus: status,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     return {
         request: {
             id: pair.id,
-            uri_prefix: pair.uriPrefix,
+            uri_collection: pair.uriCollection,
             uri_id: pair.uriId,
             at: AT,
             requester_identity_id: pair.requesterIdentityId,
             message_hash: pair.requestHash,
             message: pair.requestMessage,
+            method: pair.method,
+            operation_id: pair.operationId,
         },
         response: {
             id: pair.id,
-            uri_prefix: pair.uriPrefix,
+            uri_collection: pair.uriCollection,
             uri_id: pair.uriId,
             at: AT,
-            status: pair.responseStatus,
-            etag: pair.responseEtag,
-            message_hash: pair.responseHash,
+            version: pair.responseEtag,
             message: pair.responseMessage,
+            operation_id: pair.operationId,
         },
     };
 }

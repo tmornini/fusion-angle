@@ -6,6 +6,7 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { sha256Hex } from '../shared/digest.ts';
+import { requestMessageHash } from '../api/message-form.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
@@ -20,6 +21,9 @@ import {
     tokenRevocationReason,
 } from '../api/authentication.ts';
 import type { DbAdapter } from '../api/db.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 import {
     makeAssertionSigner,
 } from './client-assertion-fixtures.ts';
@@ -46,13 +50,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -98,10 +101,10 @@ test('PUT identity-tokens/:id appends its pair at the entity'
         'PUT', '/identity-tokens/tok-1', DEV_TOKEN,
         tokenFields('jti-1'),
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     assert.equal(requests.length, 3);
-    assert.equal(requests[2]!.uri_prefix, '/identity-tokens/');
+    assert.equal(requests[2]!.uri_collection, '/identity-tokens/');
     assert.equal(requests[2]!.uri_id, 'tok-1');
     const domainRow = await deriveIdentityToken(db, 'tok-1');
     assert.deepEqual(await res.json(), domainRow);
@@ -119,8 +122,8 @@ test('two PUTs to DIFFERENT identity-tokens/:id ids each'
         'PUT', '/identity-tokens/tok-2b', DEV_TOKEN,
         tokenFields('jti-2b'),
     ));
-    assert.equal(first.status, 200);
-    assert.equal(second.status, 200);
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
     assert.equal(first.headers.get('Supersedes'), null);
     assert.equal(second.headers.get('Supersedes'), null);
 });
@@ -135,14 +138,14 @@ test('a second PUT to the SAME identity-tokens/:id id forms'
         'PUT', '/identity-tokens/tok-3', DEV_TOKEN,
         tokenFields('jti-3'),
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     assert.equal(first.headers.get('Supersedes'), null);
     const second = await handleRequest(db, req(
         'PUT', '/identity-tokens/tok-3', DEV_TOKEN,
         tokenFields('jti-3-again'),
     ));
-    assert.equal(second.status, 200);
+    assert.equal(second.status, 201);
     assert.notEqual(second.headers.get('Response-ID'), firstId);
     assert.equal(second.headers.get('Supersedes'), null);
     const domainRow = await deriveIdentityToken(db, 'tok-3');
@@ -158,11 +161,11 @@ test('PUT identity-token-revocations/:id appends its pair at'
         'PUT', '/identity-token-revocations/rev-1', DEV_TOKEN,
         revocationFields(),
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     assert.equal(requests.length, 3);
     assert.equal(
-        requests[2]!.uri_prefix, '/identity-token-revocations/',
+        requests[2]!.uri_collection, '/identity-token-revocations/',
     );
     assert.equal(requests[2]!.uri_id, 'rev-1');
     // Phase Final Task 2: identity_token_revocations ROW half
@@ -187,12 +190,12 @@ test('a rotation appends its pair at an operation address:'
         'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const wireBody = await res.json() as { jti: string };
     assert.notEqual(wireBody.jti, ROOT_JTI);
     const requests = await db.requests.getAll();
     const row = requests.find(
-        r => r.uri_prefix
+        r => r.uri_collection
             === `/identity-tokens/${ROOT_JTI}/rotation/`,
     );
     assert.ok(row);
@@ -220,7 +223,7 @@ async () => {
         'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const before = (await db.requests.getAll()).length;
     // Literally byte-identical: same jti, same {} body, same
     // bearer — exactly what a resend fast path would collapse
@@ -267,10 +270,10 @@ test('a revocation appends its pair at an operation address:'
         'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, {},
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const row = requests.find(
-        r => r.uri_prefix
+        r => r.uri_collection
             === `/identity-tokens/${ROOT_JTI}/revocation/`,
     );
     assert.ok(row);
@@ -287,10 +290,10 @@ async () => {
         'POST', '/identity-tokens/ghost/revocation',
         DEV_TOKEN, {},
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const row = requests.find(
-        r => r.uri_prefix
+        r => r.uri_collection
             === '/identity-tokens/ghost/revocation/',
     );
     assert.ok(row);
@@ -308,7 +311,7 @@ async () => {
         'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, {},
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     // A distinguishing body keeps this a genuinely NEW request
     // rather than the byte-identical resend covered elsewhere
     // (the route ignores the body either way).
@@ -316,12 +319,12 @@ async () => {
         'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, { attempt: 2 },
     ));
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     assert.equal(requests.length, responses.length);
     const rows = requests.filter(
-        r => r.uri_prefix
+        r => r.uri_collection
             === `/identity-tokens/${ROOT_JTI}/revocation/`,
     );
     assert.equal(rows.length, 2);
@@ -344,12 +347,8 @@ async () => {
     ));
     for (const row of await db.requests.getAll()) {
         assert.equal(
-            await sha256Hex(row.message), row.message_hash,
-        );
-    }
-    for (const row of await db.responses.getAll()) {
-        assert.equal(
-            await sha256Hex(row.message), row.message_hash,
+            await requestMessageHash(row.message),
+            row.message_hash,
         );
     }
 });
@@ -412,7 +411,7 @@ async function assertRootEventPair(
     const root = rows[0]!;
     const requests = await db.requests.getAll();
     const eventRequest = requests.find(
-        r => r.uri_prefix === '/identity-tokens/'
+        r => r.uri_collection === '/identity-tokens/'
             && r.uri_id === root.id,
     );
     assert.ok(eventRequest, 'no event pair for the issued root');
@@ -476,7 +475,7 @@ async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     });
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     await assertRootEventPair(db);
     // KEY-BY-ANCHOR (Phase 13 Task 7, gate 3): the issued root's
     // row id is now the code's OWN sha256 digest, not a fresh
@@ -486,7 +485,7 @@ async () => {
     assert.equal(root!.id, await sha256Hex('the-code'));
     const requests = await db.requests.getAll();
     const opPair = requests.find(
-        r => r.uri_prefix === '/authentication/token/',
+        r => r.uri_collection === '/authentication/token/',
     );
     assert.ok(opPair);
     assert.equal(opPair!.uri_id, '');
@@ -506,7 +505,7 @@ test('a token-exchange grant (a real /authentication/token'
         grant_type: 'token-exchange',
         subject_token: subject, actor_token: subject,
     });
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     await assertRootEventPair(db);
 });
 
@@ -530,7 +529,7 @@ test('a client_credentials grant appends its root\'s own'
         grant_type: 'client_credentials',
         client_id: 'svc-shadow', client_assertion: assertion,
     });
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     await assertRootEventPair(db);
 });
 
@@ -550,7 +549,7 @@ async function assertEventPairForRow(
     const row = await deriveIdentityToken(db, rowId);
     const requests = await db.requests.getAll();
     const eventRequest = requests.find(
-        r => r.uri_prefix === '/identity-tokens/'
+        r => r.uri_collection === '/identity-tokens/'
             && r.uri_id === rowId,
     );
     assert.ok(eventRequest, 'no event pair for row ' + rowId);
@@ -578,7 +577,7 @@ test('a rotation\'s ROTATE branch appends an event pair for'
         'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const { jti: newJti } = await res.json() as { jti: string };
     const rows = await deriveIdentityTokens(db);
     const retired = rows.find(
@@ -593,7 +592,7 @@ test('a rotation\'s ROTATE branch appends an event pair for'
     await assertEventPairForRow(db, issued!.id);
     const requests = await db.requests.getAll();
     const opPair = requests.find(
-        r => r.uri_prefix
+        r => r.uri_collection
             === `/identity-tokens/${ROOT_JTI}/rotation/`,
     );
     assert.ok(opPair);
@@ -635,7 +634,7 @@ async () => {
         'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, {},
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     const rows = await deriveIdentityTokens(db);
     const revoked = rows.find(
         r => r.jti === ROOT_JTI && r.action === 'revoked',
@@ -652,7 +651,7 @@ test('revoking an unknown jti appends NO event pair — only its'
         'POST', '/identity-tokens/ghost/revocation',
         DEV_TOKEN, {},
     ));
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     // +1: only the operation pair — no row written, so no event
     // pair to match it.
@@ -678,8 +677,8 @@ test('two concurrent rotations of one jti: exactly one'
             DEV_TOKEN, {},
         )),
     ]);
-    assert.deepEqual([a.status, b.status].sort(), [200, 409]);
-    const winner = a.status === 200 ? a : b;
+    assert.deepEqual([a.status, b.status].sort(), [201, 409]);
+    const winner = a.status === 201 ? a : b;
     const { jti: successorJti } =
         await winner.json() as { jti: string };
     const rows = await deriveIdentityTokens(db);
@@ -735,7 +734,7 @@ async () => {
     const requests = await db.requests.getAll();
     assert.equal(
         requests.filter(
-            r => r.uri_prefix === '/authentication/token/',
+            r => r.uri_collection === '/authentication/token/',
         ).length, 0,
     );
 });
@@ -764,7 +763,7 @@ test('revokeTokenChain racing a concurrent rotateRefreshJti on'
         'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
-    assert.equal(firstRotation.status, 200);
+    assert.equal(firstRotation.status, 201);
     const { jti: liveSuccessor } =
         await firstRotation.json() as { jti: string };
     const [revoke, rotate] = await Promise.all([
@@ -779,8 +778,8 @@ test('revokeTokenChain racing a concurrent rotateRefreshJti on'
     ]);
     // revokeTokenChain never fails (the claim-op 2xx precedent)
     // — this holds regardless of which side of the race wins.
-    assert.equal(revoke.status, 204);
-    assert.ok([200, 409].includes(rotate.status));
+    assert.equal(revoke.status, 201);
+    assert.ok([201, 409].includes(rotate.status));
     const rows = await deriveIdentityTokens(db);
     const chainId = rows.find(r => r.jti === ROOT_JTI)!.chain_id;
     const everyJti = new Set(
@@ -792,7 +791,7 @@ test('revokeTokenChain racing a concurrent rotateRefreshJti on'
     for (const jti of everyJti) {
         assert.equal(latestActionForJti(rows, jti), 'revoked');
     }
-    if (rotate.status === 200) {
+    if (rotate.status === 201) {
         const { jti: raceSuccessor } =
             await rotate.json() as { jti: string };
         assert.ok(everyJti.has(raceSuccessor));

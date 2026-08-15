@@ -1,7 +1,7 @@
 import {
     html, setHtml, SafeHtml,
 } from '../safe-html.ts';
-import { initials } from '../core.ts';
+import { initials } from '../format.ts';
 import {
     type IconSize,
     ICON_SIZE,

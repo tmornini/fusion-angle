@@ -30,6 +30,9 @@ import {
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Instance GET history — full-state revision chain (Task 19).
 // Wire DESC; each entry full state projected by CURRENT read
@@ -49,7 +52,7 @@ const TYPE_DETAIL =
 const ATTRS = TYPE_DETAIL + '/attributes';
 const INSTANCES = TYPE_DETAIL + '/instances';
 const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
-const INSTANCE_HISTORY = INSTANCE_DETAIL + '/history';
+const INSTANCE_HISTORY = INSTANCE_DETAIL + '/versions';
 
 function req(
     method: string,
@@ -58,16 +61,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-            ...(extraHeaders ?? {}),
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -98,7 +98,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -147,7 +147,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function putAttribute(
@@ -159,7 +159,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + '/' + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedPublicAndSecretAttrs(
@@ -195,7 +195,7 @@ async function putInstance(
     }[],
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, token,
+        'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
 }
@@ -220,7 +220,6 @@ async function appendInstancePair(
     method: 'PUT' | 'DELETE',
     body: Record<string, unknown> | undefined,
     requestAt: string,
-    headPairId?: string,
 ): Promise<string> {
     const pathname = '/organizations/' + organization
         + '/record-types/' + typeId
@@ -238,7 +237,7 @@ async function appendInstancePair(
         organization,
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        headPairId,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -272,7 +271,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_PUBLIC, value: 'v0' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const etag0 = put.headers.get('ETag')!;
 
     const patch1 = await patchInstance(
@@ -285,7 +284,7 @@ async () => {
             ],
         },
     );
-    assert.equal(patch1.status, 200);
+    assert.equal(patch1.status, 201);
     const etag1 = patch1.headers.get('ETag')!;
 
     const patch2 = await patchInstance(
@@ -298,7 +297,7 @@ async () => {
             ],
         },
     );
-    assert.equal(patch2.status, 200);
+    assert.equal(patch2.status, 201);
     const etag2 = patch2.headers.get('ETag')!;
 
     const detail = await handleRequest(db, req(
@@ -352,7 +351,7 @@ async () => {
             typeof entry.etag === 'string'
             && !entry.etag.includes('"'),
             true,
-            'etag is pairId, no quotes in JSON',
+            'etag is 64-hex, no quotes in JSON',
         );
         assert.equal(typeof entry.at, 'string');
     }
@@ -376,7 +375,7 @@ async () => {
             value: 'secret-0',
         },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const etag0 = put.headers.get('ETag')!;
 
     const patch1 = await patchInstance(
@@ -393,7 +392,7 @@ async () => {
             ],
         },
     );
-    assert.equal(patch1.status, 200);
+    assert.equal(patch1.status, 201);
 
     const memberHist = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
@@ -456,7 +455,7 @@ async () => {
     await putLiveType(db, adminToken);
     const res = await handleRequest(db, req(
         'GET',
-        INSTANCES + '/inst-missing/history',
+        INSTANCES + '/inst-missing/versions',
         memberToken,
     ));
     assert.equal(res.status, 404);
@@ -483,7 +482,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_PUBLIC, value: 'live' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
@@ -499,7 +498,7 @@ async () => {
     });
 });
 
-test('history foreign instance id → 403 via '
+test('history foreign instance id → 404 via '
 + 'missedReadError (R2)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -521,11 +520,10 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', INSTANCE_HISTORY, memberToken,
     ));
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
     assert.deepEqual(await res.json(), {
         error:
-            'forbidden: record_instances/' + INSTANCE_ID
-            + ' belongs to a different organization',
+            'Not found: record_instances/' + INSTANCE_ID,
     });
 });
 
@@ -536,7 +534,7 @@ async () => {
         'GET',
         '/organizations/' + ORGANIZATION
             + '/record-types/no-type/instances/'
-            + INSTANCE_ID + '/history',
+            + INSTANCE_ID + '/versions',
         memberToken,
     ));
     assert.equal(res.status, 404);

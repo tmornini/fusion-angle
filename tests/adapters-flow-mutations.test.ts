@@ -149,7 +149,7 @@ test(
         await createBaseFlow(ctx, 'flow-1');
         const events =
             await ctx.GET<StateEntity[]>(
-                'flows/flow-1/history',
+                'flows/flow-1/versions',
             );
         assert.equal(events.length, 1);
         const ev = events[0]!;
@@ -174,7 +174,7 @@ test(
         });
         const events =
             await ctx.GET<StateEntity[]>(
-                'flows/flow-1/history',
+                'flows/flow-1/versions',
             );
         assert.equal(events.length, 2);
         // Family history is DESC — current first.
@@ -349,7 +349,7 @@ test(
         await ctx.PUT('flows/flow-1', body, headers);
         await ctx.PUT('flows/flow-1', body, headers);
         const events = await ctx.GET<StateEntity[]>(
-            'flows/flow-1/history',
+            'flows/flow-1/versions',
         );
         assert.equal(events.length, 2);
     },
@@ -384,7 +384,7 @@ test(
             at: '2099-01-02T00:00:00.000000Z',
         });
         const events = await ctx.GET<StateEntity[]>(
-            'flows/flow-1/history',
+            'flows/flow-1/versions',
         );
         // Family history is DESC — index 0 is current.
         assert.equal(
@@ -428,7 +428,7 @@ test(
             ifMatchHeaders(etag),
         );
         const events = await ctx.GET<StateEntity[]>(
-            'flows/flow-1/history',
+            'flows/flow-1/versions',
         );
         // Family history is DESC — index 0 is current.
         assert.equal(

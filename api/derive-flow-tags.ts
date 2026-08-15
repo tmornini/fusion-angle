@@ -1,7 +1,8 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, FlowTagEntity } from './types.ts';
-import { pickString } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { validateFlowTagEntity } from './validators.ts';
+import { canonicalUriCollection } from './message-pair.ts';
+import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
     type DerivedDocument,
@@ -25,21 +26,21 @@ function flowTagsUriPrefix(
     organization: Id,
     flowId: Id,
 ): string {
-    return canonicalUriPrefix(
+    return canonicalUriCollection(
         organization, '/flows/' + flowId + '/tags/',
     );
 }
 
-function flowTagEntityOf(
+// G6: GET derive is the stored PUT. id-first; flow_id
+// from the address (never a client body key).
+export function flowTagEntityOf(
     flowId: Id,
     document: DerivedDocument,
 ): FlowTagEntity {
     return {
         id: document.uriId,
         flow_id: flowId,
-        flow_response_id: pickString(
-            document.body, 'flow_response_id',
-        ),
+        ...validateFlowTagEntity(withoutId(document.body)),
     };
 }
 
@@ -58,8 +59,8 @@ export async function deriveFlowTag(
 ): Promise<FlowTagEntity> {
     const prefix = flowTagsUriPrefix(organization, flowId);
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const document = deriveDocumentsAt(
         requests, responses, prefix,

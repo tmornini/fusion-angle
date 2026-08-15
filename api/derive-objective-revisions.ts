@@ -1,7 +1,9 @@
 import type { DbAdapter } from './db.ts';
 import type { Id, ObjectiveRevisionEntity } from './types.ts';
-import { pickString } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { validateObjectiveRevisionEntity } from
+    './validators.ts';
+import { canonicalUriCollection } from './message-pair.ts';
+import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
     byIdAscending,
@@ -20,7 +22,7 @@ import {
 // FAMILY-ROOTED objectives/ prefix — OBJECTIVES_WIRING IS that
 // derivation — so this nested sub-resource needs its own bespoke
 // module, exactly as flow_records did (research finding 10:
-// param() throws on '', and documentPairsAt matches uri_prefix
+// param() throws on '', and documentPairsAt matches uri_collection
 // by EQUALITY, so a revision pair at .../objectives/{id}/
 // revisions/ can never leak into the objectives-collection
 // derivation, or vice versa).
@@ -46,30 +48,22 @@ function objectiveRevisionsUriPrefix(
     organization: Id,
     objectiveId: Id,
 ): string {
-    return canonicalUriPrefix(
+    return canonicalUriCollection(
         organization,
         '/objectives/' + objectiveId + '/revisions/',
     );
 }
 
-// The derived entity: the head document's body's own five fields
-// plus `id` from the uriId, id FIRST — the seven-sibling
-// entityOf convention (deriveFlowRecords' own comment), picked
-// explicitly (pickString) rather than a body spread: a leaked
-// operation-pair body reaching this construction would throw
-// loudly (the method-filter's defense-in-depth) rather than
-// silently mis-derive.
-function objectiveRevisionEntityOf(
+// G6: GET derive is the stored PUT. id-first via
+// validateObjectiveRevisionEntity (withoutId first).
+export function objectiveRevisionEntityOf(
     document: DerivedDocument,
 ): ObjectiveRevisionEntity {
-    const body = document.body;
     return {
         id: document.uriId,
-        objective_id: pickString(body, 'objective_id'),
-        name: pickString(body, 'name'),
-        description: pickString(body, 'description'),
-        member_id: pickString(body, 'member_id'),
-        at: pickString(body, 'at'),
+        ...validateObjectiveRevisionEntity(
+            withoutId(document.body),
+        ),
     };
 }
 
@@ -90,8 +84,8 @@ export async function deriveObjectiveRevisions(
         organization, objectiveId,
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const documents = deriveDocumentsAt(
         requests, responses, prefix,

@@ -19,11 +19,11 @@ const QUOTA_HEADROOM_RATIO = 0.5;
 
 // The MEMBERS family's own flat, global-plane address —
 // members is the FIRST global-plane family (family-registry.ts:
-// organizationNested: false), so canonicalUriPrefix(undefined,
+// organizationNested: false), so canonicalUriCollection(undefined,
 // '/members/') (api/message-pair.ts) is this same literal
 // unchanged; mirrored BY CONTENT rather than imported, since
 // the value is self-disclosing (Commandment III) and importing
-// canonicalUriPrefix would drag the family registry in for one
+// canonicalUriCollection would drag the family registry in for one
 // constant. Matches api/derive-members.ts's own MEMBERS_PREFIX.
 const MEMBERS_PAIR_PREFIX = '/members/';
 
@@ -235,7 +235,7 @@ export function scanForRetiredKeys(
             }
         }
     }
-    // Fourth leg: retired message-plane uri_prefix
+    // Fourth leg: retired message-plane uri_collection
     // values on the surviving requests/responses tables.
     for (const table of [
         'requests', 'responses',
@@ -248,8 +248,8 @@ export function scanForRetiredKeys(
                 continue;
             }
             const prefix = (
-                row as { uri_prefix?: unknown }
-            ).uri_prefix;
+                row as { uri_collection?: unknown }
+            ).uri_collection;
             if (typeof prefix !== 'string') {
                 continue;
             }
@@ -261,7 +261,7 @@ export function scanForRetiredKeys(
                     && !seen.has(prefix)
                 ) {
                     findings.push(
-                        table + '[].uri_prefix='
+                        table + '[].uri_collection='
                         + prefix,
                     );
                     seen.add(prefix);
@@ -399,7 +399,7 @@ export async function getHasAnyHumanMembers(
         (row) =>
             typeof row === 'object'
             && row !== null
-            && (row as { uri_prefix?: unknown }).uri_prefix
+            && (row as { uri_collection?: unknown }).uri_collection
                 === MEMBERS_PAIR_PREFIX,
     );
 }

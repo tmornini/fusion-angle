@@ -4,6 +4,9 @@ import { handleRequest } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { DEV_TOKEN } from './token-fixtures.ts';
 import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
+import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 
@@ -21,13 +24,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -80,7 +82,7 @@ test(
                 '2099-01-01T00:00:00.000000Z',
             ),
         ));
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
         const ideaRes = await handleRequest(
             db, req('GET', '/ideas/idea-1', DEV_TOKEN),
         );
@@ -93,9 +95,9 @@ test(
         assert.equal(idea.organization_id, '1');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
-        // surviving /history.
+        // surviving /versions.
         const stateRes = await handleRequest(db, req(
-            'GET', '/ideas/idea-1/history',
+            'GET', '/ideas/idea-1/versions',
             DEV_TOKEN,
         ));
         const history = await stateRes.json() as {
@@ -134,7 +136,7 @@ test(
                 state_event_id: 'ev-x',
             },
         ));
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
         const getRes = await handleRequest(db, req(
             'GET', '/ideas/idea-survives', DEV_TOKEN,
         ));
@@ -161,11 +163,11 @@ test(
         const first = await handleRequest(db, req(
             'PUT', '/ideas/idea-retry', DEV_TOKEN, body,
         ));
-        assert.equal(first.status, 200);
+        assert.equal(first.status, 201);
         const second = await handleRequest(db, req(
             'PUT', '/ideas/idea-retry', DEV_TOKEN, body,
         ));
-        assert.equal(second.status, 200);
+        assert.equal(second.status, 201);
         assert.equal(
             second.headers.get('Response-ID'),
             first.headers.get('Response-ID'),

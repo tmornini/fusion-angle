@@ -9,6 +9,9 @@ import { ORGANIZATION_TWO } from
     '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: invitations ROW half stripped — the
 // row-plus-lifecycle dual-write oracle is retired.
@@ -25,13 +28,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -61,7 +63,7 @@ async () => {
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assert.equal(grant.status, 201);
     const afterGrant = await pendingInvitationFor(
         db, ORGANIZATION_TWO, inviteeId);
     assert.equal(afterGrant?.id, 'inv-dedup-step0-first');
@@ -78,7 +80,7 @@ async () => {
             declineAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
+    assert.equal(decline.status, 201);
     assert.equal(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,
@@ -98,7 +100,7 @@ async () => {
             grantAt: '2026-06-01T00:00:02.000000Z',
         },
     ));
-    assert.equal(regrant.status, 200);
+    assert.equal(regrant.status, 201);
     const candidates = (await deriveInvitations(db))
         .filter(inv => inv.organization_id === ORGANIZATION_TWO
             && inv.identity_id === inviteeId);
@@ -118,7 +120,7 @@ async () => {
             acceptAt: '2026-06-01T00:00:03.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assert.equal(accept.status, 201);
     assert.equal(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,

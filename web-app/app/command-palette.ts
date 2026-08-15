@@ -35,7 +35,7 @@ import {
 // intentionally outside the adapter barrel.
 import {
     sessionIsOrganizationScoped,
-} from './adapters/init.ts';
+} from './adapters/session-token.ts';
 import {
     PAGE_REGISTRY,
 } from './page-registry.ts';

@@ -30,6 +30,7 @@ import {
 import {
     formWritePair,
 } from '../api/message-pair.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // POST work-orders/:id/transition writes the transition state
 // event and an OPTIONAL claim-release event in ONE transaction.
@@ -97,6 +98,7 @@ async function appendLegacyTransition(
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
         db, 'wo1', body, SYSTEM_MEMBER_ID,

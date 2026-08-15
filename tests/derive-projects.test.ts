@@ -9,6 +9,9 @@ import {
     deriveProjectStateHistory,
 } from '../api/derive-projects.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // The projects sibling of tests/derive-ideas.test.ts: unit-level
 // lifecycle-reduction guarantees that tests/drift-projects.test.ts
@@ -23,13 +26,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -98,7 +100,7 @@ test(
             'deleted', '2020-01-01T00:00:00.000000Z',
             'ev-drv-skew-later',
         );
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
 
         // Genesis must still win the lifecycle reduction: the
         // project stays visible despite the later-arriving

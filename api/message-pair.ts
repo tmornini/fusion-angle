@@ -6,22 +6,21 @@ import { nowUtc } from './types.ts';
 import {
     generateCryptoSafeBase62,
 } from '../shared/crypto-safe-base62.ts';
-import { latestByKey } from '../shared/ledger-reduction.ts';
 import { messageAddress } from './message-address.ts';
+import { messageStore } from './message-store.ts';
 import {
     buildRequestModel,
     buildResponseModel,
-    canonicalJson,
-    messageHashOf,
-    bodyEtagOf,
+    storedWire,
+    requestMessageHash,
+    documentVersion,
+    bodyOctetsOf,
+    HEX64,
 } from './message-form.ts';
 import { validateIdentityTokenEntity } from './validators.ts';
 import type { FieldLine } from '../shared/http-message/types.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
-import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { REQUEST_ID_HEADER } from './request-context.ts';
 import {
     familyRegistration,
@@ -30,7 +29,12 @@ import {
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
 } from './family-registry.ts';
-import { HTTP_OK } from './http-errors.ts';
+import {
+    HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT, HTTP_BAD_REQUEST,
+    HTTP_PRECONDITION_FAILED, ApiError,
+} from './http-errors.ts';
+import type { NotificationEvent } from
+    './notifications.ts';
 
 // The shadow-ledger message pair: one row in `requests`, one
 // in `responses`, sharing `id`. Formed pre-tx (all crypto and
@@ -49,24 +53,20 @@ export interface MessagePair {
     // late as a same-tx write permits. Envelope only (S1): body
     // timestamps belong to the message's creator.
     readonly requestAt: string;
-    readonly uriPrefix: string;
+    readonly uriCollection: string;
     readonly uriId: string;
     readonly requesterIdentityId: Id;
-    readonly requestMessage: string;   // canonical
+    readonly requestMessage: string;   // serializeWire
     readonly requestHash: string;
     readonly responseStatus: number;
     readonly responseMessage: string;
     readonly responseEtag: string;
     readonly responseHash: string;
-    readonly supersedes?: string;      // absent == genesis
-    // The locked-class sibling of supersedes (spec §The two
-    // PUT classes): the verified If-Match pair id, carried
-    // forward as PROVENANCE rather than displacement — mutually
-    // exclusive with supersedes (a locked non-genesis write sets
-    // follows and never supersedes; a simple write sets
-    // supersedes and never follows). Absent == genesis, exactly
-    // like supersedes.
-    readonly follows?: string;
+    readonly method: string;
+    readonly operationId: string;
+    // Pre-tx lock-head pair id, latched when If-Match
+    // matches the advertised ETag. In-tx re-query only.
+    readonly latchedHeadPairId?: string;
 }
 
 // The gate's seed for the two /authentication/* grant routes
@@ -103,23 +103,20 @@ export interface WritePairInput {
     // The VERIFIED fence organization for organization-owned
     // families; undefined for the global plane. Decides the
     // canonical organization-nested prefix — see
-    // canonicalUriPrefix.
+    // canonicalUriCollection.
     readonly organization: Id | undefined;
     readonly responseStatus: number;
     readonly responseBody: unknown | undefined;
-    readonly headPairId: string | undefined;
-    // The locked-class counterpart of headPairId: the verified
-    // If-Match pair id, set by the caller ONLY when the gate's
-    // six-outcome table (api.ts) resolved the write as a
-    // matching-echo non-genesis locked write — mutually
-    // exclusive with headPairId (a caller passes one or the
-    // other, never both). Optional so every existing simple-
-    // family call site keeps compiling unchanged.
-    readonly follows?: string;
+    // 64-hex advertised ETag this later write is matching.
+    // Omitted on genesis / unconditional writes.
+    readonly matchedEtag?: string;
+    readonly latchedHeadPairId?: string;
+    // Required on every formed pair. Public writes supply
+    // the hoisted Operation-ID; seed and inner PUTs pass
+    // the envelope id here. Never minted for a public write.
+    readonly operationId: string;
 }
 
-const SUPERSEDES_FIELD = 'supersedes';
-const FOLLOWS_FIELD = 'follows';
 const RESPONSE_ID_FIELD = 'response-id';
 
 // Fallback for first path segments that are organization-
@@ -136,7 +133,7 @@ const ORGANIZATION_NESTED_FIRST_SEGMENTS: ReadonlySet<string> =
 // ONE prefix voice. A registered family's organizationNested
 // slot decides first; the literal set above is the fallback
 // for every not-yet-registered first segment.
-export function canonicalUriPrefix(
+export function canonicalUriCollection(
     organization: Id | undefined,
     flatPrefix: string,
 ): string {
@@ -153,77 +150,138 @@ export function canonicalUriPrefix(
     return flatPrefix;
 }
 
+export const OPERATION_ID_HEADER = 'operation-id';
+
+export function requireOperationId(
+    request: Request,
+    method: string,
+    bearerExempt: boolean,
+): Response | undefined {
+    if (bearerExempt) return undefined;
+    if (
+        method === 'GET' || method === 'HEAD'
+    ) {
+        return undefined;
+    }
+    const value = request.headers.get(
+        OPERATION_ID_HEADER,
+    );
+    if (value === null || value === '') {
+        return Response.json(
+            {
+                error: 'Operation-ID is required on '
+                    + method,
+            },
+            { status: HTTP_BAD_REQUEST },
+        );
+    }
+    if (!/^[0-9A-Za-z]{22}$/.test(value)) {
+        return Response.json(
+            {
+                error: 'Operation-ID must be a 22-'
+                    + 'character id',
+            },
+            { status: HTTP_BAD_REQUEST },
+        );
+    }
+    return undefined;
+}
+
+function headerFieldsWithOperationId(
+    fields: readonly FieldLine[],
+    operationId: string,
+): FieldLine[] {
+    if (fields.some((f) => f.name === OPERATION_ID_HEADER)) {
+        return [...fields];
+    }
+    return [
+        ...fields,
+        { name: OPERATION_ID_HEADER, value: operationId },
+    ];
+}
+
 export async function formWritePair(
     input: WritePairInput,
 ): Promise<MessagePair> {
+    if (!/^[0-9A-Za-z]{22}$/.test(input.operationId)) {
+        throw new Error(
+            'operationId must be a 22-character id',
+        );
+    }
     const id = generateCryptoSafeBase62();
     const address = messageAddress(
         input.routeSegments, input.pathSegments,
     );
-    const uriPrefix = canonicalUriPrefix(
-        input.organization, address.uriPrefix,
+    const uriCollection = canonicalUriCollection(
+        input.organization, address.uriCollection,
     );
     const createdId = createdEntityUriId(
         input.routePattern, input.body,
     );
     const uriId = createdId ?? address.uriId;
+    const headerFields = headerFieldsWithOperationId(
+        input.headerFields, input.operationId,
+    );
     const requestModel = buildRequestModel({
         method: input.method,
         target: input.pathname,
-        fields: input.headerFields,
+        fields: headerFields,
         body: input.body,
     });
     const responseFields = [
         { name: RESPONSE_ID_FIELD, value: id },
-        ...(input.headPairId === undefined ? [] : [{
-            name: SUPERSEDES_FIELD,
-            value: input.headPairId,
-        }]),
-        ...(input.follows === undefined ? [] : [{
-            name: FOLLOWS_FIELD,
-            value: input.follows,
-        }]),
     ];
     const responseModel = buildResponseModel({
         status: input.responseStatus,
         fields: responseFields,
         body: input.responseBody,
     });
-    const requestMessage = canonicalJson(requestModel);
-    const responseMessage = canonicalJson(responseModel);
+    const requestMessage = storedWire(requestModel);
+    const responseMessage = storedWire(responseModel);
+    const version = input.method === 'DELETE'
+        ? await requestMessageHash(responseMessage)
+        : await documentVersion(
+            bodyOctetsOf(responseModel),
+            input.matchedEtag,
+        );
     return {
         id,
         requestAt: input.requestAt,
-        uriPrefix,
+        uriCollection,
         uriId,
         requesterIdentityId: input.requesterIdentityId,
         requestMessage,
-        requestHash: await messageHashOf(requestMessage),
+        requestHash: await requestMessageHash(requestMessage),
         responseStatus: input.responseStatus,
         responseMessage,
-        responseEtag: await bodyEtagOf(responseModel),
-        responseHash: await messageHashOf(responseMessage),
-        ...(input.headPairId === undefined
-            ? {} : { supersedes: input.headPairId }),
-        ...(input.follows === undefined
-            ? {} : { follows: input.follows }),
+        responseEtag: version,
+        responseHash: await requestMessageHash(responseMessage),
+        method: input.method,
+        operationId: input.operationId,
+        ...(input.latchedHeadPairId !== undefined
+            ? { latchedHeadPairId: input.latchedHeadPairId }
+            : {}),
     };
 }
 
 // Complete an AuthPairSeed into a MessagePair for a grant's own
 // response: operation-addressed (uriId '', global plane — see
-// canonicalUriPrefix with organization undefined), never a
-// head-read, so it never chains (no Supersedes). The two
-// /authentication/* routes are the only callers; each grant
-// calls this pre-tx, once its own domain read has resolved the
-// requester identity and its response body is fully known.
+// canonicalUriCollection with organization undefined), never a
+// head-read. The two /authentication/* routes are the only
+// callers; each grant calls this pre-tx, once its own domain
+// read has resolved the requester identity and its response
+// body is fully known.
 export async function formAuthPair(
     seed: AuthPairSeed,
     body: Record<string, unknown>,
     requesterIdentityId: Id,
     responseStatus: number,
     responseBody: unknown,
+    operationId?: string,
 ): Promise<MessagePair> {
+    const hoisted = seed.headerFields.find(
+        (f) => f.name === OPERATION_ID_HEADER,
+    )?.value;
     return formWritePair({
         ...seed,
         body,
@@ -231,7 +289,9 @@ export async function formAuthPair(
         organization: undefined,
         responseStatus,
         responseBody,
-        headPairId: undefined,
+        operationId: operationId
+            ?? hoisted
+            ?? generateCryptoSafeBase62(),
     });
 }
 
@@ -253,13 +313,12 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
 // Synthesizes ONE identity_tokens row's event pair — the SAME
 // address, method, and response shape a real PUT
 // identity-tokens/:id would store for that exact row
-// ({id, jti, identity_id, action, chain_id, at}, per
-// validateIdentityTokenEntity), formed PRE-TX like every other
-// pair (formWritePair's own crypto never runs inside an open
+// (identityTokenEntityOf: jti, identity_id, action, chain_id,
+// at, id — GET wins). Formed PRE-TX like every other pair
+// (formWritePair's own crypto never runs inside an open
 // transaction — the auto-commit constraint). EVENT-APPEND, like
 // every identity_tokens row: identity-tokens/:id carries no
-// DOCUMENT_CLASS_ROUTE_PATTERNS entry, so headPairId is always
-// undefined here too — no head-read, no Supersedes.
+// DOCUMENT_CLASS_ROUTE_PATTERNS entry — no head-read.
 // requesterIdentityId is the event's OWN identity_id (the
 // affected identity) — the NAMED convention for a write with no
 // authenticated actor in view at this depth (an internal grant,
@@ -269,6 +328,7 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
 export async function formTokenEventPair(
     id: Id,
     event: Omit<IdentityTokenEntity, 'id'>,
+    operationId: string,
 ): Promise<MessagePair> {
     const pathSegments = [TOKEN_EVENT_ROUTE_SEGMENTS[0]!, id];
     const body = event as unknown as Record<string, unknown>;
@@ -285,28 +345,58 @@ export async function formTokenEventPair(
         organization: undefined,
         responseStatus: HTTP_OK,
         responseBody: {
-            id,
             ...validateIdentityTokenEntity(body),
+            id,
         },
-        headPairId: undefined,
+        operationId,
     });
 }
 
-// Pre-tx head-read: latest response pair id at the address, by
-// the (at, id) reduction — provenance source for Supersedes.
-// Returns undefined when the address is virgin.
+// Live PUT pair id at the address. POST/PATCH are not
+// heads. DELETE head and a virgin address are undefined.
 export async function headPairIdAt(
     db: DbAdapter,
-    uriPrefix: string,
+    uriCollection: string,
     uriId: string,
 ): Promise<string | undefined> {
-    const rows = await db.responses
-        .getAllWhere('uri_id', uriId);
-    const atAddress = rows.filter(
-        (row) => row.uri_prefix === uriPrefix,
+    const stored = await messageStore(db).get(
+        uriCollection, uriId,
     );
-    return latestByKey(atAddress, () => 'head')
-        .get('head')?.id;
+    return stored?.id;
+}
+
+// Latest PUT or DELETE at the address. Virgin is undefined.
+// DELETE head is a gone document, not a miss.
+export async function documentHeadAt(
+    db: DbAdapter,
+    uriCollection: string,
+    uriId: string,
+): Promise<{ id: string; method: string } | undefined> {
+    const pairs = await messageStore(db).getPairs(
+        uriCollection, uriId,
+    );
+    let head: {
+        at: string;
+        id: string;
+        method: string;
+    } | undefined;
+    for (const pair of pairs) {
+        const method = pair.request.method;
+        if (method !== 'PUT' && method !== 'DELETE') {
+            continue;
+        }
+        const at = pair.response.at;
+        const id = pair.response.id;
+        if (
+            head === undefined
+            || at > head.at
+            || (at === head.at && id > head.id)
+        ) {
+            head = { at, id, method };
+        }
+    }
+    if (head === undefined) return undefined;
+    return { id: head.id, method: head.method };
 }
 
 // Pre-tx idempotency fast-path: the stored response message
@@ -332,15 +422,17 @@ export function httpDateOf(at: string): string {
 }
 
 // Locked PUT and PATCH concurrency dialect: If-Match carries
-// the strong ETag (head document-pair response id). Not a
+// the strong ETag (quoted 64-hex documentVersion). Not a
 // credential — stored verbatim so two writes differing only
 // in If-Match are different messages for replay identity.
 export const IF_MATCH_HEADER = 'if-match';
 
-// Parse a wire If-Match value into the opaque pair id.
-// Accepts exactly one strong etag (`"id"`). Anything else —
-// `*`, weak (`W/"…"`), lists, unquoted — yields undefined;
-// the caller answers 400 (malformed precondition).
+export { HEX64 } from './message-form.ts';
+
+// Parse a wire If-Match value into the unquoted 64-hex
+// tag. Accepts exactly one strong etag (`"<hex64>"`).
+// Anything else — `*`, weak, lists, unquoted, pair id —
+// yields undefined; the caller answers 400.
 export function parseIfMatch(
     header: string,
 ): string | undefined {
@@ -352,27 +444,29 @@ export function parseIfMatch(
         return undefined;
     }
     const inner = header.slice(1, -1);
-    if (inner.length === 0 || inner.includes('"')) {
-        return undefined;
-    }
+    if (!HEX64.test(inner)) return undefined;
     return inner;
 }
 
 // Recover the client's If-Match target from a formed wire
 // pair's request message (hoisted into the hash). This is
-// the gate-verified anchor for R9 / revision.follows — never
-// re-derive a live head and treat it as the client's echo.
-export function ifMatchFromPair(
-    pair: MessagePair,
+// the gate-verified latch for the in-tx head re-read —
+// never re-derive a live head and treat it as the echo.
+export function ifMatchFromMessage(
+    message: string,
 ): string | undefined {
-    const model = parseJson(
-        pair.requestMessage, defaultBodyRegistry(),
-    );
+    const model = parseWire(message);
     const field = model.fields.find(
         (line) => line.name === IF_MATCH_HEADER,
     );
     if (field === undefined) return undefined;
     return parseIfMatch(field.value);
+}
+
+export function ifMatchFromPair(
+    pair: MessagePair,
+): string | undefined {
+    return ifMatchFromMessage(pair.requestMessage);
 }
 
 // Raw If-Match header value from a formed pair —
@@ -383,26 +477,31 @@ export function ifMatchFromPair(
 export function rawIfMatchFromPair(
     pair: MessagePair,
 ): string | undefined {
-    const model = parseJson(
-        pair.requestMessage, defaultBodyRegistry(),
-    );
+    const model = parseWire(pair.requestMessage);
     const field = model.fields.find(
         (line) => line.name === IF_MATCH_HEADER,
     );
     return field?.value;
 }
 
-// Strong wire ETag for a document-pair response id.
-// Distinct from `responses.etag` (body sha256 column).
-export function strongEtagOf(pairId: string): string {
-    return '"' + pairId + '"';
+// Strong wire ETag: quotes a 64-hex version token.
+export function strongEtagOf(tag: string): string {
+    return '"' + tag + '"';
 }
 
 // Attach the strong ETag header; returns the same Response.
 export function attachEtag(
-    response: Response, pairId: string,
+    response: Response, tag: string,
 ): Response {
-    response.headers.set('ETag', strongEtagOf(pairId));
+    response.headers.set('ETag', strongEtagOf(tag));
+    return response;
+}
+
+// Attach IMF-fixdate Date from an RFC-3339 zulu `at`.
+export function attachDate(
+    response: Response, at: string,
+): Response {
+    response.headers.set('Date', httpDateOf(at));
     return response;
 }
 
@@ -411,7 +510,7 @@ export function attachEtag(
 // verbatim, including `authorization`.
 const HOISTED_HEADER_NAMES: readonly string[] = [
     'authorization', 'content-type', 'idempotency-key',
-    REQUEST_ID_HEADER, IF_MATCH_HEADER,
+    REQUEST_ID_HEADER, IF_MATCH_HEADER, OPERATION_ID_HEADER,
 ];
 
 export function hoistedHeaderFields(request: Request): FieldLine[] {
@@ -433,24 +532,17 @@ export function wireHeadersFor(stored: ResponseEntity): HeadersInit {
     const headers: Record<string, string> = {
         'Date': httpDateOf(stored.at),
         'Response-ID': stored.id,
+        'Operation-ID': stored.operation_id,
     };
-    if (stored.supersedes !== undefined) {
-        headers['Supersedes'] = stored.supersedes;
-    }
-    if (stored.follows !== undefined) {
-        headers['Follows'] = stored.follows;
-    }
     return headers;
 }
 
 // Rebuild the wire Response from a stored response row's
-// canonical message — the one reconstruction path shared by a
-// fresh write's success return and an idempotent replay's early
-// return.
+// serializeWire message — the one reconstruction path shared
+// by a fresh write's success return and an idempotent replay's
+// early return.
 export function responseFromStored(stored: ResponseEntity): Response {
-    const model = parseJson(
-        stored.message, defaultBodyRegistry(),
-    );
+    const model = parseWire(stored.message);
     if (model.startLine.kind !== 'response') {
         throw new Error(
             'stored response message has no status line: '
@@ -467,6 +559,60 @@ export function responseFromStored(stored: ResponseEntity): Response {
         : new Response(null, init);
 }
 
+// Stream a stored PUT as this caller's GET: same body
+// octets, Date replaced with now, no Operation-ID.
+// ETag and Response-ID are projection headers.
+export function streamGetFromStored(
+    stored: ResponseEntity,
+    at: string,
+): Response {
+    const model = parseWire(stored.message);
+    if (model.startLine.kind !== 'response') {
+        throw new Error(
+            'stored response message has no status line: '
+            + stored.id,
+        );
+    }
+    const headers = new Headers();
+    headers.set('Date', httpDateOf(at));
+    headers.set('Response-ID', stored.id);
+    const storedBody = HttpMessage.fromModel(model).body();
+    if (storedBody.exists()) {
+        headers.set('Content-Type', 'application/json');
+    }
+    const response = storedBody.exists()
+        ? new Response(storedBody.toText(), {
+            status: HTTP_OK,
+            headers,
+        })
+        : new Response(null, {
+            status: HTTP_OK,
+            headers,
+        });
+    return attachEtag(response, stored.version);
+}
+
+// Send-time status: 201 if this request appended a pair
+// (PUT/PATCH/POST), 200 if it stored nothing, DELETE 204.
+// Stored start-line stays GET-shaped 200 / DELETE 204.
+// Operation-ID is added here (wireHeadersFor), never stored
+// on the GET-shaped blob.
+export function sendWriteResponse(
+    stored: ResponseEntity,
+    method: string,
+    appended: boolean,
+): Response {
+    const rendered = responseFromStored(stored);
+    const status = method === 'DELETE'
+        ? HTTP_NO_CONTENT
+        : appended ? HTTP_CREATED : HTTP_OK;
+    if (status === rendered.status) return rendered;
+    return new Response(rendered.body, {
+        status,
+        headers: rendered.headers,
+    });
+}
+
 // The pre-store body of a just-formed pair's own response
 // message — a handler that must act on a value the gate's
 // successBody resolver already minted (token rotation's
@@ -475,9 +621,7 @@ export function responseFromStored(stored: ResponseEntity): Response {
 export function pairResponseBody(
     pair: MessagePair,
 ): Record<string, unknown> | undefined {
-    const model = parseJson(
-        pair.responseMessage, defaultBodyRegistry(),
-    );
+    const model = parseWire(pair.responseMessage);
     const body = HttpMessage.fromModel(model).body();
     return body.exists()
         ? JSON.parse(body.toText()) as Record<string, unknown>
@@ -493,7 +637,10 @@ export function pairResponseBody(
 // (api.ts) since it also folds in postWriteNotification between
 // the lookup and the response there.
 export async function storedPairResponse(
-    adapter: DbAdapter, requestHash: string, opName: string,
+    adapter: DbAdapter,
+    requestHash: string,
+    opName: string,
+    method: string,
 ): Promise<Response> {
     const stored = await storedResponseFor(adapter, requestHash);
     if (stored === undefined) {
@@ -501,7 +648,7 @@ export async function storedPairResponse(
             opName + ' stored no pair for a wired write',
         );
     }
-    return responseFromStored(stored);
+    return sendWriteResponse(stored, method, true);
 }
 
 // In-tx put by pair id (row ops only, no crypto): writes both
@@ -520,13 +667,39 @@ export async function putMessagePair(
     view: DbAdapter,
     pair: MessagePair,
 ): Promise<void> {
+    await coordinateWrite(view, pair, false);
+    await writePairRows(view, pair);
+    await notifyWrite(view, pair);
+}
+
+// In-tx append (row ops only, no crypto): skips silently if a
+// request with the same hash is already stored (the concurrent
+// -retry guard); otherwise puts both rows via writePairRows.
+export async function appendMessagePair(
+    view: DbAdapter,
+    pair: MessagePair,
+): Promise<void> {
+    await coordinateWrite(view, pair, true);
+    const replay = await view.requests
+        .getAllWhere('message_hash', pair.requestHash);
+    if (replay.length > 0) return;
+    await writePairRows(view, pair);
+    await notifyWrite(view, pair);
+}
+
+async function writePairRows(
+    view: DbAdapter,
+    pair: MessagePair,
+): Promise<void> {
     await view.requests.put(pair.id, {
-        uri_prefix: pair.uriPrefix,
+        uri_collection: pair.uriCollection,
         uri_id: pair.uriId,
         at: pair.requestAt,
         requester_identity_id: pair.requesterIdentityId,
         message_hash: pair.requestHash,
         message: pair.requestMessage,
+        method: pair.method,
+        operation_id: pair.operationId,
     });
     // The response row's `at` — SAME column name as the
     // requests row, per the author — is minted HERE, as late
@@ -534,31 +707,102 @@ export async function putMessagePair(
     // await, so the auto-commit constraint (which bars only
     // awaited promises) is not in play.
     await view.responses.put(pair.id, {
-        uri_prefix: pair.uriPrefix,
+        uri_collection: pair.uriCollection,
         uri_id: pair.uriId,
         at: nowUtc(),
-        status: pair.responseStatus,
-        etag: pair.responseEtag,
-        message_hash: pair.responseHash,
+        version: pair.responseEtag,
         message: pair.responseMessage,
-        ...(pair.supersedes === undefined
-            ? {} : { supersedes: pair.supersedes }),
-        ...(pair.follows === undefined
-            ? {} : { follows: pair.follows }),
+        operation_id: pair.operationId,
     });
 }
 
-// In-tx append (row ops only, no crypto): skips silently if a
-// request with the same hash is already stored (the concurrent
-// -retry guard); otherwise puts both rows via putMessagePair.
-export async function appendMessagePair(
+// Lock order: import (shared), dedup if hash-deduped,
+// address if gated, then FOR UPDATE + a new latest SELECT.
+async function coordinateWrite(
+    view: DbAdapter,
+    pair: MessagePair,
+    hashDeduped: boolean,
+): Promise<void> {
+    const locks = view.writeLocks;
+    if (locks === undefined) return;
+    await locks.lockImportShared();
+    if (hashDeduped) {
+        await locks.lockDedup(pair.requestHash);
+    }
+    const gated = isGatedAddress(pair.uriCollection);
+    if (gated) {
+        await locks.lockAddress(
+            pair.uriCollection, pair.uriId,
+        );
+    }
+    const latched = pair.latchedHeadPairId;
+    if (latched !== undefined) {
+        await locks.lockHead(latched);
+        const latest = await locks.latestPutDelete(
+            pair.uriCollection, pair.uriId,
+        );
+        if (latest === null || latest.id !== latched) {
+            throw new ApiError(
+                'If-Match does not match the current'
+                + ' document at '
+                + pair.uriCollection + pair.uriId,
+                HTTP_PRECONDITION_FAILED,
+            );
+        }
+        return;
+    }
+    if (!gated) return;
+    const latest = await locks.latestPutDelete(
+        pair.uriCollection, pair.uriId,
+    );
+    if (latest !== null && latest.method === 'PUT') {
+        throw new ApiError(
+            'If-Match does not match the current'
+            + ' document at '
+            + pair.uriCollection + pair.uriId,
+            HTTP_PRECONDITION_FAILED,
+        );
+    }
+}
+
+async function notifyWrite(
     view: DbAdapter,
     pair: MessagePair,
 ): Promise<void> {
-    const replay = await view.requests
-        .getAllWhere('message_hash', pair.requestHash);
-    if (replay.length > 0) return;
-    await putMessagePair(view, pair);
+    const notify = view.writeLocks?.notify;
+    if (notify === undefined) return;
+    await notify(eventForPair(pair));
+}
+
+function eventForPair(
+    pair: MessagePair,
+): NotificationEvent {
+    const parts = pair.uriCollection
+        .split('/')
+        .filter((part) => part !== '');
+    const organizationIds =
+        parts[0] === 'organizations'
+            && parts[1] !== undefined
+            ? [parts[1]]
+            : [];
+    return {
+        kind: 'scoped',
+        organizationIds,
+        identityIds: [pair.requesterIdentityId],
+    };
+}
+
+function isGatedAddress(collection: string): boolean {
+    const parts = collection
+        .split('/')
+        .filter((part) => part !== '');
+    const family = parts[0] === 'organizations'
+        ? (parts[2] ?? '')
+        : (parts[0] ?? '');
+    const concurrency = familyRegistration(family)
+        ?.concurrency;
+    return concurrency === 'locked'
+        || concurrency === 'create-only';
 }
 
 // The create-address override table: which body field names
@@ -686,8 +930,9 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     RECORD_TYPE_DETAIL_PATTERN,
     // Nested attributes detail (Task 7): admin PUT/DELETE.
     ATTRIBUTE_DETAIL_PATTERN,
-    // Nested instances detail (Task 15): create-only PUT
-    // (PAIR_WIRED only — R10 keeps DOCUMENT_CLASS clear).
+    // Nested instances detail: PATCH create/update +
+    // DELETE (PAIR_WIRED only — R10 keeps DOCUMENT_CLASS
+    // clear). Public PUT is 405 (Task 20).
     INSTANCE_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
@@ -727,12 +972,12 @@ export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
 
 // The head-read class, PER ROUTE PATTERN — never inferred from
 // a request's own uriId. A document address is revisited
-// (create then update, or repeated PUT) and forms a Supersedes
-// chain via a pre-tx head-read; an operation address (uriId
-// always '') and an event-append address (a fresh, client-
-// minted id every write, e.g. states/:id) never chain, even
-// though an event-append uriId is never ''. Grown family by
-// family alongside PAIR_WIRED_ROUTE_PATTERNS.
+// (create then update, or repeated PUT) and takes a pre-tx
+// head-read; an operation address (uriId always '') and an
+// event-append address (a fresh, client-minted id every write,
+// e.g. states/:id) never head-read, even though an event-
+// append uriId is never ''. Grown family by family alongside
+// PAIR_WIRED_ROUTE_PATTERNS.
 // 'identities/:id/pii' is RETIRED here (Phase 10 Task 3): the
 // /pii address is the message plane's sanctioned hard-delete
 // zone (api/pii-hard-delete.ts) — CHAINLESS by construction, so
@@ -753,8 +998,8 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         // api.ts's isLockedWrite exact-matches routePattern ===
         // family + '/:id', and a 4-segment pattern never
         // equals 'flows/:id' — so registering tags here safely
-        // opts that address into the ordinary head-read/
-        // Supersedes chain, never the locked four-outcome table.
+        // opts that address into the ordinary head-read,
+        // never the locked four-outcome table.
         'flows/:id/tags/:name',
         'work-orders',
         'work-orders/:id',
@@ -781,8 +1026,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         // share the supersession chain at the type uri_id.
         RECORD_TYPES_COLLECTION_PATTERN,
         // Nested record-types detail (Task 3): simple class —
-        // gate stamps supersedes for non-locked PUTs; no
-        // If-Match required on types.
+        // no If-Match required on types.
         RECORD_TYPE_DETAIL_PATTERN,
         // Nested attributes detail (Task 7): simple class —
         // attributes never join the If-Match dialect.

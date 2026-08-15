@@ -21,10 +21,31 @@ const KEYED_READS: ReadonlyArray<{
     column: string;
 }> = [
     { table: 'requests', column: 'message_hash' },
-    { table: 'responses', column: 'uri_id' },
-    { table: 'requests', column: 'uri_prefix' },
-    { table: 'responses', column: 'uri_prefix' },
+    { table: 'requests', column: 'uri_collection' },
+    { table: 'requests', column: 'operation_id' },
+    { table: 'responses', column: 'uri_collection' },
+    { table: 'responses', column: 'operation_id' },
+    { table: 'responses', column: 'version' },
 ];
+
+test('no caller getAllWhere uri_id', async () => {
+    assert.equal(
+        KEYED_READS.some((r) => r.column === 'uri_id'),
+        false,
+    );
+});
+
+test('responses carry no unique follows index', () => {
+    const cols = TABLE_INDEXES['responses'] ?? [];
+    assert.equal(
+        cols.some(
+            (spec) =>
+                typeof spec !== 'string'
+                && spec.column === 'follows',
+        ),
+        false,
+    );
+});
 
 test('every keyed read has a matching secondary index', () => {
     for (const { table, column } of KEYED_READS) {

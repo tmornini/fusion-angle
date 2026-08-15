@@ -18,6 +18,7 @@ import {
 import { formWritePair } from '../api/message-pair.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // A revoked-but-unexpired token must not be launderable into a
 // fresh valid pair by the token-exchange or refresh grants —
@@ -73,7 +74,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,

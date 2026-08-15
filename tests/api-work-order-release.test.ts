@@ -15,6 +15,9 @@ import { seedCurrentMember } from './member-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { nowUtc } from '../api/types.ts';
 import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
+import {
     generateCryptoSafeBase62,
 } from '../shared/crypto-safe-base62.ts';
 import { workOrderClaimHistoryFor } from
@@ -31,13 +34,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -129,7 +131,7 @@ test(
                 releaseAt,
             },
         ));
-        assert.equal(res.status, 204);
+        assert.equal(res.status, 201);
         const events = await claimEventsFor(db);
         const released = events.find(
             (ev) => ev.id === 'rel-ev-1',
@@ -156,7 +158,7 @@ test(
                 releaseAt: nowUtc(),
             },
         ));
-        assert.equal(res.status, 204);
+        assert.equal(res.status, 201);
         // No live claim → pair derives zero events; history
         // carries no event with id 'rel-ev-2'.
         const events = await claimEventsFor(db);
@@ -189,7 +191,7 @@ test(
                 releaseAt: nowUtc(),
             },
         ));
-        assert.equal(res.status, 204);
+        assert.equal(res.status, 201);
         // claim_released authored by the releasing actor
         // (current), not the prior claimant (other).
         const events = await claimEventsFor(db);

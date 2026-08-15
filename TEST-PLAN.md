@@ -64,6 +64,10 @@ automated test files and what each covers.
 This UI plan therefore focuses on what automated tests cannot
 verify: layout, gestures, navigation, drag-and-drop, dialog
 behavior, and end-to-end user flows through the rendered DOM.
+Section **SV** is the Node + Postgres server ZIP (a separate
+ceremony from the IndexedDB / browser-ZIP cases): two
+browsers, two identities, one database, a shared refresh
+cookie, and the named stale-until-navigation residual.
 
 The fast suite (`./test` / `./validate`) now also covers:
 flow-edit business logic and the connection-validation rules
@@ -477,7 +481,9 @@ lockups — seven sections fanned out at once, none wedged.
 
 The same TEST-PLAN.md runs serially by one human in one browser
 following document order (A → AA → B → C → D → E → F → F2 → FS
-→ G → H → I → K → R → L → J). The agent-scoped mutation domains and
+→ G → H → I → K → R → L → J). Section SV is a separate
+ceremony (see Execution Order) — not in that chain. The
+agent-scoped mutation domains and
 tolerance patterns apply only to the parallel run.
 
 ### Execution Order
@@ -497,6 +503,14 @@ each with its own browser tab and disjoint entity mutation
 domain; I runs alone (global UI state); G30–G35 run alone
 last (they wipe the database). See `CLAUDE.md` section
 `## Testing`.
+
+**SV is a separate ceremony.** It is not part of the A–J
+IndexedDB / browser-ZIP run. Unzip
+`fusion-ai-server-${SHA}.zip`, set `POSTGRES_URL`,
+`JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT`, seed an
+empty database with `--seed-mock-data`, then run SV
+against that Node origin. Do not mix SV with the
+python `http.server` IndexedDB cases.
 
 ## Summary
 
@@ -519,7 +533,8 @@ last (they wipe the database). See `CLAUDE.md` section
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
 | L. IndexedDB Persistence Tier | 9 |
-| **Total** | **404** |
+| SV. Server (Node + Postgres) | 10 |
+| **Total** | **414** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -528,13 +543,13 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |     3014 |
-| Browser regression     |      404 |
-| **Combined TOTAL**     | **3418** |
+| CLI automated tests    |     3196 |
+| Browser regression     |      414 |
+| **Combined TOTAL**     | **3610** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
-suite (3006 main + 8 tz);
+suite (3188 main + 8 tz);
 the number grows as tests land in either glob. Browser count =
 the per-section table above. Update both numbers when either
 side changes.
@@ -552,8 +567,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 3418, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (3418).
+`PASS = 3610, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (3610).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -2880,6 +2895,55 @@ Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fus
 - [ ] **J2** Remove the build directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
 - [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-ai-<sha>.zip` exists.
 
+## SV. Server (Node + Postgres)
+
+This section is a separate ceremony from A–J / L. Those
+cases drive the browser ZIP over IndexedDB (`python3 -m
+http.server`). These cases drive
+`fusion-ai-server-${SHA}.zip` served by `server.mjs`
+(`boot()` in `server/boot.ts`) against one Postgres.
+
+Operator prerequisites (Tasks 40–47):
+
+- `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and
+  `HTTP_SERVER_PORT` set (required; no defaults; never
+  logged)
+- Empty database; seed with `--seed-mock-data`
+- Credentials print once on **stderr**, never HTTP
+- One mint process — do not run two `server.mjs` replicas
+- Prefer a dedicated port so a leftover `fusion-ai`
+  IndexedDB from the A–J origin cannot confuse inspection
+
+Named residual (A8): the backend emits
+`pg_notify('fusion_events', …)` inside the write
+transaction. There is no LISTEN and no SSE client. A
+second browser looking stale until it navigates is
+**PASS**, not FAIL. BroadcastChannel is same-origin
+same-browser only and is not the server-ZIP data path.
+Do not file **SV10** as a regression.
+
+### Browser against the real server
+
+- [ ] **SV1** Unzip `fusion-ai-server-${SHA}.zip`. From that directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an empty Postgres, run `node server.mjs --seed-mock-data`. PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP.
+- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the root hop to auth). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process, not `python3 -m http.server` / IndexedDB.
+- [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-ai:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
+- [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
+- [ ] **SV5** In a signed-out profile (or after Sign out), open `snapshots/`. PASS: bounced to `auth` — snapshots require a session on this ZIP. (B19 is the browser-ZIP / IndexedDB contract; do not treat this as B19 failing.)
+
+### Two browsers / two identities / one database
+
+- [ ] **SV6** Two cookie jars against the same origin (Chrome + Firefox, or Chrome + a Guest profile). In browser A, sign in as `demo@example.com`. In browser B, sign in as `sarah.chen@company.com` (stderr password; Sarah is Stark, same organization as the admin). PASS: both dashboards load; the sidebar member chips name different people; one Postgres, two sessions.
+- [ ] **SV7** In browser A, create an idea with a unique title (Ideas → Create Idea → required fields → Submit Idea). In browser B, navigate to `ideas/` (or reload if already there). PASS: Sarah's list includes A's new idea — two identities, one database.
+
+### Two tabs share the refresh cookie
+
+- [ ] **SV8** Same browser profile as the admin session (SV2). In tab A, stay signed in. Open `dashboard/index.html` in a new tab B. PASS: tab B stays authenticated with no second sign-in — both tabs share the `refresh_token` cookie; boot cookie-refreshes.
+- [ ] **SV9** In tab A, click Sign out. In tab B, navigate (sidebar click or reload). PASS: tab B lands on `auth` — logout cleared the shared cookie (`Set-Cookie` `Max-Age=0`); boot refresh cannot mint. (An already-painted tab B may still hold a live access token in memory until that navigation — that is the access-TTL covenant, not a failed cookie clear.)
+
+### Named residual — stale-until-navigation
+
+- [ ] **SV10** Re-sign browser A as `demo@example.com` if SV9 cleared that session. With browser B already sitting on `ideas/` (do not reload), create a distinctly titled idea in browser A. PASS / named residual: B's open list does not gain the new card until B navigates or reloads. There is no NOTIFY listener; BroadcastChannel does not cross browsers. A second browser looking stale until navigation is **not FAIL**. After B navigates or reloads, the card from this write is present (same pin as SV7).
+
 ---
 
 ## Summary Format
@@ -2916,6 +2980,7 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Phase-3       | I1–I30            |    X |       Y |    Z |
 | Phase-4       | G30–G35 + L1–L9 + K8 | X |       0 |    0 |
 | Teardown      | J1–J3             |    3 |       0 |    0 |
+| Server        | SV1–SV10          |   10 |       0 |    0 |
 
 ## BLOCKED detail (known MCP limitations — NOT failures)
 - <case ID>: <one-line reason>

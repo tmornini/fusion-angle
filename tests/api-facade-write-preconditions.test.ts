@@ -5,6 +5,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { GET, GETWithEtag, PUT } from '../api/api.ts';
+import { HEX64 } from '../api/message-form.ts';
 import { jitteredBackoff } from
     '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
@@ -74,9 +75,8 @@ test('PUT with no headerFields behaves exactly as before —'
     assert.equal(written.title, 'No Headers');
 });
 
-test('GETWithEtag returns the parsed body and an'
-+ ' undefined etag when the route carries no ETag'
-+ ' header (simple-class ideas/:id)',
+test('GETWithEtag returns the parsed body and the'
++ ' stored PUT version as ETag (streamed ideas/:id)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -89,7 +89,7 @@ async () => {
             id: string; title: string;
         }>(db, 'ideas/idea-hdr-3', token);
     assert.equal(body.title, 'Plain');
-    assert.equal(etag, undefined);
+    assert.ok(etag !== undefined && HEX64.test(etag));
 });
 
 test('GETWithEtag and GET agree on the body for the'

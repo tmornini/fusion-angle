@@ -51,10 +51,13 @@ export const HTTP_NOT_FOUND = 404;
 export const HTTP_METHOD_NOT_ALLOWED = 405;
 export const HTTP_CONFLICT = 409;
 export const HTTP_PRECONDITION_FAILED = 412;
+export const HTTP_PAYLOAD_TOO_LARGE = 413;
+export const HTTP_TOO_MANY_REQUESTS = 429;
 export const HTTP_PRECONDITION_REQUIRED = 428;
 export const HTTP_UNPROCESSABLE_ENTITY = 422;
 export const HTTP_INTERNAL_ERROR = 500;
 export const HTTP_NOT_IMPLEMENTED = 501;
+export const HTTP_GATEWAY_TIMEOUT = 504;
 
 // A JSON error response at one status — the shape every
 // invitation guard returns on rejection.

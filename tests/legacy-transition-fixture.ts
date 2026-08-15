@@ -8,6 +8,7 @@ import {
 import {
     SYSTEM_MEMBER_ID,
 } from '../api/types.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // Task 8 CUT: live gate rejects fieldValues. Census pins
 // that need a STORED legacy fold seed via the below-facade
@@ -46,6 +47,7 @@ export async function appendLegacyTransition(
         organization,
         responseStatus: 204,
         responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
         db, workOrderId, body, actor,

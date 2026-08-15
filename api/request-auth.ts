@@ -14,7 +14,10 @@ import type {
     AuthenticatedContext,
     RequestContext,
 } from './request-context.ts';
-import { HTTP_FORBIDDEN } from './http-errors.ts';
+import {
+    HTTP_FORBIDDEN,
+    HTTP_UNAUTHORIZED,
+} from './http-errors.ts';
 import {
     projectClaimRolesForOrganization,
     isPermitted,
@@ -40,14 +43,12 @@ export const AUTHENTICATION_ROUTES: ReadonlySet<string> =
         'authentication/authorize',
     ]);
 
-// The snapshot/bootstrap plane is auth-free — a dev-tier
-// install/demo surface that runs below the auth tier (it
-// installs the datastore before any identity can exist). It
-// carries no bearer and no route policy, regardless of
-// whether a schema exists. This is a KNOWN, accepted dev-tier
-// decision, not a regression — see ARCHITECTURE.md
-// § Server-tier deploy blockers. The whole exemption MUST be
-// removed or re-gated when the Postgres server tier lands.
+// The snapshot/bootstrap plane. The set still names that
+// plane (postWriteNotification posts a full-refresh). The
+// browser ZIP treats these routes as bearer-exempt. The
+// server ZIP — setServerTier(true) from server/boot.ts —
+// does not. AUTHENTICATION_ROUTES stay exempt on both
+// tiers. Do not sniff window; only boot() sets the flag.
 export const BOOTSTRAP_ROUTES: ReadonlySet<string> =
     new Set([
         'snapshots/schema',
@@ -55,6 +56,16 @@ export const BOOTSTRAP_ROUTES: ReadonlySet<string> =
         'snapshots/bootstrap',
         'snapshots/import',
     ]);
+
+let serverTier = false;
+
+export function setServerTier(enabled: boolean): void {
+    serverTier = enabled;
+}
+
+export function isServerTier(): boolean {
+    return serverTier;
+}
 
 export async function authenticateRequest(
     ctx: IncomingContext,
@@ -85,6 +96,18 @@ export async function authenticateRequest(
     };
 }
 
+// Wire body is the named class. The specific reason is
+// logged only — never returned.
+export function unauthorizedBearerResponse(
+    reason: string,
+): Response {
+    console.warn('authentication failed', { reason });
+    return Response.json(
+        { error: 'invalid_token' },
+        { status: HTTP_UNAUTHORIZED },
+    );
+}
+
 type FenceResult =
     | { ok: true; ctx: RequestContext }
     | { ok: false; error: string; status: number };
@@ -105,7 +128,7 @@ type FenceResult =
 // (write authorizer / resolveGlobalOwner) remain pair-plane
 // reads. Phase Final Task 5 retired the store decorator:
 // handlers receive ctx.base; pair-plane tenancy rides
-// uri_prefix.
+// uri_collection.
 export async function fenceRequest(
     ctx: AuthenticatedContext,
 ): Promise<FenceResult> {
@@ -205,12 +228,22 @@ type ParsedBody =
     | { ok: true; body: Record<string, unknown> }
     | { ok: false };
 
-export async function parseObjectBody(
-    request: Request,
-): Promise<ParsedBody> {
+type ParsedPutBody =
+    | { ok: true; body: Record<string, unknown> | undefined }
+    | { ok: false };
+
+function parseObjectText(
+    text: string,
+    allowEmpty: boolean,
+): ParsedPutBody {
+    if (text === '') {
+        return allowEmpty
+            ? { ok: true, body: undefined }
+            : { ok: false };
+    }
     let parsed: unknown;
     try {
-        parsed = await request.json();
+        parsed = JSON.parse(text);
     } catch {
         return { ok: false };
     }
@@ -225,4 +258,20 @@ export async function parseObjectBody(
         ok: true,
         body: parsed as Record<string, unknown>,
     };
+}
+
+export async function parseObjectBody(
+    request: Request,
+): Promise<ParsedBody> {
+    return parseObjectText(
+        await request.text(), false,
+    ) as ParsedBody;
+}
+
+// PUT may carry an empty body: a live empty document,
+// never a delete. POST/PATCH still reject empty as 400.
+export async function parsePutBody(
+    request: Request,
+): Promise<ParsedPutBody> {
+    return parseObjectText(await request.text(), true);
 }

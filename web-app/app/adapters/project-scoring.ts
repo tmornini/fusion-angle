@@ -2,7 +2,6 @@ import type {
     Id,
     ObjectiveEntity,
     ObjectiveId,
-    ProjectEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
 } from '../../../api/types.ts';
@@ -182,7 +181,7 @@ export async function getPortfolioImpactSummary(
         allActual,
     ] = await Promise.all([
         getObjectives(ctx),
-        ctx.GET<ProjectEntity[]>('projects'),
+        getProjectEntities(ctx),
         getAllBaselineScores(ctx),
         getAllActualScores(ctx),
     ]);
@@ -275,7 +274,7 @@ export async function getObjectiveScoringInputs(
         actualScores,
     ] = await Promise.all([
         getActiveObjectives(ctx),
-        ctx.GET<ProjectEntity[]>('projects'),
+        getProjectEntities(ctx),
         getAllBaselineScores(ctx),
         getAllActualScores(ctx),
     ]);
@@ -491,7 +490,7 @@ export async function getProjectsScoreColumn(
     ] = await Promise.all([
         getActiveObjectives(ctx),
         getObjectives(ctx),
-        ctx.GET<ProjectEntity[]>('projects'),
+        getProjectEntities(ctx),
         getAllBaselineScores(ctx),
         getAllActualScores(ctx),
     ]);

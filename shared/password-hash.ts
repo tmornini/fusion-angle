@@ -2,6 +2,7 @@
 // `secret` column. Self-describing PHC / modular-crypt strings:
 //
 //   $pbkdf2-sha256$i=<iterations>$<b64url-salt>$<b64url-digest>
+//   $scrypt$ln=17,r=8,p=1$<b64url-salt>$<b64url-digest>
 //
 // hashPassword writes with CURRENT_PASSWORD_HASH (one algorithm,
 // never a permanent second). verifyPassword parses the embedded
@@ -11,7 +12,7 @@
 // never crash a login).
 //
 // PBKDF2 is TRANSITIONAL. At the server tier CURRENT_PASSWORD_HASH
-// flips to scrypt (Node's built-in crypto.scryptSync — a
+// flips to scrypt (Node's built-in crypto.scrypt — a
 // zero-dependency, memory-hard platform primitive). During a
 // bounded window the pbkdf2 verifier stays so any $pbkdf2-sha256$
 // row verifies-then-rehashes on next login; the self-describing
@@ -30,6 +31,24 @@ const ALGO_ID = 'pbkdf2-sha256';
 const PBKDF2_ITERATIONS = 600_000;
 const SALT_BYTES = 16;
 const DIGEST_BITS = 256;
+
+export const SCRYPT_LOG_N = 17;
+export const SCRYPT_R = 8;
+export const SCRYPT_P = 1;
+export const SCRYPT_MAXMEM_BYTES = 167772160;
+
+export type PasswordHasher = (
+    plaintext: string,
+) => Promise<string>;
+
+export type ScryptDerive = (
+    plaintext: string,
+    salt: Uint8Array<ArrayBuffer>,
+    logN: number,
+    r: number,
+    p: number,
+    keyLength: number,
+) => Promise<Uint8Array<ArrayBuffer>>;
 
 interface ParsedPhc {
     readonly algoId: string;
@@ -59,6 +78,32 @@ function iterationsFromParams(params: string): number | null {
     const n = Number(params.slice(2));
     if (!Number.isInteger(n) || n < 1) return null;
     return n;
+}
+
+function scryptParamsFrom(
+    params: string,
+): { logN: number; r: number; p: number } | null {
+    const parts = params.split(',');
+    if (parts.length !== 3) return null;
+    const values: Record<string, number> = {};
+    for (const part of parts) {
+        const eq = part.indexOf('=');
+        if (eq < 1) return null;
+        const key = part.slice(0, eq);
+        const n = Number(part.slice(eq + 1));
+        if (!Number.isInteger(n) || n < 1) return null;
+        if (values[key] !== undefined) return null;
+        values[key] = n;
+    }
+    const logN = values['ln'];
+    const r = values['r'];
+    const p = values['p'];
+    if (logN === undefined
+        || r === undefined
+        || p === undefined) {
+        return null;
+    }
+    return { logN, r, p };
 }
 
 async function pbkdf2Derive(
@@ -129,27 +174,73 @@ async function pbkdf2Verify(
     return constantTimeEqual(actual, expected);
 }
 
+async function scryptVerify(
+    plaintext: string,
+    parsed: ParsedPhc,
+): Promise<boolean> {
+    if (scryptDerive === null) return false;
+    const params = scryptParamsFrom(parsed.params);
+    if (params === null) return false;
+    let salt: Uint8Array<ArrayBuffer>;
+    let expected: Uint8Array<ArrayBuffer>;
+    try {
+        salt = base64UrlToBytes(parsed.salt);
+        expected = base64UrlToBytes(parsed.digest);
+    } catch {
+        return false;
+    }
+    try {
+        const actual = await scryptDerive(
+            plaintext,
+            salt,
+            params.logN,
+            params.r,
+            params.p,
+            expected.length,
+        );
+        return constantTimeEqual(actual, expected);
+    } catch {
+        return false;
+    }
+}
+
 type PhcVerifier = (
     plaintext: string,
     parsed: ParsedPhc,
 ) => Promise<boolean>;
+
+const SCRYPT_ALGO_ID = 'scrypt';
 
 // Per-algorithm verifiers keyed by PHC algo-id. Each is a
 // self-contained, DELETABLE unit (see the scrypt-cutover note
 // above). An unknown algo-id has no entry and fails closed.
 const VERIFIERS: Record<string, PhcVerifier> = {
     [ALGO_ID]: pbkdf2Verify,
+    [SCRYPT_ALGO_ID]: scryptVerify,
 };
 
 // The single algorithm hashPassword uses for NEW credentials.
-// The server tier flips this to scrypt — never adds a second
-// permanent algorithm.
-const CURRENT_PASSWORD_HASH = pbkdf2Hash;
+// Default stays PBKDF2 so ./validate does not pay production
+// scrypt. boot() flips this via setPasswordHasher.
+let currentPasswordHash: PasswordHasher = pbkdf2Hash;
+let scryptDerive: ScryptDerive | null = null;
+
+export function setPasswordHasher(
+    hash: PasswordHasher | null,
+): void {
+    currentPasswordHash = hash ?? pbkdf2Hash;
+}
+
+export function setScryptDerive(
+    derive: ScryptDerive | null,
+): void {
+    scryptDerive = derive;
+}
 
 export async function hashPassword(
     plaintext: string,
 ): Promise<string> {
-    return CURRENT_PASSWORD_HASH(plaintext);
+    return currentPasswordHash(plaintext);
 }
 
 export async function verifyPassword(

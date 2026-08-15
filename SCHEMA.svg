@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 468" width="288" height="468">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 450" width="288" height="450">
   <defs>
     <style>
       text { font-family: ui-sans-serif, system-ui,
@@ -19,14 +19,14 @@
         stroke-width: 1.5; }
     </style>
   </defs>
-  <rect x="0" y="0" width="288" height="468" fill="hsl(217 30% 97%)" />
+  <rect x="0" y="0" width="288" height="450" fill="hsl(217 30% 97%)" />
   <g class="table">
-    <rect class="box" x="40" y="40" width="208" height="152" rx="6" />
+    <rect class="box" x="40" y="40" width="208" height="188" rx="6" />
     <rect class="head" x="40" y="40" width="208" height="26" rx="6" />
     <text class="thead" x="50" y="58">requests</text>
     <text class="pk" x="50" y="79">id</text>
     <text class="type" x="238" y="79">id</text>
-    <text class="col" x="50" y="97">uri_prefix</text>
+    <text class="col" x="50" y="97">uri_collection</text>
     <text class="type" x="238" y="97">text</text>
     <text class="col" x="50" y="115">uri_id</text>
     <text class="type" x="238" y="115">text</text>
@@ -38,30 +38,28 @@
     <text class="type" x="238" y="169">text</text>
     <text class="col" x="50" y="187">message</text>
     <text class="type" x="238" y="187">text</text>
+    <text class="col" x="50" y="205">method</text>
+    <text class="type" x="238" y="205">text</text>
+    <text class="col" x="50" y="223">operation_id</text>
+    <text class="type" x="238" y="223">text</text>
   </g>
   <g class="table">
-    <rect class="box" x="40" y="222" width="208" height="206" rx="6" />
-    <rect class="head" x="40" y="222" width="208" height="26" rx="6" />
-    <text class="thead" x="50" y="240">responses</text>
-    <text class="pk" x="50" y="261">id</text>
-    <text class="type" x="238" y="261">id</text>
-    <text class="col" x="50" y="279">uri_prefix</text>
-    <text class="type" x="238" y="279">text</text>
-    <text class="col" x="50" y="297">uri_id</text>
-    <text class="type" x="238" y="297">text</text>
-    <text class="col" x="50" y="315">at</text>
+    <rect class="box" x="40" y="258" width="208" height="152" rx="6" />
+    <rect class="head" x="40" y="258" width="208" height="26" rx="6" />
+    <text class="thead" x="50" y="276">responses</text>
+    <text class="pk" x="50" y="297">id</text>
+    <text class="type" x="238" y="297">id</text>
+    <text class="col" x="50" y="315">uri_collection</text>
     <text class="type" x="238" y="315">text</text>
-    <text class="col" x="50" y="333">status</text>
-    <text class="type" x="238" y="333">num</text>
-    <text class="col" x="50" y="351">etag</text>
+    <text class="col" x="50" y="333">uri_id</text>
+    <text class="type" x="238" y="333">text</text>
+    <text class="col" x="50" y="351">at</text>
     <text class="type" x="238" y="351">text</text>
-    <text class="col" x="50" y="369">message_hash</text>
+    <text class="col" x="50" y="369">version</text>
     <text class="type" x="238" y="369">text</text>
     <text class="col" x="50" y="387">message</text>
     <text class="type" x="238" y="387">text</text>
-    <text class="col" x="50" y="405">follows</text>
+    <text class="col" x="50" y="405">operation_id</text>
     <text class="type" x="238" y="405">text</text>
-    <text class="col" x="50" y="423">supersedes</text>
-    <text class="type" x="238" y="423">text</text>
   </g>
 </svg>

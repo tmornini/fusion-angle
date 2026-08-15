@@ -25,14 +25,12 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
-import {
-    navigateTo,
-    trimStrings,
-} from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
+import { trimStrings } from '../app/format.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,
-} from '../../api/api.ts';
+} from '../../api/http-errors.ts';
 import {
     sessionContext,
     getHumanMember,

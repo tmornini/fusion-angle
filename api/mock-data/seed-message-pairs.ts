@@ -75,10 +75,7 @@
 // quadruple), and each seeded role grant forms its OWN
 // role-grants/:id document pair. Every invocation here (as
 // always) forms through the SAME formSeedPair pipeline, UNTOUCHED
-// — formSeedPair carries no `chain` argument at all, so
-// headPairId is undefined for EVERY seed pair by construction
-// (always-genesis; the live-path `chain: 'none'` vocabulary,
-// api/routes.ts's formDocumentPairFor, does not apply here). The
+// — formSeedPair is genesis by construction. The
 // 12 identity-credential document pairs (11 human passwords + the
 // system client secret) are the ONE exception: a credential's
 // hashed secret is unknown until PBKDF2 resolves inside
@@ -137,8 +134,12 @@ import {
 } from '../types.ts';
 import {
     formWritePair,
+    OPERATION_ID_HEADER,
 } from '../message-pair.ts';
 import type { MessagePair } from '../message-pair.ts';
+import {
+    generateCryptoSafeBase62,
+} from '../../shared/crypto-safe-base62.ts';
 import {
     HTTP_NO_CONTENT,
     HTTP_OK,
@@ -2046,7 +2047,10 @@ export function buildMockDataInvocations():
 // LAST segment.
 async function formSeedPair(
     inv: MockDataInvocation, requestAt: string,
+    operationId?: string,
 ): Promise<MessagePair> {
+    const envelopeId = operationId
+        ?? generateCryptoSafeBase62();
     const idParams = inv.idParams;
     const routeSegments = inv.routePattern.split('/');
     let paramIndex = 0;
@@ -2083,16 +2087,20 @@ async function formSeedPair(
         // redact, no content-type to hoist. Honest about the
         // below-gate carve-out rather than synthesizing a fake
         // bearer (CLAUDE.md's named carve-out).
-        headerFields: [],
+        headerFields: [
+            {
+                name: OPERATION_ID_HEADER,
+                value: envelopeId,
+            },
+        ],
         body: inv.body,
         requesterIdentityId: inv.requesterIdentityId,
         requestAt,
         organization: inv.organization,
         responseStatus: response.status,
         responseBody: response.body,
-        // Fresh database: every seed pair is genesis, so there
-        // is nothing to chain off of — no pre-tx head-read.
-        headPairId: undefined,
+        operationId: envelopeId,
+        // Fresh database: every seed pair is genesis.
     });
 }
 
@@ -2160,6 +2168,7 @@ async function formDefaultOrganizationSeedPair(
     const pathSegments = [
         'identities', identityId, 'default-org', eventId,
     ];
+    const operationId = generateCryptoSafeBase62();
     return formWritePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
@@ -2168,29 +2177,33 @@ async function formDefaultOrganizationSeedPair(
             'identities', ':id', 'default-org', ':eventId',
         ],
         pathSegments,
-        headerFields: [],
+        headerFields: [
+            {
+                name: OPERATION_ID_HEADER,
+                value: operationId,
+            },
+        ],
         body: defaultOrganizationSeedBody(organizationId, eventId),
         requesterIdentityId: identityId,
         requestAt,
         organization: undefined,
         responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId,
     });
 }
 
 // The instance chain cannot ride formSeedPair: its
-// revisions have predecessors (follows) and its head
-// depends on (at, id) order — so this pass mints
-// DISTINCT ascending requestAt values (a named
-// deviation from the seed's shared-arrival-moment
-// covenant) and forms sequentially, capturing each
-// pair id for the next link's follows. headerFields
-// stays [] for every link — the seed's no-bearer
-// carve-out extends to If-Match on seed revision pairs
-// (never hoist If-Match onto synthetic revisions; the
-// wire op pair's hoisted If-Match is what makes resends
-// distinct messages on the live path).
+// revisions share an address and its head depends on
+// (at, id) order — so this pass mints DISTINCT
+// ascending requestAt values (a named deviation from
+// the seed's shared-arrival-moment covenant) and forms
+// sequentially. headerFields stays [] for every link
+// — the seed's no-bearer carve-out extends to If-Match
+// on seed revision pairs (never hoist If-Match onto
+// synthetic revisions; the wire op pair's hoisted
+// If-Match is what makes resends distinct messages on
+// the live path).
 export async function formInstanceChainPairs():
     Promise<ReadonlyMap<string, MessagePair>>
 {
@@ -2221,6 +2234,10 @@ export async function formInstanceChainPairs():
     const instancePathname =
         '/' + instancePathSegments.join('/');
 
+    // Document-plane genesis: the inner PUT a public
+    // PATCH create would store. Seed writes this one
+    // pair only (1498).
+    const genesisId = generateCryptoSafeBase62();
     const genesis = await formWritePair({
         method: 'PUT',
         pathname: instancePathname,
@@ -2228,20 +2245,16 @@ export async function formInstanceChainPairs():
         routeSegments: instanceRouteSegments,
         pathSegments: instancePathSegments,
         headerFields: [],
-        body: { set: [] },
+        body: { values: [] },
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: genesisAt,
         organization: org,
         responseStatus: HTTP_OK,
-        responseBody: {
-            id: instanceId,
-            organization_id: org,
-            record_type_id: typeId,
-            set: [],
-        },
-        headPairId: undefined,
+        responseBody: { values: [] },
+        operationId: genesisId,
     });
 
+    const bindingId = generateCryptoSafeBase62();
     const binding = await formWritePair({
         method: 'POST',
         pathname:
@@ -2263,9 +2276,10 @@ export async function formInstanceChainPairs():
         organization: org,
         responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId: bindingId,
     });
 
+    const reviewOpId = generateCryptoSafeBase62();
     const reviewOp = await formWritePair({
         method: 'POST',
         pathname:
@@ -2284,7 +2298,7 @@ export async function formInstanceChainPairs():
         organization: org,
         responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId: reviewOpId,
     });
 
     const reviewSet = seedSetFor(review.id);
@@ -2304,10 +2318,10 @@ export async function formInstanceChainPairs():
         organization: org,
         responseStatus: HTTP_OK,
         responseBody: {},
-        headPairId: undefined,
-        follows: genesis.id,
+        operationId: reviewOpId,
     });
 
+    const completeOpId = generateCryptoSafeBase62();
     const completeOp = await formWritePair({
         method: 'POST',
         pathname:
@@ -2326,7 +2340,7 @@ export async function formInstanceChainPairs():
         organization: org,
         responseStatus: HTTP_NO_CONTENT,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId: completeOpId,
     });
 
     const completeSet = seedSetFor(complete.id);
@@ -2346,8 +2360,7 @@ export async function formInstanceChainPairs():
         organization: org,
         responseStatus: HTTP_OK,
         responseBody: {},
-        headPairId: undefined,
-        follows: reviewRevision.id,
+        operationId: completeOpId,
     });
 
     const pairs = new Map<string, MessagePair>();
@@ -2542,6 +2555,7 @@ export async function formBootstrapMessagePair(
     readonly organizationPair: MessagePair;
 }> {
     const body = bootstrapCurrentMemberBody(nowUtc());
+    const envelopeId = generateCryptoSafeBase62();
     const operation = await formSeedPair(
         {
             key: seedPairKey('human-members', 'current'),
@@ -2551,6 +2565,7 @@ export async function formBootstrapMessagePair(
             body,
         },
         requestAt,
+        envelopeId,
     );
     const memberDocument = await formSeedPair(
         {
@@ -2568,6 +2583,7 @@ export async function formBootstrapMessagePair(
             }),
         },
         requestAt,
+        envelopeId,
     );
     const detailDocument = await formSeedPair(
         {
@@ -2579,6 +2595,7 @@ export async function formBootstrapMessagePair(
             body: humanMemberDetailBodyOf(body),
         },
         requestAt,
+        envelopeId,
     );
     // Task 5: the current member's own identities/:id document
     // pair — the SAME fourth invocation the mock-data seed's own
@@ -2593,6 +2610,7 @@ export async function formBootstrapMessagePair(
             body: identityDocumentBodyOf('person'),
         },
         requestAt,
+        envelopeId,
     );
     const membershipPair = await formSeedPair(
         {

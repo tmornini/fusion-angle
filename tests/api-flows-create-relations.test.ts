@@ -155,7 +155,7 @@ test(
             name: 'State Event Test Flow',
         });
         const events = await ctx.GET<StateEntity[]>(
-            'flows/' + flowId + '/history',
+            'flows/' + flowId + '/versions',
         );
         assert.equal(events.length, 1);
         const ev = events[0]!;

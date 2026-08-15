@@ -12,7 +12,7 @@ import {
 } from '../app/loading-states.ts';
 import {
     navigateTo,
-} from '../app/core.ts';
+} from '../app/navigation.ts';
 import {
     sessionContext,
     getFlowGraph,

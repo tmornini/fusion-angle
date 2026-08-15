@@ -16,6 +16,10 @@ import {
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
+    withLifecycleTrio,
+    withLifecycleTrios,
+} from './shared.ts';
+import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
 import {
@@ -54,7 +58,10 @@ export {
 export async function getProjectEntities(
     ctx: RequestContext,
 ): Promise<ProjectEntity[]> {
-    return ctx.GET<ProjectEntity[]>('projects');
+    return withLifecycleTrios(
+        ctx, 'projects',
+        await ctx.GET<ProjectEntity[]>('projects'),
+    );
 }
 
 // Lifecycle-current trio is stamped on the ProjectEntity GET
@@ -246,8 +253,9 @@ export async function getProjectEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<ProjectEntity> {
-    return ctx.GET<ProjectEntity>(
-        `projects/${id}`,
+    return withLifecycleTrio(
+        ctx, 'projects',
+        await ctx.GET<ProjectEntity>(`projects/${id}`),
     );
 }
 

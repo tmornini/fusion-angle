@@ -13,7 +13,7 @@ import { documentPairsAt } from './derive-documents.ts';
 // FABRICATED trailing :param segment (the live PUT's eventId is
 // a BODY key; no real URL ever carries a fourth path segment),
 // so the family is identity-keyed even though it is never
-// organization-nested (canonicalUriPrefix never nests it — the
+// organization-nested (canonicalUriCollection never nests it — the
 // route always forms the pair with organization: undefined).
 function defaultOrganizationPrefix(identityId: Id): string {
     return '/identities/' + identityId + '/default-org/';
@@ -30,7 +30,7 @@ function defaultOrganizationPrefix(identityId: Id): string {
 // but it always carries the SAME organization_id the identity
 // already held, so including it in the reduction changes nothing
 // the reducer would resolve. TARGETED read: one identity-keyed
-// prefix via the existing uri_prefix index — never a full-ledger
+// prefix via the existing uri_collection index — never a full-ledger
 // scan (the E13 generic-scan abomination).
 export async function deriveDefaultOrganization(
     db: DbAdapter,
@@ -38,8 +38,8 @@ export async function deriveDefaultOrganization(
 ): Promise<IdentityDefaultOrganizationEntity[]> {
     const prefix = defaultOrganizationPrefix(identityId);
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     return documentPairsAt(requests, responses, prefix).map(
         (pair) => ({

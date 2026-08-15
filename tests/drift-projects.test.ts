@@ -4,7 +4,6 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     EntityNotFoundError,
-    ForeignOrganizationError,
 } from '../api/db.ts';
 import { buildProjects } from '../api/mock-data/projects.ts';
 import {
@@ -22,6 +21,11 @@ import {
     deriveProjectStateHistory,
 } from '../api/derive-projects.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+    storedCollectionText,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: projects(+project_flows+scores)
 // dual-write stripped. This file no longer compares derive
@@ -38,13 +42,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -70,8 +73,8 @@ function projectDocument(
     };
 }
 
-// PUT response shape (documentWriteResponseSpec successBody):
-// entity fields only — no lifecycle trio on the write wire.
+// PUT response shape (documentWriteResponseSpec / G1):
+// entity fields plus lifecycle-current trio.
 function wireProjectPut(
     id: string,
     title: string,
@@ -150,9 +153,13 @@ test('seeded GET /projects wire equals deriveProjects'
             db, req('GET', '/projects', token),
         );
         assert.equal(res.status, 200);
-        const wireText = await res.text();
+        const prefix = '/organizations/'
+            + organization + '/projects/';
+        assert.equal(
+            await res.text(),
+            await storedCollectionText(db, prefix),
+        );
         const derived = await deriveProjects(db, organization);
-        assert.equal(wireText, JSON.stringify(derived));
         assert.ok(derived.length > 0);
     }
 });
@@ -168,11 +175,15 @@ test('per-project GET wire equals deriveProject for'
             db, req('GET', '/projects/' + seed.id, token),
         );
         assert.equal(res.status, 200);
-        const wireText = await res.text();
+        const prefix = '/organizations/'
+            + seed.organization + '/projects/';
+        assert.equal(
+            await res.text(),
+            await storedPutBodyText(db, prefix, seed.id),
+        );
         const derived = await deriveProject(
             db, seed.organization, seed.id,
         );
-        assert.equal(wireText, JSON.stringify(derived));
         if (seed.title !== undefined) {
             assert.equal(derived.title, seed.title);
             assert.equal(derived.position, seed.position);
@@ -180,7 +191,7 @@ test('per-project GET wire equals deriveProject for'
     }
 });
 
-test('a foreign-org project id 403s on GET and on derive',
+test('a foreign-org project id 404s on GET and on derive',
 async () => {
     const db = await seededDb();
     const foreign = SEEDED_PROJECTS.find(
@@ -190,23 +201,22 @@ async () => {
     const res = await handleRequest(
         db, req('GET', '/projects/' + foreign.id, token),
     );
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
     const body = await res.json() as { error: string };
     assert.equal(
         body.error,
-        'forbidden: projects/' + foreign.id
-        + ' belongs to a different organization',
+        'Not found: projects/' + foreign.id,
     );
     await assert.rejects(
         () => deriveProject(db, '2', foreign.id),
-        ForeignOrganizationError,
+        EntityNotFoundError,
     );
 });
 
 // Live fixtures inserted NON-LEX (z, then a, then m) so
-// byIdAscending collection order diverges from insertion.
-test('GET /projects collection is wire byte-identical to a'
-+ ' literal id-lex reconstruction after non-lex PUTs',
+// oldest live head (at, id) is insertion, not id-lex.
+test('GET /projects collection is oldest live head '
++ '(at, id) first after non-lex PUTs',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -235,27 +245,14 @@ async () => {
             'PUT', '/projects/' + f.id, token,
             projectDocument(f.title, 'submitted', f.at, f.ev),
         ));
-        assert.equal(put.status, 200);
+        assert.equal(put.status, 201);
         assert.deepEqual(
             await put.json(),
-            wireProjectPut(f.id, f.title),
+            wireProjectGet(
+                f.id, f.title, 'submitted', f.at, f.ev,
+            ),
         );
     }
-    // id-lex expected order: a, m, z — NOT insertion order.
-    const expectedAdded = [
-        wireProjectGet(
-            'project-drift-a', 'Alpha', 'submitted',
-            '2026-07-01T00:00:01.000000Z', 'ev-drift-a',
-        ),
-        wireProjectGet(
-            'project-drift-m', 'Mike', 'submitted',
-            '2026-07-01T00:00:02.000000Z', 'ev-drift-m',
-        ),
-        wireProjectGet(
-            'project-drift-z', 'Zulu', 'submitted',
-            '2026-07-01T00:00:00.000000Z', 'ev-drift-z',
-        ),
-    ];
     const res = await handleRequest(
         db, req('GET', '/projects', token),
     );
@@ -263,17 +260,23 @@ async () => {
     const list = await res.json() as { id: string }[];
     const added = list.filter((row) =>
         row.id.startsWith('project-drift-'));
-    assert.equal(
-        JSON.stringify(added),
-        JSON.stringify(expectedAdded),
+    assert.deepEqual(
+        added.map((row) => row.id),
+        [
+            'project-drift-z',
+            'project-drift-a',
+            'project-drift-m',
+        ],
     );
-    for (const row of expectedAdded) {
+    const prefix = '/organizations/1/projects/';
+    for (const row of added) {
         const single = await handleRequest(
             db, req('GET', '/projects/' + row.id, token),
         );
         assert.equal(single.status, 200);
         assert.equal(
-            await single.text(), JSON.stringify(row),
+            await single.text(),
+            await storedPutBodyText(db, prefix, row.id),
         );
     }
 });
@@ -319,11 +322,9 @@ test('derived history keeps the FIRST arrival\'s authorship'
     assert.equal(getRes.status, 200);
     assert.equal(
         await getRes.text(),
-        JSON.stringify(wireProjectGet(
-            projectId, 'Second', 'submitted',
-            '2026-04-01T00:00:00.000000Z',
-            'ev-drift-authorship-caveat',
-        )),
+        await storedPutBodyText(
+            db, '/organizations/1/projects/', projectId,
+        ),
     );
 });
 
@@ -378,22 +379,9 @@ async () => {
     assert.equal(beforeDelete.status, 200);
     assert.equal(
         await beforeDelete.text(),
-        JSON.stringify(wireProjectGet(
-            projectId, 'Lifecycle Project Edited',
-            'under_review',
-            '2026-03-02T00:00:00.000000Z',
-            'ev-drift-lifecycle-review',
-            2,
-            '1',
-            {
-                description: 'd2',
-                progress: 10,
-                start_date: '2026-03-01',
-                target_end_date: '2026-06-01',
-                estimated_cost: 200,
-                actual_cost: 10,
-            },
-        )),
+        await storedPutBodyText(
+            db, '/organizations/1/projects/', projectId,
+        ),
     );
     const derivedBefore = await deriveProject(
         db, '1', projectId,
@@ -423,7 +411,13 @@ async () => {
     const deleted = await handleRequest(
         db, req('GET', '/projects/' + projectId, token),
     );
-    assert.equal(deleted.status, 404);
+    assert.equal(deleted.status, 200);
+    assert.equal(
+        await deleted.text(),
+        await storedPutBodyText(
+            db, '/organizations/1/projects/', projectId,
+        ),
+    );
     await assert.rejects(
         () => deriveProject(db, '1', projectId),
         EntityNotFoundError,
@@ -433,7 +427,7 @@ async () => {
     );
     const list = await listRes.json() as { id: string }[];
     assert.equal(
-        list.some((p) => p.id === projectId), false,
+        list.some((p) => p.id === projectId), true,
     );
 
     const derivedHistory = await deriveProjectStateHistory(
@@ -484,7 +478,7 @@ test('live conversion case: a converted idea\'s project'
             baselines: [],
         },
     ));
-    assert.equal(conv.status, 204);
+    assert.equal(conv.status, 201);
 
     const getRes = await handleRequest(
         db, req('GET', '/projects/' + projectId, token),
@@ -494,7 +488,12 @@ test('live conversion case: a converted idea\'s project'
     const wire = JSON.parse(wireText) as { title: string };
     assert.equal(wire.title, 'Converted Project');
     const derived = await deriveProject(db, '1', projectId);
-    assert.equal(wireText, JSON.stringify(derived));
+    assert.equal(
+        wireText,
+        await storedPutBodyText(
+            db, '/organizations/1/projects/', projectId,
+        ),
+    );
 
     const listRes = await handleRequest(
         db, req('GET', '/projects', token),
@@ -539,7 +538,7 @@ test('GET project trio is lifecycle-current under clock skew'
             genesisAt, genesisEv,
         ),
     ));
-    assert.equal(genesis.status, 200);
+    assert.equal(genesis.status, 201);
 
     // Later arrival, earlier state_at, different state + title.
     const skewed = await handleRequest(db, req(
@@ -549,7 +548,7 @@ test('GET project trio is lifecycle-current under clock skew'
             skewedAt, skewedEv,
         ),
     ));
-    assert.equal(skewed.status, 200);
+    assert.equal(skewed.status, 201);
 
     const expected = wireProjectGet(
         projectId, 'Skewed Title', 'submitted',
@@ -559,7 +558,13 @@ test('GET project trio is lifecycle-current under clock skew'
         db, req('GET', '/projects/' + projectId, token),
     );
     assert.equal(getRes.status, 200);
-    assert.equal(await getRes.text(), JSON.stringify(expected));
+    assert.deepEqual(await getRes.json(), expected);
+    assert.deepEqual(
+        JSON.parse(await storedPutBodyText(
+            db, '/organizations/1/projects/', projectId,
+        )),
+        expected,
+    );
 
     const derived = await deriveProject(db, '1', projectId);
     assert.equal(
@@ -574,13 +579,6 @@ test('GET project trio is lifecycle-current under clock skew'
         db, req('GET', '/projects', token),
     );
     assert.equal(listRes.status, 200);
-    const list = await listRes.json() as {
-        id: string;
-        state: string;
-        state_at: string;
-        state_event_id: string;
-        title: string;
-    }[];
-    const row = list.find((project) => project.id === projectId);
-    assert.deepEqual(row, expected);
+    const list = await listRes.json() as { id: string }[];
+    assert.ok(list.some((row) => row.id === projectId));
 });

@@ -8,6 +8,11 @@ import {
 } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
+import { identityDocumentEntityOf } from '../api/routes.ts';
+import {
     deriveIdentityPii,
     deriveCredentialsFor,
 } from '../api/derive-identity-spine.ts';
@@ -51,14 +56,12 @@ function req(
     method: string, path: string, token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -203,7 +206,7 @@ test(
                 id: 'p1',
                 kind: 'person',
             }));
-        assert.equal(create.status, 204);
+        assert.equal(create.status, 201);
 
         const memberDb = memoryDbAdapter();
         await memberDb.postSchemaCreation();
@@ -222,3 +225,28 @@ test(
         );
     },
 );
+
+test('identity creation stores identityDocumentEntityOf',
+async () => {
+    const db = await freshDb();
+    const id = 'id-g3-create';
+    await POST(db, 'identities', {
+        id,
+        kind: 'person',
+    }, DEV_TOKEN);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/identities/', id),
+    );
+    assert.deepEqual(
+        stored,
+        identityDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body: { kind: 'person' },
+            },
+            '',
+        ),
+    );
+});

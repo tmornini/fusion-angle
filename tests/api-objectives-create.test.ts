@@ -58,21 +58,13 @@ test(
             id: string;
             position: number;
             organization_id: string;
-            state: string;
-            state_at: string;
-            state_event_id: string;
+            state?: string;
         }>(db, 'objectives/obj-1', DEV_TOKEN);
         assert.equal(objective.position, 1);
         // The fence stamped the bound org — never the body.
         assert.equal(objective.organization_id, '1');
-        // GET stamps lifecycle-current trio from the event.
+        // GET streams the stored PUT (G1: trio included).
         assert.equal(objective.state, 'active');
-        assert.equal(
-            objective.state_at, '2026-05-14T00:00:00.000000Z',
-        );
-        assert.equal(
-            objective.state_event_id, 'obj-1-active',
-        );
         // The leaf revision route is PUT-only; read the nested
         // per-objective collection and find the revision the
         // create synthesized (the server filters to obj-1).

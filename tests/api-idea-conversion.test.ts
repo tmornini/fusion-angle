@@ -14,6 +14,20 @@ import {
 import {
     type ProjectObjectiveBaselineScoreEntity,
 } from '../api/types.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+
+function pairJsonOf(message: string): {
+    readonly body: Record<string, unknown>;
+} {
+    const body = HttpMessage.fromWire(message).body();
+    return {
+        body: body.exists()
+            ? JSON.parse(body.toText()) as
+                Record<string, unknown>
+            : {},
+    };
+}
 
 // POST ideas/:id/conversion is the LONE cross-aggregate write:
 // a new project row, the promoted idea row, TWO state events
@@ -67,7 +81,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     // The source idea, already approved — seeded through the
     // wire (Phase 15 Task 7): bare per-entity current-state
-    // alias retired; surviving /history derives from the pair
+    // alias retired; surviving /versions derives from the pair
     // plane, so a raw ideas.put + states.postEvent leaves no
     // pair and history would read empty after a rolled-back
     // conversion.
@@ -138,12 +152,12 @@ test(
         // The idea moved to 'promoted', authored by the actor.
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
-        // surviving /history.
+        // surviving /versions.
         const ideaHistory = await GET<{
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'ideas/idea-1/history', DEV_TOKEN);
+        }[]>(db, 'ideas/idea-1/versions', DEV_TOKEN);
         // Family history is DESC — index 0 is current.
         const ideaCurrent = ideaHistory[0]!;
         assert.equal(ideaCurrent.state, 'promoted');
@@ -224,13 +238,13 @@ test(
 
         const atProjectAddress = allRequests.filter(
             (r) =>
-                r.uri_prefix === '/organizations/1/projects/'
+                r.uri_collection === '/organizations/1/projects/'
                 && r.uri_id === 'p9',
         );
         assert.equal(atProjectAddress.length, 1);
         const responsesAtProjectAddress = allResponses.filter(
             (r) =>
-                r.uri_prefix === '/organizations/1/projects/'
+                r.uri_collection === '/organizations/1/projects/'
                 && r.uri_id === 'p9',
         );
         assert.equal(responsesAtProjectAddress.length, 1);
@@ -239,7 +253,7 @@ test(
         // The requester is the caller, never the idea's author.
         assert.equal(request.requester_identity_id, 'current');
 
-        const parsed = JSON.parse(request.message) as {
+        const parsed = pairJsonOf(request.message) as {
             body: Record<string, unknown>;
         };
         assert.deepEqual(parsed.body, {
@@ -253,13 +267,13 @@ test(
         // document pair both land at idea-1's address.
         const atIdeaAddress = allRequests.filter(
             (r) =>
-                r.uri_prefix === '/organizations/1/ideas/'
+                r.uri_collection === '/organizations/1/ideas/'
                 && r.uri_id === 'idea-1',
         );
         assert.equal(atIdeaAddress.length, 2);
         const responsesAtIdeaAddress = allResponses.filter(
             (r) =>
-                r.uri_prefix === '/organizations/1/ideas/'
+                r.uri_collection === '/organizations/1/ideas/'
                 && r.uri_id === 'idea-1',
         );
         assert.equal(responsesAtIdeaAddress.length, 2);
@@ -267,7 +281,7 @@ test(
         // The conversion's idea pair is the one carrying
         // 'promoted' (the seed carried 'approved').
         const ideaRequest = atIdeaAddress.find((r) => {
-            const body = (JSON.parse(r.message) as {
+            const body = (pairJsonOf(r.message) as {
                 body: Record<string, unknown>;
             }).body;
             return body['state'] === 'promoted';
@@ -278,7 +292,7 @@ test(
             ideaRequest.requester_identity_id, 'current',
         );
 
-        const ideaParsed = JSON.parse(ideaRequest.message) as {
+        const ideaParsed = pairJsonOf(ideaRequest.message) as {
             body: Record<string, unknown>;
         };
         assert.deepEqual(ideaParsed.body, {
@@ -302,14 +316,14 @@ test(
         for (const { id, fields } of baselineCases) {
             const atBaselineAddress = allRequests.filter(
                 (r) =>
-                    r.uri_prefix === baselinesPrefix
+                    r.uri_collection === baselinesPrefix
                     && r.uri_id === id,
             );
             assert.equal(atBaselineAddress.length, 1);
             const responsesAtBaselineAddress = allResponses
                 .filter(
                     (r) =>
-                        r.uri_prefix === baselinesPrefix
+                        r.uri_collection === baselinesPrefix
                         && r.uri_id === id,
                 );
             assert.equal(responsesAtBaselineAddress.length, 1);
@@ -319,7 +333,7 @@ test(
                 baselineRequest.requester_identity_id,
                 'current',
             );
-            const baselineParsed = JSON.parse(
+            const baselineParsed = pairJsonOf(
                 baselineRequest.message,
             ) as { body: Record<string, unknown> };
             // KEY-SET spot-check: the wire body is the
@@ -363,7 +377,7 @@ test(
         );
         assert.equal(project.id, 'p1');
         const ideaHistory = await GET<{ state: string }[]>(
-            db, 'ideas/idea-1/history', DEV_TOKEN,
+            db, 'ideas/idea-1/versions', DEV_TOKEN,
         );
         // Family history is DESC — index 0 is current.
         const ideaCurrent = ideaHistory[0]!;

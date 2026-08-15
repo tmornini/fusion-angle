@@ -13,6 +13,7 @@ import { postBootstrap } from
 import {
     deriveOrganizations,
     deriveOrganization,
+    organizationEntityOf,
 } from '../api/derive-organizations.ts';
 import {
     STARK_ORGANIZATION,
@@ -26,6 +27,11 @@ import { deriveMembershipsForIdentity } from
 import { mintAccessToken, TOKEN_AUDIENCE } from
     '../api/access-token.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
+import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 
 // Phase Final Task 2: organizations dual-write stripped. This
 // file no longer compares derive vs old-table oracles — the
@@ -47,13 +53,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -262,7 +267,7 @@ test('leg 4: PUT /organizations/:id then wire + derive agree'
         'PUT', '/organizations/' + STARK_ORGANIZATION,
         adminToken, updatedFields,
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const putBody = await put.json() as OrganizationEntity;
     assert.equal(putBody.name, 'Stark Industries Renamed');
 
@@ -271,6 +276,19 @@ test('leg 4: PUT /organizations/:id then wire + derive agree'
     );
     assert.deepEqual(derived, putBody);
     assert.equal(derived.name, 'Stark Industries Renamed');
+    const stored = JSON.parse(
+        await storedPutBodyText(
+            db, '/organizations/', STARK_ORGANIZATION,
+        ),
+    );
+    const expected = organizationEntityOf({
+        uriId: STARK_ORGANIZATION,
+        pairId: STARK_ORGANIZATION,
+        method: 'PUT',
+        body: updatedFields,
+    });
+    assert.equal(Object.keys(expected).at(-1), 'id');
+    assert.deepEqual(stored, expected);
     // Phase Final Stage B: organizations table retired.
 });
 
@@ -303,4 +321,20 @@ async () => {
         );
         assert.equal(Object.keys(derived).at(-1), 'id');
     }
+});
+
+// Writer matches GET: successBody is organizationEntityOf
+// (id-last). The id-first pin is deleted.
+test('leg 6b: organizations/:id successBody is id-last',
+() => {
+    const entry = WRITE_RESPONSE_SPECS['organizations/:id'];
+    assert.ok(entry !== undefined && 'successBody' in entry);
+    const body = entry.successBody!(
+        [STARK_ORGANIZATION],
+        organizationRow('Stark Industries Renamed'),
+        'current',
+        undefined,
+    ) as { id: string };
+    assert.equal(Object.keys(body).at(-1), 'id');
+    assert.equal(body.id, STARK_ORGANIZATION);
 });

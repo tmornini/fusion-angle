@@ -12,7 +12,7 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { canonicalUriPrefix } from '../api/message-pair.ts';
+import { canonicalUriCollection } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -45,6 +45,9 @@ import { organizationToken } from './token-fixtures.ts';
 import { seedIdentityCredential } from './identity-fixtures.ts';
 import { identityByEmail } from '../api/authentication.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: identity spine dual-write stripped.
 // This file no longer compares derive vs old-table oracles —
@@ -93,13 +96,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -167,7 +169,7 @@ const MEMBERSHIPS_TEST_WIRING: DocumentFamilyWiring = {
 };
 
 // identities is GLOBAL plane (family-registry.ts:
-// organizationNested:false) — canonicalUriPrefix ignores whatever
+// organizationNested:false) — canonicalUriCollection ignores whatever
 // organization value a caller passes for this family, so this
 // fixed placeholder is never load-bearing; requireOrganization
 // (document-family.ts) merely demands a defined value to dispatch
@@ -296,8 +298,8 @@ test('identities collection wire equals derive (16 incl. the'
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
 
-    const derived = sortById(
-        await derivedIdentities(db, GLOBAL_PLANE_PLACEHOLDER),
+    const derived = await derivedIdentities(
+        db, GLOBAL_PLANE_PLACEHOLDER,
     );
     assert.equal(derived.length, 16);
     const token = await organizationToken(

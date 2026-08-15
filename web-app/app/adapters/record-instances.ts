@@ -2,8 +2,8 @@ import type { RequestContext } from './shared.ts';
 import { activeOrganization } from './shared.ts';
 
 // Domain face of a record instance (Task 21): values as a
-// map keyed by attribute id; etag is the opaque pair id
-// (quotes already stripped) for If-Match on PATCH.
+// map keyed by attribute id; etag is the unquoted 64-hex
+// advertised ETag for If-Match on PATCH.
 export interface RecordInstance {
     readonly id: string;
     readonly recordTypeId: string;
@@ -38,6 +38,7 @@ interface InstanceDetailWire {
 interface InstanceHistoryWire {
     readonly at: string;
     readonly etag: string;
+    readonly version?: string;
     readonly values: readonly InstanceValueWire[];
 }
 
@@ -132,21 +133,21 @@ export async function getRecordInstance(
     );
 }
 
-// Create-only PUT genesis. Returns the fresh etag so the
-// caller can enter edit without a re-GET.
+// PATCH create (no If-Match). Returns the fresh etag
+// so the caller can enter edit without a re-GET.
 export async function putRecordInstance(
     ctx: RequestContext,
     recordTypeId: string,
     id: string,
     set: readonly InstanceValueSet[],
 ): Promise<{ etag: string }> {
-    const { etag } = await ctx.PUTWithEtag(
+    const { etag } = await ctx.PATCHWithEtag(
         instancePath(ctx, recordTypeId, id),
         { set: setWire(set) },
     );
     return {
         etag: requireEtag(
-            etag, 'instance PUT ' + id,
+            etag, 'instance PATCH create ' + id,
         ),
     };
 }
@@ -199,7 +200,7 @@ export async function getRecordInstanceHistory(
 ): Promise<RecordInstanceHistoryEntry[]> {
     const rows = await ctx.GET<InstanceHistoryWire[]>(
         instancePath(ctx, recordTypeId, id)
-        + '/history',
+        + '/versions',
     );
     return rows.map(row => ({
         at: row.at,

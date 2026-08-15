@@ -1,12 +1,110 @@
 import { TABLE_NAMES } from './db.ts';
 import { extractErrorMessage } from '../shared/error-helpers.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { ValidationError } from './types.ts';
 import {
     validateRequestEntity,
     validateResponseEntity,
 } from './validators.ts';
 
-// Anchored retired message-plane uri_prefix patterns.
+// Same width as validators.ts ISO_ZULU. Pre-break
+// snapshots used fractionless or 3-digit stamps.
+const ISO_ZULU_6 =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+
+const RESEED =
+    ' Re-snapshot from current state or reseed.';
+
+function whereRow(
+    table: string,
+    rowIndex: number,
+): string {
+    return 'row ' + rowIndex
+        + ' in table "' + table + '"';
+}
+
+function refusePreBreak(
+    message: string,
+): never {
+    throw new ValidationError(message + RESEED);
+}
+
+// Pre-break rows fail these even when the entity
+// validator would already throw — operators must
+// see Re-snapshot / reseed.
+function refusePreBreakKeys(
+    row: Record<string, unknown>,
+    table: string,
+    rowIndex: number,
+): void {
+    const where = whereRow(table, rowIndex);
+    if (!('operation_id' in row)) {
+        refusePreBreak(
+            'Invalid snapshot: ' + where
+            + ' is missing operation_id.',
+        );
+    }
+    if (!('uri_collection' in row)) {
+        refusePreBreak(
+            'Invalid snapshot: ' + where
+            + ' is missing uri_collection.',
+        );
+    }
+    const at = row['at'];
+    if (
+        typeof at !== 'string'
+        || !ISO_ZULU_6.test(at)
+    ) {
+        refusePreBreak(
+            'Invalid snapshot: ' + where
+            + ' at is not 6-digit zulu.',
+        );
+    }
+}
+
+function isCanonicalJsonMessage(
+    message: string,
+): boolean {
+    try {
+        const parsed = JSON.parse(message);
+        return typeof parsed === 'object'
+            && parsed !== null
+            && !Array.isArray(parsed)
+            && 'startLine' in parsed;
+    } catch {
+        return false;
+    }
+}
+
+function isSerializeWire(message: string): boolean {
+    try {
+        parseWire(message);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function refusePreBreakMessage(
+    row: Record<string, unknown>,
+    table: string,
+    rowIndex: number,
+): void {
+    const where = whereRow(table, rowIndex);
+    const message = row['message'];
+    if (
+        typeof message !== 'string'
+        || isCanonicalJsonMessage(message)
+        || !isSerializeWire(message)
+    ) {
+        refusePreBreak(
+            'Invalid snapshot: ' + where
+            + ' message is not serializeWire.',
+        );
+    }
+}
+
+// Anchored retired message-plane uri_collection patterns.
 // Task 5: flat records. Task 8: flat record-attributes.
 // Anchored so the live flows/:id/records join family is
 // accepted (never a substring match).
@@ -105,8 +203,10 @@ export function parseAndValidateSnapshot(
                 );
             }
             const r = row as Record<string, unknown>;
+            refusePreBreakKeys(r, table, i);
             validateSnapshotRow(table, r, i);
-            const prefix = r['uri_prefix'];
+            refusePreBreakMessage(r, table, i);
+            const prefix = r['uri_collection'];
             if (typeof prefix === 'string') {
                 for (
                     const p of RETIRED_URI_PREFIX_PATTERNS
@@ -118,7 +218,7 @@ export function parseAndValidateSnapshot(
                             + ' in table "'
                             + table
                             + '" carries retired'
-                            + ' uri_prefix '
+                            + ' uri_collection '
                             + prefix
                             + '. Re-snapshot from'
                             + ' current state.',

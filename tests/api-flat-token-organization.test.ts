@@ -16,6 +16,7 @@ import {
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -75,7 +76,7 @@ async function join(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -103,6 +104,7 @@ function putDefaultOrganization(
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
+                'operation-id': TEST_OPERATION_ID,
             },
             body: JSON.stringify({
                 organization_id: organization,
@@ -121,7 +123,7 @@ async () => {
     const token = await reachableToken('current', ['2']);
     const put = await handleRequest(
         db, putDefaultOrganization(token, 'current', '2'));
-    assert.equal(put.status, 204);
+    assert.equal(put.status, 201);
     const res = await handleRequest(db, getMembers(token));
     assert.equal(res.status, 200);
 });

@@ -13,7 +13,7 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { canonicalUriPrefix } from '../api/message-pair.ts';
+import { canonicalUriCollection } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -44,12 +44,14 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
-import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+    storedCollectionText,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: roster (members / human_members /
 // ai_members / memberships / invitations) dual-write stripped.
@@ -89,13 +91,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -171,7 +172,7 @@ const HUMAN_MEMBERS_TEST_WIRING: DocumentFamilyWiring = {
 const READER_ACTOR: Id = 'drift-reader';
 
 // members/ai-members/human-members are GLOBAL plane (family-
-// registry.ts: organizationNested:false) — canonicalUriPrefix
+// registry.ts: organizationNested:false) — canonicalUriCollection
 // ignores whatever organization value a caller passes for these
 // three families, so this fixed placeholder is never load-
 // bearing; requireOrganization (document-family.ts) merely
@@ -241,7 +242,7 @@ function decodeRequestMessage(message: string): {
     readonly method: string;
     readonly body: Record<string, unknown>;
 } {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     if (model.startLine.kind !== 'request') {
         throw new Error(
             'stored message carries no request line',
@@ -363,10 +364,17 @@ async () => {
         db, req('GET', '/memberships', tokenStark),
     );
     assert.equal(resStark.status, 200);
-    const stark = sortById(
-        await derivedMemberships(db, STARK_ORGANIZATION),
+    const stark = await derivedMemberships(
+        db, STARK_ORGANIZATION,
     );
-    assert.equal(await resStark.text(), JSON.stringify(stark));
+    assert.equal(
+        await resStark.text(),
+        await storedCollectionText(
+            db,
+            '/organizations/' + STARK_ORGANIZATION
+                + '/memberships/',
+        ),
+    );
     assert.equal(stark.length, 10);
 
     const tokenTwo = await organizationToken(
@@ -376,10 +384,17 @@ async () => {
         db, req('GET', '/memberships', tokenTwo),
     );
     assert.equal(resTwo.status, 200);
-    const org2 = sortById(
-        await derivedMemberships(db, ORGANIZATION_TWO),
+    const org2 = await derivedMemberships(
+        db, ORGANIZATION_TWO,
     );
-    assert.equal(await resTwo.text(), JSON.stringify(org2));
+    assert.equal(
+        await resTwo.text(),
+        await storedCollectionText(
+            db,
+            '/organizations/' + ORGANIZATION_TWO
+                + '/memberships/',
+        ),
+    );
     assert.equal(org2.length, 6);
 
     const THIRD_ORGANIZATION = '3';
@@ -412,7 +427,17 @@ test('per-membership GET wire equals derive (all 16); missing-'
         const derived = await derivedMembership(
             db, membership.organization_id, membership.id,
         );
-        assert.equal(await res.text(), JSON.stringify(derived));
+        assert.equal(
+            await res.text(),
+            await storedPutBodyText(
+                db,
+                '/organizations/'
+                    + membership.organization_id
+                    + '/memberships/',
+                membership.id,
+            ),
+        );
+        assert.equal(derived.id, membership.id);
     }
 
     const missingId = 'no-such-membership';
@@ -484,21 +509,25 @@ test('ai-members + human-members wire equals derive (GLOBAL)'
         db, req('GET', '/ai-members', token),
     );
     assert.equal(resAi.status, 200);
-    const derivedAi = sortById(
-        await derivedAiMembers(db, GLOBAL_PLANE_PLACEHOLDER),
+    const derivedAi = await derivedAiMembers(
+        db, GLOBAL_PLANE_PLACEHOLDER,
     );
-    assert.equal(await resAi.text(), JSON.stringify(derivedAi));
+    assert.equal(
+        await resAi.text(),
+        await storedCollectionText(db, '/ai-members/'),
+    );
     assert.equal(derivedAi.length, 4);
 
     const resHuman = await handleRequest(
         db, req('GET', '/human-members', token),
     );
     assert.equal(resHuman.status, 200);
-    const derivedHuman = sortById(
-        await derivedHumanMembers(db, GLOBAL_PLANE_PLACEHOLDER),
+    const derivedHuman = await derivedHumanMembers(
+        db, GLOBAL_PLANE_PLACEHOLDER,
     );
     assert.equal(
-        await resHuman.text(), JSON.stringify(derivedHuman),
+        await resHuman.text(),
+        await storedCollectionText(db, '/human-members/'),
     );
     assert.equal(derivedHuman.length, 11);
 
@@ -510,7 +539,13 @@ test('ai-members + human-members wire equals derive (GLOBAL)'
         const derived = await derivedAiMember(
             db, GLOBAL_PLANE_PLACEHOLDER, row.id,
         );
-        assert.equal(await res.text(), JSON.stringify(derived));
+        assert.equal(
+            await res.text(),
+            await storedPutBodyText(
+                db, '/ai-members/', row.id,
+            ),
+        );
+        assert.equal(derived.id, row.id);
     }
     for (const row of derivedHuman) {
         const res = await handleRequest(
@@ -520,7 +555,13 @@ test('ai-members + human-members wire equals derive (GLOBAL)'
         const derived = await derivedHumanMember(
             db, GLOBAL_PLANE_PLACEHOLDER, row.id,
         );
-        assert.equal(await res.text(), JSON.stringify(derived));
+        assert.equal(
+            await res.text(),
+            await storedPutBodyText(
+                db, '/human-members/', row.id,
+            ),
+        );
+        assert.equal(derived.id, row.id);
     }
 
     const missingId = 'no-such-detail';
@@ -655,7 +696,7 @@ async () => {
             aiId, 'Chain AI', aiGenesisEventId, aiGenesisAt,
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
     assert.equal(
         (await db.requests.getAll()).length, beforeCreate + 3,
     );
@@ -679,7 +720,7 @@ async () => {
             'Chain AI Edited', aiGenesisEventId, aiGenesisAt,
         ),
     ));
-    assert.equal(edited.status, 204);
+    assert.equal(edited.status, 201);
     const derivedAiDetail2 = await derivedAiMember(
         db, GLOBAL_PLANE_PLACEHOLDER, aiId,
     );
@@ -690,8 +731,8 @@ async () => {
         'PUT', '/ai-members/' + aiId, token,
         aiMemberDocumentBody('Chain AI Facet'),
     ));
-    assert.equal(facetPut.status, 200);
-    assert.ok(facetPut.headers.get('Supersedes'));
+    assert.equal(facetPut.status, 201);
+    assert.equal(facetPut.headers.get('Supersedes'), null);
     const derivedAiDetail3 = await derivedAiMember(
         db, GLOBAL_PLANE_PLACEHOLDER, aiId,
     );
@@ -709,7 +750,7 @@ async () => {
             humanGenesisAt,
         ),
     ));
-    assert.equal(humanCreated.status, 204);
+    assert.equal(humanCreated.status, 201);
     assert.equal(
         (await db.requests.getAll()).length,
         beforeHumanCreate + 4,
@@ -730,7 +771,7 @@ async () => {
             humanGenesisEventId, humanGenesisAt,
         ),
     ));
-    assert.equal(humanEdited.status, 204);
+    assert.equal(humanEdited.status, 201);
     const derivedHumanDetail2 = await derivedHumanMember(
         db, GLOBAL_PLANE_PLACEHOLDER, humanId,
     );
@@ -746,7 +787,7 @@ async () => {
             at: nowUtc(),
         },
     ));
-    assert.equal(membershipPut.status, 200);
+    assert.equal(membershipPut.status, 201);
     const rosterAfterMembership = await deriveMembers(
         db, STARK_ORGANIZATION,
     );
@@ -834,7 +875,7 @@ async () => {
         'inv-roster-sarah', 'sarah.chen@company.com',
         'ev-roster-sarah-grant', '2026-06-01T00:00:00.000000Z',
     );
-    assert.equal(sarahGrant.status, 200);
+    assert.equal(sarahGrant.status, 201);
     const sarahRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-sarah',
     )!;
@@ -847,12 +888,12 @@ async () => {
         'inv-roster-jessica', 'jessica.park@company.com',
         'ev-roster-jessica-grant', '2026-06-01T00:00:01.000000Z',
     );
-    assert.equal(jessicaGrant.status, 200);
+    assert.equal(jessicaGrant.status, 201);
     const jessicaAccept = await acceptAs(
         jessicaId, 'inv-roster-jessica', 'ms-roster-jessica',
         'ev-roster-jessica-accept', '2026-06-01T00:00:02.000000Z',
     );
-    assert.equal(jessicaAccept.status, 204);
+    assert.equal(jessicaAccept.status, 201);
     const jessicaRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-jessica',
     )!;
@@ -872,12 +913,12 @@ async () => {
         'inv-roster-emily', 'emily.rodriguez@company.com',
         'ev-roster-emily-grant', '2026-06-01T00:00:03.000000Z',
     );
-    assert.equal(emilyGrant.status, 200);
+    assert.equal(emilyGrant.status, 201);
     const emilyDecline = await declineAs(
         '53J8h9dr76XFqCjYcNVwIR', 'inv-roster-emily',
         'ev-roster-emily-decline', '2026-06-01T00:00:04.000000Z',
     );
-    assert.equal(emilyDecline.status, 204);
+    assert.equal(emilyDecline.status, 201);
     const emilyRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-emily',
     )!;
@@ -888,12 +929,12 @@ async () => {
         'inv-roster-marcus', 'marcus@acmecorp.com',
         'ev-roster-marcus-grant', '2026-06-01T00:00:05.000000Z',
     );
-    assert.equal(marcusGrant.status, 200);
+    assert.equal(marcusGrant.status, 201);
     const marcusRevoke = await revoke(
         'inv-roster-marcus', 'ev-roster-marcus-revoke',
         '2026-06-01T00:00:06.000000Z',
     );
-    assert.equal(marcusRevoke.status, 204);
+    assert.equal(marcusRevoke.status, 201);
     const marcusRow = (await deriveInvitations(db)).find(
         (row) => row.id === 'inv-roster-marcus',
     )!;
@@ -906,7 +947,7 @@ async () => {
         'inv-roster-sarah-dup', 'sarah.chen@company.com',
         'ev-roster-sarah-dup-grant', '2026-06-01T00:00:07.000000Z',
     );
-    assert.equal(sarahDuplicate.status, 200);
+    assert.equal(sarahDuplicate.status, 201);
     assert.equal(
         (await deriveInvitations(db)).length, beforeDerived,
     );
@@ -926,7 +967,7 @@ async () => {
         'ev-roster-jessica-reaccept',
         '2026-06-01T00:00:08.000000Z',
     );
-    assert.equal(jessicaReaccept.status, 204);
+    assert.equal(jessicaReaccept.status, 201);
     assert.equal(
         0 /* states table retired */,
         statesBefore,
@@ -952,15 +993,15 @@ test('the ai-members and human-members create-op POST pairs are'
             aiId, 'Filter AI', aiId + '-ev', nowUtc(),
         ),
     ));
-    assert.equal(aiCreated.status, 204);
+    assert.equal(aiCreated.status, 201);
 
-    const aiPrefix = canonicalUriPrefix(undefined, '/ai-members/');
+    const aiPrefix = canonicalUriCollection(undefined, '/ai-members/');
     const [aiRequests, aiResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', aiPrefix),
-        db.responses.getAllWhere('uri_prefix', aiPrefix),
+        db.requests.getAllWhere('uri_collection', aiPrefix),
+        db.responses.getAllWhere('uri_collection', aiPrefix),
     ]);
     const atAiAddress = aiRequests.filter(
-        (r) => r.uri_prefix === aiPrefix && r.uri_id === aiId,
+        (r) => r.uri_collection === aiPrefix && r.uri_id === aiId,
     );
     assert.equal(atAiAddress.length, 2);
     const aiDocumentPairs = documentPairsAt(
@@ -991,17 +1032,17 @@ test('the ai-members and human-members create-op POST pairs are'
             humanId, 'Filter Human', humanId + '-ev', nowUtc(),
         ),
     ));
-    assert.equal(humanCreated.status, 204);
+    assert.equal(humanCreated.status, 201);
 
-    const humanPrefix = canonicalUriPrefix(
+    const humanPrefix = canonicalUriCollection(
         undefined, '/human-members/',
     );
     const [humanRequests, humanResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', humanPrefix),
-        db.responses.getAllWhere('uri_prefix', humanPrefix),
+        db.requests.getAllWhere('uri_collection', humanPrefix),
+        db.responses.getAllWhere('uri_collection', humanPrefix),
     ]);
     const atHumanAddress = humanRequests.filter(
-        (r) => r.uri_prefix === humanPrefix
+        (r) => r.uri_collection === humanPrefix
             && r.uri_id === humanId,
     );
     assert.equal(atHumanAddress.length, 2);
@@ -1031,10 +1072,10 @@ test('the ai-members and human-members create-op POST pairs are'
 
     // exactly-one-document-head-per-address at members/:id too —
     // the ONE shared roster row every member kind writes through.
-    const membersPrefix = canonicalUriPrefix(undefined, '/members/');
+    const membersPrefix = canonicalUriCollection(undefined, '/members/');
     const [memberRequests, memberResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', membersPrefix),
-        db.responses.getAllWhere('uri_prefix', membersPrefix),
+        db.requests.getAllWhere('uri_collection', membersPrefix),
+        db.responses.getAllWhere('uri_collection', membersPrefix),
     ]);
     for (const id of [aiId, humanId]) {
         const pairs = documentPairsAt(
@@ -1066,14 +1107,14 @@ test('resend idempotency: a byte-identical ai-members/:id PUT'
     const first = await handleRequest(db, req(
         'PUT', '/ai-members/' + aiId, token, body,
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const afterFirst = (await db.requests.getAll()).length;
     assert.equal(afterFirst, beforeCount + 1);
 
     const second = await handleRequest(db, req(
         'PUT', '/ai-members/' + aiId, token, body,
     ));
-    assert.equal(second.status, 200);
+    assert.equal(second.status, 201);
     const afterSecond = (await db.requests.getAll()).length;
     assert.equal(afterSecond, afterFirst);
     assert.equal(
@@ -1115,11 +1156,14 @@ test('GET member trio is lifecycle-current under clock skew'
             state_event_id: genesisEv,
         },
     ));
-    assert.equal(genesis.status, 200);
-    // PUT successBody is entity fields only — no trio.
+    assert.equal(genesis.status, 201);
+    // PUT successBody is memberDocumentEntityOf (G1 trio).
     assert.deepEqual(await genesis.json(), {
         id: memberId,
         type: 'human',
+        state: 'active',
+        state_at: genesisAt,
+        state_event_id: genesisEv,
     });
 
     // Later arrival, earlier state_at, different state +
@@ -1135,7 +1179,7 @@ test('GET member trio is lifecycle-current under clock skew'
             state_event_id: skewedEv,
         },
     ));
-    assert.equal(skewed.status, 200);
+    assert.equal(skewed.status, 201);
 
     const expected: MemberEntity = {
         id: memberId,
@@ -1149,7 +1193,13 @@ test('GET member trio is lifecycle-current under clock skew'
         db, req('GET', '/members/' + memberId, token),
     );
     assert.equal(res.status, 200);
-    assert.equal(await res.text(), JSON.stringify(expected));
+    assert.deepEqual(await res.json(), expected);
+    assert.deepEqual(
+        JSON.parse(
+            await storedPutBodyText(db, '/members/', memberId),
+        ),
+        expected,
+    );
 
     const derived = await deriveMemberParent(db, memberId);
     assert.equal(
@@ -1208,7 +1258,7 @@ test('plain PUT-supersession at a membership address — a'
             at: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     assert.ok(firstId);
 
@@ -1224,8 +1274,8 @@ test('plain PUT-supersession at a membership address — a'
             at: '2020-01-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(second.status, 200);
-    assert.equal(second.headers.get('Supersedes'), firstId);
+    assert.equal(second.status, 201);
+    assert.equal(second.headers.get('Supersedes'), null);
 
     const derived = await derivedMembership(
         db, STARK_ORGANIZATION, membershipId,
@@ -1267,7 +1317,7 @@ async () => {
             at: nowUtc(),
         },
     ));
-    assert.equal(membershipPut.status, 200);
+    assert.equal(membershipPut.status, 201);
 
     // GET /members drops the orphan — the join iterates
     // MEMBERS documents and tests membership, never the reverse.

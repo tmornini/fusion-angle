@@ -7,5 +7,7 @@ set -euo pipefail
 #   --visualize (history HTML; bare = no Chrome),
 #   --profile (API counts + page-init outside
 #   fetch/render; defaults: 4 pages, 1 run),
+#   --base-url URL (Node origin; no python/seed),
+#   --password SECRET (or MEASURE_PASSWORD),
 #   --help / -h
 node --strip-types web-app/app/measure.ts "$@"

@@ -23,6 +23,7 @@ import {
 import {
     deriveDocumentsAt,
 } from '../api/derive-documents.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // Phase 6 Task 3 (sixth family, 'stateless' evidence #2): PUT
 // /record-attributes/:id takes the entity's OWN fields only —
@@ -139,7 +140,7 @@ test('postRecordAttributeDocumentOp writes exactly the'
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     // Phase Final Task 2: record_attributes ROW half stripped
     // — pair plane + op return are the oracles.
@@ -183,13 +184,17 @@ async () => {
         options: [],
         constraints: [],
     };
+    const opHeaders: readonly (readonly [string, string])[] =
+        [['operation-id', TEST_OPERATION_ID]];
     const first = await PUT(
         db, 'organizations/1/record-types/rec-fixture-1'
         + '/attributes/ra-resend-1', body, DEV_TOKEN,
+        opHeaders,
     );
     const second = await PUT(
         db, 'organizations/1/record-types/rec-fixture-1'
         + '/attributes/ra-resend-1', body, DEV_TOKEN,
+        opHeaders,
     );
     assert.deepEqual(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
@@ -234,7 +239,7 @@ async function putDocumentPair(
         requestAt: '2026-01-01T00:00:00.000000Z',
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -269,7 +274,7 @@ async function deleteDocumentPair(
         requestAt: '2026-01-02T00:00:00.000000Z',
         organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -287,8 +292,8 @@ test('a DELETE-head derives absent on the nested attributes'
     const prefix = '/organizations/1/record-types/'
         + typeId + '/attributes/';
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const head = deriveDocumentsAt(
         requests, responses, prefix,

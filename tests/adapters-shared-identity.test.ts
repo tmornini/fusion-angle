@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import '../web-app/app/adapters/in-page-facade.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     createRequestContext,

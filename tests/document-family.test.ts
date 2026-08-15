@@ -6,7 +6,6 @@ import {
 } from '../api/db-memory.ts';
 import {
     EntityNotFoundError,
-    UniqueConstraintError,
 } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { Id } from '../api/types.ts';
@@ -14,6 +13,7 @@ import { handleRequest } from '../api/api.ts';
 import {
     formWritePair,
     appendMessagePair,
+    headPairIdAt,
     IF_MATCH_HEADER,
     strongEtagOf,
 } from '../api/message-pair.ts';
@@ -45,6 +45,11 @@ import {
 import { deriveIdea } from '../api/derive-ideas.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { ApiError, HTTP_PRECONDITION_FAILED } from
+    '../api/http-errors.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -56,15 +61,13 @@ function req(
     body?: unknown,
     headers?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-            ...headers,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        headers,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -75,15 +78,9 @@ async function freshDb(): Promise<MemoryDbAdapter> {
 }
 
 // -- (a) documentWriteResponseSpec's successBody, pinned
-// against FIXED expected literals. Before the wiring-collapse
-// fix, this compared the generic builder's output against
-// WRITE_RESPONSE_SPECS['ideas|projects/:id'] — TWO hand-
-// maintained wiring copies — but that spec entry is now built
-// from the SAME single registered row (routes.ts's
-// registerDocumentFamilyWiring call), so a same-object
-// comparison would prove nothing. Pinned to literals instead —
-// a strengthening: this is the ONLY place the shape of a
-// document PUT's successBody is asserted byte-for-byte. -------
+// against FIXED expected literals. G1 trio families emit
+// wiring.entityOf (id first, trio last). Pinned to literals —
+// the shape of a document PUT's successBody. -------
 
 test('documentWriteResponseSpec produces the ideas'
 + ' successBody', () => {
@@ -101,6 +98,7 @@ test('documentWriteResponseSpec produces the ideas'
         title: 'T', position: 1, problem_statement: 'p',
         target_users: 't', proposed_solution: 's',
         expected_outcome: 'o', success_metrics: 'm',
+        state: 'active', state_at: AT, state_event_id: 'ev-1',
     });
 });
 
@@ -120,7 +118,55 @@ test('documentWriteResponseSpec produces the projects'
         title: 'T', description: 'd', progress: 5,
         start_date: '2026-01-01', target_end_date: '2026-02-01',
         estimated_cost: 100, actual_cost: 50, position: 1,
+        state: 'submitted', state_at: AT, state_event_id: 'ev-1',
     });
+});
+
+test('documentWriteResponseSpec produces the identities'
++ ' successBody (G3 entityOf)', () => {
+    const wiring = documentFamilyWiring('identities')!;
+    const body = { kind: 'person' };
+    const actual = documentWriteResponseSpec(wiring)
+        .successBody!(['id-1'], body, 'current', '1');
+    assert.deepEqual(actual, { id: 'id-1', kind: 'person' });
+});
+
+test('documentWriteResponseSpec produces the memberships'
++ ' successBody (G3 entityOf)', () => {
+    const wiring = documentFamilyWiring('memberships')!;
+    const body = {
+        organization_id: '1', identity_id: 'sarah',
+        type: 'member', at: AT,
+    };
+    const actual = documentWriteResponseSpec(wiring)
+        .successBody!(['ms-1'], body, 'current', '1');
+    assert.deepEqual(actual, { id: 'ms-1', ...body });
+});
+
+test('documentWriteResponseSpec produces the ai-members'
++ ' successBody (G3 entityOf, request-body key order)',
+() => {
+    const wiring = documentFamilyWiring('ai-members')!;
+    const body = {
+        name: 'A', description: 'd',
+        model: 'mnte677fU2G1V2B9vJp9z7',
+        skill_focus: 's',
+    };
+    const actual = documentWriteResponseSpec(wiring)
+        .successBody!(['ai-1'], body, 'current', '1');
+    assert.deepEqual(actual, { id: 'ai-1', ...body });
+});
+
+test('documentWriteResponseSpec produces the human-members'
++ ' successBody (G3 entityOf)', () => {
+    const wiring = documentFamilyWiring('human-members')!;
+    const body = {
+        title: 'T', department: 'D',
+        strengths: [], team_dimensions: {},
+    };
+    const actual = documentWriteResponseSpec(wiring)
+        .successBody!(['hm-1'], body, 'current', '1');
+    assert.deepEqual(actual, { id: 'hm-1', ...body });
 });
 
 // -- (b) documentEntityRoute('simple') dispatches PUT to the
@@ -152,7 +198,7 @@ test('documentEntityRoute (simple arm) PUTs through the'
         headerFields: [], body, requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     const written = await route.put!(
         db, ['idea-9'], body, 'current', pair,
@@ -192,6 +238,21 @@ async function testDocumentOp(
         ['requests', 'responses'],
         async (view) => {
             if (pair !== undefined) {
+                const latchedId = pair.latchedHeadPairId;
+                const latest = await headPairIdAt(
+                    view, pair.uriCollection, pair.uriId,
+                );
+                if (
+                    latchedId !== undefined
+                    && latest !== latchedId
+                ) {
+                    throw new ApiError(
+                        'If-Match does not match the current'
+                        + ' document at /'
+                        + TEST_FAMILY + '/' + id,
+                        HTTP_PRECONDITION_FAILED,
+                    );
+                }
                 await appendMessagePair(view, pair);
             }
             return { id, ...body };
@@ -296,7 +357,7 @@ async () => {
             'PUT', '/' + TEST_FAMILY + '/doc-1', token,
             { v: 'first' },
         ));
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
         assert.equal(res.headers.get('Follows'), null);
         assert.equal(res.headers.get('Supersedes'), null);
     });
@@ -313,14 +374,14 @@ test('locked arm: a sibling route under the SAME family'
         const first = await handleRequest(db, req(
             'PUT', path, token, { v: 'first' },
         ));
-        assert.equal(first.status, 204);
+        assert.equal(first.status, 201);
         // A second PUT, still with NO If-Match — if the
         // gate mistakenly keyed the locked arm off TEST_FAMILY
         // alone, this would 428 (head present, echo absent).
         const second = await handleRequest(db, req(
             'PUT', path, token, { v: 'second' },
         ));
-        assert.equal(second.status, 204);
+        assert.equal(second.status, 201);
     });
 });
 
@@ -357,7 +418,10 @@ test('locked arm: a stale If-Match echo 412s', async () => {
         const res = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-3', token,
             { v: 'second' },
-            { [IF_MATCH_HEADER]: strongEtagOf('bogus') },
+            { [IF_MATCH_HEADER]: strongEtagOf(
+                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+                + 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+            ) },
         ));
         assert.equal(res.status, 412);
         assert.equal(
@@ -368,8 +432,8 @@ test('locked arm: a stale If-Match echo 412s', async () => {
     });
 });
 
-test('locked arm: a matching echo populates follows, not'
-+ ' supersedes', async () => {
+test('locked arm: a matching echo stores no predecessor'
++ ' columns or headers', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
         const token = await organizationToken();
@@ -377,20 +441,24 @@ test('locked arm: a matching echo populates follows, not'
             'PUT', '/' + TEST_FAMILY + '/doc-4', token,
             { v: 'first' },
         ));
-        const firstId = first.headers.get('Response-ID')!;
+        const firstEtag = first.headers.get('ETag')!;
         const second = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-4', token,
             { v: 'second' },
-            { [IF_MATCH_HEADER]: strongEtagOf(firstId) },
+            { [IF_MATCH_HEADER]: firstEtag },
         ));
-        assert.equal(second.status, 200);
-        assert.equal(second.headers.get('Follows'), firstId);
+        assert.equal(second.status, 201);
+        assert.equal(second.headers.get('Follows'), null);
         assert.equal(second.headers.get('Supersedes'), null);
         const secondId = second.headers.get('Response-ID')!;
         const stored = (await db.responses.getAll())
             .find((row) => row.id === secondId);
-        assert.equal(stored?.follows, firstId);
-        assert.equal(stored?.supersedes, undefined);
+        assert.equal(
+            stored !== undefined
+                && !('follows' in stored)
+                && !('supersedes' in stored),
+            true,
+        );
     });
 });
 
@@ -404,21 +472,21 @@ async () => {
             'PUT', '/' + TEST_FAMILY + '/doc-5', token,
             { v: 'first' },
         ));
-        const firstId = first.headers.get('Response-ID')!;
+        const firstEtag = first.headers.get('ETag')!;
         const editRequest = req(
             'PUT', '/' + TEST_FAMILY + '/doc-5', token,
             { v: 'second' },
-            { [IF_MATCH_HEADER]: strongEtagOf(firstId) },
+            { [IF_MATCH_HEADER]: firstEtag },
         );
         const edit = await handleRequest(db, editRequest.clone());
-        assert.equal(edit.status, 200);
+        assert.equal(edit.status, 201);
         const editDate = edit.headers.get('Date');
         // A byte-identical resend of the edit: its echo (firstId)
         // is now STALE against the new head (the edit's own id),
         // yet it must replay — never 412 — because the fast path
         // runs BEFORE the four-outcome table.
         const resend = await handleRequest(db, editRequest.clone());
-        assert.equal(resend.status, 200);
+        assert.equal(resend.status, 201);
         assert.equal(resend.headers.get('Date'), editDate);
         assert.equal(
             resend.headers.get('Response-ID'),
@@ -437,26 +505,26 @@ test('locked arm: a fresh-keyed replay echoing a superseded'
             'PUT', '/' + TEST_FAMILY + '/doc-6', token,
             { v: 'first' },
         ));
-        const genesisId = genesis.headers.get('Response-ID')!;
+        const genesisEtag = genesis.headers.get('ETag')!;
         await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-6', token,
             { v: 'second' },
-            { [IF_MATCH_HEADER]: strongEtagOf(genesisId) },
+            { [IF_MATCH_HEADER]: genesisEtag },
         ));
         // A DIFFERENT (fresh) address has no head of its own;
-        // echoing doc-6's now-superseded genesis id is neither
+        // echoing doc-6's now-superseded genesis tag is neither
         // "absent" nor "matches MY head" — 412.
         const res = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-7', token,
             { v: 'first' },
-            { [IF_MATCH_HEADER]: strongEtagOf(genesisId) },
+            { [IF_MATCH_HEADER]: genesisEtag },
         ));
         assert.equal(res.status, 412);
     });
 });
 
 test('locked arm: two writers racing the SAME echo — the'
-+ ' second aborts via the unique follows index', async () => {
++ ' second aborts via the in-tx head re-read', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const genesis = await formWritePair({
@@ -467,7 +535,8 @@ test('locked arm: two writers racing the SAME echo — the'
         headerFields: [], body: { v: 'genesis' },
         requesterIdentityId: 'current', requestAt: AT,
         organization: '1', responseStatus: 200,
-        responseBody: undefined, headPairId: undefined,
+        responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -475,60 +544,62 @@ test('locked arm: two writers racing the SAME echo — the'
     );
     // Two writers both observed the SAME head (genesis.id)
     // before either committed — the race the pre-check alone
-    // cannot close; the UNIQUE index on responses.follows is
-    // the platform primitive that closes it.
+    // cannot close; the in-tx head re-read closes it.
+    const echo = {
+        name: IF_MATCH_HEADER,
+        value: strongEtagOf(genesis.responseEtag),
+    };
     const writerA = await formWritePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
         routePattern: TEST_PATTERN,
         routeSegments: [TEST_FAMILY, ':id'],
         pathSegments: [TEST_FAMILY, 'race'],
-        headerFields: [], body: { v: 'a' },
+        headerFields: [echo], body: { v: 'a' },
         requesterIdentityId: 'current', requestAt: AT,
         organization: '1', responseStatus: 200,
-        responseBody: undefined, headPairId: undefined,
-        follows: genesis.id,
+        responseBody: undefined,
+        latchedHeadPairId: genesis.id,
+        matchedEtag: genesis.responseEtag,
+        operationId: TEST_OPERATION_ID,
     });
     const writerB = await formWritePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
         routePattern: TEST_PATTERN,
         routeSegments: [TEST_FAMILY, ':id'],
         pathSegments: [TEST_FAMILY, 'race'],
-        headerFields: [], body: { v: 'b' },
+        headerFields: [echo], body: { v: 'b' },
         requesterIdentityId: 'current', requestAt: AT,
         organization: '1', responseStatus: 200,
-        responseBody: undefined, headPairId: undefined,
-        follows: genesis.id,
+        responseBody: undefined,
+        latchedHeadPairId: genesis.id,
+        matchedEtag: genesis.responseEtag,
+        operationId: TEST_OPERATION_ID,
     });
-    await db.transaction(
-        ['requests', 'responses'],
-        (view) => appendMessagePair(view, writerA),
+    await testDocumentOp(
+        db, 'race', { v: 'a' }, 'current', writerA,
     );
     await assert.rejects(
-        db.transaction(
-            ['requests', 'responses'],
-            (view) => appendMessagePair(view, writerB),
+        () => testDocumentOp(
+            db, 'race', { v: 'b' }, 'current', writerB,
         ),
-        UniqueConstraintError,
+        (err: unknown) =>
+            err instanceof ApiError
+            && err.status === HTTP_PRECONDITION_FAILED,
     );
 });
 
 // The e2e sibling of the storage-level race above: TWO PUTs
 // echoing the SAME valid head, launched together through
 // handleRequest itself — never formWritePair/appendMessagePair
-// directly — so the gate's OWN UniqueConstraintError -> 412
-// mapping (api.ts's catch block) is what's under test, not the
-// storage primitive alone. On the memory backend, the global
-// transaction serializer (store-serializer.ts) processes each
-// racer's headPairIdAt read and dispatch as separate queued
-// steps, so BOTH racers observe genesis as their head and pass
-// the pre-dispatch echo check before either's write commits —
-// verified empirically (ten runs, zero flakes; see the fix
-// report) — so the SECOND-dispatched racer's write collides on
-// the unique responses.follows index, never the pre-check's
-// echo-mismatch branch (a distinct error message), pinning the
-// gate's mapping rather than re-proving the storage primitive.
+// directly — so the in-tx head re-read's 412 is what's under
+// test. On the memory backend, the global transaction
+// serializer (store-serializer.ts) processes each racer's
+// headPairIdAt read and dispatch as separate queued steps, so
+// BOTH racers observe genesis as their head and pass the
+// pre-dispatch echo check before either's write commits — the
+// SECOND-dispatched racer's in-tx re-read then 412s.
 test('locked arm: two concurrent PUTs echoing the same head —'
-+ ' the loser 412s via the gate\'s unique-index mapping',
++ ' the loser 412s via the in-tx head re-read',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -537,39 +608,37 @@ async () => {
         const genesis = await handleRequest(db, req(
             'PUT', path, token, { v: 'genesis' },
         ));
-        const head = genesis.headers.get('Response-ID')!;
+        const head = genesis.headers.get('ETag')!;
         const [first, second] = await Promise.all([
             handleRequest(db, req(
                 'PUT', path, token, { v: 'a' },
-                { [IF_MATCH_HEADER]: strongEtagOf(head) },
+                { [IF_MATCH_HEADER]: head },
             )),
             handleRequest(db, req(
                 'PUT', path, token, { v: 'b' },
-                { [IF_MATCH_HEADER]: strongEtagOf(head) },
+                { [IF_MATCH_HEADER]: head },
             )),
         ]);
         const statuses =
             [first.status, second.status].sort();
-        assert.deepEqual(statuses, [200, 412]);
+        assert.deepEqual(statuses, [201, 412]);
         const loser = first.status === 412 ? first : second;
         const loserBody =
             await loser.json() as { error: string };
-        // The mechanism pin: this exact message is thrown
-        // only by the storage layer's unique-column scan
-        // (api/db.ts's UniqueConstraintError), never by the
-        // gate's pre-check branches (api.ts:532-550), which
-        // read "If-Match is required..." or "...does
-        // not match the current document...".
         assert.equal(
             loserBody.error,
-            'Unique column responses.follows already holds'
-            + ' this value',
+            'If-Match does not match the current document at '
+            + path,
         );
         const responses = await db.responses.getAll();
-        const followingHead = responses.filter(
-            (row) => row.follows === head,
+        const atPath = responses.filter(
+            (row) =>
+                row.uri_collection
+                    === '/organizations/1/'
+                    + TEST_FAMILY + '/'
+                && row.uri_id === 'doc-race',
         );
-        assert.equal(followingHead.length, 1);
+        assert.equal(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
         assert.equal((await db.requests.getAll()).length, 4);
@@ -647,8 +716,9 @@ async function putStatelessDocumentPair(
         pathSegments: [STATELESS_FAMILY, id],
         headerFields: [], body, requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
-        responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        responseStatus: 200,
+        responseBody: { id, ...body },
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -670,7 +740,7 @@ async function deleteStatelessDocumentPair(
         requesterIdentityId: 'current',
         requestAt: AT, organization: '1',
         responseStatus: 200, responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],

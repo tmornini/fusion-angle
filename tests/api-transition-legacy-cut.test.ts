@@ -30,6 +30,9 @@ import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 import { workOrderLifecycleStatesFor } from
     '../api/derive-states.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Task 8 CUT — hard-cut at the gate for the legacy
 // fieldValues transition wire. Spec W2 / plan Task 8:
@@ -73,15 +76,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -206,6 +206,7 @@ async () => {
         organization: ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
         db,

@@ -8,6 +8,9 @@ import { handleRequest } from '../api/api.ts';
 import { organizationToken, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Pins the CURRENT status of every deliberate identity-spine
 // verb gap, through handleRequest, so Task 4's document-wiring
@@ -88,14 +91,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -567,7 +568,7 @@ test('POST identity-tokens/:jti/revocation clears authz for a'
             token, {},
         ),
     );
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
 });
 
 // ── regime 4: the identity-token-revocations PUT-member/
@@ -592,5 +593,5 @@ test('PUT identity-token-revocations/:id clears authz for a'
             },
         ),
     );
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
 });

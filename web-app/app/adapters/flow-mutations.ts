@@ -43,7 +43,7 @@ import {
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../../../api/api.ts';
+} from '../../../api/http-errors.ts';
 import type {
     RequestContext,
 } from './shared.ts';

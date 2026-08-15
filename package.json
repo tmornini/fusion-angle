@@ -3,6 +3,7 @@
     "type": "module",
     "devDependencies": {
         "esbuild": "0.28.0",
+        "postgres": "3.4.9",
         "typescript": "6.0.3"
     }
 }

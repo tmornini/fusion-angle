@@ -3,29 +3,26 @@ import {
     type Id,
 } from '../../../api/types.ts';
 import {
-    GET as httpGet,
-    GETWithEtag as httpGetWithEtag,
-    PUT as httpPut,
-    PUTWithEtag as httpPutWithEtag,
-    PATCH as httpPatch,
-    PATCHWithEtag as httpPatchWithEtag,
-    DELETE as httpDelete,
-    POST as httpPost,
     UnauthorizedError,
-    type ClientFacadeAdapter,
-} from '../../../api/api.ts';
+} from '../../../api/http-errors.ts';
+import { OPERATION_ID_HEADER } from
+    '../../../api/message-pair.ts';
 import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
 import {
-    getDbAdapter,
     getSessionToken,
     putSessionToken,
-} from './init.ts';
+    sessionTokenIsSeeded,
+} from './session-token.ts';
+import {
+    getClientFacade,
+    wrapClientAdapter,
+} from './facade-holder.ts';
 import {
     type Principal,
     principalFromToken,
-} from '../../../api/access-token.ts';
+} from '../../../shared/access-token-decode.ts';
 import {
     resolveCredentialDecision,
 } from '../credential-resolution.ts';
@@ -36,6 +33,9 @@ import {
     deleteSessionCredentials,
 } from './session-credentials.ts';
 import { postSessionRefresh } from './session-refresh.ts';
+import { isCookieSession } from './session-credentials.ts';
+import { runSingleFlightRefresh } from
+    './session-refresh-mutex.ts';
 import { redirectToLogin } from '../auth-redirect.ts';
 import { getOrganizations } from './organizations.ts';
 import {
@@ -49,6 +49,11 @@ import {
 import {
     recordApiRequest,
 } from '../page-request-profile.ts';
+import type { HttpFacade } from './http-facade.ts';
+
+// Either the in-page handleRequest adapter or the fetch
+// facade. RequestContext verbs are the same on both.
+type ClientFacade = HttpFacade | object;
 
 // Rows whose `field` equals `value` — the single-field
 // equality filter the adapters repeat. Type-safe: `field`
@@ -61,6 +66,55 @@ export function filterByField<T, K extends keyof T>(
 ): T[] {
     return rows.filter(row => row[field] === value);
 }
+
+// G1 stores trio on the PUT; GET streams it. Pre-G1
+// rows still fill lifecycle from GET :id/versions.
+interface TrioRow {
+    readonly id: string;
+    readonly state?: string;
+    readonly state_at?: string;
+    readonly state_event_id?: string;
+}
+
+interface VersionRow {
+    readonly id: string;
+    readonly state: string;
+    readonly at: string;
+    readonly version?: string;
+}
+
+export async function withLifecycleTrio<T extends TrioRow>(
+    ctx: RequestContext,
+    family: string,
+    row: T,
+): Promise<T> {
+    if (row.state !== undefined) return row;
+    const history = await ctx.GET<readonly VersionRow[]>(
+        family + '/' + row.id + '/versions',
+    );
+    const current = history[0];
+    if (current === undefined) return row;
+    return {
+        ...row,
+        state: current.state,
+        state_at: current.at,
+        state_event_id: current.id,
+    };
+}
+
+export async function withLifecycleTrios<T extends TrioRow>(
+    ctx: RequestContext,
+    family: string,
+    rows: readonly T[],
+): Promise<T[]> {
+    return Promise.all(
+        rows.map(
+            (row) => withLifecycleTrio(ctx, family, row),
+        ),
+    );
+}
+
+
 
 export interface RequestContext {
     readonly requestId: string;
@@ -110,7 +164,7 @@ export interface RequestContext {
 // captured token. The recovering sibling below is the
 // sessionContext path.
 export function createRequestContext(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     token: string,
 ): RequestContext {
     return makeRequestContext(adapter, token, false);
@@ -120,18 +174,29 @@ export function createRequestContext(
 // via withAuthRecovery and retries against the live token
 // once.
 export function createRecoveringRequestContext(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     token: string,
 ): RequestContext {
     return makeRequestContext(adapter, token, true);
 }
 
+function guestPrincipal(): Principal {
+    return {
+        id: '',
+        roles: [],
+        name: '',
+    };
+}
+
 function makeRequestContext(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     token: string,
     recover: boolean,
 ): RequestContext {
-    const identity = principalFromToken(token);
+    const identity = token === ''
+        ? guestPrincipal()
+        : principalFromToken(token);
+    const verbs = wrapClientAdapter(adapter);
 
     function run<T>(
         make: (tok: string) => Promise<T>,
@@ -147,13 +212,28 @@ function makeRequestContext(
     // REQUEST_ID_HEADER so the server gate reuses it instead
     // of minting a second, unrelated trace.
     const requestId = generateCryptoSafeBase62();
+    const operationId = generateCryptoSafeBase62();
+    function writeHeaders(
+        extra?:
+            readonly (readonly [string, string])[],
+    ): readonly (readonly [string, string])[] {
+        if (extra?.some(([name]) =>
+            name.toLowerCase() === OPERATION_ID_HEADER
+        )) {
+            return extra;
+        }
+        return [
+            [OPERATION_ID_HEADER, operationId],
+            ...(extra ?? []),
+        ];
+    }
     const ctx: RequestContext = {
         requestId,
         identity,
         GET: <T>(resource: string) => {
             recordApiRequest('GET', resource);
-            return run<T>(tok => httpGet<T>(
-                adapter, resource, tok, requestId,
+            return run<T>(tok => verbs.GET<T>(
+                resource, tok, requestId,
             ));
         },
         GETWithEtag: <T>(resource: string) => {
@@ -162,8 +242,8 @@ function makeRequestContext(
                 body: T;
                 etag: string | undefined;
             }>(
-                tok => httpGetWithEtag<T>(
-                    adapter, resource, tok, requestId,
+                tok => verbs.GETWithEtag<T>(
+                    resource, tok, requestId,
                 ),
             );
         },
@@ -175,9 +255,9 @@ function makeRequestContext(
         ) => {
             recordApiRequest('PUT', resource);
             return run<T>(
-                tok => httpPut<T>(
-                    adapter, resource, body, tok,
-                    headerFields, requestId,
+                tok => verbs.PUT<T>(
+                    resource, body, tok,
+                    writeHeaders(headerFields), requestId,
                 ));
         },
         PUTWithEtag: <T>(
@@ -191,9 +271,9 @@ function makeRequestContext(
                 body: T;
                 etag: string | undefined;
             }>(
-                tok => httpPutWithEtag<T>(
-                    adapter, resource, body, tok,
-                    headerFields, requestId,
+                tok => verbs.PUTWithEtag<T>(
+                    resource, body, tok,
+                    writeHeaders(headerFields), requestId,
                 ),
             );
         },
@@ -205,9 +285,9 @@ function makeRequestContext(
         ) => {
             recordApiRequest('PATCH', resource);
             return run<T>(
-                tok => httpPatch<T>(
-                    adapter, resource, body, tok,
-                    headerFields, requestId,
+                tok => verbs.PATCH<T>(
+                    resource, body, tok,
+                    writeHeaders(headerFields), requestId,
                 ));
         },
         PATCHWithEtag: <T>(
@@ -221,17 +301,18 @@ function makeRequestContext(
                 body: T;
                 etag: string | undefined;
             }>(
-                tok => httpPatchWithEtag<T>(
-                    adapter, resource, body, tok,
-                    headerFields, requestId,
+                tok => verbs.PATCHWithEtag<T>(
+                    resource, body, tok,
+                    writeHeaders(headerFields), requestId,
                 ),
             );
         },
         DELETE: (resource: string) => {
             recordApiRequest('DELETE', resource);
             return run<void>(
-                tok => httpDelete(
-                    adapter, resource, tok, requestId,
+                tok => verbs.DELETE(
+                    resource, tok, requestId,
+                    writeHeaders(),
                 ));
         },
         POST: <T>(
@@ -240,9 +321,9 @@ function makeRequestContext(
         ) => {
             recordApiRequest('POST', resource);
             return run<T>(
-                tok => httpPost<T>(
-                    adapter, resource, body, tok,
-                    requestId,
+                tok => verbs.POST<T>(
+                    resource, body, tok,
+                    requestId, writeHeaders(),
                 ));
         },
         POSTWithHeaders: <T>(
@@ -253,9 +334,9 @@ function makeRequestContext(
         ) => {
             recordApiRequest('POST', resource);
             return run<T>(
-                tok => httpPost<T>(
-                    adapter, resource, body, tok,
-                    requestId, headerFields,
+                tok => verbs.POST<T>(
+                    resource, body, tok,
+                    requestId, writeHeaders(headerFields),
                 ));
         },
     };
@@ -282,7 +363,7 @@ export async function jitteredBackoff(
 
 export function sessionContext(): RequestContext {
     return createRecoveringRequestContext(
-        getDbAdapter(), getSessionToken(),
+        getClientFacade(), getSessionToken(),
     );
 }
 
@@ -296,7 +377,7 @@ export function sessionContext(): RequestContext {
 let recoveryInFlight: Promise<string | null> | null = null;
 
 function sharedRecovery(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     requestOrganization: Id | undefined,
 ): Promise<string | null> {
     recoveryInFlight ??= recoverSession(adapter, requestOrganization)
@@ -315,7 +396,7 @@ function sharedRecovery(
 // second 401 (or no refreshable credential) clears the session
 // and bounces to login — there is no third attempt.
 async function withAuthRecovery<T>(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     token: string,
     requestOrganization: Id | undefined,
     make: (tok: string) => Promise<T>,
@@ -349,7 +430,7 @@ async function withAuthRecovery<T>(
 // 401 with no refreshable credential never makes a pointless
 // refresh round-trip.
 async function recoverSession(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     requestOrganization: Id | undefined,
 ): Promise<string | null> {
     let creds: SessionCredentials | null;
@@ -379,19 +460,25 @@ async function recoverSession(
         return installAndScope(
             adapter, decision.accessToken, requestOrganization);
     }
+    if (isCookieSession()) {
+        // HttpFacade already single-flights the cookie
+        // refresh. A second POST here is reuse.
+        deleteSessionCredentials();
+        redirectToLogin();
+        return null;
+    }
     if (decision.kind !== 'refresh') {
         deleteSessionCredentials();
         redirectToLogin();
         return null;
     }
-    const refreshed = await refreshCredentials(
+    const access = await refreshCredentials(
         adapter, decision.refreshToken);
-    if (refreshed === null) {
+    if (access === null) {
         return null;
     }
-    putSessionCredentials(refreshed);
     return installAndScope(
-        adapter, refreshed.accessToken, requestOrganization);
+        adapter, access, requestOrganization);
 }
 
 // Install a flat token as the session and re-scope it to the active
@@ -404,7 +491,7 @@ async function recoverSession(
 // recovery branches: re-install a known-live token (install), and
 // refresh-then-install (refresh).
 async function installAndScope(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     flatToken: string,
     requestOrganization: Id | undefined,
 ): Promise<string | null> {
@@ -427,12 +514,35 @@ async function installAndScope(
 // that itself 401s (reuse/expiry) is terminal and must not
 // recurse. A dead refresh scrubs the session and bounces.
 async function refreshCredentials(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     refreshToken: string,
-): Promise<SessionCredentials | null> {
-    const free = createRequestContext(adapter, getSessionToken());
+): Promise<string | null> {
+    const token = sessionTokenIsSeeded()
+        ? getSessionToken()
+        : '';
+    const free = createRequestContext(adapter, token);
     try {
-        return await postSessionRefresh(free, refreshToken);
+        const access = await runSingleFlightRefresh(
+            async () => {
+                try {
+                    const creds = await postSessionRefresh(
+                        free, refreshToken);
+                    putSessionCredentials(creds);
+                    return creds.accessToken;
+                } catch (err) {
+                    if (err instanceof UnauthorizedError) {
+                        return null;
+                    }
+                    throw err;
+                }
+            },
+        );
+        if (access === null) {
+            deleteSessionCredentials();
+            redirectToLogin();
+            return null;
+        }
+        return access;
     } catch (err) {
         if (err instanceof UnauthorizedError) {
             deleteSessionCredentials();
@@ -454,7 +564,7 @@ async function refreshCredentials(
 // (no claim) falls back to the identity default, then the first
 // reachable.
 async function rescopeToActiveOrganization(
-    adapter: ClientFacadeAdapter,
+    adapter: ClientFacade,
     flatToken: string,
     requestOrganization: Id | undefined,
 ): Promise<void> {

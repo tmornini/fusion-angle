@@ -24,6 +24,7 @@ import {
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
+    HEX64,
 } from '../api/message-pair.ts';
 import {
     ApiError,
@@ -41,10 +42,14 @@ import {
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Instance PATCH — If-Match + full-state revision (R5).
 // Two pairs per PATCH: wire delta + PUT {values} revision.
-// Gate ladder after replay; ETag = revision pair id.
+// Gate ladder after replay; ETag is documentVersion of
+// the projected body (not the pair id).
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -63,6 +68,9 @@ const TYPE_DETAIL =
 const ATTRS = TYPE_DETAIL + '/attributes';
 const INSTANCES = TYPE_DETAIL + '/instances';
 const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
+const WELL_FORMED_TAG =
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    + 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 function req(
     method: string,
@@ -71,16 +79,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer ' + token,
-            ...(extraHeaders ?? {}),
-        },
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -111,7 +116,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -160,7 +165,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function putAttribute(
@@ -172,7 +177,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + '/' + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedWritableTextAttr(
@@ -199,7 +204,7 @@ async function putInstance(
     }[],
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, token,
+        'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
 }
@@ -211,7 +216,7 @@ async function countInstancePairs(
         ORGANIZATION, TYPE_ID,
     );
     const responses = await db.responses.getAllWhere(
-        'uri_prefix', prefix,
+        'uri_collection', prefix,
     );
     return responses.filter(
         (r) => r.uri_id === INSTANCE_ID,
@@ -226,7 +231,6 @@ async function appendInstancePair(
     method: 'PUT' | 'DELETE',
     body: Record<string, unknown> | undefined,
     requestAt: string,
-    headPairId?: string,
 ): Promise<string> {
     const pathname = '/organizations/' + organization
         + '/record-types/' + typeId
@@ -244,7 +248,7 @@ async function appendInstancePair(
         organization,
         responseStatus: method === 'DELETE' ? 204 : 200,
         responseBody: undefined,
-        headPairId,
+        operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
         ['requests', 'responses'],
@@ -263,7 +267,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const headEtag = put.headers.get('ETag')!;
     const before = await countInstancePairs(db);
     const patch = await handleRequest(db, req(
@@ -278,7 +282,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: headEtag },
     ));
-    assert.equal(patch.status, 200);
+    assert.equal(patch.status, 201);
     const newEtag = patch.headers.get('ETag');
     assert.ok(newEtag !== null && newEtag !== '');
     assert.notEqual(newEtag, headEtag);
@@ -313,10 +317,8 @@ async () => {
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert.ok(head !== undefined);
-    assert.equal(
-        strongEtagOf(head.pairId),
-        newEtag,
-    );
+    assert.ok(newEtag !== null && HEX64.test(newEtag.slice(1, -1)));
+    assert.notEqual(newEtag, strongEtagOf(head.pairId));
     assert.equal(
         await countInstancePairs(db),
         before + 2,
@@ -333,16 +335,19 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
     ));
     assert.equal(res.status, 428);
-    assert.deepEqual(await res.json(), {
-        error: 'If-Match is required to PATCH '
-            + INSTANCE_DETAIL,
-    });
+    const body = await res.json() as {
+        id: string;
+        error?: string;
+    };
+    assert.equal(body.error, undefined);
+    assert.equal(body.id, INSTANCE_ID);
+    assert.ok(res.headers.get('ETag'));
 });
 
 test('PATCH stale If-Match → 412; re-GET + retry → 200',
@@ -360,7 +365,7 @@ async () => {
         { set: [{ attribute_id: ATTR_ID, value: 'B' }] },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(p1.status, 200);
+    assert.equal(p1.status, 201);
     const e1 = p1.headers.get('ETag')!;
     const stale = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
@@ -368,10 +373,13 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
     ));
     assert.equal(stale.status, 412);
-    assert.deepEqual(await stale.json(), {
-        error: 'If-Match does not match the '
-            + 'current instance at ' + INSTANCE_DETAIL,
-    });
+    const staleBody = await stale.json() as {
+        id: string;
+        error?: string;
+    };
+    assert.equal(staleBody.error, undefined);
+    assert.equal(staleBody.id, INSTANCE_ID);
+    assert.ok(stale.headers.get('ETag'));
     const freshGet = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
@@ -382,7 +390,7 @@ async () => {
         { set: [{ attribute_id: ATTR_ID, value: 'C' }] },
         { [IF_MATCH_HEADER]: e1 },
     ));
-    assert.equal(retry.status, 200);
+    assert.equal(retry.status, 201);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -400,7 +408,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const malformed = [
         '*',
         '"a", "b"',
@@ -431,7 +439,7 @@ async () => {
     }
 });
 
-test('PATCH absent → 404 via missedReadError (R2)',
+test('PATCH absent with If-Match → 412 (no live PUT)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -439,12 +447,12 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
-        { [IF_MATCH_HEADER]: '"ghost"' },
+        { [IF_MATCH_HEADER]: '"' + WELL_FORMED_TAG + '"' },
     ));
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 412);
     assert.deepEqual(await res.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
+        error: 'If-Match does not match the current '
+            + 'instance at ' + INSTANCE_DETAIL,
     });
 });
 
@@ -473,7 +481,8 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
         {
-            [IF_MATCH_HEADER]: strongEtagOf(genesisId),
+            [IF_MATCH_HEADER]:
+                '"' + WELL_FORMED_TAG + '"',
         },
     ));
     assert.equal(res.status, 404);
@@ -487,7 +496,7 @@ async () => {
     assert.equal(head, undefined);
 });
 
-test('PATCH foreign instance id → 403 (R2)',
+test('PATCH foreign instance id with If-Match → 412',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -508,13 +517,15 @@ async () => {
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { set: [{ attribute_id: ATTR_ID, value: 'x' }] },
-        { [IF_MATCH_HEADER]: '"anything"' },
+        {
+            [IF_MATCH_HEADER]:
+                '"' + WELL_FORMED_TAG + '"',
+        },
     ));
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 412);
     assert.deepEqual(await res.json(), {
-        error:
-            'forbidden: record_instances/' + INSTANCE_ID
-            + ' belongs to a different organization',
+        error: 'If-Match does not match the current '
+            + 'instance at ' + INSTANCE_DETAIL,
     });
 });
 
@@ -662,15 +673,19 @@ async () => {
         read_roles: ['admin'],
         write_roles: [],
     });
-    const put = await putInstance(db, adminToken, [
+    await putInstance(db, adminToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
         { attribute_id: ATTR_LOCKED, value: 's' },
     ]);
+    const memberGet = await handleRequest(db, req(
+        'GET', INSTANCE_DETAIL, memberToken,
+    ));
+    assert.equal(memberGet.status, 200);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { clear: [ATTR_LOCKED] },
         {
-            [IF_MATCH_HEADER]: put.headers.get('ETag')!,
+            [IF_MATCH_HEADER]: memberGet.headers.get('ETag')!,
         },
     ));
     assert.equal(res.status, 403);
@@ -709,7 +724,7 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const afterHead = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -751,7 +766,7 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const echo = await res.json() as {
         set: { attribute_id: string; value: string }[];
     };
@@ -790,7 +805,7 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const originalEtag = first.headers.get('ETag')!;
     const originalBody = await first.json();
     const originalResponseId =
@@ -808,7 +823,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: originalEtag },
     ));
-    assert.equal(secondWrite.status, 200);
+    assert.equal(secondWrite.status, 201);
     assert.notEqual(
         secondWrite.headers.get('ETag'),
         originalEtag,
@@ -819,7 +834,7 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(replay.status, 200);
+    assert.equal(replay.status, 201);
     assert.equal(
         replay.headers.get('ETag'),
         originalEtag,
@@ -873,7 +888,7 @@ async () => {
     ]);
     assert.deepEqual(
         [a.status, b.status].sort(),
-        [200, 412],
+        [201, 412],
     );
 });
 
@@ -932,7 +947,7 @@ async () => {
             set: staleBody.set,
             clear: [],
         },
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     // Advance the real head past H0.
     const advance = await handleRequest(db, req(
@@ -947,7 +962,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: strongEtagOf(h0) },
     ));
-    assert.equal(advance.status, 200);
+    assert.equal(advance.status, 201);
     const live = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -990,39 +1005,15 @@ async () => {
     assert.equal(after?.pairId, live.pairId);
 });
 
-test('explicit-follows race pin: formDocumentPairFor never '
-+ 're-reads head when follows is supplied',
+test('formed revision pair carries no predecessor fields',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
     await seedWritableTextAttr(db, adminToken);
-    const put = await putInstance(db, memberToken, [
+    await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
-    const h0 = parseIfMatch(put.headers.get('ETag')!)!;
-    // Advance the real head past h0.
-    const p1 = await handleRequest(db, req(
-        'PATCH', INSTANCE_DETAIL, memberToken,
-        {
-            set: [
-                {
-                    attribute_id: ATTR_ID,
-                    value: 'B',
-                },
-            ],
-        },
-        {
-            [IF_MATCH_HEADER]: put.headers.get('ETag')!,
-        },
-    ));
-    assert.equal(p1.status, 200);
-    const live = await deriveInstanceHead(
-        db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
-    );
-    assert.notEqual(live?.pairId, h0);
-    // Form a revision anchored to the STALE head id
-    // explicitly — must not silently re-read live head.
     const revision = await formDocumentPairFor(db, {
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [ORGANIZATION, TYPE_ID, INSTANCE_ID],
@@ -1038,16 +1029,11 @@ async () => {
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization: ORGANIZATION,
-        chain: 'follows',
-        follows: h0,
         response: { status: 200, body: {} },
+        operationId: TEST_OPERATION_ID,
     });
-    assert.equal(
-        revision.follows,
-        h0,
-        'explicit follows wins; no live-head re-read',
-    );
-    assert.notEqual(revision.follows, live?.pairId);
+    assert.equal('follows' in revision, false);
+    assert.equal('supersedes' in revision, false);
 });
 
 test('ETag/ACL interplay: unreadable write moves head; '
@@ -1084,7 +1070,7 @@ async () => {
         },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(adminPatch.status, 200);
+    assert.equal(adminPatch.status, 201);
     const e1 = adminPatch.headers.get('ETag')!;
     assert.notEqual(e1, e0);
     // Member still holding e0 412s.
@@ -1101,12 +1087,21 @@ async () => {
         { [IF_MATCH_HEADER]: e0 },
     ));
     assert.equal(blind.status, 412);
-    // Re-GET: member does not see secret, but gets new ETag.
+    // Re-GET: member does not see secret; projected ETag
+    // differs from admin's stored-write ETag.
     const reget = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(reget.status, 200);
-    assert.equal(reget.headers.get('ETag'), e1);
+    const memberEtag = reget.headers.get('ETag')!;
+    assert.notEqual(memberEtag, e0);
+    assert.notEqual(memberEtag, e1);
+    assert.equal(
+        reget.headers.get(
+            'Authorization-Limited-Attributes',
+        ),
+        'true',
+    );
     const visible = await reget.json() as {
         values: { attribute_id: string; value: string }[];
     };
@@ -1123,9 +1118,9 @@ async () => {
                 },
             ],
         },
-        { [IF_MATCH_HEADER]: e1 },
+        { [IF_MATCH_HEADER]: memberEtag },
     ));
-    assert.equal(retry.status, 200);
+    assert.equal(retry.status, 201);
     const head = await deriveInstanceHead(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
@@ -1147,7 +1142,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
-    assert.equal(await countInstancePairs(db), 1);
+    assert.equal(await countInstancePairs(db), 2);
     await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         {
@@ -1162,5 +1157,5 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assert.equal(await countInstancePairs(db), 3);
+    assert.equal(await countInstancePairs(db), 4);
 });

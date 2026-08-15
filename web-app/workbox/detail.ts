@@ -18,11 +18,11 @@ import {
     buildSkeleton,
     loadInto,
 } from '../app/loading-states.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
-    navigateTo,
     handleDialogClick,
     closeDialog,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     getWorkOrder,
     getWorkOrderHistory,
@@ -53,7 +53,7 @@ import type {
 import {
     RequestError,
     HTTP_PRECONDITION_FAILED,
-} from '../../api/api.ts';
+} from '../../api/http-errors.ts';
 
 /* ── Module state ────────── */
 

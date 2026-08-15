@@ -1109,6 +1109,7 @@ async function postMockDataLoadIn(
 
 export async function postBootstrap(
     adapter: DbAdapter,
+    options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): the lone 'current' human-member create's
     // bundle, formed up front — see postMockDataLoad's pass 1 for
@@ -1183,6 +1184,7 @@ export async function postBootstrap(
             identityId: 'current',
             email: bootstrapEmail,
         }],
+        options?.hashPassword,
     );
     await adapter.postSchemaCreation();
     return creds;

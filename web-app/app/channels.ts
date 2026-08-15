@@ -5,10 +5,10 @@ import {
     getSessionToken,
     sessionIsAuthenticated,
     sessionTokenIsSeeded,
-} from './adapters/init.ts';
+} from './adapters/session-token.ts';
 import {
     principalFromToken,
-} from '../../api/access-token.ts';
+} from '../../shared/access-token-decode.ts';
 
 type Listener<T> = (value: T) => void;
 

@@ -7,6 +7,7 @@ import type {
 } from '../../../api/types.ts';
 import { AIMember, nowUtc } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
+import { withLifecycleTrio } from './shared.ts';
 import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
@@ -91,13 +92,16 @@ export async function getAIMember(
     ctx: RequestContext,
     id: MemberId,
 ): Promise<AIMember> {
-    const [parent, detail] =
+    const [parentRaw, detail] =
         await Promise.all([
             ctx.GET<MemberEntity>(`members/${id}`),
             ctx.GET<AIMemberEntity>(
                 `ai-members/${id}`,
             ),
         ]);
+    const parent = await withLifecycleTrio(
+        ctx, 'members', parentRaw,
+    );
     return new AIMember(
         parent, detail,
         memberStateDetailFromRow(parent),

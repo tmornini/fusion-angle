@@ -25,6 +25,7 @@ import {
     formWritePair,
     type MessagePair,
 } from '../api/message-pair.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 // The catalog's first model — the fixture default.
 export function firstProviderModel() {
@@ -164,7 +165,7 @@ async function memberDocumentPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -201,7 +202,7 @@ async function detailDocumentPair(
         responseBody: spec.successBody?.(
             [id], detail, SYSTEM_MEMBER_ID, undefined,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -236,7 +237,7 @@ async function identityPiiDocumentPair(
         responseBody: spec.successBody?.(
             [id], pii, SYSTEM_MEMBER_ID, undefined,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -258,7 +259,7 @@ async function memberCreateOperationPair(
         organization: undefined,
         responseStatus: 204,
         responseBody: undefined,
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -290,7 +291,7 @@ async function membershipDocumentPair(
             [membershipId], body, SYSTEM_MEMBER_ID,
             MEMBER_ORGANIZATION,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
 }
 

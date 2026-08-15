@@ -9,13 +9,14 @@ Options:
   path/      Output directory (trailing / required)
              Default: ~/Desktop/
   --no-zip   Create bundle directory without zipping
+             (browser entry — for ./serve)
   --help     Show this help message
 
 Examples:
-  ./build                          # bundle and ZIP to ~/Desktop/
-  ./build dist/                    # bundle ZIP to dist/
-  ./build --no-zip /tmp/test/      # bundle to /tmp/test/
-  ./build --no-zip                 # bundle to ~/Desktop/
+  ./build                          # two ZIPs to ~/Desktop/
+  ./build dist/                    # two ZIPs to dist/
+  ./build --no-zip /tmp/test/      # browser bundle to /tmp/test/
+  ./build --no-zip                 # browser bundle to ~/Desktop/
 USAGE
 }
 
@@ -134,10 +135,39 @@ if [ "$NO_ZIP" = true ]; then
     echo "Bundle: $BUILD_DIR"
 else
     SHA=$(git rev-parse --short=7 HEAD)
-    ZIPNAME="fusion-ai-${SHA}.zip"
-    ZIPDEST="${DEST:-$HOME/Desktop/}$ZIPNAME"
-    (cd "$BUILD_DIR" && zip -r "$ZIPDEST" .)
-    echo "Distribution: $ZIPDEST" \
-        "($(wc -c < "$ZIPDEST" | xargs) bytes)"
+    DEST_DIR="${DEST:-$HOME/Desktop/}"
+    BROWSER_ZIP="${DEST_DIR}fusion-ai-browser-${SHA}.zip"
+    (cd "$BUILD_DIR" && zip -r "$BROWSER_ZIP" .)
+    echo "Distribution: $BROWSER_ZIP" \
+        "($(wc -c < "$BROWSER_ZIP" | xargs) bytes)"
+
+    npx --no-install esbuild \
+        web-app/app/server-core.ts \
+        --bundle \
+        --minify \
+        --keep-names \
+        --target=es2024 \
+        --format=iife \
+        --outfile="$BUILD_DIR/assets/app.js"
+
+    emitted "Server bundle created" \
+        "$BUILD_DIR/assets/app.js"
+
+    npx --no-install esbuild \
+        server/boot.ts \
+        --bundle \
+        --platform=node \
+        --format=esm \
+        --target=es2024 \
+        --keep-names \
+        --outfile="$BUILD_DIR/server.mjs"
+
+    emitted "Server process created" \
+        "$BUILD_DIR/server.mjs"
+
+    SERVER_ZIP="${DEST_DIR}fusion-ai-server-${SHA}.zip"
+    (cd "$BUILD_DIR" && zip -r "$SERVER_ZIP" .)
+    echo "Distribution: $SERVER_ZIP" \
+        "($(wc -c < "$SERVER_ZIP" | xargs) bytes)"
 fi
 echo "Done."

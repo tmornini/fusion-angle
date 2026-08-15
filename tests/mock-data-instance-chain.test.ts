@@ -25,6 +25,20 @@ import {
     workOrderBindingFor,
     workOrderHistoryFor,
 } from '../api/derive-states.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+
+function pairJsonOf(message: string): {
+    readonly body: Record<string, unknown>;
+} {
+    const body = HttpMessage.fromWire(message).body();
+    return {
+        body: body.exists()
+            ? JSON.parse(body.toText()) as
+                Record<string, unknown>
+            : {},
+    };
+}
 
 // Task 6: WO-instance SoT seed chain — genesis empty, binding,
 // Review 6 + Complete 1 new-shape ops with revision pairs.
@@ -149,11 +163,11 @@ async () => {
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + otherWoId + '/transition/';
     const otherReqs = await db.requests.getAllWhere(
-        'uri_prefix', otherPrefix,
+        'uri_collection', otherPrefix,
     );
     assert.ok(otherReqs.length > 0);
     for (const request of otherReqs) {
-        const embedded = JSON.parse(request.message) as {
+        const embedded = pairJsonOf(request.message) as {
             body: Record<string, unknown>;
         };
         assert.ok(
@@ -171,16 +185,16 @@ async () => {
     }
 });
 
-test('chain provenance: revision follows predecessor;'
-+ ' genesis has none',
+test('chain provenance: three instance pairs ordered by at;'
++ ' no predecessor columns',
 async () => {
     const db = await seededDb();
     const prefix = instancesUriPrefix(
         STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const byId = new Map(
         responses
@@ -206,7 +220,11 @@ async () => {
     const reviewRev = byId.get(ordered[1]!.id)!;
     const completeRev = byId.get(ordered[2]!.id)!;
 
-    assert.equal(genesis.follows, undefined);
-    assert.equal(reviewRev.follows, genesis.id);
-    assert.equal(completeRev.follows, reviewRev.id);
+    assert.ok(genesis);
+    assert.ok(reviewRev);
+    assert.ok(completeRev);
+    for (const row of [genesis, reviewRev, completeRev]) {
+        assert.equal('follows' in row, false);
+        assert.equal('supersedes' in row, false);
+    }
 });

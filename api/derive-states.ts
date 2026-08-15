@@ -14,7 +14,7 @@ import {
     pickString, pickNumber, asObject,
     asWorkOrderFlowGraph,
 } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { canonicalUriCollection } from './message-pair.ts';
 import {
     documentPairsAt,
     deriveDocumentsAt,
@@ -27,10 +27,7 @@ import { latestByKey } from '../shared/ledger-reduction.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import { latestClaimEvent } from './work-order-claims.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
-import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 
 // Pair-plane lifecycle derives and ownership resolution
 // (Phase 11
@@ -75,20 +72,14 @@ import {
 // exactly (ideas, projects, flows, records, objectives,
 // work-orders); invitations is handled separately below (its
 // address is flat, never organization-nested — message-pair.ts's
-// canonicalUriPrefix / family-registry.ts has no entry for it).
+// canonicalUriCollection / family-registry.ts has no entry for it).
 const ORGANIZATION_NESTED_ENTITY_FAMILIES = [
     'ideas', 'projects', 'flows',
     'work-orders', 'record-types', 'objectives',
 ] as const;
 
-const ORGANIZATION_NESTED_FAMILY_ADDRESS_PATTERN = new RegExp(
-    '^/organizations/([^/]+)/('
-    + ORGANIZATION_NESTED_ENTITY_FAMILIES.join('|')
-    + ')/$',
-);
-
 const INVITATIONS_PREFIX =
-    canonicalUriPrefix(undefined, '/invitations/');
+    canonicalUriCollection(undefined, '/invitations/');
 
 // organizations is the tenant root (global plane, never itself
 // organization-nested — derive-organizations.ts). An
@@ -96,7 +87,7 @@ const INVITATIONS_PREFIX =
 // 1, Author gate 3 — the ONE new resolveOwningOrganization
 // leg).
 const ORGANIZATIONS_ADDRESS_PREFIX =
-    canonicalUriPrefix(undefined, '/organizations/');
+    canonicalUriCollection(undefined, '/organizations/');
 
 // ALL-orgs, server-side ownership resolution — distinct from
 // api/organization-requests.ts's enumerateMyOrganizations, which
@@ -114,7 +105,7 @@ async function organizationIds(
 
 // The invitation's own organization_id — carried in the STORED
 // REQUEST body (derive-invitations.ts's own precedent), never the
-// uri_prefix (the invitations address is flat, unlike every
+// uri_collection (the invitations address is flat, unlike every
 // org-nested family above). A full scan of the (small) invitations
 // family, mirroring derive-invitations.ts exactly — reused rather
 // than reimplemented.
@@ -123,9 +114,9 @@ async function resolveInvitationOwner(
     entityId: Id,
 ): Promise<Id | null> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', INVITATIONS_PREFIX),
+        db.requests.getAllWhere('uri_collection', INVITATIONS_PREFIX),
         db.responses.getAllWhere(
-            'uri_prefix', INVITATIONS_PREFIX,
+            'uri_collection', INVITATIONS_PREFIX,
         ),
     ]);
     const document = deriveDocumentsAt(
@@ -179,10 +170,10 @@ async function resolveFlowGraphOwner(
         ...organizations.filter((o) => o !== boundOrganization),
     ];
     for (const organization of ordered) {
-        const prefix = canonicalUriPrefix(organization, '/flows/');
+        const prefix = canonicalUriCollection(organization, '/flows/');
         const [requests, responses] = await Promise.all([
-            db.requests.getAllWhere('uri_prefix', prefix),
-            db.responses.getAllWhere('uri_prefix', prefix),
+            db.requests.getAllWhere('uri_collection', prefix),
+            db.responses.getAllWhere('uri_collection', prefix),
         ]);
         for (const pair of documentPairsAt(
             requests, responses, prefix,
@@ -218,12 +209,12 @@ async function organizationHasMemberPair(
     organization: Id,
     identityId: Id,
 ): Promise<boolean> {
-    const prefix = canonicalUriPrefix(
+    const prefix = canonicalUriCollection(
         organization, '/memberships/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     // HEAD-REDUCED (deriveDocumentsAt), not raw pairs, unlike
     // every other leg in this module: a membership REMOVAL is a
@@ -274,26 +265,39 @@ async function computeOwningOrganization(
     entityId: Id,
     boundOrganization: Id,
 ): Promise<Id | null> {
-    // (a) org-nested document families + (e) organizations
-    // self-as-owner: a targeted uri_id index read (mirrors
-    // message-pair.ts's own headPairIdAt) rather than a full-
-    // ledger scan — an entity id is globally unique
-    // (generateCryptoSafeBase62), so at most one distinct
-    // document prefix can ever match.
-    const responseHits =
-        await db.responses.getAllWhere('uri_id', entityId);
-    for (const response of responseHits) {
-        if (
-            response.uri_prefix
-                === ORGANIZATIONS_ADDRESS_PREFIX
+    // (e) organizations self-as-owner: the document id IS
+    // the owning organization. Collection read, then filter
+    // uri_id in JS — no uri_id-only index.
+    const organizationRows = await db.responses.getAllWhere(
+        'uri_collection', ORGANIZATIONS_ADDRESS_PREFIX,
+    );
+    if (organizationRows.some((row) => row.uri_id === entityId)) {
+        return entityId;
+    }
+
+    // (a) org-nested document families: probe each known
+    // organization's family collection. Same id at two
+    // collections is two documents; this walk still answers
+    // "who owns this id anywhere" for visibility.
+    const organizations = await organizationIds(db);
+    const ordered = [
+        boundOrganization,
+        ...organizations.filter((o) => o !== boundOrganization),
+    ];
+    for (const organization of ordered) {
+        for (
+            const family of ORGANIZATION_NESTED_ENTITY_FAMILIES
         ) {
-            // (e) organizations self-as-owner: the document
-            // id IS the owning organization.
-            return entityId;
+            const prefix = canonicalUriCollection(
+                organization, '/' + family + '/',
+            );
+            const rows = await db.responses.getAllWhere(
+                'uri_collection', prefix,
+            );
+            if (rows.some((row) => row.uri_id === entityId)) {
+                return organization;
+            }
         }
-        const match = ORGANIZATION_NESTED_FAMILY_ADDRESS_PATTERN
-            .exec(response.uri_prefix);
-        if (match !== null) return match[1]!;
     }
 
     // (c) invitations: flat address, org lives in the body.
@@ -350,71 +354,129 @@ export async function resolveOwningOrganization(
     return owner;
 }
 
-// Global-existence probe for the 403-vs-404 ownership
-// covenant. Unfiltered uri_id index hit across every org +
-// resolveOwningOrganization fallback (boundOrganization is a
-// cheap-path hint, not a filter). Covers three families the
-// narrower resolveOwningOrganization allowlist omits:
-// memberships, record-attributes, role-grants. Future 403-vs-
-// 404 decisions route through this, not the narrower resolver
-// alone.
-//
-// Prefers a direct uri_id hit (covers memberships + record-
-// attributes, which resolveOwningOrganization's states.entity_id
-// alphabet does not list, and role-grants' flat prefix whose org
-// lives in the response body). Falls back to
-// resolveOwningOrganization for the nested document families
-// already in that alphabet (ideas/projects/flows/...).
+// Address-scoped 403-vs-404 probe. Same id at two
+// collections is two documents. Miss at THIS address is
+// 404. 403 only when this address has a live PUT the
+// caller may not have.
 const ROLE_GRANTS_URI_PREFIX =
-    canonicalUriPrefix(undefined, '/role-grants/');
+    canonicalUriCollection(undefined, '/role-grants/');
 
 // Organization-nested document prefixes:
 // /organizations/{id}/...
 const ORGANIZATION_NESTED_URI_PREFIX =
     /^\/organizations\/([^/]+)\//;
 
+// Table → family path segment for the address-scoped
+// owner probe. Nested children (flow tags/records,
+// attributes, instances) probe the parent family at
+// this organization.
+const OWNER_PROBE_FAMILY: Record<string, string> = {
+    ideas: 'ideas',
+    projects: 'projects',
+    flows: 'flows',
+    work_orders: 'work-orders',
+    record_types: 'record-types',
+    record_attributes: 'record-types',
+    record_instances: 'record-types',
+    objectives: 'objectives',
+    memberships: 'memberships',
+    flow_records: 'flows',
+    flow_tags: 'flows',
+};
+
+function ownerProbeCollection(
+    organization: Id,
+    table: string,
+): string | undefined {
+    if (table === 'organizations') {
+        return ORGANIZATIONS_ADDRESS_PREFIX;
+    }
+    if (table === 'invitations') {
+        return INVITATIONS_PREFIX;
+    }
+    if (table === 'role_grants') {
+        return ROLE_GRANTS_URI_PREFIX;
+    }
+    const family = OWNER_PROBE_FAMILY[table];
+    if (family === undefined) return undefined;
+    return canonicalUriCollection(
+        organization, '/' + family + '/',
+    );
+}
+
 function responseBodyOf(
     message: string,
 ): Record<string, unknown> {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     const body = HttpMessage.fromModel(model).body();
     return body.exists()
         ? JSON.parse(body.toText()) as Record<string, unknown>
         : {};
 }
 
+function ownerFromAddress(
+    uriCollection: string,
+    uriId: Id,
+    message: string,
+): Id | null {
+    if (uriCollection === ORGANIZATIONS_ADDRESS_PREFIX) {
+        return uriId;
+    }
+    const nested = ORGANIZATION_NESTED_URI_PREFIX.exec(
+        uriCollection,
+    );
+    if (nested !== null) return nested[1]!;
+    if (
+        uriCollection === ROLE_GRANTS_URI_PREFIX
+        || uriCollection === INVITATIONS_PREFIX
+    ) {
+        const body = responseBodyOf(message);
+        const organizationId = body['organization_id'];
+        if (typeof organizationId === 'string') {
+            return organizationId;
+        }
+    }
+    return null;
+}
+
 export async function resolveGlobalOwner(
     db: DbAdapter,
     entityId: Id,
     boundOrganization: Id,
+    table?: string,
 ): Promise<Id | null> {
-    const hits = await db.responses.getAllWhere(
-        'uri_id', entityId,
-    );
-    for (const response of hits) {
-        const nested = ORGANIZATION_NESTED_URI_PREFIX.exec(
-            response.uri_prefix,
+    const collection = table === undefined
+        ? undefined
+        : ownerProbeCollection(boundOrganization, table);
+    if (collection !== undefined) {
+        const hits = await db.responses.getAllWhere(
+            'uri_collection', collection,
         );
-        if (nested !== null) return nested[1]!;
-        if (response.uri_prefix === ROLE_GRANTS_URI_PREFIX) {
-            const body = responseBodyOf(response.message);
-            const organizationId = body['organization_id'];
-            if (typeof organizationId === 'string') {
-                return organizationId;
-            }
+        const atAddress = hits.filter(
+            (row) => row.uri_id === entityId,
+        );
+        if (atAddress.length === 0) return null;
+        for (const response of atAddress) {
+            const owner = ownerFromAddress(
+                response.uri_collection,
+                entityId,
+                response.message,
+            );
+            if (owner !== null) return owner;
         }
+        return boundOrganization;
     }
     return resolveOwningOrganization(
         db, entityId, boundOrganization,
     );
 }
 
-// Miss-path 403-vs-404 helper for org-scoped reads. Probe runs
-// ONLY on the org-scoped miss/deny path (never the happy path).
+// Miss-path 403-vs-404 helper for org-scoped reads. Probe
+// THIS route's collection, not any row with this id.
 // owner-null → EntityNotFoundError (404); foreign →
-// ForeignOrganizationError (403). probeId defaults to id; pass
-// a parent id when the miss is on a nested child (e.g. flow
-// records probe the parent flow).
+// ForeignOrganizationError (403). probeId defaults to id;
+// pass a parent id when the miss is on a nested child
+// (e.g. flow records probe the parent flow).
 export async function missedReadError(
     db: DbAdapter,
     id: Id,
@@ -423,7 +485,7 @@ export async function missedReadError(
     probeId: Id = id,
 ): Promise<EntityNotFoundError | ForeignOrganizationError> {
     const owner = await resolveGlobalOwner(
-        db, probeId, organization,
+        db, probeId, organization, table,
     );
     if (owner !== null && owner !== organization) {
         return new ForeignOrganizationError(table, id);
@@ -536,15 +598,15 @@ async function organizationHasOpBornEvent(
     for (
         const family of ORGANIZATION_NESTED_ENTITY_FAMILIES
     ) {
-        const prefix = canonicalUriPrefix(
+        const prefix = canonicalUriCollection(
             organization, '/' + family + '/',
         );
         const [requests, responses] = await Promise.all([
             dbOrView.requests.getAllWhere(
-                'uri_prefix', prefix,
+                'uri_collection', prefix,
             ),
             dbOrView.responses.getAllWhere(
-                'uri_prefix', prefix,
+                'uri_collection', prefix,
             ),
         ]);
         for (const pair of documentPairsAt(
@@ -567,13 +629,13 @@ async function organizationHasOpBornEvent(
     // Discover work-order ids from the collection responses
     // already readable via the work-orders family scan above
     // — re-read that one prefix for the id set, then probe
-    // each sub-resource with an indexed uri_prefix read.
-    const workOrdersPrefix = canonicalUriPrefix(
+    // each sub-resource with an indexed uri_collection read.
+    const workOrdersPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
     const workOrderResponses =
         await dbOrView.responses.getAllWhere(
-            'uri_prefix', workOrdersPrefix,
+            'uri_collection', workOrdersPrefix,
         );
     const workOrderIds = new Set<Id>(
         workOrderResponses.map((r) => r.uri_id),
@@ -582,17 +644,17 @@ async function organizationHasOpBornEvent(
         for (const sub of [
             'claim', 'transition', 'release',
         ] as const) {
-            const prefix = canonicalUriPrefix(
+            const prefix = canonicalUriCollection(
                 organization,
                 '/work-orders/' + workOrderId
                     + '/' + sub + '/',
             );
             const [requests, responses] = await Promise.all([
                 dbOrView.requests.getAllWhere(
-                    'uri_prefix', prefix,
+                    'uri_collection', prefix,
                 ),
                 dbOrView.responses.getAllWhere(
-                    'uri_prefix', prefix,
+                    'uri_collection', prefix,
                 ),
             ]);
             for (const pair of operationPairsAt(
@@ -616,15 +678,15 @@ async function organizationHasOpBornEvent(
     // membership boolean alone would mis-orphan unowned
     // genesis events (create never mints a membership).
     for (const prefix of [
-        canonicalUriPrefix(undefined, '/ai-members/'),
-        canonicalUriPrefix(undefined, '/human-members/'),
+        canonicalUriCollection(undefined, '/ai-members/'),
+        canonicalUriCollection(undefined, '/human-members/'),
     ]) {
         const [requests, responses] = await Promise.all([
             dbOrView.requests.getAllWhere(
-                'uri_prefix', prefix,
+                'uri_collection', prefix,
             ),
             dbOrView.responses.getAllWhere(
-                'uri_prefix', prefix,
+                'uri_collection', prefix,
             ),
         ]);
         for (const pair of operationPairsAt(
@@ -650,10 +712,10 @@ async function organizationHasOpBornEvent(
     {
         const [requests, responses] = await Promise.all([
             dbOrView.requests.getAllWhere(
-                'uri_prefix', INVITATIONS_PREFIX,
+                'uri_collection', INVITATIONS_PREFIX,
             ),
             dbOrView.responses.getAllWhere(
-                'uri_prefix', INVITATIONS_PREFIX,
+                'uri_collection', INVITATIONS_PREFIX,
             ),
         ]);
         for (const pair of operationPairsAt(
@@ -674,7 +736,7 @@ async function organizationHasOpBornEvent(
             for (const sub of [
                 'acceptance', 'decline', 'revocation',
             ] as const) {
-                const prefix = canonicalUriPrefix(
+                const prefix = canonicalUriCollection(
                     undefined,
                     '/invitations/' + invitationId
                         + '/' + sub + '/',
@@ -682,10 +744,10 @@ async function organizationHasOpBornEvent(
                 const [opRequests, opResponses] =
                     await Promise.all([
                         dbOrView.requests.getAllWhere(
-                            'uri_prefix', prefix,
+                            'uri_collection', prefix,
                         ),
                         dbOrView.responses.getAllWhere(
-                            'uri_prefix', prefix,
+                            'uri_collection', prefix,
                         ),
                     ]);
                 for (const pair of operationPairsAt(
@@ -845,7 +907,7 @@ function decodeRequestOperation(message: string): {
     readonly method: string;
     readonly body: Record<string, unknown>;
 } {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     if (model.startLine.kind !== 'request') {
         throw new Error(
             'stored request message carries no request line',
@@ -875,7 +937,7 @@ function atIdCompare(
                     : 0;
 }
 
-// Every successful (2xx) POST pair at `uriPrefix`, (at, id)
+// Every successful (2xx) POST pair at `uriCollection`, (at, id)
 // ascending. REUSED below by source (f)
 // (deriveInvitationStates) — a flat, non-work-order
 // collection's own 2xx POST pairs, the exact shape this
@@ -890,17 +952,16 @@ function atIdCompare(
 export function operationPairsAt(
     requests: readonly RequestEntity[],
     responses: readonly ResponseEntity[],
-    uriPrefix: string,
+    uriCollection: string,
 ): OperationPair[] {
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
     );
     const pairs: OperationPair[] = [];
     for (const response of responses) {
-        if (
-            response.uri_prefix !== uriPrefix
-            || response.status < 200 || response.status > 299
-        ) continue;
+        if (response.uri_collection !== uriCollection) {
+            continue;
+        }
         const request = requestById.get(response.id);
         if (request === undefined) continue;
         const decoded = decodeRequestOperation(request.message);
@@ -1184,7 +1245,7 @@ function replayWorkOrderOperations(
 
 // Prefix-filtered pure core of the op-pair reader (gate 5d).
 // When `organization` is set, only that org's work-orders
-// uri_prefix family is considered (collection + claim/release/
+// uri_collection family is considered (collection + claim/release/
 // transition); when undefined, every org — the whole-plane
 // scan deriveWorkOrderLifecycle needs. Returns ASC events and
 // the transition pairs consumed so bulk history can fold
@@ -1202,14 +1263,14 @@ function workOrderLifecycleFromPlane(
     const collectionPrefixes = new Set<string>();
     if (organization !== undefined) {
         collectionPrefixes.add(
-            canonicalUriPrefix(organization, '/work-orders/'),
+            canonicalUriCollection(organization, '/work-orders/'),
         );
     } else {
         for (const request of requests) {
             if (WORK_ORDERS_COLLECTION_PATTERN.test(
-                request.uri_prefix,
+                request.uri_collection,
             )) {
-                collectionPrefixes.add(request.uri_prefix);
+                collectionPrefixes.add(request.uri_collection);
             }
         }
     }
@@ -1240,36 +1301,36 @@ function workOrderLifecycleFromPlane(
     for (const request of requests) {
         if (
             organizationRoot !== null
-            && !request.uri_prefix.startsWith(
+            && !request.uri_collection.startsWith(
                 organizationRoot,
             )
         ) {
             continue;
         }
         const claimMatch = WORK_ORDER_CLAIM_PATTERN.exec(
-            request.uri_prefix,
+            request.uri_collection,
         );
         if (claimMatch !== null) {
             claimPrefixByWorkOrder.set(
-                claimMatch[1]!, request.uri_prefix,
+                claimMatch[1]!, request.uri_collection,
             );
         }
         const releaseMatch =
             WORK_ORDER_RELEASE_PATTERN.exec(
-                request.uri_prefix,
+                request.uri_collection,
             );
         if (releaseMatch !== null) {
             releasePrefixByWorkOrder.set(
-                releaseMatch[1]!, request.uri_prefix,
+                releaseMatch[1]!, request.uri_collection,
             );
         }
         const transitionMatch =
             WORK_ORDER_TRANSITION_PATTERN.exec(
-                request.uri_prefix,
+                request.uri_collection,
             );
         if (transitionMatch !== null) {
             transitionPrefixByWorkOrder.set(
-                transitionMatch[1]!, request.uri_prefix,
+                transitionMatch[1]!, request.uri_collection,
             );
         }
     }
@@ -1382,12 +1443,11 @@ export async function deriveWorkOrderHistories(
 // known (organization, workOrderId) pair, rather than the
 // whole-org scan the multi-work-order reader needs to discover
 // EVERY id at once —
-//   * create + document pairs: uri_id (both a create's response
-//     and its later document PUT/DELETE share ONE uriId at the
-//     work-orders collection address — the SAME finding
-//     drift-work-orders.test.ts case 8 pins), filtered to the
-//     collection prefix;
-//   * claim/release/transition: uri_prefix at each sub-
+//   * create + document pairs: uri_collection at the
+//     work-orders prefix, filtered to this workOrderId (both
+//     a create's response and its later document PUT/DELETE
+//     share ONE uriId — drift-work-orders.test.ts case 8);
+//   * claim/release/transition: uri_collection at each sub-
 //     resource's own per-id address (WORK_ORDER_CLAIM_PATTERN/
 //     WORK_ORDER_RELEASE_PATTERN/
 //     WORK_ORDER_TRANSITION_PATTERN's own shape, constructed
@@ -1411,18 +1471,23 @@ async function workOrderClaimSourcesFor(
     organization: Id,
     workOrderId: Id,
 ): Promise<WorkOrderClaimSources> {
-    const collectionPrefix = canonicalUriPrefix(
+    const collectionPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
-    const [byIdRequests, byIdResponses] = await Promise.all([
-        dbOrView.requests.getAllWhere('uri_id', workOrderId),
-        dbOrView.responses.getAllWhere('uri_id', workOrderId),
-    ]);
-    const collectionRequests = byIdRequests.filter(
-        (r) => r.uri_prefix === collectionPrefix,
+    const [byCollectionRequests, byCollectionResponses] =
+        await Promise.all([
+            dbOrView.requests.getAllWhere(
+                'uri_collection', collectionPrefix,
+            ),
+            dbOrView.responses.getAllWhere(
+                'uri_collection', collectionPrefix,
+            ),
+        ]);
+    const collectionRequests = byCollectionRequests.filter(
+        (r) => r.uri_id === workOrderId,
     );
-    const collectionResponses = byIdResponses.filter(
-        (r) => r.uri_prefix === collectionPrefix,
+    const collectionResponses = byCollectionResponses.filter(
+        (r) => r.uri_id === workOrderId,
     );
     const createPairs = operationPairsAt(
         collectionRequests, collectionResponses, collectionPrefix,
@@ -1431,36 +1496,36 @@ async function workOrderClaimSourcesFor(
         collectionRequests, collectionResponses, collectionPrefix,
     );
 
-    const claimPrefix = canonicalUriPrefix(
+    const claimPrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
     const [claimRequests, claimResponses] = await Promise.all([
-        dbOrView.requests.getAllWhere('uri_prefix', claimPrefix),
-        dbOrView.responses.getAllWhere('uri_prefix', claimPrefix),
+        dbOrView.requests.getAllWhere('uri_collection', claimPrefix),
+        dbOrView.responses.getAllWhere('uri_collection', claimPrefix),
     ]);
     const claimPairs = operationPairsAt(
         claimRequests, claimResponses, claimPrefix,
     );
 
-    const releasePrefix = canonicalUriPrefix(
+    const releasePrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/release/',
     );
     const [releaseRequests, releaseResponses] =
         await Promise.all([
             dbOrView.requests.getAllWhere(
-                'uri_prefix', releasePrefix,
+                'uri_collection', releasePrefix,
             ),
             dbOrView.responses.getAllWhere(
-                'uri_prefix', releasePrefix,
+                'uri_collection', releasePrefix,
             ),
         ]);
     const releasePairs = operationPairsAt(
         releaseRequests, releaseResponses, releasePrefix,
     );
 
-    const transitionPrefix = canonicalUriPrefix(
+    const transitionPrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
@@ -1468,10 +1533,10 @@ async function workOrderClaimSourcesFor(
         transitionRequests, transitionResponses,
     ] = await Promise.all([
         dbOrView.requests.getAllWhere(
-            'uri_prefix', transitionPrefix,
+            'uri_collection', transitionPrefix,
         ),
         dbOrView.responses.getAllWhere(
-            'uri_prefix', transitionPrefix,
+            'uri_collection', transitionPrefix,
         ),
     ]);
     const transitionPairs = operationPairsAt(
@@ -1529,6 +1594,7 @@ function fieldValuesByTransitionEvent(
                     body: fieldValue.fields,
                     requesterIdentityId:
                         transition.requesterIdentityId,
+                    version: '',
                 });
             }
             continue;
@@ -1624,7 +1690,7 @@ function historyEventsWithFieldValues(
 // Head-reduction per field-value row id matches
 // stateFieldValuesFrom (api/derive-state-field-values.ts);
 // claim/birth/release rows carry field_values: []. Empty
-// lifecycle → missedReadError (403 foreign / 404 absent).
+// lifecycle → missedReadError (404 miss at this address).
 // Entity-scoped indexed reads only — no whole-plane getAll.
 export async function workOrderHistoryFor(
     db: DbAdapter,
@@ -1640,17 +1706,17 @@ export async function workOrderHistoryFor(
         );
     }
 
-    const transitionPrefix = canonicalUriPrefix(
+    const transitionPrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
     const [transitionRequests, transitionResponses] =
         await Promise.all([
             db.requests.getAllWhere(
-                'uri_prefix', transitionPrefix,
+                'uri_collection', transitionPrefix,
             ),
             db.responses.getAllWhere(
-                'uri_prefix', transitionPrefix,
+                'uri_collection', transitionPrefix,
             ),
         ]);
     const transitionPairs = operationPairsAt(
@@ -1696,16 +1762,16 @@ export async function workOrderBindingFor(
 ): Promise<
     { instanceId: Id; recordTypeId: Id } | null
 > {
-    const prefix = canonicalUriPrefix(
+    const prefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/binding/',
     );
     const [requests, responses] = await Promise.all([
         dbOrView.requests.getAllWhere(
-            'uri_prefix', prefix,
+            'uri_collection', prefix,
         ),
         dbOrView.responses.getAllWhere(
-            'uri_prefix', prefix,
+            'uri_collection', prefix,
         ),
     ]);
     const pairs = operationPairsAt(
@@ -1735,8 +1801,8 @@ export async function workOrderBindingFor(
 // reads for flow_graph (Task 2 re-anchors the call site).
 //
 // REUSE TARGET: the entity-scoped entityPairs computation
-// inside workOrderClaimSourcesFor (uri_id-indexed +
-// collection-prefix filter) — NOT derivedDocumentEntity /
+// inside workOrderClaimSourcesFor (collection-indexed +
+// uri_id filter) — NOT derivedDocumentEntity /
 // documentGetHandler, whose collection-wide prefix scan is
 // the forbidden whole-plane shape inside a write gate.
 //
@@ -1752,18 +1818,23 @@ export async function workOrderDocumentHeadFor(
     organization: Id,
     workOrderId: Id,
 ): Promise<WorkOrderEntity | null> {
-    const collectionPrefix = canonicalUriPrefix(
+    const collectionPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
-    const [byIdRequests, byIdResponses] = await Promise.all([
-        dbOrView.requests.getAllWhere('uri_id', workOrderId),
-        dbOrView.responses.getAllWhere('uri_id', workOrderId),
-    ]);
-    const collectionRequests = byIdRequests.filter(
-        (r) => r.uri_prefix === collectionPrefix,
+    const [byCollectionRequests, byCollectionResponses] =
+        await Promise.all([
+            dbOrView.requests.getAllWhere(
+                'uri_collection', collectionPrefix,
+            ),
+            dbOrView.responses.getAllWhere(
+                'uri_collection', collectionPrefix,
+            ),
+        ]);
+    const collectionRequests = byCollectionRequests.filter(
+        (r) => r.uri_id === workOrderId,
     );
-    const collectionResponses = byIdResponses.filter(
-        (r) => r.uri_prefix === collectionPrefix,
+    const collectionResponses = byCollectionResponses.filter(
+        (r) => r.uri_id === workOrderId,
     );
     const entityPairs = documentPairsAt(
         collectionRequests, collectionResponses,
@@ -1798,7 +1869,7 @@ export async function workOrderDocumentHeadFor(
 // machinery is NOT bent to fit (members are
 // organizationNested: false).
 const MEMBERS_DOCUMENT_PREFIX =
-    canonicalUriPrefix(undefined, '/members/');
+    canonicalUriCollection(undefined, '/members/');
 
 export async function deriveMemberStates(
     db: DbAdapter,
@@ -1808,10 +1879,10 @@ export async function deriveMemberStates(
         async (view) => {
             const [requests, responses] = await Promise.all([
                 view.requests.getAllWhere(
-                    'uri_prefix', MEMBERS_DOCUMENT_PREFIX,
+                    'uri_collection', MEMBERS_DOCUMENT_PREFIX,
                 ),
                 view.responses.getAllWhere(
-                    'uri_prefix', MEMBERS_DOCUMENT_PREFIX,
+                    'uri_collection', MEMBERS_DOCUMENT_PREFIX,
                 ),
             ]);
             const pairs = documentPairsAt(
@@ -1941,9 +2012,9 @@ export async function deriveInvitationStates(
             const opPrefixes = new Set<string>();
             for (const request of requests) {
                 if (INVITATION_OP_ADDRESS_PATTERN.test(
-                    request.uri_prefix,
+                    request.uri_collection,
                 )) {
-                    opPrefixes.add(request.uri_prefix);
+                    opPrefixes.add(request.uri_collection);
                 }
             }
             for (const prefix of opPrefixes) {
@@ -1973,12 +2044,11 @@ export async function deriveInvitationStates(
 
 // ENTITY-SCOPED sibling of deriveInvitationStates above (Phase
 // 14 Task 1): the SAME grant + op-address reduction, restricted
-// to ONE known invitation id via INDEXED reads — uri_id for the
-// grant/document pair (both share ONE uriId: the operation
-// pair's own createdEntityUriId resolution and the document
-// PUT's own path segment, api/invitations-domain.ts's
-// grantInvitation) and uri_prefix for each of the three op
-// addresses — rather than the whole-collection scan
+// to ONE known invitation id via INDEXED reads —
+// uri_collection at the invitations prefix, filtered to
+// this id (grant + document share ONE uriId) and
+// uri_collection for each of the three op addresses —
+// rather than the whole-collection scan
 // (documentIds discovery) and the whole-ledger requests.getAll()
 // (op-prefix discovery) the multi-invitation reader above needs
 // to find EVERY id at once. dbOrView-shaped and opens no nested
@@ -1998,15 +2068,20 @@ export async function invitationLifecycleStatesFor(
 ): Promise<StateEntity[]> {
     const rows: StateEntity[] = [];
 
-    const [byIdRequests, byIdResponses] = await Promise.all([
-        dbOrView.requests.getAllWhere('uri_id', id),
-        dbOrView.responses.getAllWhere('uri_id', id),
-    ]);
-    const collectionRequests = byIdRequests.filter(
-        (r) => r.uri_prefix === INVITATIONS_PREFIX,
+    const [byCollectionRequests, byCollectionResponses] =
+        await Promise.all([
+            dbOrView.requests.getAllWhere(
+                'uri_collection', INVITATIONS_PREFIX,
+            ),
+            dbOrView.responses.getAllWhere(
+                'uri_collection', INVITATIONS_PREFIX,
+            ),
+        ]);
+    const collectionRequests = byCollectionRequests.filter(
+        (r) => r.uri_id === id,
     );
-    const collectionResponses = byIdResponses.filter(
-        (r) => r.uri_prefix === INVITATIONS_PREFIX,
+    const collectionResponses = byCollectionResponses.filter(
+        (r) => r.uri_id === id,
     );
     const hasDocument = documentPairsAt(
         collectionRequests, collectionResponses,
@@ -2030,12 +2105,12 @@ export async function invitationLifecycleStatesFor(
     for (const op of [
         'acceptance', 'decline', 'revocation',
     ] as const) {
-        const prefix = canonicalUriPrefix(
+        const prefix = canonicalUriCollection(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
         const [opRequests, opResponses] = await Promise.all([
-            dbOrView.requests.getAllWhere('uri_prefix', prefix),
-            dbOrView.responses.getAllWhere('uri_prefix', prefix),
+            dbOrView.requests.getAllWhere('uri_collection', prefix),
+            dbOrView.responses.getAllWhere('uri_collection', prefix),
         ]);
         const fields = INVITATION_OP_FIELDS[op]!;
         const earliest = operationPairsAt(

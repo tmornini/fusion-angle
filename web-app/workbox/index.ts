@@ -17,11 +17,9 @@ import {
     iconMail, iconArchive, iconPlus,
     iconNoEntry,
 } from '../app/icons.ts';
-import {
-    navigateTo,
-    initTabs,
-    initDropdown,
-} from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
+import { initTabs } from '../app/dialog.ts';
+import { initDropdown } from '../app/theme-toggle.ts';
 import {
     getWorkOrders,
     getWorkOrderHistories,

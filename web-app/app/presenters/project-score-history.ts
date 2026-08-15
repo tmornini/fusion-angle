@@ -14,7 +14,7 @@ import {
     formatSigned,
     toneForScore,
 } from '../scoring-format.ts';
-import { formatDateTime } from '../core.ts';
+import { formatDateTime } from '../format.ts';
 import { DISPLAY_ABSENT } from '../format.ts';
 
 export type DefinitionResolver = (

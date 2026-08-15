@@ -13,15 +13,15 @@ import {
 import { iconShield, ICON_SIZE } from '../app/icons.ts';
 import {
     RequestError, HTTP_FORBIDDEN,
-} from '../../api/api.ts';
+} from '../../api/http-errors.ts';
 import { showToast } from '../app/toast.ts';
 import { log } from '../app/logger.ts';
 import { extractErrorMessage } from '../app/error-helpers.ts';
+import { trimStrings } from '../app/format.ts';
 import {
-    trimStrings,
     openDialog, closeDialog,
     handleDialogClick,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     getOrganization,
     getOrganizationStats,

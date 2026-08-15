@@ -10,7 +10,10 @@ import {
     deriveFlowStateHistory,
 } from '../api/derive-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
-import { strongEtagOf } from '../api/message-pair.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
+
 
 // The flows sibling of tests/derive-ideas.test.ts/derive-
 // projects.test.ts: unit-level lifecycle-reduction guarantees
@@ -18,7 +21,7 @@ import { strongEtagOf } from '../api/message-pair.ts';
 // only) does not exercise. MECHANISM: flows are the LOCKED
 // class (Decision 7) — a SECOND PUT to an existing flow is
 // non-genesis and must thread If-Match via a header-
-// capable req helper (echo the first PUT's pair-id ETag),
+// capable req helper (echo the first PUT's 64-hex ETag),
 // unlike the bare-req idiom the ideas/projects skew tests use.
 
 const BASE = 'http://localhost';
@@ -32,14 +35,13 @@ function req(
     body?: unknown,
     headers?: Record<string, string>,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-            ...(headers ?? {}),
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        headers,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -115,19 +117,6 @@ function putFlow(
     ));
 }
 
-async function headResponseId(
-    db: MemoryDbAdapter,
-    token: string,
-    flowId: string,
-): Promise<string> {
-    const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
-    ));
-    const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /flows/' + flowId);
-    return id!;
-}
-
 test(
     'a clock-skewed transition does NOT displace genesis — '
     + 'the graph still tracks the DOCUMENT head',
@@ -147,11 +136,15 @@ test(
             '2026-06-01T00:00:00.000000Z', 'ev-drv-skew-genesis',
             genesisGraph,
         );
-        assert.equal(genesis.status, 200);
-        const headId = await headResponseId(db, token, id);
+        assert.equal(genesis.status, 201);
+        const head = await handleRequest(db, req(
+            'GET', '/flows/' + id, token,
+        ));
+        const etag = head.headers.get('ETag');
+        assert.ok(etag, 'no ETag on GET /flows/' + id);
 
         // The locked class: this second PUT is non-genesis, so
-        // it must echo the current head's Response-ID rather
+        // it must echo the current head's ETag rather
         // than the bare-req idiom the ideas/projects skew tests
         // use — a save with no echo 412s outright.
         const skewedGraph = graphWithNode(
@@ -160,9 +153,9 @@ test(
         const res = await putFlow(
             db, token, id, 'Skewed Title', 'deleted',
             '2020-01-01T00:00:00.000000Z', 'ev-drv-skew-later',
-            skewedGraph, { 'if-match': strongEtagOf(headId) },
+            skewedGraph, { 'if-match': etag },
         );
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
 
         // Genesis must still win the lifecycle reduction: the
         // flow stays visible despite the later-arriving
@@ -222,7 +215,7 @@ test(
     },
 );
 
-test('ordering is id-lex', async () => {
+test('ordering is oldest live head (at, id)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ids = [
@@ -233,11 +226,11 @@ test('ordering is id-lex', async () => {
             db, token, id, 'Order ' + id, 'active',
             AT, 'ev-' + id, emptyGraph(),
         );
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
     }
     const derived = await deriveFlows(db, STARK_ORGANIZATION);
     const observed = derived
         .map((flow) => flow.id)
         .filter((id) => ids.includes(id));
-    assert.deepEqual(observed, [...ids].sort());
+    assert.deepEqual(observed, ids);
 });

@@ -18,13 +18,16 @@ import {
 import {
     formWritePair,
     IF_MATCH_HEADER,
-    strongEtagOf,
+    HEX64,
 } from '../api/message-pair.ts';
 import {
     nowUtc,
     SYSTEM_MEMBER_ID,
     DEFAULT_ATTRIBUTE_ACL_ROLES,
 } from '../api/types.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Task 20 covenant suite — 12-step status ladder (earlier
 // step answers) + If-Match / ETag cross-pins. Each pin is
@@ -56,19 +59,13 @@ function req(
     body?: unknown,
     extraHeaders?: Record<string, string>,
 ): Request {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        ...(extraHeaders ?? {}),
-    };
-    if (token !== undefined) {
-        headers['Authorization'] = 'Bearer ' + token;
-    }
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers,
-        ...(body !== undefined
-            ? { body: JSON.stringify(body) }
-            : {}),
+        path,
+        token,
+        body,
+        headers: extraHeaders,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -99,7 +96,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -148,7 +145,7 @@ async function putLiveType(
     const put = await handleRequest(db, req(
         'PUT', TYPE_DETAIL, adminToken, typeBody(),
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function putAttribute(
@@ -160,7 +157,7 @@ async function putAttribute(
     const put = await handleRequest(db, req(
         'PUT', ATTRS + '/' + attrId, adminToken, body,
     ));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
 }
 
 async function seedWritableTextAttr(
@@ -187,7 +184,7 @@ async function putInstance(
     }[],
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, token,
+        'PATCH', INSTANCE_DETAIL, token,
         { set: [...set] },
     ));
 }
@@ -242,12 +239,12 @@ async () => {
 
 // --- Step 4–5: parent / existence before dialect ---
 
-test('4 admin PUT instance under absent type → 404 '
+test('4 admin PATCH instance under absent type → 404 '
 + 'record_types',
 async () => {
     const { db, adminToken } = await adminDb();
     const res = await handleRequest(db, req(
-        'PUT', INSTANCE_DETAIL, adminToken,
+        'PATCH', INSTANCE_DETAIL, adminToken,
         { set: [] },
     ));
     assert.equal(res.status, 404);
@@ -256,29 +253,18 @@ async () => {
     });
 });
 
-test('5 PATCH absent instance w/o If-Match → 404 '
-+ '(not 428)',
+test('5 PATCH absent instance w/o If-Match → 201 '
++ 'create (not 428)',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
-        {
-            set: [
-                {
-                    attribute_id: ATTR_ID,
-                    value: 'x',
-                },
-            ],
-        },
+        { set: [] },
     ));
-    assert.equal(res.status, 404);
+    assert.equal(res.status, 201);
     assert.notEqual(res.status, 428);
-    assert.deepEqual(await res.json(), {
-        error: 'Not found: record_instances/'
-            + INSTANCE_ID,
-    });
 });
 
 // --- Step 6–7: If-Match before body shape ---
@@ -293,16 +279,18 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { not_a_valid_patch: true },
     ));
     assert.equal(res.status, 428);
-    assert.deepEqual(await res.json(), {
-        error: 'If-Match is required to PATCH '
-            + INSTANCE_DETAIL,
-    });
+    const body = await res.json() as {
+        id: string;
+        error?: string;
+    };
+    assert.equal(body.error, undefined);
+    assert.equal(body.id, INSTANCE_ID);
 });
 
 test('7 PATCH stale If-Match + garbage body → 412 '
@@ -328,18 +316,19 @@ async () => {
         },
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(p1.status, 200);
+    assert.equal(p1.status, 201);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { not_a_valid_patch: true },
         { [IF_MATCH_HEADER]: e0 },
     ));
     assert.equal(res.status, 412);
-    assert.deepEqual(await res.json(), {
-        error: 'If-Match does not match the '
-            + 'current instance at '
-            + INSTANCE_DETAIL,
-    });
+    const staleBody = await res.json() as {
+        id: string;
+        error?: string;
+    };
+    assert.equal(staleBody.error, undefined);
+    assert.equal(staleBody.id, INSTANCE_ID);
 });
 
 // --- Step 8–11: body / ACL / value after fresh match ---
@@ -417,15 +406,19 @@ async () => {
         read_roles: ['admin'],
         write_roles: [],
     });
-    const put = await putInstance(db, adminToken, [
+    await putInstance(db, adminToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
         { attribute_id: ATTR_LOCKED, value: 's' },
     ]);
+    const memberGet = await handleRequest(db, req(
+        'GET', INSTANCE_DETAIL, memberToken,
+    ));
+    assert.equal(memberGet.status, 200);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { clear: [ATTR_LOCKED] },
         {
-            [IF_MATCH_HEADER]: put.headers.get('ETag')!,
+            [IF_MATCH_HEADER]: memberGet.headers.get('ETag')!,
         },
     ));
     assert.equal(res.status, 403);
@@ -475,7 +468,7 @@ async () => {
 
 // --- Step 12: spent-address 409 is last (in-tx) ---
 
-test('12 PUT race at a spent address → 409 '
+test('12 PATCH create race at one address → 201/428 '
 + '(in-tx, last)',
 async () => {
     const { db, adminToken, memberToken } =
@@ -484,7 +477,7 @@ async () => {
     await seedWritableTextAttr(db, adminToken);
     const [a, b] = await Promise.all([
         handleRequest(db, req(
-            'PUT', INSTANCE_DETAIL, memberToken,
+            'PATCH', INSTANCE_DETAIL, memberToken,
             {
                 set: [
                     {
@@ -495,7 +488,7 @@ async () => {
             },
         )),
         handleRequest(db, req(
-            'PUT', INSTANCE_DETAIL, memberToken,
+            'PATCH', INSTANCE_DETAIL, memberToken,
             {
                 set: [
                     {
@@ -508,13 +501,8 @@ async () => {
     ]);
     assert.deepEqual(
         [a.status, b.status].sort(),
-        [200, 409],
+        [201, 428],
     );
-    const loser = a.status === 409 ? a : b;
-    assert.deepEqual(await loser.json(), {
-        error: 'instance already exists at '
-            + INSTANCE_DETAIL,
-    });
 });
 
 // --- Cross-pins ---
@@ -539,7 +527,7 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID')!;
     const e1 = first.headers.get('ETag')!;
     assert.notEqual(e1, e0);
@@ -549,7 +537,7 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e1 },
     ));
-    assert.equal(second.status, 200);
+    assert.equal(second.status, 201);
     assert.notEqual(
         second.headers.get('Response-ID'),
         firstId,
@@ -565,15 +553,15 @@ async () => {
         'PATCH', INSTANCE_DETAIL, memberToken, body,
         { [IF_MATCH_HEADER]: e0 },
     ));
-    assert.equal(replay.status, 200);
+    assert.equal(replay.status, 201);
     assert.equal(
         replay.headers.get('Response-ID'),
         firstId,
     );
 });
 
-test('ETag byte source ≠ responses.etag column '
-+ '(covenant tier)',
+test('document ETag === version; instance projected ETag '
++ 'is not stored',
 async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
@@ -582,22 +570,24 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const pairId = put.headers.get('Response-ID')!;
     const res = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(res.status, 200);
     const header = res.headers.get('ETag');
-    assert.equal(header, strongEtagOf(pairId));
+    assert.ok(header !== null);
+    assert.match(header.slice(1, -1), HEX64);
     const stored = await db.responses.getById(pairId);
     assert.ok(stored !== undefined);
+    assert.match(stored.version, HEX64);
     assert.notEqual(
-        header,
-        stored!.etag,
-        'wire ETag must not be body-sha responses.etag',
+        header.slice(1, -1),
+        stored.version,
+        'instance projected ETag is not stored version',
     );
-    assert.notEqual(pairId, stored!.etag);
+    assert.notEqual(pairId, stored.version);
 });
 
 test('list-row etag == detail ETag validator sans quotes',
@@ -609,8 +599,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    assert.equal(put.status, 200);
-    const pairId = put.headers.get('Response-ID')!;
+    assert.equal(put.status, 201);
     const list = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
     ));
@@ -621,15 +610,15 @@ async () => {
     }[];
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.id, INSTANCE_ID);
-    assert.equal(rows[0]!.etag, pairId);
+    assert.ok(HEX64.test(rows[0]!.etag));
     const detail = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(detail.status, 200);
     const detailEtag = detail.headers.get('ETag');
-    assert.equal(detailEtag, strongEtagOf(pairId));
+    assert.ok(detailEtag !== null);
     assert.equal(
         rows[0]!.etag,
-        detailEtag!.slice(1, -1),
+        detailEtag.slice(1, -1),
     );
 });

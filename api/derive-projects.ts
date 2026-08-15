@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { missedReadError } from './derive-states.ts';
 import type { Id, ProjectEntity, StateEntity } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { canonicalUriCollection } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     documentPairsAt,
@@ -10,11 +10,12 @@ import {
     stateHistoryFrom,
     currentDocumentState,
     currentLifecycleEvent,
-    byIdAscending,
     DELETED_STATE,
     type DerivedDocument,
     type DocumentPair,
 } from './derive-documents.ts';
+import { liveHeadId, messageStore } from
+    './message-store.ts';
 
 // Projects' own reshaping of the generic message-plane reduction
 // (derive-documents.ts): the async fetching (one prefix scan per
@@ -31,7 +32,7 @@ import {
 const PROJECTS_TABLE = 'projects';
 
 function projectsUriPrefix(organization: Id): string {
-    return canonicalUriPrefix(organization, '/projects/');
+    return canonicalUriCollection(organization, '/projects/');
 }
 
 // The derived entity: the head document's body minus the
@@ -87,8 +88,8 @@ async function fetchProjectPairs(
     readonly pairs: readonly DocumentPair[];
 }> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     return {
         documents: deriveDocumentsAt(requests, responses, prefix),
@@ -96,11 +97,11 @@ async function fetchProjectPairs(
     };
 }
 
-// id-lex ordered (the IndexedDB reference), deleted-filtered —
-// the head lifecycle state 'deleted' excludes a project exactly
-// as EntityStore's states-log tombstone filter does today
-// (declined/archived projects are NOT filtered here — client-side
-// concerns, untouched).
+// Oldest live head (at, id) first via getCollection,
+// deleted-filtered — the head lifecycle state 'deleted'
+// excludes a project exactly as EntityStore's states-log
+// tombstone filter does today (declined/archived projects
+// are NOT filtered here — client-side concerns, untouched).
 export async function deriveProjects(
     db: DbAdapter,
     organization: Id,
@@ -117,7 +118,7 @@ export async function deriveProjects(
             list.push(pair);
         }
     }
-    const projects: ProjectEntity[] = [];
+    const byId = new Map<Id, ProjectEntity>();
     for (const [projectId, document] of documents) {
         const history = stateHistoryFrom(
             documentLifecycleEvents(
@@ -131,11 +132,18 @@ export async function deriveProjects(
         // After DELETED filter history is non-empty for every
         // live trio document (genesis always mints an event).
         const current = currentLifecycleEvent(history)!;
-        projects.push(
+        byId.set(
+            projectId,
             projectEntityOf(document, organization, current),
         );
     }
-    return projects.sort(byIdAscending);
+    const live = await messageStore(db).getCollection(prefix);
+    const projects: ProjectEntity[] = [];
+    for (const entity of live) {
+        const row = byId.get(liveHeadId(entity));
+        if (row !== undefined) projects.push(row);
+    }
+    return projects;
 }
 
 export async function deriveProject(

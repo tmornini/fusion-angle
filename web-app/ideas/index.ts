@@ -12,7 +12,7 @@ import {
     ICON_SIZE,
     iconPlus, iconLightbulb,
 } from '../app/icons.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
     getIdeas,
     putIdea,

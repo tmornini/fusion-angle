@@ -8,6 +8,11 @@ import {
 } from './test-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { firstProviderModel } from './member-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
+import { aiMemberDocumentEntityOf } from '../api/routes.ts';
 
 const BASE = 'http://localhost';
 const MEMBER = 'walt';
@@ -34,14 +39,12 @@ function req(
     method: string, path: string, token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -68,12 +71,12 @@ test(
         assert.equal(facet.name, 'Claude');
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7); post-write check rides
-        // surviving /history.
+        // surviving /versions.
         const history = await GET<{
             state: string;
             member_id: string;
             at: string;
-        }[]>(db, 'members/a1/history', DEV_TOKEN);
+        }[]>(db, 'members/a1/versions', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
         assert.equal(current.state, 'active');
@@ -160,7 +163,7 @@ test(
                 initialStateEventId: 'ev-1',
                 initialStateAt: '2099-01-01T00:00:00.000000Z',
             }));
-        assert.equal(create.status, 204);
+        assert.equal(create.status, 201);
         const edit = await handleRequest(adminDb, req(
             'POST', '/ai-members/a1', DEV_TOKEN, {
                 detail: detail('Renamed'),
@@ -168,7 +171,7 @@ test(
                 stateAt: '2099-01-01T00:00:00.000000Z',
                 stateEventId: 'ev-1',
             }));
-        assert.equal(edit.status, 204);
+        assert.equal(edit.status, 201);
 
         const memberDb = memoryDbAdapter();
         await memberDb.postSchemaCreation();
@@ -201,3 +204,67 @@ test(
         );
     },
 );
+
+test('AI create stores aiMemberDocumentEntityOf at '
++ 'ai-members/:id', async () => {
+    const db = await freshDb();
+    const id = 'a-g3-create';
+    const fields = detail('Claude');
+    await POST(db, 'ai-members', {
+        id,
+        detail: fields,
+        initialState: 'active',
+        initialStateEventId: 'ev-g3',
+        initialStateAt: '2099-01-01T00:00:00.000000Z',
+    }, DEV_TOKEN);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/ai-members/', id),
+    );
+    assert.deepEqual(
+        stored,
+        aiMemberDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body: fields,
+            },
+            '',
+        ),
+    );
+});
+
+test('AI edit stores aiMemberDocumentEntityOf at '
++ 'ai-members/:id', async () => {
+    const db = await freshDb();
+    const id = 'a-g3-edit';
+    await POST(db, 'ai-members', {
+        id,
+        detail: detail('Claude'),
+        initialState: 'active',
+        initialStateEventId: 'ev-g3',
+        initialStateAt: '2099-01-01T00:00:00.000000Z',
+    }, DEV_TOKEN);
+    const fields = { ...detail('Renamed'), skill_focus: 'qa' };
+    await POST(db, 'ai-members/' + id, {
+        detail: fields,
+        state: 'active',
+        stateAt: '2099-01-01T00:00:00.000000Z',
+        stateEventId: 'ev-g3',
+    }, DEV_TOKEN);
+    const stored = JSON.parse(
+        await storedPutBodyText(db, '/ai-members/', id),
+    );
+    assert.deepEqual(
+        stored,
+        aiMemberDocumentEntityOf(
+            {
+                uriId: id,
+                pairId: id,
+                method: 'PUT',
+                body: fields,
+            },
+            '',
+        ),
+    );
+});

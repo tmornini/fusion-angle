@@ -201,8 +201,10 @@ test(
         assert.equal(
             projects[0]?.titleText(), 'Keep',
         );
+        // Collection GET streams live PUT heads, including
+        // a trio-deleted document. getProjects filters it.
         const rows = await getProjectEntities(ctx);
-        assert.equal(rows.length, 1);
+        assert.equal(rows.length, 2);
     },
 );
 

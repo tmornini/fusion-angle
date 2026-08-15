@@ -13,15 +13,18 @@ import {
     iconArrowRight,
     iconLoader,
 } from '../app/icons.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import { log } from '../app/logger.ts';
 import { getViewportWidth } from '../app/adapters/index.ts';
 import {
-    getDbAdapter,
+    getClientFacade,
+} from '../app/adapters/facade-holder.ts';
+import {
     getSessionToken,
     putSessionToken,
     sessionHasReachableOrganization,
-} from '../app/adapters/init.ts';
+    sessionTokenIsSeeded,
+} from '../app/adapters/session-token.ts';
 import {
     createRequestContext,
 } from '../app/adapters/shared.ts';
@@ -589,7 +592,11 @@ export async function init(): Promise<void> {
             try {
                 creds = await postPasswordLogin(
                     createRequestContext(
-                        getDbAdapter(), getSessionToken()),
+                        getClientFacade(),
+                        sessionTokenIsSeeded()
+                            ? getSessionToken()
+                            : '',
+                    ),
                     email, password,
                 );
             } catch (err) {

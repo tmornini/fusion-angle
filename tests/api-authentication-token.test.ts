@@ -34,10 +34,11 @@ import {
     seedClientRegistration,
     seedClientRegistrationTombstone,
 } from './identity-fixtures.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 
-const INVALID_CODE_ERROR = 'invalid or used authorization code';
+const INVALID_CODE_ERROR = 'invalid_grant';
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -121,7 +122,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -135,6 +136,42 @@ function tokenRequest(body: Record<string, unknown>): Request {
         body: JSON.stringify(body),
     });
 }
+
+test('a missing bearer is 401 invalid_token', async () => {
+    const db = await freshDb();
+    const res = await handleRequest(
+        db, new Request(`${BASE}/members`));
+    assert.equal(res.status, 401);
+    assert.deepEqual(
+        await res.json(), { error: 'invalid_token' });
+});
+
+test('a failed client assertion is 401 invalid_client',
+async () => {
+    const db = await freshDb();
+    await seedClientRegistration(
+        db, 'svc-client', activeClient,
+    );
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'client_credentials',
+        client_id: 'svc-client',
+        client_assertion: 'not-a-jwt',
+    }));
+    assert.equal(res.status, 401);
+    assert.deepEqual(
+        await res.json(), { error: 'invalid_client' });
+});
+
+test('an unknown authorization code is 401 invalid_grant',
+async () => {
+    const db = await freshDb();
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code', code: 'ghost',
+    }));
+    assert.equal(res.status, 401);
+    assert.deepEqual(
+        await res.json(), { error: 'invalid_grant' });
+});
 
 test('the token endpoint is reachable without a Bearer',
 async () => {
@@ -182,7 +219,7 @@ async () => {
         code: 'code-for-match',
         client_id: 'client-a',
     }));
-    assert.equal(match.status, 200);
+    assert.equal(match.status, 201);
 });
 
 // PKCE S256 (RFC 7636): when authorize stored a code_challenge,
@@ -212,7 +249,7 @@ async () => {
         client_id: 'web',
         code_verifier: verifier,
     }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
 });
 
 test('authorization_code with PKCE rejects a wrong verifier',
@@ -262,6 +299,46 @@ async () => {
     );
 });
 
+function setCookieHeader(res: Response): string {
+    const cookies = typeof res.headers.getSetCookie
+        === 'function'
+        ? res.headers.getSetCookie()
+        : [];
+    if (cookies.length > 0) {
+        return cookies.join('\n');
+    }
+    return res.headers.get('Set-Cookie') ?? '';
+}
+
+function refreshTokenFromSetCookie(res: Response): string {
+    const cookie = setCookieHeader(res);
+    const match = /(?:^|[\n,])\s*refresh_token=([^;\n]+)/
+        .exec(cookie);
+    assert.ok(match, 'Set-Cookie missing refresh_token');
+    return match[1]!.trim();
+}
+
+test('token JSON has no refresh_token; Set-Cookie is HttpOnly',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    await seedAuthorizationCodePair(
+        db, 'the-code', 'current', 'web');
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'authorization_code', code: 'the-code',
+        client_id: 'web',
+    }));
+    assert.equal(res.status, 201);
+    const body = await res.json() as Record<string, unknown>;
+    assert.equal(body['refresh_token'], undefined);
+    assert.equal(typeof body['access_token'], 'string');
+    const cookie = setCookieHeader(res);
+    assert.match(cookie, /refresh_token=/);
+    assert.match(cookie, /HttpOnly/i);
+    assert.match(cookie, /Path=\/authentication/);
+    assert.match(cookie, /SameSite=Strict/i);
+});
+
 test('authorization_code grant issues a gate-valid token pair',
 async () => {
     const db = await freshDb();
@@ -272,14 +349,19 @@ async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const body = await res.json() as {
-        access_token: string; refresh_token: string;
+        access_token: string;
         token_type: string; expires_in: number;
     };
     assert.equal(body.token_type, 'Bearer');
     assert.ok(body.access_token.length > 0);
-    assert.ok(body.refresh_token.length > 0);
+    assert.equal(
+        (body as { refresh_token?: unknown }).refresh_token,
+        undefined,
+    );
+    const refreshToken = refreshTokenFromSetCookie(res);
+    assert.ok(refreshToken.length > 0);
     // act.sub carries the acting client (RFC 8693 shape,
     // mirroring token-exchange); sub stays the user. The
     // refresh token never carries act.
@@ -287,7 +369,7 @@ async () => {
     assert.equal(claims.sub, 'current');
     assert.equal(claims.act?.sub, 'web');
     assert.equal(
-        decodeAccessToken(body.refresh_token).act,
+        decodeAccessToken(refreshToken).act,
         undefined,
     );
     // the minted access token passes the SP-3 gate
@@ -303,7 +385,7 @@ test('replaying a consumed code is a 401 no-op', async () => {
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const before = (await deriveIdentityTokens(db)).length;
     const replay = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code', code: 'the-code',
@@ -336,7 +418,7 @@ test(
             })),
         ]);
         assert.deepEqual(
-            [a.status, b.status].sort(), [200, 401],
+            [a.status, b.status].sort(), [201, 401],
         );
         assert.equal(
             (await deriveIdentityTokens(db)).length, 1,
@@ -379,7 +461,7 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
         code: 'the-code-spent',
         client_id: 'web',
     }));
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const spent = await handleRequest(db, tokenRequest({
         grant_type: 'authorization_code',
         code: 'the-code-spent',
@@ -403,7 +485,7 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
             client_id: 'web',
         })),
     ]);
-    assert.deepEqual([a.status, b.status].sort(), [200, 401]);
+    assert.deepEqual([a.status, b.status].sort(), [201, 401]);
     const raced = a.status === 401 ? a : b;
     assert.deepEqual(
         await raced.json(), { error: INVALID_CODE_ERROR });
@@ -426,8 +508,67 @@ async function initialPair(
         grant_type: 'authorization_code', code: 'the-code',
         client_id: 'web',
     }));
-    return res.json();
+    const body = await res.json() as { access_token: string };
+    return {
+        access_token: body.access_token,
+        refresh_token: refreshTokenFromSetCookie(res),
+    };
 }
+
+test('refresh grant rotates from the Cookie, not the body',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    const pair1 = await initialPair(db);
+    const res = await handleRequest(db, new Request(
+        `${BASE}/authentication/token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: 'refresh_token=' + pair1.refresh_token,
+            },
+            body: JSON.stringify({ grant_type: 'refresh' }),
+        }));
+    assert.equal(res.status, 201);
+    const body = await res.json() as Record<string, unknown>;
+    assert.equal(body['refresh_token'], undefined);
+    assert.ok(typeof body['access_token'] === 'string');
+    assert.notEqual(
+        refreshTokenFromSetCookie(res), pair1.refresh_token);
+    assert.ok(Array.isArray(
+        await GET(db, 'members', body['access_token'] as string)));
+});
+
+test('stale body refresh_token loses to a live Cookie',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    const pair1 = await initialPair(db);
+    const rotated = await handleRequest(db, tokenRequest({
+        grant_type: 'refresh',
+        refresh_token: pair1.refresh_token,
+    }));
+    assert.equal(rotated.status, 201);
+    const liveCookie = refreshTokenFromSetCookie(rotated);
+    const res = await handleRequest(db, new Request(
+        `${BASE}/authentication/token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: 'refresh_token=' + liveCookie,
+            },
+            body: JSON.stringify({
+                grant_type: 'refresh',
+                refresh_token: pair1.refresh_token,
+            }),
+        }));
+    assert.equal(res.status, 201);
+    const body = await res.json() as {
+        access_token: string;
+    };
+    assert.ok(Array.isArray(
+        await GET(db, 'members', body.access_token)));
+});
 
 test('refresh rotates to a new pair', async () => {
     const db = await freshDb();
@@ -437,12 +578,12 @@ test('refresh rotates to a new pair', async () => {
         grant_type: 'refresh',
         refresh_token: pair1.refresh_token,
     }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const pair2 = await res.json() as {
-        access_token: string; refresh_token: string;
+        access_token: string;
     };
     assert.notEqual(
-        pair2.refresh_token, pair1.refresh_token);
+        refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert.ok(Array.isArray(
         await GET(db, 'members', pair2.access_token)));
 });
@@ -452,10 +593,13 @@ async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const pair1 = await initialPair(db);
-    const pair2 = await (await handleRequest(db, tokenRequest({
+    const rotated = await handleRequest(db, tokenRequest({
         grant_type: 'refresh',
         refresh_token: pair1.refresh_token,
-    }))).json() as { refresh_token: string };
+    }));
+    const pair2 = {
+        refresh_token: refreshTokenFromSetCookie(rotated),
+    };
     // replay the now-rotated pair1 token → reuse detected
     const replay = await handleRequest(db, tokenRequest({
         grant_type: 'refresh',
@@ -489,7 +633,7 @@ async () => {
         subject_token: await devToken('current'),
         actor_token: await devToken('current'),
     }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assert.equal(claims.sub, 'current');
@@ -497,6 +641,38 @@ async () => {
     // the delegated token passes the gate (current = admin)
     assert.ok(Array.isArray(
         await GET(db, 'members', body.access_token)));
+});
+
+test('token-exchange 201 has no refresh Set-Cookie',
+async () => {
+    const db = await freshDb();
+    await seedRootAdmin(db);
+    const pair = await initialPair(db);
+    const rotated = await handleRequest(db, new Request(
+        `${BASE}/authentication/token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: 'refresh_token=' + pair.refresh_token,
+            },
+            body: JSON.stringify({ grant_type: 'refresh' }),
+        }));
+    assert.equal(rotated.status, 201);
+    assert.match(setCookieHeader(rotated), /refresh_token=/);
+    const access = (await rotated.json() as {
+        access_token: string;
+    }).access_token;
+    const exchange = await handleRequest(db, tokenRequest({
+        grant_type: 'token-exchange',
+        subject_token: access,
+        actor_token: access,
+    }));
+    assert.equal(exchange.status, 201);
+    const body = await exchange.json() as Record<
+        string, unknown
+    >;
+    assert.equal(body['refresh_token'], undefined);
+    assert.equal(setCookieHeader(exchange), '');
 });
 
 test('token-exchange denies cross-party delegation',
@@ -547,7 +723,7 @@ async () => {
         actor_token: await devToken('current'),
         organization: '1',
     }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assert.equal(claims.organization, '1');
@@ -592,7 +768,7 @@ async () => {
         subject_token: await devToken('current'),
         actor_token: await devToken('current'),
     }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     const claims = decodeAccessToken(body.access_token);
     assert.equal(claims.organization, undefined);
@@ -638,10 +814,118 @@ test('client_credentials issues a gate-valid token', async () => {
         client_id: 'svc-client',
         client_assertion: assertion,
     }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     assert.ok(Array.isArray(
         await GET(db, 'members', body.access_token)));
+    assert.notEqual(
+        decodeAccessToken(body.access_token).jti, 'assert-1',
+    );
+});
+
+test('a second client_credentials grant with the same jti'
++ ' is 401 invalid_grant and mints nothing', async () => {
+    const db = await freshDb();
+    await seedMembershipPair(db, 'm-svc-replay', {
+        organization_id: '1',
+        identity_id: 'svc-client',
+        type: 'member',
+        at: '2020-01-01T00:00:00.000000Z',
+    });
+    const { client, assertion } =
+        await signedClientSetup();
+    await seedClientRegistration(db, 'svc-client', client);
+    const first = await handleRequest(db, tokenRequest({
+        grant_type: 'client_credentials',
+        client_id: 'svc-client',
+        client_assertion: assertion,
+    }));
+    assert.equal(first.status, 201);
+    const before = await db.requests.getAll();
+    const grantCount = before.filter((row) =>
+        row.uri_collection === '/authentication/token/',
+    ).length;
+    const eventCount = before.filter((row) =>
+        row.uri_collection === '/identity-tokens/',
+    ).length;
+    const second = await handleRequest(db, tokenRequest({
+        grant_type: 'client_credentials',
+        client_id: 'svc-client',
+        client_assertion: assertion,
+    }));
+    assert.equal(second.status, 401);
+    assert.deepEqual(
+        await second.json(), { error: 'invalid_grant' },
+    );
+    const after = await db.requests.getAll();
+    assert.equal(
+        after.filter((row) =>
+            row.uri_collection === '/authentication/token/',
+        ).length,
+        grantCount,
+    );
+    assert.equal(
+        after.filter((row) =>
+            row.uri_collection === '/identity-tokens/',
+        ).length,
+        eventCount,
+    );
+});
+
+test('an expired assertion-jti ticket is still spent',
+async () => {
+    const db = await freshDb();
+    await seedMembershipPair(db, 'm-svc-expired', {
+        organization_id: '1',
+        identity_id: 'svc-client',
+        type: 'member',
+        at: '2020-01-01T00:00:00.000000Z',
+    });
+    const signer = await makeAssertionSigner('ES256');
+    const now = Math.floor(Date.now() / 1000);
+    const jti = 'assert-expired-spent';
+    await seedClientRegistration(db, 'svc-client', {
+        ...activeClient, jwks: signer.jwks,
+    });
+    const ticket = await formWritePair({
+        method: 'PUT',
+        pathname:
+            '/authentication/assertion-jtis/' + jti,
+        routePattern:
+            'authentication/assertion-jtis/:jti',
+        routeSegments: [
+            'authentication', 'assertion-jtis', ':jti',
+        ],
+        pathSegments: [
+            'authentication', 'assertion-jtis', jti,
+        ],
+        headerFields: [],
+        body: { exp: now - 60 },
+        requesterIdentityId: 'svc-client',
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseStatus: 200,
+        responseBody: { exp: now - 60 },
+        operationId: TEST_OPERATION_ID,
+    });
+    await putMessagePair(db, ticket);
+    const assertion = await signer.sign({
+        iss: 'svc-client', sub: 'svc-client',
+        aud: 'fusion-ai-web',
+        exp: now + 300, iat: now, jti,
+    });
+    const res = await handleRequest(db, tokenRequest({
+        grant_type: 'client_credentials',
+        client_id: 'svc-client',
+        client_assertion: assertion,
+    }));
+    assert.equal(res.status, 401);
+    assert.deepEqual(
+        await res.json(), { error: 'invalid_grant' },
+    );
+    assert.equal(
+        (await deriveIdentityTokens(db)).length, 0,
+    );
 });
 
 test('client_credentials refuses an unsigned assertion',
@@ -665,7 +949,7 @@ async () => {
     }));
     assert.equal(res.status, 401);
     const body = await res.json() as { error: string };
-    assert.match(body.error, /invalid client_assertion/);
+    assert.equal(body.error, 'invalid_client');
 });
 
 test('client_credentials with a malformed assertion is 401',

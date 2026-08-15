@@ -1,0 +1,12 @@
+#!/bin/bash
+set -euo pipefail
+if [ -z "${POSTGRES_URL:-}" ]; then
+    echo "POSTGRES_URL is required" >&2
+    exit 1
+fi
+export SCHEMA_NAME="fusion_test_$(date +%s)_$$"
+TZ=UTC node --test --strip-types \
+    tests/pg-acceptance.test.ts \
+    tests/pg-races.test.ts \
+    tests/pg-boot.test.ts \
+    tests/pg-seed.test.ts

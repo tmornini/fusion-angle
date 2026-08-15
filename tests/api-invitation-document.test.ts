@@ -12,15 +12,20 @@ import {
     documentFamilyWiring,
     documentGetHandler,
 } from '../api/document-family.ts';
-import { sha256Hex } from '../shared/digest.ts';
+import { requestMessageHash } from '../api/message-form.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
 import {
     postMembershipDocumentOp,
+    membershipDocumentEntityOf,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
 
 // Phase 8 Task 6: the invitation document plane — the grant's
 // PUT-shaped invitation document (the entity minus id, NO email
@@ -40,13 +45,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -99,7 +103,7 @@ async function seedMembershipPair(
         responseBody: spec.successBody?.(
             [id], body, SYSTEM_MEMBER_ID, organization,
         ),
-        headPairId: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
@@ -147,7 +151,7 @@ test('a fresh grant appends 2 pairs — the operation and the'
 async () => {
     const db = await freshDb();
     const res = await grant(db, 'inv-doc-1');
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     // 6: the fixture's own membership pair (Phase 13 Task 1;
@@ -156,7 +160,7 @@ async () => {
     // (Stage B), and the grant's own 2 pairs.
     assert.equal(requests.length, 6);
     const atAddress = requests.filter(
-        r => r.uri_prefix === '/invitations/'
+        r => r.uri_collection === '/invitations/'
             && r.uri_id === 'inv-doc-1',
     );
     assert.equal(atAddress.length, 2);
@@ -184,17 +188,17 @@ test('a duplicate grant appends ONLY its operation pair — no'
 async () => {
     const db = await freshDb();
     const first = await grant(db, 'inv-doc-2a');
-    assert.equal(first.status, 200);
+    assert.equal(first.status, 201);
     const second = await grant(db, 'inv-doc-2b');
-    assert.equal(second.status, 200);
+    assert.equal(second.status, 201);
     const requests = await db.requests.getAll();
     const atDuplicateId = requests.filter(
-        r => r.uri_prefix === '/invitations/'
+        r => r.uri_collection === '/invitations/'
             && r.uri_id === 'inv-doc-2b',
     );
     assert.equal(atDuplicateId.length, 1);
     const atFreshId = requests.filter(
-        r => r.uri_prefix === '/invitations/'
+        r => r.uri_collection === '/invitations/'
             && r.uri_id === 'inv-doc-2a',
     );
     assert.equal(atFreshId.length, 2);
@@ -247,7 +251,7 @@ test('a fresh accept appends its memberships document at the'
         db, 'inv-doc-3', 'ms-doc-3', 'ev-acc-3',
         '2026-01-01T00:00:01.000000Z',
     );
-    assert.equal(res.status, 204);
+    assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     const documents = documentPairsAt(
@@ -267,12 +271,31 @@ test('a fresh accept appends its memberships document at the'
     const derived = await documentGetHandler(wiring)(
         db, ['ms-doc-3'], 'sarah', '1',
     );
-    assert.deepEqual(derived, {
-        id: 'ms-doc-3', organization_id: '1',
-        identity_id: 'sarah',
+    const acceptBody = {
+        organization_id: '1', identity_id: 'sarah',
         type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
+    };
+    assert.deepEqual(derived, {
+        id: 'ms-doc-3', ...acceptBody,
     });
+    const stored = JSON.parse(
+        await storedPutBodyText(
+            db, '/organizations/1/memberships/', 'ms-doc-3',
+        ),
+    );
+    assert.deepEqual(
+        stored,
+        membershipDocumentEntityOf(
+            {
+                uriId: 'ms-doc-3',
+                pairId: 'ms-doc-3',
+                method: 'PUT',
+                body: acceptBody,
+            },
+            '1',
+        ),
+    );
 });
 
 test('a no-op re-accept appends no memberships document',
@@ -283,14 +306,14 @@ async () => {
         db, 'inv-doc-4', 'ms-doc-4', 'ev-acc-4',
         '2026-01-01T00:00:01.000000Z',
     );
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
     const second = await accept(
         db, 'inv-doc-4', 'ms-doc-4b', 'ev-acc-4b',
         '2026-01-01T00:00:02.000000Z',
     );
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
     const documents = (await db.requests.getAll()).filter(
-        r => r.uri_prefix === '/organizations/1/memberships/',
+        r => r.uri_collection === '/organizations/1/memberships/',
     );
     // 2: the fixture's own membership pair (Phase 13 Task 1)
     // shares this SAME org-nested address, so it matches the
@@ -421,12 +444,8 @@ test('every stored invitation-family message verifies against'
     assert.equal(responses.length, 15);
     for (const row of requests) {
         assert.equal(
-            await sha256Hex(row.message), row.message_hash,
-        );
-    }
-    for (const row of responses) {
-        assert.equal(
-            await sha256Hex(row.message), row.message_hash,
+            await requestMessageHash(row.message),
+            row.message_hash,
         );
     }
 });

@@ -6,15 +6,14 @@ import {
     identityDefaultOrganization,
 } from './authentication.ts';
 import {
-    errorJson,
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
-    HTTP_UNAUTHORIZED,
     HTTP_FORBIDDEN,
     HTTP_METHOD_NOT_ALLOWED,
 } from './http-errors.ts';
 import {
     authenticateRequest,
+    unauthorizedBearerResponse,
     parseObjectBody,
     callerOrganizationIds,
 } from './request-auth.ts';
@@ -29,9 +28,11 @@ import {
     formWritePair,
     storedResponseFor,
     appendMessagePair,
-    responseFromStored,
+    sendWriteResponse,
     hoistedHeaderFields,
     storedPairResponse,
+    requireOperationId,
+    OPERATION_ID_HEADER,
 } from './message-pair.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
 import {
@@ -72,11 +73,12 @@ export async function identityDefaultOrganizationRequest(
     const authed =
         await authenticateRequest(ctx, request);
     if (typeof authed === 'string') {
-        return Response.json(
-            { error: authed },
-            { status: HTTP_UNAUTHORIZED },
-        );
+        return unauthorizedBearerResponse(authed);
     }
+    const denied = requireOperationId(
+        request, ctx.method, false,
+    );
+    if (denied !== undefined) return denied;
     const identityId = segments[1]!;
     if (authed.principal.id !== identityId) {
         return Response.json(
@@ -159,6 +161,14 @@ export async function identityDefaultOrganizationRequest(
         // constraint). The response is ALWAYS 204/no-body, so
         // the pair's shape is identical whether or not the org
         // actually changes.
+        const operationId = request.headers.get(
+            OPERATION_ID_HEADER,
+        );
+        if (operationId === null || operationId === '') {
+            throw new Error(
+                'Operation-ID missing after require',
+            );
+        }
         const pair = await formWritePair({
             method: 'PUT',
             pathname: ctx.pathname,
@@ -174,12 +184,12 @@ export async function identityDefaultOrganizationRequest(
             requestAt: ctx.requestAt, organization: undefined,
             responseStatus: HTTP_NO_CONTENT,
             responseBody: undefined,
-            headPairId: undefined,
+            operationId,
         });
         const replay = await storedResponseFor(
             ctx.base, pair.requestHash);
         if (replay !== undefined) {
-            return responseFromStored(replay);
+            return sendWriteResponse(replay, 'PUT', true);
         }
         // FLIPPED (Phase 13 Task 8): deriveDefaultOrganization
         // (Phase 11) reads this identity's own /default-org
@@ -230,6 +240,7 @@ export async function identityDefaultOrganizationRequest(
         return storedPairResponse(
             ctx.base, pair.requestHash,
             'identityDefaultOrganizationRequest',
+            'PUT',
         );
     }
     return Response.json(
@@ -253,7 +264,7 @@ export async function organizationsEnumerationRequest(
     const authed =
         await authenticateRequest(ctx, request);
     if (typeof authed === 'string') {
-        return errorJson(authed, HTTP_UNAUTHORIZED);
+        return unauthorizedBearerResponse(authed);
     }
     return enumerateMyOrganizations(authed);
 }

@@ -27,12 +27,12 @@ import {
     SafeHtml,
 } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
-    navigateTo,
     openDialog,
     closeDialog,
     handleDialogClick,
-} from '../app/core.ts';
+} from '../app/dialog.ts';
 import {
     credentialRevealPanel,
     credentialsCopyText,

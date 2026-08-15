@@ -10,6 +10,9 @@ import {
     deriveIdeaStateHistory,
 } from '../api/derive-ideas.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const STARK_ORGANIZATION = '1';
@@ -20,13 +23,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -76,7 +78,7 @@ test('a created idea derives', async () => {
         db, token, 'idea-drv-created', 'Fresh Idea', 'active',
         '2026-02-01T00:00:00.000000Z', 'ev-drv-created',
     );
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const derived = await deriveIdea(
         db, STARK_ORGANIZATION, 'idea-drv-created',
     );
@@ -109,7 +111,7 @@ test('an edited idea derives the edit body', async () => {
         db, token, 'idea-drv-edited', 'After Edit', 'active',
         '2026-02-01T00:00:00.000000Z', 'ev-drv-edited',
     );
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
     const derived = await deriveIdea(
         db, STARK_ORGANIZATION, 'idea-drv-edited',
     );
@@ -135,7 +137,7 @@ test(
             db, token, 'idea-drv-deleted', 'Doomed', 'deleted',
             '2026-02-02T00:00:00.000000Z', 'ev-drv-deleted-tomb',
         );
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
 
         const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
         assert.equal(
@@ -167,7 +169,7 @@ test(
             db, token, 'idea-drv-skew', 'Skewed Title', 'deleted',
             '2020-01-01T00:00:00.000000Z', 'ev-drv-skew-later',
         );
-        assert.equal(res.status, 200);
+        assert.equal(res.status, 201);
 
         // Genesis must still win the lifecycle reduction: the
         // idea stays visible despite the later-arriving 'deleted'
@@ -217,7 +219,7 @@ test(
     },
 );
 
-test('ordering is id-lex', async () => {
+test('ordering is oldest live head (at, id)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const ids = [
@@ -233,7 +235,7 @@ test('ordering is id-lex', async () => {
     const observed = derived
         .map((idea) => idea.id)
         .filter((id) => ids.includes(id));
-    assert.deepEqual(observed, [...ids].sort());
+    assert.deepEqual(observed, ids);
 });
 
 test(

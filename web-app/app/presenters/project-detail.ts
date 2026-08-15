@@ -20,7 +20,7 @@ import {
     formatCalendarDate,
     toDateInputValue,
     DISPLAY_ABSENT,
-} from '../core.ts';
+} from '../format.ts';
 import type {
     ProjectView,
     ProjectFieldsPatch,

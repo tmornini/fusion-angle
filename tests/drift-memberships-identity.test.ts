@@ -16,6 +16,9 @@ import { buildMembers } from '../api/mock-data/members.ts';
 import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: memberships dual-write stripped. This
 // file no longer compares derive vs row-plane oracles — the
@@ -31,13 +34,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -243,7 +245,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 200);
+    assert.equal(grant.status, 201);
 
     const membershipId = 'ms-drift-identity-sarah';
     const accept = await handleRequest(db, req(
@@ -256,7 +258,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
             acceptAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assert.equal(accept.status, 201);
 
     // Phase Final Task 2: memberships ROW half stripped —
     // accept lands on the pair plane only.
@@ -366,7 +368,7 @@ async () => {
             at: existing!.at,
         },
     ));
-    assert.equal(echoPut.status, 200);
+    assert.equal(echoPut.status, 201);
 
     const derived = sortById(
         await deriveMembershipsForIdentity(db, davidId),

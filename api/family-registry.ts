@@ -152,27 +152,22 @@ export const RECORD_TYPES_COLLECTION_PATTERN =
     'organizations/:organization-id/record-types';
 export const RECORD_TYPE_DETAIL_PATTERN =
     RECORD_TYPES_COLLECTION_PATTERN + '/:record-type-id';
-export const RECORD_TYPE_HISTORY_PATTERN =
-    RECORD_TYPE_DETAIL_PATTERN + '/history';
+export const RECORD_TYPE_VERSIONS_PATTERN =
+    RECORD_TYPE_DETAIL_PATTERN + '/versions';
+export const RECORD_TYPE_VERSION_PATTERN =
+    RECORD_TYPE_VERSIONS_PATTERN + '/:version';
 // Nested attributes under a record type (Task 7).
 export const ATTRIBUTES_COLLECTION_PATTERN =
     RECORD_TYPE_DETAIL_PATTERN + '/attributes';
 export const ATTRIBUTE_DETAIL_PATTERN =
     ATTRIBUTES_COLLECTION_PATTERN + '/:attribute-id';
-// Nested instances under a record type (Task 14 patterns;
-// routes land in Tasks 15–19).
+// Nested instances under a record type (Task 20: public
+// PUT is 405; PATCH creates and updates).
 export const INSTANCES_COLLECTION_PATTERN =
     RECORD_TYPE_DETAIL_PATTERN + '/instances';
 export const INSTANCE_DETAIL_PATTERN =
     INSTANCES_COLLECTION_PATTERN + '/:instance-id';
-export const INSTANCE_HISTORY_PATTERN =
-    INSTANCE_DETAIL_PATTERN + '/history';
-
-// Create-only PUT addresses (Task 15): If-Match rejected;
-// in-tx spent-address check owns the race. NOT registered
-// in DOCUMENT_CLASS_ROUTE_PATTERNS (R10) — headPairId stays
-// undefined so genesis carries neither supersedes nor
-// follows.
-export const CREATE_ONLY_PUT_ROUTE_PATTERNS:
-    ReadonlySet<string> =
-    new Set([INSTANCE_DETAIL_PATTERN]);
+export const INSTANCE_VERSIONS_PATTERN =
+    INSTANCE_DETAIL_PATTERN + '/versions';
+export const INSTANCE_VERSION_PATTERN =
+    INSTANCE_VERSIONS_PATTERN + '/:version';

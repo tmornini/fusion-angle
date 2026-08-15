@@ -13,38 +13,62 @@ import type { LatencySimulation } from './latency.ts';
 import {
     ValidationError,
     msSinceUtc,
+    nowUtc,
 } from './types.ts';
 import type { Id } from './types.ts';
 import { messageAddress } from './message-address.ts';
 import {
     formWritePair,
-    headPairIdAt,
+    appendMessagePair,
     storedResponseFor,
     createdEntityUriId,
-    canonicalUriPrefix,
+    canonicalUriCollection,
     hoistedHeaderFields,
-    responseFromStored,
+    sendWriteResponse,
+    documentHeadAt,
     attachEtag,
+    attachDate,
+    streamGetFromStored,
     parseIfMatch,
+    requireOperationId,
+    OPERATION_ID_HEADER,
     PAIR_WIRED_ROUTE_PATTERNS,
-    DOCUMENT_CLASS_ROUTE_PATTERNS,
     REPLAY_EXEMPT_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
+import {
+    bodyOctetsOf,
+} from './message-form.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
+import { HttpMessage } from '../shared/http-message/http-message.ts';
 import type { MessagePair, AuthPairSeed } from './message-pair.ts';
 import {
     familyRegistration,
     INSTANCE_DETAIL_PATTERN,
-    CREATE_ONLY_PUT_ROUTE_PATTERNS,
+    INSTANCE_VERSION_PATTERN,
+    RECORD_TYPES_COLLECTION_PATTERN,
 } from './family-registry.ts';
 import {
     documentFamilyWiring,
     documentHeadPairId,
+    lookupStoredRevision,
+    throwDocumentMiss,
+    requireOrganization,
+    resolveStreamedTrioWriteBody,
 } from './document-family.ts';
 import {
-    instancesUriPrefix,
+    messageStore,
+} from './message-store.ts';
+import {
     deriveInstanceHead,
+    instanceGetBody,
+    instanceParentEtag,
+    advertisedInstanceEtag,
+    projectionOmitsStored,
+    revisionValuesOf,
+    instancesUriPrefix,
 } from './derive-record-instances.ts';
+import { projectReadableValues } from './attribute-acl.ts';
 import {
     ANONYMOUS_ID,
     decodeAccessToken,
@@ -64,6 +88,11 @@ import {
     exchangeBearerForOrganization,
     postToken,
     postAuthorize,
+    attachSetCookie,
+    refreshSetCookie,
+    refreshClearCookie,
+    refreshTokenFromCookieHeader,
+    wireGrantError,
 } from './authentication.ts';
 import {
     ApiError,
@@ -72,6 +101,7 @@ import {
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_NOT_FOUND,
+    HTTP_CONFLICT,
     HTTP_METHOD_NOT_ALLOWED,
     HTTP_INTERNAL_ERROR,
     HTTP_UNAUTHORIZED,
@@ -83,16 +113,20 @@ import {
     AUTHENTICATION_ROUTES,
     BOOTSTRAP_ROUTES,
     authenticateRequest,
+    unauthorizedBearerResponse,
     fenceRequest,
     authorizeRequest,
     authorizeIdentityPii,
     parseObjectBody,
+    parsePutBody,
+    isServerTier,
 } from './request-auth.ts';
 import {
     routes,
     matchRoute,
     param,
     WRITE_RESPONSE_SPECS,
+    loadAttributeSchemaById,
     type Route,
     type WriteResponseSpec,
 } from './routes.ts';
@@ -108,6 +142,9 @@ import {
     REQUEST_ID_HEADER,
     type IncomingContext,
 } from './request-context.ts';
+import {
+    generateCryptoSafeBase62,
+} from '../shared/crypto-safe-base62.ts';
 
 export {
     ApiError,
@@ -243,18 +280,150 @@ function writeResponseSpecFor(
     return entry.post;
 }
 
-// Instance PATCH ETag (R8): the REVISION pair's response
-// id (new head), not the wire PATCH pair. Recovery is one
-// UNIQUE follows lookup on the If-Match-verified head the
-// wire operation raced — synthesis Mechanism (Task 17).
-async function revisionEtagForInstancePatch(
+function octetsEqual(
+    left: Uint8Array,
+    right: Uint8Array,
+): boolean {
+    if (left.length !== right.length) return false;
+    for (let i = 0; i < left.length; i++) {
+        if (left[i] !== right[i]) return false;
+    }
+    return true;
+}
+
+async function livePutVersion(
     db: DbAdapter,
-    ifMatchPairId: string,
-): Promise<string | undefined> {
-    const rows = await db.responses.getAllWhere(
-        'follows', ifMatchPairId,
+    prefix: string,
+    uriId: string,
+): Promise<{ pairId: string; version: string } | undefined> {
+    const pairId = await documentHeadPairId(
+        db, prefix, uriId,
     );
-    return rows[0]?.id;
+    if (pairId === undefined) return undefined;
+    const stored = await db.responses.getById(pairId);
+    if (stored === undefined) return undefined;
+    return { pairId, version: stored.version };
+}
+
+async function instanceAdvertised(
+    db: DbAdapter,
+    organization: string,
+    typeId: string,
+    instanceId: string,
+    roles: readonly string[],
+): Promise<{
+    tag: string;
+    limited: boolean;
+    pairId: string;
+} | undefined> {
+    const head = await deriveInstanceHead(
+        db, organization, typeId, instanceId,
+    );
+    if (head === undefined) return undefined;
+    const attributesById = await loadAttributeSchemaById(
+        db, organization, typeId,
+    );
+    const projected = projectReadableValues(
+        head.values, attributesById, roles,
+    );
+    const parent = await instanceParentEtag(db, head.pairId);
+    const tag = await advertisedInstanceEtag(
+        instanceGetBody(
+            instanceId, organization, typeId, projected,
+        ),
+        parent,
+    );
+    return {
+        tag,
+        limited: projectionOmitsStored(
+            head.values, projected,
+        ),
+        pairId: head.pairId,
+    };
+}
+
+function limitedHeaders(
+    limited: boolean,
+): Record<string, string> {
+    return limited
+        ? { 'Authorization-Limited-Attributes': 'true' }
+        : {};
+}
+
+// 412 / 428 with a live PUT: this caller's GET of the
+// current head — fresh Date, current ETag, limited
+// header when the projection omits stored attributes.
+function preconditionDocument(
+    status: number,
+    document: unknown,
+    etag: string,
+    limited: boolean,
+): Response {
+    return attachDate(
+        attachEtag(
+            Response.json(document, {
+                status,
+                headers: limitedHeaders(limited),
+            }),
+            etag,
+        ),
+        nowUtc(),
+    );
+}
+
+async function revisionPairIdForPatch(
+    db: DbAdapter,
+    wirePairId: string,
+): Promise<string | undefined> {
+    const wireReq = await db.requests.getById(wirePairId);
+    if (wireReq === undefined) return undefined;
+    const siblings = await db.requests.getAllWhere(
+        'uri_collection', wireReq.uri_collection,
+    );
+    const revision = siblings.find(
+        (row) =>
+            row.uri_id === wireReq.uri_id
+            && row.at === wireReq.at
+            && row.id !== wirePairId,
+    );
+    return revision?.id;
+}
+
+async function advertisedForRevisionPair(
+    db: DbAdapter,
+    organization: string,
+    typeId: string,
+    instanceId: string,
+    roles: readonly string[],
+    revisionPairId: string,
+): Promise<string | undefined> {
+    const request = await db.requests.getById(
+        revisionPairId,
+    );
+    if (request === undefined) return undefined;
+    const model = parseWire(request.message);
+    const wireBody = HttpMessage.fromModel(model).body();
+    const parsed = wireBody.exists()
+        ? JSON.parse(wireBody.toText()) as Record<
+            string, unknown
+        >
+        : {};
+    const values = revisionValuesOf(parsed);
+    const attributesById = await loadAttributeSchemaById(
+        db, organization, typeId,
+    );
+    const projected = projectReadableValues(
+        values, attributesById, roles,
+    );
+    const parent = await instanceParentEtag(
+        db, revisionPairId,
+    );
+    return advertisedInstanceEtag(
+        instanceGetBody(
+            instanceId, organization, typeId, projected,
+        ),
+        parent,
+    );
 }
 
 // The one catch shared by both pre-dispatch ownership regions
@@ -347,7 +516,7 @@ export async function handleRequest(
     // fenceRequest, which completes the vessel: the
     // organization, the live memberships, and the roles.
     // Surviving stores are global (message plane);
-    // pair-plane tenancy rides uri_prefix. effective stays
+    // pair-plane tenancy rides uri_collection. effective stays
     // the unfenced base adapter.
     let effective: DbAdapter = adapter;
     // The acting member, sourced from the verified token and
@@ -373,21 +542,20 @@ export async function handleRequest(
     // threaded to every handler (Task 10 reconciliation 5).
     // Empty for bearer-exempt routes (no fence ran).
     let roles: readonly string[] = [];
-    // BOOTSTRAP_ROUTES: the accepted dev-tier auth-free
-    // snapshot plane (removed at the Postgres server tier) —
-    // see api/request-auth.ts. An unmatched path can never be
-    // exempt — bearerExempt requires a defined route pattern.
+    // BOOTSTRAP_ROUTES: bearer-exempt on the browser ZIP;
+    // the server ZIP (isServerTier) does not exempt them.
+    // AUTHENTICATION_ROUTES stay exempt on both tiers.
+    // An unmatched path can never be exempt — bearerExempt
+    // requires a defined route pattern.
     const bearerExempt = matchedRoutePattern !== undefined
         && (AUTHENTICATION_ROUTES.has(matchedRoutePattern)
-            || BOOTSTRAP_ROUTES.has(matchedRoutePattern));
+            || (!isServerTier()
+                && BOOTSTRAP_ROUTES.has(matchedRoutePattern)));
     if (!bearerExempt) {
         const authed =
             await authenticateRequest(ctx, request);
         if (typeof authed === 'string') {
-            return Response.json(
-                { error: authed },
-                { status: HTTP_UNAUTHORIZED },
-            );
+            return unauthorizedBearerResponse(authed);
         }
         // Auth first; only then admit an unmatched path as
         // 404 (bytes unchanged for authenticated callers).
@@ -472,6 +640,7 @@ export async function handleRequest(
                     adapter,
                     organizationId,
                     fenced.organization,
+                    'organizations',
                 );
                 if (owner !== null) {
                     return Response.json(
@@ -514,6 +683,11 @@ export async function handleRequest(
     const { route: matched, params } = match;
     const routePattern = matched.segments.join('/');
 
+    const denied = requireOperationId(
+        request, method, bearerExempt,
+    );
+    if (denied !== undefined) return denied;
+
     // Parse the request body when the method
     // has one. A malformed or non-object JSON
     // body is a client error (400), not a
@@ -525,7 +699,9 @@ export async function handleRequest(
         || method === 'POST'
         || method === 'PATCH'
     ) {
-        const parse = await parseObjectBody(request);
+        const parse = method === 'PUT'
+            ? await parsePutBody(request)
+            : await parseObjectBody(request);
         if (!parse.ok) {
             return Response.json(
                 {
@@ -635,26 +811,6 @@ export async function handleRequest(
                 }
             }
         }
-        // Create-only PUT (Task 15): If-Match is rejected
-        // before pair formation — create is unconditional
-        // and the in-tx spent-address check owns the race.
-        const isCreateOnlyWrite = method === 'PUT'
-            && CREATE_ONLY_PUT_ROUTE_PATTERNS
-                .has(routePattern);
-        if (
-            isCreateOnlyWrite
-            && request.headers.get(IF_MATCH_HEADER)
-                !== null
-        ) {
-            return Response.json(
-                {
-                    error: 'If-Match is not accepted on PUT: '
-                        + 'create is unconditional at '
-                        + pathname,
-                },
-                { status: HTTP_BAD_REQUEST },
-            );
-        }
         // The shadow-ledger pair: formed pre-tx (all crypto and
         // address resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in
@@ -673,27 +829,12 @@ export async function handleRequest(
             const address = messageAddress(
                 matched.segments, pathSegments,
             );
-            const canonicalPrefix = canonicalUriPrefix(
-                organization, address.uriPrefix,
+            const canonicalPrefix = canonicalUriCollection(
+                organization, address.uriCollection,
             );
             const uriId = createdEntityUriId(
                 routePattern, body,
             ) ?? address.uriId;
-            // The head-read class is encoded PER ROUTE PATTERN,
-            // never inferred from uriId — an event-append
-            // address (states/:id) has a non-empty uriId yet
-            // must never chain (message-pair.ts). Create-only
-            // (R10) forces undefined so genesis carries neither
-            // supersedes nor follows — the in-tx spent check
-            // owns the race.
-            const headPairId =
-                !isCreateOnlyWrite
-                && DOCUMENT_CLASS_ROUTE_PATTERNS
-                    .has(routePattern)
-                    ? await headPairIdAt(
-                        effective, canonicalPrefix, uriId,
-                    )
-                    : undefined;
             // The locked/simple divide (spec §The two PUT classes): keyed by
             // the route's family registration THROUGH THE WIRING CONSULT —
             // never a blanket family-registry or
@@ -713,33 +854,38 @@ export async function handleRequest(
             const wiring = documentFamilyWiring(
                 matched.segments[0] ?? '',
             );
-            const isLockedWrite = method === 'PUT'
+            const isDocumentPut = method === 'PUT'
                 && wiring !== undefined
-                && routePattern === wiring.family + '/:id'
+                && routePattern === wiring.family + '/:id';
+            const isLockedWrite = isDocumentPut
+                && wiring !== undefined
                 && familyRegistration(wiring.family)
                     ?.concurrency === 'locked';
-            // The hoisted echo: read If-Match directly (not
-            // merely via hoisted-header storage) so the gate
-            // can compare the parsed pair id against the head
-            // BEFORE dispatch. Only consulted for a locked
-            // write — inert (null) otherwise.
+            // Advertised ETag is the live PUT's version,
+            // never the lock-head pair id. DELETE heads have
+            // no If-Match target (documentHeadPairId skips
+            // them). Same-body no-append uses this for both
+            // PUT kinds (simple and locked).
+            const livePut = isDocumentPut
+                ? await livePutVersion(
+                    effective, canonicalPrefix, uriId,
+                )
+                : undefined;
+            const advertised = livePut?.version;
+            // The hoisted echo: read If-Match directly so
+            // the gate can compare the parsed 64-hex tag
+            // against the advertised ETag BEFORE dispatch.
             const rawIfMatch = isLockedWrite
                 ? request.headers.get(IF_MATCH_HEADER)
                 : null;
             const echo = rawIfMatch === null
                 ? null
                 : parseIfMatch(rawIfMatch);
-            // follows is set ONLY when the parsed echo matches
-            // the current head — the locked sibling of
-            // headPairId's supersedes; the two are mutually
-            // exclusive by construction (a locked write never
-            // supersedes). The matched pair id, not the quoted
-            // header.
-            const follows = isLockedWrite
+            const echoMatchesHead = isLockedWrite
                 && echo !== undefined
                 && echo !== null
-                && echo === headPairId
-                ? echo : undefined;
+                && advertised !== undefined
+                && echo === advertised;
             // DELETE responses are UNIVERSALLY 204 with no
             // body — every wired DELETE handler returns void
             // (message-pair.ts resolution: DELETEs join their
@@ -765,6 +911,49 @@ export async function handleRequest(
                     + routePattern,
                 );
             }
+            const operationId = request.headers.get(
+                OPERATION_ID_HEADER,
+            );
+            if (
+                operationId === null || operationId === ''
+            ) {
+                throw new Error(
+                    'Operation-ID missing after require',
+                );
+            }
+            // DELETE table: never-written 404 stores nothing;
+            // already-gone 204 no append; live PUT proceeds.
+            if (method === 'DELETE') {
+                const head = await documentHeadAt(
+                    effective, canonicalPrefix, uriId,
+                );
+                if (head === undefined) {
+                    return Response.json(
+                        { error: 'Not found: ' + pathname },
+                        { status: HTTP_NOT_FOUND },
+                    );
+                }
+                if (head.method === 'DELETE') {
+                    return new Response(null, {
+                        status: HTTP_NO_CONTENT,
+                        headers: {
+                            'Operation-ID': operationId,
+                        },
+                    });
+                }
+            }
+            const streamedTrioBody =
+                method === 'PUT'
+                && body === undefined
+                    ? undefined
+                    : await resolveStreamedTrioWriteBody(
+                        effective,
+                        routePattern,
+                        params,
+                        body,
+                        actor,
+                        organization,
+                    );
             pair = await formWritePair({
                 method, pathname, routePattern,
                 routeSegments: matched.segments,
@@ -774,16 +963,25 @@ export async function handleRequest(
                 requesterIdentityId: actor,
                 requestAt: ctx.requestAt,
                 organization,
+                operationId,
                 responseStatus: spec.status,
-                responseBody: spec.successBody?.(
-                    params, body, actor, organization,
-                ),
-                // A locked write never supersedes (its head-read
-                // decides genesis/412/follows, never a chain);
-                // a simple write carries headPairId exactly as
-                // today.
-                headPairId: isLockedWrite ? undefined : headPairId,
-                ...(follows === undefined ? {} : { follows }),
+                responseBody: method === 'PUT'
+                    && body === undefined
+                    ? undefined
+                    : streamedTrioBody
+                        ?? spec.successBody?.(
+                            params, body, actor,
+                            organization,
+                        ),
+                ...(echoMatchesHead
+                    && echo !== null
+                    && echo !== undefined
+                    && livePut !== undefined
+                    ? {
+                        matchedEtag: echo,
+                        latchedHeadPairId: livePut.pairId,
+                    }
+                    : {}),
             });
             // The pre-tx idempotency fast-path: a byte-
             // identical resend never reaches the handler and
@@ -802,38 +1000,57 @@ export async function handleRequest(
                     effective, pair.requestHash,
                 );
                 if (replay !== undefined) {
-                    const response =
-                        responseFromStored(replay);
+                    const response = sendWriteResponse(
+                        replay, method, true,
+                    );
                     if (
                         routePattern
                             === INSTANCE_DETAIL_PATTERN
                     ) {
-                        // PUT create: ETag = wire pair id.
-                        // PATCH: ETag = revision that followed
-                        // the If-Match head (R8 original).
                         if (method === 'PATCH') {
-                            const raw = request.headers
-                                .get(IF_MATCH_HEADER);
-                            const ifMatch = raw === null
-                                ? undefined
-                                : parseIfMatch(raw);
-                            if (ifMatch !== undefined) {
-                                const revisionId =
-                                    await revisionEtagForInstancePatch(
-                                        effective, ifMatch,
-                                    );
-                                if (
-                                    revisionId !== undefined
-                                ) {
-                                    return attachEtag(
-                                        response,
+                            const revisionId =
+                                await revisionPairIdForPatch(
+                                    effective, replay.id,
+                                );
+                            if (
+                                revisionId !== undefined
+                            ) {
+                                const tag =
+                                    await advertisedForRevisionPair(
+                                        effective,
+                                        param(params, 0),
+                                        param(params, 1),
+                                        param(params, 2),
+                                        roles,
                                         revisionId,
+                                    );
+                                if (tag !== undefined) {
+                                    return attachEtag(
+                                        response, tag,
                                     );
                                 }
                             }
                         }
+                        const advertisedReplay =
+                            await instanceAdvertised(
+                                effective,
+                                param(params, 0),
+                                param(params, 1),
+                                param(params, 2),
+                                roles,
+                            );
+                        if (
+                            advertisedReplay !== undefined
+                        ) {
+                            return attachEtag(
+                                response,
+                                advertisedReplay.tag,
+                            );
+                        }
+                    }
+                    if (isDocumentPut) {
                         return attachEtag(
-                            response, replay.id,
+                            response, replay.version,
                         );
                     }
                     return response;
@@ -842,16 +1059,35 @@ export async function handleRequest(
             // The locked six-outcome table, applied ONLY after
             // the replay fast-path MISSES: live + absent → 428;
             // live + malformed → 400; live + ≠ head → 412; live
-            // + == head → follows already set above, proceed;
+            // + == head → echoMatchesHead, proceed;
             // none + absent → genesis; none + present → 412.
             // A 412 here returns BEFORE dispatch, and
             // appendMessagePair only ever runs inside the op's
             // own tx, so NOTHING is stored.
             if (isLockedWrite) {
                 if (
-                    headPairId !== undefined
+                    livePut !== undefined
                     && rawIfMatch === null
                 ) {
+                    if (matched.get !== undefined) {
+                        try {
+                            return preconditionDocument(
+                                HTTP_PRECONDITION_REQUIRED,
+                                await matched.get(
+                                    effective, params,
+                                    actor, organization,
+                                    roles,
+                                ),
+                                livePut.version,
+                                false,
+                            );
+                        } catch {
+                            // GET derive may fail on a
+                            // stored shape this caller
+                            // cannot project; status
+                            // still 428.
+                        }
+                    }
                     return Response.json(
                         {
                             error: 'If-Match is required to PUT '
@@ -864,7 +1100,7 @@ export async function handleRequest(
                     );
                 }
                 if (
-                    headPairId !== undefined
+                    livePut !== undefined
                     && echo === undefined
                 ) {
                     return Response.json(
@@ -878,8 +1114,27 @@ export async function handleRequest(
                 }
                 if (
                     rawIfMatch !== null
-                    && follows === undefined
+                    && !echoMatchesHead
                 ) {
+                    if (
+                        livePut !== undefined
+                        && matched.get !== undefined
+                    ) {
+                        try {
+                            return preconditionDocument(
+                                HTTP_PRECONDITION_FAILED,
+                                await matched.get(
+                                    effective, params,
+                                    actor, organization,
+                                    roles,
+                                ),
+                                livePut.version,
+                                false,
+                            );
+                        } catch {
+                            // Same fallback as 428.
+                        }
+                    }
                     return Response.json(
                         {
                             error: 'If-Match does not '
@@ -890,11 +1145,10 @@ export async function handleRequest(
                     );
                 }
             }
-            // Instance PATCH If-Match ladder (Task 17 / R5):
-            // AFTER replay (load-bearing). Tombstone == absent.
-            // Wire pair is operation-plane; revision pair
-            // carries follows = verified head (UNIQUE
-            // backstop).
+            // Instance PATCH table (Task 20). AFTER replay.
+            // Malformed If-Match is 400 before create/404/
+            // 412. Never-written + no pin → create. DELETE
+            // head + no pin → 409 spent; + pin → 404.
             if (
                 method === 'PATCH'
                 && routePattern
@@ -903,60 +1157,311 @@ export async function handleRequest(
                 const pathOrganization = param(params, 0);
                 const typeId = param(params, 1);
                 const instanceId = param(params, 2);
+                const prefix = instancesUriPrefix(
+                    pathOrganization, typeId,
+                );
+                const raw = request.headers
+                    .get(IF_MATCH_HEADER);
+                if (raw !== null) {
+                    const parsed = parseIfMatch(raw);
+                    if (parsed === undefined) {
+                        return Response.json(
+                            {
+                                error: 'If-Match must '
+                                    + 'carry exactly '
+                                    + 'one strong '
+                                    + 'validator',
+                            },
+                            {
+                                status:
+                                    HTTP_BAD_REQUEST,
+                            },
+                        );
+                    }
+                }
                 const head = await deriveInstanceHead(
                     effective,
                     pathOrganization,
                     typeId,
                     instanceId,
                 );
+                const docHead = await documentHeadAt(
+                    effective, prefix, instanceId,
+                );
                 if (head === undefined) {
-                    throw await missedReadError(
-                        effective,
-                        instanceId,
-                        organization
-                            ?? pathOrganization,
-                        'record_instances',
+                    if (docHead?.method === 'DELETE') {
+                        if (raw === null) {
+                            return Response.json(
+                                {
+                                    error:
+                                        'instance '
+                                        + 'already '
+                                        + 'exists at '
+                                        + pathname,
+                                },
+                                {
+                                    status:
+                                        HTTP_CONFLICT,
+                                },
+                            );
+                        }
+                        throw await missedReadError(
+                            effective,
+                            instanceId,
+                            organization
+                                ?? pathOrganization,
+                            'record_instances',
+                        );
+                    }
+                    if (raw !== null) {
+                        return Response.json(
+                            {
+                                error: 'If-Match does '
+                                    + 'not match the '
+                                    + 'current '
+                                    + 'instance at '
+                                    + pathname,
+                            },
+                            {
+                                status:
+                                    HTTP_PRECONDITION_FAILED,
+                            },
+                        );
+                    }
+                    // Never written, no pin → create.
+                } else {
+                    const advertisedNow =
+                        await instanceAdvertised(
+                            effective,
+                            pathOrganization,
+                            typeId,
+                            instanceId,
+                            roles,
+                        );
+                    if (raw === null) {
+                        if (
+                            advertisedNow !== undefined
+                            && matched.get !== undefined
+                        ) {
+                            try {
+                                return preconditionDocument(
+                                    HTTP_PRECONDITION_REQUIRED,
+                                    await matched.get(
+                                        effective,
+                                        params,
+                                        actor,
+                                        organization,
+                                        roles,
+                                    ),
+                                    advertisedNow.tag,
+                                    advertisedNow.limited,
+                                );
+                            } catch {
+                                // Status stays 428.
+                            }
+                        }
+                        return Response.json(
+                            {
+                                error: 'If-Match is '
+                                    + 'required to '
+                                    + 'PATCH '
+                                    + pathname,
+                            },
+                            {
+                                status:
+                                    HTTP_PRECONDITION_REQUIRED,
+                            },
+                        );
+                    }
+                    const ifMatch = parseIfMatch(raw);
+                    if (
+                        advertisedNow === undefined
+                        || ifMatch !== advertisedNow.tag
+                    ) {
+                        if (
+                            advertisedNow !== undefined
+                            && matched.get !== undefined
+                        ) {
+                            try {
+                                return preconditionDocument(
+                                    HTTP_PRECONDITION_FAILED,
+                                    await matched.get(
+                                        effective,
+                                        params,
+                                        actor,
+                                        organization,
+                                        roles,
+                                    ),
+                                    advertisedNow.tag,
+                                    advertisedNow.limited,
+                                );
+                            } catch {
+                                // Status stays 412.
+                            }
+                        }
+                        return Response.json(
+                            {
+                                error: 'If-Match does '
+                                    + 'not match the '
+                                    + 'current '
+                                    + 'instance at '
+                                    + pathname,
+                            },
+                            {
+                                status:
+                                    HTTP_PRECONDITION_FAILED,
+                            },
+                        );
+                    }
+                }
+            }
+            // Same-body as live PUT head → 200, no append.
+            // Body equality is octets, not ETag. The no-op
+            // still takes the in-tx latch so it cannot
+            // return a dead ETag.
+            if (
+                method === 'PUT'
+                && livePut !== undefined
+                && (
+                    !isLockedWrite
+                    || echoMatchesHead
+                )
+            ) {
+                const liveReq = await effective.requests
+                    .getById(livePut.pairId);
+                if (liveReq !== undefined) {
+                    const liveOctets = bodyOctetsOf(
+                        parseWire(liveReq.message),
+                    );
+                    const newOctets = bodyOctetsOf(
+                        parseWire(pair.requestMessage),
+                    );
+                    if (octetsEqual(liveOctets, newOctets)) {
+                        const raced =
+                            await effective.transaction(
+                                ['requests', 'responses'],
+                                async (view) => {
+                                    const latest =
+                                        await documentHeadPairId(
+                                            view,
+                                            canonicalPrefix,
+                                            uriId,
+                                        );
+                                    return latest
+                                        !== livePut.pairId;
+                                },
+                            );
+                        if (raced) {
+                            const nowLive =
+                                await livePutVersion(
+                                    effective,
+                                    canonicalPrefix,
+                                    uriId,
+                                );
+                            if (
+                                nowLive !== undefined
+                                && matched.get
+                                    !== undefined
+                            ) {
+                                try {
+                                    return preconditionDocument(
+                                        HTTP_PRECONDITION_FAILED,
+                                        await matched.get(
+                                            effective,
+                                            params,
+                                            actor,
+                                            organization,
+                                            roles,
+                                        ),
+                                        nowLive.version,
+                                        false,
+                                    );
+                                } catch {
+                                    // GET derive failed;
+                                    // no document body.
+                                }
+                            }
+                            return Response.json(
+                                {
+                                    error: 'If-Match does not '
+                                        + 'match the current '
+                                        + 'document at '
+                                        + pathname,
+                                },
+                                {
+                                    status:
+                                        HTTP_PRECONDITION_FAILED,
+                                },
+                            );
+                        }
+                        const stored =
+                            await effective.responses
+                                .getById(livePut.pairId);
+                        if (stored !== undefined) {
+                            return attachEtag(
+                                sendWriteResponse(
+                                    stored, 'PUT', false,
+                                ),
+                                stored.version,
+                            );
+                        }
+                    }
+                }
+            }
+            // Empty-body PUT is a live empty document. Skip
+            // the family validator; store GET-shaped 200
+            // with ETag sha256('').
+            if (
+                method === 'PUT'
+                && body === undefined
+                && pair !== undefined
+            ) {
+                const emptyPair = pair;
+                await effective.transaction(
+                    ['requests', 'responses'],
+                    async (view) => {
+                        const latchedId =
+                            emptyPair.latchedHeadPairId;
+                        if (latchedId !== undefined) {
+                            const latest =
+                                await documentHeadPairId(
+                                    view,
+                                    emptyPair.uriCollection,
+                                    emptyPair.uriId,
+                                );
+                            if (latest !== latchedId) {
+                                throw new ApiError(
+                                    'If-Match does not match'
+                                    + ' the current document'
+                                    + ' at ' + pathname,
+                                    HTTP_PRECONDITION_FAILED,
+                                );
+                            }
+                        }
+                        await appendMessagePair(
+                            view, emptyPair,
+                        );
+                    },
+                );
+                const stored = await storedResponseFor(
+                    effective, emptyPair.requestHash,
+                );
+                if (stored === undefined) {
+                    throw new Error(
+                        'wired write stored no pair: '
+                        + routePattern,
                     );
                 }
-                const raw = request.headers
-                    .get(IF_MATCH_HEADER);
-                if (raw === null) {
-                    return Response.json(
-                        {
-                            error: 'If-Match is required '
-                                + 'to PATCH ' + pathname,
-                        },
-                        {
-                            status:
-                                HTTP_PRECONDITION_REQUIRED,
-                        },
-                    );
-                }
-                const ifMatch = parseIfMatch(raw);
-                if (ifMatch === undefined) {
-                    return Response.json(
-                        {
-                            error: 'If-Match must carry '
-                                + 'exactly one strong '
-                                + 'validator',
-                        },
-                        { status: HTTP_BAD_REQUEST },
-                    );
-                }
-                if (ifMatch !== head.pairId) {
-                    return Response.json(
-                        {
-                            error: 'If-Match does not '
-                                + 'match the current '
-                                + 'instance at '
-                                + pathname,
-                        },
-                        {
-                            status:
-                                HTTP_PRECONDITION_FAILED,
-                        },
-                    );
-                }
+                postWriteNotification(
+                    adapter, routePattern, params,
+                    body, organization, actor,
+                );
+                return attachEtag(
+                    sendWriteResponse(
+                        stored, 'PUT', true,
+                    ),
+                    stored.version,
+                );
             }
         }
         switch (method) {
@@ -971,6 +1476,25 @@ export async function handleRequest(
                         },
                         { status: HTTP_METHOD_NOT_ALLOWED },
                     );
+                }
+                const streamedDocument =
+                    await streamStoredDocumentGet(
+                        effective,
+                        routePattern,
+                        params,
+                        organization,
+                    );
+                if (streamedDocument !== undefined) {
+                    return streamedDocument;
+                }
+                const streamedCollection =
+                    await streamStoredCollectionGet(
+                        effective,
+                        routePattern,
+                        organization,
+                    );
+                if (streamedCollection !== undefined) {
+                    return streamedCollection;
                 }
                 const result = await matched.get(
                     effective,
@@ -1002,7 +1526,7 @@ export async function handleRequest(
                     && familyRegistration(readWiring.family)
                         ?.concurrency === 'locked'
                 ) {
-                    const prefix = canonicalUriPrefix(
+                    const prefix = canonicalUriCollection(
                         organization,
                         '/' + readWiring.family + '/',
                     );
@@ -1018,40 +1542,100 @@ export async function handleRequest(
                         effective, prefix, param(params, 0),
                     );
                     if (headPairId !== undefined) {
-                        return attachEtag(
-                            Response.json(result, {
-                                headers: {
-                                    'Response-ID':
-                                        headPairId,
-                                },
-                            }),
-                            headPairId,
-                        );
+                        const stored = await effective
+                            .responses.getById(headPairId);
+                        if (stored !== undefined) {
+                            return attachEtag(
+                                Response.json(result, {
+                                    headers: {
+                                        'Response-ID':
+                                            headPairId,
+                                    },
+                                }),
+                                stored.version,
+                            );
+                        }
                     }
                 }
-                // Instance detail ETag (Task 16 / R8): strong
-                // validator from the head document-pair id
-                // (PUT|DELETE only — never a PATCH wire pair).
-                // Distinct from responses.etag (body sha).
+                // Document /versions/:version: ETag is the
+                // column hash (same as the path token).
+                if (
+                    routePattern.endsWith(
+                        '/versions/:version',
+                    )
+                    && routePattern
+                        !== INSTANCE_VERSION_PATTERN
+                ) {
+                    return attachEtag(
+                        Response.json(result),
+                        param(
+                            params, params.length - 1,
+                        ),
+                    );
+                }
+                // Instance versions leaf: ETag is the
+                // projected hash, not the path token.
                 if (
                     routePattern
-                        === INSTANCE_DETAIL_PATTERN
+                        === INSTANCE_VERSION_PATTERN
                 ) {
-                    const headPairId =
-                        await documentHeadPairId(
+                    const found =
+                        await lookupStoredRevision(
                             effective,
                             instancesUriPrefix(
                                 param(params, 0),
                                 param(params, 1),
                             ),
                             param(params, 2),
+                            param(params, 3),
                         );
-                    if (headPairId !== undefined) {
+                    const parent = found === undefined
+                        ? undefined
+                        : await instanceParentEtag(
+                            effective,
+                            found.response.id,
+                        );
+                    const tag =
+                        await advertisedInstanceEtag(
+                            result, parent,
+                        );
+                    return attachEtag(
+                        Response.json(result), tag,
+                    );
+                }
+                // Instance detail ETag: documentVersion of
+                // this caller's projected GET body.
+                if (
+                    routePattern
+                        === INSTANCE_DETAIL_PATTERN
+                ) {
+                    const advertisedGet =
+                        await instanceAdvertised(
+                            effective,
+                            param(params, 0),
+                            param(params, 1),
+                            param(params, 2),
+                            roles,
+                        );
+                    if (advertisedGet !== undefined) {
                         return attachEtag(
-                            Response.json(result),
-                            headPairId,
+                            Response.json(result, {
+                                headers: limitedHeaders(
+                                    advertisedGet.limited,
+                                ),
+                            }),
+                            advertisedGet.tag,
                         );
                     }
+                }
+                // Stream collection GET: one Date: now. No
+                // collection ETag. No 304. Assemble surfaces
+                // (organizations, invitations, members join)
+                // stay Date-free.
+                if (isLiveHeadCollectionGet(routePattern)) {
+                    return attachDate(
+                        Response.json(result), nowUtc(),
+                    );
                 }
                 return Response.json(result);
             }
@@ -1091,14 +1675,28 @@ export async function handleRequest(
                         adapter, routePattern, params,
                         body, organization, actor,
                     );
-                    const response =
-                        responseFromStored(stored);
+                    const response = sendWriteResponse(
+                        stored, 'PUT', true,
+                    );
                     if (
                         routePattern
-                            === INSTANCE_DETAIL_PATTERN
+                            === 'identity-token-revocations/:id'
+                    ) {
+                        return attachSetCookie(
+                            response,
+                            refreshClearCookie(request),
+                        );
+                    }
+                    const putWiring = documentFamilyWiring(
+                        matched.segments[0] ?? '',
+                    );
+                    if (
+                        putWiring !== undefined
+                        && routePattern
+                            === putWiring.family + '/:id'
                     ) {
                         return attachEtag(
-                            response, stored.id,
+                            response, stored.version,
                         );
                     }
                     return response;
@@ -1115,9 +1713,9 @@ export async function handleRequest(
                 return Response.json(result);
             }
             case 'PATCH': {
-                // Task 10/17: instance PATCH wires through
-                // the same gate shape as PUT (pair + replay
-                // + ETag). Ladder ran pre-dispatch above.
+                // Instance PATCH (Task 20): create and
+                // update. Pair + replay + ETag. Table ran
+                // pre-dispatch above.
                 if (!matched.patch) {
                     return Response.json(
                         {
@@ -1153,35 +1751,31 @@ export async function handleRequest(
                         adapter, routePattern, params,
                         body, organization, actor,
                     );
-                    const response =
-                        responseFromStored(stored);
+                    const response = sendWriteResponse(
+                        stored, 'PATCH', true,
+                    );
                     if (
                         routePattern
                             === INSTANCE_DETAIL_PATTERN
                     ) {
-                        // R8: ETag = revision head, not the
-                        // wire PATCH operation pair.
-                        const raw = request.headers
-                            .get(IF_MATCH_HEADER);
-                        const ifMatch = raw === null
-                            ? undefined
-                            : parseIfMatch(raw);
-                        if (ifMatch !== undefined) {
-                            const revisionId =
-                                await revisionEtagForInstancePatch(
-                                    effective, ifMatch,
-                                );
-                            if (
-                                revisionId !== undefined
-                            ) {
-                                return attachEtag(
-                                    response,
-                                    revisionId,
-                                );
-                            }
+                        const advertisedPatch =
+                            await instanceAdvertised(
+                                effective,
+                                param(params, 0),
+                                param(params, 1),
+                                param(params, 2),
+                                roles,
+                            );
+                        if (
+                            advertisedPatch !== undefined
+                        ) {
+                            return attachEtag(
+                                response,
+                                advertisedPatch.tag,
+                            );
                         }
                         return attachEtag(
-                            response, stored.id,
+                            response, stored.version,
                         );
                     }
                     return response;
@@ -1232,7 +1826,9 @@ export async function handleRequest(
                         adapter, routePattern, params,
                         body, organization, actor,
                     );
-                    return responseFromStored(stored);
+                    return sendWriteResponse(
+                        stored, 'DELETE', true,
+                    );
                 }
                 postWriteNotification(
                     adapter, routePattern, params,
@@ -1273,10 +1869,31 @@ export async function handleRequest(
                     const dispatched =
                         routePattern === 'authentication/token'
                             ? await postToken(
-                                effective, body!, seed)
+                                effective, body!, seed,
+                                request.headers.get('cookie'))
                             : await postAuthorize(
                                 effective, body!, seed);
                     if (!dispatched.ok) {
+                        if (dispatched.status
+                            === HTTP_UNAUTHORIZED) {
+                            console.warn(
+                                'authentication failed',
+                                {
+                                    reason: dispatched.error,
+                                },
+                            );
+                            return Response.json(
+                                {
+                                    error: wireGrantError(
+                                        dispatched.error,
+                                    ),
+                                },
+                                {
+                                    status:
+                                        dispatched.status,
+                                },
+                            );
+                        }
                         return Response.json(
                             { error: dispatched.error },
                             { status: dispatched.status },
@@ -1322,7 +1939,31 @@ export async function handleRequest(
                             ],
                         });
                     }
-                    return responseFromStored(authStored);
+                    const written = sendWriteResponse(
+                        authStored, 'POST', true,
+                    );
+                    const grantType =
+                        typeof body!.grant_type === 'string'
+                            ? body!.grant_type
+                            : '';
+                    const setsRefreshCookie =
+                        grantType === 'authorization_code'
+                        || grantType === 'refresh'
+                        || grantType === 'client_credentials';
+                    if (
+                        routePattern === 'authentication/token'
+                        && 'refreshToken' in dispatched
+                        && setsRefreshCookie
+                    ) {
+                        return attachSetCookie(
+                            written,
+                            refreshSetCookie(
+                                dispatched.refreshToken,
+                                request,
+                            ),
+                        );
+                    }
+                    return written;
                 }
                 if (!matched.post) {
                     return Response.json(
@@ -1359,7 +2000,9 @@ export async function handleRequest(
                         adapter, routePattern, params,
                         body, organization, actor,
                     );
-                    return responseFromStored(stored);
+                    return sendWriteResponse(
+                        stored, 'POST', true,
+                    );
                 }
                 postWriteNotification(
                     adapter, routePattern, params,
@@ -1451,13 +2094,40 @@ export async function handleRequest(
 export type ClientFacadeAdapter =
     GuardedDbAdapter & LatencySimulation;
 
+function setCookieFromResponse(response: Response): string {
+    const cookies = typeof response.headers.getSetCookie
+        === 'function'
+        ? response.headers.getSetCookie()
+        : [];
+    if (cookies.length > 0) {
+        return cookies.join('; ');
+    }
+    return response.headers.get('Set-Cookie') ?? '';
+}
+
 async function unwrapResponse<T>(
     response: Response,
 ): Promise<T> {
     if (response.ok) {
-        return (response.status === HTTP_NO_CONTENT
-            ? undefined
-            : await response.json()) as T;
+        const text = await response.text();
+        if (text === '') return undefined as T;
+        const parsed: unknown = JSON.parse(text);
+        const refresh = refreshTokenFromCookieHeader(
+            setCookieFromResponse(response),
+        );
+        if (
+            refresh !== ''
+            && typeof parsed === 'object'
+            && parsed !== null
+            && !Array.isArray(parsed)
+            && !('refresh_token' in parsed)
+        ) {
+            return {
+                ...(parsed as Record<string, unknown>),
+                refresh_token: refresh,
+            } as T;
+        }
+        return parsed as T;
     }
     const { error } =
         (await response.json()) as {
@@ -1481,6 +2151,7 @@ function facadeHeaders(
     token: string,
     requestId: string | undefined,
     contentType: boolean,
+    write = false,
 ): Record<string, string> {
     const headers: Record<string, string> = {
         'Authorization': 'Bearer ' + token,
@@ -1490,6 +2161,10 @@ function facadeHeaders(
     }
     if (requestId !== undefined) {
         headers[REQUEST_ID_HEADER] = requestId;
+    }
+    if (write) {
+        headers[OPERATION_ID_HEADER] =
+            generateCryptoSafeBase62();
     }
     return headers;
 }
@@ -1534,9 +2209,15 @@ async function bodyWriteResponse(
     requestId?: string,
 ): Promise<Response> {
     await adapter.simulateLatency();
-    const headers = facadeHeaders(token, requestId, true);
+    const headers = facadeHeaders(
+        token, requestId, true, true,
+    );
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
+    }
+    if (headers[OPERATION_ID_HEADER] === undefined) {
+        headers[OPERATION_ID_HEADER] =
+            generateCryptoSafeBase62();
     }
     return handleRequest(
         adapter,
@@ -1551,8 +2232,95 @@ async function bodyWriteResponse(
     );
 }
 
-// Strong ETag header → opaque pair id (strip surrounding
-// quotes when present). Absent / empty → undefined.
+const ID_SUFFIX = '/:id';
+
+// Stream families (ideas, projects, …). Work-orders still
+// assemble (binding). Flows stay on derive: stored PUT has
+// no trio, so a state-'deleted' head must 404 via the
+// lifecycle walk, and hasUndoHistory is stamped there.
+// Record instances still project.
+function streamFamilyWiring(
+    routePattern: string,
+): ReturnType<typeof documentFamilyWiring> {
+    if (!routePattern.endsWith(ID_SUFFIX)) {
+        return undefined;
+    }
+    const family = routePattern.slice(0, -ID_SUFFIX.length);
+    if (
+        family === 'work-orders'
+        || family === 'flows'
+        || family.includes('/')
+    ) {
+        return undefined;
+    }
+    return documentFamilyWiring(family);
+}
+
+function streamCollectionWiring(
+    routePattern: string,
+): ReturnType<typeof documentFamilyWiring> {
+    if (routePattern === 'work-orders') return undefined;
+    if (routePattern === 'flows') return undefined;
+    if (routePattern === 'members') return undefined;
+    if (routePattern.includes('/')) return undefined;
+    return documentFamilyWiring(routePattern);
+}
+
+async function streamStoredDocumentGet(
+    db: DbAdapter,
+    routePattern: string,
+    params: string[],
+    organization: Id | undefined,
+): Promise<Response | undefined> {
+    const wiring = streamFamilyWiring(routePattern);
+    if (wiring === undefined) return undefined;
+    const organizationId = requireOrganization(organization);
+    const id = param(params, 0);
+    const prefix = canonicalUriCollection(
+        organizationId, '/' + wiring.family + '/',
+    );
+    const stored = await messageStore(db).get(prefix, id);
+    if (stored === undefined) {
+        throw await throwDocumentMiss(
+            wiring, db, organizationId, id,
+        );
+    }
+    return streamGetFromStored(stored, nowUtc());
+}
+
+async function streamStoredCollectionGet(
+    db: DbAdapter,
+    routePattern: string,
+    organization: Id | undefined,
+): Promise<Response | undefined> {
+    const wiring = streamCollectionWiring(routePattern);
+    if (wiring === undefined) return undefined;
+    const organizationId = requireOrganization(organization);
+    const prefix = canonicalUriCollection(
+        organizationId, '/' + wiring.family + '/',
+    );
+    const rows = await messageStore(db).getCollection(
+        prefix,
+    );
+    return attachDate(Response.json(rows), nowUtc());
+}
+
+// Stream family collection GET (live heads). members is
+// a memberships join (not this path). record-types is
+// org-nested, so its pattern is not the family name.
+function isLiveHeadCollectionGet(
+    routePattern: string,
+): boolean {
+    if (routePattern === 'members') return false;
+    if (routePattern === RECORD_TYPES_COLLECTION_PATTERN) {
+        return true;
+    }
+    return documentFamilyWiring(routePattern) !== undefined;
+}
+
+// Strong ETag header → unquoted 64-hex version token
+// (strip surrounding quotes when present). Absent /
+// empty → undefined.
 function etagFromHeader(
     response: Response,
 ): string | undefined {
@@ -1676,8 +2444,19 @@ export async function DELETE(
     resource: string,
     token: string,
     requestId?: string,
+    headerFields?: readonly (readonly [string, string])[],
 ): Promise<void> {
     await adapter.simulateLatency();
+    const headers = facadeHeaders(
+        token, requestId, false, true,
+    );
+    for (const [name, value] of headerFields ?? []) {
+        headers[name] = value;
+    }
+    if (headers[OPERATION_ID_HEADER] === undefined) {
+        headers[OPERATION_ID_HEADER] =
+            generateCryptoSafeBase62();
+    }
     await unwrapResponse(
         await handleRequest(
             adapter,
@@ -1685,9 +2464,7 @@ export async function DELETE(
                 `${BASE_URL}/${resource}`,
                 {
                     method: 'DELETE',
-                    headers: facadeHeaders(
-                        token, requestId, false,
-                    ),
+                    headers,
                 },
             ),
         ),
@@ -1704,10 +2481,14 @@ export async function POST<T>(
 ): Promise<T> {
     await adapter.simulateLatency();
     const headers = facadeHeaders(
-        token, requestId, true,
+        token, requestId, true, true,
     );
     for (const [name, value] of headerFields ?? []) {
         headers[name] = value;
+    }
+    if (headers[OPERATION_ID_HEADER] === undefined) {
+        headers[OPERATION_ID_HEADER] =
+            generateCryptoSafeBase62();
     }
     return unwrapResponse<T>(
         await handleRequest(

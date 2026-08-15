@@ -33,12 +33,16 @@ function installFailingShim(
 }
 
 const aRequest = {
-    uri_prefix: '/organizations/1/ideas/',
+    uri_collection: '/organizations/1/ideas/',
     uri_id: '42',
     at: '2026-01-01T00:00:00.000000Z',
     requester_identity_id: 'current',
     message_hash: 'a'.repeat(64),
-    message: '{"kind":"request"}',
+    message:
+        'PUT /organizations/1/ideas/42'
+        + ' HTTP/1.1\r\n\r\n',
+    method: 'PUT',
+    operation_id: '0123456789ABCDEFGHIJKL',
 };
 
 // Wipe-on-fail is retired: the import now runs in one

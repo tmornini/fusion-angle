@@ -27,12 +27,15 @@ import {
 import {
     formWritePair,
 } from '../api/message-pair.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // GET work-orders/:id/history — Phase A1 of states-URI
 // elimination. Lifecycle events DESC (index 0 = current),
 // with transition field_values folded inline; claim/birth/
 // release rows carry []. Miss posture: empty lifecycle →
-// missedReadError → 403 foreign / 404 absent.
+// missedReadError → 404 miss at this address / 404 absent.
 
 const BASE = 'http://localhost';
 const WORK_ORDER_ID = 'wo-hist-1';
@@ -43,16 +46,12 @@ function req(
     token?: string,
     body?: unknown,
 ): Request {
-    const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-    };
-    if (token !== undefined) {
-        headers['Authorization'] = 'Bearer ' + token;
-    }
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers,
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -151,7 +150,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         db,
         req('POST', '/work-orders', DEV_TOKEN, createBody()),
     );
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     // Task 8 CUT: legacy fieldValues fold is below-gate
     // stored-data seed (live wire rejects the key).
@@ -189,6 +188,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         organization: STARK_ORGANIZATION,
         responseStatus: 204,
         responseBody: undefined,
+        operationId: TEST_OPERATION_ID,
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, transitionBody,
@@ -207,7 +207,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
             },
         ),
     );
-    assert.equal(release.status, 204);
+    assert.equal(release.status, 201);
 
     return db;
 }
@@ -286,7 +286,7 @@ test(
 );
 
 test(
-    'foreign work order history → 403 honest body',
+    'foreign work order history → 404 at this address',
     async () => {
         const db = await seededMockDb();
         const foreignId = buildWorkOrders()[0]!.id;
@@ -301,12 +301,11 @@ test(
                 tokenTwo,
             ),
         );
-        assert.equal(res.status, 403);
+        assert.equal(res.status, 404);
         const body = await res.json() as { error: string };
         assert.equal(
             body.error,
-            'forbidden: work_orders/' + foreignId
-                + ' belongs to a different organization',
+            'Not found: work_orders/' + foreignId,
         );
         // Stark still owns the seed WO (sanity).
         assert.equal(
@@ -353,7 +352,7 @@ test(
         );
         assert.equal(res.status, 401);
         const body = await res.json() as { error: string };
-        assert.match(body.error, /missing bearer token/);
+        assert.equal(body.error, 'invalid_token');
     },
 );
 
@@ -464,7 +463,7 @@ test(
                 minimalCreate(starkId),
             ),
         );
-        assert.equal(starkCreated.status, 204);
+        assert.equal(starkCreated.status, 201);
 
         const twoCreated = await handleRequest(
             db,
@@ -473,7 +472,7 @@ test(
                 minimalCreate(twoId),
             ),
         );
-        assert.equal(twoCreated.status, 204);
+        assert.equal(twoCreated.status, 201);
 
         const starkRes = await handleRequest(
             db,

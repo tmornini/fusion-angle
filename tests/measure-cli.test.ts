@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     DEFAULT_RUNS,
     finalizeMeasureCli,
+    parseMeasureArgv,
     type MeasureCliFlags,
 } from '../web-app/app/measure-cli.ts';
 
@@ -18,6 +19,8 @@ function baseFlags(
         pages: null,
         runs: DEFAULT_RUNS,
         runsExplicit: false,
+        baseUrl: null,
+        password: null,
         ...over,
     };
 }
@@ -116,4 +119,53 @@ test('record full registry leaves flags', () => {
     assert.equal(result.kind, 'ok');
     if (result.kind !== 'ok') return;
     assert.deepEqual(result.cli, input);
+});
+
+test('parse accepts --base-url and --password', () => {
+    const result = parseMeasureArgv([
+        '--base-url',
+        'http://127.0.0.1:8080/',
+        '--password',
+        'secret',
+    ]);
+    assert.equal(result.kind, 'ok');
+    if (result.kind !== 'ok') return;
+    assert.equal(
+        result.cli.baseUrl,
+        'http://127.0.0.1:8080',
+    );
+    assert.equal(result.cli.password, 'secret');
+    assert.equal(result.cli.record, false);
+    assert.equal(result.cli.writeBudgets, false);
+});
+
+test('unknown flags still error', () => {
+    const result = parseMeasureArgv(['--not-a-flag']);
+    assert.equal(result.kind, 'error');
+    if (result.kind !== 'error') return;
+    assert.equal(
+        result.message,
+        'Unknown flag: --not-a-flag',
+    );
+});
+
+test('--base-url requires a password', () => {
+    const result = parseMeasureArgv(
+        ['--base-url', 'http://127.0.0.1:8080'],
+        {},
+    );
+    assert.equal(result.kind, 'error');
+    if (result.kind !== 'error') return;
+    assert.match(result.message, /--password/);
+    assert.match(result.message, /MEASURE_PASSWORD/);
+});
+
+test('MEASURE_PASSWORD satisfies --base-url', () => {
+    const result = parseMeasureArgv(
+        ['--base-url', 'http://127.0.0.1:8080'],
+        { MEASURE_PASSWORD: 'from-env' },
+    );
+    assert.equal(result.kind, 'ok');
+    if (result.kind !== 'ok') return;
+    assert.equal(result.cli.password, 'from-env');
 });

@@ -428,6 +428,9 @@ export interface StateEntity {
     state: string;
     member_id: Id;
     at: string;
+    // Present on /versions index rows: the response
+    // version of the pair that recorded this event.
+    version?: string;
 }
 
 // Nested field-value shape on work-order history events
@@ -1022,30 +1025,27 @@ export interface ProjectObjectiveActualScoreEntity {
 // and index machinery, never a second truth.
 export interface RequestEntity {
     id: Id;
-    uri_prefix: string;
+    uri_collection: string;
     uri_id: string;
     at: string;
     requester_identity_id: Id;
     message_hash: string;
     message: string;
+    method: string;
+    operation_id: string;
 }
 
-// The paired response. id equals the request's id. follows /
-// supersedes are absent when the write had no predecessor —
-// key absence, not null (the IndexedDB unique index skips
-// absent keys, which is the partial-index semantics the
-// two-PUT-classes design requires).
+// The paired response. id equals the request's id.
+// Only successful writes are stored — no status column.
+// Request `message_hash` remains; the response has none.
 export interface ResponseEntity {
     id: Id;
-    uri_prefix: string;
+    uri_collection: string;
     uri_id: string;
     at: string;
-    status: number;
-    etag: string;
-    message_hash: string;
+    version: string;
     message: string;
-    follows?: string;
-    supersedes?: string;
+    operation_id: string;
 }
 
 export interface ProjectEntity {

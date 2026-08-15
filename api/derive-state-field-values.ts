@@ -33,8 +33,8 @@ function matchingPrefixes(
 ): ReadonlySet<string> {
     const prefixes = new Set<string>();
     for (const request of requests) {
-        if (pattern.test(request.uri_prefix)) {
-            prefixes.add(request.uri_prefix);
+        if (pattern.test(request.uri_collection)) {
+            prefixes.add(request.uri_collection);
         }
     }
     return prefixes;
@@ -80,6 +80,7 @@ function transitionFieldValueCandidates(
                     body: fieldValue.fields,
                     requesterIdentityId:
                         transition.requesterIdentityId,
+                    version: '',
                 });
             }
         }
@@ -163,9 +164,9 @@ async function isVisibleStateEvent(
 // deviation PERSISTS BY DESIGN at the browser tier — it is not
 // a Phase Final residual for the SFV count. The transition
 // family (work-orders/:id/transition/) WOULD be servable via N
-// indexed requests/responses.getAllWhere ('uri_prefix', ...)
+// indexed requests/responses.getAllWhere ('uri_collection', ...)
 // reads (api/db.ts's TABLE_INDEXES: both tables index
-// uri_prefix — an EXACT-match index, one value per entity, not
+// uri_collection — an EXACT-match index, one value per entity, not
 // a family-wide constant), one per known work-order id, EXCEPT
 // enumerating those ids WITHOUT the EntityStore deleted-filter
 // would drop a since-deleted work order's field-value history

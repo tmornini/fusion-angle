@@ -10,12 +10,15 @@ import { deriveObjectiveStateHistory } from
     '../api/derive-objectives.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
 
 // Objectives' own state-history reduction (states-address
 // retirement): unit-level trio walk + echo dedup, and the
-// family history route GET objectives/:id/history. Uses
+// family history route GET objectives/:id/versions. Uses
 // seedAdminSchema (not postMockDataLoad) so the suite stays
 // self-contained; seeded genesis lives in mock-data/drift
 // pins. Writes go through the live gate.
@@ -28,13 +31,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -80,7 +82,7 @@ test('deriveObjectiveStateHistory returns the trio walk in'
     );
 });
 
-test('GET objectives/:id/history carries the objective'
+test('GET objectives/:id/versions carries the objective'
 + ' trio rows (DESC current-first)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -100,7 +102,7 @@ test('GET objectives/:id/history carries the objective'
         },
     ));
     const res = await handleRequest(db, req(
-        'GET', '/objectives/' + id + '/history', token,
+        'GET', '/objectives/' + id + '/versions', token,
     ));
     assert.equal(res.status, 200);
     const rows = JSON.parse(await res.text()) as {

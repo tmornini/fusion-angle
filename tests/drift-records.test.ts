@@ -14,7 +14,7 @@ import type {
 } from '../api/types.ts';
 import { nowUtc } from
     '../api/types.ts';
-import { canonicalUriPrefix } from '../api/message-pair.ts';
+import { canonicalUriCollection } from '../api/message-pair.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -60,12 +60,13 @@ import {
     SEED_INSTANCE_ID,
 } from '../api/mock-data/seed-message-pairs.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { parseJson } from '../shared/http-message/json-codec.ts';
+import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
-import {
-    defaultBodyRegistry,
-} from '../shared/http-message/media-registry.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+    storedPutBodyText,
+} from './http-fixtures.ts';
 
 // Phase Final Task 2: records(+record_attributes+flow_records)
 // dual-write stripped. This file no longer compares derive vs
@@ -82,13 +83,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -198,10 +198,10 @@ async function resolveAttributePath(
         + '/record-types/';
     for (const hit of hits) {
         if (
-            hit.uri_prefix.startsWith(needle)
-            && hit.uri_prefix.endsWith('/attributes/')
+            hit.uri_collection.startsWith(needle)
+            && hit.uri_collection.endsWith('/attributes/')
         ) {
-            const typeId = hit.uri_prefix
+            const typeId = hit.uri_collection
                 .slice(needle.length)
                 .split('/')[0];
             if (typeId !== undefined && typeId !== '') {
@@ -335,7 +335,7 @@ function decodeRequestMessage(message: string): {
     readonly method: string;
     readonly body: Record<string, unknown>;
 } {
-    const model = parseJson(message, defaultBodyRegistry());
+    const model = parseWire(message);
     if (model.startLine.kind !== 'request') {
         throw new Error(
             'stored message carries no request line',
@@ -384,9 +384,9 @@ test('seeded GET nested record-types wire equals derived'
     // Phase Final Stage B: records table retired.
 });
 
-// -- 2. foreign-org GET 403 on wire + derive ---------------------
+// -- 2. foreign-org GET 404 on wire + derive ---------------------
 
-test('a foreign-org GET 403s on wire and on derive, for'
+test('a foreign-org GET 404s on wire and on derive, for'
 + ' records, record-attributes, and flow_records',
 async () => {
     const db = await seededDb();
@@ -394,12 +394,11 @@ async () => {
         'current', ORGANIZATION_TWO,
     );
 
-    // Nested path org = token org (TWO); foreign id is
-    // STARK-owned — ownership fence 403, not path mismatch.
+    // Nested path org = token org (TWO); foreign id was
+    // never written at this address → 404.
     const expectedRecordMessage =
-        'forbidden: record_types/'
-        + customerProfileRecordId
-        + ' belongs to a different organization';
+        'Not found: record_types/'
+        + customerProfileRecordId;
     const recRes = await handleRequest(
         db,
         req(
@@ -410,7 +409,7 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(recRes.status, 403);
+    assert.equal(recRes.status, 404);
     const recBody = await recRes.json() as { error: string };
     assert.equal(recBody.error, expectedRecordMessage);
     await assert.rejects(
@@ -418,17 +417,16 @@ async () => {
             db, ORGANIZATION_TWO, customerProfileRecordId,
         ),
         (err: unknown) =>
-            err instanceof ForeignOrganizationError
+            err instanceof EntityNotFoundError
             && err.message === expectedRecordMessage,
     );
 
     const attributeId = '5JZ0LeKdPCa4QMtg1RsF1M';
-    // Nested GET probes the parent type first — foreign type
-    // under own path org → record_types ownership 403.
+    // Nested GET probes the parent type first — miss at
+    // this org's record-types address → 404.
     const expectedTypeMessage =
-        'forbidden: record_types/'
-        + customerProfileRecordId
-        + ' belongs to a different organization';
+        'Not found: record_types/'
+        + customerProfileRecordId;
     const attrRes = await handleRequest(
         db,
         req(
@@ -440,26 +438,24 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(attrRes.status, 403);
+    assert.equal(attrRes.status, 404);
     const attrBody = await attrRes.json() as { error: string };
     assert.equal(attrBody.error, expectedTypeMessage);
     const expectedAttributeMessage =
-        'forbidden: record_attributes/' + attributeId
-        + ' belongs to a different organization';
+        'Not found: record_attributes/' + attributeId;
     await assert.rejects(
         () => derivedRecordAttribute(
             db, ORGANIZATION_TWO, attributeId,
         ),
         (err: unknown) =>
-            err instanceof ForeignOrganizationError
+            err instanceof EntityNotFoundError
             && err.message === expectedAttributeMessage,
     );
 
     const joinId = 'frb01CustOnbCustProfA1';
     const flowId = 'h5mErVBQhwdMKwi1co30jB';
     const expectedJoinMessage =
-        'forbidden: flow_records/' + joinId
-        + ' belongs to a different organization';
+        'Not found: flow_records/' + joinId;
     const joinRes = await handleRequest(
         db,
         req(
@@ -468,7 +464,7 @@ async () => {
             tokenTwo,
         ),
     );
-    assert.equal(joinRes.status, 403);
+    assert.equal(joinRes.status, 404);
     const joinBody = await joinRes.json() as { error: string };
     assert.equal(joinBody.error, expectedJoinMessage);
     await assert.rejects(
@@ -476,7 +472,7 @@ async () => {
             db, ORGANIZATION_TWO, flowId, joinId,
         ),
         (err: unknown) =>
-            err instanceof ForeignOrganizationError
+            err instanceof EntityNotFoundError
             && err.message === expectedJoinMessage,
     );
 });
@@ -718,7 +714,7 @@ async () => {
             'rec-drift-chain-1-genesis', nowUtc(),
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
     await assertRecordWire();
     await assertAttributeWire(attrA);
     await assertAttributeWire(attrB);
@@ -741,7 +737,7 @@ async () => {
             'active', editStateAt, editStateEventId,
         ),
     ));
-    assert.equal(edited.status, 204);
+    assert.equal(edited.status, 201);
     await assertRecordWire();
     await assertAttributeAbsent(attrA);
     await assertAttributeWire(attrB);
@@ -787,7 +783,7 @@ async () => {
             state_event_id: editStateEventId,
         },
     ));
-    assert.equal(echoed.status, 200);
+    assert.equal(echoed.status, 201);
     assert.equal(
         0 /* states table retired */,
         beforeStatesCount,
@@ -810,7 +806,7 @@ async () => {
             state_event_id: 'rec-drift-chain-1-archived',
         },
     ));
-    assert.equal(archived.status, 200);
+    assert.equal(archived.status, 201);
     await assertRecordWire();
     const afterArchive = await derivedRecords(
         db, STARK_ORGANIZATION,
@@ -831,7 +827,7 @@ async () => {
             state_event_id: 'rec-drift-chain-1-deleted',
         },
     ));
-    assert.equal(deletedTransition.status, 200);
+    assert.equal(deletedTransition.status, 201);
     const deletedGet = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + recordId, token),
@@ -866,7 +862,7 @@ async () => {
             [], 'rec-drift-chain-2-genesis', nowUtc(),
         ),
     ));
-    assert.equal(secondCreated.status, 204);
+    assert.equal(secondCreated.status, 201);
     const secondDeleted = await handleRequest(db, req(
         'DELETE', '/organizations/' + STARK_ORGANIZATION
                 + '/record-types/' + secondRecordId, token,
@@ -893,7 +889,7 @@ async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const recordId = 'rec-drift-dup-1';
-    const prefix = canonicalUriPrefix(
+    const prefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/record-types/',
     );
 
@@ -912,15 +908,14 @@ async () => {
             '2026-05-02T00:00:00.000000Z',
         ),
     ));
-    assert.equal(first.status, 204);
+    assert.equal(first.status, 201);
 
     const firstDocumentPairs = documentPairsAt(
-        await db.requests.getAllWhere('uri_prefix', prefix),
-        await db.responses.getAllWhere('uri_prefix', prefix),
+        await db.requests.getAllWhere('uri_collection', prefix),
+        await db.responses.getAllWhere('uri_collection', prefix),
         prefix,
     ).filter((pair) => pair.uriId === recordId);
     assert.equal(firstDocumentPairs.length, 1);
-    const firstDocumentPairId = firstDocumentPairs[0]!.id;
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
@@ -937,12 +932,12 @@ async () => {
             '2026-05-02T00:00:01.000000Z',
         ),
     ));
-    assert.equal(second.status, 204);
+    assert.equal(second.status, 201);
 
     const allRequests =
-        await db.requests.getAllWhere('uri_prefix', prefix);
+        await db.requests.getAllWhere('uri_collection', prefix);
     const allResponses =
-        await db.responses.getAllWhere('uri_prefix', prefix);
+        await db.responses.getAllWhere('uri_collection', prefix);
     const secondDocumentPairs = documentPairsAt(
         allRequests, allResponses, prefix,
     ).filter((pair) => pair.uriId === recordId);
@@ -952,7 +947,7 @@ async () => {
         (r) => r.id === secondDocumentPairId,
     )!;
     assert.equal(
-        secondDocumentResponseRow.supersedes, firstDocumentPairId,
+        'supersedes' in secondDocumentResponseRow, false,
     );
 
     const res = await handleRequest(
@@ -994,17 +989,17 @@ async () => {
             '2026-05-03T00:00:00.000000Z',
         ),
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
-    const recordsPrefix = canonicalUriPrefix(
+    const recordsPrefix = canonicalUriCollection(
         STARK_ORGANIZATION, '/record-types/',
     );
     const [recordRequests, recordResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', recordsPrefix),
-        db.responses.getAllWhere('uri_prefix', recordsPrefix),
+        db.requests.getAllWhere('uri_collection', recordsPrefix),
+        db.responses.getAllWhere('uri_collection', recordsPrefix),
     ]);
     const atRecordAddress = recordRequests.filter(
-        (r) => r.uri_prefix === recordsPrefix
+        (r) => r.uri_collection === recordsPrefix
             && r.uri_id === recordId,
     );
     assert.equal(atRecordAddress.length, 2);
@@ -1037,10 +1032,10 @@ async () => {
     const [attributeRequests, attributeResponses] =
         await Promise.all([
             db.requests.getAllWhere(
-                'uri_prefix', attributesPrefix,
+                'uri_collection', attributesPrefix,
             ),
             db.responses.getAllWhere(
-                'uri_prefix', attributesPrefix,
+                'uri_collection', attributesPrefix,
             ),
         ]);
     const attributeDocumentPairs = documentPairsAt(
@@ -1078,7 +1073,7 @@ test('GET record trio is lifecycle-current under clock skew'
             state_event_id: genesisEv,
         },
     ));
-    assert.equal(genesis.status, 200);
+    assert.equal(genesis.status, 201);
 
     // Later arrival, earlier state_at, different state + name.
     // 'deleted' would hide the row if it won as current —
@@ -1092,7 +1087,7 @@ test('GET record trio is lifecycle-current under clock skew'
             state_event_id: skewedEv,
         },
     ));
-    assert.equal(skewed.status, 200);
+    assert.equal(skewed.status, 201);
 
     const expected = {
         id: recordId,
@@ -1111,6 +1106,15 @@ test('GET record trio is lifecycle-current under clock skew'
     );
     assert.equal(res.status, 200);
     assert.equal(await res.text(), JSON.stringify(expected));
+    assert.deepEqual(
+        JSON.parse(await storedPutBodyText(
+            db,
+            '/organizations/' + STARK_ORGANIZATION
+                + '/record-types/',
+            recordId,
+        )),
+        expected,
+    );
 
     const derived = await derivedRecord(
         db, STARK_ORGANIZATION, recordId,
@@ -1193,11 +1197,11 @@ async () => {
                 state_event_id: f.ev,
             },
         ));
-        assert.equal(put.status, 200);
+        assert.equal(put.status, 201);
     }
-    // id-lex expected order: a, m, z — NOT insertion order.
+    // Oldest live head (at, id): z, a, m — insertion.
     const expectedIds = [
-        'rec-drift-a', 'rec-drift-m', 'rec-drift-z',
+        'rec-drift-z', 'rec-drift-a', 'rec-drift-m',
     ];
     const res = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
@@ -1234,7 +1238,7 @@ async () => {
             state_event_id: 'rec-drift-recreate-1-genesis',
         },
     ));
-    assert.equal(genesis.status, 200);
+    assert.equal(genesis.status, 201);
 
     const deleted = await handleRequest(db, req(
         'DELETE', '/organizations/' + STARK_ORGANIZATION
@@ -1263,9 +1267,9 @@ async () => {
             state_event_id: 'rec-drift-recreate-1-reborn',
         },
     ));
-    assert.equal(recreated.status, 200);
+    assert.equal(recreated.status, 201);
     assert.equal(
-        recreated.headers.get('Supersedes'), deleteResponseId,
+        recreated.headers.get('Supersedes'), null,
     );
 
     const res = await handleRequest(
@@ -1298,24 +1302,20 @@ async function transitionFieldValueCounts(
     organization: string,
     workOrderId: string,
 ): Promise<Map<string, number>> {
-    const prefix = canonicalUriPrefix(
+    const prefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', prefix),
-        db.responses.getAllWhere('uri_prefix', prefix),
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
     ]);
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
     );
     const counts = new Map<string, number>();
     for (const response of responses) {
-        if (
-            response.uri_prefix !== prefix
-            || response.status < 200
-            || response.status > 299
-        ) continue;
+        if (response.uri_collection !== prefix) continue;
         const request = requestById.get(response.id);
         if (request === undefined) continue;
         const decoded = decodeRequestMessage(request.message);
@@ -1475,7 +1475,7 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
             states: ['n-start', 'n-middle', 'claimed'],
         },
     ));
-    assert.equal(created.status, 204);
+    assert.equal(created.status, 201);
 
     // Task 8 CUT: legacy fieldValues below the gate
     // (live leg still seeds STORED SFV fold shape).

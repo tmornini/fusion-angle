@@ -9,7 +9,7 @@ import {
 } from './adapters/organization-session.ts';
 import {
     RequestError, HTTP_FORBIDDEN,
-} from '../../api/api.ts';
+} from '../../api/http-errors.ts';
 import type {
     OrganizationEntity,
 } from '../../api/types.ts';

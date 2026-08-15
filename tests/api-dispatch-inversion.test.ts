@@ -73,7 +73,7 @@ test('unauthenticated in-table nested path answers the '
         ));
         assert.equal(res.status, 401);
         const body = await res.json();
-        assert.match(body.error, /missing bearer token/);
+        assert.equal(body.error, 'invalid_token');
     } finally {
         const i = routes.indexOf(probe);
         if (i >= 0) routes.splice(i, 1);

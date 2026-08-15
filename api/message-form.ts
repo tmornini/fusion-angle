@@ -7,11 +7,19 @@ import {
 import {
     defaultBodyRegistry,
 } from '../shared/http-message/media-registry.ts';
+import {
+    serializeWire,
+} from '../shared/http-message/wire-codec.ts';
 import type {
     FieldLine,
     MessageModel,
 } from '../shared/http-message/types.ts';
-import { sha256Hex } from '../shared/digest.ts';
+import {
+    sha256HexOfBytes,
+} from '../shared/digest.ts';
+import { Octets } from '../shared/http-message/octets.ts';
+
+export const HEX64 = /^[0-9a-f]{64}$/;
 
 const HTTP_VERSION = 'HTTP/1.1';
 const JSON_MEDIA_TYPE = 'application/json';
@@ -92,17 +100,51 @@ export function canonicalJson(
     return HttpMessage.fromModel(model).toJson();
 }
 
-export function messageHashOf(
-    canonical: string,
-): Promise<string> {
-    return sha256Hex(canonical);
+export function storedWire(
+    model: MessageModel,
+): string {
+    return serializeWire(model);
 }
 
-export async function bodyEtagOf(
-    model: MessageModel,
+export function requestMessageHash(
+    wire: string,
 ): Promise<string> {
-    const body = HttpMessage.fromModel(model).body();
-    return sha256Hex(
-        body.exists() ? body.toBase64() : '',
+    return sha256HexOfBytes(
+        Octets.fromLatin1(wire).asBytes(),
     );
+}
+
+export function bodyOctetsOf(
+    model: MessageModel,
+): Uint8Array {
+    const body = HttpMessage.fromModel(model).body();
+    return body.exists()
+        ? body.toBytes()
+        : new Uint8Array(0);
+}
+
+export function jsonBodyOctets(
+    body: unknown,
+): Uint8Array {
+    return bodyOctetsOf(buildResponseModel({
+        status: 200,
+        fields: [],
+        body,
+    }));
+}
+
+export async function documentVersion(
+    bodyOctets: Uint8Array,
+    matchedEtag?: string,
+): Promise<string> {
+    if (matchedEtag === undefined) {
+        return sha256HexOfBytes(bodyOctets);
+    }
+    const tag = Octets.fromLatin1(matchedEtag).asBytes();
+    const joined = new Uint8Array(
+        bodyOctets.length + tag.length,
+    );
+    joined.set(bodyOctets, 0);
+    joined.set(tag, bodyOctets.length);
+    return sha256HexOfBytes(joined);
 }

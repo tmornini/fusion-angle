@@ -46,12 +46,16 @@ import { seededMockDb } from './mock-seed.ts';
 // put() bodies omit it.
 function requestFields() {
     return {
-        uri_prefix: '/organizations/1/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '42',
         at: '2026-01-01T00:00:00.000000Z',
         requester_identity_id: 'current',
         message_hash: 'a'.repeat(64),
-        message: '{"kind":"request"}',
+        message:
+            'PUT /organizations/1/ideas/42'
+            + ' HTTP/1.1\r\n\r\n',
+        method: 'PUT',
+        operation_id: '0123456789ABCDEFGHIJKL',
     };
 }
 function buildRequest(id: string) {
@@ -163,7 +167,9 @@ test(
         assert.equal(rows.length, 1);
         assert.equal(rows[0]?.id, 'u2');
         assert.equal(
-            rows[0]?.message, '{"kind":"request"}',
+            rows[0]?.message,
+            'PUT /organizations/1/ideas/42'
+            + ' HTTP/1.1\r\n\r\n',
         );
     },
 );
@@ -544,7 +550,7 @@ test(
         const ctx = stubSnapshotCtx({
             members: [],
             requests: [{
-                id: 'r1', uri_prefix: '/members/',
+                id: 'r1', uri_collection: '/members/',
                 uri_id: 'm1',
                 at: '2026-01-01T00:00:00.000000Z',
                 requester_identity_id: 'system',
@@ -568,7 +574,7 @@ test(
         const ctx = stubSnapshotCtx({
             members: [],
             requests: [{
-                id: 'r1', uri_prefix: '/human-members/',
+                id: 'r1', uri_collection: '/human-members/',
                 uri_id: 'u1',
                 at: '2026-01-01T00:00:00.000000Z',
                 requester_identity_id: 'system',

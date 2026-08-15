@@ -1,7 +1,7 @@
 import {
     $, $required, getRequiredAttribute,
 } from '../app/dom.ts';
-import { navigateTo } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
 import {
     buildSkeleton,
     loadInto,

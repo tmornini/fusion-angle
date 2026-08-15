@@ -2,7 +2,7 @@ import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type { Id, MemberEntity, StateEntity } from './types.ts';
 import { pickString } from './validators.ts';
-import { canonicalUriPrefix } from './message-pair.ts';
+import { canonicalUriCollection } from './message-pair.ts';
 import {
     deriveDocumentsAt,
     documentPairsAt,
@@ -22,7 +22,7 @@ import {
 // today's live closures: deriveMemberParents/deriveMemberParent
 // read the FLAT '/members/' address (members is the FIRST
 // global-plane family — family-registry.ts: organizationNested:
-// false — so canonicalUriPrefix ignores whatever organization
+// false — so canonicalUriCollection ignores whatever organization
 // argument a caller passes for this family); deriveMembers
 // re-derives route('members')'s own hand-written GET closure
 // (api/routes.ts): a membership names an org's roster by
@@ -44,10 +44,10 @@ import {
 // through this; tests/drift-roster.test.ts pins parity with the
 // retired old-plane closure.
 
-const MEMBERS_PREFIX = canonicalUriPrefix(undefined, '/members/');
+const MEMBERS_PREFIX = canonicalUriCollection(undefined, '/members/');
 
 function membershipsPrefixFor(organization: Id): string {
-    return canonicalUriPrefix(organization, '/memberships/');
+    return canonicalUriCollection(organization, '/memberships/');
 }
 
 // id-first — the seven-sibling entityOf convention — picked
@@ -119,8 +119,8 @@ export async function deriveMemberParents(
     db: DbAdapter,
 ): Promise<MemberEntity[]> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', MEMBERS_PREFIX),
-        db.responses.getAllWhere('uri_prefix', MEMBERS_PREFIX),
+        db.requests.getAllWhere('uri_collection', MEMBERS_PREFIX),
+        db.responses.getAllWhere('uri_collection', MEMBERS_PREFIX),
     ]);
     const documents = deriveDocumentsAt(
         requests, responses, MEMBERS_PREFIX,
@@ -143,8 +143,8 @@ export async function deriveMemberParent(
     id: Id,
 ): Promise<MemberEntity> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', MEMBERS_PREFIX),
-        db.responses.getAllWhere('uri_prefix', MEMBERS_PREFIX),
+        db.requests.getAllWhere('uri_collection', MEMBERS_PREFIX),
+        db.responses.getAllWhere('uri_collection', MEMBERS_PREFIX),
     ]);
     const document = deriveDocumentsAt(
         requests, responses, MEMBERS_PREFIX,
@@ -180,8 +180,8 @@ export async function deriveMembers(
 ): Promise<MemberEntity[]> {
     const membershipsPrefix = membershipsPrefixFor(organization);
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_prefix', membershipsPrefix),
-        db.responses.getAllWhere('uri_prefix', membershipsPrefix),
+        db.requests.getAllWhere('uri_collection', membershipsPrefix),
+        db.responses.getAllWhere('uri_collection', membershipsPrefix),
     ]);
     const memberships = deriveDocumentsAt(
         requests, responses, membershipsPrefix,

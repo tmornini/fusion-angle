@@ -29,7 +29,7 @@ export interface IncomingContext {
     readonly pathname: string;
     // The unfenced tier. Phase Final Task 5 retired the
     // org-scoped decorator shell; handlers receive this base
-    // adapter. Pair-plane tenancy rides uri_prefix, not a
+    // adapter. Pair-plane tenancy rides uri_collection, not a
     // store fence.
     readonly base: GuardedDbAdapter;
     // The ARRIVAL stamp: minted here, gate entry, as early as

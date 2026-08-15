@@ -1,5 +1,23 @@
-import { decodeAccessToken } from '../../../api/access-token.ts';
+import { decodeAccessToken } from
+    '../../../shared/access-token-decode.ts';
 import { STORAGE_KEY_AUTHORIZATION } from '../storage-keys.ts';
+import {
+    deleteSessionToken,
+    putSessionToken,
+} from './session-token.ts';
+
+// Cookie-session mode (server ZIP). Default is today's
+// localStorage pair (browser ZIP). server-core.ts enables
+// this; do not reuse setServerTier.
+let cookieSession = false;
+
+export function setCookieSession(enabled: boolean): void {
+    cookieSession = enabled;
+}
+
+export function isCookieSession(): boolean {
+    return cookieSession;
+}
 
 // The persisted session credential: the OAuth token pair the
 // web tier holds so a login survives the navigateTo() reload.
@@ -9,6 +27,8 @@ import { STORAGE_KEY_AUTHORIZATION } from '../storage-keys.ts';
 // value — replaced, never mutated. Stored under
 // STORAGE_KEY_AUTHORIZATION; the access token becomes the
 // Authorization: Bearer value on authenticated requests.
+// Cookie-session: access is memory only; refresh is the
+// HttpOnly cookie — never localStorage.
 export interface SessionCredentials {
     readonly accessToken: string;
     readonly refreshToken: string;
@@ -31,6 +51,9 @@ export class SessionCredentialsCorruptError extends Error {
 // Corrupt and is never null-masked.
 export function getSessionCredentials():
     SessionCredentials | null {
+    if (isCookieSession()) {
+        return null;
+    }
     const raw = localStorage.getItem(
         STORAGE_KEY_AUTHORIZATION,
     );
@@ -51,6 +74,10 @@ export function getSessionCredentials():
 export function putSessionCredentials(
     creds: SessionCredentials,
 ): void {
+    if (isCookieSession()) {
+        putSessionToken(creds.accessToken);
+        return;
+    }
     localStorage.setItem(
         STORAGE_KEY_AUTHORIZATION,
         JSON.stringify({
@@ -62,6 +89,10 @@ export function putSessionCredentials(
 
 // Idempotent: removing an absent credential is a no-op.
 export function deleteSessionCredentials(): void {
+    if (isCookieSession()) {
+        deleteSessionToken();
+        return;
+    }
     localStorage.removeItem(STORAGE_KEY_AUTHORIZATION);
 }
 

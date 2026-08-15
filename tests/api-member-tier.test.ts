@@ -8,6 +8,9 @@ import { handleRequest } from '../api/api.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedOrganizationMember } from './root-admin-fixture.ts';
 import { ideaBody } from './test-fixtures.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 const BASE = 'http://localhost';
 const MEMBER = 'walt';
@@ -16,14 +19,12 @@ function req(
     method: string, path: string, token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body === undefined
-            ? {} : { body: JSON.stringify(body) }),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -45,7 +46,7 @@ async () => {
             state_at: '2026-01-01T00:00:00.000000Z',
             state_event_id: 'ev-i1',
         }));
-    assert.equal(put.status, 200);
+    assert.equal(put.status, 201);
     const list = await handleRequest(
         db, req('GET', '/ideas', token));
     assert.equal(list.status, 200);

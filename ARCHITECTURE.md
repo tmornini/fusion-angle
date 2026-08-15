@@ -177,7 +177,7 @@ enriches it to `AuthenticatedContext` (principal), and
 `memberOrganizations`, and roles — each field set exactly
 once. There is **no org-scoped adapter wrapper**: the
 message plane (`requests`, `responses`) is global; tenancy
-rides `uri_prefix` on the pair plane. Handlers receive
+rides `uri_collection` on the pair plane. Handlers receive
 `ctx.base`. The org rides the VERIFIED token claim,
 never the path; a flat (un-exchanged) token has none and
 resolves via `identityDefaultOrganization`: the identity's
@@ -205,7 +205,7 @@ live handler arities (`GetHandler`: adapter, params, actor,
 organization, roles; write handlers add payload + pair).
 
 **Write-time cross-tenant authorizer.** Pair addresses are
-per-org namespaced (`canonicalUriPrefix` from the VERIFIED
+per-org namespaced (`canonicalUriCollection` from the VERIFIED
 claim). A foreign-id PUT/DELETE/PATCH on an org-scoped
 family must 403 (never invent a genesis in the caller's
 own namespace). `writeAuthorizerFor` /
@@ -593,7 +593,7 @@ its caller already listed in its own `transaction(...)`
 call, never widening the caller's table set on its own
 authority; (d) every write-gate read is ENTITY-SCOPED —
 indexed or prefix reads (`getAllWhere('uri_id', ...)`,
-`getAllWhere('uri_prefix', ...)`), never a whole-plane
+`getAllWhere('uri_collection', ...)`), never a whole-plane
 `getAll()` of `requests`/`responses` on a hot path (the one
 named exception is below); (e) a pre-tx call and an in-tx
 call of the same core return byte-identical results, pinned

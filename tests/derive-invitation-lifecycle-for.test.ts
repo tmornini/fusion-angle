@@ -11,11 +11,14 @@ import {
 } from '../api/mock-data/seed-constants.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    apiRequest, TEST_OPERATION_ID,
+} from './http-fixtures.ts';
 
 // The Phase 14 Task 1 core: invitationLifecycleStatesFor is the
 // ENTITY-SCOPED sibling of deriveInvitationStates — INDEXED
 // getAllWhere reads (uri_id for the grant/document pair,
-// uri_prefix per op address) restricted to ONE known invitation
+// uri_collection per op address) restricted to ONE known invitation
 // id, rather than the whole-collection + whole-ledger scans the
 // multi-invitation reader needs to DISCOVER every id. This file
 // proves it byte-identical to deriveInvitationStates's own
@@ -30,13 +33,12 @@ function req(
     token: string,
     body?: unknown,
 ): Request {
-    return new Request(`${BASE}${path}`, {
+    return apiRequest({
         method,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-        },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        path,
+        token,
+        body,
+        operationId: TEST_OPERATION_ID,
     });
 }
 
@@ -60,7 +62,7 @@ async function grant(
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 201);
 }
 
 async function bulkRowsFor(
@@ -102,7 +104,7 @@ async () => {
             acceptAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 204);
+    assert.equal(accept.status, 201);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
     assert.equal(scoped.length, 2);
@@ -129,7 +131,7 @@ async () => {
             declineAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 204);
+    assert.equal(decline.status, 201);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
     assert.equal(scoped.length, 2);
@@ -155,7 +157,7 @@ async () => {
             revokeAt: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(revoke.status, 204);
+    assert.equal(revoke.status, 201);
 
     const scoped = await invitationLifecycleStatesFor(db, id);
     assert.equal(scoped.length, 2);
@@ -204,7 +206,7 @@ test('invitationLifecycleStatesFor: a duplicate-grant\'s'
             grantAt: '2026-06-01T00:00:02.000000Z',
         },
     ));
-    assert.equal(echoRes.status, 200);
+    assert.equal(echoRes.status, 201);
     const echoBody = await echoRes.json() as { id: string };
     assert.equal(echoBody.id, freshId);
 

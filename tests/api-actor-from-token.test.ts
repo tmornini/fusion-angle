@@ -10,7 +10,7 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 
 // Actor-stamping for lifecycle rides document trios —
 // PUT members/:id stamps requester_identity_id on the
-// pair, derived as member_id on GET members/:id/history.
+// pair, derived as member_id on GET members/:id/versions.
 // Member lifecycle via PUT members/:id — the document
 // trio is authored by the verified token.
 test(
@@ -29,7 +29,7 @@ test(
             id: string;
             member_id: string;
         }>>(
-            db, 'members/current/history', DEV_TOKEN,
+            db, 'members/current/versions', DEV_TOKEN,
         );
         const event = history.find(e => e.id === 'ev-1');
         assert.ok(event, 'trio event missing from history');
