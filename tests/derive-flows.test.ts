@@ -10,15 +10,16 @@ import {
     deriveFlowStateHistory,
 } from '../api/derive-flows.ts';
 import { seededMockDb } from './mock-seed.ts';
+import { strongEtagOf } from '../api/message-pair.ts';
 
 // The flows sibling of tests/derive-ideas.test.ts/derive-
 // projects.test.ts: unit-level lifecycle-reduction guarantees
 // that tests/drift-flows.test.ts (parity-against-old-plane
 // only) does not exercise. MECHANISM: flows are the LOCKED
 // class (Decision 7) — a SECOND PUT to an existing flow is
-// non-genesis and must thread If-Response-ID via a header-
-// capable req helper (echo the first PUT's Response-ID), unlike
-// the bare-req idiom the ideas/projects skew tests use.
+// non-genesis and must thread If-Match via a header-
+// capable req helper (echo the first PUT's pair-id ETag),
+// unlike the bare-req idiom the ideas/projects skew tests use.
 
 const BASE = 'http://localhost';
 const STARK_ORGANIZATION = '1';
@@ -159,7 +160,7 @@ test(
         const res = await putFlow(
             db, token, id, 'Skewed Title', 'deleted',
             '2020-01-01T00:00:00.000000Z', 'ev-drv-skew-later',
-            skewedGraph, { 'if-response-id': headId },
+            skewedGraph, { 'if-match': strongEtagOf(headId) },
         );
         assert.equal(res.status, 200);
 

@@ -373,12 +373,12 @@ export function buildRevivals(
 // revivals diffed against that SAME fresh baseline (empty for
 // every ordinary edit; performRedo is the one caller that
 // supplies a revivalTarget — see putFlow below). ONE GET
-// (ctx.GETWithResponseId, never getFlowGraph — that helper also
+// (ctx.GETWithEtag, never getFlowGraph — that helper also
 // applies withRenderableLayout, a presentation concern, and
-// hides the Response-ID header this builder also needs) serves
-// BOTH the baseline diff source AND the echo to carry as
-// If-Response-ID — calling getFlowGraph plus a separate header
-// read would silently add a hop to every save path. Not
+// hides the ETag this builder also needs) serves BOTH the
+// baseline diff source AND the echo to carry as If-Match —
+// calling getFlowGraph plus a separate header read would
+// silently add a hop to every save path. Not
 // exported: putFlow (below) is the ONLY caller since the C6
 // retry loop owns rebuilding a fresh body per attempt —
 // including the revivals: everything derived from the mutable
@@ -392,11 +392,11 @@ async function buildFlowPutBody(
     revivalTarget: StoredGraph | undefined,
 ): Promise<{
     body: Record<string, unknown>;
-    ifResponseId: string | undefined;
+    etag: string | undefined;
 }> {
     const now = nowUtc();
-    const { body: current, responseId } =
-        await ctx.GETWithResponseId<FlowWithGraph>(
+    const { body: current, etag } =
+        await ctx.GETWithEtag<FlowWithGraph>(
             'flows/' + id,
         );
     const baseline = asStoredGraph(
@@ -425,7 +425,7 @@ async function buildFlowPutBody(
             graphDelta: delta,
             revivals,
         },
-        ifResponseId: responseId,
+        etag,
     };
 }
 
@@ -472,9 +472,9 @@ export function enqueueFlowSave(
 // Save a flow: the flow row PUT, its 'updated' state event, and
 // the graph delta — written atomically through the locked-class
 // PUT /flows/:id. The client echoes the baseline it just read
-// (buildFlowPutBody's ifResponseId) as If-Response-ID; a save
-// racing another writer's save finds the head has moved and
-// 412s. This loop ABSORBS that 412: on attempt < 3 it backs off
+// (buildFlowPutBody's etag) as If-Match; a save racing another
+// writer's save finds the head has moved and 412s. This loop
+// ABSORBS that 412: on attempt < 3 it backs off
 // (jitteredBackoff) and REBUILDS the body — buildFlowPutBody
 // re-fetches the baseline and re-diffs, so the rebuild IS the
 // re-apply — then resubmits with the FRESH echo. E6 split: each
@@ -510,7 +510,7 @@ export async function putFlow(
         attempt <= MAX_PUT_ATTEMPTS;
         attempt++
     ) {
-        const { body, ifResponseId } =
+        const { body, etag } =
             await buildFlowPutBody(
                 ctx, id, save, revivalTarget,
             );
@@ -518,9 +518,9 @@ export async function putFlow(
             await ctx.PUT(
                 `flows/${id}`,
                 body,
-                ifResponseId === undefined
+                etag === undefined
                     ? undefined
-                    : [['if-response-id', ifResponseId]],
+                    : [['if-match', '"' + etag + '"']],
             );
             flowChanges.notify();
             return;

@@ -428,7 +428,7 @@ test(
 
         const working = buildWorkingGraph();
         // Capture ONE PUT body (with one graphDelta) AND its
-        // If-Response-ID echo, and replay both.
+        // If-Match echo, and replay both.
         let captured: Record<string, unknown> | null = null;
         let capturedHeaders:
             readonly (readonly [string, string])[]

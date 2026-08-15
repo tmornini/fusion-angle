@@ -4,18 +4,16 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
-import { GET, GETWithResponseId, PUT } from '../api/api.ts';
+import { GET, GETWithEtag, PUT } from '../api/api.ts';
 import { jitteredBackoff } from
     '../web-app/app/adapters/shared.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
-// Commit A: the facade plumbing that will carry the C6 retry
-// loop's If-Response-ID echo (web-app/app/adapters/
-// flow-mutations.ts) — additive and INERT today. No live route
-// is locked-flipped yet (Task 3's own flip commit does that), so
-// these tests pin the mechanism generically, against the
-// already-wired 'ideas/:id' route.
+// Facade plumbing that carries the C6 retry loop's If-Match
+// echo (web-app/app/adapters/flow-mutations.ts). Ideas/:id is
+// simple-class (If-Match is inert there); the pin is that PUT
+// hoists the header into the stored request message.
 
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
@@ -53,7 +51,7 @@ async () => {
     await PUT(
         db, 'ideas/idea-hdr-1',
         ideaPutBody('idea-hdr-1', 'Headers'), token,
-        [['if-response-id', 'probe-value-123']],
+        [['if-match', '"probe-value-123"']],
     );
     const stored = (await db.requests.getAll())
         .find(r => r.uri_id === 'idea-hdr-1');
@@ -76,9 +74,9 @@ test('PUT with no headerFields behaves exactly as before —'
     assert.equal(written.title, 'No Headers');
 });
 
-test('GETWithResponseId returns the parsed body and an'
-+ ' undefined responseId when the route carries no'
-+ ' Response-ID header (every route today, pre-flip)',
+test('GETWithEtag returns the parsed body and an'
++ ' undefined etag when the route carries no ETag'
++ ' header (simple-class ideas/:id)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -86,15 +84,15 @@ async () => {
         db, 'ideas/idea-hdr-3',
         ideaPutBody('idea-hdr-3', 'Plain'), token,
     );
-    const { body, responseId } =
-        await GETWithResponseId<{
+    const { body, etag } =
+        await GETWithEtag<{
             id: string; title: string;
         }>(db, 'ideas/idea-hdr-3', token);
     assert.equal(body.title, 'Plain');
-    assert.equal(responseId, undefined);
+    assert.equal(etag, undefined);
 });
 
-test('GETWithResponseId and GET agree on the body for the'
+test('GETWithEtag and GET agree on the body for the'
 + ' same resource (delegation, not a divergent read path)',
 async () => {
     const db = await freshDb();
@@ -106,11 +104,11 @@ async () => {
     const viaGet = await GET<{ id: string; title: string }>(
         db, 'ideas/idea-hdr-4', token,
     );
-    const { body: viaGetWithResponseId } =
-        await GETWithResponseId<{
+    const { body: viaGetWithEtag } =
+        await GETWithEtag<{
             id: string; title: string;
         }>(db, 'ideas/idea-hdr-4', token);
-    assert.deepEqual(viaGetWithResponseId, viaGet);
+    assert.deepEqual(viaGetWithEtag, viaGet);
 });
 
 test('jitteredBackoff waits base*2^(attempt-1) plus jitter'

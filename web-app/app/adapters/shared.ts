@@ -4,7 +4,6 @@ import {
 } from '../../../api/types.ts';
 import {
     GET as httpGet,
-    GETWithResponseId as httpGetWithResponseId,
     GETWithEtag as httpGetWithEtag,
     PUT as httpPut,
     PUTWithEtag as httpPutWithEtag,
@@ -67,12 +66,6 @@ export interface RequestContext {
     readonly requestId: string;
     readonly identity: Principal;
     GET<T>(resource: string): Promise<T>;
-    // The locked-class baseline+echo read: the parsed body plus
-    // the Response-ID header to carry forward as If-Response-ID
-    // on the next save.
-    GETWithResponseId<T>(
-        resource: string,
-    ): Promise<{ body: T; responseId: string | undefined }>;
     // Body plus strong ETag (quotes stripped) for If-Match.
     GETWithEtag<T>(
         resource: string,
@@ -162,17 +155,6 @@ function makeRequestContext(
             return run<T>(tok => httpGet<T>(
                 adapter, resource, tok, requestId,
             ));
-        },
-        GETWithResponseId: <T>(resource: string) => {
-            recordApiRequest('GET', resource);
-            return run<{
-                body: T;
-                responseId: string | undefined;
-            }>(
-                tok => httpGetWithResponseId<T>(
-                    adapter, resource, tok, requestId,
-                ),
-            );
         },
         GETWithEtag: <T>(resource: string) => {
             recordApiRequest('GET', resource);

@@ -186,7 +186,7 @@ async function save(
     const res = await handleRequest(db, req(
         'PUT', '/flows/' + flowId, token,
         documentBody(name, eventId),
-        { 'if-response-id': head },
+        { 'if-match': '"' + head + '"' },
     ));
     assert.equal(res.status, 200);
 }
@@ -620,7 +620,7 @@ test(
                     },
                 },
             ),
-            { 'if-response-id': head },
+            { 'if-match': '"' + head + '"' },
         ));
         assert.equal(deleted.status, 200);
 

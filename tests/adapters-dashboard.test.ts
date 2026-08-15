@@ -130,8 +130,8 @@ async function tombstoneFlow(
     id: string,
 ): Promise<void> {
     await seedFlow(ctx, id);
-    const { body: current, responseId } =
-        await ctx.GETWithResponseId<FlowWithGraph>(
+    const { body: current, etag } =
+        await ctx.GETWithEtag<FlowWithGraph>(
             'flows/' + id,
         );
     await ctx.PUT(
@@ -152,9 +152,9 @@ async function tombstoneFlow(
             },
             revivals: [],
         },
-        responseId === undefined
+        etag === undefined
             ? undefined
-            : [['if-response-id', responseId]],
+            : [['if-match', '"' + etag + '"']],
     );
 }
 

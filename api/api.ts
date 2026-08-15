@@ -29,7 +29,6 @@ import {
     PAIR_WIRED_ROUTE_PATTERNS,
     DOCUMENT_CLASS_ROUTE_PATTERNS,
     REPLAY_EXEMPT_ROUTE_PATTERNS,
-    IF_RESPONSE_ID_HEADER,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
 import type { MessagePair, AuthPairSeed } from './message-pair.ts';
@@ -719,19 +718,27 @@ export async function handleRequest(
                 && routePattern === wiring.family + '/:id'
                 && familyRegistration(wiring.family)
                     ?.concurrency === 'locked';
-            // The hoisted echo: read directly (not merely via
-            // hoisted-header storage) so the gate can compare it
-            // against the head BEFORE dispatch. Only consulted
-            // for a locked write — inert (null) otherwise.
-            const echo = isLockedWrite
-                ? request.headers.get(IF_RESPONSE_ID_HEADER)
+            // The hoisted echo: read If-Match directly (not
+            // merely via hoisted-header storage) so the gate
+            // can compare the parsed pair id against the head
+            // BEFORE dispatch. Only consulted for a locked
+            // write — inert (null) otherwise.
+            const rawIfMatch = isLockedWrite
+                ? request.headers.get(IF_MATCH_HEADER)
                 : null;
-            // follows is set ONLY when the echo matches the
-            // current head — the locked sibling of headPairId's
-            // supersedes; the two are mutually exclusive by
-            // construction (a locked write never supersedes).
+            const echo = rawIfMatch === null
+                ? null
+                : parseIfMatch(rawIfMatch);
+            // follows is set ONLY when the parsed echo matches
+            // the current head — the locked sibling of
+            // headPairId's supersedes; the two are mutually
+            // exclusive by construction (a locked write never
+            // supersedes). The matched pair id, not the quoted
+            // header.
             const follows = isLockedWrite
-                && echo !== null && echo === headPairId
+                && echo !== undefined
+                && echo !== null
+                && echo === headPairId
                 ? echo : undefined;
             // DELETE responses are UNIVERSALLY 204 with no
             // body — every wired DELETE handler returns void
@@ -832,29 +839,50 @@ export async function handleRequest(
                     return response;
                 }
             }
-            // The locked four-outcome table (spec §The two PUT
-            // classes), applied ONLY after the replay fast-path
-            // MISSES: head present + echo absent → 412; echo
-            // present + != head → 412; echo present + == head →
-            // follows already set above, proceed; head absent +
-            // echo absent → genesis, proceed. A 412 here returns
-            // BEFORE dispatch, and appendMessagePair only ever
-            // runs inside the op's own tx, so NOTHING is stored.
+            // The locked six-outcome table, applied ONLY after
+            // the replay fast-path MISSES: live + absent → 428;
+            // live + malformed → 400; live + ≠ head → 412; live
+            // + == head → follows already set above, proceed;
+            // none + absent → genesis; none + present → 412.
+            // A 412 here returns BEFORE dispatch, and
+            // appendMessagePair only ever runs inside the op's
+            // own tx, so NOTHING is stored.
             if (isLockedWrite) {
-                if (headPairId !== undefined && echo === null) {
+                if (
+                    headPairId !== undefined
+                    && rawIfMatch === null
+                ) {
                     return Response.json(
                         {
-                            error: 'If-Response-ID is required: '
-                                + 'a document already exists at '
+                            error: 'If-Match is required to PUT '
                                 + pathname,
                         },
-                        { status: HTTP_PRECONDITION_FAILED },
+                        {
+                            status:
+                                HTTP_PRECONDITION_REQUIRED,
+                        },
                     );
                 }
-                if (echo !== null && echo !== headPairId) {
+                if (
+                    headPairId !== undefined
+                    && echo === undefined
+                ) {
                     return Response.json(
                         {
-                            error: 'If-Response-ID does not '
+                            error: 'If-Match must carry '
+                                + 'exactly one strong '
+                                + 'validator',
+                        },
+                        { status: HTTP_BAD_REQUEST },
+                    );
+                }
+                if (
+                    rawIfMatch !== null
+                    && follows === undefined
+                ) {
+                    return Response.json(
+                        {
+                            error: 'If-Match does not '
                                 + 'match the current document '
                                 + 'at ' + pathname,
                         },
@@ -990,11 +1018,15 @@ export async function handleRequest(
                         effective, prefix, param(params, 0),
                     );
                     if (headPairId !== undefined) {
-                        return Response.json(result, {
-                            headers: {
-                                'Response-ID': headPairId,
-                            },
-                        });
+                        return attachEtag(
+                            Response.json(result, {
+                                headers: {
+                                    'Response-ID':
+                                        headPairId,
+                                },
+                            }),
+                            headPairId,
+                        );
                     }
                 }
                 // Instance detail ETag (Task 16 / R8): strong
@@ -1462,9 +1494,9 @@ function facadeHeaders(
     return headers;
 }
 
-// The ONE await site for a GET-shaped facade call — GET,
-// GETWithResponseId, and GETWithEtag are thin wrappers over
-// this, so the simulateLatency literal-count pin
+// The ONE await site for a GET-shaped facade call — GET
+// and GETWithEtag are thin wrappers over this, so the
+// simulateLatency literal-count pin
 // (pair-write-coverage.test.ts) stays at exactly 4 no matter
 // how many GET-shaped verbs read from it (delegation, not a
 // copy-pasted fifth await site).
@@ -1551,30 +1583,8 @@ export async function GET<T>(
     );
 }
 
-// The locked-class sibling of GET: the same wire round-trip,
-// plus the response's Response-ID header (attached by
-// handleRequest's GET case for a locked-family document read;
-// undefined for every other route today) — the baseline a C6
-// save both diffs against and echoes back as If-Response-ID.
-export async function GETWithResponseId<T>(
-    adapter: ClientFacadeAdapter,
-    resource: string,
-    token: string,
-    requestId?: string,
-): Promise<{ body: T; responseId: string | undefined }> {
-    const response = await getResponse(
-        adapter, resource, token, requestId,
-    );
-    const body = await unwrapResponse<T>(response);
-    return {
-        body,
-        responseId:
-            response.headers.get('Response-ID') ?? undefined,
-    };
-}
-
-// Instance / concurrency sibling of GET: body plus the strong
-// ETag (quotes stripped) for If-Match on a later PATCH.
+// Locked / instance sibling of GET: body plus the strong
+// ETag (quotes stripped) for If-Match on a later PUT/PATCH.
 export async function GETWithEtag<T>(
     adapter: ClientFacadeAdapter,
     resource: string,

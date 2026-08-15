@@ -14,7 +14,8 @@ import { handleRequest } from '../api/api.ts';
 import {
     formWritePair,
     appendMessagePair,
-    IF_RESPONSE_ID_HEADER,
+    IF_MATCH_HEADER,
+    strongEtagOf,
 } from '../api/message-pair.ts';
 import type { MessagePair } from '../api/message-pair.ts';
 import {
@@ -313,9 +314,9 @@ test('locked arm: a sibling route under the SAME family'
             'PUT', path, token, { v: 'first' },
         ));
         assert.equal(first.status, 204);
-        // A second PUT, still with NO If-Response-ID — if the
+        // A second PUT, still with NO If-Match — if the
         // gate mistakenly keyed the locked arm off TEST_FAMILY
-        // alone, this would 412 (head present, echo absent).
+        // alone, this would 428 (head present, echo absent).
         const second = await handleRequest(db, req(
             'PUT', path, token, { v: 'second' },
         ));
@@ -323,7 +324,7 @@ test('locked arm: a sibling route under the SAME family'
     });
 });
 
-test('locked arm: head present, If-Response-ID absent, 412s',
+test('locked arm: head present, If-Match absent, 428s',
 async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
@@ -336,11 +337,16 @@ async () => {
             'PUT', '/' + TEST_FAMILY + '/doc-2', token,
             { v: 'second' },
         ));
-        assert.equal(res.status, 412);
+        assert.equal(res.status, 428);
+        assert.equal(
+            (await res.json()).error,
+            'If-Match is required to PUT /'
+            + TEST_FAMILY + '/doc-2',
+        );
     });
 });
 
-test('locked arm: a stale If-Response-ID echo 412s', async () => {
+test('locked arm: a stale If-Match echo 412s', async () => {
     await withSyntheticLockedFamily(async () => {
         const db = await freshDb();
         const token = await organizationToken();
@@ -350,9 +356,15 @@ test('locked arm: a stale If-Response-ID echo 412s', async () => {
         ));
         const res = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-3', token,
-            { v: 'second' }, { [IF_RESPONSE_ID_HEADER]: 'bogus' },
+            { v: 'second' },
+            { [IF_MATCH_HEADER]: strongEtagOf('bogus') },
         ));
         assert.equal(res.status, 412);
+        assert.equal(
+            (await res.json()).error,
+            'If-Match does not match the current document at '
+            + '/' + TEST_FAMILY + '/doc-3',
+        );
     });
 });
 
@@ -369,7 +381,7 @@ test('locked arm: a matching echo populates follows, not'
         const second = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-4', token,
             { v: 'second' },
-            { [IF_RESPONSE_ID_HEADER]: firstId },
+            { [IF_MATCH_HEADER]: strongEtagOf(firstId) },
         ));
         assert.equal(second.status, 200);
         assert.equal(second.headers.get('Follows'), firstId);
@@ -396,7 +408,7 @@ async () => {
         const editRequest = req(
             'PUT', '/' + TEST_FAMILY + '/doc-5', token,
             { v: 'second' },
-            { [IF_RESPONSE_ID_HEADER]: firstId },
+            { [IF_MATCH_HEADER]: strongEtagOf(firstId) },
         );
         const edit = await handleRequest(db, editRequest.clone());
         assert.equal(edit.status, 200);
@@ -429,7 +441,7 @@ test('locked arm: a fresh-keyed replay echoing a superseded'
         await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-6', token,
             { v: 'second' },
-            { [IF_RESPONSE_ID_HEADER]: genesisId },
+            { [IF_MATCH_HEADER]: strongEtagOf(genesisId) },
         ));
         // A DIFFERENT (fresh) address has no head of its own;
         // echoing doc-6's now-superseded genesis id is neither
@@ -437,7 +449,7 @@ test('locked arm: a fresh-keyed replay echoing a superseded'
         const res = await handleRequest(db, req(
             'PUT', '/' + TEST_FAMILY + '/doc-7', token,
             { v: 'first' },
-            { [IF_RESPONSE_ID_HEADER]: genesisId },
+            { [IF_MATCH_HEADER]: strongEtagOf(genesisId) },
         ));
         assert.equal(res.status, 412);
     });
@@ -529,11 +541,11 @@ async () => {
         const [first, second] = await Promise.all([
             handleRequest(db, req(
                 'PUT', path, token, { v: 'a' },
-                { [IF_RESPONSE_ID_HEADER]: head },
+                { [IF_MATCH_HEADER]: strongEtagOf(head) },
             )),
             handleRequest(db, req(
                 'PUT', path, token, { v: 'b' },
-                { [IF_RESPONSE_ID_HEADER]: head },
+                { [IF_MATCH_HEADER]: strongEtagOf(head) },
             )),
         ]);
         const statuses =
@@ -546,7 +558,7 @@ async () => {
         // only by the storage layer's unique-column scan
         // (api/db.ts's UniqueConstraintError), never by the
         // gate's pre-check branches (api.ts:532-550), which
-        // read "If-Response-ID is required..." or "...does
+        // read "If-Match is required..." or "...does
         // not match the current document...".
         assert.equal(
             loserBody.error,

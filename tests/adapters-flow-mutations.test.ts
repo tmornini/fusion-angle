@@ -57,14 +57,14 @@ const EMPTY_GRAPH_DELTA = {
 // flows/:id is locked-class (Task 3): a raw ctx.PUT that hand-
 // crafts its wire body (rather than riding putFlow's own C6
 // retry loop) must echo the current head itself, or a
-// non-genesis save 412s. Read once via GETWithResponseId and
+// non-genesis save 428s. Read once via GETWithEtag and
 // thread the echo through PUT's headerFields.
-function ifResponseIdHeaders(
-    responseId: string | undefined,
+function ifMatchHeaders(
+    etag: string | undefined,
 ): readonly (readonly [string, string])[] | undefined {
-    return responseId === undefined
+    return etag === undefined
         ? undefined
-        : [['if-response-id', responseId]];
+        : [['if-match', '"' + etag + '"']];
 }
 
 function buildNode(
@@ -324,8 +324,8 @@ test(
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
-        const { responseId } =
-            await ctx.GETWithResponseId<FlowWithGraph>(
+        const { etag } =
+            await ctx.GETWithEtag<FlowWithGraph>(
                 'flows/flow-1',
             );
         const body = {
@@ -345,7 +345,7 @@ test(
             graphDelta: EMPTY_GRAPH_DELTA,
             revivals: [],
         };
-        const headers = ifResponseIdHeaders(responseId);
+        const headers = ifMatchHeaders(etag);
         await ctx.PUT('flows/flow-1', body, headers);
         await ctx.PUT('flows/flow-1', body, headers);
         const events = await ctx.GET<StateEntity[]>(
@@ -402,8 +402,8 @@ test(
         await createBaseFlow(ctx, 'flow-1');
         // versions POST RETIRED (Phase 15 Task 7); redo is
         // client-side document PUT only (performRedo).
-        const { responseId } =
-            await ctx.GETWithResponseId<FlowWithGraph>(
+        const { etag } =
+            await ctx.GETWithEtag<FlowWithGraph>(
                 'flows/flow-1',
             );
         await ctx.PUT(
@@ -425,7 +425,7 @@ test(
                 graphDelta: EMPTY_GRAPH_DELTA,
                 revivals: [],
             },
-            ifResponseIdHeaders(responseId),
+            ifMatchHeaders(etag),
         );
         const events = await ctx.GET<StateEntity[]>(
             'flows/flow-1/history',

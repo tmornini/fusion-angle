@@ -60,7 +60,7 @@ export interface MessagePair {
     readonly responseHash: string;
     readonly supersedes?: string;      // absent == genesis
     // The locked-class sibling of supersedes (spec §The two
-    // PUT classes): the verified If-Response-ID echo, carried
+    // PUT classes): the verified If-Match pair id, carried
     // forward as PROVENANCE rather than displacement — mutually
     // exclusive with supersedes (a locked non-genesis write sets
     // follows and never supersedes; a simple write sets
@@ -109,8 +109,8 @@ export interface WritePairInput {
     readonly responseBody: unknown | undefined;
     readonly headPairId: string | undefined;
     // The locked-class counterpart of headPairId: the verified
-    // If-Response-ID echo, set by the caller ONLY when the gate's
-    // four-outcome table (api.ts) resolved the write as a
+    // If-Match pair id, set by the caller ONLY when the gate's
+    // six-outcome table (api.ts) resolved the write as a
     // matching-echo non-genesis locked write — mutually
     // exclusive with headPairId (a caller passes one or the
     // other, never both). Optional so every existing simple-
@@ -331,16 +331,9 @@ export function httpDateOf(at: string): string {
     return new Date(at).toUTCString();
 }
 
-// The locked-class request header: the client's claimed current
-// head, echoed back so a byte-identical resend is a different
-// message from a genuinely stale one (a different echo hashes
-// differently — spec §The two PUT classes). Exported so api.ts
-// reads the SAME header name the hash covers.
-export const IF_RESPONSE_ID_HEADER = 'if-response-id';
-
-// PATCH concurrency dialect (Task 10/11): If-Match carries
+// Locked PUT and PATCH concurrency dialect: If-Match carries
 // the strong ETag (head document-pair response id). Not a
-// credential — stored verbatim so two PATCHes differing only
+// credential — stored verbatim so two writes differing only
 // in If-Match are different messages for replay identity.
 export const IF_MATCH_HEADER = 'if-match';
 
@@ -418,8 +411,7 @@ export function attachEtag(
 // verbatim, including `authorization`.
 const HOISTED_HEADER_NAMES: readonly string[] = [
     'authorization', 'content-type', 'idempotency-key',
-    REQUEST_ID_HEADER, IF_RESPONSE_ID_HEADER,
-    IF_MATCH_HEADER,
+    REQUEST_ID_HEADER, IF_MATCH_HEADER,
 ];
 
 export function hoistedHeaderFields(request: Request): FieldLine[] {

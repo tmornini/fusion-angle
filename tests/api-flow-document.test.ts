@@ -19,6 +19,7 @@ import {
 import {
     headPairIdAt,
     canonicalUriPrefix,
+    strongEtagOf,
 } from '../api/message-pair.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
@@ -134,7 +135,7 @@ async function createFlow(
 // longer the address's head — its synthesized document pair
 // (appended after, so strictly later) is. A save must echo THIS
 // id, read fresh via GET, exactly as the real client
-// (buildFlowPutBody's ctx.GETWithResponseId) does.
+// (buildFlowPutBody's ctx.GETWithEtag) does.
 async function headResponseId(
     db: MemoryDbAdapter,
     token: string,
@@ -146,6 +147,21 @@ async function headResponseId(
     const id = got.headers.get('Response-ID');
     assert.ok(id, 'no Response-ID on GET /flows/' + flowId);
     return id!;
+}
+
+async function headEtag(
+    db: MemoryDbAdapter,
+    token: string,
+    flowId: string,
+): Promise<string> {
+    const res = await handleRequest(
+        db,
+        req('GET', '/flows/' + flowId, token),
+    );
+    assert.equal(res.status, 200);
+    const raw = res.headers.get('ETag');
+    assert.notEqual(raw, null, 'locked GET carries ETag');
+    return raw!;
 }
 
 // Decode a stored request row's canonical message back into its
@@ -216,7 +232,7 @@ test('postFlowDocumentOp returns the entity, exactly one'
                 }],
             },
         }),
-        { 'If-Response-ID': headId },
+        { 'if-match': strongEtagOf(headId) },
     ));
     assert.equal(update.status, 200);
     const wire = await update.json() as { name: string };
@@ -280,7 +296,7 @@ test('postFlowDocumentOp with revivals posts the restored'
                 },
             ],
         },
-        { 'If-Response-ID': headId },
+        { 'if-match': strongEtagOf(headId) },
     ));
     assert.equal(update.status, 200);
     // SIDECAR-KEEP (C3): pin graphDelta.deletions / revivals
@@ -362,6 +378,78 @@ test('the document body carries state/state_at/graph while'
 // --- e2e locked-class tests (through handleRequest — flows/:id
 // is now wired onto documentPutHandler(FLOWS_WIRING)) ---
 
+test('locked PUT with no If-Match over a head is 428',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await createFlow(db, token, 'flow-if-match-428');
+    const res = await handleRequest(db, req(
+        'PUT', '/flows/flow-if-match-428', token,
+        documentBody('No Match', 'flow-if-match-428-a'),
+    ));
+    assert.equal(res.status, 428);
+    assert.equal(
+        (await res.json()).error,
+        'If-Match is required to PUT /flows/'
+        + 'flow-if-match-428',
+    );
+});
+
+test('locked PUT with a malformed If-Match is 400',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await createFlow(db, token, 'flow-if-match-400');
+    for (const bad of ['*', 'W/"x"', '"a", "b"', 'bare']) {
+        const res = await handleRequest(db, req(
+            'PUT', '/flows/flow-if-match-400', token,
+            documentBody('Bad Match', 'flow-if-match-400-a'),
+            { 'if-match': bad },
+        ));
+        assert.equal(res.status, 400, bad);
+        assert.equal(
+            (await res.json()).error,
+            'If-Match must carry exactly one strong'
+            + ' validator',
+        );
+    }
+});
+
+test('locked PUT with a stale If-Match is 412',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await createFlow(db, token, 'flow-if-match-412');
+    const res = await handleRequest(db, req(
+        'PUT', '/flows/flow-if-match-412', token,
+        documentBody('Stale Match', 'flow-if-match-412-a'),
+        { 'if-match': '"zzzzzzzzzzzzzzzzzzzzzz"' },
+    ));
+    assert.equal(res.status, 412);
+    assert.equal(
+        (await res.json()).error,
+        'If-Match does not match the current document at '
+        + '/flows/flow-if-match-412',
+    );
+});
+
+test('locked PUT with If-Match and no head is 412',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'PUT', '/flows/flow-if-match-none', token,
+        documentBody('Ghost', 'flow-if-match-none-a'),
+        { 'if-match': '"zzzzzzzzzzzzzzzzzzzzzz"' },
+    ));
+    assert.equal(res.status, 412);
+    assert.equal(
+        (await res.json()).error,
+        'If-Match does not match the current document at '
+        + '/flows/flow-if-match-none',
+    );
+});
+
 test('e2e: a byte-identical resend converges (one event, one'
 + ' pair, stored response returned)', async () => {
     const db = await freshDb();
@@ -369,7 +457,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     await createFlow(db, token, 'flow-locked-3');
     const headId = await headResponseId(db, token, 'flow-locked-3');
     const body = documentBody('Resend', 'flow-locked-3-a');
-    const headers = { 'if-response-id': headId };
+    const headers = { 'if-match': strongEtagOf(headId) };
     const first = await handleRequest(db, req(
         'PUT', '/flows/flow-locked-3', token, body, headers,
     ));
@@ -395,8 +483,8 @@ test('e2e: a byte-identical resend converges (one event, one'
     );
 });
 
-test('e2e: a save without If-Response-ID on an existing flow'
-+ ' 412s; with the stale echo 412s; with the fresh echo'
+test('e2e: a save without If-Match on an existing flow'
++ ' 428s; with the stale echo 412s; with the fresh echo'
 + ' succeeds and the stored response carries Follows',
 async () => {
     const db = await freshDb();
@@ -408,19 +496,19 @@ async () => {
         'PUT', '/flows/flow-locked-1', token,
         documentBody('No Echo', 'flow-locked-1-a'),
     ));
-    assert.equal(noEcho.status, 412);
+    assert.equal(noEcho.status, 428);
 
     const staleEcho = await handleRequest(db, req(
         'PUT', '/flows/flow-locked-1', token,
         documentBody('Stale Echo', 'flow-locked-1-b'),
-        { 'if-response-id': 'not-the-real-head' },
+        { 'if-match': strongEtagOf('not-the-real-head') },
     ));
     assert.equal(staleEcho.status, 412);
 
     const fresh = await handleRequest(db, req(
         'PUT', '/flows/flow-locked-1', token,
         documentBody('Fresh Echo', 'flow-locked-1-c'),
-        { 'if-response-id': headId },
+        { 'if-match': strongEtagOf(headId) },
     ));
     assert.equal(fresh.status, 200);
     assert.equal(fresh.headers.get('Follows'), headId);
@@ -447,6 +535,8 @@ async () => {
     const headId = got.headers.get('Response-ID');
     assert.ok(headId);
     assert.notEqual(headId, createdId);
+    const etag = await headEtag(db, token, 'flow-locked-2');
+    assert.equal(etag, strongEtagOf(headId));
     const requests = await db.requests.getAll();
     const atAddress = requests.filter(
         r => r.uri_prefix === '/organizations/1/flows/'
@@ -761,7 +851,7 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
                 memberEvents: [], attributeEvents: [],
             },
         }),
-        { 'if-response-id': genesisHead },
+        { 'if-match': strongEtagOf(genesisHead) },
     ));
     assert.equal(firstSave.status, 200);
     const headAfterFirstSave = await headResponseId(
@@ -774,7 +864,7 @@ test('e2e: POST flows/:id/undo forms a document pair carrying'
     const secondSave = await handleRequest(db, req(
         'PUT', '/flows/flow-undo-pairs-1', token,
         documentBody('Back To Empty', 'flow-undo-pairs-1-ev-2'),
-        { 'if-response-id': headAfterFirstSave },
+        { 'if-match': strongEtagOf(headAfterFirstSave) },
     ));
     assert.equal(secondSave.status, 200);
     const preUndoHead = await headResponseId(
@@ -866,7 +956,7 @@ async () => {
     const before = await handleRequest(db, req(
         'PUT', '/flows/flow-race-1', token,
         documentBody('Before Race', 'flow-race-1-ev-1'),
-        { 'if-response-id': genesisHead },
+        { 'if-match': strongEtagOf(genesisHead) },
     ));
     assert.equal(before.status, 200);
     const head = await headResponseId(db, token, 'flow-race-1');
@@ -881,7 +971,7 @@ async () => {
         handleRequest(db, req(
             'PUT', '/flows/flow-race-1', token,
             documentBody('Saved', 'flow-race-1-save-ev'),
-            { 'if-response-id': head },
+            { 'if-match': strongEtagOf(head) },
         )),
     ]);
 

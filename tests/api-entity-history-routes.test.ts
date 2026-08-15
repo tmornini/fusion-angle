@@ -585,7 +585,7 @@ async function seedFlowLifecycle(
                 '2026-03-02T00:00:00.000000Z',
                 id + '-ev2',
             ),
-            { 'if-response-id': headId! },
+            { 'if-match': '"' + headId! + '"' },
         ),
     );
     assert.equal(t.status, 200);

@@ -1133,7 +1133,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
             },
             revivals: [],
         },
-        { 'if-response-id': headId! },
+        { 'if-match': '"' + headId! + '"' },
     ));
     assert.equal(putRemove.status, 200);
 
@@ -1273,7 +1273,7 @@ test('residual pin: soft-deleted node drops from'
             },
             revivals: [],
         },
-        { 'if-response-id': headId! },
+        { 'if-match': '"' + headId! + '"' },
     ));
     assert.equal(putDelete.status, 200);
 

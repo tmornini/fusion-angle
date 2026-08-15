@@ -413,9 +413,9 @@ function recordingCtx(
         DELETE: async () => {
             throw new Error('unexpected DELETE');
         },
-        GETWithResponseId: async () => {
+        GETWithEtag: async () => {
             throw new Error(
-                'unexpected GETWithResponseId',
+                'unexpected GETWithEtag',
             );
         },
     } as unknown as RequestContext;

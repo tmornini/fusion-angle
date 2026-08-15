@@ -528,7 +528,7 @@ test('live-write chain: create, save, node delete, undo, '
         documentBody('Chain Flow Saved', flowId + '-save', {
             state_at: saveAt, graph: fullGraph,
         }),
-        { 'if-response-id': headId },
+        { 'if-match': '"' + headId + '"' },
     ));
     assert.equal(saved.status, 200);
     headId = saved.headers.get('Response-ID')!;
@@ -543,7 +543,7 @@ test('live-write chain: create, save, node delete, undo, '
                 state_at: versionAt, graph: fullGraph,
             },
         ),
-        { 'if-response-id': headId },
+        { 'if-match': '"' + headId + '"' },
     ));
     assert.equal(versionedSave.status, 200);
     headId = versionedSave.headers.get('Response-ID')!;
@@ -574,7 +574,7 @@ test('live-write chain: create, save, node delete, undo, '
                 },
             },
         ),
-        { 'if-response-id': headId },
+        { 'if-match': '"' + headId + '"' },
     ));
     assert.equal(deletedSave.status, 200);
     headId = deletedSave.headers.get('Response-ID')!;
@@ -623,7 +623,7 @@ test('live-write chain: create, save, node delete, undo, '
                 ],
             },
         }),
-        { 'if-response-id': headId },
+        { 'if-match': '"' + headId + '"' },
     ));
     assert.equal(redone.status, 200);
     headId = redone.headers.get('Response-ID')!;
@@ -638,7 +638,7 @@ test('live-write chain: create, save, node delete, undo, '
             state: 'deleted', state_at: tombstoneAt,
             graph: deletedGraph,
         }),
-        { 'if-response-id': headId },
+        { 'if-match': '"' + headId + '"' },
     ));
     assert.equal(tombstoned.status, 200);
 
@@ -926,7 +926,7 @@ test('the Follows chain terminal reaches exactly the derived '
             documentBody(
                 'Save ' + i, 'flow-drift-follows-ev-' + i,
             ),
-            { 'if-response-id': headId },
+            { 'if-match': '"' + headId + '"' },
         ));
         assert.equal(saved.status, 200);
         assert.equal(saved.headers.get('Follows'), headId);

@@ -933,7 +933,7 @@ async () => {
             },
             revivals: [],
         },
-        { 'if-response-id': headId },
+        { 'if-match': '"' + headId + '"' },
     ));
     assert.equal(deleted.status, 200);
 

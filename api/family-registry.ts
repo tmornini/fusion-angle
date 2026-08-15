@@ -129,7 +129,7 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
             // organizations/:id comment: "a repeat PUT
             // records Supersedes" — the simple-class chain
             // (spec §The two PUT classes), never
-            // If-Response-ID/Follows.
+            // If-Match/Follows.
         createBodyIdField: 'id', // INERT — no collection POST
             // exists for organizations either (route(
             // 'organizations', {get}) is GET-only); the same

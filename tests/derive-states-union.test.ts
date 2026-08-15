@@ -278,7 +278,7 @@ async function saveFlowWithSidecars(
             },
             revivals,
         },
-        { 'if-response-id': headId },
+        { 'if-match': '"' + headId + '"' },
     ));
     assert.equal(res.status, 200, 'flow save PUT failed');
 }

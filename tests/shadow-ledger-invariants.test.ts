@@ -99,7 +99,7 @@ function recordPutBody(
 }
 
 // Task 7's additive pin: a GENESIS-shaped flows document PUT.
-// A fresh id needs no If-Response-ID (the locked class's
+// A fresh id needs no If-Match (the locked class's
 // genesis-with-neither-header-passes rule), so this addition is
 // purely additive — deliberately NOT mirroring the ideas case's
 // second-PUT chain above, which would need header threading for
@@ -313,7 +313,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     assert.equal(revoked.status, 204);
 
     // Genesis document PUT (flows, org 1) — a fresh id needs no
-    // If-Response-ID under the locked class.
+    // If-Match under the locked class.
     const flowGenesis = await handleRequest(db, req(
         'PUT', '/flows/inv-flow-1', org1Token,
         flowDocumentBody('Invariant Flow', 'inv-flow-1-ev'),

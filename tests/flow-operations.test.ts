@@ -220,7 +220,7 @@ async function setupFlow(): Promise<{
 }
 
 // A db with NO flow row: commitFlowMutation's / putFlow's own
-// baseline read (buildFlowPutBody's ctx.GETWithResponseId)
+// baseline read (buildFlowPutBody's ctx.GETWithEtag)
 // does ctx.GET('flows/flow-1') which 404s, driving the catch
 // → failOp(...).
 async function setupNoFlow(): Promise<MemoryDbAdapter> {
@@ -1360,7 +1360,7 @@ test(
 // comment originally described is retired — undo no longer
 // consumes it, so archiving before redo served no purpose).
 // putFlow's own baseline read (buildFlowPutBody's
-// ctx.GETWithResponseId) 404s on a missing flow exactly as
+// ctx.GETWithEtag) 404s on a missing flow exactly as
 // postFlowVersion's read used to, so the SAME graceful failOp
 // this test pins still holds, matching every sibling perform*
 // mutation's read-then-write covenant.
