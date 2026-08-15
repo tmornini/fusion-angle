@@ -2,12 +2,18 @@
 
 Date: 2026-08-13
 Author: Fusion-AI / Grok Build
-Status: Draft
+Status: **Superseded** by
+`docs/superpowers/specs/2026-08-14-postgres-backend-design.md`
+(accepted walkthrough 2026-08-13–14). Do not implement
+from this file.
 
 Supersedes:
 `docs/superpowers/specs/2026-08-12-postgres-backend-design.md`
 
-Does **not** supersede If-Match D1–D12:
+Supersedes If-Match **D4** (strong-validator byte source),
+D1's validator-value detail, and D8's "wire ETag" row —
+owner-gated 2026-08-13 (KD1). D2, D3, D5–D7, and D9–D12
+remain law:
 
 - `docs/superpowers/specs/2026-08-05-optimistic-locking-if-match-unification-design.md`
   and its merged amendments
@@ -35,10 +41,13 @@ inherited from the superseded 2026-08-12 Postgres spec are
 in import). Do not write bare “W14” for the column hash.
 
 Review lineage (absorbed, not appended): raccoon concurrency
-critique
-(`~/.claude/plans/go-to-church-state-vivid-raccoon.md`) and
-grok cross-spec critique
-(`~/.claude/plans/go-to-church-state-postgres-backend-critique.md`).
+critique (`2026-08-13-postgres-backend-review-raccoon.md`)
+and grok cross-spec critique
+(`2026-08-13-postgres-backend-review-grok.md`), both
+retained verbatim in this directory, synthesized with
+owner-gated dispositions in
+`2026-08-13-postgres-backend-amendments-design.md`
+(W22 = KD1 as revised; W23 = KD2; W24 = KD3).
 Decisions below are law. Implement from this file.
 
 ## Overview
@@ -56,11 +65,14 @@ ZIP, testing, and the yank. Postgres starts empty. There is no
 data migration.
 
 Two prior defects in the 2026-08-12 spec are closed here, not
-left as options: wire `ETag` / `If-Match` stay the document-pair
-**response id** (If-Match D4); the UNIQUE `follows` /
-`replaces_response_id` column is dropped (If-Match D5/D6).
-Content-hash lives only in column `responses.etag` as the
-`/versions/<etag>` path token.
+left as options: wire `ETag` / `If-Match` become the stored
+**content hash** (column `responses.etag`), superseding
+If-Match D4 explicitly — owner-gated 2026-08-13 (KD1) — and
+the UNIQUE `follows` / `replaces_response_id` column is
+dropped (If-Match D5/D6). For STREAM documents the live
+`ETag` and the `/versions/<etag>` path token are the same
+value; instances advertise a per-caller projected hash
+(KD1).
 
 This ship is a **demo server**: live passwords, refresh tokens,
 authorization codes, and `client_assertion` JWS sit verbatim in
@@ -150,8 +162,9 @@ Locked from 2026-08-12 (not reopened):
 10. **`/history` → `/versions`**, plus per-version fetch at
     `GET <family>/:id/versions/<etag>` on every PUTable
     family. Path token is the **column** etag
-    (Postgres-W14 content hash), not the live advertised
-    `ETag`.
+    (Postgres-W14 content hash) — which under KD1 IS the
+    live advertised document `ETag`; only instances
+    diverge (projected live tag vs full-state token).
 11. **Env names call the thing the thing:** `POSTGRES_URL`,
     `JWT_HMAC_SIGNING_KEY`, `HTTP_SERVER_PORT`.
 12. **Password hashing upgrades to scrypt** at the server
@@ -161,17 +174,22 @@ Locked from 2026-08-12 (not reopened):
 ### Amendments (2026-08-13)
 
 Authoritative over any conflicting 2026-08-12 letter,
-including Postgres-W4, Postgres-W14-as-advertised-ETag,
-and the `replaces_response_id` UNIQUE.
+including Postgres-W4 and the `replaces_response_id`
+UNIQUE. KD1 was reversed later the same day by the owner
+(second review synthesis, W22): the first draft kept D4;
+the gated decision completes Postgres-W14 instead.
 
-1. **KD1 — Keep If-Match D4. Retreat Postgres-W14 to
-   column + versions.** Live `ETag` / `If-Match` stay the
-   head document-pair response id. Column `responses.etag`
-   becomes the Postgres-W14 content hash and is used only
-   as the `/versions/<etag>` path token. Write responses
-   advertise `ETag: "<pairId>"` and `Response-ID:
-   <pairId>`. One dialect. Raccoon "etag-resolved
-   If-Match" is Option B with a hop and is rejected.
+1. **KD1 — Complete Postgres-W14: content-hash wire
+   validator. Supersedes If-Match D4.** Owner-gated
+   2026-08-13. Live `ETag` / `If-Match` on PUTable
+   document GETs carry the column `responses.etag`
+   content hash — the live tag IS the `/versions/<etag>`
+   token. Instances advertise a per-caller PROJECTED-wire
+   hash. Write responses advertise `ETag: "<etag>"` and
+   `Response-ID: <pairId>`. The gate compares the head's
+   own `etag` value pre-tx and anchors the unchanged
+   in-tx assert on the pair id (crypto never inside a
+   transaction). One dialect, flipped once in the A-cut.
 2. **KD2 — Honor If-Match D5/D6. Drop UNIQUE follows /
    replaces.** No `follows` column. No
    `replaces_response_id` column. Race backstop is
@@ -289,7 +307,8 @@ and the `replaces_response_id` UNIQUE.
 - `/snapshots/export` and `/snapshots/pristine` (B4/B5).
 - Versioned record-type snapshots (B7); work-order abandon
   (B8).
-- Overturning If-Match D4/D5/D6.
+- Overturning If-Match D5/D6 (D4 IS superseded — KD1,
+  owner-gated).
 - Converting work-orders in Phase B.
 - A mint realm / multi-process `nowUtc()`.
 - Token-at-rest hashing (named future).
@@ -301,52 +320,124 @@ and the `replaces_response_id` UNIQUE.
 Each decision is binding. Rationale is the shortest honest
 one.
 
-### KD1 — Keep If-Match D4 (Postgres-W14 column-only)
+### KD1 — Complete Postgres-W14: content-hash wire validator
 
-**Law.** Wire `ETag` and `If-Match` carry the head document-
-pair **response id** (quoted: `strongEtagOf`). This spec does
-not supersede If-Match D4. Column `responses.etag` is the
-Postgres-W14 content hash: sha256 hex of that stored
-response's `serializeWire` octets with the `ETag` and
-`Date` fields omitted. The column is the path token for
-`GET <family>/:id/versions/<etag>` (noun-scoped via
-`responses_version_etag`). Live advertised `ETag` is not a
-versions address (already true for instances).
+**Law.** Wire `ETag` and `If-Match` on PUTable document
+GETs carry the **column `responses.etag` content hash**:
+sha256 hex of that stored response's `serializeWire`
+octets with the `ETag` and `Date` fields omitted. This
+**supersedes If-Match D4** (and D1's validator-value
+detail and D8's "wire ETag" row) — owner-gated 2026-08-13
+with both options on the table; the review synthesis
+(`2026-08-13-postgres-backend-amendments-design.md`, W22)
+records the adjudication. D2, D3, D5–D7, and D9–D12 are
+untouched: only the validator BYTES change. The
+409/412/428/400 taxonomy, genesis rules, replay-first,
+hoist covenants, and client re-quote discipline all
+stand.
 
-Write responses advertise both:
+Emission:
 
-```
-ETag: "<pairId>"
-Response-ID: <pairId>
-```
+- PUTable-family document GET (and locked flow GET after
+  the cut): `ETag: "<column etag of the head row>"`. The
+  live tag IS the `/versions/<etag>` address — the
+  content-addressing property Postgres-W14 exists for.
+- Write success and replay responses attach the stored
+  response's own `etag` value, plus
+  `Response-ID: <pairId>` (pair identity — never the
+  concurrency dialect).
+- Live instance GET: `ETag` = sha256 of the PROJECTED
+  wire for THIS caller, with the head `Response-ID` in
+  the preimage (position-uniqueness, below). The stored
+  column (FULL-STATE hash) never appears on the live
+  instance wire.
+- Collection GET does not advertise `ETag` in v1 (no
+  304; see KD7; collections are not If-Match targets).
+  Original-W14 collection emission is deferred with the
+  304 path — named residual.
+- Simple-class document GET does not gain a REQUIRED
+  If-Match just because a validator exists (If-Match
+  D7: simple class stays LWW).
 
-One dialect. Collection GET does not advertise `ETag` in v1
-(no 304; see KD7). Simple-class document GET does not gain
-an `ETag` just because versions exist (If-Match D7: simple
-class stays LWW).
+Gate mechanics (the trap the 2026-08-12 letter never
+specified):
 
-**Why.** Today's If-Match gate compares pair ids
-(`api/api.ts`, `api/routes.ts`). Postgres-W14-as-advertised-
-ETag 412s every locked write forever. Mixing dialects
-(hash on GET, pair id on If-Match) is the same defect.
-Raccoon etag-resolved If-Match is Option B with a lookup
-hop; it is valid only if D4 is superseded. Phase A is
-already the blast radius. Do not add a second platform
-cut.
+- `If-Match` carries the quoted 64-hex hash.
+  `parseIfMatch` mechanics unchanged; malformed → 400.
+- **Documents:** pre-tx HEAD PROBE; compare the head
+  row's `etag` value to the If-Match hash — mismatch →
+  412 (stale or unknown validator; no index probe on
+  the write path). Match → `expectedPairId` = the head's
+  pair id; then the unchanged in-tx
+  `assertHeadMatchesIfMatch` (KD2).
+- **Instances:** pre-tx derive the head, project for
+  THIS caller, hash the projected wire, compare —
+  mismatch → 412. Match → in-tx assert on the pre-tx
+  head's pair id. The work-order transition's If-Match
+  (preconditions the bound instance head) rides the
+  same comparison.
+- **Crypto stays pre-tx.** The WIRE dialect is content
+  hashes; the INTERNAL in-tx anchor stays a pair id —
+  the same wire-vs-internal split If-Match D1 already
+  draws ("Server-internal head lookups stay on bare
+  pair id"). Hashing inside `transaction()` would break
+  the IndexedDB auto-commit constraint and § F's
+  retained pre-tx crypto discipline. An implementation
+  that recomputes hashes in-tx is wrong on both tiers.
+- Hoisted `If-Match` (replay identity; post-KD2 the
+  only predecessor provenance) now stores the hash.
+  Rare provenance resolution is the noun-scoped
+  `responses_version_etag` lookup.
+- R8 recovery: replay serves the stored response; the
+  attach reads the stored row's `etag` (documents) or
+  recomputes the caller's projected hash of that
+  revision (instances). No column chain read.
+
+**Position-uniqueness** (why a revert does not revive an
+old validator): the stored response wire carries its own
+`Response-ID` field, so two writes with byte-identical
+bodies still hash differently. N matches in
+`responses_version_etag` stay a cryptographic curiosity
+(the index is not unique; N → latest `(at, id)`, versions
+fetch only). The instance projected preimage includes the
+head `Response-ID` for the same reason. The validator
+keeps history-position semantics while committing to
+content.
+
+Read-path cost: documents pay zero (column value);
+instance detail / list / history rows pay one sha256 per
+projected row — WebCrypto on a path that already projects
+per row. Bounded, named; measure at first-light.
 
 `SCHEMA.md`'s current etag wording ("sha256 of body bytes
 (or empty; `bodyEtagOf`)" / "hashes base64 text") dies
 with this column-meaning change. SCHEMA.md is updated at
 implementation to: column etag = Postgres-W14 content
-hash; wire ETag = pair id.
+hash = the document wire validator; instance wire
+validator = per-caller projected hash. The old
+name-the-collision pins (wire ETag ≠ `responses.etag`)
+retire with the covenant: for documents the two are now
+the same value BY DESIGN, and the pins flip to assert
+that.
 
-Phase B render-at-write changes stored response bodies, so
-every `/versions/<etag>` token minted in Phase A dies at
-B. Recovery is reseed until a re-render primitive exists.
+Phase B render-at-write changes stored response bodies,
+so every `/versions/<etag>` token AND every live document
+validator minted in Phase A dies at B (same reseed; a
+stale If-Match after it 412s and recovers by re-GET).
+Recovery is reseed until a re-render primitive exists.
 Do not promise stable version tokens across B.
 
-Cross-references: If-Match D4; work-order SoT (instance ETag
-is the same pair-id validator).
+Sequencing: the content-hash validator requires the
+stored-wire `etag` column, so the S1 dialect flip cannot
+precede the storage covenant — S1 rides the A-cut (PR
+plan). Pair-id wire ETags are never shipped and then
+flipped; instances leave the pair-id tag in the same
+cut. D3's 428 letter may still land independently
+before it.
+
+Cross-references: If-Match D4 (superseded), D5–D12
+(law); work-order SoT instance-ETag pins re-pin on the
+projected hash in the same cut.
 
 ### KD2 — Honor If-Match D5/D6. Drop UNIQUE follows/replaces
 
@@ -358,7 +449,10 @@ column name").
 - Race backstop = `assertHeadMatchesIfMatch(view, {
   uriPrefix, uriId, expectedPairId })` on the transaction
   view, before `appendMessagePair`. Mismatch → 412, zero
-  rows stored.
+  rows stored. `expectedPairId` is the pre-tx head's pair
+  id after the KD1 hash comparison (documents: head
+  `etag` column vs If-Match; instances: projected hash
+  vs If-Match).
 - Predecessor = hoisted `If-Match` on the request message
   when present (`ifMatchFromPair`). R8 recovery
   (`revisionEtagForInstancePatch`) moves to the message
@@ -605,10 +699,12 @@ Hashed assets (content-addressed bundle names):
 HTML: `Cache-Control: no-store`. API:
 `Cache-Control: no-store`.
 
-**No 304 in v1.** `If-None-Match` is unnamed today. Pair-id
-ETags ship on instance GET and (after S1) locked flow GET.
-The server does not evaluate them for conditional GET.
-Residual, not a silent gap. A 304 path is future work.
+**No 304 in v1.** `If-None-Match` is unnamed today.
+Content-hash ETags (KD1) ship on document and instance
+GETs with the A-cut. The server does not evaluate them
+for conditional GET. Residual, not a silent gap. A 304
+path is future work — content validators make it natural
+when it comes.
 
 ### KD8 — Render-at-write is REST or a named cache
 
@@ -954,6 +1050,7 @@ not remaining blockers.
 | B7 versioned type snapshots | Domain feature; stays future. |
 | B8 work-order W5 no-abandon | Domain gap; untouched. |
 | B9 API.md §5 chronology | Docs-only; stays deferred. |
+| B10 304 / `If-None-Match` | Deferred. Content-hash `ETag`s ship on document and record-instance GETs; the server does not evaluate them for conditional GET. Not a silent gap. |
 
 ## Design
 
@@ -1144,10 +1241,12 @@ Column notes:
 - `etag` is the Postgres-W14 content hash (KD1). App-computed at
   pair formation from the response wire with `ETag` and
   `Date` omitted. Retires today's `bodyEtagOf` meaning
-  (same covenant break as the hash re-baseline). Live
-  advertised `ETag` does not use this column. Collection
-  and live-instance ETags (pair id on the wire) do not
-  use this column.
+  (same covenant break as the hash re-baseline). Under
+  KD1 the live advertised DOCUMENT `ETag` IS this column
+  (head row); write and replay responses attach their
+  own row's value. Live-instance ETags (per-caller
+  projected hash) and collections (no v1 tag) do not use
+  this column.
 - The pair FK (`responses.id REFERENCES requests`) makes
   the response→request half of the 1:1 pair balance
   structural. An orphan request row remains representable;
@@ -1230,8 +1329,11 @@ Each index maps to catalogued reads:
   dedup re-check. Non-unique on purpose: replay-exempt
   routes legitimately carry duplicate hashes.
 - `responses_version_etag` — noun-scoped
-  `GET <family>/:id/versions/<etag>` lookup. Not unique:
-  N matches serve latest `(at, id)`.
+  `GET <family>/:id/versions/<etag>` lookup, plus rare
+  provenance resolution of a hoisted If-Match hash. Not
+  unique: N matches serve latest `(at, id)`. The
+  If-Match WRITE gate does not probe it (KD1 compares
+  the head's own `etag` value).
 - `responses_body` GIN — body-fact probes via `@>`
   (authorize-response `code`, `chain_id`, `identity_id`,
   `organization_id`, `attribute_id`, graph node ids).
@@ -1679,7 +1781,7 @@ Dashboard / workbox / flow-stats are not API routes.
 | Pattern | Class | Notes |
 |---|---|---|
 | `GET flows` | STREAM G2 | `flowEntityOf` minus `hasUndoHistory`; read-time stamp. |
-| `GET flows/:id` | STREAM G2 | Same. Locked GET advertises pair-id `ETag` after S1. |
+| `GET flows/:id` | STREAM G2 | Same. Locked GET advertises the content-hash `ETag` after the A-cut (KD1). |
 | `GET flows/:id/history` | CHAIN | Trio **history** exists even though GET does not stamp trio. |
 | `GET flows/:id/work-orders` | STREAM G6 | `flowWorkOrderEntityOf`. |
 | `GET flows/:id/records` | STREAM G6 | `flowRecordEntityOf`. |
@@ -1711,9 +1813,9 @@ pin site. There is no test today that this address is 404.
 | `GET .../record-types/:id/history` | CHAIN | Trio history; `missedReadError('record_types')`. |
 | `GET .../attributes` | STREAM G6 | `nestedAttributeWireOf`; parent type 404 first. |
 | `GET .../attributes/:attribute-id` | STREAM G6 | `nestedAttributeWireOf`. |
-| `GET .../instances` | PROJECT | `projectReadableValues` + list-row `etag` = pair id. |
-| `GET .../instances/:instance-id` | PROJECT | Same; live `ETag` = pair id (`attachEtag`). |
-| `GET .../instances/:id/history` | PROJECT + CHAIN | `{ at, etag: pairId, values }` DESC; project values. Gains `version` (column etag) as the `/versions/<etag>` token. |
+| `GET .../instances` | PROJECT | `projectReadableValues` + list-row `etag` = per-caller projected hash (KD1). |
+| `GET .../instances/:instance-id` | PROJECT | Same; live `ETag` = projected hash (KD1). |
+| `GET .../instances/:id/history` | PROJECT + CHAIN | `{ at, etag, values }` DESC; `etag` = per-caller projected revision hash (KD1); project values. Gains `version` (column etag) as the `/versions/<etag>` token. |
 
 **Objectives**
 
@@ -1797,28 +1899,34 @@ field.
 the column `etag` (Postgres-W14 content hash) of the
 document pair that recorded that event. That is the path
 token for
-`GET <family>/:id/versions/<version>`. Instance history
-keeps `etag` = pair id (If-Match dialect, D4 / D9) and
-adds `version` beside it. Do not overload the two.
+`GET <family>/:id/versions/<version>`. For documents the
+row's concurrency `etag` and `version` are the same value
+under KD1. Instance history keeps `etag` = the per-caller
+projected revision hash (D9 ladder mechanics; KD1 bytes)
+and adds `version` (full-state column hash) beside it. Do
+not overload the two on instances.
 
-**Wire ETag (KD1).** Advertised `ETag` is the pair id
-where a concurrency validator already exists (instances
-now; locked flows after S1). Column `etag` is the content
-hash. `Response-ID` stays the locator (`responses.id`).
+**Wire ETag (KD1).** Advertised `ETag` is the column
+content hash on document GETs and the per-caller
+projected hash on instance GETs — one flip, in the
+A-cut. `Response-ID` stays the locator (`responses.id`).
 Integrity of stored octets is `message_hash`. Date is
 re-spoken fresh on every serve and is omitted from the
-column-hash preimage (a Date in the preimage would churn
-the token).
+hash preimages (a Date in the preimage would churn the
+token). The stored wire's own `Response-ID` field stays
+IN the preimage — position-uniqueness (KD1).
 
 Algorithm is sha256 — the house digest. SHA-3 is rejected
 (WebCrypto has none).
 
-Live instance GET hashes nothing for the advertised tag:
-it attaches the pair id. The stored column hashes the
+Live instance GET hashes the PROJECTED wire per caller
+for the advertised tag. The stored column hashes the
 FULL-STATE stored wire. Those values differ. A client
 cannot take a live instance `ETag` and fetch
 `.../versions/<that>` — named, not a bug. The versions
 index's `version` field is the token that works.
+Documents have no such divergence: the live tag IS the
+token (KD1).
 
 **Phase B invalidates version tokens.** Phase A stores
 today's `successBody` and hashes that wire. Phase B
@@ -2090,7 +2198,13 @@ In `./validate` (no Postgres):
   → statuses `[200, 412]`, exactly one new head, loser
   stores nothing — **without** a `follows` unique index.
   Locked missing-If-Match 428. R8 message-plane ETag
-  recovery.
+  recovery. KD1 dialect pins: document GET → PUT
+  round-trips the column hash; stale hash → 412; two
+  differently-roled callers each round-trip their own
+  instance validator; byte-identical bodies on two
+  writes still yield distinct validators (`Response-ID`
+  in the preimage); no crypto inside `transaction()` on
+  any gate path.
 - Hasher self-description: PHC parse / dispatch, PBKDF2
   verify path, scrypt path with `maxmem`.
 - Server-ZIP client metafile: `SIGNING_KEY_MATERIAL` and
@@ -2174,13 +2288,15 @@ chain columns, `route`/`method`, and snapshot
 invalidation are **one storage covenant**. Merge them
 as one PR (A-cut) or as a stacked sequence that is
 **not** independently mergeable without a reseed — say
-so on every stacked PR. One reseed, not five. If-Match
-S1 (header dialect + D3 428) can land before the cut
-without a store break. `/history` → `/versions` is a
-client-path break on top of the cut. The working
-browser product takes the break first. Do not mix
-ETag dialects: S1 lands before or with any GET that
-advertises `ETag`. Phase B is a **second** version-
+so on every stacked PR. One reseed, not five. The D3
+428 letter can land before the cut without a store
+break; the S1 dialect flip rides the cut (KD1 — the
+content-hash validator needs the `etag` column).
+`/history` → `/versions` is a client-path break on top
+of the cut. The working browser product takes the break
+first. Do not mix ETag dialects: the KD1 flip lands
+atomically across flows, instances, and gates inside
+the cut. Phase B is a **second** version-
 token break (reseed). Yank waits on D stability, not
 on the work-order follow-on: FOLLOW-ON derives already
 run on Postgres via `getAll()`.
@@ -2228,11 +2344,11 @@ Two merge classes:
 | PR | Title | Touches | Depends | Class |
 |---|---|---|---|---|
 | A1 | Bytes-in digest seam | `shared/digest.ts`, digest tests | — | Independent. `sha256HexOfBytes` only. |
-| A2 | If-Match S1 + D3 428 | `message-pair.ts`, `api.ts`, `flow-mutations.ts`, `shared.ts`, If-Match tests | — | Independent. Flows advertise pair-id `ETag`; PUT only `If-Match`; delete `IF_RESPONSE_ID_HEADER` / `GETWithResponseId`. **Locked missing-If-Match → 428** (live is 412). Pins: 428 + header sweep. |
+| A2 | If-Match D3 428 letter | `api.ts`, If-Match tests | — | Independent. **Locked missing-If-Match → 428** (live is 412). The S1 dialect flip moves INTO the A-cut: the KD1 content-hash validator needs the stored-wire `etag` column, so flows and instances flip to `If-Match` + content-hash `ETag` (and `IF_RESPONSE_ID_HEADER` / `GETWithResponseId` are deleted) with the cut, not before. Pins: 428 now; dialect + header sweep with the cut. |
 | S2 | If-Match D12 S2 Request-ID | `shared.ts` `createRequestContext`, flow save + instance patch loops | — | Independent. Free to interleave. Operation-scoped `X-Request-ID` minted at loop entry, echoed on every hop. Live `shared.ts` mints one id per page context — that is D8/S2 unfinished. This PR lands it. |
 | A7 | 404-pin `flows/:id/versions` | history-route tests | — | Independent. Before A8. |
 | A9 | Tighten `successBody` | `api/routes.ts` | — | Independent. `Record<string, unknown>`. |
-| A-cut | Storage covenant | `db.ts`, `message-form.ts`, `message-pair.ts`, validators, seeds, snapshot gate, SCHEMA.md | A1, A2 | **One reseed.** Drop `follows`/`supersedes`; `assertHeadMatchesIfMatch`; R8 → message plane; delete UNIQUE → 412 and `headPairIdAt`; store `serializeWire`; `message_hash` via `sha256HexOfBytes`; Postgres-W14 column etag; `route`+`method`; loud-reject pre-break snapshots. Pair count 1498. **Not** five mergeable PRs. |
+| A-cut | Storage covenant | `db.ts`, `message-form.ts`, `message-pair.ts`, validators, seeds, snapshot gate, SCHEMA.md | A1, A2 | **One reseed.** Drop `follows`/`supersedes`; `assertHeadMatchesIfMatch`; R8 → message plane; delete UNIQUE → 412 and `headPairIdAt`; store `serializeWire`; `message_hash` via `sha256HexOfBytes`; Postgres-W14 column etag; KD1 dialect flip (content-hash `ETag` / `If-Match` on flows + instances; delete `IF_RESPONSE_ID_HEADER` / `GETWithResponseId`); `route`+`method`; loud-reject pre-break snapshots. Pair count 1498. **Not** five mergeable PRs. |
 | A8 | `/history` → `/versions` | routes, family-registry, adapters, tests | A-cut, A7 | Client-path break. Add `version` field. Register `GET .../versions/<etag>`. Flip A7 pin. |
 | B1 | Extended seam + IDB impls | `api/db.ts`, three backends | A-cut | `getAllAt` / `getHeadAt` / `getAllByRoute` / `getAllWhereBody` / `existsAt` / `getByEtag`. |
 | B2 | Render-at-write machinery | pair formation, document PUT, undo | B1, A9 | Mapper algorithm. **Second version-token break** (reseed). |
@@ -2258,9 +2374,10 @@ Two merge classes:
 | E1 | Work-order follow-on | WO routes, workbox, pins | B3f, D2, SoT W2–W10 | **Execute** locked re-verb (W1 already superseded here). Expiry, embed, history. Does **not** block F1. |
 | F1 | Yank | backends, browser ZIP, BOOTSTRAP_ROUTES, docs | **D stability** | Checklist in § N. post-yank `--record`. FOLLOW-ON may still use `getAll` on Postgres. |
 
-A2 may merge with A-cut’s S3 half if review wants one
-bisectable If-Match story (If-Match D12). Digest (A1)
-stays out of that cut.
+A2's 428 letter may merge with the A-cut if review wants
+one bisectable If-Match story (If-Match D12); the S1
+dialect flip is already inside the cut under KD1. Digest
+(A1) stays out of that cut.
 
 ## Follow-on session charter
 
@@ -2288,6 +2405,9 @@ and its amendments.
 5. Design work-order render-at-write + event-history
    shape; classify `GET work-orders` STREAM or ASSEMBLE
    behind parity pins. Yank does not wait for this.
+6. Consider renaming bind to `location` or `position`
+   (path, vocabulary, and wire keys). Verbs stay
+   locked; the name is open.
 
 ## Out of scope
 
@@ -2298,7 +2418,7 @@ and its amendments.
 - `/snapshots/export` and `/snapshots/pristine` (B4/B5).
 - Versioned record-type snapshots (B7); work-order
   abandon (work-order W5 / B8).
-- A 304 / `If-None-Match` path.
+- A 304 / `If-None-Match` path (B10).
 - A mint realm / multi-process `nowUtc()`.
 - Token-at-rest hashing.
 - A stored-GET re-render primitive.
@@ -2310,23 +2430,29 @@ and its amendments.
 
 ### ETag dialect A (pair id) vs B (content hash)
 
-- **A — keep D4 (chosen).** Advertised `ETag` / `If-Match`
-  stay pair id. Column etag is Postgres-W14 for
-  `/versions/<etag>`
-  only. Fits "`Response-ID` stays the locator." Phase A
-  blast radius stays one covenant (storage + chain
-  columns), not two platform cuts.
-- **B — overturn D4.** Advertised `ETag` and `If-Match`
-  become the content hash. Rewrite the If-Match gate,
-  instance PATCH, flow lock, and work-order transition
-  together. Raccoon etag-resolved If-Match is B with a
-  lookup hop.
+- **A — keep D4.** Advertised `ETag` / `If-Match` stay
+  pair id. Column etag is Postgres-W14 for
+  `/versions/<etag>` only. Fits "`Response-ID` stays the
+  locator." Smallest blast radius. This was the first
+  draft's choice.
+- **B — supersede D4 (chosen; owner-gated 2026-08-13).**
+  Advertised `ETag` and `If-Match` become the content
+  hash: the live document tag IS the versions address,
+  and instances gain per-caller validators (repairing
+  the one-validator-over-projected-bodies defect the
+  synthesis surfaced). The gate compares the head's own
+  `etag` value pre-tx and anchors the unchanged in-tx
+  assert on the pair id — no lookup hop, no crypto
+  in-tx. The flip rides the A-cut the platform is
+  already taking, so no second cut exists in practice.
 - **Rejected mix.** Hash on GET, pair id on If-Match.
-  412s every locked write.
+  412s every locked write. Also rejected: raccoon's
+  index-resolved If-Match (a probe the head comparison
+  makes unnecessary).
 
-Chosen A because D4 is approved, live, and shared with
-the work-order SoT spec. B is a second cut for no product
-gain.
+Chosen B by the owner with both options on the table;
+the review synthesis (W22) records the adjudication and
+the D4 supersession grounds.
 
 ### Keep-and-rename UNIQUE follows vs drop
 
@@ -2388,6 +2514,8 @@ the two critiques are decided above (KD1–KD12).
 | Demo-server posture read as production | High | Disposition table and § K.3 say "demo server" at full strength. |
 | 40P01 under import + append | Low | Typed 500; no auto-retry; lock order pinned. |
 | `flows/:id/versions` flip without 404 pin | Medium | A7 before A8. Succession named at the pin. |
+| Mixed ETag dialects mid-rollout | High | KD1 flip is inside the A-cut; flows, instances, and gates change atomically; post-cut pins reject pair-id tags. |
+| Instance rows pay a per-row hash at read | Low | WebCrypto on rows that already project per caller; measure at first-light. |
 
 ## Observability
 
@@ -2415,12 +2543,18 @@ the two critiques are decided above (KD1–KD12).
   (B6, A8 residual).
 - `docs/superpowers/specs/2026-08-05-optimistic-locking-if-match-unification-design.md`
   and `2026-08-07-if-match-unification-amendments-design.md`
-  — D1–D12 remain law. This spec implements them; it
-  does not overturn them.
+  — D2, D3, D5–D12 remain law and this spec implements
+  them. **D4 (and D1's validator value / D8's wire-ETag
+  row) is superseded by KD1**, owner-gated 2026-08-13.
 - `docs/superpowers/specs/2026-08-05-work-order-instance-sot-coupling-design.md`
   and `2026-08-07-work-order-instance-sot-coupling-amendments-design.md`
   — W1 (bind verb / no join document) superseded here.
-  W2–W10 remain law. Same pair-id ETag on instances.
+  W2–W10 remain law. Instance-ETag pins re-pin on the
+  KD1 projected hash (transition If-Match preconditions
+  the bound instance head; validator bytes change).
+- `docs/superpowers/specs/2026-08-13-postgres-backend-amendments-design.md`
+  — the review synthesis; W22 / W23 / W24 = KD1 (as
+  revised) / KD2 / KD3.
 - `docs/superpowers/specs/2026-07-12-page-performance-measurement-design.md`
   — fetch/render migration signal and the RUM seam.
 - `docs/superpowers/specs/2026-07-11-clients-table-elimination-design.md`
