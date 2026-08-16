@@ -11,6 +11,7 @@ import { seedOrganizationMember } from './root-admin-fixture.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { seedIdentityProvider } from './identity-fixtures.ts';
 
 // Pins the CURRENT status of every deliberate identity-spine
 // verb gap, through handleRequest, so Task 4's document-wiring
@@ -20,22 +21,25 @@ import {
 // accidental route or authz change, not a wiring change. THREE
 // regimes (finding 20), each dispatched a different way:
 //
-// (1) the route-table regime — 36 combos across the FIFTEEN
+// (1) the route-table regime — 36 combos across the
 // identity-spine route() patterns (identities, identities/:id,
-// identities/:id/pii, identity-pii, identities/:id/credentials,
-// identities/:id/credentials/:cid, identity-token-revocations/
-// :id, role-grants, role-grants/:id, identity-tokens,
-// identity-tokens/:id, identity-tokens/:jti/rotation,
-// identity-tokens/:jti/revocation, identity-providers,
-// identity-providers/:id): a matched pattern with no handler
-// for the request's verb 405s via handleRequest's own
-// per-method branch ("Method X not allowed on <path>"). Every
-// one of these patterns is admin-only for any verb this suite
-// exercises (none of their prefixes appear in authorization.ts's
-// MEMBER_VERBS, aside from '/identity-tokens' POST and — since
-// WP8, Phase 13 Task 8 — '/identity-token-revocations' PUT,
-// neither of which this regime's POST/DELETE combos exercise),
-// so an admin token is required to reach the 405 branch rather
+// identities/:id/pii, identities/:id/credentials,
+// identities/:id/credentials/:cid, identities/:id/token-
+// revocations/:rid, role-grants, role-grants/:id,
+// identities/:id/tokens,
+// identities/:id/tokens/:tid, identities/:id/tokens/:jti/
+// rotation, identities/:id/tokens/:jti/revocation,
+// identities/:id/providers, identities/:id/providers/:eid):
+// a matched pattern with no handler for the request's verb
+// 405s via handleRequest's own per-method branch ("Method X
+// not allowed on <path>"). Flat identity-tokens patterns are
+// retired and assert 404. Every live pattern here is
+// admin-only for any verb this suite exercises (none of their
+// prefixes appear in authorization.ts's MEMBER_VERBS, aside
+// from '/identities/:id/tokens' POST and
+// '/identities/:id/token-revocations' PUT, neither of
+// which this regime's POST/DELETE combos exercise), so an
+// admin token is required to reach the 405 branch rather
 // than an earlier 403.
 //
 // (2) the default-organization side channel regime — 2
@@ -50,33 +54,32 @@ import {
 // caller's own identity id), not the admin role policy, so a
 // bare identity token reaches the 405 branch.
 //
-// (3) the identity-tokens authz-tier regime — 3 combos: GET
-// /identity-tokens is admin-only (absent from MEMBER_VERBS'
-// '/identity-tokens' entry, which lists only POST), so a
-// member-tier token 403s at the authz layer, BEFORE matchRoute
-// even runs. POST /identity-tokens/:jti/rotation and .../
-// revocation, by contrast, DO match MEMBER_VERBS' '/identity-
-// tokens': POST entry (segment-boundary prefix, so both
-// sub-routes qualify) — a member-tier token clears authz and
-// reaches the route handler, which then answers on its own
-// domain terms (409 reuse for an unknown rotation jti; 204
-// idempotent no-op for an unknown revocation jti) rather than
-// 403. This is the GET-admin/POST-member asymmetry finding 20
-// names.
+// (3) the identity-tokens authz-tier regime — GET
+// /identities/:id/tokens is admin-only (absent from
+// MEMBER_VERBS' '/identities/:id/tokens' entry, which lists
+// only POST), so a member-tier token 403s at the authz
+// layer, BEFORE matchRoute even runs. Flat GET
+// /identity-tokens is RETIRED (router 404). POST
+// /identities/:id/tokens/:jti/rotation and .../revocation
+// DO match MEMBER_VERBS' POST entry (segment-boundary
+// prefix) — a member-tier token clears authz and reaches
+// the route handler, which then answers on its own domain
+// terms (409 reuse for an unknown rotation jti; 204
+// idempotent no-op for an unknown revocation jti) rather
+// than 403. Flat POST /identity-tokens/:jti/rotation is
+// RETIRED (router 404). Path identity must match the
+// jti's identity or 403; an absent jti GET 404s.
 //
-// (4) the identity-token-revocations authz-tier regime (WP8,
-// Phase 13 Task 8) — 1 combo: GET identity-token-revocations/:id
-// stays admin-only — UNTOUCHED, not re-pinned here (regime 1's
-// own comment above already names the fact; this regime adds no
-// new GET assertion). PUT, by contrast, now DOES match
-// MEMBER_VERBS' new '/identity-token-revocations': PUT entry, so
-// a member-tier token clears authz and reaches the route
-// handler — which then answers on api/api.ts's Region B
-// self-only ownership-fence terms (2xx for a self-target; a
-// foreign target's byte-pinned 403 lives in
-// tests/api-identity-token-revocations-self.test.ts, not here —
-// this file pins the authz-TIER asymmetry only, the regime 3
-// precedent). The ONE sanctioned combo-pin addition this phase.
+// (4) the identity-token-revocations authz-tier regime —
+// 1 combo: GET identities/:id/token-revocations/:rid stays
+// admin-only. PUT matches MEMBER_VERBS'
+// '/identities/:id/token-revocations' PUT, so a member-tier
+// token clears authz and reaches the route handler — which
+// then answers on api/api.ts's Region B self-only fence
+// (path identity vs actor). Flat
+// /identity-token-revocations/:rid is RETIRED (router 404).
+// A foreign target's 403 lives in
+// tests/api-identity-token-revocations-self.test.ts.
 //
 // 36 + 2 + 3 + 1 = 42 combos (the brief's own estimate was ~19
 // per route-table-style regime; this is the actual, execution-
@@ -169,33 +172,33 @@ async () => {
     assert.equal(res.status, 405);
 });
 
-test('PUT identity-pii 405s (no put handler wired)', async () => {
+test('PUT identity-pii 404s (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/identity-pii', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('POST identity-pii 405s (no post handler wired)',
+test('POST identity-pii 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-pii', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-pii 405s (no delete handler wired)',
+test('DELETE identity-pii 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-pii', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
 test('PUT identities/:id/credentials 405s (no put handler'
@@ -256,8 +259,8 @@ test('DELETE identities/:id/credentials/:cid 405s (no delete'
     assert.equal(res.status, 405);
 });
 
-test('POST identity-token-revocations/:id 405s (no post'
-+ ' handler wired)', async () => {
+test('POST identity-token-revocations/:id 404s'
++ ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -265,15 +268,68 @@ test('POST identity-token-revocations/:id 405s (no post'
             'POST', '/identity-token-revocations/r1', token, {},
         ),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-token-revocations/:id 405s (no delete'
-+ ' handler wired)', async () => {
+test('DELETE identity-token-revocations/:id 404s'
++ ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-token-revocations/r1', token),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('PUT identity-token-revocations/:id 404s'
++ ' (route retired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req(
+            'PUT', '/identity-token-revocations/r1', token, {
+                identity_id: 'current',
+                at: '2026-01-01T00:00:00.000000Z',
+            },
+        ),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('GET identity-token-revocations/:id 404s'
++ ' (route retired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req('GET', '/identity-token-revocations/r1', token),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('POST identities/:id/token-revocations/:rid 405s'
++ ' (no post handler wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req(
+            'POST',
+            '/identities/current/token-revocations/r1',
+            token, {},
+        ),
+    );
+    assert.equal(res.status, 405);
+});
+
+test('DELETE identities/:id/token-revocations/:rid 405s'
++ ' (no delete handler wired)', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req(
+            'DELETE',
+            '/identities/current/token-revocations/r1',
+            token,
+        ),
     );
     assert.equal(res.status, 405);
 });
@@ -327,58 +383,58 @@ async () => {
     assert.equal(res.status, 404);
 });
 
-test('PUT identity-tokens 405s (no put handler wired)',
+test('PUT identity-tokens 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/identity-tokens', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('POST identity-tokens 405s (no post handler wired)',
+test('POST identity-tokens 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-tokens', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-tokens 405s (no delete handler wired)',
+test('DELETE identity-tokens 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-tokens', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('POST identity-tokens/:id 405s (no post handler wired)',
+test('POST identity-tokens/:id 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-tokens/it1', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-tokens/:id 405s (no delete handler'
-+ ' wired)', async () => {
+test('DELETE identity-tokens/:id 404s (route retired)',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-tokens/it1', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('GET identity-tokens/:jti/rotation 405s (no get handler'
-+ ' wired)', async () => {
+test('GET identity-tokens/:jti/rotation 404s (route retired)',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -386,11 +442,11 @@ test('GET identity-tokens/:jti/rotation 405s (no get handler'
             'GET', '/identity-tokens/jti1/rotation', token,
         ),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('PUT identity-tokens/:jti/rotation 405s (no put handler'
-+ ' wired)', async () => {
+test('PUT identity-tokens/:jti/rotation 404s (route retired)',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -398,11 +454,11 @@ test('PUT identity-tokens/:jti/rotation 405s (no put handler'
             'PUT', '/identity-tokens/jti1/rotation', token, {},
         ),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-tokens/:jti/rotation 405s (no delete'
-+ ' handler wired)', async () => {
+test('DELETE identity-tokens/:jti/rotation 404s'
++ ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -410,11 +466,11 @@ test('DELETE identity-tokens/:jti/rotation 405s (no delete'
             'DELETE', '/identity-tokens/jti1/rotation', token,
         ),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('GET identity-tokens/:jti/revocation 405s (no get handler'
-+ ' wired)', async () => {
+test('GET identity-tokens/:jti/revocation 404s'
++ ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -422,11 +478,11 @@ test('GET identity-tokens/:jti/revocation 405s (no get handler'
             'GET', '/identity-tokens/jti1/revocation', token,
         ),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('PUT identity-tokens/:jti/revocation 405s (no put handler'
-+ ' wired)', async () => {
+test('PUT identity-tokens/:jti/revocation 404s'
++ ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -434,11 +490,11 @@ test('PUT identity-tokens/:jti/revocation 405s (no put handler'
             'PUT', '/identity-tokens/jti1/revocation', token, {},
         ),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-tokens/:jti/revocation 405s (no delete'
-+ ' handler wired)', async () => {
+test('DELETE identity-tokens/:jti/revocation 404s'
++ ' (route retired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
@@ -446,57 +502,137 @@ test('DELETE identity-tokens/:jti/revocation 405s (no delete'
             'DELETE', '/identity-tokens/jti1/revocation', token,
         ),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('PUT identity-providers 405s (no put handler wired)',
+const SARAH_PROVIDER = {
+    identity_id: 'sarah',
+    provider: 'google',
+    provider_subject: 'sub-sarah',
+    action: 'linked',
+    at: '2026-01-01T00:00:00.000000Z',
+};
+
+test('GET /identities/:id/providers lists that identity',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await seedIdentityProvider(
+        db, 'sarah', 'ip-sarah-1', SARAH_PROVIDER,
+    );
+    const res = await handleRequest(
+        db, req('GET', '/identities/sarah/providers', token),
+    );
+    assert.equal(res.status, 200);
+    const rows = await res.json() as readonly {
+        readonly provider: string;
+        readonly provider_subject: string;
+        readonly action: string;
+    }[];
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.provider, 'google');
+    assert.equal(rows[0]!.provider_subject, 'sub-sarah');
+    assert.equal(rows[0]!.action, 'linked');
+});
+
+test('GET /identities/:id/providers 403s for a member'
++ ' naming another identity (absent from MEMBER_VERBS)',
+async () => {
+    const db = await freshDb();
+    await seedOrganizationMember(db, 'sarah');
+    const token = await devToken('sarah');
+    const res = await handleRequest(
+        db, req(
+            'GET', '/identities/current/providers', token,
+        ),
+    );
+    assert.equal(res.status, 403);
+});
+
+test('GET /identity-providers is retired (router 404)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req('GET', '/identity-providers', token),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('GET /identity-providers/:id is retired (router 404)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    await seedIdentityProvider(
+        db, 'sarah', 'ip1', SARAH_PROVIDER,
+    );
+    const res = await handleRequest(
+        db, req('GET', '/identity-providers/ip1', token),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('PUT /identity-providers/:id is retired (router 404)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req(
+            'PUT', '/identity-providers/ip1', token,
+            SARAH_PROVIDER,
+        ),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('PUT identity-providers 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('PUT', '/identity-providers', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('POST identity-providers 405s (no post handler wired)',
+test('POST identity-providers 404s (route retired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-providers', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-providers 405s (no delete handler'
-+ ' wired)', async () => {
+test('DELETE identity-providers 404s (route retired)',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-providers', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('POST identity-providers/:id 405s (no post handler'
-+ ' wired)', async () => {
+test('POST identity-providers/:id 404s (route retired)',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('POST', '/identity-providers/ip1', token, {}),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('DELETE identity-providers/:id 405s (no delete handler'
-+ ' wired)', async () => {
+test('DELETE identity-providers/:id 404s (route retired)',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/identity-providers/ip1', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
 // ── regime 2: the default-organization side channel's own
@@ -531,23 +667,79 @@ test('DELETE identities/:id/default-organization 405s (side'
 });
 
 // ── regime 3: the identity-tokens GET-admin/POST-member authz
-// asymmetry (3 combos, pinned via authorization.ts's tier) ──
+// asymmetry (nested under the identity; flat RETIRED) ──
 
-test('GET identity-tokens 403s for a member-tier token'
-+ ' (admin-only; absent from MEMBER_VERBS)', async () => {
+const TOKEN_AT = '2026-01-01T00:00:00.000000Z';
+
+test('GET /identities/:id/tokens lists that identity',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const put = await handleRequest(db, req(
+        'PUT', '/identities/current/tokens/tok-list',
+        token, {
+            jti: 'jti-list', identity_id: 'current',
+            action: 'issued', chain_id: 'chain-list',
+            at: TOKEN_AT,
+        },
+    ));
+    assert.ok(put.status === 200 || put.status === 201);
+    const res = await handleRequest(
+        db, req('GET', '/identities/current/tokens', token),
+    );
+    assert.equal(res.status, 200);
+    const rows = await res.json() as readonly {
+        readonly jti: string;
+        readonly identity_id: string;
+        readonly action: string;
+    }[];
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.jti, 'jti-list');
+    assert.equal(rows[0]!.identity_id, 'current');
+    assert.equal(rows[0]!.action, 'issued');
+});
+
+test('GET /identity-tokens is retired (router 404)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(
+        db, req('GET', '/identity-tokens', token),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('GET /identities/:id/tokens 403s for a member-tier'
++ ' token (admin-only; absent from MEMBER_VERBS GET)',
+async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'member1');
     const token = await organizationToken('member1');
     const res = await handleRequest(
-        db, req('GET', '/identity-tokens', token),
+        db, req('GET', '/identities/current/tokens', token),
     );
     assert.equal(res.status, 403);
 });
 
-test('POST identity-tokens/:jti/rotation clears authz for a'
-+ ' member-tier token (MEMBER_VERBS widens'
-+ ' /identity-tokens POST) and 409s on domain terms for an'
-+ ' unknown jti', async () => {
+test('POST /identities/:id/tokens/:jti/rotation clears'
++ ' authz for a member-tier token (MEMBER_VERBS widens'
++ ' /identities/:id/tokens POST) and 409s on domain terms'
++ ' for an unknown jti', async () => {
+    const db = await freshDb();
+    await seedOrganizationMember(db, 'member1');
+    const token = await organizationToken('member1');
+    const res = await handleRequest(
+        db, req(
+            'POST',
+            '/identities/current/tokens/bogus-jti/rotation',
+            token, {},
+        ),
+    );
+    assert.equal(res.status, 409);
+});
+
+test('POST /identity-tokens/:jti/rotation is retired'
++ ' (router 404)', async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'member1');
     const token = await organizationToken('member1');
@@ -557,13 +749,28 @@ test('POST identity-tokens/:jti/rotation clears authz for a'
             token, {},
         ),
     );
-    assert.equal(res.status, 409);
+    assert.equal(res.status, 404);
 });
 
-test('POST identity-tokens/:jti/revocation clears authz for a'
-+ ' member-tier token (MEMBER_VERBS widens'
-+ ' /identity-tokens POST) and no-ops 204 for an unknown'
-+ ' jti', async () => {
+test('POST /identities/:id/tokens/:jti/revocation clears'
++ ' authz for a member-tier token (MEMBER_VERBS widens'
++ ' /identities/:id/tokens POST) and no-ops 204 for an'
++ ' unknown jti', async () => {
+    const db = await freshDb();
+    await seedOrganizationMember(db, 'member1');
+    const token = await organizationToken('member1');
+    const res = await handleRequest(
+        db, req(
+            'POST',
+            '/identities/current/tokens/bogus-jti/revocation',
+            token, {},
+        ),
+    );
+    assert.equal(res.status, 201);
+});
+
+test('POST /identity-tokens/:jti/revocation is retired'
++ ' (router 404)', async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'member1');
     const token = await organizationToken('member1');
@@ -573,16 +780,55 @@ test('POST identity-tokens/:jti/revocation clears authz for a'
             token, {},
         ),
     );
-    assert.equal(res.status, 201);
+    assert.equal(res.status, 404);
+});
+
+test('POST rotation 403s when path identity is not the'
++ ' jti owner', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const put = await handleRequest(db, req(
+        'PUT', '/identities/current/tokens/tok-owned',
+        token, {
+            jti: 'jti-owned', identity_id: 'current',
+            action: 'issued', chain_id: 'chain-owned',
+            at: TOKEN_AT,
+        },
+    ));
+    assert.ok(put.status === 200 || put.status === 201);
+    const res = await handleRequest(db, req(
+        'POST',
+        '/identities/sarah/tokens/jti-owned/rotation',
+        token, {},
+    ));
+    assert.equal(res.status, 403);
+});
+
+test('GET /identities/:id/tokens/:tid 404s for an absent'
++ ' jti', async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'GET',
+        '/identities/current/tokens/no-such-token',
+        token,
+    ));
+    assert.equal(res.status, 404);
+    const body = await res.json() as { error: string };
+    assert.equal(
+        body.error,
+        'Not found: identity_tokens/no-such-token',
+    );
 });
 
 // ── regime 4: the identity-token-revocations PUT-member/
 // GET-admin authz asymmetry (WP8, Phase 13 Task 8; 1 combo) ──
 
-test('PUT identity-token-revocations/:id clears authz for a'
-+ ' member-tier token naming itself (MEMBER_VERBS widens'
-+ " '/identity-token-revocations' PUT) and succeeds 2xx —"
-+ ' the row-level self/foreign fence lives in'
+test('PUT identities/:id/token-revocations/:rid clears'
++ ' authz for a member-tier token naming itself'
++ " (MEMBER_VERBS widens '/identities/:id/token-revocations'"
++ ' PUT) and succeeds 2xx — the path-level self/foreign'
++ ' fence lives in'
 + ' tests/api-identity-token-revocations-self.test.ts, not'
 + ' here', async () => {
     const db = await freshDb();
@@ -590,7 +836,8 @@ test('PUT identity-token-revocations/:id clears authz for a'
     const token = await organizationToken('member1');
     const res = await handleRequest(
         db, req(
-            'PUT', '/identity-token-revocations/regime4-1',
+            'PUT',
+            '/identities/member1/token-revocations/regime4-1',
             token,
             {
                 identity_id: 'member1',

@@ -166,11 +166,10 @@ export function authorizeRequest(
         + ' requires a role this principal lacks';
 }
 
-// The PII facet of an identity's subtree. A member reads ONLY
-// its own (GET self); writes are its own OR an admin's (member
-// management). Mirrors the tree-ownership check of
-// /identities/:id/default-organization, widened to admin for
-// writes.
+// The PII facet of an identity's subtree. GET is self or
+// admin; writes are self or admin (member management).
+// Mirrors the tree-ownership check of
+// /identities/:id/default-organization, widened to admin.
 export function authorizeIdentityPii(
     ctx: RequestContext,
     targetId: string,
@@ -178,15 +177,15 @@ export function authorizeIdentityPii(
     if (ctx.principal.id === targetId) {
         return null;
     }
-    if (ctx.method === 'GET') {
-        return 'forbidden: an identity may read only its'
-            + ' own pii';
-    }
     if (ctx.roles.includes('admin')) {
         return null;
     }
-    return "forbidden: writing another identity's pii"
-        + ' requires an admin role';
+    if (ctx.method === 'GET') {
+        return 'forbidden: an identity may read only'
+            + ' its own pii';
+    }
+    return "forbidden: writing another identity's"
+        + ' pii requires an admin role';
 }
 
 // The orgs a caller can reach, from the token's organizations

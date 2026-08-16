@@ -86,8 +86,8 @@ resolves a request in this order:
    either the pair or the handler ever sees it.
 5. **Region B + pre-pair write guards** (after body parse):
    the self-only identity-token-revocation target guard
-   (`PUT identity-token-revocations/:id` — body
-   `identity_id` must be the actor unless admin) runs for
+   (`PUT identities/:id/token-revocations/:rid` — path
+   identity must be the actor unless admin) runs for
    that route. Then, for a write with a handler on a non-
    exempt route: `writeAuthorizerFor` (foreign id → **403**
    before pair formation). Public writes require header
@@ -215,10 +215,11 @@ Legend for classification:
 - `GET /identities/:id/versions/:version` — document
   version leaf (§2.10).
 - `POST /identities` — operation (§3.5). Admin-only.
-- `GET|PUT|DELETE /identities/:id/pii` — facet. Self-only read;
-  self-or-admin write. PUT/DELETE ride the message plane's
-  sanctioned hard-delete zone (§5.12).
-- `GET /identity-pii` — admin PII roster.
+- `GET|PUT|DELETE /identities/:id/pii` — facet. GET is
+  self-or-admin; PUT/DELETE are self-or-admin. The only
+  PII HTTP (flat `/identity-pii` is RETIRED, router 404).
+  PUT/DELETE ride the message plane's sanctioned
+  hard-delete zone (§5.12).
 - `GET /identities/:id/credentials` ·
   `GET|PUT /identities/:id/credentials/:cid` — nested; the opaque
   `secret` is projected out on every read. Admin-only. `PUT`'s
@@ -231,18 +232,28 @@ Legend for classification:
 
 ### 2.3 Auth spine — tokens, providers, grants
 
-- `GET /identity-tokens` (derived) · `GET /identity-tokens/:id`
-  (derived) · `PUT /identity-tokens/:id` — primitive. `PUT` is
-  pair-only (Phase 13 Task 9 retired the row write — nothing
-  has read `identity_tokens` rows since Task 6).
-- `POST /identity-tokens/:jti/rotation` — operation (§3.6).
-- `POST /identity-tokens/:jti/revocation` — operation (§3.7).
-- `GET|PUT /identity-token-revocations/:id` — primitive. `GET`
-  admin-only; `PUT` is self-or-admin (WP8, Phase 13 Task 8) — a
-  member may revoke its OWN token chain, naming another
-  identity still requires admin.
-- `GET /identity-providers` · `GET|PUT /identity-providers/:id` —
-  primitive.
+- `GET /identities/:id/tokens` (derived) ·
+  `GET|PUT /identities/:id/tokens/:tid` — nested under the
+  identity. Admin-only GET. `PUT` is pair-only and stamps
+  `identity_id` from the path. Flat `GET /identity-tokens` ·
+  `GET|PUT /identity-tokens/:id` are RETIRED (router 404).
+- `POST /identities/:id/tokens/:jti/rotation` — operation
+  (§3.6). Path identity must match the jti's identity.
+  Flat `POST /identity-tokens/:jti/rotation` is RETIRED.
+- `POST /identities/:id/tokens/:jti/revocation` — operation
+  (§3.7). Path identity must match the jti's identity.
+  Flat `POST /identity-tokens/:jti/revocation` is RETIRED.
+- `GET|PUT /identities/:id/token-revocations/:rid` —
+  nested under the identity. `GET` admin-only; `PUT` is
+  self-or-admin (path identity vs actor) — a member may
+  revoke its OWN token chain, naming another identity
+  still requires admin. Path stamps `identity_id`.
+  Flat `GET|PUT /identity-token-revocations/:id` is
+  RETIRED (router 404). No collection route.
+- `GET /identities/:id/providers` ·
+  `GET|PUT /identities/:id/providers/:eid` — nested under the
+  identity. Admin-only. Flat `GET /identity-providers` ·
+  `GET|PUT /identity-providers/:id` are RETIRED (router 404).
 - `GET /role-grants` · `GET|PUT /role-grants/:id` — RETIRED
   (router 404). Roles derive from membership `type` / claims;
   `postRoleGrantDocumentOp` and the role-grants seed pairs are
@@ -960,7 +971,7 @@ PII, so it stays one atomic write).
   fence organization — a below-facade caller (`api/mock-data.ts`,
   Task 6's own scope) skips it, exactly like every prior bundle.
 
-### 3.6 `POST /identity-tokens/:jti/rotation` — rotate refresh jti
+### 3.6 `POST /identities/:id/tokens/:jti/rotation` — rotate refresh jti
 
 Delegates to `rotateRefreshJti` (`api/authentication.ts`).
 
@@ -983,7 +994,7 @@ Delegates to `rotateRefreshJti` (`api/authentication.ts`).
   PAIR-ONLY (Phase 13 Task 9 retired the `identity_tokens` row
   write — every event lives only as its own message pair).
 
-### 3.7 `POST /identity-tokens/:jti/revocation` — revoke chain
+### 3.7 `POST /identities/:id/tokens/:jti/revocation` — revoke chain
 
 Delegates to `revokeTokenChain` (`api/authentication.ts`).
 
@@ -1026,9 +1037,9 @@ logins each land) — see §5.1 for the headers this produces and
 
 - **`authorization_code`** → `grantAuthorizationCode`:
   - PRE-TX: `deriveAuthorizationCodeId` (`sha256Hex(code)`) →
-    `authorizeCodeIssuer` (scans the
-    `/authentication/authorize/` response family for a raw
-    `code` match) → TTL check → redeeming `client_id` must
+    `authorizeCodeIssuer` (`messageStore.getAllWhereBody`
+    on `/authentication/authorize/` with `{ code }`) →
+    TTL check → redeeming `client_id` must
     equal authorize's issuer (shared 401 on miss/wrong) →
     PKCE S256 when issuer stored `code_challenge`
     (`code_verifier` → base64url(sha256) must match; the
@@ -1036,10 +1047,12 @@ logins each land) — see §5.1 for the headers this produces and
     always verifies there; the browser ZIP still accepts
     authorize without a challenge) →
     `authorizationCodeSpent` fast-fail
-    (`requests.getAllWhere('uri_id', derivedId)` filtered to the
-    `identity-tokens/` prefix — a hit IS the spend marker,
-    KEY-BY-ANCHOR: the issued root's row id equals the code's
-    own digest) → `mintPair` → `formAuthPair` →
+    (`requests.getAllAtAddress` on
+    `/identities/<id>/tokens/` + the code digest —
+    leftover `/identity-tokens/` still dual-read — a
+    hit IS the spend marker, KEY-BY-ANCHOR: the issued
+    root's row id equals the code's own digest) →
+    `mintPair` → `formAuthPair` →
     `formTokenEventPair` (the root's own event). Mints
     `act: {sub: clientId}` — the acting client — on the
     access token (RFC 8693 shape, the token-exchange
@@ -3154,28 +3167,32 @@ combos across four regimes**
 (`tests/api-identity-spine-verb-gaps.test.ts`, own commit BEFORE
 the wiring landed):
 
-1. The route-table regime — 36 combos across the FIFTEEN
-   identity-spine `route()` patterns (`identities` through
-   `identity-providers/:id`): a matched pattern with no handler
-   for the request's verb 405s via `handleRequest`'s own
-   per-method branch; role-grants / role-grants/:id patterns are
-   retired and assert 404 (not matchRoute 405).
+1. The route-table regime — 36 combos across the identity-spine
+   `route()` patterns (`identities` through
+   `identities/:id/providers/:eid`): a matched pattern with no
+   handler for the request's verb 405s via `handleRequest`'s own
+   per-method branch; role-grants, flat identity-providers, and
+   their `:id` patterns are retired and assert 404 (not
+   matchRoute 405).
 2. The `identities/:id/default-org` side channel regime — 2
    combos: this side channel never calls `matchRoute` — a POST or
    DELETE falls through its own if-chain to ITS OWN inline 405
    terminal (`organization-requests.ts`).
-3. The identity-tokens authz-tier regime — 3 combos: `GET
-   /identity-tokens` is admin-only (absent from `MEMBER_VERBS`),
-   so a member-tier token 403s at the authz layer BEFORE
-   `matchRoute` runs; `POST /identity-tokens/:jti/rotation` and
-   `.../revocation`, by contrast, DO match `MEMBER_VERBS`'
-   `'/identity-tokens'` entry (POST), so a member-tier token
-   clears authz and reaches the route handler's own domain terms
-   (409 reuse; 204 idempotent no-op) instead of 403.
+3. The identity-tokens authz-tier regime — `GET
+   /identities/:id/tokens` is admin-only (absent from
+   `MEMBER_VERBS` GET), so a member-tier token 403s at the
+   authz layer BEFORE `matchRoute` runs; `POST
+   /identities/:id/tokens/:jti/rotation` and `.../revocation`
+   match `MEMBER_VERBS`' `'/identities/:id/tokens'` POST, so a
+   member-tier token clears authz and reaches the handler's
+   own domain terms (409 reuse; 204 idempotent no-op). Flat
+   `/identity-tokens` is RETIRED (router 404). Path identity
+   must match the jti's identity or 403.
 4. The identity-token-revocations authz-tier regime — 1 combo:
-   `PUT /identity-token-revocations/:id` matches `MEMBER_VERBS`
-   (member clears authz; self-target 2xx). GET stays admin-only.
-   (36 + 2 + 3 + 1 = 42.)
+   `PUT /identities/:id/token-revocations/:rid` matches
+   `MEMBER_VERBS` (member clears authz; self-target 2xx). GET
+   stays admin-only. Flat `/identity-token-revocations` is
+   RETIRED (router 404). (36 + 2 + 3 + 1 = 42.)
 
 `tests/family-registry.test.ts` gains the twelfth case
 (`identities`, global-plane like `members`). **As of Phase 12:**

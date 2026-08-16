@@ -296,9 +296,9 @@ export async function formAuthPair(
     });
 }
 
-// The literal 'identity-tokens/:id' route pattern: the wired
-// PUT's own address family and response spec (routes.ts,
-// WRITE_RESPONSE_SPECS['identity-tokens/:id']), reused
+// The literal 'identities/:id/tokens/:tid' route pattern: the
+// wired PUT's own address family and response spec (routes.ts,
+// WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid']), reused
 // byte-for-byte by every synthesized identity_tokens row-write
 // pair (Phase 13 Task 5, Gate 7) — one derivation later serves
 // fixture pairs, real PUT pairs, and these synthesized
@@ -307,31 +307,36 @@ export async function formAuthPair(
 // FROM message-pair.ts (formWritePair, headPairIdAt), never the
 // reverse — the import graph stays acyclic (see
 // formDocumentPairFor's own comment, routes.ts).
-const TOKEN_EVENT_ROUTE_PATTERN = 'identity-tokens/:id';
+const TOKEN_EVENT_ROUTE_PATTERN = 'identities/:id/tokens/:tid';
 const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
     TOKEN_EVENT_ROUTE_PATTERN.split('/');
 
 // Synthesizes ONE identity_tokens row's event pair — the SAME
 // address, method, and response shape a real PUT
-// identity-tokens/:id would store for that exact row
+// identities/:id/tokens/:tid would store for that exact row
 // (identityTokenEntityOf: jti, identity_id, action, chain_id,
 // at, id — GET wins). Formed PRE-TX like every other pair
 // (formWritePair's own crypto never runs inside an open
 // transaction — the auto-commit constraint). EVENT-APPEND, like
-// every identity_tokens row: identity-tokens/:id carries no
-// DOCUMENT_CLASS_ROUTE_PATTERNS entry — no head-read.
-// requesterIdentityId is the event's OWN identity_id (the
-// affected identity) — the NAMED convention for a write with no
-// authenticated actor in view at this depth (an internal grant,
-// a rotation, a chain revocation). jti is an identifier, not a
-// bearer secret — stored plaintext as the live wired PUT's own
-// pairs already do.
+// every identity_tokens row: identities/:id/tokens/:tid
+// carries no DOCUMENT_CLASS_ROUTE_PATTERNS entry — no
+// head-read. requesterIdentityId is the event's OWN
+// identity_id (the affected identity) — the NAMED convention
+// for a write with no authenticated actor in view at this
+// depth (an internal grant, a rotation, a chain revocation).
+// jti is an identifier, not a bearer secret — stored
+// plaintext as the live wired PUT's own pairs already do.
 export async function formTokenEventPair(
     id: Id,
     event: Omit<IdentityTokenEntity, 'id'>,
     operationId: string,
 ): Promise<MessagePair> {
-    const pathSegments = [TOKEN_EVENT_ROUTE_SEGMENTS[0]!, id];
+    const pathSegments = [
+        TOKEN_EVENT_ROUTE_SEGMENTS[0]!,
+        event.identity_id,
+        TOKEN_EVENT_ROUTE_SEGMENTS[2]!,
+        id,
+    ];
     const body = event as unknown as Record<string, unknown>;
     return formWritePair({
         method: 'PUT',
@@ -913,12 +918,12 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'identities/:id/pii',
     'identities/:id/credentials/:cid',
     'identities/:id/registration',
-    'identity-tokens/:id',
-    'identity-token-revocations/:id',
-    'identity-tokens/:jti/rotation',
-    'identity-tokens/:jti/revocation',
+    'identities/:id/tokens/:tid',
+    'identities/:id/token-revocations/:rid',
+    'identities/:id/tokens/:jti/rotation',
+    'identities/:id/tokens/:jti/revocation',
     'organizations/:id',
-    'identity-providers/:id',
+    'identities/:id/providers/:eid',
     // Nested record-types collection POST (Task 9) + detail
     // PUT/DELETE (Task 3).
     RECORD_TYPES_COLLECTION_PATTERN,
@@ -961,7 +966,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
 // fast path safe to skip.
 export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
     new Set([
-        'identity-tokens/:jti/rotation',
+        'identities/:id/tokens/:jti/rotation',
         'authentication/token',
         'authentication/authorize',
     ]);

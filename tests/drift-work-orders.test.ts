@@ -1645,9 +1645,9 @@ test('same-join-id retry: two different work-order creates '
         STARK_ORGANIZATION,
         '/flows/' + flowId + '/work-orders/',
     );
-    const joinResponses = (await db.responses.getAllWhere(
-        'uri_id', sharedFwoId,
-    )).filter((row) => row.uri_collection === joinPrefix);
+    const joinResponses = await db.responses.getAllAtAddress(
+        joinPrefix, sharedFwoId,
+    );
     assert.equal(joinResponses.length, 2);
     for (const response of joinResponses) {
         assert.equal('supersedes' in response, false);

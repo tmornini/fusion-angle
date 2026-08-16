@@ -77,18 +77,20 @@ RETURN CASE
 END;`;
 
 export const POSTGRES_INDEXES =
-    String.raw`CREATE INDEX IF NOT EXISTS requests_address
+    String.raw`DROP INDEX IF EXISTS requests_operation;
+DROP INDEX IF EXISTS responses_operation;
+CREATE INDEX IF NOT EXISTS requests_address
     ON requests (uri_collection, uri_id, at, id);
 CREATE INDEX IF NOT EXISTS responses_address
     ON responses (uri_collection, uri_id, at, id);
+CREATE INDEX IF NOT EXISTS requests_collection
+    ON requests (uri_collection, at, id);
+CREATE INDEX IF NOT EXISTS responses_collection
+    ON responses (uri_collection, at, id);
 CREATE INDEX IF NOT EXISTS requests_replay
     ON requests (message_hash);
-CREATE INDEX IF NOT EXISTS requests_operation
-    ON requests (operation_id);
 CREATE INDEX IF NOT EXISTS responses_version
     ON responses (uri_collection, uri_id, version);
-CREATE INDEX IF NOT EXISTS responses_operation
-    ON responses (operation_id);
 CREATE INDEX IF NOT EXISTS responses_body
     ON responses
     USING gin (message_body(message) jsonb_path_ops);`;

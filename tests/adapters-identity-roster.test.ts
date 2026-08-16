@@ -116,17 +116,17 @@ async () => {
 test('getProviderEvents returns one identity\'s link log',
 async () => {
     const { ctx } = await setup();
-    await ctx.PUT('identity-providers/e1', {
+    await ctx.PUT('identities/p1/providers/e1', {
         identity_id: 'p1', provider: 'google',
         provider_subject: 'g-1', action: 'linked',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    await ctx.PUT('identity-providers/e2', {
+    await ctx.PUT('identities/p1/providers/e2', {
         identity_id: 'p1', provider: 'google',
         provider_subject: 'g-1', action: 'unlinked',
         at: '2026-01-02T00:00:00.000000Z',
     });
-    await ctx.PUT('identity-providers/e3', {
+    await ctx.PUT('identities/other/providers/e3', {
         identity_id: 'other', provider: 'github',
         provider_subject: 'h-1', action: 'linked',
         at: '2026-01-03T00:00:00.000000Z',
@@ -142,22 +142,22 @@ async () => {
 test('getTokenChainsFor groups one identity\'s tokens',
 async () => {
     const { ctx } = await setup();
-    await ctx.PUT('identity-tokens/t1', {
+    await ctx.PUT('identities/p1/tokens/t1', {
         jti: 'j1', identity_id: 'p1', action: 'issued',
         chain_id: 'c1',
         at: '2026-01-01T00:00:00.000000Z',
     });
-    await ctx.PUT('identity-tokens/t2', {
+    await ctx.PUT('identities/p1/tokens/t2', {
         jti: 'j2', identity_id: 'p1', action: 'issued',
         chain_id: 'c1',
         at: '2026-01-02T00:00:00.000000Z',
     });
-    await ctx.PUT('identity-tokens/t3', {
+    await ctx.PUT('identities/p1/tokens/t3', {
         jti: 'j3', identity_id: 'p1', action: 'issued',
         chain_id: 'c2',
         at: '2026-01-03T00:00:00.000000Z',
     });
-    await ctx.PUT('identity-tokens/t4', {
+    await ctx.PUT('identities/other/tokens/t4', {
         jti: 'j4', identity_id: 'other', action: 'issued',
         chain_id: 'c3',
         at: '2026-01-04T00:00:00.000000Z',

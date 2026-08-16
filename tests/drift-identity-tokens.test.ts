@@ -29,7 +29,11 @@ import {
     deriveIdentityTokenEventsForJti,
     identityTokenEntityOf,
 } from '../api/derive-identity-tokens.ts';
-import { formTokenEventPair } from '../api/message-pair.ts';
+import {
+    formTokenEventPair,
+    formWritePair,
+    appendMessagePair,
+} from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 import {
     authorizationCodeSpent,
@@ -140,12 +144,14 @@ test('KEY ORDER: the derived row is id-LAST — matching'
 + ' validateIdentityTokenEntity\'s own return-literal order',
 async () => {
     const db = await freshDb();
-    await PUT(db, 'identity-tokens/tok-order', {
+    await PUT(db, 'identities/current/tokens/tok-order', {
         jti: 'jti-order', identity_id: 'current',
         action: 'issued', chain_id: 'chain-order', at: AT,
     }, DEV_TOKEN);
 
-    const derived = await deriveIdentityToken(db, 'tok-order');
+    const derived = await deriveIdentityToken(
+        db, 'current', 'tok-order',
+    );
     const expectedOrder = [
         'jti', 'identity_id', 'action', 'chain_id', 'at', 'id',
     ];
@@ -163,11 +169,14 @@ async () => {
         action: 'issued', chain_id: 'chain-g4', at: AT,
     };
     const put = await handleRequest(db, req(
-        'PUT', '/identity-tokens/' + id, DEV_TOKEN, fields,
+        'PUT', '/identities/current/tokens/' + id,
+        DEV_TOKEN, fields,
     ));
     assert.equal(put.status, 201);
     const stored = JSON.parse(
-        await storedPutBodyText(db, '/identity-tokens/', id),
+        await storedPutBodyText(
+            db, '/identities/current/tokens/', id,
+        ),
     );
     const expected = identityTokenEntityOf({
         uriId: id,
@@ -177,7 +186,9 @@ async () => {
     });
     assert.equal(Object.keys(expected).at(-1), 'id');
     assert.deepEqual(stored, expected);
-    const derived = await deriveIdentityToken(db, id);
+    const derived = await deriveIdentityToken(
+        db, 'current', id,
+    );
     assert.deepEqual(stored, derived);
     const wire = await put.json();
     assert.deepEqual(stored, wire);
@@ -209,11 +220,13 @@ test('formTokenEventPair stored body equals '
 
 // Writer matches GET: successBody is identityTokenEntityOf
 // (id-last). The id-first pin is deleted.
-test('identity-tokens/:id successBody is id-last', () => {
-    const entry = WRITE_RESPONSE_SPECS['identity-tokens/:id'];
+test('identities/:id/tokens/:tid successBody is id-last',
+() => {
+    const entry =
+        WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid'];
     assert.ok(entry !== undefined && 'successBody' in entry);
     const body = entry.successBody!(
-        ['tok-g4'],
+        ['current', 'tok-g4'],
         {
             jti: 'j', identity_id: 'id',
             action: 'issued', chain_id: 'c', at: AT,
@@ -229,9 +242,10 @@ test('identity-tokens/:id successBody is id-last', () => {
 // -- a LITERAL id-LAST reconstruction of what was PUT: -----------
 // -- byIdAscending collection order, and the 404 body -------------
 
-test('GET /identity-tokens + /:id are wire byte-identical to a'
-+ ' literal id-LAST reconstruction of what was PUT:'
-+ ' byIdAscending collection order and the 404 body',
+test('GET /identities/:id/tokens + /:tid are wire'
++ ' byte-identical to a literal id-LAST reconstruction of'
++ ' what was PUT: byIdAscending collection order and the'
++ ' 404 body',
 async () => {
     const db = await freshDb();
     // Inserted in NON-lex order (w3, then w1, then w2) so the
@@ -239,15 +253,15 @@ async () => {
     // byIdAscending order genuinely diverge — a test that
     // inserted in lex order already would pass by ACCIDENT of
     // insertion order, never by the property it claims to prove.
-    await PUT(db, 'identity-tokens/tok-w3', {
+    await PUT(db, 'identities/current/tokens/tok-w3', {
         jti: 'jti-w3', identity_id: 'current',
         action: 'issued', chain_id: 'chain-w3', at: AT,
     }, DEV_TOKEN);
-    await PUT(db, 'identity-tokens/tok-w1', {
+    await PUT(db, 'identities/current/tokens/tok-w1', {
         jti: 'jti-w1', identity_id: 'current',
         action: 'issued', chain_id: 'chain-w', at: AT,
     }, DEV_TOKEN);
-    await PUT(db, 'identity-tokens/tok-w2', {
+    await PUT(db, 'identities/current/tokens/tok-w2', {
         jti: 'jti-w1', identity_id: 'current',
         action: 'rotated', chain_id: 'chain-w', at: AT2,
     }, DEV_TOKEN);
@@ -275,7 +289,9 @@ async () => {
     ];
 
     const collectionRes = await handleRequest(
-        db, req('GET', '/identity-tokens', DEV_TOKEN),
+        db, req(
+            'GET', '/identities/current/tokens', DEV_TOKEN,
+        ),
     );
     assert.equal(collectionRes.status, 200);
     assert.equal(
@@ -284,7 +300,9 @@ async () => {
 
     for (const row of expected) {
         const singleRes = await handleRequest(db, req(
-            'GET', '/identity-tokens/' + row.id, DEV_TOKEN,
+            'GET',
+            '/identities/current/tokens/' + row.id,
+            DEV_TOKEN,
         ));
         assert.equal(singleRes.status, 200);
         assert.equal(
@@ -293,7 +311,9 @@ async () => {
     }
 
     const missingRes = await handleRequest(db, req(
-        'GET', '/identity-tokens/no-such-token', DEV_TOKEN,
+        'GET',
+        '/identities/current/tokens/no-such-token',
+        DEV_TOKEN,
     ));
     assert.equal(missingRes.status, 404);
     const missingBody =
@@ -313,11 +333,11 @@ test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
 + ' sharing rotateRefreshJti/revokeTokenChain\'s own table'
 + ' list) — the membershipExistsFor precedent', async () => {
     const db = await freshDb();
-    await PUT(db, 'identity-tokens/tok-tx1', {
+    await PUT(db, 'identities/current/tokens/tok-tx1', {
         jti: 'jti-tx', identity_id: 'current',
         action: 'issued', chain_id: 'chain-tx', at: AT,
     }, DEV_TOKEN);
-    await PUT(db, 'identity-tokens/tok-tx2', {
+    await PUT(db, 'identities/current/tokens/tok-tx2', {
         jti: 'jti-tx', identity_id: 'current',
         action: 'rotated', chain_id: 'chain-tx', at: AT2,
     }, DEV_TOKEN);
@@ -393,20 +413,25 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
 
     // Live BEFORE revocation: access token reaches admin route.
     const before = await handleRequest(
-        db, req('GET', '/identity-tokens', accessToken),
+        db, req(
+            'GET', '/identities/current/tokens', accessToken,
+        ),
     );
     assert.equal(before.status, 200);
 
     // Revoke the whole chain.
     const revokeRes = await handleRequest(db, req(
-        'POST', `/identity-tokens/${rootJti}/revocation`,
+        'POST',
+        `/identities/current/tokens/${rootJti}/revocation`,
         accessToken, {},
     ));
     assert.equal(revokeRes.status, 201);
 
     // ACCESS still passes the gate (≤15-min staleness covenant).
     const afterAccess = await handleRequest(
-        db, req('GET', '/identity-tokens', accessToken),
+        db, req(
+            'GET', '/identities/current/tokens', accessToken,
+        ),
     );
     assert.equal(afterAccess.status, 200);
 
@@ -462,10 +487,14 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
 
     const grantTxTables = ['requests', 'responses'];
 
-    const preTxBefore = await authorizationCodeSpent(db, derivedId);
+    const preTxBefore = await authorizationCodeSpent(
+        db, derivedId, 'current',
+    );
     const inTxBefore = await db.transaction(
         grantTxTables,
-        (view) => authorizationCodeSpent(view, derivedId),
+        (view) => authorizationCodeSpent(
+            view, derivedId, 'current',
+        ),
     );
     assert.equal(inTxBefore, preTxBefore);
     assert.equal(preTxBefore, false);
@@ -477,11 +506,119 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
     });
     assert.equal(grantRes.status, 201);
 
-    const preTxAfter = await authorizationCodeSpent(db, derivedId);
+    const preTxAfter = await authorizationCodeSpent(
+        db, derivedId, 'current',
+    );
     const inTxAfter = await db.transaction(
         grantTxTables,
-        (view) => authorizationCodeSpent(view, derivedId),
+        (view) => authorizationCodeSpent(
+            view, derivedId, 'current',
+        ),
     );
     assert.equal(inTxAfter, preTxAfter);
     assert.equal(preTxAfter, true);
+});
+
+// -- 6: NESTED WIRE — collection under the identity; flat
+// -- prefix RETIRED; omit-PUT stamps identity_id from path ----
+
+test('GET /identities/current/tokens is a 200 array',
+async () => {
+    const db = await freshDb();
+    const res = await handleRequest(
+        db, req('GET', '/identities/current/tokens', DEV_TOKEN),
+    );
+    assert.equal(res.status, 200);
+    const rows = await res.json() as unknown;
+    assert.ok(Array.isArray(rows));
+});
+
+test('GET /identity-tokens is retired (router 404)',
+async () => {
+    const db = await freshDb();
+    const res = await handleRequest(
+        db, req('GET', '/identity-tokens', DEV_TOKEN),
+    );
+    assert.equal(res.status, 404);
+});
+
+test('GET stamps identity_id from the path when PUT omits it',
+async () => {
+    const db = await freshDb();
+    const id = 'tok-omit';
+    const withoutIdentity = {
+        jti: 'jti-omit', action: 'issued',
+        chain_id: 'chain-omit', at: AT,
+    };
+    const put = await handleRequest(db, req(
+        'PUT', '/identities/current/tokens/' + id,
+        DEV_TOKEN, withoutIdentity,
+    ));
+    assert.ok(put.status === 200 || put.status === 201);
+    const list = await handleRequest(
+        db, req('GET', '/identities/current/tokens', DEV_TOKEN),
+    );
+    assert.equal(list.status, 200);
+    const rows = await list.json() as readonly {
+        readonly id: string;
+        readonly identity_id: string;
+    }[];
+    const row = rows.find(r => r.id === id);
+    assert.ok(row, 'omitted-id event is in the collection');
+    assert.equal(row.identity_id, 'current');
+    const leaf = await handleRequest(db, req(
+        'GET', '/identities/current/tokens/' + id, DEV_TOKEN,
+    ));
+    assert.equal(leaf.status, 200);
+    const one = await leaf.json() as {
+        readonly identity_id: string;
+    };
+    assert.equal(one.identity_id, 'current');
+});
+
+test('GET /identities/:id/tokens dual-reads leftover flat',
+async () => {
+    const db = await freshDb();
+    const id = 'old-flat-tok';
+    const fields = {
+        jti: 'jti-flat', identity_id: 'current',
+        action: 'issued', chain_id: 'chain-flat', at: AT,
+    };
+    const flatPair = await formWritePair({
+        method: 'PUT',
+        pathname: '/identity-tokens/' + id,
+        routePattern: 'identity-tokens/:id',
+        routeSegments: ['identity-tokens', ':id'],
+        pathSegments: ['identity-tokens', id],
+        headerFields: [],
+        body: fields,
+        requesterIdentityId: 'current',
+        requestAt: AT,
+        organization: undefined,
+        responseStatus: 200,
+        responseBody: identityTokenEntityOf({
+            uriId: id,
+            pairId: id,
+            method: 'PUT',
+            body: fields,
+        }),
+        operationId: TEST_OPERATION_ID,
+    });
+    await db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            await appendMessagePair(view, flatPair);
+        },
+    );
+    const res = await handleRequest(
+        db, req('GET', '/identities/current/tokens', DEV_TOKEN),
+    );
+    assert.equal(res.status, 200);
+    const rows = await res.json() as readonly {
+        readonly id: string;
+        readonly identity_id: string;
+    }[];
+    const row = rows.find(r => r.id === id);
+    assert.ok(row, 'leftover flat event is in the collection');
+    assert.equal(row.identity_id, 'current');
 });

@@ -1086,9 +1086,9 @@ test('same-join-id retry: two different flow creates reusing '
         STARK_ORGANIZATION,
         '/projects/' + projectId + '/flows/',
     );
-    const joinResponses = (await db.responses.getAllWhere(
-        'uri_id', sharedPfid,
-    )).filter((row) => row.uri_collection === joinPrefix);
+    const joinResponses = await db.responses.getAllAtAddress(
+        joinPrefix, sharedPfid,
+    );
     assert.equal(joinResponses.length, 2);
     for (const response of joinResponses) {
         assert.equal('supersedes' in response, false);

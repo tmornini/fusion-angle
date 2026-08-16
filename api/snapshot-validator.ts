@@ -106,8 +106,10 @@ function refusePreBreakMessage(
 
 // Anchored retired message-plane uri_collection patterns.
 // Task 5: flat records. Task 8: flat record-attributes.
-// Anchored so the live flows/:id/records join family is
-// accepted (never a substring match).
+// identity-pii / identity-providers / identity-tokens /
+// identity-token-revocations collections retired
+// (router 404). Anchored so the live flows/:id/records
+// join family is accepted (never a substring match).
 const RETIRED_URI_PREFIX_PATTERNS:
     readonly RegExp[] = [
     /^\/organizations\/[^/]+\/records\//,
@@ -116,6 +118,10 @@ const RETIRED_URI_PREFIX_PATTERNS:
     /^\/human-members\//,
     /^\/ai-members\//,
     /^\/organizations\/[^/]+\/memberships\//,
+    /^\/identity-pii\//,
+    /^\/identity-providers\//,
+    /^\/identity-tokens\//,
+    /^\/identity-token-revocations\//,
 ];
 
 // Map table name → entity validator. Stored rows

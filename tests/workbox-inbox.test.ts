@@ -51,6 +51,9 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import {
+    MEMBER_WITHOUT_PII_NAME,
+} from '../web-app/app/adapters/members-union.ts';
 
 // -- Fixtures ---------------------------------
 
@@ -243,7 +246,8 @@ test(
         );
         assert.notEqual(item.displayId, '');
         assert.equal(
-            item.transitionerName, 'Demo Test',
+            item.transitionerName,
+            MEMBER_WITHOUT_PII_NAME,
         );
         assert.equal(
             typeof item.lastTransitionedAt,

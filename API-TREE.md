@@ -3,19 +3,19 @@ organization/default-organization sub-routers).
 
 └─|─ /invitations/ • RECONCILED: derived view, but NOT a registered family — the permanent side channel (Author gate 2); grant/accept synthesize PUT-shaped document pairs off the route table, rows derive from PUT-method document heads at /invitations/ and state from op-address pair presence (accepted/declined/revoked/pending), the facade's 404-only verb regime preserved — Phase 15 gate 6 re-homes grant email onto deriveIdentityPiiRows and pendingInvitationFor/loadInvitation onto deriveInvitations (no live invitations-table decision read) — see the roster seam FLIPPED 2026-07-06 block + Phase 15 FLIPPED
   |  └── :id
-└─|─ /memberships/ • RECONCILED: shipped as the EIGHTH registered family (organizationNested:true, 'stateless' — a pure join relation, no lifecycle), collection + entity GETs served by the generic document handlers, DELETE a marked tombstone; the members/human-members/ai-members derive-on-read directory is realized over this ∩ the ninth-through-eleventh global-plane member families — see the same block (Author gate 1)
+└─|─ /memberships/ • RETIRED: global family, router 404 — seats live at organizations/:id/members
   |  └── :id
-└─|─ /members/ • RECONCILED: ninth registered family, GLOBAL plane (organizationNested:false, lifecycle:'trio'); GET collection org-fenced via memberships join; GET|PUT members/:id document; GET members/:id/history (global miss → 404)
+└─|─ /members/ • RETIRED: global family, router 404 — seats live at organizations/:id/members
   |  └── :id
   |      └── /history
-└─|─ /ai-members/ • RECONCILED: tenth registered family, GLOBAL plane (detail facet, 'stateless'); GET collection; GET|PUT :id document; POST collection create + POST :id edit (admin)
+└─|─ /ai-members/ • RETIRED: global family, router 404
   |  └── :id
 └─|─ /ai-agents/ • RECONCILED: fourteenth registered family, GLOBAL plane ('stateless'); not a member and not an identity; GET collection; GET|PUT :id document (name, description, skill_focus, model)
   |  └── :id
-└─|─ /human-members/ • RECONCILED: eleventh registered family, GLOBAL plane (detail facet, 'stateless'); GET collection; GET :id; POST collection create + POST :id edit (admin); NO live PUT on :id (wiring/seed only)
+└─|─ /human-members/ • RETIRED: global family, router 404
   |  └── :id
-└─|─ /current-member • RECONCILED: GET actor's own member parent (global plane; deriveMemberParent)
-└─|─ /identity-pii • RECONCILED: GET collection roster (fenced via membership pair plane over deriveIdentityPiiRows) — distinct from nested identities/:id/pii
+└─|─ /current-member • RETIRED: router 404
+└─|─ /identity-pii • RETIRED: router 404 — nested GET|PUT|DELETE identities/:id/pii is the only PII HTTP
 └─|─ work-orders/ • RECONCILED: registered org-nested document family (organizationNested:true, concurrency:'simple', lifecycle:'stateless' — flat wire; storage uri_prefix nests org), collection + entity GETs with optional binding enrichment (instance_id + record_type_id), PUT via documentPutHandler, POST create, named ops PUT/GET/DELETE claim, POST transition, PUT binding (create-only); POST release retired (404); no document DELETE
   |  └── :id/
   |      └── claim                            • RECONCILED: PUT/GET/DELETE work-orders/:id/claim — first PUT 201; GET {member_id, expires_at} 200 / 404 only when unclaimed; DELETE releases 204; POST 405; contention 409 + nonexistent-WO 404 + foreign-WO 403 — see API.md §3.18
@@ -28,12 +28,12 @@ organization/default-organization sub-routers).
   |      └─|─ /credentials                     • RECONCILED: collection GET returns rows[]; not a singleton document
   |      |  └── :cid                           • GET|PUT per-credential document at identities/:id/credentials/:cid
   |      └─|─ /notifications                   • TARGET-STATE: postgres LISTEN/NOTIFY for all changes to identity
-  |      └─|─ /pii                             • GET|PUT|DELETE nested document; full physical removal from the DB required, i.e. physical delete (sole hard-delete zone; no Delete-At header)
+  |      └─|─ /pii                             • GET|PUT|DELETE nested document; GET self-or-admin; PUT/DELETE self-or-admin; full physical removal from the DB required, i.e. physical delete (sole hard-delete zone; no Delete-At header)
   |      └─|─ /registration                    • RECONCILED (clients retirement): client registration facet — single-slot PUT-overwrite document (grant_types, redirect_uris, jwks, aud, status), admin-realm writes, kind-'service' gate; grantClientCredentials derives it pre-token (bearer-exempt precedent); DELETE tombstone = deregistration
   |      └─|─ /role-grants                     • RETIRED (membership type + claim roles)
-  |      └─|─ /third-party-identity-providers  • RECONCILED: shipped FLAT as GET identity-providers + GET|PUT identity-providers/:id (GLOBAL multi-document event ledger); not nested under identities/:id and not a singleton — name third-party-* retired
-  |      └─|─ /token-revocations               • RECONCILED: shipped FLAT, not nested here — GET|PUT /identity-token-revocations/:id (GLOBAL-plane, no organization_id), the answer WAS "PUT/GET"; GET stays admin-only, PUT widened to member-tier SELF-target only at WP8 (Phase 13 Task 8) — a member may revoke its own chain, naming another identity still requires admin — see the Auth RECONCILED 2026-07-06 block
-  |      └─|─ /tokens/                         • RECONCILED: shipped FLAT, not nested here — GET /identity-tokens, GET|PUT /identity-tokens/:id, POST /identity-tokens/:jti/rotation, POST /identity-tokens/:jti/revocation; both GETs derive from the pair plane (Phase 13 Task 6), PUT is pair-only and rotation/revocation append event pairs only (Task 5) — Phase 13 Task 9 retired the identity_tokens row store outright (alongside authorization_codes) — see the Auth RECONCILED 2026-07-06 block
+  |      └─|─ /providers                       • RECONCILED: GET identities/:id/providers + GET|PUT identities/:id/providers/:eid (GLOBAL multi-document event ledger, nested under the identity); flat GET identity-providers + GET|PUT identity-providers/:id RETIRED (router 404) — name third-party-* retired
+  |      └─|─ /token-revocations               • RECONCILED: GET|PUT identities/:id/token-revocations/:rid (GLOBAL-plane, no organization_id, no collection route); GET stays admin-only; PUT member-tier SELF-target only (path identity vs actor) — a member may revoke its own chain, naming another identity still requires admin; path stamps identity_id; flat GET|PUT /identity-token-revocations/:id RETIRED (router 404) — see the Auth RECONCILED 2026-07-06 block
+  |      └─|─ /tokens/                         • RECONCILED: GET identities/:id/tokens + GET|PUT identities/:id/tokens/:tid + POST identities/:id/tokens/:jti/rotation + POST identities/:id/tokens/:jti/revocation (GLOBAL event ledger, nested under the identity); both GETs derive from the pair plane (Phase 13 Task 6), PUT is pair-only and stamps identity_id from the path, rotation/revocation append event pairs only (Task 5) — Phase 13 Task 9 retired the identity_tokens row store outright (alongside authorization_codes); flat GET /identity-tokens + GET|PUT /identity-tokens/:id + POST /identity-tokens/:jti/rotation + POST /identity-tokens/:jti/revocation RETIRED (router 404) — see the Auth RECONCILED 2026-07-06 block
   |        |  └── :id
   |        |      ├── /rotation                • is this a POST? — YES, see the /tokens/ RECONCILED note above
   |        |      └── /revocation              • is this a POST? — YES, see the /tokens/ RECONCILED note above

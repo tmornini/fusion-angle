@@ -13,7 +13,7 @@ export async function postIdentityLogoutEverywhere(
 ): Promise<void> {
     const id = generateCryptoSafeBase62();
     await ctx.PUT(
-        `identity-token-revocations/${id}`,
-        { identity_id: identityId, at: nowUtc() },
+        `identities/${identityId}/token-revocations/${id}`,
+        { at: nowUtc() },
     );
 }

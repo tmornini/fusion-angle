@@ -33,8 +33,6 @@ import {
     deriveIdentityPii,
     deriveCredentialsFor,
     deriveCredential,
-    deriveIdentityProviders,
-    deriveIdentityProvider,
     deriveTokenRevocation,
     deriveTokenRevocationsFor,
 } from '../api/derive-identity-spine.ts';
@@ -324,10 +322,11 @@ test('identities collection wire equals derive (12 incl.'
     );
 });
 
-// -- 2. identity-pii collection parity + the THREE-WAY --------
+// -- 2. identity-pii derive/fence parity + the THREE-WAY ------
 // -- viaMembership fence legs + leaf parity + 404 bytes ---------
+// -- Flat GET /identity-pii is retired (router 404). ------------
 
-test('identity-pii collection (11 seeded slots) fenced both'
+test('identity-pii derive (11 seeded slots) fenced both'
 + ' orgs + the THREE-WAY viaMembership fence legs (co-member'
 + ' visible, FOREIGN-org hidden — orphan visible) + leaf +'
 + ' 404 bytes', async () => {

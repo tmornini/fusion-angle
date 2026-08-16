@@ -5,7 +5,6 @@ import type {
     IdentityEntity,
     IdentityPiiEntity,
     MembershipEntity,
-    MemberPii,
     MemberState,
     MemberStateDetail,
 } from '../../../api/types.ts';
@@ -50,18 +49,15 @@ export type HumanMemberDraft =
         bio: string;
     };
 
-function memberPiiOf(
-    row: IdentityPiiEntity | undefined,
-): MemberPii {
-    if (row === undefined) {
-        return { erased: true };
-    }
+function emptyPersonProfile(
+    id: MemberId,
+): HumanMemberEntity {
     return {
-        erased: false,
-        name: row.name,
-        email: row.email,
-        phone: row.phone,
-        bio: row.bio,
+        id,
+        title: '',
+        department: '',
+        strengths: [],
+        team_dimensions: {},
     };
 }
 
@@ -121,36 +117,17 @@ function seatedHumanParent(
 
 export function buildHumanMemberMap(
     seats: readonly MembershipEntity[],
-    identities: readonly IdentityEntity[],
-    piiRows: readonly IdentityPiiEntity[],
 ): Map<MemberId, HumanMember> {
-    const identityById = new Map(
-        identities.map(row => [row.id, row]),
-    );
-    const piiById = new Map(
-        piiRows.map(row => [row.id, row]),
-    );
     const map = new Map<MemberId, HumanMember>();
     for (const seat of seats) {
-        const identity = identityById.get(
-            seat.identity_id,
-        );
-        if (
-            identity === undefined
-            || identity.kind !== 'person'
-        ) {
-            continue;
-        }
         map.set(
             seat.identity_id,
             new HumanMember(
                 seatedHumanParent(
                     seat.identity_id, seat.at,
                 ),
-                profileOf(identity),
-                memberPiiOf(
-                    piiById.get(seat.identity_id),
-                ),
+                emptyPersonProfile(seat.identity_id),
+                { erased: true },
                 {
                     state: 'active',
                     stateAt: seat.at,
@@ -165,19 +142,10 @@ export function buildHumanMemberMap(
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const [seats, identities, piiRows] =
-        await Promise.all([
-            ctx.GET<MembershipEntity[]>(
-                seatsCollection(ctx),
-            ),
-            ctx.GET<IdentityEntity[]>('identities'),
-            ctx.GET<IdentityPiiEntity[]>(
-                'identity-pii',
-            ),
-        ]);
-    return buildHumanMemberMap(
-        seats, identities, piiRows,
+    const seats = await ctx.GET<MembershipEntity[]>(
+        seatsCollection(ctx),
     );
+    return buildHumanMemberMap(seats);
 }
 
 export async function getCurrentHumanMember(

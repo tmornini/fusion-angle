@@ -9,4 +9,5 @@ TZ=UTC node --test --strip-types \
     tests/pg-acceptance.test.ts \
     tests/pg-races.test.ts \
     tests/pg-boot.test.ts \
-    tests/pg-seed.test.ts
+    tests/pg-seed.test.ts \
+    tests/pg-explain.test.ts

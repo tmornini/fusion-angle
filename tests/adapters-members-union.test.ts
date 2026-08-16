@@ -19,6 +19,7 @@ import { adminContext } from './context-fixtures.ts';
 import {
     getMembers,
     getMemberMap,
+    fillHumanMemberPii,
     memberName,
     isHumanMember,
     isAIMember,
@@ -92,16 +93,16 @@ test(
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db, await devToken());
         const members = await getMembers(ctx);
-        assert.equal(members.length, 2);
-        const human = members.find(isHumanMember)!;
+        assert.equal(members.length, 3);
+        const human = members.find(
+            m => m.idForLink() === 'hw_sarah_chen',
+        );
         const ai = members.find(isAIMember)!;
         assert.ok(human);
+        assert.ok(isHumanMember(human));
         assert.ok(ai);
         assert.equal(human.kind, 'human');
         assert.equal(ai.kind, 'ai');
-        assert.equal(
-            human.idForLink(), 'hw_sarah_chen',
-        );
         assert.equal(
             ai.idForLink(), 'ai_claude_opus',
         );
@@ -148,7 +149,7 @@ test(
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);
-        assert.equal(map.size, 3);
+        assert.equal(map.size, 4);
         const human = map.get('hw_sarah_chen')!;
         const ai = map.get('ai_claude_opus')!;
         assert.ok(human);
@@ -167,7 +168,7 @@ test(
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
-            'Sarah Test',
+            MEMBER_WITHOUT_PII_NAME,
         );
         assert.equal(
             memberName(map, 'ai_claude_opus'),
@@ -185,7 +186,7 @@ test(
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
-            'Sarah Test',
+            MEMBER_WITHOUT_PII_NAME,
         );
         assert.equal(
             memberName(map, 'ai_claude_opus'),
@@ -207,12 +208,25 @@ test(
 );
 
 test(
-    'getMembers on an empty database returns'
-    + ' an empty array',
+    'getMembers on a schema-only db is the'
+    + ' seated root admin',
     async () => {
         const { ctx } = await adminContext();
         const members = await getMembers(ctx);
-        assert.deepEqual(members, []);
+        assert.equal(members.length, 1);
+        assert.equal(
+            members[0]?.idForLink(), 'current',
+        );
+        assert.ok(
+            members[0] !== undefined
+            && isHumanMember(members[0]),
+        );
+        assert.equal(
+            memberName(
+                await getMemberMap(ctx), 'current',
+            ),
+            MEMBER_WITHOUT_PII_NAME,
+        );
     },
 );
 
@@ -274,5 +288,50 @@ test(
             memberName(map, 'member_without_pii'),
             MEMBER_WITHOUT_PII_NAME,
         );
+    },
+);
+
+test(
+    'fillHumanMemberPii names a seeded human;'
+    + ' getMembers stays erased',
+    async () => {
+        const { db, ctx } = await adminContext();
+        await seedHumanMember(
+            db, 'u1', 'Alice Test',
+        );
+        await seedAIMember(
+            db, 'ai1', 'Claude Opus',
+        );
+        const raw = await getMembers(ctx);
+        const alice = raw.find(
+            m => m.idForLink() === 'u1',
+        );
+        assert.ok(alice && isHumanMember(alice));
+        assert.equal(alice.pii().erased, true);
+        const filled = await fillHumanMemberPii(
+            ctx, raw,
+        );
+        const named = filled.find(
+            m => m.idForLink() === 'u1',
+        );
+        assert.ok(named && isHumanMember(named));
+        const pii = named.pii();
+        assert.ok(!pii.erased);
+        if (!pii.erased) {
+            assert.equal(pii.name, 'Alice Test');
+        }
+        const agent = filled.find(
+            m => m.idForLink() === 'ai1',
+        );
+        assert.ok(agent && isAIMember(agent));
+        assert.equal(agent.name(), 'Claude Opus');
+        const stillRaw = await getMembers(ctx);
+        const stillAlice = stillRaw.find(
+            m => m.idForLink() === 'u1',
+        );
+        assert.ok(
+            stillAlice && isHumanMember(stillAlice),
+        );
+        assert.equal(stillAlice.pii().erased, true);
     },
 );

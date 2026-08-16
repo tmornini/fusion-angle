@@ -483,7 +483,9 @@ export async function tokenRevocationReason(
     // jti, so the latest action for the presented jti already
     // reflects it.
     const events =
-        await deriveIdentityTokenEventsForJti(adapter, jti);
+        await deriveIdentityTokenEventsForJti(
+            adapter, jti, sub,
+        );
     if (isTokenRevoked(events, jti)) {
         return 'token chain revoked';
     }
@@ -1129,8 +1131,15 @@ export async function deriveAuthorizationCodeId(
 
 const AUTHORIZE_PREFIX =
     canonicalUriCollection(undefined, '/authentication/authorize/');
-const IDENTITY_TOKENS_EVENT_PREFIX =
+const IDENTITY_TOKENS_FLAT_PREFIX =
     canonicalUriCollection(undefined, '/identity-tokens/');
+
+function tokensEventPrefixFor(identityId: Id): string {
+    return canonicalUriCollection(
+        undefined,
+        '/identities/' + identityId + '/tokens/',
+    );
+}
 
 // A stored message's JSON body — the ONE local decode this file
 // needs for both the request and response side of the authorize
@@ -1175,14 +1184,11 @@ async function authorizeCodeIssuer(
     adapter: DbAdapter,
     code: string,
 ): Promise<AuthorizeCodeIssuer | null> {
-    const responses = await adapter.responses
-        .getAllWhere('uri_collection', AUTHORIZE_PREFIX);
-    const matched = responses.find(
-        (response) =>
-            decodedBodyOf(response.message).code === code,
-    );
+    const hits = await messageStore(adapter)
+        .getAllWhereBody(AUTHORIZE_PREFIX, { code });
+    const matched = hits[0]?.response;
     if (matched === undefined) return null;
-    const request = await adapter.requests.getById(matched.id);
+    const request = hits[0]!.request;
     const requestBody = decodedBodyOf(request.message);
     // code_challenge is optional on authorize (PKCE only when
     // the client sent one). Soft read — pickString would throw
@@ -1210,22 +1216,29 @@ async function authorizeCodeIssuer(
 // deriveIdentityTokenEventsForJti precedent), `dbOrView` is
 // whichever face is in scope: the plain adapter pre-tx, the open
 // transaction view in-tx. A genuine event already lives at
-// 'identity-tokens/<derivedId>' exactly when this code has already
-// minted a chain root — the pair append at that KEYED address IS
-// the spend marker (KEY-BY-ANCHOR), replacing the retired
-// authorization_codes 'consumed' row. Filtered to the identity-
-// tokens prefix so a coincidental non-identity-tokens hit —
-// astronomically unlikely for a 64-hex-char sha256 digest against
-// 22-char base62 ids, but never assumed — cannot false-positive
-// the guard.
+// 'identities/<identityId>/tokens/<derivedId>' exactly when
+// this code has already minted a chain root — the pair append
+// at that KEYED address IS the spend marker (KEY-BY-ANCHOR),
+// replacing the retired authorization_codes 'consumed' row.
+// Dual-reads leftover /identity-tokens/<derivedId> so a
+// pre-nest spend still fails closed. Filtered to those two
+// prefixes so a coincidental non-token hit — astronomically
+// unlikely for a 64-hex-char sha256 digest against 22-char
+// base62 ids, but never assumed — cannot false-positive the
+// guard.
 export async function authorizationCodeSpent(
     dbOrView: DbAdapter,
     derivedId: Id,
+    identityId: Id,
 ): Promise<boolean> {
-    const rows = await dbOrView.requests.getAllWhere(
-        'uri_collection', IDENTITY_TOKENS_EVENT_PREFIX,
+    const nested = await dbOrView.requests.getAllAtAddress(
+        tokensEventPrefixFor(identityId), derivedId,
     );
-    return rows.some((row) => row.uri_id === derivedId);
+    if (nested.length > 0) return true;
+    const leftover = await dbOrView.requests.getAllAtAddress(
+        IDENTITY_TOKENS_FLAT_PREFIX, derivedId,
+    );
+    return leftover.length > 0;
 }
 
 // authorization_code grant: consume an ISSUED code, then issue a
@@ -1290,7 +1303,9 @@ async function grantAuthorizationCode(
             return invalid;
         }
     }
-    if (await authorizationCodeSpent(adapter, derivedId)) {
+    if (await authorizationCodeSpent(
+        adapter, derivedId, issuer.identityId,
+    )) {
         return invalid;
     }
     const refreshJti = generateCryptoSafeBase62();
@@ -1331,7 +1346,9 @@ async function grantAuthorizationCode(
     const consumed = await adapter.transaction(
         ['requests', 'responses'],
         async (view) => {
-            if (await authorizationCodeSpent(view, derivedId)) {
+            if (await authorizationCodeSpent(
+                view, derivedId, issuer.identityId,
+            )) {
                 return false;
             }
             await appendMessagePair(view, eventPair);

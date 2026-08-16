@@ -4,7 +4,6 @@ import {
     type IdentityProviderEntity,
 } from '../../../api/types.ts';
 import {
-    filterByField,
     type RequestContext,
 } from './shared.ts';
 import {
@@ -40,16 +39,15 @@ export async function getProviderEvents(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<ProviderEvent[]> {
-    const all = await ctx.GET<IdentityProviderEntity[]>(
-        'identity-providers',
+    const rows = await ctx.GET<IdentityProviderEntity[]>(
+        `identities/${identityId}/providers`,
     );
-    return filterByField(all, 'identity_id', identityId)
-        .map(ev => ({
-            provider: ev.provider,
-            providerSubject: ev.provider_subject,
-            action: ev.action,
-            at: ev.at,
-        }));
+    return rows.map(ev => ({
+        provider: ev.provider,
+        providerSubject: ev.provider_subject,
+        action: ev.action,
+        at: ev.at,
+    }));
 }
 
 // The providers an identity currently has linked: the latest
@@ -59,15 +57,12 @@ export async function getProvidersFor(
     ctx: RequestContext,
     identityId: Id,
 ): Promise<string[]> {
-    const all = await ctx.GET<IdentityProviderEntity[]>(
-        'identity-providers',
-    );
-    const forIdentity = filterByField(
-        all, 'identity_id', identityId,
+    const rows = await ctx.GET<IdentityProviderEntity[]>(
+        `identities/${identityId}/providers`,
     );
     // Latest by `at`, not array order — latestByKey's default
     // >= tiebreak is the secure direction the siblings share.
-    const latest = latestByKey(forIdentity, ev => ev.provider);
+    const latest = latestByKey(rows, ev => ev.provider);
     const linked: string[] = [];
     for (const [provider, last] of latest) {
         if (last.action === 'linked') linked.push(provider);

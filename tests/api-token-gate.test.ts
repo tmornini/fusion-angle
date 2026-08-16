@@ -123,7 +123,7 @@ async () => {
         jti: 'stale-but-live',
     });
     await PUT(
-        db, 'identity-token-revocations/r1',
+        db, 'identities/current/token-revocations/r1',
         {
             identity_id: 'current',
             at: '2021-01-01T00:00:00.000000Z',
@@ -152,7 +152,7 @@ test('a token minted within a revocation second still'
         jti: 'same-second',
     });
     await PUT(
-        db, 'identity-token-revocations/r1',
+        db, 'identities/current/token-revocations/r1',
         { identity_id: 'current', at: revokedAt },
         await devToken(),
     );
@@ -166,7 +166,7 @@ test('a jti revoked in the ledger still admits the access'
 + ' token until exp', async () => {
     const db = await freshDb();
     await PUT(
-        db, 'identity-tokens/e1',
+        db, 'identities/current/tokens/e1',
         {
             jti: 'dev-current', identity_id: 'current',
             action: 'issued', chain_id: 'c1',
@@ -175,7 +175,7 @@ test('a jti revoked in the ledger still admits the access'
         await devToken(),
     );
     await PUT(
-        db, 'identity-tokens/e2',
+        db, 'identities/current/tokens/e2',
         {
             jti: 'dev-current', identity_id: 'current',
             action: 'revoked', chain_id: 'c1',

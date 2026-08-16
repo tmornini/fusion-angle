@@ -3,10 +3,15 @@ import {
 } from './storage-serialize.ts';
 import {
     UniqueConstraintError,
+    assertGetWhereColumn,
     uniqueColumns,
     type Tx,
     type TxMode,
 } from './db.ts';
+import { HttpMessage } from
+    '../shared/http-message/http-message.ts';
+import { parseWire } from
+    '../shared/http-message/wire-codec.ts';
 
 // Builds a row-granular Tx handle over a pre-loaded buffer
 // of the touched tables. The buffer IS the unit of
@@ -69,11 +74,124 @@ export function bufferTx(
             column: string,
             key: string,
         ): Promise<T[]> {
+            assertGetWhereColumn(table, column);
             return scoped(table)
                 .filter(row => (
                     row as Record<string, unknown>
                 )[column] === key)
                 .map(row => ({ ...row })) as T[];
+        },
+        async getAddress<T extends { id: string }>(
+            table: string,
+            collection: string,
+            uriId: string,
+        ): Promise<T[]> {
+            return scoped(table)
+                .filter((row) => {
+                    const rec = row as
+                        Record<string, unknown>;
+                    return rec['uri_collection']
+                        === collection
+                        && rec['uri_id'] === uriId;
+                })
+                .sort((left, right) => {
+                    const l = left as
+                        Record<string, unknown>;
+                    const r = right as
+                        Record<string, unknown>;
+                    const atL = String(l['at'] ?? '');
+                    const atR = String(r['at'] ?? '');
+                    if (atL < atR) return -1;
+                    if (atL > atR) return 1;
+                    if (left.id < right.id) return -1;
+                    if (left.id > right.id) return 1;
+                    return 0;
+                })
+                .map((row) => ({ ...row })) as T[];
+        },
+        async getAddressVersion<T extends { id: string }>(
+            table: string,
+            collection: string,
+            uriId: string,
+            version: string,
+        ): Promise<T[]> {
+            if (table === 'requests') {
+                throw new Error(
+                    'getAddressVersion does not'
+                    + ' accept requests',
+                );
+            }
+            return scoped(table)
+                .filter((row) => {
+                    const rec = row as
+                        Record<string, unknown>;
+                    return rec['uri_collection']
+                        === collection
+                        && rec['uri_id'] === uriId
+                        && rec['version'] === version;
+                })
+                .sort((left, right) => {
+                    const l = left as
+                        Record<string, unknown>;
+                    const r = right as
+                        Record<string, unknown>;
+                    const atL = String(l['at'] ?? '');
+                    const atR = String(r['at'] ?? '');
+                    if (atL < atR) return -1;
+                    if (atL > atR) return 1;
+                    if (left.id < right.id) return -1;
+                    if (left.id > right.id) return 1;
+                    return 0;
+                })
+                .map((row) => ({ ...row })) as T[];
+        },
+        async getWhereBody<T extends { id: string }>(
+            table: string,
+            collection: string,
+            containment: Record<string, unknown>,
+        ): Promise<T[]> {
+            if (table === 'requests') {
+                throw new Error(
+                    'getWhereBody does not accept'
+                    + ' requests',
+                );
+            }
+            return scoped(table)
+                .filter((row) => {
+                    const rec = row as
+                        Record<string, unknown>;
+                    if (
+                        rec['uri_collection']
+                        !== collection
+                    ) {
+                        return false;
+                    }
+                    const message = rec['message'];
+                    if (typeof message !== 'string') {
+                        return false;
+                    }
+                    const body = jsonBodyOf(message);
+                    if (body === undefined) {
+                        return false;
+                    }
+                    return containsFact(
+                        body, containment,
+                    );
+                })
+                .sort((left, right) => {
+                    const l = left as
+                        Record<string, unknown>;
+                    const r = right as
+                        Record<string, unknown>;
+                    const atL = String(l['at'] ?? '');
+                    const atR = String(r['at'] ?? '');
+                    if (atL < atR) return -1;
+                    if (atL > atR) return 1;
+                    if (left.id < right.id) return -1;
+                    if (left.id > right.id) return 1;
+                    return 0;
+                })
+                .map((row) => ({ ...row })) as T[];
         },
         async put<T extends { id: string }>(
             table: string,
@@ -140,4 +258,30 @@ export function bufferTx(
             dirty.add(table);
         },
     };
+}
+
+function jsonBodyOf(message: string): unknown | undefined {
+    const model = parseWire(message);
+    const body = HttpMessage.fromModel(model).body();
+    if (!body.exists()) return undefined;
+    return JSON.parse(body.toText());
+}
+
+function containsFact(
+    body: unknown,
+    containment: Record<string, unknown>,
+): boolean {
+    if (body === null || typeof body !== 'object') {
+        return false;
+    }
+    const record = body as Record<string, unknown>;
+    for (const [key, value] of Object.entries(containment)) {
+        if (
+            JSON.stringify(record[key])
+            !== JSON.stringify(value)
+        ) {
+            return false;
+        }
+    }
+    return true;
 }

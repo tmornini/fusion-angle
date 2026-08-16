@@ -1,12 +1,11 @@
 import type {
     MemberId,
     Member,
-    IdentityPiiEntity,
-    IdentityEntity,
     MembershipEntity,
     AIAgentEntity,
 } from '../../../api/types.ts';
 import {
+    HumanMember,
     SystemMember,
     SYSTEM_MEMBER_ID,
 } from '../../../api/types.ts';
@@ -17,6 +16,7 @@ import {
 import {
     buildAIAgentMap,
 } from './ai-members.ts';
+import { getMemberPii } from './identities.ts';
 
 export {
     SystemMember,
@@ -48,27 +48,64 @@ export async function getMembers(
 ): Promise<Member[]> {
     const organization = ctx.identity.organization
         ?? ctx.identity.organizations?.[0];
-    const [
-        seats, identities, piiRows, agents,
-    ] = await Promise.all([
+    const [seats, agents] = await Promise.all([
         organization === undefined
             ? Promise.resolve([] as MembershipEntity[])
             : ctx.GET<MembershipEntity[]>(
                 'organizations/' + organization
                     + '/members',
             ),
-        ctx.GET<IdentityEntity[]>('identities'),
-        ctx.GET<IdentityPiiEntity[]>('identity-pii'),
         ctx.GET<AIAgentEntity[]>('ai-agents'),
     ]);
-    const humans = buildHumanMemberMap(
-        seats, identities, piiRows,
-    );
+    const humans = buildHumanMemberMap(seats);
     const ais = buildAIAgentMap(agents);
     return [
         ...humans.values(),
         ...ais.values(),
     ];
+}
+
+// Admin Members page fill. Member-tier getMembers stays
+// seats + agents with erased PII; this pass reads each
+// human's nested identities/:id/pii in parallel.
+export async function fillHumanMemberPii(
+    ctx: RequestContext,
+    members: readonly Member[],
+): Promise<Member[]> {
+    return Promise.all(members.map(async member => {
+        if (member.kind !== 'human') {
+            return member;
+        }
+        const pii = await getMemberPii(
+            ctx, member.idForLink(),
+        );
+        return new HumanMember(
+            {
+                id: member.idForLink(),
+                type: 'human',
+                state: member.stateValue(),
+                state_at: member.stateAtValue(),
+                state_event_id:
+                    member.stateEventIdValue(),
+            },
+            {
+                id: member.idForLink(),
+                title: member.titleLabel(),
+                department: member.departmentLabel(),
+                strengths: [...member.strengths()],
+                team_dimensions: {
+                    ...member.teamDimensions(),
+                },
+            },
+            pii,
+            {
+                state: member.stateValue(),
+                stateAt: member.stateAtValue(),
+                stateEventId:
+                    member.stateEventIdValue(),
+            },
+        );
+    }));
 }
 
 export async function getMemberMap(

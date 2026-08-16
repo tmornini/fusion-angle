@@ -102,6 +102,25 @@ test('ensureTables runs compile-time SCHEMA', async () => {
     assert.equal(fake.calls[0]!.text, POSTGRES_SCHEMA);
 });
 
+test('schema declares collection indexes', () => {
+    assert.match(
+        POSTGRES_SCHEMA,
+        /CREATE INDEX IF NOT EXISTS requests_collection/,
+    );
+    assert.match(
+        POSTGRES_SCHEMA,
+        /CREATE INDEX IF NOT EXISTS responses_collection/,
+    );
+    assert.match(
+        POSTGRES_SCHEMA,
+        /ON requests \(uri_collection, at, id\)/,
+    );
+    assert.match(
+        POSTGRES_SCHEMA,
+        /ON responses \(uri_collection, at, id\)/,
+    );
+});
+
 test('deleteSchema drops tables, function, marker',
 async () => {
     const fake = fakeClient();
@@ -182,6 +201,113 @@ async () => {
     assert.deepEqual(
         fake.calls[0]!.values,
         ['/ideas/', '42'],
+    );
+});
+
+test('getAddressVersion uses the triple predicate',
+async () => {
+    const fake = fakeClient();
+    const backend = new PostgresBackend(fake.sql);
+    await backend.transaction(
+        ['responses'],
+        'readonly',
+        (tx) => tx.getAddressVersion(
+            'responses', '/ideas/', '42', 'ab',
+        ),
+    );
+    const text = fake.calls[0]!.text;
+    assert.match(text, /FROM responses/);
+    assert.match(text, /uri_collection = \$1/);
+    assert.match(text, /uri_id = \$2/);
+    assert.match(text, /version = \$3/);
+    assert.match(text, /ORDER BY at, id/);
+    assert.deepEqual(
+        fake.calls[0]!.values,
+        ['/ideas/', '42', 'ab'],
+    );
+});
+
+test('getWhere throws for version', async () => {
+    const fake = fakeClient();
+    const backend = new PostgresBackend(fake.sql);
+    await assert.rejects(
+        () => backend.transaction(
+            ['responses'],
+            'readonly',
+            (tx) => tx.getWhere(
+                'responses', 'version', 'ab',
+            ),
+        ),
+        (error: unknown) =>
+            error instanceof Error
+            && error.message
+                === 'getWhere does not accept version',
+    );
+});
+
+test('schema drops unused operation indexes', () => {
+    assert.match(
+        POSTGRES_SCHEMA,
+        /DROP INDEX IF EXISTS requests_operation/,
+    );
+    assert.match(
+        POSTGRES_SCHEMA,
+        /DROP INDEX IF EXISTS responses_operation/,
+    );
+    assert.doesNotMatch(
+        POSTGRES_SCHEMA,
+        /CREATE INDEX.*operation/,
+    );
+});
+
+test('getWhere throws for operation_id', async () => {
+    const fake = fakeClient();
+    const backend = new PostgresBackend(fake.sql);
+    await assert.rejects(
+        () => backend.transaction(
+            ['requests'],
+            'readonly',
+            (tx) => tx.getWhere(
+                'requests',
+                'operation_id',
+                'cccccccccccccccccccccc',
+            ),
+        ),
+        (error: unknown) =>
+            error instanceof Error
+            && error.message
+                === 'getWhere does not accept'
+                + ' operation_id',
+    );
+});
+
+test('getWhereBody uses message_body containment',
+async () => {
+    const fake = fakeClient();
+    const backend = new PostgresBackend(fake.sql);
+    await backend.transaction(
+        ['responses'],
+        'readonly',
+        (tx) => tx.getWhereBody(
+            'responses',
+            '/authentication/authorize/',
+            { code: 'abc' },
+        ),
+    );
+    const text = fake.calls[0]!.text;
+    assert.match(text, /FROM responses/);
+    assert.match(text, /uri_collection = \$1/);
+    assert.match(
+        text, /message_body\(message\) @> \$2/,
+    );
+    assert.match(text, /ORDER BY at, id/);
+    assert.deepEqual(
+        fake.calls[0]!.values[0],
+        '/authentication/authorize/',
+    );
+    assert.deepEqual(
+        fake.calls[0]!.values[1],
+        { code: 'abc' },
     );
 });
 

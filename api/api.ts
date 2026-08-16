@@ -532,8 +532,8 @@ export async function handleRequest(
     // organization — threaded out of Region A (below) alongside
     // effective/actor/organization for WP8's self-only revocation
     // guard (Region B, below): MEMBER_VERBS widens PUT
-    // /identity-token-revocations to the member tier, but an
-    // admin may still name any identity. False for a bearer-
+    // /identities/:id/token-revocations to the member tier, but
+    // an admin may still name any identity. False for a bearer-
     // exempt route (no fence ran, so no role to hold) — the
     // guard below only ever runs on an authenticated route.
     let callerIsAdmin = false;
@@ -721,25 +721,20 @@ export async function handleRequest(
     // write authorizer RETIRED with the leaf routes (Phase 15
     // Task 7).
     try {
-        // WP8 (Phase 13 Task 8): the self-only revocation guard.
-        // MEMBER_VERBS widens PUT /identity-token-revocations to
-        // the member tier (Region A's route-policy check already
-        // cleared it), but the revocation's TARGET identity_id
-        // rides the BODY, parsed above — the URL :id is the
-        // revocation ROW's own id, never the target — so no
-        // upstream check has fenced ownership yet. A member may
-        // revoke only its OWN chain; an admin may name any
-        // identity. The 403 body reuses authorizeRequest's OWN
-        // wording (request-auth.ts) — byte-identical to what
-        // EVERY member request against this route returned before
-        // this task, self or foreign alike — so a foreign-target
-        // member sees no wire change at all; only the self-target
-        // case flips 403 to the admin path's exact success shape.
+        // WP8 self-only revocation guard. MEMBER_VERBS widens
+        // PUT /identities/:id/token-revocations to the member
+        // tier (Region A's route-policy check already cleared
+        // it). The path identity IS the address — compare it
+        // to the actor. A member may revoke only its OWN
+        // chain; an admin may name any identity. The 403 body
+        // reuses authorizeRequest's OWN wording
+        // (request-auth.ts).
         if (
             method === 'PUT'
-            && routePattern === 'identity-token-revocations/:id'
+            && routePattern
+                === 'identities/:id/token-revocations/:rid'
         ) {
-            const targetIdentityId = body?.identity_id;
+            const targetIdentityId = params[0];
             if (
                 typeof targetIdentityId === 'string'
                 && targetIdentityId !== actor
@@ -1676,7 +1671,7 @@ export async function handleRequest(
                     );
                     if (
                         routePattern
-                            === 'identity-token-revocations/:id'
+                            === 'identities/:id/token-revocations/:rid'
                     ) {
                         return attachSetCookie(
                             response,

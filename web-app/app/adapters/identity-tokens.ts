@@ -49,8 +49,8 @@ export interface TokenChain {
     readonly events: readonly TokenEvent[];
 }
 
-// All token chains for one identity: read the ledger, keep
-// this identity's rows, then group by chain_id. The UI
+// All token chains for one identity: the nested collection
+// is already scoped, then group by chain_id. The UI
 // renders each chain so a session's issue/rotate/revoke
 // lineage reads as one unit.
 export async function getTokenChainsFor(
@@ -58,12 +58,11 @@ export async function getTokenChainsFor(
     identityId: Id,
 ): Promise<TokenChain[]> {
     const rows = await ctx.GET<IdentityTokenEntity[]>(
-        'identity-tokens',
+        `identities/${identityId}/tokens`,
     );
     const parentByJti = parentJtiByJti(rows);
     const byChain = new Map<string, TokenEvent[]>();
     for (const row of rows) {
-        if (row.identity_id !== identityId) continue;
         const parent = parentByJti.get(row.jti);
         const event: TokenEvent = {
             jti: row.jti,

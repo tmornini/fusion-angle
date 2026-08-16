@@ -142,6 +142,7 @@ import {
     HTTP_OK,
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
+    HTTP_FORBIDDEN,
     HTTP_CONFLICT,
     HTTP_PRECONDITION_FAILED,
     HTTP_PRECONDITION_REQUIRED,
@@ -257,13 +258,12 @@ import {
     deriveOrganizationMemberSeat,
 } from './derive-memberships.ts';
 import {
-    deriveIdentityPiiRows,
     deriveIdentityPii,
     deriveCredentialsFor,
     deriveCredential,
     deriveClientRegistration,
     deriveIdentityKind,
-    deriveIdentityProviders,
+    deriveIdentityProvidersFor,
     deriveIdentityProvider,
     deriveTokenRevocation,
     piiEntityOf,
@@ -286,10 +286,12 @@ import {
     organizationEntityOf,
 } from './derive-organizations.ts';
 import {
-    deriveIdentityTokens,
+    deriveIdentityTokensFor,
     deriveIdentityToken,
+    deriveIdentityTokenEventsForJti,
     identityTokenEntityOf,
 } from './derive-identity-tokens.ts';
+import { identityForJti } from './identity-tokens.ts';
 import {
     param,
     requireOrganization,
@@ -3164,20 +3166,30 @@ async function requireServiceIdentity(
 // below-facade fixtures form pairs derivation can see.
 export async function postIdentityProviderDocumentOp(
     db: DbAdapter,
+    identityId: Id,
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
     pair?: MessagePair,
 ): Promise<IdentityProviderEntity> {
+    const raw = withoutId(body);
+    if (
+        'identity_id' in raw
+        && raw['identity_id'] !== identityId
+    ) {
+        throw new ApiError(
+            'identity_id does not match path identity',
+            HTTP_BAD_REQUEST,
+        );
+    }
+    const stamped = { ...raw, identity_id: identityId };
     const entity = identityProviderEntityOf({
         uriId: id,
         pairId: id,
         method: 'PUT',
-        body: withoutId(body),
+        body: stamped,
     });
     return db.transaction(
-        // Phase Final Task 2: identity_providers ROW half
-        // stripped.
         ['requests', 'responses'],
         async (view) => {
             if (pair !== undefined) {
@@ -3514,26 +3526,35 @@ export const WRITE_RESPONSE_SPECS:
         },
     },
     // G4: GET wins. identityTokenEntityOf is id-last;
-    // formTokenEventPair and this spec were id-first.
-    // Stored PUT = GET.
-    'identity-tokens/:id': {
+    // identity_id is stamped from the path so stored PUT
+    // = GET (omit-PUT cannot poison GET).
+    'identities/:id/tokens/:tid': {
         status: HTTP_OK,
-        successBody: (params, body) => identityTokenEntityOf({
-            uriId: param(params, 0),
-            pairId: param(params, 0),
-            method: 'PUT',
-            body: withoutId(body ?? {}),
-        }),
+        successBody: (params, body) =>
+            identityTokenEntityOf({
+                uriId: param(params, 1),
+                pairId: param(params, 1),
+                method: 'PUT',
+                body: {
+                    ...withoutId(body ?? {}),
+                    identity_id: param(params, 0),
+                },
+            }),
     },
-    // G4: tokenRevocationEntityOf (GET derive).
-    'identity-token-revocations/:id': {
+    // G4: tokenRevocationEntityOf (GET derive). identity_id
+    // is stamped from the path so stored PUT = GET
+    // (omit-PUT cannot poison GET).
+    'identities/:id/token-revocations/:rid': {
         status: HTTP_OK,
         successBody: (params, body) =>
             tokenRevocationEntityOf({
-                uriId: param(params, 0),
-                pairId: param(params, 0),
+                uriId: param(params, 1),
+                pairId: param(params, 1),
                 method: 'PUT',
-                body: withoutId(body ?? {}),
+                body: {
+                    ...withoutId(body ?? {}),
+                    identity_id: param(params, 0),
+                },
             }),
     },
     // The gate PRE-MINTS the successor jti here — the ONE
@@ -3543,13 +3564,15 @@ export const WRITE_RESPONSE_SPECS:
     // idempotent replay would). The route handler reads this
     // exact value back off the formed pair (pairResponseBody)
     // rather than minting a second one.
-    'identity-tokens/:jti/rotation': {
+    'identities/:id/tokens/:jti/rotation': {
         status: HTTP_OK,
         successBody: () => ({
             jti: generateCryptoSafeBase62(),
         }),
     },
-    'identity-tokens/:jti/revocation': { status: HTTP_NO_CONTENT },
+    'identities/:id/tokens/:jti/revocation': {
+        status: HTTP_NO_CONTENT,
+    },
     // G3: GET wins. organizationEntityOf is id-last; the
     // prior successBody was id-first. Stored PUT = GET.
     'organizations/:id': {
@@ -3561,15 +3584,19 @@ export const WRITE_RESPONSE_SPECS:
             body: withoutId(body ?? {}),
         }),
     },
-    // G4: identityProviderEntityOf (GET derive).
-    'identity-providers/:id': {
+    // G4: identityProviderEntityOf (GET derive). identity_id
+    // is stamped from the path so stored PUT = GET.
+    'identities/:id/providers/:eid': {
         status: HTTP_OK,
         successBody: (params, body) =>
             identityProviderEntityOf({
-                uriId: param(params, 0),
-                pairId: param(params, 0),
+                uriId: param(params, 1),
+                pairId: param(params, 1),
                 method: 'PUT',
-                body: withoutId(body ?? {}),
+                body: {
+                    ...withoutId(body ?? {}),
+                    identity_id: param(params, 0),
+                },
             }),
     },
 };
@@ -3836,12 +3863,11 @@ async function instanceAddressSpent(
     prefix: string,
     instanceId: Id,
 ): Promise<boolean> {
-    const responses = await db.responses.getAllWhere(
-        'uri_collection', prefix,
-    );
-    return responses.some(
-        (response) => response.uri_id === instanceId,
-    );
+    const responses =
+        await db.responses.getAllAtAddress(
+            prefix, instanceId,
+        );
+    return responses.length > 0;
 }
 
 // Instance PATCH create (Task 20): no live PUT, no
@@ -4153,10 +4179,10 @@ export const routes: Route[] = [
     documentVersionRoute(IDENTITIES_WIRING),
     documentVersionRoute(AI_AGENTS_WIRING),
     // PII is a facet of the identity's own subtree: GET is
-    // self-only, PUT/DELETE self-or-admin (enforced in the
-    // request gate, mirroring
-    // /identities/:id/default-organization). The
-    // identity-pii COLLECTION below (admin roster) is separate.
+    // self-or-admin, PUT/DELETE self-or-admin (enforced in
+    // the request gate, mirroring
+    // /identities/:id/default-organization). There is no
+    // flat identity-pii collection (retired, router 404).
     // PUT/DELETE each REPLACE the slot's message pair
     // (replacePiiSlot, api/pii-hard-delete.ts) in the same
     // transaction as the write — the message plane's sanctioned
@@ -4168,15 +4194,37 @@ export const routes: Route[] = [
     // yields uriId '' (a singleton document at a collection-
     // style address). GET is FLIPPED (Phase 10 Task 8): derived
     // via deriveIdentityPii — wire-identical to the hand-written
-    // db.identityPii.getById dispatch it replaces. No fence is
-    // reproduced HERE: authorizeIdentityPii (the gate dispatch,
-    // api.ts/request-auth.ts, UNTOUCHED by this task) already
-    // restricts a GET to the caller reading its OWN pii, and a
-    // fenced request's own membership always includes its active
-    // org, so the row is always visible to itself regardless of
-    // any org fence.
+    // db.identityPii.getById dispatch it replaces.
+    // authorizeIdentityPii (the gate dispatch) restricts a GET
+    // to self or admin. The handler then applies the same
+    // viaMembership org fence credentials use: foreign 403,
+    // orphan visible. A member never reads another identity's
+    // pii.
     route('identities/:id/pii', {
-        get: (db, p) => deriveIdentityPii(db, param(p, 0)),
+        get: async (db, p, actor, organization) => {
+            const organizationId = requireOrganization(
+                organization,
+            );
+            const identityId = param(p, 0);
+            const row = await deriveIdentityPii(
+                db, identityId,
+            );
+            const memberships =
+                await membershipsAcrossAllOrganizations(
+                    db, actor,
+                );
+            const owner =
+                ownerOrganizationViaMembershipPairPlane(
+                    memberships, identityId, organizationId,
+                );
+            if (owner !== null
+                && owner !== organizationId) {
+                throw new ForeignOrganizationError(
+                    'identity_pii', identityId,
+                );
+            }
+            return row;
+        },
         put: (db, p, body, actor, pair) =>
             postIdentityPiiDocumentOp(
                 db, param(p, 0), body, actor, pair,
@@ -4197,30 +4245,6 @@ export const routes: Route[] = [
             );
         },
     }),
-    // GET is FLIPPED (Phase 10 Task 8): derived via
-    // deriveIdentityPiiRows, THEN fenced by gate 15's production
-    // membership pair plane (above) — reproducing, byte-
-    // identically, the SAME three-way viaMembership decision the
-    // hand-written db.identityPii.getAll() dispatch (the org-
-    // scoped adapter's own parentScope+viaMembership) made.
-    route('identity-pii', {
-        get: async (db, _p, actor, organization) => {
-            const organizationId = requireOrganization(
-                organization,
-            );
-            const rows = await deriveIdentityPiiRows(db);
-            const memberships =
-                await membershipsAcrossAllOrganizations(
-                    db, actor,
-                );
-            return rows.filter((row) => {
-                const owner = ownerOrganizationViaMembershipPairPlane(
-                    memberships, row.id, organizationId,
-                );
-                return owner === null || owner === organizationId;
-            });
-        },
-    }),
     // Credentials nest under their parent identity: the identity
     // id is param 0, so the SERVER filters the collection to that
     // identity by its identity_id FK (the org fence still rides
@@ -4236,9 +4260,9 @@ export const routes: Route[] = [
     // WRITE_RESPONSE_SPECS's 'identities/:id/credentials/:cid'
     // entry, which reconstructs the FULL entity, unlike the GETs'
     // withoutSecret projection). GET is FLIPPED (Phase 10 Task 8):
-    // derived via deriveCredentialsFor, fenced the SAME way
-    // identity-pii's collection above is (gate 15, keyed on the
-    // PARENT identity id rather than each row's own id) — a
+    // derived via deriveCredentialsFor, fenced via gate 15
+    // (keyed on the PARENT identity id rather than each
+    // row's own id) — a
     // hidden identity's credentials read as an EMPTY array, byte-
     // identical to parentScope.getAllWhere silently dropping every
     // matched-but-invisible row (never a 404 — getAllWhere never
@@ -4366,34 +4390,40 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Hand-written in place of makeIdRoute<
-    // IdentityTokenRevocationEntity> so PUT can append its
-    // message pair in the same transaction as the write — the
-    // factory's fixed closures have no per-family pair
-    // selector (see message-pair.ts). identity_token_revocations
-    // is a HistoryEntityStore ledger row, so this is
-    // EVENT-APPEND: no head-read, no Supersedes (message-pair.ts
-    // DOCUMENT_CLASS_ROUTE_PATTERNS omits it on purpose). Verbs
-    // stay {get, put}. GET is FLIPPED (Phase 10 Task 8): derived
-    // via deriveTokenRevocation — wire-identical to the
-    // hand-written db.identityTokenRevocations.getById dispatch
-    // it replaces. No fence: identity_token_revocations is
-    // GLOBAL-plane (no organization_id field at all), matching
-    // its sibling identity-providers below.
-    route('identity-token-revocations/:id', {
+    // Nested token-revocations (tokens/providers shape). No
+    // collection route. GET is admin-only (not in
+    // MEMBER_VERBS). PUT is member-legal via
+    // '/identities/:id/token-revocations' PUT; Region B
+    // keeps it self-only (path identity vs actor). Flat
+    // /identity-token-revocations is retired (router 404).
+    // EVENT-APPEND: no head-read, no Supersedes. Path
+    // identity is the address — stamped on write and GET.
+    route('identities/:id/token-revocations/:rid', {
         get: (db, p) =>
-            deriveTokenRevocation(db, param(p, 0)),
+            deriveTokenRevocation(
+                db, param(p, 0), param(p, 1),
+            ),
         put: (db, p, body, _actor, pair) => {
-            // Phase Final Task 2: identity_token_revocations
-            // ROW half stripped — pure pair-plane write.
-            // WRITE_RESPONSE_SPECS successBody forms the wire
-            // via tokenRevocationEntityOf (GET derive).
-            const id = param(p, 0);
+            const identityId = param(p, 0);
+            const id = param(p, 1);
+            const raw = withoutId(body);
+            if (
+                'identity_id' in raw
+                && raw['identity_id'] !== identityId
+            ) {
+                throw new ApiError(
+                    'identity_id does not match path identity',
+                    HTTP_BAD_REQUEST,
+                );
+            }
+            const stamped = {
+                ...raw, identity_id: identityId,
+            };
             const entity = tokenRevocationEntityOf({
                 uriId: id,
                 pairId: id,
                 method: 'PUT',
-                body: withoutId(body),
+                body: stamped,
             });
             return db.transaction(
                 ['requests', 'responses'],
@@ -4406,41 +4436,47 @@ export const routes: Route[] = [
             );
         },
     }),
-    // GET is FLIPPED (Phase 13 Task 6, gate 7 discharged):
-    // derived via deriveIdentityTokens — every identity_tokens
-    // writer forms its own event pair from Task 5 on (issued
-    // roots, rotations, revocations alike), so the derivation now
-    // sees every row the old plane did. Wire-identical to the
-    // hand-written db.identityTokens.getAll() dispatch it
-    // replaces: id-LAST key order (GET / stored PUT),
-    // byIdAscending collection order (== IndexedDB's production
-    // getAll order) — tests/drift-identity-tokens.test.ts pins
-    // stored PUT = identityTokenEntityOf.
-    route('identity-tokens', {
-        get: (db) => deriveIdentityTokens(db),
+    // Nested token events (credentials/providers shape).
+    // Dual-read still sees leftover /identity-tokens/ pairs.
+    // GET is admin-only (not in MEMBER_VERBS). POST on
+    // rotation/revocation stays member-legal via
+    // '/identities/:id/tokens' POST. Flat /identity-tokens
+    // is retired (router 404).
+    route('identities/:id/tokens', {
+        get: (db, p) =>
+            deriveIdentityTokensFor(db, param(p, 0)),
     }),
-    // Hand-written in place of makeIdRoute<IdentityTokenEntity>
-    // so PUT can append its message pair without a row write.
-    // GET is FLIPPED (Phase 13 Task 6, gate 7 discharged):
-    // derived via deriveIdentityToken — wire-identical to the
-    // hand-written db.identityTokens.getById dispatch it
-    // replaces, including the 404 body. PUT is PAIR-ONLY (Phase
-    // 13 Task 9: the row write retires — nothing has read
-    // identity_tokens rows since Task 6); the wire response
-    // comes from WRITE_RESPONSE_SPECS successBody
-    // (identityTokenEntityOf, id-last). `pair` is always
-    // defined for this wired, fenced route — the transaction
-    // still wraps the append for parity with this address's
-    // other writers (rotation/revocation).
-    route('identity-tokens/:id', {
-        get: (db, p) => deriveIdentityToken(db, param(p, 0)),
+    // Hand-written so PUT can stamp identity_id from the
+    // path (the Task 3 hole: omit-PUT must not poison GET)
+    // and append its message pair without a row write.
+    // GET is FLIPPED: derived via deriveIdentityToken —
+    // 404 body unchanged. PUT is PAIR-ONLY.
+    route('identities/:id/tokens/:tid', {
+        get: (db, p) =>
+            deriveIdentityToken(
+                db, param(p, 0), param(p, 1),
+            ),
         put: (db, p, body, _actor, pair) => {
-            const id = param(p, 0);
+            const identityId = param(p, 0);
+            const id = param(p, 1);
+            const raw = withoutId(body);
+            if (
+                'identity_id' in raw
+                && raw['identity_id'] !== identityId
+            ) {
+                throw new ApiError(
+                    'identity_id does not match path identity',
+                    HTTP_BAD_REQUEST,
+                );
+            }
+            const stamped = {
+                ...raw, identity_id: identityId,
+            };
             const entity = identityTokenEntityOf({
                 uriId: id,
                 pairId: id,
                 method: 'PUT',
-                body: withoutId(body),
+                body: stamped,
             });
             return db.transaction(
                 ['requests', 'responses'],
@@ -4453,8 +4489,9 @@ export const routes: Route[] = [
             );
         },
     }),
-    // Rotate a refresh jti. The ledger read, the rotation
-    // plan, and its appends ride ONE transaction
+    // Rotate a refresh jti. Path identity must match the
+    // jti's ledger identity or 403. The ledger read, the
+    // rotation plan, and its appends ride ONE transaction
     // (rotateRefreshJti — the same body the refresh grant
     // runs), so two concurrent rotations of one chain
     // cannot both observe the live jti (the lost-rotation
@@ -4475,9 +4512,22 @@ export const routes: Route[] = [
     // reuse branch still revokes the chain for real. When pair
     // is undefined (unreachable for this wired, fenced route)
     // a fresh jti is minted here instead — crash-free.
-    route('identity-tokens/:jti/rotation', {
+    route('identities/:id/tokens/:jti/rotation', {
         post: async (db, p, _body, _actor, pair) => {
-            const presented = param(p, 0);
+            const identityId = param(p, 0);
+            const presented = param(p, 1);
+            const owner = identityForJti(
+                await deriveIdentityTokenEventsForJti(
+                    db, presented,
+                ),
+                presented,
+            );
+            if (owner !== null && owner !== identityId) {
+                throw new ApiError(
+                    'token does not belong to this identity',
+                    HTTP_FORBIDDEN,
+                );
+            }
             const newJti = pair === undefined
                 ? generateCryptoSafeBase62()
                 : (pairResponseBody(pair)?.['jti'] as
@@ -4497,41 +4547,48 @@ export const routes: Route[] = [
         },
     }),
     // Revoke the whole chain a jti belongs to (log out one
-    // session). Read and appends ride one transaction; an
-    // unknown jti is an idempotent no-op that still appends
-    // its pair (revokeTokenChain guards both exit paths).
-    route('identity-tokens/:jti/revocation', {
+    // session). Path identity must match the jti's ledger
+    // identity or 403. Read and appends ride one transaction;
+    // an unknown jti is an idempotent no-op that still
+    // appends its pair (revokeTokenChain guards both exit
+    // paths).
+    route('identities/:id/tokens/:jti/revocation', {
         post: async (db, p, _body, _actor, pair) => {
-            await revokeTokenChain(db, param(p, 0), pair);
+            const identityId = param(p, 0);
+            const presented = param(p, 1);
+            const owner = identityForJti(
+                await deriveIdentityTokenEventsForJti(
+                    db, presented,
+                ),
+                presented,
+            );
+            if (owner !== null && owner !== identityId) {
+                throw new ApiError(
+                    'token does not belong to this identity',
+                    HTTP_FORBIDDEN,
+                );
+            }
+            await revokeTokenChain(db, presented, pair);
         },
     }),
-    // GET is FLIPPED (Phase 10 Task 8): derived via
-    // deriveIdentityProviders — wire-identical to the
-    // hand-written db.identityProviders.getAll() dispatch it
-    // replaces. No fence: GLOBAL-plane (no organization_id field
-    // at all), matching identities' own global-plane collection
-    // above.
-    route('identity-providers', {
-        get: (db) => deriveIdentityProviders(db),
+    // Nested provider events (credentials shape). Dual-read
+    // still sees leftover /identity-providers/ pairs. No fence:
+    // GLOBAL-plane (no organization_id). ADMIN-ONLY — not in
+    // MEMBER_VERBS. Flat /identity-providers is retired
+    // (router 404).
+    route('identities/:id/providers', {
+        get: (db, p) =>
+            deriveIdentityProvidersFor(db, param(p, 0)),
     }),
-    // Hand-written in place of makeIdRoute<
-    // IdentityProviderEntity> so PUT can append its message
-    // pair in the same transaction as the write — the
-    // factory's fixed closures have no per-family pair
-    // selector (see message-pair.ts). identity_providers is a
-    // HistoryEntityStore ledger row (linked/unlinked events) and
-    // a GLOBAL-plane store (no organization_id field at all), so
-    // this is EVENT-APPEND: no head-read, no Supersedes. Verbs
-    // stay {get, put}. GET is FLIPPED (Phase 10 Task 8): derived
-    // via deriveIdentityProvider — wire-identical to the
-    // hand-written db.identityProviders.getById dispatch it
-    // replaces. PUT rides postIdentityProviderDocumentOp
-    // (identityProviderEntityOf; GET derive).
-    route('identity-providers/:id', {
-        get: (db, p) => deriveIdentityProvider(db, param(p, 0)),
+    route('identities/:id/providers/:eid', {
+        get: (db, p) =>
+            deriveIdentityProvider(
+                db, param(p, 0), param(p, 1),
+            ),
         put: (db, p, body, actor, pair) =>
             postIdentityProviderDocumentOp(
-                db, param(p, 0), body, actor, pair,
+                db, param(p, 0), param(p, 1),
+                body, actor, pair,
             ),
     }),
     // The grant closures retire into api.ts's dedicated

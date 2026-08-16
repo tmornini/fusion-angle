@@ -110,7 +110,7 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/identity-tokens/t-root',
+            path: '/identities/current/tokens/t-root',
             token: DEV_TOKEN,
             body: {
                 jti: 'jti-root',
@@ -129,7 +129,7 @@ async () => {
         db,
         apiRequest({
             method: 'POST',
-            path: '/identity-tokens/jti-root/rotation',
+            path: '/identities/current/tokens/jti-root/rotation',
             token: DEV_TOKEN,
             body: {},
             operationId: ROTATION_OP,
@@ -141,7 +141,7 @@ async () => {
     assert.ok(fresh.length > 1);
     const outer = fresh.find((r) =>
         r.uri_collection
-            === '/identity-tokens/jti-root/rotation/',
+            === '/identities/current/tokens/jti-root/rotation/',
     );
     assert.ok(outer);
     assert.equal(outer.operation_id, ROTATION_OP);

@@ -243,10 +243,18 @@ export async function deriveCredential(
     return credentialEntityOf(document);
 }
 
-// ---- identity_providers — same event-plane shape, REQUEST body -
+// ---- identity_providers — nested under the identity; dual-read
+// ---- the old flat prefix so leftover seed pairs still derive.
 
 const IDENTITY_PROVIDERS_PREFIX =
     canonicalUriCollection(undefined, '/identity-providers/');
+
+function providersPrefixFor(identityId: Id): string {
+    return canonicalUriCollection(
+        undefined,
+        '/identities/' + identityId + '/providers/',
+    );
+}
 
 export function identityProviderEntityOf(
     document: DerivedDocument,
@@ -259,58 +267,101 @@ export function identityProviderEntityOf(
     };
 }
 
-async function fetchIdentityProviderDocuments(
-    db: DbAdapter,
-): Promise<Map<string, DerivedDocument>> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere(
-            'uri_collection', IDENTITY_PROVIDERS_PREFIX,
-        ),
-        db.responses.getAllWhere(
-            'uri_collection', IDENTITY_PROVIDERS_PREFIX,
-        ),
-    ]);
-    return deriveDocumentsAt(
-        requests, responses, IDENTITY_PROVIDERS_PREFIX,
-    );
+// Nested address is the source of truth — fill or overwrite
+// the request body's identity_id from the path.
+function nestedProviderEntityOf(
+    identityId: Id,
+    document: DerivedDocument,
+): IdentityProviderEntity {
+    return identityProviderEntityOf({
+        ...document,
+        body: {
+            ...withoutId(document.body),
+            identity_id: identityId,
+        },
+    });
 }
 
-export async function deriveIdentityProviders(
+async function fetchProviderDocumentsAt(
     db: DbAdapter,
+    prefix: string,
+): Promise<Map<string, DerivedDocument>> {
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
+    ]);
+    return deriveDocumentsAt(requests, responses, prefix);
+}
+
+// Nested docs plus old-flat docs whose identity_id matches.
+// Nested wins on the same event id.
+export async function deriveIdentityProvidersFor(
+    db: DbAdapter,
+    identityId: Id,
 ): Promise<IdentityProviderEntity[]> {
-    const documents = await fetchIdentityProviderDocuments(db);
-    const rows: IdentityProviderEntity[] = [];
-    for (const document of documents.values()) {
-        rows.push(identityProviderEntityOf(document));
+    const nested = await fetchProviderDocumentsAt(
+        db, providersPrefixFor(identityId),
+    );
+    const flat = await fetchProviderDocumentsAt(
+        db, IDENTITY_PROVIDERS_PREFIX,
+    );
+    const byId = new Map<string, IdentityProviderEntity>();
+    for (const document of flat.values()) {
+        const entity = identityProviderEntityOf(document);
+        if (entity.identity_id === identityId) {
+            byId.set(entity.id, entity);
+        }
     }
-    return rows.sort(byIdAscending);
+    for (const document of nested.values()) {
+        const entity = nestedProviderEntityOf(
+            identityId, document,
+        );
+        byId.set(entity.id, entity);
+    }
+    return [...byId.values()].sort(byIdAscending);
 }
 
 export async function deriveIdentityProvider(
     db: DbAdapter,
-    id: Id,
+    identityId: Id,
+    eid: Id,
 ): Promise<IdentityProviderEntity> {
-    const documents = await fetchIdentityProviderDocuments(db);
-    const document = documents.get(id);
-    if (document === undefined) {
-        throw new EntityNotFoundError('identity_providers', id);
+    const nested = await fetchProviderDocumentsAt(
+        db, providersPrefixFor(identityId),
+    );
+    const nestedDocument = nested.get(eid);
+    if (nestedDocument !== undefined) {
+        return nestedProviderEntityOf(
+            identityId, nestedDocument,
+        );
     }
-    return identityProviderEntityOf(document);
+    const flat = await fetchProviderDocumentsAt(
+        db, IDENTITY_PROVIDERS_PREFIX,
+    );
+    const flatDocument = flat.get(eid);
+    if (flatDocument !== undefined) {
+        const entity = identityProviderEntityOf(flatDocument);
+        if (entity.identity_id === identityId) {
+            return entity;
+        }
+    }
+    throw new EntityNotFoundError('identity_providers', eid);
 }
 
-// ---- identity_token_revocations — same event-plane shape, ------
-// ---- REQUEST body; the family is flat (no live collection ------
-// ---- route lists it, unlike role-grants/identity-providers), ---
-// ---- so the by-identity read below scans the family then -------
-// ---- filters the body's identity_id, rather than addressing ----
-// ---- one identity's slot directly (the /credentials shape). ----
-// ---- Phase 13 Task 4: deriveTokenRevocationsFor is the coarse --
-// ---- 'sign out everywhere' gate's (tokenRevocationReason's -----
-// ---- FIRST read) one production reader --------------------------
+// ---- identity_token_revocations — nested under the identity.
+// ---- No collection route. No leftover flat scan: writers
+// ---- are nested-only and snapshots reject the retired
+// ---- prefix. Path stamps identity_id. deriveTokenRevocationsFor
+// ---- is the coarse 'sign out everywhere' gate's
+// ---- (tokenRevocationReason's FIRST read) one production
+// ---- reader.
 
-const IDENTITY_TOKEN_REVOCATIONS_PREFIX = canonicalUriCollection(
-    undefined, '/identity-token-revocations/',
-);
+function tokenRevocationsPrefixFor(identityId: Id): string {
+    return canonicalUriCollection(
+        undefined,
+        '/identities/' + identityId + '/token-revocations/',
+    );
+}
 
 export function tokenRevocationEntityOf(
     document: DerivedDocument,
@@ -323,56 +374,63 @@ export function tokenRevocationEntityOf(
     };
 }
 
-// Every LIVE revocation for one identity, id-lex ordered — the
-// SAME family scan deriveTokenRevocation reads by id, filtered
-// by the body's identity_id AFTER the scan (the family is flat,
-// unlike /credentials, which nests one prefix per identity).
+// Nested address is the source of truth — fill or overwrite
+// the request body's identity_id from the path.
+function nestedTokenRevocationEntityOf(
+    identityId: Id,
+    document: DerivedDocument,
+): IdentityTokenRevocationEntity {
+    return tokenRevocationEntityOf({
+        ...document,
+        body: {
+            ...withoutId(document.body),
+            identity_id: identityId,
+        },
+    });
+}
+
+async function fetchRevocationDocumentsFor(
+    db: DbAdapter,
+    identityId: Id,
+): Promise<Map<string, DerivedDocument>> {
+    const prefix = tokenRevocationsPrefixFor(identityId);
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere('uri_collection', prefix),
+        db.responses.getAllWhere('uri_collection', prefix),
+    ]);
+    return deriveDocumentsAt(requests, responses, prefix);
+}
+
 export async function deriveTokenRevocationsFor(
     db: DbAdapter,
     identityId: Id,
 ): Promise<IdentityTokenRevocationEntity[]> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere(
-            'uri_collection', IDENTITY_TOKEN_REVOCATIONS_PREFIX,
-        ),
-        db.responses.getAllWhere(
-            'uri_collection', IDENTITY_TOKEN_REVOCATIONS_PREFIX,
-        ),
-    ]);
-    const documents = deriveDocumentsAt(
-        requests, responses, IDENTITY_TOKEN_REVOCATIONS_PREFIX,
+    const documents = await fetchRevocationDocumentsFor(
+        db, identityId,
     );
     const rows: IdentityTokenRevocationEntity[] = [];
     for (const document of documents.values()) {
-        const entity = tokenRevocationEntityOf(document);
-        if (entity.identity_id === identityId) {
-            rows.push(entity);
-        }
+        rows.push(nestedTokenRevocationEntityOf(
+            identityId, document,
+        ));
     }
     return rows.sort(byIdAscending);
 }
 
 export async function deriveTokenRevocation(
     db: DbAdapter,
+    identityId: Id,
     id: Id,
 ): Promise<IdentityTokenRevocationEntity> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere(
-            'uri_collection', IDENTITY_TOKEN_REVOCATIONS_PREFIX,
-        ),
-        db.responses.getAllWhere(
-            'uri_collection', IDENTITY_TOKEN_REVOCATIONS_PREFIX,
-        ),
-    ]);
-    const document = deriveDocumentsAt(
-        requests, responses, IDENTITY_TOKEN_REVOCATIONS_PREFIX,
-    ).get(id);
+    const document = (await fetchRevocationDocumentsFor(
+        db, identityId,
+    )).get(id);
     if (document === undefined) {
         throw new EntityNotFoundError(
             'identity_token_revocations', id,
         );
     }
-    return tokenRevocationEntityOf(document);
+    return nestedTokenRevocationEntityOf(identityId, document);
 }
 
 // ---- client_registration — the clients-table replacement: a ----

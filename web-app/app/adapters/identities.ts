@@ -13,6 +13,7 @@ import {
 import {
     RequestError,
     HTTP_NOT_FOUND,
+    HTTP_FORBIDDEN,
 } from '../../../api/http-errors.ts';
 import type { RequestContext } from './shared.ts';
 import {
@@ -91,20 +92,6 @@ export type IdentityRosterRow =
         readonly service: ServiceFacet;
     };
 
-function piiFacet(
-    row: IdentityPiiEntity | undefined,
-): MemberPii {
-    return row
-        ? {
-            erased: false,
-            name: row.name,
-            email: row.email,
-            phone: row.phone,
-            bio: row.bio,
-        }
-        : { erased: true };
-}
-
 function serviceFacet(
     row: AIMemberEntity | undefined,
 ): ServiceFacet {
@@ -117,27 +104,16 @@ function serviceFacet(
         : { named: false };
 }
 
-// Single-pass join of identities + identity-pii + ai-members:
-// read all three in parallel, index the facets by id, then map
-// each identity to its row. A person draws its name from
-// identity-pii; a service draws its name from ai-members. The
-// ai-members read is org-scoped while the identity spine is
-// global, so a service owned by another org has no visible
-// ai-members row and falls to { named: false } — the service
-// analog of out-of-org PII redaction (no leak).
+// GET identities, then fill each person via nested
+// GET identities/:id/pii. Service rows stay unnamed
+// (serviceFacet(undefined)); agents are not identities.
 export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {
-    const [identities, piiRows] =
-        await Promise.all([
-            ctx.GET<IdentityEntity[]>('identities'),
-            ctx.GET<IdentityPiiEntity[]>('identity-pii'),
-        ]);
-    const piiById = new Map<Id, IdentityPiiEntity>();
-    for (const row of piiRows) {
-        piiById.set(row.id, row);
-    }
-    return identities.map(identity =>
+    const identities = await ctx.GET<IdentityEntity[]>(
+        'identities',
+    );
+    return Promise.all(identities.map(async identity =>
         identity.kind === 'service'
             ? {
                 kind: 'service',
@@ -147,31 +123,36 @@ export async function getIdentityRoster(
             : {
                 kind: 'person',
                 id: identity.id,
-                pii: piiFacet(piiById.get(identity.id)),
-            });
+                pii: await getMemberPii(ctx, identity.id),
+            }));
 }
 
-// Returns the tagged union. A missing pii row (erased, or a
-// service identity) is reported as erased — the CALLER, not
-// this adapter, decides what to display.
+// Nested facet only. 404 (absent/erased) and 403
+// (not self, not admin) both surface as erased —
+// the CALLER, not this adapter, decides the display.
 export async function getMemberPii(
     ctx: RequestContext,
     id: Id,
 ): Promise<MemberPii> {
-    const all = await ctx.GET<IdentityPiiEntity[]>(
-        'identity-pii',
-    );
-    const row = all.find(r => r.id === id);
-    if (row === undefined) {
-        return { erased: true };
+    try {
+        const row = await ctx.GET<IdentityPiiEntity>(
+            `identities/${id}/pii`,
+        );
+        return {
+            erased: false,
+            name: row.name,
+            email: row.email,
+            phone: row.phone,
+            bio: row.bio,
+        };
+    } catch (error) {
+        if (error instanceof RequestError
+            && (error.status === HTTP_NOT_FOUND
+                || error.status === HTTP_FORBIDDEN)) {
+            return { erased: true };
+        }
+        throw error;
     }
-    return {
-        erased: false,
-        name: row.name,
-        email: row.email,
-        phone: row.phone,
-        bio: row.bio,
-    };
 }
 
 // One service identity's display facet — its name from the

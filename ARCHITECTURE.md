@@ -501,9 +501,10 @@ re-verified by the automated suite:
   writes, and snapshots stay admin-only
   (deny-by-default). Seat and ai-agent GET are
   member-readable. Member-tier carve-outs:
-  `identity-tokens` POST (rotation/revocation) and
-  `identity-token-revocations` PUT (self logout-everywhere;
-  write authorizer keeps the write self-only).
+  `identities/:id/tokens` POST (rotation/revocation) and
+  `identities/:id/token-revocations` PUT (self
+  logout-everywhere; write authorizer keeps the write
+  self-only — path identity vs actor).
 
 ## API Layer (`/api`)
 
@@ -640,9 +641,10 @@ transaction (see below); (c) a core reads only the stores
 its caller already listed in its own `transaction(...)`
 call, never widening the caller's table set on its own
 authority; (d) every write-gate read is ENTITY-SCOPED —
-indexed or prefix reads (`getAllWhere('uri_id', ...)`,
-`getAllWhere('uri_collection', ...)`), never a whole-plane
-`getAll()` of `requests`/`responses` on a hot path (the one
+indexed or address reads (`getAllAtAddress`,
+`getAllWhere('uri_collection', ...)`,
+`getAllWhere('message_hash', ...)`), never a
+whole-plane `getAll()` of `requests`/`responses` on a hot path (the one)
 named exception is below); (e) a pre-tx call and an in-tx
 call of the same core return byte-identical results, pinned
 by drift/parity tests.

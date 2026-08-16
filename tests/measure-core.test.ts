@@ -38,19 +38,42 @@ test('trimExtremes rejects bad fraction', () => {
     );
 });
 
-test('trimExtremes n<20 at 5% keeps all', () => {
-    // floor(5 × 0.05) = 0 → no drop
+test('trimExtremes n=25 at 10% drops 3 each tail', () => {
+    // ceil(25 × 0.10) = 3 each side
+    const values = [];
+    for (let i = 1; i <= 25; i++) {
+        values.push(i);
+    }
+    assert.deepEqual(
+        trimExtremes(values),
+        [
+            4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
+            14, 15, 16, 17, 18, 19, 20, 21, 22,
+        ],
+    );
+});
+
+test('trimExtremes n=5 at 10% drops 1 each tail', () => {
+    // ceil(5 × 0.10) = 1 each side
     const input = [5, 1, 4, 2, 3];
     assert.deepEqual(
         trimExtremes(input),
-        [1, 2, 3, 4, 5],
+        [2, 3, 4],
     );
     // Input not mutated.
     assert.deepEqual(input, [5, 1, 4, 2, 3]);
 });
 
-test('trimExtremes drops 5% each tail', () => {
-    // n=20 → floor(20×0.05)=1 each side
+test('trimExtremes n=2 keeps all (cap)', () => {
+    // ceil(2 × 0.10) = 1, but maxDrop is 0
+    assert.deepEqual(
+        trimExtremes([2, 1]),
+        [1, 2],
+    );
+});
+
+test('trimExtremes drops 10% each tail', () => {
+    // n=20 → ceil(20×0.10)=2 each side
     const values = [];
     for (let i = 1; i <= 20; i++) {
         values.push(i);
@@ -58,8 +81,8 @@ test('trimExtremes drops 5% each tail', () => {
     assert.deepEqual(
         trimExtremes(values),
         [
-            2, 3, 4, 5, 6, 7, 8, 9, 10,
-            11, 12, 13, 14, 15, 16, 17, 18, 19,
+            3, 4, 5, 6, 7, 8, 9, 10,
+            11, 12, 13, 14, 15, 16, 17, 18,
         ],
     );
 });
@@ -137,12 +160,13 @@ test(
     'budgetReadyMsFromSamples is mean + sigmas×σ'
     + ' ceiled',
     () => {
-        // n=8 < 20 → no trim; mean=5, sample σ=√(32/7)
-        // 5 + 1.5×√(32/7) ≈ 8.207 → ceil 9
+        // n=8 → drop 1 each tail; [4,4,4,5,5,7]
+        // mean=29/6; sample σ=√(41/30)
+        // 29/6 + 1.5×√(41/30) ≈ 6.587 → ceil 7
         const values = [2, 4, 4, 4, 5, 5, 7, 9];
         assert.equal(
             budgetReadyMsFromSamples(values, 1.5),
-            9,
+            7,
         );
         // mean of [1,2]=1.5, σ=√0.5
         // 1.5 + 1.5×√0.5 ≈ 2.5607 → 3
@@ -159,10 +183,10 @@ test(
 );
 
 test(
-    'budgetReadyMsFromSamples trims 5% each tail',
+    'budgetReadyMsFromSamples trims 10% each tail',
     () => {
-        // n=20: drop 1 and 100; mean of 2..19 = 10.5
-        // sample σ of 2..19; 10.5 + 0×σ → ceil 11
+        // n=20: drop 1,2 and 19,20; mean of 3..18 = 10.5
+        // 10.5 + 0×σ → ceil 11
         const values = [];
         for (let i = 1; i <= 20; i++) {
             values.push(i);
@@ -188,10 +212,10 @@ test('budgetReadyMsFromSamples rejects bad sigmas', () => {
 // --- statsForPage ---
 
 test('statsForPage min/median/max readyMs', () => {
+    // n=2: ceil trim is capped, so both samples remain
     const runs: PageRun[] = [
         { readyMs: 100, phases: {} },
         { readyMs: 300, phases: {} },
-        { readyMs: 200, phases: {} },
     ];
     const s = statsForPage(runs);
     assert.equal(s.readyMs.min, 100);
@@ -229,16 +253,16 @@ test('statsForPage empty runs throws', () => {
 });
 
 test('statsForPage trims extremes on readyMs', () => {
-    // n=20 → drop lowest (1) and highest (1000)
+    // n=20 → drop two lowest and two highest
     const runs: PageRun[] = [];
     for (let i = 1; i <= 19; i++) {
         runs.push({ readyMs: i, phases: {} });
     }
     runs.push({ readyMs: 1000, phases: {} });
     const s = statsForPage(runs);
-    assert.equal(s.readyMs.min, 2);
-    assert.equal(s.readyMs.max, 19);
-    // Middle of 2..19 (18 values, even): (10+11)/2 = 10.5
+    assert.equal(s.readyMs.min, 3);
+    assert.equal(s.readyMs.max, 18);
+    // 3..18 (16 values, even): (10+11)/2 = 10.5
     assert.equal(s.readyMs.median, 10.5);
 });
 

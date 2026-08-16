@@ -157,9 +157,13 @@ send it; it is ignored. Seed `formSeedPair` mints one
 id per envelope and copies it onto inner PUTs.
 
 Validator: `validateRequestEntity` (`api/validators.ts`).
-Secondary indexes: `uri_collection`,
-`message_hash`, `operation_id`
-(`api/db.ts` `TABLE_INDEXES`).
+getWhere allow-list (`api/db.ts` `TABLE_INDEXES`):
+`uri_collection`, `message_hash`.
+
+Postgres indexes: `requests_address`
+`(uri_collection, uri_id, at, id)`;
+`requests_collection` `(uri_collection, at, id)`;
+`requests_replay` `(message_hash)`.
 
 ### responses
 
@@ -193,9 +197,15 @@ from this column. It is not stored on the GET-shaped
 response blob.
 
 Validator: `validateResponseEntity` (`api/validators.ts`).
-Secondary indexes: `uri_collection`,
-`operation_id`, `version`
-(`api/db.ts` `TABLE_INDEXES`).
+getWhere allow-list: `uri_collection`.
+
+Postgres indexes: `responses_address`
+`(uri_collection, uri_id, at, id)`;
+`responses_collection` `(uri_collection, at, id)`;
+`responses_version`
+`(uri_collection, uri_id, version)`;
+`responses_body` GIN `message_body(message)
+jsonb_path_ops`.
 
 ## Derived document families (no table)
 
@@ -285,8 +295,11 @@ Org-nested wire = storage (no dual-wire flat `/records`):
   body. The two differ by definition.
 
 Snapshot import rejects retired flat prefixes
-`/organizations/:org/records/` and
-`/organizations/:org/record-attributes/` (anchored so
+`/organizations/:org/records/`,
+`/organizations/:org/record-attributes/`,
+`/identity-pii/`, `/identity-providers/`,
+`/identity-tokens/`, and
+`/identity-token-revocations/` (anchored so
 `flows/:id/records` join pairs pass) via
 `RETIRED_URI_PREFIX_PATTERNS` on both server
 (`api/snapshot-validator.ts`) and client

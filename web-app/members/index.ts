@@ -29,6 +29,7 @@ import {
 import {
     sessionContext,
     getMembers,
+    fillHumanMemberPii,
     postHumanMemberCreation,
     postAIMemberCreation,
     postInvitationGrant,
@@ -116,7 +117,9 @@ export async function init(): Promise<void> {
         container: memberList,
         skeleton: buildSkeleton('table', 5),
         fetch: async () => {
-            const members = await getMembers(ctx);
+            const members = await fillHumanMemberPii(
+                ctx, await getMembers(ctx),
+            );
             return { members };
         },
         retry: init,
@@ -146,8 +149,9 @@ export async function init(): Promise<void> {
 
 async function refresh(): Promise<void> {
     if (!membersState || !memberListEl) return;
-    const fresh = await getMembers(
-        sessionContext(),
+    const ctx = sessionContext();
+    const fresh = await fillHumanMemberPii(
+        ctx, await getMembers(ctx),
     );
     membersState =
         buildInitialManagedMembersState(

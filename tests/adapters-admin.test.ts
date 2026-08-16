@@ -203,7 +203,7 @@ test(
         await seedMember(db, 'u4', 'archived');
         const stats =
             await getOrganizationStats(ctx);
-        assert.equal(stats.activePeopleCount, 4);
+        assert.equal(stats.activePeopleCount, 5);
     },
 );
 
@@ -221,7 +221,7 @@ test(
             await getOrganizationStats(ctx);
         assert.equal(stats.projectsCurrent, 1);
         assert.equal(stats.ideasCurrent, 1);
-        assert.equal(stats.activePeopleCount, 1);
+        assert.equal(stats.activePeopleCount, 2);
 
         // Transitions through later document-trio PUTs
         // (latest by 'at' wins) — the states/:id address is
@@ -246,7 +246,7 @@ test(
         stats = await getOrganizationStats(ctx);
         assert.equal(stats.projectsCurrent, 0);
         assert.equal(stats.ideasCurrent, 0);
-        assert.equal(stats.activePeopleCount, 1);
+        assert.equal(stats.activePeopleCount, 2);
     },
 );
 

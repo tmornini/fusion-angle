@@ -162,3 +162,22 @@ async () => {
     );
     assert.equal(got?.id, second.id);
 });
+
+test('getAllWhereBody matches one JSON fact',
+async () => {
+    const db = await freshDb();
+    await writePair(db, {
+        method: 'PUT',
+        uriId: 'doc-1',
+        responseBody: { code: 'abc', n: 1 },
+    });
+    await writePair(db, {
+        method: 'PUT',
+        uriId: 'doc-2',
+        responseBody: { code: 'zzz', n: 2 },
+    });
+    const hits = await messageStore(db)
+        .getAllWhereBody(COLLECTION, { code: 'abc' });
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0]!.response.uri_id, 'doc-1');
+});

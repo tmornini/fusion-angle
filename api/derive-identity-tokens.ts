@@ -20,10 +20,12 @@ import {
 // in would both bloat that header's claim and mix an unrelated
 // shape into it). identity_tokens is a HistoryEntityStore row
 // (api/store-history-entity.ts): from Phase 13 Task 5 on, EVERY
-// row-write appends its own event pair at 'identity-tokens/
-// <rowId>' (api/message-pair.ts's formTokenEventPair — the SAME
-// address/method/response shape a real PUT identity-tokens/:id
-// would store) — issued roots (grant, client-credentials, token-
+// row-write appends its own event pair at
+// 'identities/<identityId>/tokens/<rowId>'
+// (api/message-pair.ts's formTokenEventPair — the SAME
+// address/method/response shape a real PUT
+// identities/:id/tokens/:tid would store) — issued roots
+// (grant, client-credentials, token-
 // exchange, the org-exchange hop), rotations, and revocations ALL
 // form one, so this derivation now sees every LIVE row the row
 // plane does. Before Task 5 a pair-less writer would have left
@@ -33,7 +35,7 @@ import {
 //
 // THE KEY-ORDER SUBTLETY: the derived row is id-LAST —
 // validateIdentityTokenEntity's return-literal order plus `id`.
-// G4: GET wins. WRITE_RESPONSE_SPECS['identity-tokens/:id']
+// G4: GET wins. WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid']
 // and formTokenEventPair emit this mapper, not the older
 // id-first stamp. withoutId FIRST, always (the
 // organizationEntityOf / deriveMembershipsForIdentity
@@ -81,8 +83,18 @@ import {
 
 const IDENTITY_TOKENS_TABLE = 'identity_tokens';
 
-const IDENTITY_TOKENS_PREFIX =
+const IDENTITY_TOKENS_FLAT_PREFIX =
     canonicalUriCollection(undefined, '/identity-tokens/');
+
+const TOKENS_ADDRESS_PATTERN =
+    /^\/identities\/([^/]+)\/tokens\/$/;
+
+function tokensPrefixFor(identityId: Id): string {
+    return canonicalUriCollection(
+        undefined,
+        '/identities/' + identityId + '/tokens/',
+    );
+}
 
 export function identityTokenEntityOf(
     document: DerivedDocument,
@@ -93,73 +105,142 @@ export function identityTokenEntityOf(
     };
 }
 
-async function fetchIdentityTokenDocuments(
+// Nested address is the source of truth — fill or overwrite
+// the request body's identity_id from the path.
+function nestedTokenEntityOf(
+    identityId: Id,
+    document: DerivedDocument,
+): IdentityTokenEntity {
+    return identityTokenEntityOf({
+        ...document,
+        body: {
+            ...withoutId(document.body),
+            identity_id: identityId,
+        },
+    });
+}
+
+async function fetchTokenDocumentsAt(
     dbOrView: DbAdapter,
+    prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
     const [requests, responses] = await Promise.all([
         dbOrView.requests.getAllWhere(
-            'uri_collection', IDENTITY_TOKENS_PREFIX,
+            'uri_collection', prefix,
         ),
         dbOrView.responses.getAllWhere(
-            'uri_collection', IDENTITY_TOKENS_PREFIX,
+            'uri_collection', prefix,
         ),
     ]);
-    return deriveDocumentsAt(
-        requests, responses, IDENTITY_TOKENS_PREFIX,
-    );
+    return deriveDocumentsAt(requests, responses, prefix);
 }
 
-// Every LIVE identity-token event row, id-lex ordered
-// (byIdAscending, the IndexedDB reference) — GET /identity-tokens'
-// own read source from this task on.
+// Nested docs plus leftover flat docs whose identity_id
+// matches. Nested wins on the same event id.
+export async function deriveIdentityTokensFor(
+    db: DbAdapter,
+    identityId: Id,
+): Promise<IdentityTokenEntity[]> {
+    const nested = await fetchTokenDocumentsAt(
+        db, tokensPrefixFor(identityId),
+    );
+    const flat = await fetchTokenDocumentsAt(
+        db, IDENTITY_TOKENS_FLAT_PREFIX,
+    );
+    const byId = new Map<string, IdentityTokenEntity>();
+    for (const document of flat.values()) {
+        const entity = identityTokenEntityOf(document);
+        if (entity.identity_id === identityId) {
+            byId.set(entity.id, entity);
+        }
+    }
+    for (const document of nested.values()) {
+        const entity = nestedTokenEntityOf(
+            identityId, document,
+        );
+        byId.set(entity.id, entity);
+    }
+    return [...byId.values()].sort(byIdAscending);
+}
+
+export async function deriveIdentityToken(
+    db: DbAdapter,
+    identityId: Id,
+    tid: Id,
+): Promise<IdentityTokenEntity> {
+    const nested = await fetchTokenDocumentsAt(
+        db, tokensPrefixFor(identityId),
+    );
+    const nestedDocument = nested.get(tid);
+    if (nestedDocument !== undefined) {
+        return nestedTokenEntityOf(identityId, nestedDocument);
+    }
+    const flat = await fetchTokenDocumentsAt(
+        db, IDENTITY_TOKENS_FLAT_PREFIX,
+    );
+    const flatDocument = flat.get(tid);
+    if (flatDocument !== undefined) {
+        const entity = identityTokenEntityOf(flatDocument);
+        if (entity.identity_id === identityId) {
+            return entity;
+        }
+    }
+    throw new EntityNotFoundError(IDENTITY_TOKENS_TABLE, tid);
+}
+
+// Internal global fold — leftover flat plus every nested
+// /identities/:id/tokens/ prefix. Used by rotation/revocation
+// chain lookup, never exposed as an HTTP list.
 export async function deriveIdentityTokens(
     db: DbAdapter,
 ): Promise<IdentityTokenEntity[]> {
-    const documents = await fetchIdentityTokenDocuments(db);
-    const rows: IdentityTokenEntity[] = [];
-    for (const document of documents.values()) {
-        rows.push(identityTokenEntityOf(document));
+    const [requests, responses] = await Promise.all([
+        db.requests.getAll(),
+        db.responses.getAll(),
+    ]);
+    const byId = new Map<string, IdentityTokenEntity>();
+    const flat = deriveDocumentsAt(
+        requests, responses, IDENTITY_TOKENS_FLAT_PREFIX,
+    );
+    for (const document of flat.values()) {
+        byId.set(document.uriId, identityTokenEntityOf(document));
     }
-    return rows.sort(byIdAscending);
+    const prefixes = new Set<string>();
+    for (const request of requests) {
+        if (TOKENS_ADDRESS_PATTERN.test(request.uri_collection)) {
+            prefixes.add(request.uri_collection);
+        }
+    }
+    for (const prefix of prefixes) {
+        const match = TOKENS_ADDRESS_PATTERN.exec(prefix)!;
+        const identityId = match[1]!;
+        const documents = deriveDocumentsAt(
+            requests, responses, prefix,
+        );
+        for (const document of documents.values()) {
+            byId.set(
+                document.uriId,
+                nestedTokenEntityOf(identityId, document),
+            );
+        }
+    }
+    return [...byId.values()].sort(byIdAscending);
 }
 
-// The single-row read; throws EntityNotFoundError(
-// 'identity_tokens', id) on absence — mirroring
-// db.identityTokens.getById's own EntityNotFoundError(this same
-// table, id). GET /identity-tokens/:id's own read source from
-// this task on.
-export async function deriveIdentityToken(
-    db: DbAdapter,
-    id: Id,
-): Promise<IdentityTokenEntity> {
-    const documents = await fetchIdentityTokenDocuments(db);
-    const document = documents.get(id);
-    if (document === undefined) {
-        throw new EntityNotFoundError(IDENTITY_TOKENS_TABLE, id);
-    }
-    return identityTokenEntityOf(document);
-}
-
-// Every LIVE event naming `jti`, id-lex ordered — the by-jti fold
-// tokenRevocationReason's SECOND read (isTokenRevoked) folds over,
-// and the PRE-TX provisional leg of rotateRefreshJti/
-// revokeTokenChain's own chain lookup (api/authentication.ts).
-// A jti that has never appeared returns an empty array, never a
-// throw — isTokenRevoked/chainIdForJti/identityForJti (api/
-// identity-tokens.ts) all treat an empty set as "unknown", the
-// SAME contract the row-plane getAllWhere('jti', jti) miss always
-// carried.
+// Every LIVE event naming `jti`, id-lex ordered — the by-jti
+// fold tokenRevocationReason's SECOND read (isTokenRevoked)
+// folds over, and the PRE-TX provisional leg of
+// rotateRefreshJti/revokeTokenChain's own chain lookup.
+// Optional identityId scopes the fold (nested prefix + leftover
+// flat for that identity) so the Bearer-gate hot path does not
+// full-scan. A jti that has never appeared returns [].
 export async function deriveIdentityTokenEventsForJti(
     dbOrView: DbAdapter,
     jti: string,
+    identityId?: Id,
 ): Promise<IdentityTokenEntity[]> {
-    const documents = await fetchIdentityTokenDocuments(dbOrView);
-    const rows: IdentityTokenEntity[] = [];
-    for (const document of documents.values()) {
-        const entity = identityTokenEntityOf(document);
-        if (entity.jti === jti) {
-            rows.push(entity);
-        }
-    }
-    return rows.sort(byIdAscending);
+    const rows = identityId === undefined
+        ? await deriveIdentityTokens(dbOrView)
+        : await deriveIdentityTokensFor(dbOrView, identityId);
+    return rows.filter((row) => row.jti === jti);
 }

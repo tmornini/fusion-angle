@@ -104,7 +104,7 @@ test('member tier: content surfaces are permitted', () => {
         true);
     assert.equal(
         isPermitted(
-            'POST', '/identity-tokens/j1/rotation',
+            'POST', '/identities/current/tokens/j1/rotation',
             ['member']),
         true);
     assert.equal(
@@ -132,7 +132,9 @@ test('member tier: admin surfaces stay denied', () => {
         isPermitted('PUT', '/members/m1', ['member']),
         false);
     assert.equal(
-        isPermitted('GET', '/identity-tokens', ['member']),
+        isPermitted(
+            'GET', '/identities/current/tokens', ['member'],
+        ),
         false);
 });
 

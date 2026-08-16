@@ -86,15 +86,17 @@ export function matchesOnSegmentBoundary(
 // keeps them at the root admin entries. Seats and
 // ai-agents appear read-only here for author and roster
 // display; their writes stay admin (member management).
-// identity-tokens POST covers only its rotation/revocation
-// sub-routes — session management any member performs.
-// identity-token-revocations PUT (WP8, Phase 13 Task 8) widens
-// analogously: a member may revoke its OWN token chain — a real
-// logout-everywhere, not merely rotation/revocation of a single
-// session. This route-policy entry only clears the coarse
-// content-prefix check; api/api.ts's Region B write authorizer
-// keeps the write self-only — naming another identity still
-// requires admin. GET stays admin-only, untouched.
+// identities/:id/tokens POST covers only its rotation/
+// revocation sub-routes — session management any member
+// performs. Do not add GET.
+// identities/:id/token-revocations PUT widens analogously: a
+// member may revoke its OWN token chain — a real
+// logout-everywhere, not merely rotation/revocation of a
+// single session. This route-policy entry only clears the
+// coarse content-prefix check; api/api.ts's Region B write
+// authorizer keeps the write self-only — the path identity
+// must be the actor. Naming another identity still requires
+// admin. GET stays admin-only, untouched. Do not add GET.
 const MEMBER_VERBS: Readonly<
     Record<string, readonly string[]>
 > = {
@@ -132,8 +134,8 @@ const MEMBER_VERBS: Readonly<
     '/ai-agents': ['GET'],
     '/organizations/:id/members': ['GET'],
     '/organizations': ['GET'],
-    '/identity-tokens': ['POST'],
-    '/identity-token-revocations': ['PUT'],
+    '/identities/:id/tokens': ['POST'],
+    '/identities/:id/token-revocations': ['PUT'],
 };
 
 const MEMBER_TIER: readonly PolicyEntry[] =

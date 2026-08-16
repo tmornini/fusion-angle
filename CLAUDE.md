@@ -108,10 +108,10 @@ derive, or presenter changes; at migration milestones
 (bare `./measure` or `--record` on a full sweep).
 
 Stats (median/min/max readyMs, phase medians, and
-`--write-budgets` mean+σ) drop the top and bottom 5% of
-samples (`floor(n×0.05)` per tail). Default `--runs 25`
-drops one sample per tail (`floor(25×0.05)=1`); smaller
-`n` (e.g. 5) trims nothing.
+`--write-budgets` mean+σ) drop the top and bottom 10%
+of samples (`ceil(n×0.10)` per tail). Default
+`--runs 25` drops three samples per tail
+(`ceil(25×0.10)=3`).
 
 Budgets live in `measurements/budgets.json` — per
 `PAGE_REGISTRY` page `readyMs` ceiling. Calibrate with

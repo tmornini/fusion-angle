@@ -316,14 +316,16 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // the PUT route forms both the row AND its pair, the SAME
     // mechanism a live write uses.
     const tokenRootPut = await handleRequest(db, req(
-        'PUT', '/identity-tokens/inv-tok-root', org1Token, {
+        'PUT', '/identities/current/tokens/inv-tok-root',
+        org1Token, {
             jti: 'inv-jti-root', identity_id: 'current',
             action: 'issued', chain_id: 'inv-chain-1', at: AT,
         },
     ));
     assert.equal(tokenRootPut.status, 201);
     const revoked = await handleRequest(db, req(
-        'POST', '/identity-tokens/inv-jti-root/revocation',
+        'POST',
+        '/identities/current/tokens/inv-jti-root/revocation',
         org1Token, {},
     ));
     assert.equal(revoked.status, 201);

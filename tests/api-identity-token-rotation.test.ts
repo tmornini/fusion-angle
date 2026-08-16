@@ -36,7 +36,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     // (Phase 13 Task 6/9a), so a pair-less event is invisible to
     // them — the PUT route forms the SAME event pair a live write
     // uses (Phase 13 Task 9: pair-only, no row).
-    await PUT(db, 'identity-tokens/t-root', {
+    await PUT(db, 'identities/current/tokens/t-root', {
         jti: ROOT_JTI, identity_id: 'current',
         action: 'issued', chain_id: 'chain-1',
         at: '2026-06-01T00:00:00.000000Z',
@@ -49,7 +49,7 @@ function rotate(
     jti: string,
 ): Promise<{ jti: string }> {
     return POST(
-        db, `identity-tokens/${jti}/rotation`, {},
+        db, `identities/current/tokens/${jti}/rotation`, {},
         DEV_TOKEN,
     );
 }
@@ -111,7 +111,8 @@ test(
         const db = await seededDb();
         const { jti: next } = await rotate(db, ROOT_JTI);
         await POST(
-            db, `identity-tokens/${next}/revocation`, {},
+            db, `identities/current/tokens/${next}/revocation`,
+            {},
             DEV_TOKEN,
         );
         const rows = await deriveIdentityTokens(db);
@@ -127,7 +128,8 @@ test(
     async () => {
         const db = await seededDb();
         await POST(
-            db, 'identity-tokens/ghost/revocation', {},
+            db, 'identities/current/tokens/ghost/revocation',
+            {},
             DEV_TOKEN,
         );
         const rows = await deriveIdentityTokens(db);

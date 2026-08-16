@@ -131,11 +131,11 @@ const DUMMY_BODIES: Readonly<
     [ORGANIZATION_MEMBER_DETAIL_PATTERN]: {
         type: 'member', at: AT,
     },
-    'identity-tokens/:id': {
+    'identities/:id/tokens/:tid': {
         jti: 'j', identity_id: 'id',
         action: 'issued', chain_id: 'c', at: AT,
     },
-    'identity-token-revocations/:id': {
+    'identities/:id/token-revocations/:rid': {
         identity_id: 'id', at: AT,
     },
     'organizations/:id': {
@@ -143,7 +143,7 @@ const DUMMY_BODIES: Readonly<
         next_billing: AT, seats: 1,
         projects_limit: 1, ideas_limit: 1,
     },
-    'identity-providers/:id': {
+    'identities/:id/providers/:eid': {
         identity_id: 'id', provider: 'p',
         provider_subject: 's', action: 'linked',
         at: AT,

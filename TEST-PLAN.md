@@ -8,16 +8,18 @@ When the user says "run the test plan", the agent:
 
 1. Reads this document's `### Protocol` section — required
    context, not optional reference. Default parallel path
-   is **Per-origin parallel run — validated operational
+   is **Shared-origin parallel run — operational
    recipe** (below). The six-phase subsection is a
    SUPERSEDED historical appendix only.
 2. Executes section **AT** as a fail-fast gate; any AT
    failure aborts the run before A1's build.
-3. Executes A1–A5 preflight; on success spawns the
-   **per-origin** parallel recipe (one origin/port per
-   agent; each agent self-seeds; fan-out by section —
-   see "Per-origin parallel run — validated operational
-   recipe"). Or runs serially if `--serial` is requested.
+3. Executes A1–A5 preflight (Node + Postgres; A3 is
+   SV1); on success spawns the **shared-origin**
+   parallel recipe (one `server.mjs`, one database;
+   session isolation is Chrome `isolatedContext`, not
+   port — see "Shared-origin parallel run —
+   operational recipe"). Or runs serially if
+   `--serial` is requested.
 4. Emits the run summary in the canonical format
    documented at the bottom of this file (`## Summary
    Format`). The summary is the conversational artifact;
@@ -64,10 +66,10 @@ automated test files and what each covers.
 This UI plan therefore focuses on what automated tests cannot
 verify: layout, gestures, navigation, drag-and-drop, dialog
 behavior, and end-to-end user flows through the rendered DOM.
-Section **SV** is the Node + Postgres server ZIP (a separate
-ceremony from the IndexedDB / browser-ZIP cases): two
-browsers, two identities, one database, a shared refresh
-cookie, and the named stale-until-navigation residual.
+Section **SV** is the default origin (A3 **is** SV1):
+two cookie jars, two identities, one Postgres, a shared
+refresh cookie in the same jar, and the named
+stale-until-navigation residual (SV6–SV10).
 
 The fast suite (`./test` / `./validate`) now also covers:
 flow-edit business logic and the connection-validation rules
@@ -98,75 +100,90 @@ note pointing at the test file.
 ### Protocol
 
 The automated layer (`## AT`) runs first as a fail-fast
-gate. On green, the browser regression runs over HTTP in
-one of two modes:
+gate. Abort on red — the browser layer never tests a
+validate-broken tree. On green, the browser regression
+runs against **one Node origin** in one of two modes:
 
-- **Serial (single human tester)**:
-  `./build --no-zip /tmp/fusion-test/` then
-  `cd /tmp/fusion-test/ && python3 -m http.server 8080`. Run
-  sections in document order.
-- **Parallel (Claude Code agents)**:
-  `TMPDIR=/tmp/claude ./build --no-zip /tmp/claude/fusion-test/`
-  once, then one static server per agent on its own port, all
-  serving that dir: `python3 -m http.server <port> --directory
-  /tmp/claude/fusion-test` (see the validated operational recipe).
+- **Serial (single human tester)**: A1 `./build` →
+  `~/Desktop/fusion-ai-server-${SHA}.zip`; A2 unzip
+  (or `./build --no-zip`) to a temp dir that contains
+  `server.mjs`; A3 set `POSTGRES_URL`,
+  `JWT_HMAC_SIGNING_KEY`, `HTTP_SERVER_PORT` against
+  an **empty** database and run
+  `node server.mjs --seed-mock-data` (or `./serve`
+  after commit). One process. Run sections in
+  document order.
+- **Parallel (Claude Code agents)**: the same A1–A3
+  once. Agents **share** that origin. Session
+  isolation is Chrome `isolatedContext` (private
+  cookie jar), not a port per agent. See the
+  operational recipe.
 
 #### Six-phase parallel protocol
 
-> SUPERSEDED (2026-06) by the per-origin recipe below — see
-> "Per-origin parallel run — validated operational recipe." The
-> shared-one-IndexedDB model in this subsection is what caused
-> the documented connection-concurrency lockups; the validated
-> run gives each agent its OWN origin (distinct port), so the
-> entity mutation-domain partitioning here is no longer needed.
-> Kept for historical context only.
+> SUPERSEDED by the shared-origin recipe below — see
+> "Shared-origin parallel run — operational recipe."
+> Kept as the phase / agent map only. Phase 2 agents
+> share one Postgres message plane; the mutation-
+> domain table still applies. The retired browser-ZIP
+> origin (`python3 -m http.server` + in-browser
+> IndexedDB) is gone.
 
-Agents execute the plan in six phases to fit within context and
-time budgets while keeping per-entity mutation domains disjoint:
+Agents execute the plan in six phases to fit within
+context and time budgets while keeping per-entity
+mutation domains disjoint:
 
-1. **Phase 0 — Preflight** (main): `./validate`, `./build` to
-   produce the distribution ZIP, `./build --no-zip` for the test
-   server, start HTTP server, open tab 0. Covers A1–A5.
-2. **Phase 1 — Data setup** (one agent, serial): AA1–AA43 in
-   tab 0. Creates pristine environment, members (humans + AIs),
-   ideas, projects, one flow. Populates the shared database
-   that Phase 2 verifies.
-3. **Phase 2 — Parallel verification** (7 agents concurrent,
-   each in its own tab, no shared tabs):
-   - Agent-B — Entry pages (EXCLUDING Sidebar Sign-out, which
-     is identity-wide — deferred per "Parallel session &
-     connection isolation")
+1. **Phase 0 — Preflight** (main): `./validate`,
+   `./build` to produce `fusion-ai-server-${SHA}.zip`,
+   unzip or `--no-zip` so `server.mjs` is on disk,
+   start `node server.mjs --seed-mock-data` (A3 /
+   SV1). Covers A1–A5.
+2. **Phase 1 — Data setup** (one agent, serial):
+   AA1–AA43 in tab 0. Creates pristine environment,
+   members (humans + AIs), ideas, projects, one flow.
+   Populates the shared database that Phase 2
+   verifies. A3 already mock-seeded; Phase 1 may
+   wipe to pristine and rebuild through the UI.
+3. **Phase 2 — Parallel verification** (7 agents
+   concurrent, each in its own `isolatedContext`, no
+   shared tabs):
+   - Agent-B — Entry pages (EXCLUDING Sidebar
+     Sign-out, which is identity-wide on the server —
+     deferred per "Parallel session & connection
+     isolation")
    - Agent-CH — Dashboard + Reference (read-only)
    - Agent-D — Ideas
    - Agent-E — Projects
-   - Agent-F — Flows (includes hazard severity, flow-publish
-     gate)
-   - Agent-F2 — Workbox (includes Create-Work-Order picker
-     READY / NOT READY split) + Records (section R) + Flow
-     Statistics (FS1–FS9, read-only)
-   - Agent-G — Admin (Members page, Member detail (human + AI),
-     Identities (list + detail + providers + tokens),
-     Organization, Snapshots, Billing). The retired Teams /
-     Roles / Crews / Activity Feed pages have no cases.
-4. **Phase 3 — Cross-cutting** (one agent, alone): I1–I30.
-   Mutates global UI state (theme, sidebar, command palette) —
-   no concurrent agents.
-5. **Phase 4 — Snapshot lifecycle + persistence tier** (one
-   agent, alone): G30–G35 and L1–L9 (IndexedDB persistence).
-   Wipes and reloads the database — strictly last before
-   teardown.
-6. **Phase 5 — Teardown** (main): stop HTTP server, remove
-   build directory, verify distribution ZIP remains, aggregate
-   results.
+   - Agent-F — Flows (includes hazard severity,
+     flow-publish gate)
+   - Agent-F2 — Workbox (includes Create-Work-Order
+     picker READY / NOT READY split) + Records
+     (section R) + Flow Statistics (FS1–FS9,
+     read-only)
+   - Agent-G — Admin (Members page, Member detail
+     (human + AI), Identities (list + detail +
+     providers + tokens), Organization, Snapshots,
+     Billing). The retired Teams / Roles / Crews /
+     Activity Feed pages have no cases.
+4. **Phase 3 — Cross-cutting** (one agent, alone):
+   I1–I30. Mutates global UI state (theme, sidebar,
+   command palette) — no concurrent agents.
+5. **Phase 4 — Snapshot lifecycle** (one agent,
+   alone): G30–G35 and K8. Wipes and reloads the
+   shared database — strictly last before teardown.
+6. **Phase 5 — Teardown** (main): stop `server.mjs`
+   (J1), remove the build directory, verify the
+   distribution ZIP remains, aggregate results.
 
 #### Entity mutation domain scoping
 
-Phase 2 agents share one IndexedDB database. Post-Phase-
-Final there are only two tables (`requests`,
-`responses`); every product write appends pairs only. Agents
-own **disjoint pair-address families** (URI prefixes), not
-entity tables — the historical table names below name the
-ADDRESS family each agent mutates:
+Phase 2 agents share one Postgres (`requests` /
+`responses`); every product write appends pairs
+only. There is no per-agent private ledger.
+Agents own **disjoint pair-address families**
+(URI prefixes), not entity tables — the historical
+table names below name the ADDRESS family each
+agent mutates:
 
 | Agent | Mutation domain (pair-address families) |
 |---|---|
@@ -199,14 +216,15 @@ matches the current database at read time" framing rather
 than frozen expected values. Agent-CH's dashboard count
 checks are non-zero + consistency, not numeric equality.
 
-**Shared pair-plane appends are safe.** Several agents append
-to `requests`/`responses` at once — Agent-D (idea lifecycle),
-Agent-E (project lifecycle), Agent-G (member lifecycle), and
-Agent-F2 (work-order transitions and claims). On IndexedDB an
-append is an O(1) per-row `objectStore.put`, so concurrent
-appends from sibling tabs both survive (CLAUDE.md § Gotchas —
-"Cross-tab writes are safe"). Re-read tolerantly (`≥ N`) for
-timing rather than asserting exact pair counts.
+**Shared pair-plane appends are safe.** Several
+agents append to `requests`/`responses` at once —
+Agent-D (idea lifecycle), Agent-E (project
+lifecycle), Agent-G (member lifecycle), and
+Agent-F2 (work-order transitions and claims).
+Postgres commits each pair atomically; concurrent
+appends from sibling sessions both survive.
+Re-read tolerantly (`≥ N`) for timing rather than
+asserting exact pair counts.
 
 Post-Phase-Final + states-address retirement: every
 lifecycle-backed surface (workbox inbox, flow-stats,
@@ -263,131 +281,114 @@ suite + HTTP page smoke.
 
 #### Parallel session & connection isolation
 
-Write-table partitioning (above) keeps *data* writes
-disjoint, but three resources are shared per **origin**, not
-per tab, and the mutation-domain table does not fence them.
-A Phase-2 run that ignores them collapses:
+Write-family partitioning (above) keeps *data* writes
+disjoint, but session state is per **cookie jar**, not
+per tab, and the mutation-domain table does not fence
+it. A Phase-2 run that ignores this collapses:
 
-- **`fusion-ai:authorization`** is one localStorage key
-  per origin. Every agent that logs in as the same identity
-  in the same origin overwrites the prior agent's credential
-  blob (last write wins); a sibling tab's silent refresh
-  then reads a stranger's tokens
-  (`web-app/app/adapters/session-credentials.ts`).
-- **`fusion-ai:active-organization-id`** is likewise one per-origin key, so
-  concurrent org switches race the same slot.
-- **Sign-out is identity-wide.** `postSessionLogout` calls
-  `postIdentityLogoutEverywhere` — a coarse server-side
-  revoke of EVERY token for the identity. One agent's
-  sign-out revokes every other agent that shares that
-  identity (`web-app/app/adapters/session-logout.ts`).
-- **IndexedDB connection concurrency.** ~9 concurrent
-  connections to the single `fusion-ai` database wedge it: a
-  schema-mutating open (wipe / mock-data seed / snapshot
-  import — all call `deleteSchema`) blocks behind the other
-  open connections, and the blocked `indexedDB.open` never
-  resolves until every origin tab closes.
+- **Cookie session.** Product access is memory-only;
+  refresh is the HttpOnly `refresh_token` cookie
+  (`Path=/authentication`, `SameSite=Strict`).
+  `fusion-ai:authorization` is not the product path
+  (`server-core.ts` calls `setCookieSession(true)`).
+  Two pages in the same Chrome context share that
+  cookie.
+- **`fusion-ai:active-organization-id`** is still one
+  localStorage key per context, so concurrent org
+  switches in the same jar race the same slot.
+- **Sign-out is identity-wide on the server.**
+  `postSessionLogout` calls
+  `postIdentityLogoutEverywhere` — a coarse revoke of
+  EVERY token for the identity, then clears this
+  jar's cookie (`Set-Cookie` `Max-Age=0`). One
+  agent's sign-out evicts every other agent signed in
+  as that identity, even in a different
+  `isolatedContext`.
+- **IndexedDB connection concurrency is gone.** The
+  retired browser-ZIP origin wedged on ~9 concurrent
+  `fusion-ai` IDB connections. One Postgres, one
+  `server.mjs` — that recipe does not apply.
 
-**Primary strategy — one origin per agent (distinct ports).**
-Serve the same build on one port per Phase-2 agent (8080,
-8081, …); each agent drives its own port. An origin is
-scheme+host+**port**, so each agent gets a private
-localStorage (credentials, active-org) AND a private
-`fusion-ai` database — including its own revocation ledger,
-so a sign-out in one origin cannot revoke another's tokens,
-and connection counts stay at 1–2 per database. Phase 1
-seeds :8080 and **exports a snapshot**; each Phase-2 agent
-**imports that snapshot** into its own origin before logging
-in, so every agent verifies byte-identical data. The shared
-HMAC signing key (a client constant) makes the imported
-credentials' logins valid in every origin.
+**Primary strategy — one origin, isolated contexts.**
+A1–A3 start one `server.mjs`. Each Phase-2 agent
+opens its page with Chrome `isolatedContext` set to
+a unique name so cookie jars (and that context's
+localStorage) do not clobber each other. They still
+share the database: mutation domains and the
+sign-out rule remain required. A3 (or an admin
+Snapshots → Wipe and Load Mock Data) is the seed;
+there is no per-agent private ledger.
 
-**Fallback strategy — serial for session-bound sections.**
-When per-origin serving is impractical, run the
-member/session-dependent sections (D, E, F2, G, the command
-palette, Phase 3, Phase 4) in ONE tab serially after Phase 1,
-keeping parallelism only for genuinely independent or
-read-only work. Simpler, slower, equally correct.
+**Fallback strategy — serial for session-bound
+sections.** When isolated contexts are impractical,
+run the member/session-dependent sections (D, E, F2,
+G, the command palette, Phase 3, Phase 4) in ONE jar
+serially after Phase 1, keeping parallelism only for
+genuinely independent or read-only work.
 
 **Hard invariants (either mode).**
 
-1. **No concurrent sign-out.** The Sidebar Sign-out case
-   (Agent-B's domain) revokes the shared identity. Move it
-   out of the parallel window — run it last, alone, in its
-   own origin/tab — never while a sibling shares the
-   identity.
-2. **One credential writer per origin at a time.** Only one
-   login (or refresh) may write `fusion-ai:authorization`
-   per origin; per-origin isolation makes this automatic.
-3. **Schema mutations need exclusive origin access.** Any
-   wipe / seed / snapshot import (`deleteSchema`) runs with
-   no other tab open on that origin. Phase 4 already honors
-   this by running alone; extend the rule to any in-run
-   snapshot import (Agent-G's Snapshots cases).
+1. **No concurrent sign-out.** The Sidebar Sign-out
+   case (Agent-B's domain) revokes the identity on
+   the server. Run it last, alone — never while a
+   sibling is signed in as that identity.
+2. **One cookie writer per isolated context.** Only
+   one login (or refresh) may mint into a given
+   jar at a time; `isolatedContext` makes this
+   automatic across agents.
+3. **Schema mutations need exclusive database
+   access.** Any wipe / seed / snapshot import runs
+   with no sibling mutating the same Postgres.
+   Phase 4 already honors this by running alone;
+   extend the rule to any in-run snapshot import
+   (Agent-G's Snapshots cases).
 
-Recovery no longer scrubs a live credential on an unscoped
-401 — `recoverSession` re-installs and re-scopes instead —
-which softens the clobber blast radius but does not remove
-the shared-key races; the isolation rules above remain
-required.
+#### Shared-origin parallel run — operational recipe
 
-#### Per-origin parallel run — validated operational recipe
+This is THE default protocol. One Node process, one
+Postgres, many isolated Chrome contexts.
 
-This is THE default protocol. It ran the full plan as concurrent
-agents (2026-06) with per-port isolation and ZERO shared-DB
-lockups — seven sections fanned out at once, none wedged.
-
-1. **Build once, serve many.** `TMPDIR=/tmp/claude ./build
-   --no-zip /tmp/claude/fusion-test/` ONCE, then one static
-   server per agent, each on its own port, all serving that ONE
-   dir: `python3 -m http.server <port> --directory
-   /tmp/claude/fusion-test` (8080, 8081, …). Servers serve
-   static files only; the API + IndexedDB run in-browser and are
-   partitioned by origin — so one build feeds every port and
-   isolation comes from the port, not from separate file trees
-   or rebuilds. (Do NOT use `./serve` per agent — it rebuilds
-   each call and runs in the foreground.)
-2. **Grant host permission FIRST — hard prerequisite.** The
-   Claude-in-Chrome extension gates navigation per ORIGIN. An
-   unattended subagent CANNOT approve the side-panel prompt, so
-   a never-visited port returns "Permission denied by user" and
-   the agent blocks before it can load anything. Before
-   dispatching, a human grants the extension access to
-   `http://localhost` (chrome://extensions → the extension →
-   Details → Site access → On all sites), or approves each
-   port's prompt once. This is the single most common cause of a
+1. **AT first.** `./validate`. Abort on red.
+2. **A1.** `./build` from a clean tree →
+   `~/Desktop/fusion-ai-server-${SHA}.zip`.
+3. **A2.** Unzip that ZIP (or
+   `./build --no-zip /tmp/fusion-test/`) to a temp
+   dir that contains `server.mjs`.
+4. **A3 / SV1.** Set `POSTGRES_URL`,
+   `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT`
+   against an **empty** database. Run
+   `node server.mjs --seed-mock-data` (or `./serve`
+   after commit). One process. Capture the stderr
+   seed reveal (SV1 text).
+5. **Agents share that origin.** Do not start a
+   second `server.mjs`. Session isolation is Chrome
+   `isolatedContext`, not port. Tab-scoped tools
+   only (navigate, find, evaluate, snapshot, form
+   fill). NEVER coordinate-based clicks or
+   screenshots — those are display-global and
+   collide across concurrent agents.
+6. **Seed is shared.** A3 already mock-seeded.
+   Re-seed only as **admin** via Snapshots → Wipe
+   and Load Mock Data (or Create Pristine). That
+   wipe is global. No per-agent private ledger.
+7. **Sign in as the ADMIN for admin-only
+   surfaces.** The stderr reveal lists a password
+   for EVERY login-capable person, including
+   emily.rodriguez@company.com — a seeded
+   `member`-role human who reads org-scoped content
+   fine but 403s on admin-only writes (members,
+   identities, organization, snapshots;
+   deny-by-default authz). For any section touching
+   those admin surfaces, sign in as
+   `demo@example.com` (Tony Stark, admin in both
+   orgs).
+8. **Mutation-domain table stays.** Sign-out last /
+   alone (identity-wide on the server).
+9. **Grant host permission FIRST.** The Chrome
+   DevTools MCP gates navigation per origin. Before
+   dispatching, grant access to `http://localhost`.
+   This is the single most common cause of a
    stalled parallel run.
-3. **One origin per agent, tab-scoped tools only.** Each agent
-   calls `tabs_context_mcp({createIfEmpty:true})`, creates ONE
-   tab via `tabs_create_mcp`, and confines all work to it. Use
-   only tab-scoped tools (navigate, find, javascript_tool,
-   get_page_text, read_page, form_input, browser_batch, and
-   `computer` with a `ref`). NEVER coordinate-based clicks or
-   screenshots — those are display-global and collide across
-   concurrent agents.
-4. **Each agent self-seeds its origin.** snapshots → "Wipe and
-   Load Mock Data" → Confirm → capture the revealed credentials
-   → "I have saved it — continue". This clears any stale
-   per-origin storage from prior sessions AND guarantees a known
-   IndexedDB seed. There is NO auto-seed — a fresh/empty origin
-   redirects to snapshots by design (an empty active IndexedDB,
-   regardless of any leftover `fusion-ai:*` localStorage from an
-   old LocalStorage-backend run).
-5. **Sign in as the ADMIN for admin-only surfaces.** The
-   reveal lists a password for EVERY login-capable person,
-   including emily.rodriguez@company.com — a seeded
-   `member`-role human who reads org-scoped content fine but
-   403s on admin-only writes (members, identities,
-   organization, snapshots; deny-by-default authz). For any
-   section touching those admin surfaces, sign in as
-   `demo@example.com` (Tony Stark, admin in both orgs). The
-   reveal lists its password.
-6. **No orphan tab on a port you intend to wipe.** A lingering
-   tab holding an IndexedDB connection blocks the next wipe's
-   `deleteSchema` (the connection-concurrency hazard). Give each
-   wave fresh ports, or close prior tabs first. The MCP tab
-   group also rotates between turns — re-fetch IDs with
-   `tabs_context_mcp` rather than reusing stale ones.
 
 #### Known MCP limitations
 
@@ -401,8 +402,8 @@ lockups — seven sections fanned out at once, none wedged.
   on the `.drag-handle`, NOT pointer-capture, so they are
   driveable. Work around the gesture cases by
   validating end-state via pair-plane fixtures (PUT a
-  flow document pair through the gate, or inspect the
-  `requests`/`responses` stores for the flow's
+  flow document pair through the gate, or GET the
+  flow document / its pair history for the flow's
   `uri_prefix`/`uri_id`), then reloading and verifying
   render. When the fixture succeeds and the SVG renders
   the expected end state, the case is **PASS** with the
@@ -430,20 +431,19 @@ lockups — seven sections fanned out at once, none wedged.
   Claude Code sandbox rejects `kill -TERM` and `kill -9`
   against PIDs of long-running background tasks started via
   the Bash tool's `run_in_background: true` (EPERM). Phase 5
-  teardown's **J1** ("Stop the HTTP server") cannot terminate
+  teardown's **J1** ("Stop `server.mjs`") cannot terminate
   the process from within the sandbox; mark J1 BLOCKED with
   the reason "sandbox EPERM on kill". The server is cleaned
   up at session end. Workaround: the user terminates manually
-  after the run via `lsof -ti tcp:8080 | xargs kill -9`
+  after the run via
+  `lsof -ti tcp:$HTTP_SERVER_PORT | xargs kill -9`
   outside the sandbox.
 - **Phase 5 build-dir cleanup (J2)**: deferred while the
-  server remains alive. Deleting `/tmp/claude/fusion-serve.*`
-  while the python `http.server` holds open file descriptors
-  leaves the server in an unrecoverable state. After the
-  user kills the server outside the sandbox
-  (`lsof -ti tcp:8080 | xargs kill -9`), they should run
-  `rm -rf /tmp/claude/fusion-serve.*` to reclaim the build
-  artifacts. J2 is marked DEFERRED whenever J1 is BLOCKED.
+  server remains alive. Deleting the A2 temp dir while
+  `server.mjs` holds open file descriptors leaves the
+  process in an unrecoverable state. After the user kills
+  the server outside the sandbox, they should `rm -rf`
+  that dir. J2 is marked DEFERRED whenever J1 is BLOCKED.
 - **Chrome MCP tab-group volatility**: the MCP tab group can
   dissolve between calls when no tabs in the group are
   actively held. If `tabs_create_mcp` returns "No tab
@@ -454,11 +454,8 @@ lockups — seven sections fanned out at once, none wedged.
 - **`javascript_tool` async/await blocked by CSP**: the app
   ships `script-src 'self'` with no `unsafe-eval`, so the
   tool's async/IIFE wrapper throws `await is not defined`.
-  Read IndexedDB with a callback-built `Promise` (no `await`
-  keyword) and call `db.close()` before resolving — a
-  dangling read connection blocks the snapshot reset's
-  `deleteSchema` (delete+reopen) and wedges the renderer
-  (the documented IndexedDB connection-concurrency hazard).
+  Drive the page with callback-built `Promise`s (no `await`
+  keyword). There is no in-browser data database to inspect.
 - **`getBoundingClientRect` ≠ click coordinates**: a ~1.19×
   CSS-px ↔ screenshot-px scale exists on the driven tab.
   Click by the coordinates seen in a screenshot, never by
@@ -479,12 +476,13 @@ lockups — seven sections fanned out at once, none wedged.
 
 #### Serial single-tester mode
 
-The same TEST-PLAN.md runs serially by one human in one browser
-following document order (A → AA → B → C → D → E → F → F2 → FS
-→ G → H → I → K → R → L → J). Section SV is a separate
-ceremony (see Execution Order) — not in that chain. The
-agent-scoped mutation domains and
-tolerance patterns apply only to the parallel run.
+The same TEST-PLAN.md runs serially by one human in one
+browser following document order (A → AA → B → C → D →
+E → F → F2 → FS → G → H → I → K → R → SV6–SV10 → J).
+A3 **is** SV1; SV2–SV5 pin cookie-session / snapshots
+on this same origin (not a second ceremony). The
+agent-scoped mutation domains and tolerance patterns
+apply only to the parallel run.
 
 ### Execution Order
 
@@ -492,25 +490,18 @@ tolerance patterns apply only to the parallel run.
 failure aborts the run before A1's build — the expensive
 browser layer never tests against a validate-broken tree.
 
-After AT passes, sections A through AA establish a pristine
-environment and populate it through the UI. Sections B
-through J then verify every page renders correctly against
-that data.
+After AT passes, A1–A3 stand up Node + Postgres (A3 is
+SV1). AA may rebuild through the UI from pristine.
+Sections B through J then verify every page against
+that origin. SV6–SV10 are the two-jar / two-tab /
+stale-until-nav pins on the **same** process.
 
-In the serial run the plan is a single continuous regression
-pass. In the parallel run B–J split across seven agents
-each with its own browser tab and disjoint entity mutation
-domain; I runs alone (global UI state); G30–G35 run alone
-last (they wipe the database). See `CLAUDE.md` section
-`## Testing`.
-
-**SV is a separate ceremony.** It is not part of the A–J
-IndexedDB / browser-ZIP run. Unzip
-`fusion-ai-server-${SHA}.zip`, set `POSTGRES_URL`,
-`JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT`, seed an
-empty database with `--seed-mock-data`, then run SV
-against that Node origin. Do not mix SV with the
-python `http.server` IndexedDB cases.
+In the serial run the plan is a single continuous
+regression pass. In the parallel run B–J split across
+seven agents each with its own `isolatedContext` and
+disjoint entity mutation domain; I runs alone (global
+UI state); G30–G35 and K8 run alone last (they wipe
+the database). See `CLAUDE.md` section `## Testing`.
 
 ## Summary
 
@@ -518,7 +509,7 @@ python `http.server` IndexedDB cases.
 |---|--:|
 | AT. Automated Test Suite | 3 |
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 49 |
+| AA. Data Entry Workflow | 48 |
 | B. Entry Pages | 29 |
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 38 |
@@ -526,15 +517,14 @@ python `http.server` IndexedDB cases.
 | F. Tools | 77 |
 | F2. Workbox | 31 |
 | FS. Flow Statistics | 9 |
-| G. Admin Pages | 45 |
+| G. Admin Pages | 44 |
 | H. Reference & System | 2 |
 | I. Cross-Cutting Concerns | 30 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
-| L. IndexedDB Persistence Tier | 9 |
 | SV. Server (Node + Postgres) | 10 |
-| **Total** | **414** |
+| **Total** | **403** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -543,13 +533,13 @@ only. Combined with the CLI automated suite:
 
 | Layer                  | Cases    |
 |------------------------|---------:|
-| CLI automated tests    |     3196 |
-| Browser regression     |      414 |
-| **Combined TOTAL**     | **3610** |
+| CLI automated tests    |     3262 |
+| Browser regression     |      403 |
+| **Combined TOTAL**     | **3665** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
-suite (3188 main + 8 tz);
+suite (3254 main + 8 tz, including 5 skipped);
 the number grows as tests land in either glob. Browser count =
 the per-section table above. Update both numbers when either
 side changes.
@@ -567,8 +557,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 3610, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (3610).
+`PASS = 3665, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (3665).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -588,11 +578,11 @@ run before A1's build. The single canonical invocation is
 
 ## A. Build & Setup
 
-- [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-<sha>.zip`.
-- [ ] **A2** Run `./build --no-zip /tmp/fusion-test/`. PASS: `/tmp/fusion-test/` contains `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`) with 29 HTML page files (including `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`.
-- [ ] **A3** Start an HTTP server from the build directory (`cd /tmp/fusion-test/ && python3 -m http.server 8080`). PASS: server starts without errors.
-- [ ] **A4** Open `http://localhost:8080/` in the test browser. PASS: root `index.html` runs `root-redirect.ts` — redirects to `snapshots/index.html` when no schema/data exists (first run or post-wipe), or `auth/index.html` when a schema is present (signed-in sessions reach gated pages from auth; landing is a separate public marketing page, not the root target).
-- [ ] **A5** Open DevTools Console and confirm no JavaScript errors on initial load. PASS: console is clean (warnings from browser extensions are acceptable).
+- [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-server-${SHA}.zip`.
+- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`) with 29 HTML page files (including `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`.
+- [ ] **A3** From the A2 directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an **empty** Postgres, run `node server.mjs --seed-mock-data` (or `./serve` after commit). PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP. This pin **is** SV1.
+- [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser. PASS: root hops to `auth/index.html` after seed (`root-redirect.ts` reads schema-present → auth). Landing is a separate public marketing page, not the root target.
+- [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /authentication/token` refresh 401 are acceptable.
 
 ---
 
@@ -604,8 +594,7 @@ on. Run these in order.
 
 ### AA1. Create Pristine Environment
 
-- [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
-- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly two: `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 8; demo seed 1448). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread (now also covers the dead clients store). Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
+- [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -915,20 +904,20 @@ on. Run these in order.
 
 ### Auth Session & Redirect
 
-- [ ] **B15** With no stored credential (sign out, or delete the `localStorage` key `fusion-ai:authorization`), open `dashboard/index.html` directly. PASS: bounced to `auth/index.html?return=dashboard` (the Sign In page), not the dashboard.
+- [ ] **B15** With no session (Sign out, or a profile with no `refresh_token` cookie), open `dashboard/index.html` directly. PASS: bounced to `auth/index.html?return=dashboard` (the Sign In page), not the dashboard.
 - [ ] **B16** From the B15 bounce, sign in with the seeded admin credentials. PASS: lands on `dashboard/index.html` — the `?return=` target, not a generic default.
-- [ ] **B17** With no credential, open `flows/detail.html?flowId=<id>` directly. PASS: bounced to `auth` with the flow preserved in `?return=`; after signing in, lands back on that exact flow with `flowId` intact.
-- [ ] **B18** After signing in on the dashboard, reload (Cmd-R). PASS: stays authenticated on the dashboard — no bounce to `auth` (the credential persisted across the hard-reload).
-- [ ] **B19** With no credential, open each exempt page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`, `snapshots/`. PASS: each renders normally with NO redirect to `auth` (public surface + bootstrap plane are gate-exempt).
-- [ ] **B20** After signing in, close the tab, then reopen `dashboard/index.html` in a new tab. PASS: still authenticated — no bounce (the credential lives in `localStorage`, not tab memory).
-- [ ] **B21** Silent refresh: after signing in, in DevTools replace the stored `access_token` with an expired JWT (keep the live `refresh_token`), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was refreshed transparently.
-- [ ] **B22** Both tokens dead: replace BOTH `access_token` and `refresh_token` with expired JWTs, then open `dashboard/`. PASS: bounced once to `auth?return=dashboard` — no retry loop, no console error storm.
+- [ ] **B17** With no session, open `flows/detail.html?flowId=<id>` directly. PASS: bounced to `auth` with the flow preserved in `?return=`; after signing in, lands back on that exact flow with `flowId` intact.
+- [ ] **B18** After signing in on the dashboard, reload (Cmd-R). PASS: stays authenticated on the dashboard — no bounce to `auth` (boot cookie-refreshes via `POST /authentication/token` with `grant_type=refresh` and `credentials: 'same-origin'`).
+- [ ] **B19** With no session, open each public page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`. PASS: each renders normally with NO redirect to `auth`. Open `snapshots/` unsigned. PASS: bounced to `auth` — snapshots require a session (SV5).
+- [ ] **B20** After signing in, close the tab, then reopen `dashboard/index.html` in a new tab in the **same** cookie jar. PASS: still authenticated — no bounce (the HttpOnly `refresh_token` cookie is shared by the jar; boot cookie-refreshes).
+- [ ] **B21** Silent refresh: after signing in, replace the in-memory access token with an expired JWT (keep the live `refresh_token` cookie), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was cookie-refreshed transparently.
+- [ ] **B22** Dead refresh: clear the `refresh_token` cookie and drop the in-memory access token, then open `dashboard/`. PASS: bounced once to `auth?return=dashboard` — no retry loop, no console error storm.
 
-> Note: `snapshots/` is intentionally an UNAUTHENTICATED plane — its import/bootstrap routes are BEARER-exempt and can wipe the store. It stays gate-exempt by design so a wiped-DB user can reach recovery; acceptable only because the store is single-user and client-side (B19 covers it).
+> Note: `snapshots/` requires a session (SV5). Public pages remain `landing/`, `auth/`, `not-found/`, and `design-system/`. The bootstrap plane is not bearer-exempt.
 
 ### Sidebar Sign-out
 
-- [ ] **B23** On any gated page (e.g. dashboard), click "Sign out" in the sidebar. PASS: `fusion-ai:authorization` is removed from `localStorage`, a revocation row is recorded, and the page navigates to `auth`; pressing Back to the protected page bounces again to `auth`.
+- [ ] **B23** On any gated page (e.g. dashboard), click "Sign out" in the sidebar. PASS: the `refresh_token` cookie is cleared (`Set-Cookie` `Max-Age=0`), a revocation row is recorded, and the page navigates to `auth`; pressing Back to the protected page bounces again to `auth?return=`.
 - [ ] **B24** Open the app in two tabs (both signed in). Click "Sign out" in tab A, then trigger a fetch in tab B (navigate within it). PASS: tab B's next request 401s against the shared revocation ledger and bounces to `auth` — eventual cross-tab convergence, no corruption.
 
 ### Zero-membership landing (org gate)
@@ -939,7 +928,7 @@ on. Run these in order.
 - [ ] **B26** From the zero-membership state while signed in, open `dashboard/index.html` (or any org-gated page) directly and reload (Cmd-R). PASS: redirected to `invitations/index.html` by the boot org gate — no dashboard error card, no retry loop (the returning-user path, not just fresh login).
 - [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows pending invitations, or the "No invitations." empty state when none exist.
 - [ ] **B28** Restore the deleted membership row (or repeat with an untouched seeded member), then sign in. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected by the new gate).
-- [ ] **B29** As the zero-membership identity, open an auth-EXEMPT page (`snapshots/`, `design-system/`). PASS: renders normally with NO redirect to invitations — the org gate guards only auth-gated pages; exempt pages degrade to the unscoped sidebar (B19 unaffected).
+- [ ] **B29** As the zero-membership identity, open `design-system/`. PASS: renders normally with NO redirect to invitations — the org gate guards auth-gated pages; public pages degrade to the unscoped sidebar (B19). Open `snapshots/` while still signed in. PASS: bounced to `invitations/` (snapshots is auth-gated, so the org gate fires). Unsigned `snapshots/` still bounces to `auth` (B19), not invitations.
 
 ---
 
@@ -1593,8 +1582,8 @@ designer "tag current" action lands.)
 - [ ] **F65** Open an edge panel. PASS: the header shows
   "Transition Properties" title and close button — no
   Members fieldset.
-- [ ] **F66** MOOT (Phase Final). The `flow_versions` table and
-  object store are DELETED; there is nothing to inspect.
+- [ ] **F66** MOOT (Phase Final). The `flow_versions` table is
+  DELETED; there is nothing to inspect.
   Member assignment is captured only in the flow's own
   document-pair history (`requests`/`responses`). Confirm
   via pair fixtures or F67: a `memberIds` change is still
@@ -2066,18 +2055,15 @@ the claude-in-chrome MCP.
 
 ### Members list (`members/index.html`)
 
-> **Session role.** G11–G14 and V* Invite cases run as an
-> **org admin** (Tony Stark after mock seed). The roster
-> adapter (`getMembers`) always `GET`s `identity-pii`, and
-> that collection is admin-tier (`MEMBER_VERBS` omits it;
-> `tests/api-member-tier.test.ts` pins member 403). A
-> non-admin (e.g. Emily) therefore fails the Members list
-> load with `forbidden` on `identity-pii` while still
-> holding member-tier GETs on seats and `/ai-agents`.
-> Invite **grant** is also admin-gated in
-> `grantInvitation`. Known authz posture, not a residual
-> FAIL — do not re-litigate as product drift without an
-> intentional member-tier roster design.
+> **Session role.** G11–G14 and V* Invite cases run as
+> an **org admin** (Tony Stark after mock seed). The
+> Members list fills names via `fillHumanMemberPii` —
+> nested `GET identities/:id/pii` (self or admin). A
+> non-admin Ideas list must paint without
+> `GET /identities` or `GET /identity-pii`
+> (`getMemberMap` is seats + `/ai-agents`; a missing
+> name may read `MEMBER_WITHOUT_PII_NAME`). Invite
+> **grant** stays admin-gated in `grantInvitation`.
 
 - [ ] **G11** Navigate to `members/index.html` (reachable
   via the "Members" sidebar entry). PASS: page header reads
@@ -2296,7 +2282,7 @@ the claude-in-chrome MCP.
 
 ### Identities (list & detail) (`identities/`, `identities/detail.html`)
 
-- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. With mock data seeded and the demo admin's active organization (Stark), the identity-pii fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
+- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. With mock data seeded and the demo admin's active organization (Stark), the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
 - [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `requests`/`responses` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the localStorage session-credentials JWT's name claim, and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
@@ -2304,17 +2290,16 @@ the claude-in-chrome MCP.
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
-- [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the page title is "Tokens" with muted subtitle "Refresh-token chains for this identity"; the page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
-- [ ] **G26** Navigate to `identity-providers/index.html?identityId=current` (or the identity's "Providers" link). PASS: the page title is "Identity Providers" with muted subtitle "External sign-in links for this identity"; the page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded `current` logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
+- [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the page title is "Tokens" with muted subtitle "Refresh-token chains for this identity"; the page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `GET identities/:id/tokens` via `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
+- [ ] **G26** Navigate to `identity-providers/index.html?identityId=current` (or the identity's "Providers" link). PASS: the page title is "Identity Providers" with muted subtitle "External sign-in links for this identity"; the page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded `current` logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `GET identities/:id/providers` via `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
 
 ### Snapshots (`snapshots/`) — Phase 4 (Run These Last)
 
 **Phase 4 — Snapshot lifecycle & objective wipe.** Cases
-G30–G35 (snapshot lifecycle) and K8 (DevTools IndexedDB
-wipe → Organization empty-state check → mock-data restore)
-all destroy and restore the shared database. They MUST run
-alone in tab 0 after Phase 3 completes — never concurrent
-with Phase 2.
+G30–G35 (snapshot lifecycle) and K8 (pristine wipe →
+Organization empty-state → mock-data restore) all destroy
+and restore the shared database. They MUST run alone after
+Phase 3 completes — never concurrent with Phase 2.
 
 (Snapshot serialization, per-row import-validation, the quota
 pre-flight, the localStorage tier's column compression, and
@@ -2346,13 +2331,7 @@ restored data.)
   organization/default-organization — derived reads, not
   entity
   tables. NOTE: pristine seeds NO Records. Source of
-  truth: `postBootstrap` in `api/mock-data.ts`. IndexedDB
-  stores each row as an object — no `gz1` compression —
-  and the `__schema__` marker store holds one row. The
-  full table set is `TABLE_NAMES` in `api/db.ts` (two
-  survivors); no object stores outside that list (plus
-  `__schema__`) appear on a post-Final origin (pre-Final
-  orphans may linger inert — gate 6).
+  truth: `postBootstrap` in `api/mock-data.ts`.
 - [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — Stark's 6 ideas are back (the seed plants 11 ideas total, split across both orgs via `assignOrganization`; the org fence shows only the active org's).
 - [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
 - [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
@@ -2362,14 +2341,13 @@ restored data.)
 - [ ] **G35** On `snapshots/`, click "Upload Snapshot" and select a
   malformed JSON file (e.g. truncated mid-object). PASS: a toast or
   inline error reports the upload failed with a human-readable
-  message; existing data is untouched (verify via DevTools that
-  the IndexedDB object stores were not overwritten or cleared).
-  Note: malformed JSON is rejected at parse time — BEFORE the
-  import transaction opens — so no data is touched. A
-  parse-success but validator-throw is rejected at the gate too;
-  and on IndexedDB the clear+put runs in one transaction, so even
-  a mid-write failure aborts whole, leaving prior data intact
-  (atomic import replaced wipe-on-fail). Covered by
+  message; existing data is untouched (re-open Ideas or Members
+  and confirm the pre-upload cards remain). Note: malformed JSON
+  is rejected at parse time — BEFORE the import transaction
+  opens — so no data is touched. A parse-success but
+  validator-throw is rejected at the gate too; Postgres commits
+  the clear+put whole or not at all (atomic import replaced
+  wipe-on-fail). Covered by
   `tests/snapshot-import-validation.test.ts` and
   `tests/snapshot-wipe-on-fail.test.ts` (now atomic-rollback) —
   this case verifies the error toast/inline-error surfaces in the
@@ -2383,7 +2361,6 @@ restored data.)
   Save. PASS: `PUT /ai-agents/:id` persists; reload
   shows the new values. No composing POST writes
   three pairs.
-- [ ] **G37 — Boot recovery from a missing schema** With the app loaded, open DevTools → Application → IndexedDB and delete the `fusion-ai` database (or clear the `__schema__` store). Reload a schema-requiring page (e.g. `dashboard/index.html`). PASS: boot reopens a fresh empty database, `hasSchema()` is false, and `core.ts` REDIRECTS to `snapshots/index.html` with the "Your database is empty." banner and the four recovery cards (Download Snapshot / Upload Snapshot / Wipe and Load Mock Data / Create Pristine) — never the terminal "Failed to initialize database" dead-end. Afterward, Wipe and Load Mock Data to restore a healthy DB before continuing. (Unlike the old localStorage tier, IndexedDB object stores always exist post-upgrade, so a hand-corrupted "partial table" shape is no longer reproducible; a genuinely missing store arises only on a schema version bump, where boot throws `MissingTableError` and `redirectIfMissingTable` routes to `snapshots/index.html?missing-table=<name>` with the matching "The schema is missing the \"<name>\" table" banner.) Source: `web-app/app/core.ts` (`redirectIfMissingTable` + the `initDatabase()` catch), `web-app/app/adapters/snapshots.ts` (`getHasAnyHumanMembers`), `web-app/snapshots/index.ts` (`mutateMissingTableBanner`).
 
 ### Billing (`billing/`) — STUB
 
@@ -2475,7 +2452,7 @@ feature is implemented.
 ### Loading States
 
 - [ ] **I21** Navigate to a data-dependent page with mock data loaded. PASS: loading skeleton (card-grid, card-list, or detail pattern) appears briefly before content renders.
-- [ ] **I22** If an error occurs inside a `loadInto()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading. (Note: errors surfaced from `initDatabase` itself — e.g. a failed IndexedDB open/version error before the page renders — show a separate "Failed to initialize database" error UI via `handleDatabaseError`, without a retry button. Both are valid error states for different layers.)
+- [ ] **I22** If an error occurs inside a `loadInto()` fetch path (e.g. a data-dependent page hits a thrown adapter error after the database initialized successfully), the error state with "Try Again" retry button is shown. PASS: clicking retry re-attempts data loading.
 
 ### Toasts
 
@@ -2559,12 +2536,11 @@ after Phase 2 and Phase 3 complete. Catastrophic if run
 in Phase 2 because it wipes the database, which is shared
 across all seven Phase 2 agents.
 
-Empty state: wipe the database via DevTools (Application >
-IndexedDB > delete `fusion-ai`), then navigate
-to the Organization page. PASS if the empty-state copy
-"No objectives yet. Add one to get started." renders
-(or the bootstrap redirects to the snapshots page per the
-existing missing-schema rule). Restore via mock data
+Empty state: as admin, Create Pristine Environment on
+`snapshots/`, then navigate to the Organization page.
+PASS if the empty-state copy "No objectives yet. Add one
+to get started." renders (pristine seeds org 1 with no
+objectives). Restore via Wipe and Load Mock Data
 afterward.
 
 ### K9–K18 — Project detail: inline scoring + Approve (Agent-E)
@@ -2847,62 +2823,45 @@ every other agent, so no write-domain collision.
   projection matches held roles; no ACL editing UI on
   this page.
 
-## L. IndexedDB Persistence Tier
-
-Backend: `api/backend-indexeddb.ts`. No Node test (no fake-IDB, zero devDeps) — verified in-browser via the Chrome MCP. Serve: `TMPDIR=/tmp/claude ./serve 8080`.
-
-Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fusion-ai` database, so they need exclusive DB access alongside G30–G35 — never concurrently with the seven Phase 2 agents.
-
-- [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 3 object stores (2 tables in `TABLE_NAMES` — `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
-- [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
-- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org. Absolute pair pin is **1448** balanced request/response pairs — single source of truth `EXPECTED_PAIR_COUNT` in `tests/mock-data-pairs.test.ts` (count `requests` length after seed).
-- [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
-- [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct pairs concurrently (e.g. two lifecycle state changes). PASS: both pairs survive (count grows by 2) — the old localStorage clobber is gone.
-- [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).
-- [ ] **L7** Atomic import. The clear+put import runs in one `IDBTransaction`. PASS: a rejected import leaves prior data intact (no corruption).
-- [ ] **L8** Quota pre-flight. PASS: an oversize snapshot rejects with `SnapshotTooLargeError` before any write (also `tests/snapshot-quota.test.ts`).
-- [ ] **L9** Bare-DB self-heal. On a 404 path (no app connection), run `indexedDB.deleteDatabase('fusion-ai')` then `indexedDB.open('fusion-ai', 1)` with NO `onupgradeneeded` handler — forging a v1 DB with 0 object stores and no `__schema__` — then load a real page. PASS: `open()` (`api/backend-indexeddb.ts`) sees the missing `__schema__` store, deletes and reopens so the upgrade rebuilds all 3 stores (2 tables + `__schema__`), and the app boots to the graceful empty-state (Snapshots route + working "Wipe and Load Mock Data"), NOT a "Failed to initialize database" dead-end.
-
 ## J. Teardown
 
-- [ ] **J1** Stop the HTTP server started in A3. PASS: process terminates.
+- [ ] **J1** Stop the `server.mjs` process started in A3. PASS: process terminates.
 - [ ] **J2** Remove the build directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
-- [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-ai-<sha>.zip` exists.
+- [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-ai-server-${SHA}.zip` exists.
 
 ## SV. Server (Node + Postgres)
 
-This section is a separate ceremony from A–J / L. Those
-cases drive the browser ZIP over IndexedDB (`python3 -m
-http.server`). These cases drive
-`fusion-ai-server-${SHA}.zip` served by `server.mjs`
-(`boot()` in `server/boot.ts`) against one Postgres.
+This is the default origin, not a second ceremony. A3
+**is** SV1. B15 / B18 / B19 / B23 pin cookie-session
+and the snapshots bounce on the same process. Keep
+SV6–SV10 as the two-jar / two-tab /
+stale-until-navigation pins.
 
-Operator prerequisites (Tasks 40–47):
+Operator prerequisites:
 
 - `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and
   `HTTP_SERVER_PORT` set (required; no defaults; never
   logged)
-- Empty database; seed with `--seed-mock-data`
+- Empty database; seed with `--seed-mock-data` (A3)
 - Credentials print once on **stderr**, never HTTP
-- One mint process — do not run two `server.mjs` replicas
-- Prefer a dedicated port so a leftover `fusion-ai`
-  IndexedDB from the A–J origin cannot confuse inspection
+- One mint process — do not run two `server.mjs`
+  replicas
 
-Named residual (A8): the backend emits
+Named residual: the backend emits
 `pg_notify('fusion_events', …)` inside the write
 transaction. There is no LISTEN and no SSE client. A
 second browser looking stale until it navigates is
 **PASS**, not FAIL. BroadcastChannel is same-origin
-same-browser only and is not the server-ZIP data path.
-Do not file **SV10** as a regression.
+same-browser only. Do not file **SV10** as a
+regression.
 
 ### Browser against the real server
 
-- [ ] **SV1** Unzip `fusion-ai-server-${SHA}.zip`. From that directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an empty Postgres, run `node server.mjs --seed-mock-data`. PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP.
-- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the root hop to auth). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process, not `python3 -m http.server` / IndexedDB.
+- [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stderr seed reveal).
+- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the root hop to auth). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
 - [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-ai:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
 - [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
-- [ ] **SV5** In a signed-out profile (or after Sign out), open `snapshots/`. PASS: bounced to `auth` — snapshots require a session on this ZIP. (B19 is the browser-ZIP / IndexedDB contract; do not treat this as B19 failing.)
+- [ ] **SV5** In a signed-out profile (or after Sign out), open `snapshots/`. PASS: bounced to `auth` — snapshots require a session (same pin as B19).
 
 ### Two browsers / two identities / one database
 
@@ -2942,7 +2901,7 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 
 | Phase / Agent | Sections          | Pass | Blocked | Fail |
 |---------------|-------------------|-----:|--------:|-----:|
-| Preflight     | A1–A5             |    5 |       0 |    0 |
+| Preflight     | A1–A5 (Node)      |    5 |       0 |    0 |
 | Phase-1       | AA1–AA43+subs     |    X |       Y |    Z |
 | Agent-B       | B1–B29 (less B23–B24) | 27 |       0 |    0 |
 | Agent-CH      | C1–C7 + H1–H2 + K27–K29 | 12 |       0 |    0 |
@@ -2952,9 +2911,9 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Agent-F2      | WB1–WB22 + subs, FS1–FS9, R1–R21 | X |    0 |    0 |
 | Agent-G       | G9–14,19–26,36–46 + K1–K6 | X | 0 | 0 |
 | Phase-3       | I1–I30            |    X |       Y |    Z |
-| Phase-4       | G30–G35 + L1–L9 + K8 | X |       0 |    0 |
+| Phase-4       | G30–G35 + K8 | X |       0 |    0 |
 | Teardown      | J1–J3             |    3 |       0 |    0 |
-| Server        | SV1–SV10          |   10 |       0 |    0 |
+| Server        | SV2–SV10 (A3=SV1) |    9 |       0 |    0 |
 
 ## BLOCKED detail (known MCP limitations — NOT failures)
 - <case ID>: <one-line reason>

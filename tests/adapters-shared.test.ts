@@ -11,6 +11,7 @@ import {
 } from '../web-app/app/adapters/members.ts';
 import {
     memberName,
+    MEMBER_WITHOUT_PII_NAME,
 } from '../web-app/app/adapters/members-union.ts';
 import {
     type Member,
@@ -56,13 +57,12 @@ test(
         await seedHumanMember(db, 'u1', 'Alice Adams');
         const ctx = createRequestContext(db, DEV_TOKEN);
         const map = await getHumanMemberMap(ctx);
-        assert.equal(map.size, 1);
+        assert.ok(map.has('u1'));
         const pii = map.get('u1')?.pii();
+        assert.ok(pii?.erased);
         assert.equal(
-            pii !== undefined && !pii.erased
-                ? pii.name
-                : undefined,
-            'Alice Adams',
+            memberName(map, 'u1'),
+            MEMBER_WITHOUT_PII_NAME,
         );
     },
 );
@@ -79,8 +79,10 @@ test('Fresh ctx re-fetches each call', async () => {
         createRequestContext(db, DEV_TOKEN),
     );
     assert.notEqual(m1, m2);
-    assert.equal(m1.size, 1);
-    assert.equal(m2.size, 2);
+    assert.ok(m1.has('u1'));
+    assert.ok(!m1.has('u2'));
+    assert.ok(m2.has('u1'));
+    assert.ok(m2.has('u2'));
 });
 
 test(

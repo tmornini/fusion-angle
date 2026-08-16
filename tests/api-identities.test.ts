@@ -14,13 +14,6 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import { seedPersonIdentity } from './identity-fixtures.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
-import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
 test('validateIdentityEntity accepts person/service', () => {
@@ -99,10 +92,10 @@ async () => {
 });
 
 // ---- /identities/:id/pii subtree authz ----
-// GET self-only (tree ownership); PUT/DELETE self-or-admin.
-// A roleless member reads/writes its OWN pii; an admin manages
-// any; nobody reads another's pii here (the roster reads the
-// identity-pii COLLECTION).
+// GET is self-or-admin; PUT/DELETE self-or-admin.
+// A roleless member reads/writes its OWN pii; an admin
+// reads or writes any. The flat identity-pii collection
+// is retired (router 404).
 
 const PII = {
     name: 'Sarah', email: 's@x.io', phone: 'p', bio: 'b',
@@ -177,12 +170,22 @@ async () => {
     assert.equal(res.status, 403);
 });
 
-test('a GET of another pii is forbidden even for an admin',
+test('admin GET reads another identity nested pii',
 async () => {
     const db = await dbWithMember();
     const res = await handleRequest(db, piiReq(
         'GET', '/identities/sarah/pii', DEV_TOKEN));
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 200);
+    const pii = await res.json() as {
+        name: string;
+        email: string;
+        phone: string;
+        bio: string;
+    };
+    assert.equal(pii.name, PII.name);
+    assert.equal(pii.email, PII.email);
+    assert.equal(pii.phone, PII.phone);
+    assert.equal(pii.bio, PII.bio);
 });
 
 test('a member writes its own pii', async () => {

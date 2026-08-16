@@ -71,10 +71,8 @@ async function seedMembershipPair(
 // Phase 13 Task 4: a raw store write would leave this
 // revocation invisible to deriveTokenRevocationsFor once the
 // coarse gate reads it, silently admitting a signed-out
-// session. identity-token-revocations/:id PUT is admin-only
-// (ROUTE_POLICY, api/authorization.ts), so the writer is
-// seedRootAdmin's 'current', never u1/u2 — the two identities
-// under test.
+// session. Nested PUT is admin-or-self (ROUTE_POLICY +
+// Region B); the writer is seedRootAdmin's 'current'.
 async function seedTokenRevocationPair(
     db: MemoryDbAdapter,
     id: string,
@@ -82,7 +80,8 @@ async function seedTokenRevocationPair(
     at: string,
 ): Promise<void> {
     await PUT(
-        db, 'identity-token-revocations/' + id,
+        db,
+        'identities/' + identityId + '/token-revocations/' + id,
         { identity_id: identityId, at },
         await devToken(),
     );
@@ -154,7 +153,7 @@ test('refresh on a logged-out but live jti is the'
     // via the PUT route (not a raw store write, Phase 13 Task 9:
     // the row plane no longer receives writes at all) — revokedDb
     // already grants 'current' admin, the role this route needs.
-    await PUT(db, 'identity-tokens/t-live', {
+    await PUT(db, 'identities/u1/tokens/t-live', {
         jti: 'live-jti', identity_id: 'u1',
         action: 'issued', chain_id: 'c1',
         at: '2019-01-01T00:00:00.000000Z',

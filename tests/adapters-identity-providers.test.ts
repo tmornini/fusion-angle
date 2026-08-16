@@ -16,8 +16,14 @@ import {
 import { seedIdentityProvider } from './identity-fixtures.ts';
 import {
     deriveIdentityProvider,
+    deriveIdentityProvidersFor,
     identityProviderEntityOf,
 } from '../api/derive-identity-spine.ts';
+import {
+    appendMessagePair,
+    formWritePair,
+} from '../api/message-pair.ts';
+import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import {
     apiRequest, TEST_OPERATION_ID, storedPutBodyText,
 } from './http-fixtures.ts';
@@ -76,19 +82,12 @@ async () => {
     // 'linked' precedes the earlier 'unlinked', so
     // array-order "last wins" would wrongly drop it.
     //
-    // Re-pointed (Phase 10 Task 8 Session B, closing session A's
-    // named gap): getProvidersFor reads GET /identity-providers,
-    // now flipped to derive-identity-spine.ts's
-    // deriveIdentityProviders, so a raw put with no message pair
-    // would go derivation-invisible. seedIdentityProvider forms
-    // both — the SAME below-facade mechanism identity-fixtures.ts
-    // uses throughout, riding the postIdentityProviderDocumentOp
-    // extraction this session lands.
-    await seedIdentityProvider(db, 'pl', {
+    // getProvidersFor reads GET /identities/:id/providers.
+    await seedIdentityProvider(db, 'p2', 'pl', {
         ...goodRow, identity_id: 'p2', action: 'linked',
         at: '2026-02-01T00:00:00.000000Z',
     });
-    await seedIdentityProvider(db, 'pe', {
+    await seedIdentityProvider(db, 'p2', 'pe', {
         ...goodRow, identity_id: 'p2', action: 'unlinked',
         at: '2026-01-01T00:00:00.000000Z',
     });
@@ -104,7 +103,7 @@ async () => {
     const id = 'ip-g4';
     const put = await handleRequest(db, apiRequest({
         method: 'PUT',
-        path: '/identity-providers/' + id,
+        path: '/identities/current/providers/' + id,
         token: DEV_TOKEN,
         body: goodRow,
         operationId: TEST_OPERATION_ID,
@@ -112,7 +111,7 @@ async () => {
     assert.equal(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
-            db, '/identity-providers/', id,
+            db, '/identities/current/providers/', id,
         ),
     );
     const expected = identityProviderEntityOf({
@@ -124,7 +123,156 @@ async () => {
     assert.equal(Object.keys(expected)[0], 'id');
     assert.deepEqual(stored, expected);
     assert.deepEqual(
-        stored, await deriveIdentityProvider(db, id),
+        stored, await deriveIdentityProvider(db, 'current', id),
     );
     assert.deepEqual(stored, await put.json());
+});
+
+test('GET stamps identity_id from the path when PUT omits it',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'ip-omit';
+    const withoutIdentity = {
+        provider: goodRow.provider,
+        provider_subject: goodRow.provider_subject,
+        action: goodRow.action,
+        at: goodRow.at,
+    };
+    const put = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/identities/current/providers/' + id,
+        token: DEV_TOKEN,
+        body: withoutIdentity,
+        operationId: TEST_OPERATION_ID,
+    }));
+    assert.ok(put.status === 200 || put.status === 201);
+    const list = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/identities/current/providers',
+        token: DEV_TOKEN,
+        operationId: TEST_OPERATION_ID,
+    }));
+    assert.equal(list.status, 200);
+    const rows = await list.json() as readonly {
+        readonly id: string;
+        readonly identity_id: string;
+    }[];
+    const row = rows.find(r => r.id === id);
+    assert.ok(row, 'omitted-id event is in the collection');
+    assert.equal(row.identity_id, 'current');
+    const leaf = await handleRequest(db, apiRequest({
+        method: 'GET',
+        path: '/identities/current/providers/' + id,
+        token: DEV_TOKEN,
+        operationId: TEST_OPERATION_ID,
+    }));
+    assert.equal(leaf.status, 200);
+    const one = await leaf.json() as {
+        readonly identity_id: string;
+    };
+    assert.equal(one.identity_id, 'current');
+});
+
+test('PUT 400s when identity_id disagrees with the path',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const res = await handleRequest(db, apiRequest({
+        method: 'PUT',
+        path: '/identities/current/providers/ip-bad',
+        token: DEV_TOKEN,
+        body: { ...goodRow, identity_id: 'other' },
+        operationId: TEST_OPERATION_ID,
+    }));
+    assert.equal(res.status, 400);
+});
+
+test('derive dual-reads leftover flat provider pairs',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'old-flat-1';
+    const body = { ...goodRow, identity_id: 'p2' };
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/identity-providers/' + id,
+        routePattern: 'identity-providers/:id',
+        routeSegments: ['identity-providers', ':id'],
+        pathSegments: ['identity-providers', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseStatus: 200,
+        responseBody: identityProviderEntityOf({
+            uriId: id,
+            pairId: id,
+            method: 'PUT',
+            body,
+        }),
+        operationId: TEST_OPERATION_ID,
+    });
+    await db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            await appendMessagePair(view, pair);
+        },
+    );
+    const rows = await deriveIdentityProvidersFor(db, 'p2');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.id, id);
+    assert.deepEqual(
+        rows[0],
+        await deriveIdentityProvider(db, 'p2', id),
+    );
+});
+
+test('same event id on both planes — nested wins',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'same-eid';
+    const flatBody = {
+        ...goodRow, identity_id: 'p2',
+        provider: 'flat-google',
+    };
+    const flatPair = await formWritePair({
+        method: 'PUT',
+        pathname: '/identity-providers/' + id,
+        routePattern: 'identity-providers/:id',
+        routeSegments: ['identity-providers', ':id'],
+        pathSegments: ['identity-providers', id],
+        headerFields: [],
+        body: flatBody,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseStatus: 200,
+        responseBody: identityProviderEntityOf({
+            uriId: id,
+            pairId: id,
+            method: 'PUT',
+            body: flatBody,
+        }),
+        operationId: TEST_OPERATION_ID,
+    });
+    await db.transaction(
+        ['requests', 'responses'],
+        async (view) => {
+            await appendMessagePair(view, flatPair);
+        },
+    );
+    await seedIdentityProvider(db, 'p2', id, {
+        ...goodRow, identity_id: 'p2',
+        provider: 'nested-github',
+    });
+    const rows = await deriveIdentityProvidersFor(db, 'p2');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.provider, 'nested-github');
+    assert.equal(
+        (await deriveIdentityProvider(db, 'p2', id)).provider,
+        'nested-github',
+    );
 });

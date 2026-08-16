@@ -45,15 +45,15 @@ export type HistoryLine = {
 
 /**
  * Drop the lowest and highest `fraction` of samples
- * (default 5% each tail) to mute environment noise.
+ * (default 10% each tail) to mute environment noise.
  * Sorts a copy; never mutates input. Empty → throws.
  * `fraction` must be finite and in [0, 0.5). Drop count
- * is `floor(n × fraction)` per tail; n < 20 keeps all
- * at the default fraction. Always leaves ≥ 1 value.
+ * is `ceil(n × fraction)` per tail; n=25 drops 3 each
+ * end. Always leaves ≥ 1 value.
  */
 export function trimExtremes(
     values: number[],
-    fraction: number = 0.05,
+    fraction: number = 0.10,
 ): number[] {
     if (values.length === 0) {
         throw new Error('trimExtremes: empty values');
@@ -69,7 +69,7 @@ export function trimExtremes(
         );
     }
     const sorted = values.slice().sort((a, b) => a - b);
-    const drop = Math.floor(sorted.length * fraction);
+    const drop = Math.ceil(sorted.length * fraction);
     if (drop === 0) {
         return sorted;
     }
@@ -139,7 +139,7 @@ export function sampleStandardDeviation(
 /**
  * Upper budget for readyMs: mean + sigmas × sample σ,
  * ceiled to a whole millisecond. Samples are first
- * trimmed (default 5% each tail) to mute environment
+ * trimmed (default 10% each tail) to mute environment
  * noise. Empty → throws. sigmas must be finite and ≥ 0.
  */
 export function budgetReadyMsFromSamples(
@@ -169,7 +169,7 @@ export function budgetReadyMsFromSamples(
 
 /**
  * Aggregate min/median/max readyMs and per-phase medians
- * across runs. Each series is first trimmed (default 5%
+ * across runs. Each series is first trimmed (default 10%
  * each tail) so min/max/median ignore environment
  * extremes. Empty runs → throws.
  */

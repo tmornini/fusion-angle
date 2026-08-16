@@ -73,7 +73,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     // is invisible to it — the PUT route forms both the row AND
     // its pair, the SAME mechanism a live write uses.
     await handleRequest(db, req(
-        'PUT', '/identity-tokens/t-root', DEV_TOKEN, {
+        'PUT', '/identities/current/tokens/t-root', DEV_TOKEN, {
             jti: ROOT_JTI, identity_id: 'current',
             action: 'issued', chain_id: 'chain-1', at: AT,
         },
@@ -98,15 +98,17 @@ test('PUT identity-tokens/:id appends its pair at the entity'
 + ' address', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
-        'PUT', '/identity-tokens/tok-1', DEV_TOKEN,
+        'PUT', '/identities/current/tokens/tok-1', DEV_TOKEN,
         tokenFields('jti-1'),
     ));
     assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     assert.equal(requests.length, 3);
-    assert.equal(requests[2]!.uri_collection, '/identity-tokens/');
+    assert.equal(requests[2]!.uri_collection, '/identities/current/tokens/');
     assert.equal(requests[2]!.uri_id, 'tok-1');
-    const domainRow = await deriveIdentityToken(db, 'tok-1');
+    const domainRow = await deriveIdentityToken(
+        db, 'current', 'tok-1',
+    );
     assert.deepEqual(await res.json(), domainRow);
 });
 
@@ -115,11 +117,11 @@ test('two PUTs to DIFFERENT identity-tokens/:id ids each'
 + ' ledger row is never revisited', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
-        'PUT', '/identity-tokens/tok-2a', DEV_TOKEN,
+        'PUT', '/identities/current/tokens/tok-2a', DEV_TOKEN,
         tokenFields('jti-2a'),
     ));
     const second = await handleRequest(db, req(
-        'PUT', '/identity-tokens/tok-2b', DEV_TOKEN,
+        'PUT', '/identities/current/tokens/tok-2b', DEV_TOKEN,
         tokenFields('jti-2b'),
     ));
     assert.equal(first.status, 201);
@@ -135,43 +137,49 @@ test('a second PUT to the SAME identity-tokens/:id id forms'
 + ' resolution, never a ledger guard)', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
-        'PUT', '/identity-tokens/tok-3', DEV_TOKEN,
+        'PUT', '/identities/current/tokens/tok-3', DEV_TOKEN,
         tokenFields('jti-3'),
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
     assert.equal(first.headers.get('Supersedes'), null);
     const second = await handleRequest(db, req(
-        'PUT', '/identity-tokens/tok-3', DEV_TOKEN,
+        'PUT', '/identities/current/tokens/tok-3', DEV_TOKEN,
         tokenFields('jti-3-again'),
     ));
     assert.equal(second.status, 201);
     assert.notEqual(second.headers.get('Response-ID'), firstId);
     assert.equal(second.headers.get('Supersedes'), null);
-    const domainRow = await deriveIdentityToken(db, 'tok-3');
+    const domainRow = await deriveIdentityToken(
+        db, 'current', 'tok-3',
+    );
     assert.equal(domainRow.jti, 'jti-3-again');
 });
 
-// ── identity-token-revocations/:id — EVENT-APPEND ──
+// ── identities/:id/token-revocations/:rid — EVENT-APPEND ──
 
-test('PUT identity-token-revocations/:id appends its pair at'
-+ ' the entity address', async () => {
+test('PUT identities/:id/token-revocations/:rid appends its'
++ ' pair at the entity address', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
-        'PUT', '/identity-token-revocations/rev-1', DEV_TOKEN,
+        'PUT',
+        '/identities/current/token-revocations/rev-1',
+        DEV_TOKEN,
         revocationFields(),
     ));
     assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     assert.equal(requests.length, 3);
     assert.equal(
-        requests[2]!.uri_collection, '/identity-token-revocations/',
+        requests[2]!.uri_collection,
+        '/identities/current/token-revocations/',
     );
     assert.equal(requests[2]!.uri_id, 'rev-1');
     // Phase Final Task 2: identity_token_revocations ROW half
     // stripped — oracle is the pair plane.
-    const domainRow =
-        await deriveTokenRevocation(db, 'rev-1');
+    const domainRow = await deriveTokenRevocation(
+        db, 'current', 'rev-1',
+    );
     assert.deepEqual(await res.json(), domainRow);
 });
 
@@ -187,7 +195,7 @@ test('a rotation appends its pair at an operation address:'
 + ' own stored response body', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     assert.equal(res.status, 201);
@@ -196,7 +204,7 @@ test('a rotation appends its pair at an operation address:'
     const requests = await db.requests.getAll();
     const row = requests.find(
         r => r.uri_collection
-            === `/identity-tokens/${ROOT_JTI}/rotation/`,
+            === `/identities/current/tokens/${ROOT_JTI}/rotation/`,
     );
     assert.ok(row);
     assert.equal(row!.uri_id, '');
@@ -220,7 +228,7 @@ test('a byte-identical second rotation of the SAME jti still'
 async () => {
     const db = await seededDb();
     const first = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     assert.equal(first.status, 201);
@@ -229,7 +237,7 @@ async () => {
     // bearer — exactly what a resend fast path would collapse
     // for a non-exempt route.
     const second = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     assert.equal(second.status, 409);
@@ -250,7 +258,7 @@ test('rotating an unknown jti is a 409 that appends nothing',
 async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
-        'POST', '/identity-tokens/ghost/rotation',
+        'POST', '/identities/current/tokens/ghost/rotation',
         DEV_TOKEN, {},
     ));
     assert.equal(res.status, 409);
@@ -267,14 +275,14 @@ test('a revocation appends its pair at an operation address:'
 + ' uriId stays empty', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, {},
     ));
     assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const row = requests.find(
         r => r.uri_collection
-            === `/identity-tokens/${ROOT_JTI}/revocation/`,
+            === `/identities/current/tokens/${ROOT_JTI}/revocation/`,
     );
     assert.ok(row);
     assert.equal(row!.uri_id, '');
@@ -287,14 +295,14 @@ test('revoking an unknown jti is an idempotent 2xx no-op that'
 async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
-        'POST', '/identity-tokens/ghost/revocation',
+        'POST', '/identities/current/tokens/ghost/revocation',
         DEV_TOKEN, {},
     ));
     assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const row = requests.find(
         r => r.uri_collection
-            === '/identity-tokens/ghost/revocation/',
+            === '/identities/current/tokens/ghost/revocation/',
     );
     assert.ok(row);
     // The domain ledger stays untouched by the no-op — only
@@ -308,7 +316,7 @@ test('a repeat idempotent revocation of the same chain still'
 async () => {
     const db = await seededDb();
     const first = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, {},
     ));
     assert.equal(first.status, 201);
@@ -316,7 +324,7 @@ async () => {
     // rather than the byte-identical resend covered elsewhere
     // (the route ignores the body either way).
     const second = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, { attempt: 2 },
     ));
     assert.equal(second.status, 201);
@@ -325,7 +333,7 @@ async () => {
     assert.equal(requests.length, responses.length);
     const rows = requests.filter(
         r => r.uri_collection
-            === `/identity-tokens/${ROOT_JTI}/revocation/`,
+            === `/identities/current/tokens/${ROOT_JTI}/revocation/`,
     );
     assert.equal(rows.length, 2);
 });
@@ -334,15 +342,15 @@ test('stored messages verify against their hashes',
 async () => {
     const db = await seededDb();
     await handleRequest(db, req(
-        'PUT', '/identity-tokens/tok-9', DEV_TOKEN,
+        'PUT', '/identities/current/tokens/tok-9', DEV_TOKEN,
         tokenFields('jti-9'),
     ));
     await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, {},
     ));
     for (const row of await db.requests.getAll()) {
@@ -358,20 +366,22 @@ test('request and response counts stay equal across a mix'
 + ' one failed (reuse) rotation', async () => {
     const db = await seededDb();
     await handleRequest(db, req(
-        'PUT', '/identity-tokens/tok-10', DEV_TOKEN,
+        'PUT', '/identities/current/tokens/tok-10', DEV_TOKEN,
         tokenFields('jti-10'),
     ));
     await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     const reused = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     assert.equal(reused.status, 409);
     const failed = await handleRequest(db, req(
-        'PUT', '/identity-token-revocations/rev-fail', DEV_TOKEN,
+        'PUT',
+        '/identities/current/token-revocations/rev-fail',
+        DEV_TOKEN,
         { identity_id: 'current' }, // missing required `at`
     ));
     assert.equal(failed.status, 400);
@@ -411,7 +421,9 @@ async function assertRootEventPair(
     const root = rows[0]!;
     const requests = await db.requests.getAll();
     const eventRequest = requests.find(
-        r => r.uri_collection === '/identity-tokens/'
+        r => r.uri_collection
+            === '/identities/' + root.identity_id
+                + '/tokens/'
             && r.uri_id === root.id,
     );
     assert.ok(eventRequest, 'no event pair for the issued root');
@@ -434,7 +446,8 @@ async function assertRootEventPair(
 
 // Below-facade pair formation, mirroring authorizePassword's OWN
 // storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
-// 's pre-tx lookup scans the '/authentication/authorize/' response
+// 's pre-tx lookup reads by body containment the
+// '/authentication/authorize/' response
 // family for a stored pair whose `code` field equals the
 // presented code, so a bare pair — the SAME
 // shape a real login forms (Phase 13 Task 9: the authorization_
@@ -546,10 +559,12 @@ test('a client_credentials grant appends its root\'s own'
 async function assertEventPairForRow(
     db: MemoryDbAdapter, rowId: string,
 ): Promise<void> {
-    const row = await deriveIdentityToken(db, rowId);
+    const row = await deriveIdentityToken(
+        db, 'current', rowId,
+    );
     const requests = await db.requests.getAll();
     const eventRequest = requests.find(
-        r => r.uri_collection === '/identity-tokens/'
+        r => r.uri_collection === '/identities/current/tokens/'
             && r.uri_id === rowId,
     );
     assert.ok(eventRequest, 'no event pair for row ' + rowId);
@@ -574,7 +589,7 @@ test('a rotation\'s ROTATE branch appends an event pair for'
 + ' OWN operation pair', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     assert.equal(res.status, 201);
@@ -593,7 +608,7 @@ test('a rotation\'s ROTATE branch appends an event pair for'
     const requests = await db.requests.getAll();
     const opPair = requests.find(
         r => r.uri_collection
-            === `/identity-tokens/${ROOT_JTI}/rotation/`,
+            === `/identities/current/tokens/${ROOT_JTI}/rotation/`,
     );
     assert.ok(opPair);
     assert.equal(opPair!.uri_id, '');
@@ -603,13 +618,13 @@ test('a rotation\'s REPLAY branch appends an event pair for'
 + ' EVERY jti the chain has ever held', async () => {
     const db = await seededDb();
     const first = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     const { jti: successorJti } =
         await first.json() as { jti: string };
     const replay = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     assert.equal(replay.status, 409);
@@ -631,7 +646,7 @@ test('a revocation appends an event pair for the revoked row,'
 async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/revocation`,
         DEV_TOKEN, {},
     ));
     assert.equal(res.status, 201);
@@ -648,7 +663,7 @@ test('revoking an unknown jti appends NO event pair — only its'
     const db = await seededDb();
     const before = (await db.requests.getAll()).length;
     const res = await handleRequest(db, req(
-        'POST', '/identity-tokens/ghost/revocation',
+        'POST', '/identities/current/tokens/ghost/revocation',
         DEV_TOKEN, {},
     ));
     assert.equal(res.status, 201);
@@ -669,11 +684,11 @@ test('two concurrent rotations of one jti: exactly one'
     const beforeIds = new Set(before.map(r => r.id));
     const [a, b] = await Promise.all([
         handleRequest(db, req(
-            'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+            'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
             DEV_TOKEN, {},
         )),
         handleRequest(db, req(
-            'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+            'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
             DEV_TOKEN, {},
         )),
     ]);
@@ -719,7 +734,7 @@ async () => {
     const before = await deriveIdentityTokens(db);
     const beforeIds = new Set(before.map(r => r.id));
     const res = await handleRequest(db, new Request(
-        `${BASE}/organizations/1/identity-tokens`, {
+        `${BASE}/organizations/1/identities/current/tokens`, {
             method: 'GET',
             headers: { 'Authorization': 'Bearer ' + flatToken },
         },
@@ -760,7 +775,7 @@ test('revokeTokenChain racing a concurrent rotateRefreshJti on'
     // live (issued) successor jti — "the chain's live successor"
     // the racing rotation below targets.
     const firstRotation = await handleRequest(db, req(
-        'POST', `/identity-tokens/${ROOT_JTI}/rotation`,
+        'POST', `/identities/current/tokens/${ROOT_JTI}/rotation`,
         DEV_TOKEN, {},
     ));
     assert.equal(firstRotation.status, 201);
@@ -768,11 +783,11 @@ test('revokeTokenChain racing a concurrent rotateRefreshJti on'
         await firstRotation.json() as { jti: string };
     const [revoke, rotate] = await Promise.all([
         handleRequest(db, req(
-            'POST', `/identity-tokens/${ROOT_JTI}/revocation`,
+            'POST', `/identities/current/tokens/${ROOT_JTI}/revocation`,
             DEV_TOKEN, {},
         )),
         handleRequest(db, req(
-            'POST', `/identity-tokens/${liveSuccessor}/rotation`,
+            'POST', `/identities/current/tokens/${liveSuccessor}/rotation`,
             DEV_TOKEN, {},
         )),
     ]);

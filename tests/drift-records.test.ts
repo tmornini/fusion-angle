@@ -191,8 +191,8 @@ async function derivedRecordAttributes(
 async function resolveAttributePath(
     db: DbAdapter, organization: Id, id: Id,
 ): Promise<string | null> {
-    const hits = await db.responses.getAllWhere(
-        'uri_id', id,
+    const hits = (await db.responses.getAll()).filter(
+        (row) => row.uri_id === id,
     );
     const needle = '/organizations/' + organization
         + '/record-types/';

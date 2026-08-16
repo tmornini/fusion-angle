@@ -3,9 +3,8 @@
 // address, then FOR UPDATE. Notify is in-transaction.
 
 import {
-    TABLE_INDEXES,
     TABLE_NAMES,
-    indexColumn,
+    assertGetWhereColumn,
     type StorageBackend,
     type Tx,
     type TxMode,
@@ -227,6 +226,29 @@ function postgresTx(
             );
             return rows.map((row) => entityOf<T>(row));
         },
+        async getAddressVersion<T extends { id: string }>(
+            table: string,
+            collection: string,
+            uriId: string,
+            version: string,
+        ): Promise<T[]> {
+            const name = assertMessageTable(table);
+            const rows = await selectAddressVersion(
+                sql, name, collection, uriId, version,
+            );
+            return rows.map((row) => entityOf<T>(row));
+        },
+        async getWhereBody<T extends { id: string }>(
+            table: string,
+            collection: string,
+            containment: Record<string, unknown>,
+        ): Promise<T[]> {
+            const name = assertMessageTable(table);
+            const rows = await selectWhereBody(
+                sql, name, collection, containment,
+            );
+            return rows.map((row) => entityOf<T>(row));
+        },
         async put<T extends { id: string }>(
             table: string,
             row: T,
@@ -339,18 +361,7 @@ function assertIndexedColumn(
     table: 'requests' | 'responses',
     column: string,
 ): void {
-    if (column === 'uri_id') {
-        throw new Error(
-            'getWhere does not accept uri_id',
-        );
-    }
-    const allowed = (TABLE_INDEXES[table] ?? [])
-        .map(indexColumn);
-    if (!allowed.includes(column)) {
-        throw new Error(
-            'getWhere does not accept ' + column,
-        );
-    }
+    assertGetWhereColumn(table, column);
 }
 
 function entityOf<T extends { id: string }>(
@@ -458,32 +469,11 @@ async function selectWhere(
                 ORDER BY at, id
             `;
         }
-        if (column === 'operation_id') {
-            return sql.query`
-                SELECT * FROM requests
-                WHERE operation_id = ${key}
-                ORDER BY at, id
-            `;
-        }
     } else {
         if (column === 'uri_collection') {
             return sql.query`
                 SELECT * FROM responses
                 WHERE uri_collection = ${key}
-                ORDER BY at, id
-            `;
-        }
-        if (column === 'operation_id') {
-            return sql.query`
-                SELECT * FROM responses
-                WHERE operation_id = ${key}
-                ORDER BY at, id
-            `;
-        }
-        if (column === 'version') {
-            return sql.query`
-                SELECT * FROM responses
-                WHERE version = ${key}
                 ORDER BY at, id
             `;
         }
@@ -511,6 +501,46 @@ async function selectAddress(
         SELECT * FROM responses
         WHERE uri_collection = ${collection}
           AND uri_id = ${uriId}
+        ORDER BY at, id
+    `;
+}
+
+async function selectAddressVersion(
+    sql: SqlClient,
+    table: 'requests' | 'responses',
+    collection: string,
+    uriId: string,
+    version: string,
+): Promise<Record<string, unknown>[]> {
+    if (table === 'requests') {
+        throw new Error(
+            'getAddressVersion does not accept requests',
+        );
+    }
+    return sql.query`
+        SELECT * FROM responses
+        WHERE uri_collection = ${collection}
+          AND uri_id = ${uriId}
+          AND version = ${version}
+        ORDER BY at, id
+    `;
+}
+
+async function selectWhereBody(
+    sql: SqlClient,
+    table: 'requests' | 'responses',
+    collection: string,
+    containment: Record<string, unknown>,
+): Promise<Record<string, unknown>[]> {
+    if (table === 'requests') {
+        throw new Error(
+            'getWhereBody does not accept requests',
+        );
+    }
+    return sql.query`
+        SELECT * FROM responses
+        WHERE uri_collection = ${collection}
+          AND message_body(message) @> ${containment}::jsonb
         ORDER BY at, id
     `;
 }

@@ -126,23 +126,30 @@ async function identityCredentialDocumentPair(
 }
 
 async function identityProviderDocumentPair(
+    identityId: Id,
     id: Id,
     body: Record<string, unknown>,
     requestAt: string,
 ): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['identity-providers/:id'];
+    const spec =
+        WRITE_RESPONSE_SPECS['identities/:id/providers/:eid'];
     if (spec === undefined || !('status' in spec)) {
         throw new Error(
             'no per-write response spec for'
-            + ' identity-providers/:id',
+            + ' identities/:id/providers/:eid',
         );
     }
     return formWritePair({
         method: 'PUT',
-        pathname: `/identity-providers/${id}`,
-        routePattern: 'identity-providers/:id',
-        routeSegments: ['identity-providers', ':id'],
-        pathSegments: ['identity-providers', id],
+        pathname:
+            `/identities/${identityId}/providers/${id}`,
+        routePattern: 'identities/:id/providers/:eid',
+        routeSegments: [
+            'identities', ':id', 'providers', ':eid',
+        ],
+        pathSegments: [
+            'identities', identityId, 'providers', id,
+        ],
         headerFields: [],
         body,
         requesterIdentityId: SYSTEM_MEMBER_ID,
@@ -150,27 +157,27 @@ async function identityProviderDocumentPair(
         organization: undefined,
         responseStatus: spec.status,
         responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, undefined,
+            [identityId, id], body, SYSTEM_MEMBER_ID,
+            undefined,
         ),
         operationId: TEST_OPERATION_ID,
     });
 }
 
-// One identity-providers/:id document — a link/unlink event,
-// GLOBAL plane (no organization_id field). Session B's own
-// fixture (identity-providers had no exported below-facade op
-// until the controller-sanctioned extraction this session
-// lands), needed so a raw-put provider row does not go
-// derivation-invisible once GET identity-providers flips.
+// One identities/:id/providers/:eid document — a link/unlink
+// event, GLOBAL plane (no organization_id field).
 export async function seedIdentityProvider(
     db: DbAdapter,
+    identityId: string,
     id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
     const requestAt = nowUtc();
     await postIdentityProviderDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID,
-        await identityProviderDocumentPair(id, body, requestAt),
+        db, identityId, id, body, SYSTEM_MEMBER_ID,
+        await identityProviderDocumentPair(
+            identityId, id, body, requestAt,
+        ),
     );
 }
 

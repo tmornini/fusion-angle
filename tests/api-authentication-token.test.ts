@@ -49,7 +49,8 @@ async function freshDb() {
 
 // Below-facade pair formation, mirroring authorizePassword's OWN
 // storage effect (Phase 13 Task 7, Gate 3): grantAuthorizationCode
-// 's pre-tx lookup scans the '/authentication/authorize/' response
+// 's pre-tx lookup reads by body containment the
+// '/authentication/authorize/' response
 // family for a stored pair whose `code` field equals the presented
 // code, so a bare pair — the SAME shape a real login forms
 // (Phase 13 Task 9: the authorization_codes row half retired) —
@@ -479,7 +480,8 @@ test('GATE 3: unknown / spent / raced code all 401 with the'
     const derivedId =
         await deriveAuthorizationCodeId('the-code-spent');
     assert.equal(
-        await authorizationCodeSpent(db, derivedId), true);
+        await authorizationCodeSpent(db, derivedId, 'current'),
+        true);
 });
 
 async function initialPair(
@@ -832,7 +834,7 @@ test('a second client_credentials grant with the same jti'
         row.uri_collection === '/authentication/token/',
     ).length;
     const eventCount = before.filter((row) =>
-        row.uri_collection === '/identity-tokens/',
+        row.uri_collection === '/identities/svc-client/tokens/',
     ).length;
     const second = await handleRequest(db, tokenRequest({
         grant_type: 'client_credentials',
@@ -852,7 +854,7 @@ test('a second client_credentials grant with the same jti'
     );
     assert.equal(
         after.filter((row) =>
-            row.uri_collection === '/identity-tokens/',
+            row.uri_collection === '/identities/svc-client/tokens/',
         ).length,
         eventCount,
     );

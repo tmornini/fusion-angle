@@ -35,6 +35,7 @@ import {
 } from '../api/message-pair.ts';
 import {
     deriveIdentityPii,
+    deriveIdentityPiiRows,
     deriveCredential,
 } from '../api/derive-identity-spine.ts';
 import { deriveOrganization } from
@@ -947,24 +948,26 @@ async () => {
     );
 });
 
-test('identity-pii lists only co-members', async () => {
+test('flat identity-pii is 404; nested foreign GET 403s',
+async () => {
     const db = await deepDb();
     const res = await facadeGet(db, '/identity-pii');
-    assert.equal(res.status, 200);
-    const ids = new Set(
-        (await res.json() as { id: string }[]).map(r => r.id));
-    assert.ok(ids.has('pa'));   // co-member of A
-    assert.ok(!ids.has('pb'));  // member of B only
-    // Phase Final Task 2: row half stripped — pair plane proves
-    // pb's pii still exists while fence hides it from A.
+    assert.equal(res.status, 404);
+    // Pair plane proves pb's pii still exists while the
+    // collection is gone. Nested GET of a FOREIGN-org
+    // identity: authorizeIdentityPii allows admin; the org
+    // fence should still 403 pb.
     assert.equal(
         (await deriveIdentityPii(db, 'pb')).id, 'pb');
-    // Phase Final Stage B: identity spine tables retired.
-    // The single-PII read is now self-only (a member reads only
-    // its own); a foreign read is a self-scope 403, identity-
-    // independent so it still never confirms pb exists.
     const foreign = await facadeGet(db, '/identities/pb/pii');
     assert.equal(foreign.status, 403);
+    const foreignBody =
+        await foreign.json() as { error: string };
+    assert.equal(
+        foreignBody.error,
+        'forbidden: identity_pii/pb belongs to a'
+        + ' different organization',
+    );
 });
 
 test('nested identities/:id/credentials hide secret, members',
@@ -1095,12 +1098,17 @@ async () => {
         name: 'orphan', email: 'orphan@x.com',
         phone: '', bio: '',
     });
-    const res = await facadeGet(db, '/identity-pii');
-    assert.equal(res.status, 200);
+    const retired = await facadeGet(db, '/identity-pii');
+    assert.equal(retired.status, 404);
     const ids = new Set(
-        (await res.json() as { id: string }[]).map(r => r.id));
-    assert.ok(ids.has('orphan'));  // no membership → visible
-    assert.ok(!ids.has('pb'));     // B-only → still hidden
+        (await deriveIdentityPiiRows(db)).map(r => r.id));
+    assert.ok(ids.has('orphan'));
+    assert.equal(
+        (await deriveIdentityPii(db, 'orphan')).id,
+        'orphan');
+    const res = await facadeGet(
+        db, '/identities/orphan/pii');
+    assert.equal(res.status, 200);
 });
 
 test('nested credentials show an orphan with no membership',

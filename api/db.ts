@@ -98,6 +98,19 @@ export interface EntityStore<
         column: string,
         key: string,
     ): Promise<T[]>;
+    getAllAtAddress(
+        collection: string,
+        uriId: string,
+    ): Promise<T[]>;
+    getAllAtVersion(
+        collection: string,
+        uriId: string,
+        version: string,
+    ): Promise<T[]>;
+    getAllWhereBody(
+        collection: string,
+        containment: Record<string, unknown>,
+    ): Promise<T[]>;
     getById(id: string): Promise<T>;
     put(
         id: string,
@@ -150,6 +163,22 @@ export interface Tx {
         table: string,
         column: string,
         key: string,
+    ): Promise<T[]>;
+    getAddress<T extends { id: string }>(
+        table: string,
+        collection: string,
+        uriId: string,
+    ): Promise<T[]>;
+    getAddressVersion<T extends { id: string }>(
+        table: string,
+        collection: string,
+        uriId: string,
+        version: string,
+    ): Promise<T[]>;
+    getWhereBody<T extends { id: string }>(
+        table: string,
+        collection: string,
+        containment: Record<string, unknown>,
     ): Promise<T[]>;
     put<T extends { id: string }>(
         table: string,
@@ -372,11 +401,27 @@ export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
     requests: [
         'uri_collection', 'message_hash',
-        'operation_id',
     ],
     responses: [
         'uri_collection',
-        'operation_id',
-        'version',
     ],
 };
+
+export function assertGetWhereColumn(
+    table: string,
+    column: string,
+): void {
+    if (column === 'uri_id') {
+        throw new Error(
+            'getWhere does not accept uri_id',
+        );
+    }
+    const specs = TABLE_INDEXES[table];
+    if (specs === undefined) return;
+    const allowed = specs.map(indexColumn);
+    if (!allowed.includes(column)) {
+        throw new Error(
+            'getWhere does not accept ' + column,
+        );
+    }
+}

@@ -29,6 +29,9 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
+import {
+    MEMBER_WITHOUT_PII_NAME,
+} from '../web-app/app/adapters/members-union.ts';
 
 // PUT/create body: no lifecycle trio — postIdeaCreation mints
 // state/stateAt/stateEventId. GET IdeaEntity carries the
@@ -88,6 +91,26 @@ async function seedIdeaSubmission(
     );
 }
 
+test('getIdeas as member lists a co-member idea',
+async () => {
+    const { db, ctx } = await adminContext();
+    await seedHumanMember(db, 'u1', 'Alice Test');
+    await seedIdea(ctx, 'i-member', 'Member list',
+        'active');
+    await seedIdeaSubmission(
+        ctx, 's-member', 'i-member', 'u1',
+        '2026-04-01T00:00:00.000000Z',
+    );
+    const memberCtx = createRequestContext(
+        db, await organizationToken('u1'),
+    );
+    const result = await getIdeas(memberCtx);
+    const hit = result.find(
+        row => row.idea.titleText() === 'Member list',
+    );
+    assert.ok(hit);
+});
+
 test('getIdeas returns ideas with submitter', async () => {
     const { db, ctx } = await adminContext();
     await seedHumanMember(db, 'u1', 'Alice Test');
@@ -104,7 +127,7 @@ test('getIdeas returns ideas with submitter', async () => {
     );
     assert.equal(
         result[0]?.submitterName,
-        'Alice Test',
+        MEMBER_WITHOUT_PII_NAME,
     );
     assert.equal(
         result[0]?.idea.stateValue(),
@@ -134,7 +157,7 @@ test('getIdea finds submission for one idea', async () => {
     const result = await getIdea(ctx, 'i1');
     assert.equal(result.idea.titleText(), 'A');
     assert.equal(
-        result.submitterName, 'Alice Test',
+        result.submitterName, MEMBER_WITHOUT_PII_NAME,
     );
 });
 

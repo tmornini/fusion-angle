@@ -10,12 +10,14 @@ import { HttpMessage } from
 import { parseWire } from
     '../shared/http-message/wire-codec.ts';
 
-// Named reads over the message plane. Dual-ZIP memory/IDB
-// path: index `uri_collection`, then filter in JS. No
-// uri_id-only scan. Live document = latest PUT or DELETE
-// at (uri_collection, uri_id) by (at, id). Head PUT →
-// that response. Head DELETE → none. POST/PATCH are not
-// heads.
+// Named reads over the message plane. One document
+// is getAllAtAddress (collection + uri_id). A
+// collection is getAllWhere('uri_collection').
+// Body containment is getAllWhereBody. No
+// uri_id-only scan. Live document = latest PUT or
+// DELETE at (uri_collection, uri_id) by (at, id).
+// Head PUT → that response. Head DELETE → none. POST/PATCH
+// are not heads.
 
 const PUT_METHOD = 'PUT';
 const DELETE_METHOD = 'DELETE';
@@ -69,13 +71,17 @@ export function messageStore(db: DbStores): MessageStore {
             return pairsInCollection(db, collection);
         },
         async getAllWhereBody(collection, containment) {
-            const pairs = await pairsInCollection(
-                db, collection,
-            );
-            return pairs.filter((pair) => containsFact(
-                jsonBodyOf(pair.response.message),
-                containment,
-            ));
+            const responses =
+                await db.responses.getAllWhereBody(
+                    collection, containment,
+                );
+            const pairs: StoredPair[] = [];
+            for (const response of responses) {
+                const request = await db.requests
+                    .getById(response.id);
+                pairs.push({ request, response });
+            }
+            return sortByAtId(pairs);
         },
         async getCollection(collection) {
             return entitiesOf(
@@ -100,11 +106,26 @@ export function messageStore(db: DbStores): MessageStore {
         },
         async getByVersion(collection, id, version) {
             const matches = (
-                await pairsAt(db, collection, id)
-            ).filter(
-                (pair) => pair.response.version === version,
+                await db.responses.getAllAtVersion(
+                    collection, id, version,
+                )
             );
-            return latestOf(matches)?.response;
+            const requestById = new Map(
+                (
+                    await db.requests.getAllAtAddress(
+                        collection, id,
+                    )
+                ).map((request) => [request.id, request]),
+            );
+            const pairs: StoredPair[] = [];
+            for (const response of matches) {
+                const request = requestById.get(
+                    response.id,
+                );
+                if (request === undefined) continue;
+                pairs.push({ request, response });
+            }
+            return latestOf(pairs)?.response;
         },
     };
 }
@@ -119,25 +140,6 @@ function jsonBodyOf(message: string): unknown | undefined {
     const body = HttpMessage.fromModel(model).body();
     if (!body.exists()) return undefined;
     return JSON.parse(body.toText());
-}
-
-function containsFact(
-    body: unknown,
-    containment: Record<string, unknown>,
-): boolean {
-    if (body === null || typeof body !== 'object') {
-        return false;
-    }
-    const record = body as Record<string, unknown>;
-    for (const [key, value] of Object.entries(containment)) {
-        if (
-            JSON.stringify(record[key])
-            !== JSON.stringify(value)
-        ) {
-            return false;
-        }
-    }
-    return true;
 }
 
 function matchesFilters(
@@ -279,8 +281,18 @@ async function pairsAt(
     collection: string,
     id: string,
 ): Promise<StoredPair[]> {
-    const pairs = await pairsInCollection(db, collection);
-    return pairs.filter(
-        (pair) => pair.response.uri_id === id,
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllAtAddress(collection, id),
+        db.responses.getAllAtAddress(collection, id),
+    ]);
+    const requestById = new Map(
+        requests.map((request) => [request.id, request]),
     );
+    const pairs: StoredPair[] = [];
+    for (const response of responses) {
+        const request = requestById.get(response.id);
+        if (request === undefined) continue;
+        pairs.push({ request, response });
+    }
+    return sortByAtId(pairs);
 }

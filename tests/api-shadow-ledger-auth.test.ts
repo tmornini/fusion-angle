@@ -236,7 +236,8 @@ test('a full login flow keeps requests/responses balanced,'
         assert.equal(row.uri_id, '');
     }
     const tokenEventRequest = requests.slice(4).find(
-        row => row.uri_collection === '/identity-tokens/',
+        row => row.uri_collection
+            === '/identities/current/tokens/',
     );
     assert.ok(tokenEventRequest);
     assert.notEqual(tokenEventRequest!.uri_id, '');
@@ -255,7 +256,8 @@ test('a full login flow keeps requests/responses balanced,'
         assert.equal(row.uri_id, '');
     }
     const tokenEventResponse = responses.slice(4).find(
-        row => row.uri_collection === '/identity-tokens/',
+        row => row.uri_collection
+            === '/identities/current/tokens/',
     );
     assert.ok(tokenEventResponse);
     assert.notEqual(tokenEventResponse!.uri_id, '');
