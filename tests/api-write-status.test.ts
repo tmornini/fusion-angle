@@ -17,7 +17,7 @@ import { messageStore } from '../api/message-store.ts';
 import { strongEtagOf } from '../api/message-pair.ts';
 
 const IDEA_PREFIX = '/organizations/1/ideas/';
-const MEMBERSHIP_PREFIX = '/organizations/1/memberships/';
+const MEMBERSHIP_PREFIX = '/organizations/1/members/';
 
 function ideaDocument(
     title: string,
@@ -38,11 +38,9 @@ function ideaDocument(
 }
 
 function membershipDocument(
-    identityId: string,
+    _identityId: string,
 ): Record<string, unknown> {
     return {
-        organization_id: '1',
-        identity_id: identityId,
         type: 'member',
         at: '2026-01-01T00:00:00.000000Z',
     };
@@ -203,7 +201,8 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const put = await handleRequest(db, req(
-        'PUT', '/memberships/ws-del-live', token,
+        'PUT', '/organizations/1/members/ws-del-live',
+        token,
         membershipDocument('ws-del-live'),
     ));
     assert.equal(put.status, 201);
@@ -212,7 +211,8 @@ async () => {
     );
     assert.equal(before, 1);
     const del = await handleRequest(db, req(
-        'DELETE', '/memberships/ws-del-live', token,
+        'DELETE', '/organizations/1/members/ws-del-live',
+        token,
     ));
     assert.equal(del.status, 204);
     const stored = await storedResponseAt(
@@ -233,11 +233,13 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await handleRequest(db, req(
-        'PUT', '/memberships/ws-del-gone', token,
+        'PUT', '/organizations/1/members/ws-del-gone',
+        token,
         membershipDocument('ws-del-gone'),
     ));
     const first = await handleRequest(db, req(
-        'DELETE', '/memberships/ws-del-gone', token,
+        'DELETE', '/organizations/1/members/ws-del-gone',
+        token,
     ));
     assert.equal(first.status, 204);
     const before = await pairsAt(
@@ -247,7 +249,8 @@ async () => {
     const second = await handleRequest(
         db,
         new Request(
-            'http://localhost/memberships/ws-del-gone',
+            'http://localhost/organizations/1/members'
+            + '/ws-del-gone',
             {
                 method: 'DELETE',
                 headers: {

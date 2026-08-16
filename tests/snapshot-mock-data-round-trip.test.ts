@@ -9,7 +9,7 @@ import { strict as assert } from 'node:assert';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     getSnapshot,
     putSnapshot,
@@ -34,7 +34,7 @@ test(
     async () => {
         const db = await seededMockDb();
         const ctx = createRequestContext(
-            db, await devToken(),
+            db, await organizationToken(),
         );
         const json = await getSnapshot(ctx);
         await putSnapshot(ctx, json);
@@ -42,7 +42,7 @@ test(
         // name from pair-plane GET.
         const ai = await ctx.GET<{
             id: string; name: string;
-        }>('ai-members/tuJwPxYtBur2KCLquScShB');
+        }>('ai-agents/tuJwPxYtBur2KCLquScShB');
         assert.equal(ai.name, 'Claude Opus 4.8');
         // Phase Final Stage B: roster tables retired.
     },
@@ -104,7 +104,7 @@ test(
     async () => {
         const db = await seededMockDb();
         const ctx = createRequestContext(
-            db, await devToken(),
+            db, await organizationToken(),
         );
         const before = await deriveFamilies(db);
         const requestsBefore = await db.requests.getAll();

@@ -1,3 +1,4 @@
+import './hmac-test-key.ts';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
@@ -21,6 +22,7 @@ test(
         const fakeStorage = createFakeStorage();
         installGlobals(fakeStorage);
         try {
+            await import('./in-page-facade.ts');
             const { initAdapter } = await import(
                 '../web-app/app/adapters/init.ts'
             );

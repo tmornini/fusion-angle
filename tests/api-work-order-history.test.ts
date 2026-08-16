@@ -198,16 +198,12 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
     const release = await handleRequest(
         db,
         req(
-            'POST',
-            '/work-orders/' + WORK_ORDER_ID + '/release',
+            'DELETE',
+            '/work-orders/' + WORK_ORDER_ID + '/claim',
             DEV_TOKEN,
-            {
-                releaseEventId: WORK_ORDER_ID + '-rel1',
-                releaseAt: nowUtc(),
-            },
         ),
     );
-    assert.equal(release.status, 201);
+    assert.equal(release.status, 204);
 
     return db;
 }
@@ -233,7 +229,6 @@ test(
         assert.equal(rows.length, 5);
 
         // DESC: index 0 is the latest event (release).
-        assert.equal(rows[0]!.id, WORK_ORDER_ID + '-rel1');
         assert.equal(rows[0]!.state, 'claim_released');
         assert.deepEqual(rows[0]!.field_values, []);
 

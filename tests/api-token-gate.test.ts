@@ -30,7 +30,8 @@ test('rejects a request with no Authorization header',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
-        db, new Request(`${BASE}/members`));
+        db, new Request(
+            `${BASE}/organizations/1/members`));
     assert.equal(res.status, 401);
     const body = await res.json() as { error: string };
     assert.equal(body.error, 'invalid_token');
@@ -38,21 +39,24 @@ async () => {
 
 test('protected route accepts a valid token', async () => {
     const db = await freshDb();
-    const rows = await GET(db, 'members', await devToken());
+    const rows = await GET(db, 'organizations/1/members', await devToken());
     assert.ok(Array.isArray(rows));
 });
 
 test('rejects an expired token', async () => {
     const db = await freshDb();
     await assert.rejects(
-        async () => GET(db, 'members', await expiredToken()),
+        async () => GET(db, 'organizations/1/members', await expiredToken()),
         /invalid_token/);
 });
 
 test('rejects a not-yet-valid token', async () => {
     const db = await freshDb();
     await assert.rejects(
-        async () => GET(db, 'members', await notYetValidToken()),
+        async () => GET(
+            db, 'organizations/1/members',
+            await notYetValidToken(),
+        ),
         /invalid_token/);
 });
 
@@ -66,15 +70,10 @@ async () => {
         jti: 'anon',
     });
     await assert.rejects(
-        () => GET(db, 'members', anon), /invalid_token/);
+        () => GET(db, 'organizations/1/members', anon), /invalid_token/);
 });
 
-// Public routes are exempt: even an anonymous token (which a
-// protected route rejects) reaches the snapshot plane. A bare
-// adapter (no postSchemaCreation) leaves hasSchema false, so the
-// handler returns null — proving the route was reached, not
-// gated.
-test('public snapshot routes admit any token', async () => {
+test('anonymous token is rejected on snapshots', async () => {
     const db = memoryDbAdapter();
     const anon = await mintAccessToken({
         aud: TOKEN_AUDIENCE,
@@ -82,14 +81,13 @@ test('public snapshot routes admit any token', async () => {
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'anon2',
     });
-    const snap = await GET(db, 'snapshots/schema', anon);
-    assert.equal(snap, null);   // hasSchema false here
+    await assert.rejects(
+        () => GET(db, 'snapshots/schema', anon),
+        /invalid_token/,
+    );
 });
 
-// The snapshot plane is auth-free (a dev-tier install/demo
-// surface): anonymous may seed, and may seed AGAIN after a
-// schema exists. No gate closes behind the first boot.
-test('anonymous may re-seed after a schema exists',
+test('anonymous may not seed snapshots',
 async () => {
     const db = memoryDbAdapter();
     const anon = await mintAccessToken({
@@ -98,20 +96,10 @@ async () => {
         iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
         jti: 'anon-boot',
     });
-    const creds = await POST<{
-        identities: readonly unknown[];
-    }>(
-        db, 'snapshots/mock-data', {}, anon,
+    await assert.rejects(
+        () => POST(db, 'snapshots/mock-data', {}, anon),
+        /invalid_token/,
     );
-    assert.ok(creds.identities.length > 0);
-    assert.equal(await db.hasSchema(), true);
-    // A second anonymous seed SUCCEEDS — the plane never closes.
-    const again = await POST<{
-        identities: readonly unknown[];
-    }>(
-        db, 'snapshots/mock-data', {}, anon,
-    );
-    assert.ok(again.identities.length > 0);
 });
 
 // Per-request access-token revocation is RETIRED. Mint /
@@ -144,8 +132,8 @@ async () => {
     );
     // Still admitted — revocation bites at next mint/exchange.
     assert.deepEqual(
-        await GET(db, 'members', live),
-        await GET(db, 'members', await devToken()),
+        await GET(db, 'organizations/1/members', live),
+        await GET(db, 'organizations/1/members', await devToken()),
     );
 });
 
@@ -168,7 +156,9 @@ test('a token minted within a revocation second still'
         { identity_id: 'current', at: revokedAt },
         await devToken(),
     );
-    const rows = await GET<unknown[]>(db, 'members', sameSecond);
+    const rows = await GET<unknown[]>(
+        db, 'organizations/1/members', sameSecond,
+    );
     assert.ok(Array.isArray(rows));
 });
 
@@ -194,25 +184,23 @@ test('a jti revoked in the ledger still admits the access'
         await devToken(),
     );
     const rows = await GET<unknown[]>(
-        db, 'members', await devToken(),
+        db, 'organizations/1/members', await devToken(),
     );
     assert.ok(Array.isArray(rows));
 });
 
-test('snapshots/schema needs no bearer even with a schema',
+test('snapshots/schema requires a bearer',
 async () => {
-    const db = await freshDb();   // schema + root admin
-    // No bearer at all → still reaches the plane (auth-free).
+    const db = await freshDb();
     const bare = await handleRequest(db, new Request(
         `${BASE}/snapshots/schema`));
-    assert.equal(bare.status, 200);
-    // An admin reaches it too.
+    assert.equal(bare.status, 401);
     const snap = await GET(
         db, 'snapshots/schema', await devToken());
     assert.ok(typeof snap === 'string');
 });
 
-test('a non-admin member reaches the snapshot plane',
+test('a non-admin member is forbidden on snapshots',
 async () => {
     const db = await freshDb();
     await seedOrganizationMember(db, 'walt');
@@ -223,5 +211,5 @@ async () => {
                     'Bearer ' + await devToken('walt'),
             },
         }));
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 403);
 });

@@ -1,3 +1,4 @@
+import './hmac-test-key.ts';
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {

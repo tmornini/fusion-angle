@@ -141,6 +141,36 @@ export function buildInitialFlowSnapshot(
     };
 }
 
+export function buildFlowSaveShape(
+    snap: FlowSnapshot,
+): FlowSaveShape {
+    const aiMemberIds = new Set(
+        snap.aiMembers.map(a => a.idForLink()),
+    );
+    return {
+        name: snap.flowName,
+        isLocked: snap.isLocked,
+        isAutoLayout: snap.isAutoLayout,
+        isAutoFit: snap.isAutoFit,
+        lockTimeout: snap.lockTimeout,
+        nodes: snap.nodes.map(n => {
+            const leftoverAgents = n.memberIds
+                .filter(id => aiMemberIds.has(id));
+            return {
+                ...n,
+                memberIds: n.memberIds.filter(
+                    id => !aiMemberIds.has(id),
+                ),
+                agentIds: [...new Set([
+                    ...(n.agentIds ?? []),
+                    ...leftoverAgents,
+                ])],
+            };
+        }),
+        edges: snap.edges,
+    };
+}
+
 // Must match .flow-props-panel width in pages-flow-detail.css
 // (18rem = 288px at 16px root).
 const PANEL_WIDTH_PX = 288;
@@ -198,20 +228,6 @@ export class FlowDesignerPresenter {
         this.#history = recordFlowMutation();
     }
 
-    #buildSaveShape(
-        snap: FlowSnapshot,
-    ): FlowSaveShape {
-        return {
-            name: snap.flowName,
-            isLocked: snap.isLocked,
-            isAutoLayout: snap.isAutoLayout,
-            isAutoFit: snap.isAutoFit,
-            lockTimeout: snap.lockTimeout,
-            nodes: snap.nodes,
-            edges: snap.edges,
-        };
-    }
-
     // Saves ORIGINATING FROM THIS PRESENTER'S OWN methods
     // are SERIALIZED on one promise chain PER FLOW via
     // enqueueFlowSave (shared with commitFlowMutation so
@@ -258,7 +274,7 @@ export class FlowDesignerPresenter {
         snap: FlowSnapshot,
     ): Promise<void> {
         await putFlow(
-            ctx, snap.flowId, this.#buildSaveShape(snap),
+            ctx, snap.flowId, buildFlowSaveShape(snap),
         );
     }
 

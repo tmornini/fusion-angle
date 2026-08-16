@@ -258,8 +258,8 @@ test('grant -> accept -> human-member create -> edit -> erase'
     const db = await freshDb();
     const id = 'erasee-1';
     const create = await handleRequest(db, req(
-        'POST', '/human-members', DEV_TOKEN,
-        humanCreateBody(id, 'ev-erasee-1'),
+        'PUT', '/identities/' + id, DEV_TOKEN,
+        { kind: 'person', ...humanDetail() },
     ));
     assert.equal(create.status, 201);
     const intake = await handleRequest(db, req(
@@ -329,25 +329,24 @@ test("the zone's confinement: a non-/pii DELETE (a memberships"
 + ' tombstone) still APPENDS — the zone never leaks', async () => {
     const db = await freshDb();
     const put = await handleRequest(db, req(
-        'PUT', '/memberships/ms-confine-1',
+        'PUT', '/organizations/1/members/confine-1',
         await organizationToken(),
-        { organization_id: '1', identity_id: 'current',
-        type: 'admin', at: AT },
+        { type: 'admin', at: AT },
     ));
     assert.equal(put.status, 201);
     const putId = put.headers.get('Response-ID');
     const del = await handleRequest(db, req(
-        'DELETE', '/memberships/ms-confine-1',
+        'DELETE', '/organizations/1/members/confine-1',
         await organizationToken(),
     ));
     assert.equal(del.status, 204);
-    // Unlike /pii, a memberships DELETE still SUPERSEDES — the
+    // Unlike /pii, a seat DELETE still APPENDS — the
     // hard-delete zone is confined to identities/:id/pii alone.
     assert.equal(del.headers.get('Supersedes'), null);
     const requests = await db.requests.getAll();
     const atAddress = requests.filter(
-        r => r.uri_collection === '/organizations/1/memberships/'
-            && r.uri_id === 'ms-confine-1',
+        r => r.uri_collection === '/organizations/1/members/'
+            && r.uri_id === 'confine-1',
     );
     assert.equal(atAddress.length, 2);
 });

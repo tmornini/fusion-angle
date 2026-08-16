@@ -1,13 +1,10 @@
 import { test } from 'node:test';
-import { deriveMemberStates } from
-    '../api/derive-states.ts';
 import { strict as assert } from 'node:assert';
 import { adminContext } from './context-fixtures.ts';
 import { deriveIdentityPii } from
     '../api/derive-identity-spine.ts';
 import {
     postHumanMemberCreation,
-    postHumanMemberStateChange,
     featuredHumanMembers,
     type HumanMemberDraft,
 } from '../web-app/app/adapters/members.ts';
@@ -18,7 +15,6 @@ import {
     seedCurrentMember,
     seedHumanMember,
 } from './member-fixtures.ts';
-import type { StateEntity } from '../api/types.ts';
 
 function buildHumanMember(
     name: string,
@@ -37,8 +33,8 @@ function buildHumanMember(
 }
 
 test(
-    'postHumanMemberCreation persists the row'
-    + ' and records the initial state event',
+    'postHumanMemberCreation persists identity'
+    + ' PII and a seat',
     async () => {
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
@@ -52,57 +48,46 @@ test(
 
         // Phase Final Task 2: members/human_members ROW
         // halves stripped — parent via pair-plane GET.
-        const row = await ctx.GET<{ id: string; type: string }>(
-            'members/w1',
-        );
-        assert.equal(row.type, 'human');
-        // Phase Final Task 2: identity_pii ROW half stripped.
+        const row = await ctx.GET<{
+            id: string; kind: string; title: string;
+        }>('identities/w1');
+        assert.equal(row.kind, 'person');
+        assert.equal(row.title, 'Engineer');
         const pii = await deriveIdentityPii(db, 'w1');
         assert.equal(pii.name, 'Alice');
-        // Phase Final Stage B: identity spine tables retired.
-        const events = (await deriveMemberStates(db))
-            .filter((e) => e.entity_id === 'w1');
-        // Phase Final Stage B: states table retired.
-        assert.equal(events.length, 1);
-        assert.equal(events[0]?.state, 'active');
-        // Phase Final Stage B: roster tables retired.
+        const seat = await ctx.GET<{
+            identity_id: string; type: string;
+        }>('organizations/1/members/w1');
+        assert.equal(seat.identity_id, 'w1');
+        assert.equal(seat.type, 'member');
     },
 );
 
 test(
-    'postHumanMemberStateChange records a state'
-    + ' change via PUT members/:id',
+    'putHumanMember updates the identity profile',
     async () => {
         const { db, ctx } = await adminContext();
         await seedCurrentMember(db);
         await seedHumanMember(db, 'w1', 'Original Name');
-        // Phase Final Task 2: parent via pair-plane GET.
-        const before = await ctx.GET<{
-            id: string; type: string;
-        }>('members/w1');
-        assert.equal(before.type, 'human');
-
-        await postHumanMemberStateChange(
-            ctx, 'w1', 'archived',
+        const { putHumanMember } = await import(
+            '../web-app/app/adapters/members.ts'
         );
-
+        await putHumanMember(
+            ctx, 'w1', {
+                title: 'Lead',
+                department: 'Product',
+                strengths: [],
+                team_dimensions: {},
+            }, {
+                state: 'active',
+                stateAt: '2026-01-01T00:00:00.000000Z',
+                stateEventId: 'st-w1',
+            },
+        );
         const after = await ctx.GET<{
-            id: string; type: string;
-        }>('members/w1');
-        // Type is a server-supplied fact; only the
-        // lifecycle trio on the members/:id document moves.
-        assert.equal(after.type, 'human');
-        assert.equal(after.id, before.id);
-        // Archive rides PUT members/:id with a fresh
-        // trio — pin history via the live derived path.
-        const events = await ctx.GET<StateEntity[]>(
-            'members/w1/versions',
-        );
-        assert.equal(events.length, 2);
-        // Family history is DESC — index 0 is current.
-        assert.equal(
-            events[0]?.state, 'archived',
-        );
+            id: string; title: string;
+        }>('identities/w1');
+        assert.equal(after.title, 'Lead');
     },
 );
 

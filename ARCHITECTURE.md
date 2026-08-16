@@ -1,9 +1,13 @@
 # Architecture
 
-Vanilla TypeScript with zero runtime dependencies. This
+Vanilla TypeScript. One ZIP: `fusion-ai-server-${SHA}.zip`.
+postgres.js 3.4.9 is bundled behind
+`api/postgres-client.ts` only (named exception). The
+client is a fetch facade (`web-app/app/server-core.ts`).
+The process is `server/boot.ts` / `server.mjs`. This
 document covers the domain, data, API, presentation, and
-convention layers. Storage shapes and state alphabets live
-in [SCHEMA.md](SCHEMA.md).
+convention layers. Storage shapes and state alphabets
+live in [SCHEMA.md](SCHEMA.md).
 
 ## Domain objects
 
@@ -119,9 +123,9 @@ Wire = storage at
 `organizations/:org/record-types/:type/{attributes,instances}/...`.
 Flat `/records` and `/record-attributes` are RETIRED.
 Schema: member READ / admin MUTATION (SIMPLE PUT class).
-Instances: member path-tier + per-attribute ACL; PUT
-create-only (409 if address spent); PATCH If-Match
-(428 / 412); DELETE tombstone-wins. See API.md §2.8 /
+Instances: member path-tier + per-attribute ACL; public
+PUT is **405**; PATCH creates and updates (If-Match
+428 / 412); DELETE tombstone-wins. See API.md §2.8 /
 §5.4.1 / §5.20.
 
 The property-test gate at work-order transitions:
@@ -181,9 +185,11 @@ rides `uri_collection` on the pair plane. Handlers receive
 `ctx.base`. The org rides the VERIFIED token claim,
 never the path; a flat (un-exchanged) token has none and
 resolves via `identityDefaultOrganization`: the identity's
-SET default org (`identity_default_organizations` ledger,
-latest wins), else its PRIMARY membership org, else a 403 —
-there is no global default to fall back on. Both
+SET default organization (pair-plane
+`/identities/:id/default-organization` document) if that
+organization is a live seat, else PRIMARY (earliest
+remaining join `at`, lex id on tie), else a 403 — there
+is no global default to fall back on. Both
 `memberOrganizations` and `roles` come from access-token
 claims (organizations set + `{type}:{organization_id}`
 roles baked at every mint/refresh/exchange from membership
@@ -214,9 +220,10 @@ own namespace). `writeAuthorizerFor` /
 `resolveGlobalOwner` before the handler runs: owner-null →
 genesis proceeds; foreign → `ForeignOrganizationError`
 (HTTP 403). Read isolation is derivation plus a miss-path
-global probe: foreign → 403, absent → 404. The HMAC signing
-key is client-shipped, so this is demo-grade isolation
-until the server tier.
+global probe: foreign → 403, absent → 404. Isolation is
+demo-grade: mint/verify reads `JWT_HMAC_SIGNING_KEY`
+from the environment. There is no client-shipped HMAC
+constant. See § Demo server tier.
 
 #### History — the decorator era (retired Phase Final)
 
@@ -236,26 +243,27 @@ plane + write authorizer is the as-built successor.
 ### Multitenancy model
 
 `organizations` is the tenant root (pair-plane document
-family); `memberships` is the identity↔org relationship
-(also pair-plane) carrying `type`: `"admin"` | `"member"`.
-The members roster is DERIVED in the `members` route
-handler — it filters the global members directory to ids
-present in the caller's membership derivation (the system
-member rides along unconditionally). Per-org roles exist
-only as access-token claims (`admin:O` / `member:O`) baked
-from membership `type` at mint; the gate projects them for
-the fenced org via `projectClaimRolesForOrganization`.
-There is no role-grants HTTP family.
+family); the seat at
+`organizations/:organization-id/members/:identity-id`
+is the identity↔org relationship, carrying `type`:
+`"admin"` | `"member"`. The members roster is seats
+(person identities) plus `/ai-agents` (not members, not
+identities). The system member is a constant, not a
+seat. Per-org roles exist only as access-token claims
+(`admin:O` / `member:O`) baked from seat `type` at
+mint; the gate projects them for the fenced org via
+`projectClaimRolesForOrganization`. There is no
+role-grants HTTP family.
 
 ### Invitation lifecycle and acceptance
 
-A `memberships` row is now born from an INVITATION accept —
-the first live membership-write path (the ledger was
-seed-only before). `invitations` (id, organization_id,
-identity_id, at) is GLOBAL spine, pass-through, NOT
-org-fenced: the invitee must read an invitation to an org it
-is not yet in, so the row cannot hide behind the org fence.
-Its lifecycle is event-sourced on the pair plane under the
+A seat is now born from an INVITATION accept — the first
+live membership-write path (the ledger was seed-only
+before). `invitations` (id, organization_id, identity_id,
+at) is GLOBAL spine, pass-through, NOT org-fenced: the
+invitee must read an invitation to an org it is not yet
+in, so the row cannot hide behind the org fence. Its
+lifecycle is event-sourced on the pair plane under the
 alphabet {pending, accepted, declined, revoked}. State is
 pending when the invitation document head exists and no
 terminal op-pair is present; terminal ops are pair-plane
@@ -265,11 +273,13 @@ LATEST event, derived and never mutated — the invitation
 document persists as audit through every transition.
 
 Grant (admin) appends `pending`. Accept (invitee) appends
-`accepted` AND writes the real `memberships` row in the SAME
-atomic ctx-batch, stamped with the INVITATION's org — not the
-caller's active org. Acceptance is inherently a cross-org act
-(the invitee acts on an org it does not yet belong to), so it
-cannot ride the org-stamped write path. Decline (invitee)
+`accepted` AND writes the seat at
+`organizations/:organization-id/members/:identity-id`
+in the SAME atomic ctx-batch, stamped with the
+INVITATION's org — not the caller's active org.
+Acceptance is inherently a cross-org act (the invitee
+acts on an org it does not yet belong to), so it cannot
+ride the org-stamped write path. Decline (invitee)
 appends `declined`; Revoke (admin) appends `revoked`.
 
 The surface is dedicated facade request handlers on the BASE
@@ -288,9 +298,9 @@ resolver probe, so an invitation's lifecycle events
 resolve to the invitation's org and stay out of every
 other tenant's history reads.
 
-`memberships` semantics are UNCHANGED: a row still means an
-accepted member, and the roster, reachable-orgs enumeration,
-and token exchange all read it untouched.
+Seat semantics are UNCHANGED: a live seat still means an
+accepted member, and the roster, reachable-orgs
+enumeration, and token exchange all read seats.
 
 ### Facade + enumeration
 
@@ -320,8 +330,8 @@ keeps facade behavior; regression surface is
 
 ### Boot + org-switcher
 
-`core.ts::scopeBootToActiveOrganization` always scopes the
-session before first render: enumerate reachable orgs →
+`app-boot.ts::scopeBootToActiveOrganization` always scopes
+the session before first render: enumerate reachable orgs →
 `resolveActiveOrganization` (the persisted
 `fusion-ai:active-organization-id`, else the identity's
 default org if reachable, else the first reachable) →
@@ -337,9 +347,10 @@ mixed-org view survives the switch).
 Pages `identities` (list, `inSidebarNav`), `identity-detail`,
 `identity-providers`, `identity-tokens` share `sidebarKey:
 'identities'`. Adapters (`adapters/identities.ts` etc.):
-`getIdentity`, `getIdentityRoster` (single-pass join of
-identities + identity_pii + ai_members), `postIdentityCreation` (person →
-identity + PII; service → identity + hashed `client_secret`).
+`getIdentity`, `getIdentityRoster` (identities +
+identity-pii; a service has no name facet on this
+roster), `postIdentityCreation` (person → identity +
+PII; service → identity + hashed `client_secret`).
 The identity stores are the GLOBAL spine — creation is a
 client-minted id + idempotent PUT, OFF the org facade.
 Presenters mirror the member ones (PII via the `MemberPii`
@@ -347,79 +358,107 @@ tagged union, erased fallback at the call site). Erasure
 splices `identity_pii` only; the identity, the member, and
 every `member_id` reference survive.
 
-## Server-tier deploy blockers
+## Demo server tier
 
-Every item below is INERT today: the whole store is client-side
-IndexedDB in the page-runner's own browser, so there is no trust
-boundary to cross. Each becomes a live exposure the moment the
-backend is physically split out and the browser becomes an
-untrusted client — this is the disclosure checklist that gates
-that split. Several former entries are now mitigated client-tier
-and listed separately below. An audit re-confirms each remaining
-seam is still KNOWN (seam flag present, unwidened) and separates
-any NEW exposure — see [AUDIT.md](AUDIT.md) § Security: KNOWN
+`./build` emits one artifact from one source tree (clean
+tree required): **`fusion-ai-server-${SHA}.zip`**. Node
+serves composed pages and the API on one origin.
+Postgres is the store. The page talks `fetch`. The
+client bundle is the fetch facade (no in-page API, no
+signing key, no IndexedDB). `--no-zip` writes that
+same server-core bundle plus `server.mjs`. A metafile
+test forbids `SIGNING_KEY_MATERIAL`,
+`backend-indexeddb`, and token mint
+(`api/access-token.ts`) in the client graph.
+
+The yank that deleted the in-browser data tier has
+shipped. Memory remains for `./test` / `./validate`.
+Theme and sidebar still use localStorage.
+
+### Server process
+
+`node server.mjs` (`server/boot.ts`). Required env, never
+logged and never defaulted: `POSTGRES_URL`,
+`JWT_HMAC_SIGNING_KEY`, `HTTP_SERVER_PORT`. Optional
+`TRUSTED_PROXY_HOPS` (comma list). Body over 1 MiB →
+**413**. Seed `--seed-bootstrap` or `--seed-mock-data` on
+an empty database only; credentials print once on stderr.
+One mint process — do not run two replicas. Boot
+`assertUtf8`; no `schema_marker` and no successful seed
+→ refuse to listen. A missing table is a loud 500.
+
+postgres.js 3.4.9 lives behind `api/postgres-client.ts`
+only. DDL is `api/schema-postgres.ts`. Message columns
+are BYTEA Latin-1. Writes `pg_notify('fusion_events',
+…)`; payload over 8000 → `{"kind":"full"}`. Snapshot
+export is REPEATABLE READ. There is no LISTEN and no SSE
+client (stale-until-navigation).
+
+scrypt hashes new passwords; PBKDF2 still verifies,
+then rehashes. Refresh is an HttpOnly cookie
+(`Path=/authentication`, `SameSite=Strict`; `Secure`
+off only on `http://localhost`). Token JSON has
+`access_token` and no `refresh_token`. Cookie-session
+access is memory-only. 401 classes: `invalid_token`
+(bearer), `invalid_client`, `invalid_grant`. Throttle:
+5 authorize + password-class token grants per address
+per minute; refresh and token-exchange are not counted
+(cookie boot). Wrong `TRUSTED_PROXY_HOPS` makes the
+throttle a global cap; refresh/exchange stay unlimited.
+
+`./measure` builds `--no-zip` and spawns
+`node server.mjs --seed-mock-data` (needs
+`POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY`).
+`--base-url` hits a running origin instead (needs
+`--password` or `MEASURE_PASSWORD`; skips seed).
+
+### Deploy blockers A1–A6 (disposed)
+
+These six seams were the old disclosure checklist.
+They are disposed as follows.
+
+- **A1 HMAC key.** Mint/verify reads
+  `JWT_HMAC_SIGNING_KEY`. There is no
+  `SIGNING_KEY_MATERIAL`.
+- **A2 credential reveal.** Operator seed prints
+  credentials once on stderr. The Snapshots page
+  (admin+bearer) may still surface
+  `SeededCredentials` after an in-app wipe-and-load.
+- **A3 plaintext ledger.** Re-gated: snapshots are
+  admin+bearer; messages stay verbatim. Residual at
+  full strength (this is a demo server). Token-at-rest
+  hashing is later.
+- **A4 jti replay.** Spent. The grant requires `jti`.
+  A second grant with the same assertion is 401
+  `invalid_grant`. Do not put `jti` on the token JSON.
+- **A5 BOOTSTRAP_ROUTES.** Never bearer-exempt.
+  Seed below HTTP, or admin+bearer on the snapshot
+  plane.
+- **A6 PKCE.** Authorize without S256 is rejected.
+  The client sends S256.
+
+### Residuals (named, still live)
+
+- Work-order locked verbs not executed
+- Two-role views and token-at-rest hashing later
+- Stale-until-navigation (no NOTIFY listener)
+- XSS can use the refresh cookie from the page
+- A raw dump still has verbatim auth messages
+- Single mint process
+- Throttle is a global cap if `TRUSTED_PROXY_HOPS` is
+  wrong; refresh/exchange unlimited
+- Instance public PUT is 405 (`putRecordInstance`
+  still PATCHes — name lie); same-body PATCH still
+  appends 201
+- `withLifecycleTrio` still exists
+- Roster seat that names an AI agent is later
+- Snapshots admin surface may still reveal
+  `SeededCredentials` after an in-app load
+
+An audit re-confirms each residual is still KNOWN
+(seam flag present, unwidened) and separates any NEW
+exposure — see [AUDIT.md](AUDIT.md) § Security: KNOWN
 vs NEW.
-
-Remaining seams — no client-tier mitigation exists:
-
-- **Client-shipped HMAC key.** `SIGNING_KEY_MATERIAL`
-  (`api/access-token.ts`) is a constant in client JS, so any
-  party with the bundle can mint a valid token — forgery is
-  trivial. NO client-tier mitigation exists or is possible:
-  whatever the browser holds, the browser's user holds. Every
-  gate downstream of token verification (org fence, role
-  policy, membership liveness) is therefore demo-grade
-  isolation until the server tier relocates ONLY the key
-  (client constant → server secret/KMS) and who-mints (browser
-  → `/authentication/token`); the wire format, alg (HS256),
-  and every caller signature stay put.
-- **In-band credential reveal.** The mock-data seeder returns
-  freshly-minted plaintext credentials in-band for a one-time
-  reveal. Domain credentials still store only PBKDF2 hashes;
-  the message plane itself is a separate concern (see
-  **Plaintext credential ledger** below). Demo-only by design;
-  the in-band return is deleted at the server tier.
-- **Plaintext credential ledger.** Stored request/response
-  pairs hold the wire bytes verbatim — including every login's
-  password and username, every authorization code, every
-  access/refresh token, every `client_assertion`, and every
-  bearer `Authorization` header on every wired write.
-  `GET /snapshots/schema` (bearer-exempt, `BOOTSTRAP_ROUTES`)
-  exports the whole store, so any downloaded snapshot is a
-  plaintext credential dump. Accepted for the local demo tier;
-  re-gating the snapshot plane and/or re-masking the message
-  plane is a named precondition of the server split. Acting on
-  snapshot-export exposure is out of scope of the verbatim-
-  storage change itself.
-- **client_assertion jti replay.** JWS verification is real
-  (below), but no ledger yet remembers a jti as spent, so a
-  captured assertion replays until its `exp`. The replay
-  ledger lands with the server tier.
-- **Auth-free snapshot plane.** `BOOTSTRAP_ROUTES`
-  (`api/request-auth.ts`) —
-  `snapshots/schema|mock-data|bootstrap|import` — is
-  bearer-exempt UNCONDITIONALLY: no bearer, no route policy,
-  regardless of whether a schema exists. A deliberate dev-tier
-  install/demo decision (the surface is local, ephemeral, and
-  slated for removal), so an anonymous wipe/seed/import is
-  intended, not a regression — the exemption was widened from
-  the old schema-gated window on purpose. This is the LAST
-  seam to leave standing: the whole `BOOTSTRAP_ROUTES`
-  exemption MUST be removed or re-gated the moment the
-  Postgres server tier lands, when the browser becomes an
-  untrusted client and an unauthenticated wipe of a populated
-  tenant store is catastrophic. Compounded by the plaintext
-  credential ledger above: an unauthenticated snapshot is a
-  full credential dump. Until then it is KNOWN and accepted;
-  do not re-raise it.
-- **Soft-optional PKCE on authorize.** `code_challenge` is
-  optional at `/authentication/authorize`; when omitted,
-  `grantAuthorizationCode` skips the verifier check so the
-  password-loop demo works without PKCE. OAuth 2.1 mandates
-  PKCE for public clients — hard enforcement (reject
-  authorize without a challenge for public clients) is a
-  residual for the server tier. When a challenge IS present,
-  S256 verification is real (mitigated below).
 
 Mitigated client-tier — the seam is narrowed in this codebase,
 re-verified by the automated suite:
@@ -428,12 +467,11 @@ re-verified by the automated suite:
   (`grantAuthorizationCode`, `api/authentication.ts`): the
   code is TTL-bound (`AUTHORIZATION_CODE_TTL_SECONDS`,
   10 min from the authorize pair's `at`), client-bound
-  (redeeming `client_id` must equal authorize's), and —
-  when authorize stored a `code_challenge` — PKCE S256-
-  verified (`code_verifier` → base64url(sha256) must match).
-  Unknown, spent, expired, wrong-client, or bad-PKCE all
-  share one 401 and mint nothing (grant-first). Soft residual
-  when authorize omits the challenge: see remaining seams.
+  (redeeming `client_id` must equal authorize's), and
+  PKCE S256-verified (`code_verifier` →
+  base64url(sha256) must match). Unknown, spent,
+  expired, wrong-client, or bad-PKCE all share one 401
+  and mint nothing (grant-first).
 - **Token-exchange delegation** (`grantTokenExchange`,
   `api/authentication.ts`): self-delegation ONLY — a
   cross-party exchange (subject ≠ actor) is 403 until a
@@ -452,13 +490,17 @@ re-verified by the automated suite:
   fence regions now share one redaction catch with the same
   fixed body, so the claim holds everywhere a request can
   fault. `MissingTableError` still re-raises past all three
-  catches, recovered by `redirectIfMissingTable`
-  (`web-app/app/core.ts`).
+  catches. Product boot sets `recoverMissingTable: false`
+  (`web-app/app/server-core.ts`); a missing table is a
+  loud 500. `redirectIfMissingTable` remains on
+  `app-boot.ts` for the recover option.
 - **Route policy tiers** (`ROUTE_POLICY`,
   `api/authorization.ts`): `admin` everywhere plus a real
   `member` tier on the content surfaces; identities,
-  credentials, providers, memberships, and snapshots stay
-  admin-only (deny-by-default). Member-tier carve-outs:
+  credentials, providers, organization and member
+  writes, and snapshots stay admin-only
+  (deny-by-default). Seat and ai-agent GET are
+  member-readable. Member-tier carve-outs:
   `identity-tokens` POST (rotation/revocation) and
   `identity-token-revocations` PUT (self logout-everywhere;
   write authorizer keeps the write self-only).
@@ -466,9 +508,11 @@ re-verified by the automated suite:
 ## API Layer (`/api`)
 
 `api/` is the server tier — the REST/DB-schema request
-handlers, currently running in-browser. Code that crosses the
-client/server chasm lives one level out in `shared/` (a sibling
-of `api/` and `web-app/`): the HTTP wire schema (`http-message/`,
+handlers. The product runs them in Node over Postgres.
+`./test` / `./validate` run them against the memory
+backend. Code that crosses the client/server chasm
+lives one level out in `shared/` (a sibling of `api/`
+and `web-app/`): the HTTP wire schema (`http-message/`,
 its own `types.ts`) plus pure cross-chasm utilities
 (`base64url.ts`, `crypto-safe-base62.ts`, `digest.ts`,
 `password-hash.ts`, `ledger-reduction.ts`,
@@ -479,6 +523,8 @@ its own `types.ts`) plus pure cross-chasm utilities
 `MemberEntity` parent + `Member` union (`HumanMember` /
 `AIMember` / `SystemMember`),
 `GraphNode.memberIds: MemberId[]`,
+`GraphNode.agentIds?: AgentId[]` (write-path `/ai-agents`
+ids; omitted from stored JSON when empty),
 `GraphNode.attributes: NodeAttribute[]`, record/constraint
 shapes, `StateEntity` as the **derived** event DTO, the
 state alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
@@ -487,61 +533,57 @@ state alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
 authoritative list and per-column reference),
 `api/store-history-entity.ts` (`HistoryEntityStore` — the
 sole store class; backs both message-plane tables; no
-tombstone filter, no lifecycle log), `api/db-indexeddb.ts`
-(production persistence tier), `api/db-localstorage.ts`
-(demo tier), `api/db-memory.ts` (test impl), `api/api.ts`
-(the HTTP gate — `handleRequest` plus the
+tombstone filter, no lifecycle log), `api/db-postgres.ts`
+(product persistence), `api/db-memory.ts` (test impl),
+`api/api.ts` (the HTTP gate — `handleRequest` plus the
 `GET/PUT/DELETE/POST` helpers, **no module-level adapter;
 threaded explicitly**), `api/routes.ts` (the route table —
 document families plus the surviving state routes),
 `api/mock-data.ts` (seeds pair-plane demo data — the
-`'system'` member plus human and AI rosters as pairs),
-`api/validators.ts` (wire/body validators still consumed by
-`WRITE_RESPONSE_SPECS`, seed pair formation, and the gate).
-The `DbAdapter` interface is the migration seam to Postgres.
+`'system'` member plus human seats and AI agents as
+pairs), `api/validators.ts` (wire/body validators still
+consumed by `WRITE_RESPONSE_SPECS`, seed pair formation,
+and the gate). The `DbAdapter` / `StorageBackend` seam
+has two backends: Postgres (`api/backend-postgres.ts`,
+product) and memory (`api/backend-memory.ts`, tests).
 
 Phase Final deleted every entity table and the dual-write
 row halves. `StateStore` and the three scoping decorators
 are GONE; `EntityStore` remains as the store interface
-implemented by `HistoryEntityStore`. IndexedDB's own open
-is UNVERSIONED, so an origin that already has a database
-never re-runs `onupgradeneeded`: an EXISTING pre-Final
-origin keeps dropped stores as harmless, unread orphans
-(gate 6 residual — see SCHEMA.md § Orphan stores); only
-`deleteSchema` (a full database delete) clears them on
-IndexedDB.
+implemented by `HistoryEntityStore`. The IndexedDB
+orphan-store residual retired with the yank.
 
-`web-app/app/adapters/init.ts` wires the production IndexedDB
-adapter singleton (`initAdapter()` / `getDbAdapter()`); the
-IDB connection opens in `initialize()`, which boot awaits.
-`web-app/app/adapters/shared.ts` defines the `RequestContext`
-interface and `createRequestContext(adapter, token)` — both
-args are required; `sessionContext()` is the no-arg
-convenience that defaults to the singleton adapter and
-session token. Tests pass `createRequestContext` a
-`MemoryDbAdapter`.
+`web-app/app/server-core.ts` is the product composition
+root: it installs the fetch facade and boots with
+`hasSchema: true` and `recoverMissingTable: false`.
+`web-app/app/adapters/init.ts` is the test composition
+root (`initAdapter()` / `getDbAdapter()` over memory).
+`web-app/app/adapters/shared.ts` defines the
+`RequestContext` interface and
+`createRequestContext(adapter, token)` — both args are
+required; `sessionContext()` is the no-arg convenience
+that reads the installed client facade and session
+token. Tests wrap a `MemoryDbAdapter`.
 
 `api/routes.ts` covers the surviving history surface —
-**nine lifecycle GET registrations + one value-history
+**eight lifecycle GET registrations + one value-history
 (instances)**, wire `(at, id)` **DESC** (index 0 =
 current):
 
-1. `GET ideas/:id/history`
-2. `GET projects/:id/history`
-3. `GET organizations/:org/record-types/:id/history`
-4. `GET flows/:id/history`
-5. `GET objectives/:id/history`
-6. `GET members/:id/history` (global; absent → 404)
-7. `GET work-orders/:id/history` (inline `field_values`)
-8. `GET work-orders/history` (bulk; always 200)
-9. `GET objectives/history` (bulk; always 200)
-10. (value-history)
-    `GET .../record-types/:type/instances/:id/history`
+1. `GET ideas/:id/versions`
+2. `GET projects/:id/versions`
+3. `GET organizations/:org/record-types/:id/versions`
+4. `GET flows/:id/versions`
+5. `GET objectives/:id/versions`
+6. `GET work-orders/:id/history` (inline `field_values`)
+7. `GET work-orders/history` (bulk; always 200)
+8. `GET objectives/versions` (bulk; always 200)
+9. (value-history)
+    `GET .../record-types/:type/instances/:id/versions`
     → `{ at, etag, values }[]` by current read ACL
 
 All reads derive from the message ledger. Trio-family
-and members per-id handlers wrap family
-`derive*StateHistory` (or `deriveMemberStates`) and
+per-id handlers wrap family `derive*StateHistory` and
 reverse to DESC; org-nested empty → `missedReadError`
 (foreign **403** / absent **404** via
 `resolveOwningOrganization`). Work-order per-id and
@@ -549,24 +591,30 @@ bulk emit `WorkOrderHistoryEventEntity` with transition
 `field_values` folded inline (`{id, attribute_id,
 value}`; claim/birth/release carry `[]`) — there is no
 successor field-values GET. Bulk legs always return an
-array. Ideas / projects / record-types / objectives /
-members GET entity rows also embed the lifecycle trio
+array. Ideas / projects / record-types / objectives
+GET entity rows also embed the lifecycle trio
 (`state`, `state_at`, `state_event_id`) from the
 lifecycle-current event. Instances carry full-state
 `values`, not the trio. `stateEventVisibilityFor`
 remains the RESTRICT / ownership 3-tier probe. Every
 verb on the retired shared event-append address is
 router 404. Flat `/records` and `/record-attributes`
-are also router 404. Phase 15 Task 7 also retired the
-per-entity current-state alias, nested field-values
-writes, and
-`GET|POST|PUT|DELETE flows/:id/versions[...]` — all
-router 404. Lifecycle writes ride document-trio PUTs and
+are also router 404. Phase 15 Task 7 retired the
+table-backed `flows/:id/versions[...]` writes and the
+zero-caller shared event-append / current-state-alias
+/ nested field-values families. Pair-chain
+`GET flows/:id/versions` is live (old `:vid` is a
+miss). Lifecycle writes ride document-trio PUTs and
 named ops (work-order create/claim/transition/release,
 invitations), not a shared event-append address.
-Instance value writes ride PUT genesis / PATCH
-If-Match / DELETE tombstone. When no schema exists,
-non-entry pages redirect to snapshots.
+Instance public PUT is **405**; PATCH creates and
+updates (If-Match). GET streams the stored PUT for
+stream families; flows GET still `deriveFlow`;
+assemble surfaces still assemble. G1–G6: stored PUT
+= today's `*EntityOf`. The process refuses to listen
+without `schema_marker` (or a successful seed).
+Snapshots is an admin import/wipe surface, not
+empty-DB first-boot recovery.
 
 ## Write-path derives (Phase 14)
 
@@ -624,30 +672,36 @@ GET and `stateFieldValuesForStateEvent` are GONE.
 `api/db.ts`'s `DbAdapter.transaction` documents nested
 re-entry as a LEGAL subset case: "a nested view.transaction
 re-enters this same tx; its tables must be a subset of the
-outer set" — the same open `IDBTransaction` is reused, not a
-second transaction opened inside the first (which IndexedDB
-forbids outright). The write-path convention still FORBIDS a
-derive core from opening one on its own initiative (rule (b)
-above): every derive is written to accept whichever view its
-caller already holds, so nesting is never needed to reach the
-open tx, and a caller's own table list stays the single,
-auditable source of truth for what one transaction touches.
+outer set" — `BackedDbAdapter` reuses the open view
+(`ambientRunner`), not a second transaction. The
+write-path convention still FORBIDS a derive core from
+opening one on its own initiative (rule (b) above):
+every derive is written to accept whichever view its
+caller already holds, so nesting is never needed to
+reach the open tx, and a caller's own table list stays
+the single, auditable source of truth for what one
+transaction touches.
 
-### Document-plane 412 (sole conflict mechanism)
+### Document-plane If-Match (sole conflict mechanism)
 
 The DOCUMENT plane — every `flows/:id`-shaped save,
 including undo's own restore write, and every other
-document-trio PUT — detects a stale basis via the
-`responses.follows` unique index: a racing write against
-the same head throws `UniqueConstraintError`, mapped to
-HTTP 412 by `handleRequest`, and the caller retries with a
-fresh basis. The old STATE-plane 409
+document-trio PUT — detects a stale basis via `If-Match`
+of the quoted 64-hex `documentVersion` (sha256 of body
+octets; later writes hash body octets || matched tag).
+Locked PUT missing If-Match over a live PUT → **428**.
+Stale or unmatched → **412**. Same-body document PUT →
+**200**, no append. First append send-time **201**;
+the stored PUT start-line stays **200**. DELETE
+never-written → **404**; already-gone → **204**, no
+append. Pair `id` is `Response-ID` only. There is no
+`follows` / `supersedes` / `etag` / `status` column.
+Public writes require header `Operation-ID` (22-char);
+the server does not mint those. Inner PUTs copy the
+outer id. The old STATE-plane 409
 (`stateEventCollisionFromPairs` →
-`LedgerImmutabilityError` on a re-put of an existing
-event id) retired with the shared event-append address
-itself; identical resends of a document PUT still
-converge via the follows index, not a separate
-immutability class.
+`LedgerImmutabilityError`) retired with the shared
+event-append address.
 
 ### SIDECAR-KEEP and undo-as-replay
 
@@ -739,7 +793,7 @@ every verb on the shared event-append address; the
 clients elimination re-homes client config to the
 identities/:id/registration pair facet, deletes the last
 entity table, and retires rawReadRow; seed absolute at
-EXPECTED_PAIR_COUNT 1498 / bootstrap 12;
+EXPECTED_PAIR_COUNT 1448 / bootstrap 8;
 `simulateLatency` 4.
 
 ### Two claims (never collapse)
@@ -822,15 +876,14 @@ free of nested transactions:
 MEASURE-AND-ACCEPT stands. Claim/echo history remains
 under the ~17ms re-election trigger at seed scale. Fence
 hit/miss stays the same class (~27µs / ~2.0ms post-Final
-measure). No entity_id index; no IndexedDB migration
-primitive (first future ADDED store/index is the
-watch-point).
+measure). No entity_id index.
 
 ### Exit residual (named, not dual-write)
 
-Gate 6 **PII orphan residual** (leave-inert stands): see
-SCHEMA.md § Orphan stores (gate 6) — the single canonical
-statement. Dual-write mechanics are GONE.
+Gate 6 **PII leave-inert** still stands on the pair
+plane (erasure completeness is pair-plane only).
+Dual-write mechanics are GONE. The IndexedDB orphan-
+store residual retired with the yank.
 
 ## Storage tiers
 
@@ -845,26 +898,24 @@ and encoding. `BackedDbAdapter` (`api/db-backed.ts`)
 composes one backend into the full `DbStores` bundle
 (two stores).
 
-Three backends implement the seam:
+Two backends implement the seam:
 
-- `backend-indexeddb.ts` — the production tier, wired by
-  `db-indexeddb.ts`. It is the ONLY file that names
-  `indexedDB.*` (the divorce point). `transaction` runs a real
-  `IDBTransaction` that commits on `oncomplete` and aborts on a
-  thrown body, so a batch applies whole or not at all; schema
-  presence is a `__schema__` marker store.
-- `backend-localstorage.ts` — the demo tier, wired by
-  `db-localstorage.ts`. It SIMULATES the transaction via
-  `backend-buffer-tx.ts` (buffer touched tables, flush on
-  success, discard on throw); schema presence is table
-  existence.
-- `backend-memory.ts` — the test tier, wired by `db-memory.ts`,
-  simulating the same buffer transaction in process.
+- `backend-postgres.ts` — the product tier, wired by
+  `db-postgres.ts`. postgres.js stays behind
+  `api/postgres-client.ts`. Message columns are BYTEA
+  Latin-1; `headPairIdAt` / `messageStore.get` is the live
+  PUT. There is no `uri_id`-only index. Schema presence
+  is the `schema_marker` row.
+- `backend-memory.ts` — the test tier, wired by
+  `db-memory.ts`, simulating the transaction via
+  `backend-buffer-tx.ts` (buffer touched tables, flush
+  on success, discard on throw). Schema presence is
+  table existence.
 
-The simulated tiers share the buffer-then-flush helper so the
-test backend cannot lie about what the production gate
-enforces. The one property only IndexedDB provides is OS-atomic
-multi-key commit — see the snapshot-import note in CLAUDE.md.
+The memory backend shares the buffer-then-flush helper so
+the test backend cannot lie about what the production
+gate enforces. Postgres import is one transaction
+(exclusive lock + `schema_marker` in the same commit).
 
 ## Page Module Pattern
 
@@ -942,22 +993,24 @@ import { html, setHtml } from '../app/safe-html.ts';
 import { showToast } from '../app/toast.ts';
 import { buildSkeleton, buildErrorState } from '../app/loading-states.ts';
 import { iconPlus, iconTrash } from '../app/icons.ts';
-import { navigateTo, openDialog, closeDialog } from '../app/core.ts';
+import { navigateTo } from '../app/navigation.ts';
+import { openDialog, closeDialog } from '../app/dialog.ts';
 ```
 
-`core.ts` re-exports from `format.ts`, `navigation.ts`, and
-`dialog.ts` so page modules can import `navigateTo`,
-`initials`, `formatDateTime`, `formatCompactCurrency`,
-`SECONDS_PER_DAY`, `openDialog`, `closeDialog`, `initTabs`
-from `'../app/core'`. The `adapters/` directory retains
-its barrel re-export (`adapters/index.ts`).
+Page modules import `navigateTo` from `navigation.ts`,
+date/number helpers from `format.ts`, and
+`openDialog` / `closeDialog` / `initTabs` from
+`dialog.ts`. The `adapters/` directory retains its
+barrel re-export (`adapters/index.ts`).
 
 **Page modules never call transport verbs from
 `api/api.ts`** — all data access (reads and writes) goes
-through the adapter layer (`adapters/`). Pages may import
-error/status symbols (`RequestError`, `HTTP_*`) and other
-non-I/O types from the API layer; only adapters invoke the
-verbs.
+through the adapter layer (`adapters/`). Product ctx
+verbs go through the fetch facade
+(`adapters/http-facade.ts`); tests wrap a memory
+adapter. Pages may import error/status symbols
+(`RequestError`, `HTTP_*`) and other non-I/O types from
+the API layer; only adapters invoke the verbs.
 
 ## Naming Conventions
 
@@ -980,16 +1033,16 @@ verbs.
 
 ## Adapter Conventions
 
-- **Member domain split.** Members are one parent
-  document family (`members`: id, type) plus per-kind
-  detail families sharing the id (`human-members`,
-  `ai-members`) on the pair plane — wire resources, not
-  storage tables. `adapters/members.ts` composes humans
-  (parent + `human-members` detail); `adapters/ai-members.ts`
-  composes AIs (parent + `ai-members` detail).
-  `adapters/members-union.ts` is the
-  union seam: `getMembers` is the roster (humans + AIs,
-  never `'system'`); `getMemberMap` additionally resolves
+- **Member domain split.** The product roster is seats
+  plus ai-agents. Humans compose from organization
+  seats (`organizations/:org/members`), the identity
+  profile, and identity-pii. AIs compose from
+  `/ai-agents` (not members, not identities).
+  `adapters/members.ts` builds seated humans;
+  `adapters/ai-members.ts` builds agents.
+  `adapters/members-union.ts` is the union seam:
+  `getMembers` is the roster (humans + AIs, never
+  `'system'`); `getMemberMap` additionally resolves
   the system member so a system-authored event's author
   has a name; plus `memberName` and `isHumanMember` /
   `isAIMember` / `isSystemMember`. Import the union for
@@ -1004,10 +1057,9 @@ verbs.
   access adapter takes `ctx: RequestContext` first and uses
   `ctx.GET/PUT/PATCH/DELETE/POST` (plus `*WithEtag` /
   `POSTWithHeaders` where callers need the ETag or headers).
-  The standalone verb exports in `api/api.ts` are the
-  transport `ctx` delegates to — only `adapters/shared.ts`
-  (RequestContext factory) imports them; other adapters
-  use `ctx.*` only. `ctx.PATCH` is platform-wide (instances
+  Product ctx verbs go through the fetch facade; tests
+  wrap a memory adapter. Other adapters use `ctx.*`
+  only. `ctx.PATCH` is platform-wide (instances
   are the first live consumer; `*WithEtag` variants return
   the strong ETag for If-Match). Each verb dispatches its
   own request with its own per-op transactions: two awaited

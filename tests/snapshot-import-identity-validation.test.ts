@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { localStorageDbAdapter } from '../api/db-localstorage.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 
 // Snapshot import is a second validation edge: the
 // per-request write path is fenced at store
@@ -9,26 +9,10 @@ import { localStorageDbAdapter } from '../api/db-localstorage.ts';
 // validation on two message-plane survivors.
 // Mirrors snapshot-import-validation.test.ts.
 
-function installShim(): void {
-    const map = new Map<string, string>();
-    (globalThis as unknown as {
-        localStorage: {
-            getItem(key: string): string | null;
-            setItem(key: string, value: string): void;
-            removeItem(key: string): void;
-        };
-    }).localStorage = {
-        getItem(key) { return map.get(key) ?? null; },
-        setItem(key, value) { map.set(key, value); },
-        removeItem(key) { map.delete(key); },
-    };
-}
-
 async function rejectsImport(
     json: string, pattern: RegExp,
 ): Promise<void> {
-    installShim();
-    const adapter = localStorageDbAdapter();
+    const adapter = memoryDbAdapter();
     await assert.rejects(
         () => adapter.putSnapshot(json),
         pattern,
@@ -36,8 +20,7 @@ async function rejectsImport(
 }
 
 async function acceptsImport(json: string): Promise<void> {
-    installShim();
-    const adapter = localStorageDbAdapter();
+    const adapter = memoryDbAdapter();
     await adapter.putSnapshot(json);
 }
 

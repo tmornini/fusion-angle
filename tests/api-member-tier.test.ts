@@ -51,7 +51,7 @@ async () => {
         db, req('GET', '/ideas', token));
     assert.equal(list.status, 200);
     const roster = await handleRequest(
-        db, req('GET', '/members', token));
+        db, req('GET', '/organizations/1/members', token));
     assert.equal(roster.status, 200);
 });
 
@@ -63,12 +63,10 @@ test('a member is denied the admin surfaces', async () => {
     // are not probed here even though the policy table would
     // deny them.
     for (const [method, path] of [
-        ['GET', '/memberships'],
-        ['PUT', '/memberships/evil'],
         ['GET', '/identities'],
         ['GET', '/identity-pii'],
         ['PUT', '/organizations/1'],
-        ['PUT', '/members/' + MEMBER],
+        ['PUT', '/ai-agents/agent-1'],
     ] as const) {
         const res = await handleRequest(db, req(
             method, path, token,

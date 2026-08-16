@@ -18,7 +18,7 @@ test('deny-by-default: a roleless principal is forbidden',
 async () => {
     const db = await freshDb();   // no role granted
     const res = await handleRequest(db, new Request(
-        `${BASE}/members`, {
+        `${BASE}/identities`, {
             headers: {
                 'Authorization': 'Bearer ' + await devToken(),
             },
@@ -31,7 +31,7 @@ async () => {
 test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
-    const rows = await GET(db, 'members', await devToken());
+    const rows = await GET(db, 'organizations/1/members', await devToken());
     assert.ok(Array.isArray(rows));   // 200, not 403
 });
 
@@ -61,7 +61,7 @@ test('admin may write a membership type', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
     const res = await handleRequest(db, new Request(
-        `${BASE}/memberships/m-p2`, {
+        `${BASE}/organizations/1/members/p2`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -69,8 +69,6 @@ test('admin may write a membership type', async () => {
                 'operation-id': TEST_OPERATION_ID,
             },
             body: JSON.stringify({
-                organization_id: '1',
-                identity_id: 'p2',
                 type: 'member',
                 at: '2026-06-03T00:00:00.000000Z',
             }),

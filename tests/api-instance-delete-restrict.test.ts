@@ -248,7 +248,7 @@ async function bindInstance(
     instanceId: string = INSTANCE_ID,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST',
+        'PUT',
         '/work-orders/' + woId + '/binding',
         token,
         {
@@ -387,7 +387,7 @@ async () => {
     ));
     assert.equal(del.status, 204);
     const bind = await handleRequest(db, req(
-        'POST',
+        'PUT',
         '/work-orders/' + WO_UNBOUND + '/binding',
         token,
         {

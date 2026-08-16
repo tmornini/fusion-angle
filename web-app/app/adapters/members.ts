@@ -2,7 +2,9 @@ import type {
     MemberId,
     MemberEntity,
     HumanMemberEntity,
+    IdentityEntity,
     IdentityPiiEntity,
+    MembershipEntity,
     MemberPii,
     MemberState,
     MemberStateDetail,
@@ -13,11 +15,7 @@ import {
     assertMemberState,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
-import { withLifecycleTrio } from './shared.ts';
 import { getMemberPii } from './identities.ts';
-import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
 import {
     createSubscriptionChannel,
 } from '../channels.ts';
@@ -43,10 +41,6 @@ export function subscribeHumanMemberChanges(
     return humanMemberChanges.subscribe(fn);
 }
 
-// A human member draft: the contact PII plus the org-
-// profile detail fields, as the Add Member dialog and the
-// edit form supply them. Split across members / identities
-// / identity_pii / human-members at the write seam below.
 export type HumanMemberDraft =
     Omit<HumanMemberEntity, 'id'>
     & {
@@ -56,10 +50,6 @@ export type HumanMemberDraft =
         bio: string;
     };
 
-// Convert an identity_pii row to the display union. A
-// missing row (erased PII) yields the erased variant; the
-// CALLER decides what to render. Duplicated from
-// getMemberPii by design — two uses, not three.
 function memberPiiOf(
     row: IdentityPiiEntity | undefined,
 ): MemberPii {
@@ -75,9 +65,6 @@ function memberPiiOf(
     };
 }
 
-// Lifecycle-current trio is stamped on the MemberEntity GET
-// row (Phase A). Map snake_case wire → MemberStateDetail;
-// no second hop to a lifecycle log or history alias.
 export function memberStateDetailFromRow(
     row: MemberEntity,
 ): MemberStateDetail {
@@ -90,38 +77,85 @@ export function memberStateDetailFromRow(
     };
 }
 
-// Assemble the human-member map from already-read rows —
-// pure, no ctx, no IO. getHumanMemberMap reads then
-// delegates here; getMembers (the roster) reads members,
-// human-members and identity-pii ONCE and feeds this
-// builder. Lifecycle trio rides each parent row.
+function sessionOrganization(
+    ctx: RequestContext,
+): string | undefined {
+    return ctx.identity.organization
+        ?? ctx.identity.organizations?.[0];
+}
+
+function seatsCollection(ctx: RequestContext): string {
+    const organization = sessionOrganization(ctx);
+    if (organization === undefined) {
+        throw new Error(
+            'no organization on the session for seats',
+        );
+    }
+    return 'organizations/' + organization + '/members';
+}
+
+function profileOf(
+    identity: IdentityEntity,
+): HumanMemberEntity {
+    return {
+        id: identity.id,
+        title: identity.title ?? '',
+        department: identity.department ?? '',
+        strengths: identity.strengths ?? [],
+        team_dimensions: identity.team_dimensions ?? {},
+    };
+}
+
+function seatedHumanParent(
+    id: MemberId,
+    at: string,
+): MemberEntity {
+    return {
+        id,
+        type: 'human',
+        state: 'active',
+        state_at: at,
+        state_event_id: id,
+    };
+}
+
 export function buildHumanMemberMap(
-    parents: readonly MemberEntity[],
-    details: readonly HumanMemberEntity[],
+    seats: readonly MembershipEntity[],
+    identities: readonly IdentityEntity[],
     piiRows: readonly IdentityPiiEntity[],
 ): Map<MemberId, HumanMember> {
-    const detailById = new Map(
-        details.map(d => [d.id, d]),
+    const identityById = new Map(
+        identities.map(row => [row.id, row]),
     );
     const piiById = new Map(
-        piiRows.map(r => [r.id, r]),
+        piiRows.map(row => [row.id, row]),
     );
     const map = new Map<MemberId, HumanMember>();
-    for (const parent of parents) {
-        if (parent.type !== 'human') continue;
-        const detail = detailById.get(parent.id);
-        if (detail === undefined) {
-            throw new Error(
-                'no human detail for member '
-                + parent.id,
-            );
+    for (const seat of seats) {
+        const identity = identityById.get(
+            seat.identity_id,
+        );
+        if (
+            identity === undefined
+            || identity.kind !== 'person'
+        ) {
+            continue;
         }
         map.set(
-            parent.id,
+            seat.identity_id,
             new HumanMember(
-                parent, detail,
-                memberPiiOf(piiById.get(parent.id)),
-                memberStateDetailFromRow(parent),
+                seatedHumanParent(
+                    seat.identity_id, seat.at,
+                ),
+                profileOf(identity),
+                memberPiiOf(
+                    piiById.get(seat.identity_id),
+                ),
+                {
+                    state: 'active',
+                    stateAt: seat.at,
+                    stateEventId: seat.id,
+                },
             ),
         );
     }
@@ -131,27 +165,25 @@ export function buildHumanMemberMap(
 export async function getHumanMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, HumanMember>> {
-    const [parents, details, piiRows] =
+    const [seats, identities, piiRows] =
         await Promise.all([
-            ctx.GET<MemberEntity[]>('members'),
-            ctx.GET<HumanMemberEntity[]>(
-                'human-members',
+            ctx.GET<MembershipEntity[]>(
+                seatsCollection(ctx),
             ),
+            ctx.GET<IdentityEntity[]>('identities'),
             ctx.GET<IdentityPiiEntity[]>(
                 'identity-pii',
             ),
         ]);
     return buildHumanMemberMap(
-        parents, details, piiRows,
+        seats, identities, piiRows,
     );
 }
 
 export async function getCurrentHumanMember(
     ctx: RequestContext,
-): Promise<MemberEntity> {
-    return ctx.GET<MemberEntity>(
-        'current-member',
-    );
+): Promise<{ id: string }> {
+    return { id: ctx.identity.id };
 }
 
 const TOP_HUMAN_MEMBER_COUNT = 6;
@@ -175,20 +207,25 @@ export async function getHumanMember(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMember> {
-    const [parentRaw, detail, pii] =
+    const [seat, identity, pii] =
         await Promise.all([
-            ctx.GET<MemberEntity>(`members/${id}`),
-            ctx.GET<HumanMemberEntity>(
-                `human-members/${id}`,
+            ctx.GET<MembershipEntity>(
+                seatsCollection(ctx) + '/' + id,
+            ),
+            ctx.GET<IdentityEntity>(
+                `identities/${id}`,
             ),
             getMemberPii(ctx, id),
         ]);
-    const parent = await withLifecycleTrio(
-        ctx, 'members', parentRaw,
-    );
     return new HumanMember(
-        parent, detail, pii,
-        memberStateDetailFromRow(parent),
+        seatedHumanParent(id, seat.at),
+        profileOf(identity),
+        pii,
+        {
+            state: 'active',
+            stateAt: seat.at,
+            stateEventId: seat.id,
+        },
     );
 }
 
@@ -196,17 +233,12 @@ export async function getHumanMemberEntity(
     ctx: RequestContext,
     id: string,
 ): Promise<HumanMemberEntity> {
-    return ctx.GET<HumanMemberEntity>(
-        `human-members/${id}`,
+    const identity = await ctx.GET<IdentityEntity>(
+        `identities/${id}`,
     );
+    return profileOf(identity);
 }
 
-// A human member's create's second hop (its PII intake, PUT
-// identities/:id/pii) failed — the member's other facets already
-// landed. Distinguished from a first-hop failure so the caller
-// can name the partial state rather than a blanket "failed to
-// add member" (mirrors identities.ts's own
-// IdentityPiiIntakeFailedError for identity create).
 export class HumanMemberPiiIntakeFailedError extends Error {
     readonly id: string;
     constructor(id: string, cause: unknown) {
@@ -220,30 +252,19 @@ export class HumanMemberPiiIntakeFailedError extends Error {
     }
 }
 
-// Re-put the human-member detail facet (the parent member type
-// and identity kind are server-supplied facts the composing
-// POST re-pins; the named composing POST /human-members/:id
-// lands them in ONE transaction). The edit body ECHOES the
-// current lifecycle trio verbatim so a byte-identical
-// members/:id re-put folds by message_hash rather than minting
-// a phantom transition. PII changes via a separate PUT
-// identities/:id/pii second hop, fired IFF the caller supplies
-// a `pii` arg — the dirty check (members/detail.ts's
-// saveHumanMember) decides, so a detail-only save stays ONE hop
-// (Phase 10 Task 2's intake decomposition).
 export async function putHumanMember(
     ctx: RequestContext,
     id: string,
     detail: Omit<HumanMemberEntity, 'id'>,
-    stateEcho: MemberStateDetail,
+    _stateEcho: MemberStateDetail,
     pii?: Omit<IdentityPiiEntity, 'id'>,
 ): Promise<void> {
-    await ctx.POST(`human-members/${id}`, {
-        detail: detail as unknown as
-            Record<string, unknown>,
-        state: stateEcho.state,
-        stateAt: stateEcho.stateAt,
-        stateEventId: stateEcho.stateEventId,
+    await ctx.PUT(`identities/${id}`, {
+        kind: 'person',
+        title: detail.title,
+        department: detail.department,
+        strengths: detail.strengths,
+        team_dimensions: detail.team_dimensions,
     });
     if (pii !== undefined) {
         await ctx.PUT(`identities/${id}/pii`, { ...pii });
@@ -251,31 +272,20 @@ export async function putHumanMember(
     humanMemberChanges.notify();
 }
 
-// Human-member creation: parent row + identity + detail row +
-// initial state event, composed by the named POST /human-
-// members into ONE transaction; PII enters via a separate PUT
-// identities/:id/pii second hop (Phase 10 Task 2's intake
-// decomposition — a bad PII sub-object can no longer roll the
-// member back). Use only at the Add Member call site;
-// transitions of an existing member go through
-// postHumanMemberStateChange. The initial event's author is
-// stamped server-side from the verified token; the client mints
-// the event id, so a retry hits one row.
 export async function postHumanMemberCreation(
     ctx: RequestContext,
     id: string,
     input: HumanMemberDraft,
-    initialState: MemberState,
+    _initialState: MemberState,
 ): Promise<void> {
     const { name, email, phone, bio, ...detail } =
         input;
-    await ctx.POST('human-members', {
-        id,
-        detail: detail as unknown as
-            Record<string, unknown>,
-        initialState,
-        initialStateEventId: generateCryptoSafeBase62(),
-        initialStateAt: nowUtc(),
+    await ctx.PUT(`identities/${id}`, {
+        kind: 'person',
+        title: detail.title,
+        department: detail.department,
+        strengths: detail.strengths,
+        team_dimensions: detail.team_dimensions,
     });
     try {
         await ctx.PUT(`identities/${id}/pii`, {
@@ -284,24 +294,17 @@ export async function postHumanMemberCreation(
     } catch (err) {
         throw new HumanMemberPiiIntakeFailedError(id, err);
     }
+    await ctx.PUT(
+        seatsCollection(ctx) + '/' + id,
+        { type: 'member', at: nowUtc() },
+    );
     humanMemberChanges.notify();
 }
 
-// A state change is an honest document write: PUT members/:id
-// with a FRESH trio — the postIdeaStateChange composition,
-// pointed at the members document address. Save stays
-// decomposed (Phase 10 Task 2): detail, PII, and state remain
-// independent writes.
 export async function postHumanMemberStateChange(
-    ctx: RequestContext,
-    id: string,
-    state: MemberState,
+    _ctx: RequestContext,
+    _id: string,
+    _state: MemberState,
 ): Promise<void> {
-    await ctx.PUT(`members/${id}`, {
-        type: 'human',
-        state,
-        state_at: nowUtc(),
-        state_event_id: generateCryptoSafeBase62(),
-    });
     humanMemberChanges.notify();
 }

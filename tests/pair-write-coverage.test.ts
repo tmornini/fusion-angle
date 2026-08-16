@@ -45,11 +45,11 @@ function writtenPattern(entry: Route): string | undefined {
     return entry.segments.join('/');
 }
 
-// BOOTSTRAP_ROUTES (the auth-free dev-tier snapshot plane) and
-// AUTHENTICATION_ROUTES (the dedicated grant arm) never reach
-// the generic pair block — api/api.ts gates it on
-// `!bearerExempt`, and both sets are bearerExempt. Named, not
-// inferred.
+// BOOTSTRAP_ROUTES (the snapshot plane) and
+// AUTHENTICATION_ROUTES (the dedicated grant arm) never
+// reach the generic pair block. AUTHENTICATION_ROUTES
+// are bearer-exempt; BOOTSTRAP_ROUTES still skip pair
+// wiring. Named, not inferred.
 const NAMED_EXEMPT_ROUTE_PATTERNS: ReadonlySet<string> = new Set([
     ...BOOTSTRAP_ROUTES,
     ...AUTHENTICATION_ROUTES,
@@ -127,7 +127,8 @@ test('AUTHENTICATION_ROUTES ride the dedicated pair arm, so'
 // channel: this test can only assert what it already knows to
 // list. A future write path dispatched the same way (matched by
 // literal path segments in api.ts BEFORE matchRoute/routes[]
-// ever runs — the identities/:id/default-org and /invitations/
+// ever runs — the identities/:id/default-organization and
+// /invitations/
 // shape) is invisible to test 1's enumeration BY CONSTRUCTION,
 // and invisible here too unless someone hand-adds its module to
 // the array below. Even for the two files already listed, this

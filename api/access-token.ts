@@ -24,16 +24,9 @@ export type {
 export const TOKEN_AUDIENCE = 'fusion-ai-web';
 const SIGNING_KEY_ID = 'dev-co-located';
 
-// The HMAC secret. CLIENT-SHIPPED CONSTANT — the browser
-// ZIP keeps this until the yank. Mint/verify read
-// JWT_HMAC_SIGNING_KEY from process env when present.
-// The server path must supply that env (no default).
-// Never log the material.
-const SIGNING_KEY_MATERIAL =
-    'dev-co-located-hmac-secret-frozen-wire-format';
-
-function processEnvJwtHmacSigningKey():
-    string | undefined {
+// The HMAC secret. Mint/verify require
+// JWT_HMAC_SIGNING_KEY. Never log the material.
+function hmacSigningKeyMaterial(): string {
     const runtime = globalThis as {
         process?: {
             env?: Record<string, string | undefined>;
@@ -45,15 +38,9 @@ function processEnvJwtHmacSigningKey():
     if (typeof key === 'string' && key !== '') {
         return key;
     }
-    return undefined;
-}
-
-function hmacSigningKeyMaterial(): string {
-    const fromEnv = processEnvJwtHmacSigningKey();
-    if (fromEnv !== undefined) {
-        return fromEnv;
-    }
-    return SIGNING_KEY_MATERIAL;
+    throw new Error(
+        'missing required env JWT_HMAC_SIGNING_KEY',
+    );
 }
 
 interface AccessTokenHeader {
@@ -68,25 +55,12 @@ const HEADER: AccessTokenHeader = {
     kid: SIGNING_KEY_ID,
 };
 
-// SEAM (SP-5 divorce point): the signature is now REAL
 // HMAC-SHA256 over the head.body signing input, via the
 // WebCrypto subtle primitive. The alg (HS256) and the
 // three-segment wire shape are FROZEN; subtle.verify performs
 // the constant-time compare — we never hand-roll one.
-//
-// !!! DEPLOYMENT CONSTRAINT — REDUCED, NOT RESOLVED. The key is
-// still a constant shipped in client JS, so any party with the
-// bundle can mint a valid token: forgery stays trivial. What
-// changed is the future server tier's BLAST RADIUS — it
-// relocates ONLY the key (client constant -> server secret/KMS)
-// and who-mints (browser -> /authentication/token); the wire
-// format, the alg, and every caller signature stay put. Safe
-// today ONLY because the whole store is client-side localStorage
-// (no trust boundary — the page-runner owns their own data). DO
-// NOT enable this gate in a networked / multi-user /
-// untrusted-client-reachable context until the key lives
-// server-side. That move arrives WITH the server tier; the gate
-// and a server-held key are inseparable.
+// JWT_HMAC_SIGNING_KEY is required; there is no client
+// default.
 
 // The imported key handle, memoized as a one-time Promise so
 // repeated sign/verify share one non-extractable CryptoKey

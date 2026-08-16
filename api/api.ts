@@ -119,7 +119,6 @@ import {
     authorizeIdentityPii,
     parseObjectBody,
     parsePutBody,
-    isServerTier,
 } from './request-auth.ts';
 import {
     routes,
@@ -468,7 +467,7 @@ export async function handleRequest(
         .filter(Boolean);
     if (pathSegments[0] === 'identities'
         && pathSegments.length === 3
-        && pathSegments[2] === 'default-org') {
+        && pathSegments[2] === 'default-organization') {
         return identityDefaultOrganizationRequest(
             ctx, request, pathSegments,
         );
@@ -542,15 +541,12 @@ export async function handleRequest(
     // threaded to every handler (Task 10 reconciliation 5).
     // Empty for bearer-exempt routes (no fence ran).
     let roles: readonly string[] = [];
-    // BOOTSTRAP_ROUTES: bearer-exempt on the browser ZIP;
-    // the server ZIP (isServerTier) does not exempt them.
-    // AUTHENTICATION_ROUTES stay exempt on both tiers.
-    // An unmatched path can never be exempt — bearerExempt
-    // requires a defined route pattern.
+    // AUTHENTICATION_ROUTES stay bearer-exempt.
+    // BOOTSTRAP_ROUTES require a bearer. An unmatched
+    // path can never be exempt — bearerExempt requires
+    // a defined route pattern.
     const bearerExempt = matchedRoutePattern !== undefined
-        && (AUTHENTICATION_ROUTES.has(matchedRoutePattern)
-            || (!isServerTier()
-                && BOOTSTRAP_ROUTES.has(matchedRoutePattern)));
+        && AUTHENTICATION_ROUTES.has(matchedRoutePattern);
     if (!bearerExempt) {
         const authed =
             await authenticateRequest(ctx, request);

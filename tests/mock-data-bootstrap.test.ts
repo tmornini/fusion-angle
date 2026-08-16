@@ -45,20 +45,20 @@ test(
     'pristine bootstrap seeds required infrastructure',
     async () => {
         const db = await bootstrappedDb();
-        // Phase Final Task 2: members ROW half stripped —
-        // parent documents from the pair plane.
-        const { deriveMemberParents } = await import(
-            '../api/derive-members.ts'
-        );
-        const ids = (await deriveMemberParents(db))
-            .map(w => w.id);
+        const requests = await db.requests.getAll();
         assert.ok(
-            ids.includes(SYSTEM_MEMBER_ID),
-            'system member seeded',
+            requests.some(r =>
+                r.uri_collection === '/identities/'
+                && r.uri_id === 'current',
+            ),
+            'current identity seeded',
         );
         assert.ok(
-            ids.includes('current'),
-            'current user seeded',
+            requests.some(r =>
+                r.uri_collection === '/identities/'
+                && r.uri_id === SYSTEM_MEMBER_ID,
+            ),
+            'system identity seeded',
         );
         // Phase Final Stage B: roster tables retired.
         // Phase Final Task 2: organizations ROW half stripped.

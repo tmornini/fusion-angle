@@ -15,7 +15,10 @@ import { handleRequest } from '../api/api.ts';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import {
+    devToken, organizationToken,
+} from './token-fixtures.ts';
+import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import {
     getSnapshot,
     putSnapshot,
@@ -191,6 +194,11 @@ test(
                     headers: {
                         'Content-Type':
                             'application/json',
+                        'Authorization':
+                            'Bearer '
+                            + await organizationToken(),
+                        'Operation-ID':
+                            TEST_OPERATION_ID,
                     },
                     body: JSON.stringify({ json }),
                 },

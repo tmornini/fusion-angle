@@ -2,54 +2,52 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { GET, PUT } from '../api/api.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import type { MemberEntity } from '../api/types.ts';
 import { DEV_TOKEN, devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedHumanMember } from './member-fixtures.ts';
-import { seedOrganizationMember } from './root-admin-fixture.ts';
+import { seedOrganizationMember } from
+    './root-admin-fixture.ts';
 
-// Actor-stamping for lifecycle rides document trios —
-// PUT members/:id stamps requester_identity_id on the
-// pair, derived as member_id on GET members/:id/versions.
-// Member lifecycle via PUT members/:id — the document
-// trio is authored by the verified token.
 test(
-    'a member state change is authored by the token',
+    'a person identity write is authored by the token',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo');
-        await PUT(db, 'members/current', {
-            type: 'human',
-            state: 'archived',
-            state_at: '2026-01-01T00:00:00.000000Z',
-            state_event_id: 'ev-1',
+        await PUT(db, 'identities/current', {
+            kind: 'person',
+            title: 'Admin',
+            department: 'Product',
+            strengths: [],
+            team_dimensions: {},
         }, DEV_TOKEN);
-        const history = await GET<Array<{
-            id: string;
-            member_id: string;
-        }>>(
-            db, 'members/current/versions', DEV_TOKEN,
+        const requests = await db.requests.getAll();
+        const row = requests.find(r =>
+            r.uri_collection === '/identities/'
+            && r.uri_id === 'current'
+            && r.requester_identity_id === 'current',
         );
-        const event = history.find(e => e.id === 'ev-1');
-        assert.ok(event, 'trio event missing from history');
-        assert.equal(event!.member_id, 'current');
+        assert.ok(row, 'identity PUT pair missing');
     },
 );
 
-// current-member resolves the CALLER, derived from the token —
-// not a hardcoded 'current' id. A token for a different member
-// returns that member.
 test(
-    'current-member resolves the token member',
+    'the token sub is the caller identity',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await seedHumanMember(db, 'alice', 'Alice');
         await seedOrganizationMember(db, 'alice');
-        const member = await GET<MemberEntity>(
-            db, 'current-member', await devToken('alice'),
+        const token = await devToken('alice');
+        const { principalFromToken } = await import(
+            '../shared/access-token-decode.ts'
         );
-        assert.equal(member.id, 'alice');
+        assert.equal(
+            principalFromToken(token).id, 'alice',
+        );
+        const seats = await GET<{ id: string }[]>(
+            db, 'organizations/1/members', token,
+        );
+        assert.ok(seats.some(s => s.id === 'alice'));
     },
 );

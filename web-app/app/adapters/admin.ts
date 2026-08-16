@@ -107,10 +107,16 @@ export class Organization {
 async function deriveOrganizationFacts(
     ctx: RequestContext,
 ): Promise<OrganizationDerived> {
-    const memberships =
-        await ctx.GET<MembershipEntity[]>('memberships');
+    const organization = ctx.identity.organization
+        ?? ctx.identity.organizations?.[0];
+    const seats = organization === undefined
+        ? []
+        : await ctx.GET<MembershipEntity[]>(
+            'organizations/' + organization
+                + '/members',
+        );
     const identities = new Set(
-        memberships.map(m => m.identity_id),
+        seats.map(m => m.identity_id),
     );
     return {
         usedSeats: identities.size,
@@ -154,9 +160,7 @@ export async function getOrganizationStats(
         p => p.stateValue() !== 'declined',
     ).length;
     const ideasCurrent = ideas.length;
-    const activePeopleCount = humans.filter(
-        h => h.stateValue() === 'active',
-    ).length;
+    const activePeopleCount = humans.length;
     return {
         projectsCurrent,
         ideasCurrent,

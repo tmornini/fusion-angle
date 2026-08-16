@@ -1,9 +1,9 @@
 import type { HttpFacade } from './http-facade.ts';
 
-// The live client transport. Browser boot wraps the
-// in-page adapter; server boot installs the fetch facade.
-// sessionContext() reads this — never IndexedDB, never
-// api/api.ts — so the server-ZIP graph stays clean.
+// The live client transport. Product boot installs the
+// fetch facade. Tests register an in-process wrap.
+// sessionContext() reads this — never api/api.ts — so
+// the client graph stays clean.
 
 let facade: HttpFacade | undefined;
 
@@ -40,11 +40,10 @@ function isHttpFacade(
         }).simulateLatency !== 'function';
 }
 
-// HttpFacade passes through. An in-page adapter
+// HttpFacade passes through. A memory adapter
 // (simulateLatency) needs the wrap registered by
-// in-page-facade.ts — browser init and the test
-// fixtures import that module; the server entry
-// never does.
+// the test in-page facade. Product boot never
+// does.
 export function wrapClientAdapter(
     adapter: object,
 ): HttpFacade {

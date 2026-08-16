@@ -2,6 +2,7 @@ import type { GraphNode } from '../../../api/types.ts';
 import {
     DEFAULT_NODE_ATTRIBUTES,
     DEFAULT_NODE_MEMBER_IDS,
+    DEFAULT_NODE_AGENT_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
 } from '../../../api/types.ts';
 import {
@@ -28,6 +29,9 @@ export function buildStartAndCompleteNodes(): {
             memberIds: [
                 ...DEFAULT_NODE_MEMBER_IDS,
             ],
+            agentIds: [
+                ...DEFAULT_NODE_AGENT_IDS,
+            ],
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,
             ],
@@ -42,6 +46,9 @@ export function buildStartAndCompleteNodes(): {
             isArchive: true,
             memberIds: [
                 ...DEFAULT_NODE_MEMBER_IDS,
+            ],
+            agentIds: [
+                ...DEFAULT_NODE_AGENT_IDS,
             ],
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,

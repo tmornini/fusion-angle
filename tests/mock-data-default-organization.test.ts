@@ -19,10 +19,12 @@ async function mockSeeded(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// Phase Final Task 2: identity + membership + default-org
-// ROW halves stripped — pair-plane oracles only.
+// Phase Final Task 2: identity + membership +
+// default-organization ROW halves stripped — pair-plane
+// oracles only.
 
-test('every membership-bearing person has a default-org event',
+test('every membership-bearing person has a'
++ ' default-organization document',
 async () => {
     const db = await mockSeeded();
     const persons = buildMembers().map(m => m.id);
@@ -35,7 +37,8 @@ async () => {
         );
         assert.ok(
             defaults.length > 0,
-            'person ' + id + ' lacks a default-org event');
+            'person ' + id
+                + ' lacks a default-organization document');
     }
 });
 
@@ -46,7 +49,8 @@ async () => {
         await identityDefaultOrganization(db, 'current'), '1');
 });
 
-test("bootstrap seeds 'current' a default-org event for org 1",
+test("bootstrap seeds 'current' a default-organization"
++ ' document for organization 1',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
@@ -56,6 +60,6 @@ async () => {
     );
     assert.ok(
         defaults.some(d => d.organization_id === '1'),
-        "current has no default-org event for org 1");
-    // Phase Final Stage B: identity spine tables retired.
+        "current has no default-organization document"
+            + ' for organization 1');
 });

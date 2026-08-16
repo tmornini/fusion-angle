@@ -16,7 +16,6 @@ import {
 } from '../api/types.ts';
 import {
     deriveInvitationStates,
-    deriveMemberStates,
     workOrderLifecycleStatesFor,
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
@@ -33,12 +32,18 @@ import {
 } from '../api/message-pair.ts';
 import {
     postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
+    postMemberDocumentOp,
+    memberDocumentBodyOf,
 } from '../api/routes.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
+import { deriveMembers } from '../api/derive-members.ts';
+import {
+    seedIdentityPii,
+    seedPersonIdentity,
+} from './identity-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 // Per-family history derives (states-URI elimination C2/C3).
 // A hand-built multi-family fixture drives ONE representative
@@ -90,18 +95,12 @@ function req(
 // a raw row here would go derivation-invisible. Every id/field
 // value stays IDENTICAL to the raw puts these replace — only the
 // write mechanism changes.
-async function seedMembershipPair(
+async function leftoverMembershipPair(
     db: MemoryDbAdapter,
     id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
     const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
     const pair = await formWritePair({
         method: 'PUT',
         pathname: '/memberships/' + id,
@@ -113,14 +112,55 @@ async function seedMembershipPair(
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt: nowUtc(),
         organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
+        responseStatus: 200,
+        responseBody: { id, ...body },
         operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function leftoverMemberParent(
+    db: MemoryDbAdapter,
+    id: string,
+): Promise<void> {
+    const body = memberDocumentBodyOf('human', {
+        state: 'active',
+        stateAt: AT,
+        stateEventId: 'seed-member-' + id + '-active',
+    });
+    const pair = await formWritePair({
+        method: 'PUT',
+        pathname: '/members/' + id,
+        routePattern: 'members/:id',
+        routeSegments: ['members', ':id'],
+        pathSegments: ['members', id],
+        headerFields: [],
+        body,
+        requesterIdentityId: SYSTEM_MEMBER_ID,
+        requestAt: nowUtc(),
+        organization: undefined,
+        responseStatus: 200,
+        responseBody: { id, ...body },
+        operationId: TEST_OPERATION_ID,
+    });
+    await postMemberDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID, pair,
+    );
+}
+
+async function seedMembershipPair(
+    db: MemoryDbAdapter,
+    _id: string,
+    body: Record<string, unknown>,
+): Promise<void> {
+    await seedSeat(
+        db,
+        String(body['organization_id'] ?? body.organization_id),
+        String(body['identity_id'] ?? body.identity_id),
+        (body['type'] ?? body.type) as 'admin' | 'member',
+        String(body['at'] ?? body.at),
     );
 }
 
@@ -181,18 +221,14 @@ function aiMemberDetail(name: string) {
 
 async function createAiMember(
     db: MemoryDbAdapter, token: string, id: string,
-    initialState: string, initialStateEventId: string,
-    initialStateAt: string,
+    _initialState: string, _initialStateEventId: string,
+    _initialStateAt: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/ai-members', token,
-        {
-            id,
-            detail: aiMemberDetail('Bot ' + id),
-            initialState, initialStateEventId, initialStateAt,
-        },
+        'PUT', '/ai-agents/' + id, token,
+        aiMemberDetail('Bot ' + id),
     ));
-    assert.equal(res.status, 201, 'ai-member create failed');
+    assert.equal(res.status, 201, 'ai-agent create failed');
 }
 
 function flowFields(name: string) {
@@ -418,12 +454,6 @@ async function buildUnionFixture(): Promise<UnionFixture> {
         db, tokenA, aiMemberId, 'active',
         aiMemberId + '-genesis', '2026-01-03T00:00:00.000000Z',
     );
-    const membershipRes = await handleRequest(db, req(
-        'PUT', '/memberships/ms-ai-union', tokenA,
-        { organization_id: 'A', identity_id: aiMemberId,
-        type: 'member', at: AT },
-    ));
-    assert.equal(membershipRes.status, 201);
 
     // (c) a work order's create-op birth (3 events).
     const workOrderId = 'wo-union';
@@ -479,6 +509,56 @@ async function buildUnionFixture(): Promise<UnionFixture> {
 
 // ---- 1. ownership fence (bulk union retired with C3) --------
 
+test('a leftover /memberships/ pair without a seat'
++ ' does not own the identity',
+async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, 'A', 'Acme');
+    await leftoverMembershipPair(db, 'm-leftover', {
+        organization_id: 'A', identity_id: 'ghost',
+        type: 'member', at: AT,
+    });
+    assert.equal(
+        await resolveOwningOrganization(db, 'ghost', 'A'),
+        null,
+    );
+});
+
+test('deriveMembers is seats ∩ identities: leftover'
++ ' /members/ and /memberships/ do not join',
+async () => {
+    const db = memoryDbAdapter();
+    await db.postSchemaCreation();
+    await seedOrganizationDocument(db, 'A', 'Acme');
+    await leftoverMemberParent(db, 'ghost');
+    await leftoverMembershipPair(db, 'm-leftover', {
+        organization_id: 'A', identity_id: 'ghost',
+        type: 'member', at: AT,
+    });
+    assert.equal(
+        (await deriveMembers(db, 'A'))
+            .some((row) => row.id === 'ghost'),
+        false,
+    );
+    await seedSeat(db, 'A', 'ghost', 'member', AT);
+    assert.equal(
+        (await deriveMembers(db, 'A'))
+            .some((row) => row.id === 'ghost'),
+        false,
+        'leftover /members/ parent does not join',
+    );
+    await seedPersonIdentity(db, 'ghost', {
+        name: 'Ghost', email: 'g@x.com',
+        phone: '', bio: '',
+    });
+    assert.equal(
+        (await deriveMembers(db, 'A'))
+            .some((row) => row.id === 'ghost'),
+        true,
+    );
+});
+
 test('resolveOwningOrganization: own entities resolve to A;'
 + ' foreign idea resolves to B (no bulk-union leak path)',
 async () => {
@@ -526,12 +606,16 @@ async () => {
         )).map((row) => row.id),
         [fx.objectiveId + '-genesis'],
     );
-    assert.deepEqual(
-        (await deriveMemberStates(fx.db))
-            .filter((row) => row.entity_id === fx.aiMemberId)
-            .map((row) => row.id),
-        [fx.aiMemberId + '-genesis'],
+    const agent = await handleRequest(
+        fx.db,
+        req(
+            'GET', '/ai-agents/' + fx.aiMemberId,
+            await organizationToken('adminA', 'A'),
+        ),
     );
+    assert.equal(agent.status, 200);
+    const agentBody = await agent.json() as { id: string };
+    assert.equal(agentBody.id, fx.aiMemberId);
     assert.deepEqual(
         (await workOrderLifecycleStatesFor(
             fx.db, 'A', fx.workOrderId,

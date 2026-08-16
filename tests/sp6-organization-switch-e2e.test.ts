@@ -51,9 +51,11 @@ async () => {
     const tokB = await postOrganizationSessionExchange(ctx, flat, '2');
 
     const membersA = idsOf(
-        await GET<{ id: string }[]>(db, 'members', tokA));
+        await GET<{ id: string }[]>(
+            db, 'organizations/1/members', tokA));
     const membersB = idsOf(
-        await GET<{ id: string }[]>(db, 'members', tokB));
+        await GET<{ id: string }[]>(
+            db, 'organizations/2/members', tokB));
     const ideasA = idsOf(
         await GET<{ id: string }[]>(db, 'ideas', tokA));
     const ideasB = idsOf(

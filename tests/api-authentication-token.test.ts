@@ -35,6 +35,7 @@ import {
     seedClientRegistrationTombstone,
 } from './identity-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 
@@ -101,32 +102,14 @@ async function seedMembershipPair(
     // to deriveMembershipsForIdentity's own enumerate-then-probe
     // (via deriveOrganizations).
     await seedOrganizationDocument(db, organization, organization);
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+    await seedSeat(
+        db,
+        String(body['organization_id'] ?? body.organization_id),
+        String(body['identity_id'] ?? body.identity_id),
+        (body['type'] ?? body.type) as 'admin' | 'member',
+        String(body['at'] ?? body.at),
     );
+
 }
 
 function tokenRequest(body: Record<string, unknown>): Request {
@@ -373,7 +356,7 @@ async () => {
         undefined,
     );
     // the minted access token passes the SP-3 gate
-    const rows = await GET(db, 'members', body.access_token);
+    const rows = await GET(db, 'organizations/1/members', body.access_token);
     assert.ok(Array.isArray(rows));
 });
 
@@ -536,7 +519,10 @@ async () => {
     assert.notEqual(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert.ok(Array.isArray(
-        await GET(db, 'members', body['access_token'] as string)));
+        await GET(
+            db, 'organizations/1/members',
+            body['access_token'] as string,
+        )));
 });
 
 test('stale body refresh_token loses to a live Cookie',
@@ -567,7 +553,7 @@ async () => {
         access_token: string;
     };
     assert.ok(Array.isArray(
-        await GET(db, 'members', body.access_token)));
+        await GET(db, 'organizations/1/members', body.access_token)));
 });
 
 test('refresh rotates to a new pair', async () => {
@@ -585,7 +571,7 @@ test('refresh rotates to a new pair', async () => {
     assert.notEqual(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert.ok(Array.isArray(
-        await GET(db, 'members', pair2.access_token)));
+        await GET(db, 'organizations/1/members', pair2.access_token)));
 });
 
 test('replaying a rotated refresh token revokes the chain',
@@ -640,7 +626,7 @@ async () => {
     assert.equal(claims.act?.sub, 'current');
     // the delegated token passes the gate (current = admin)
     assert.ok(Array.isArray(
-        await GET(db, 'members', body.access_token)));
+        await GET(db, 'organizations/1/members', body.access_token)));
 });
 
 test('token-exchange 201 has no refresh Set-Cookie',
@@ -817,7 +803,7 @@ test('client_credentials issues a gate-valid token', async () => {
     assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     assert.ok(Array.isArray(
-        await GET(db, 'members', body.access_token)));
+        await GET(db, 'organizations/1/members', body.access_token)));
     assert.notEqual(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );

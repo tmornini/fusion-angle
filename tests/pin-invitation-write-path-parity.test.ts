@@ -336,4 +336,15 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
         ),
         true,
     );
+
+    const seatPrefix = '/organizations/'
+        + ORGANIZATION_TWO + '/members/';
+    const seatRows = await db.requests.getAllWhere(
+        'uri_collection', seatPrefix,
+    );
+    assert.equal(
+        seatRows.some((row) => row.uri_id === inviteeId
+            && row.operation_id === TEST_OPERATION_ID),
+        true,
+    );
 });

@@ -31,7 +31,6 @@ import {
     getMembers,
     postHumanMemberCreation,
     postAIMemberCreation,
-    getCurrentHumanMember,
     postInvitationGrant,
     type InvitationGrantOutcome,
     generateCryptoSafeBase62,
@@ -117,19 +116,15 @@ export async function init(): Promise<void> {
         container: memberList,
         skeleton: buildSkeleton('table', 5),
         fetch: async () => {
-            const [members, currentRow] =
-                await Promise.all([
-                    getMembers(ctx),
-                    getCurrentHumanMember(ctx),
-                ]);
-            return { members, currentRow };
+            const members = await getMembers(ctx);
+            return { members };
         },
         retry: init,
         onData: loaded => {
             membersState =
                 buildInitialManagedMembersState(
                     loaded.members,
-                    loaded.currentRow.id,
+                    ctx.identity.id,
                 );
 
             memberListEl = memberList;

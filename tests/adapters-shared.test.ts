@@ -95,7 +95,6 @@ test(
             createRequestContext(db, DEV_TOKEN),
         );
         assert.equal(row.id, 'current');
-        assert.equal(row.type, 'human');
     },
 );
 

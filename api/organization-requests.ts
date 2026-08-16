@@ -2,13 +2,10 @@ import {
     currentDefaultOrganizationFor,
 } from './authorization.ts';
 import {
-    subjectOrganizations,
-    identityDefaultOrganization,
-} from './authentication.ts';
-import {
     HTTP_NO_CONTENT,
     HTTP_BAD_REQUEST,
     HTTP_FORBIDDEN,
+    HTTP_NOT_FOUND,
     HTTP_METHOD_NOT_ALLOWED,
 } from './http-errors.ts';
 import {
@@ -17,9 +14,6 @@ import {
     parseObjectBody,
     callerOrganizationIds,
 } from './request-auth.ts';
-import {
-    validateTimestampField,
-} from './validators.ts';
 import {
     type IncomingContext,
     type AuthenticatedContext,
@@ -38,6 +32,7 @@ import { deriveOrganizations } from './derive-organizations.ts';
 import {
     deriveDefaultOrganization,
 } from './derive-default-organization.ts';
+import { membershipExistsFor } from './derive-memberships.ts';
 
 // GET /organizations — the caller's reachable orgs, derived
 // fresh from the membership ledger (never the token claim, so
@@ -59,12 +54,12 @@ async function enumerateMyOrganizations(
     );
 }
 
-// PUT/GET /identities/:id/default-org — the read/write face of
-// the identity_default_organizations ledger. Authorized by tree ownership
-// (caller === :id), not the admin role policy: an identity owns
-// its own subtree. PUT appends a NEW event only when the org
-// changes (an idempotent repeat writes nothing), and only if the
-// org is one of the identity's memberships (no dangling default).
+// PUT/GET /identities/:id/default-organization — a simple
+// document. Authorized by tree ownership (caller === :id).
+// PUT { organization_id } must name a live seat, else 400
+// and nothing is stored. GET returns that document or 404
+// if never SET. No public DELETE. Revoke does not rewrite
+// this document.
 export async function identityDefaultOrganizationRequest(
     ctx: IncomingContext,
     request: Request,
@@ -90,12 +85,19 @@ export async function identityDefaultOrganizationRequest(
         );
     }
     if (ctx.method === 'GET') {
-        return Response.json({
-            organization_id:
-                await identityDefaultOrganization(
-                    ctx.base, identityId,
-                ),
-        });
+        const rows = await deriveDefaultOrganization(
+            ctx.base, identityId,
+        );
+        const set = currentDefaultOrganizationFor(
+            rows, identityId,
+        );
+        if (set === null) {
+            return Response.json(
+                { error: 'not found' },
+                { status: HTTP_NOT_FOUND },
+            );
+        }
+        return Response.json({ organization_id: set });
     }
     if (ctx.method === 'PUT') {
         const parse = await parseObjectBody(request);
@@ -105,62 +107,29 @@ export async function identityDefaultOrganizationRequest(
                 { status: HTTP_BAD_REQUEST },
             );
         }
-        const body = parse.body;
-        const organization = body.organization_id;
+        const organization = parse.body.organization_id;
         if (typeof organization !== 'string') {
             return Response.json(
                 { error: 'organization_id is required' },
                 { status: HTTP_BAD_REQUEST },
             );
         }
-        const eventId = body.eventId;
-        if (typeof eventId !== 'string') {
-            return Response.json(
-                { error: 'eventId is required' },
-                { status: HTTP_BAD_REQUEST },
-            );
-        }
-        if (eventId === '') {
-            return Response.json(
-                { error: 'eventId must be non-empty' },
-                { status: HTTP_BAD_REQUEST },
-            );
-        }
-        // Validate `at` for the wire body (pair-plane payload);
-        // Phase Final Task 2 no longer stamps a row with it.
-        try {
-            validateTimestampField(body, 'at',
-                'identity_default_organizations');
-        } catch {
-            return Response.json(
-                { error: 'at is required and must be'
-                    + ' a valid RFC-3339 timestamp' },
-                { status: HTTP_BAD_REQUEST },
-            );
-        }
-        const memberOrganizations =
-            await subjectOrganizations(ctx.base, identityId);
-        if (!memberOrganizations.includes(organization)) {
+        if (
+            !await membershipExistsFor(
+                ctx.base, organization, identityId,
+            )
+        ) {
             return Response.json(
                 {
-                    error: 'forbidden: org is not one of the'
-                        + " identity's memberships",
+                    error: 'organization_id is not a'
+                        + ' live seat',
                 },
-                { status: HTTP_FORBIDDEN },
+                { status: HTTP_BAD_REQUEST },
             );
         }
-        // Event-append class: uriId is the body's OWN eventId
-        // (fresh per write, never the identity from the URL) —
-        // achieved by treating the eventId as a trailing :param
-        // segment (messageAddress derives uriId from a route
-        // whose LAST segment is a :param). No head-read, no
-        // Supersedes, global plane (organization: undefined) —
-        // this ledger is latest-wins by (at, id), not a document
-        // chain. Formed pre-tx (crypto stays outside the
-        // transaction body — the IndexedDB auto-commit
-        // constraint). The response is ALWAYS 204/no-body, so
-        // the pair's shape is identical whether or not the org
-        // actually changes.
+        const document = {
+            organization_id: organization,
+        };
         const operationId = request.headers.get(
             OPERATION_ID_HEADER,
         );
@@ -172,15 +141,18 @@ export async function identityDefaultOrganizationRequest(
         const pair = await formWritePair({
             method: 'PUT',
             pathname: ctx.pathname,
-            routePattern: 'identities/:id/default-org',
+            routePattern:
+                'identities/:id/default-organization',
             routeSegments: [
-                'identities', ':id', 'default-org', ':eventId',
+                'identities', ':id', 'default-organization',
             ],
             pathSegments: [
-                'identities', identityId, 'default-org', eventId,
+                'identities', identityId,
+                'default-organization',
             ],
             headerFields: hoistedHeaderFields(request),
-            body, requesterIdentityId: authed.principal.id,
+            body: document,
+            requesterIdentityId: authed.principal.id,
             requestAt: ctx.requestAt, organization: undefined,
             responseStatus: HTTP_NO_CONTENT,
             responseBody: undefined,
@@ -191,51 +163,22 @@ export async function identityDefaultOrganizationRequest(
         if (replay !== undefined) {
             return sendWriteResponse(replay, 'PUT', true);
         }
-        // FLIPPED (Phase 13 Task 8): deriveDefaultOrganization
-        // (Phase 11) reads this identity's own /default-org
-        // prefix — a targeted, identity-keyed read, never a
-        // full-ledger scan — replacing the SOLE remaining
-        // production read of the identity_default_organizations
-        // table. currentDefaultOrganizationFor (the reducer) and
-        // its fallback wiring below are BYTE-UNCHANGED — only the
-        // row source moves.
         const rows = await deriveDefaultOrganization(
             ctx.base, identityId);
         const changes = currentDefaultOrganizationFor(
             rows, identityId) !== organization;
+        await ctx.base.transaction(
+            ['requests', 'responses'],
+            async (view) => {
+                await appendMessagePair(view, pair);
+            },
+        );
         if (changes) {
-            // Phase Final Task 2: identity_default_organizations
-            // ROW half stripped — pure pair-plane write.
-            await ctx.base.transaction(
-                ['requests', 'responses'],
-                async (view) => {
-                    await appendMessagePair(view, pair);
-                },
-            );
-            // This side channel returns from handleRequest
-            // BEFORE the dispatch switch, so the generic
-            // gate-side post hook (api.ts's postWriteNotification)
-            // never fires for it — post its own scoped event so
-            // cross-tab refresh of the identity-tokens page is
-            // preserved. The idempotent no-change branch below
-            // writes no ledger row, so it posts nothing — the
-            // established "skip notification on no-op writes"
-            // precedent (see git history).
             ctx.base.postNotification({
                 kind: 'scoped',
                 organizationIds: [],
                 identityIds: [identityId],
             });
-        } else {
-            // The no-change branch still returns 2xx, so the
-            // pair IS this request's only write — a minimal tx
-            // over just the message-plane tables.
-            await ctx.base.transaction(
-                ['requests', 'responses'],
-                async (view) => {
-                    await appendMessagePair(view, pair);
-                },
-            );
         }
         return storedPairResponse(
             ctx.base, pair.requestHash,

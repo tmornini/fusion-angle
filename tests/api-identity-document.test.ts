@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { PUT, handleRequest } from '../api/api.ts';
+import { PUT, GET, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
     type MemoryDbAdapter,
@@ -32,13 +32,14 @@ import {
 } from './http-fixtures.ts';
 
 // Phase 10 Task 4 (twelfth registered family): PUT
-// /identities/:id takes the entity's OWN field only ({kind}),
-// no lifecycle trio — member lifecycle rides the members/:id
-// document address (states-address retirement), and the shared
-// identity id (member.id === identity.id) must not carry a
-// competing trio that would FREEZE or double-emit lifecycle.
-// Global plane (organizationNested:false), like members/
-// ai-members/human-members: no organization_id on the wire.
+// /identities/:id takes `kind` plus, for a person, the
+// optional human profile — no lifecycle trio. Member
+// lifecycle rides the members/:id document address
+// (states-address retirement), and the shared identity id
+// (member.id === identity.id) must not carry a competing trio
+// that would FREEZE or double-emit lifecycle. Global plane
+// (organizationNested:false), like members/ai-members/
+// human-members: no organization_id on the wire.
 
 function identityFields() {
     return { kind: 'person' as const };
@@ -353,4 +354,123 @@ async () => {
             '',
         ),
     );
+});
+
+// Task 51: fold human profile onto the person identity
+// document. Title is not PII. Service must not name any of
+// title / department / strengths / team_dimensions.
+
+const PII_FACET = {
+    name: 'Ada',
+    email: 'ada@example.com',
+    phone: '',
+    bio: '',
+};
+
+test('PUT service identity with title is 400', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const res = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/identities/svc-title-1',
+            token: DEV_TOKEN,
+            body: { kind: 'service', title: 'Bot' },
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.equal(res.status, 400);
+});
+
+test('PUT person identity with title is 201', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const res = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/identities/person-title-1',
+            token: DEV_TOKEN,
+            body: { kind: 'person', title: 'Engineer' },
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.ok(res.status === 201 || res.status === 200);
+    const written = await res.json() as {
+        id: string;
+        kind: string;
+        title?: string;
+    };
+    assert.equal(written.id, 'person-title-1');
+    assert.equal(written.kind, 'person');
+    assert.equal(written.title, 'Engineer');
+});
+
+test('GET identity returns title for that person',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'person-title-get';
+    const put = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/identities/' + id,
+            token: DEV_TOKEN,
+            body: { kind: 'person', title: 'Engineer' },
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.ok(put.status === 201 || put.status === 200);
+    const got = await GET<{
+        id: string;
+        kind: string;
+        title?: string;
+    }>(db, 'identities/' + id, DEV_TOKEN);
+    assert.equal(got.id, id);
+    assert.equal(got.kind, 'person');
+    assert.equal(got.title, 'Engineer');
+});
+
+test('PUT pii does not require title; GET pii has no title',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const profile = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/identities/current',
+            token: DEV_TOKEN,
+            body: { kind: 'person', title: 'CEO' },
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.ok(
+        profile.status === 201 || profile.status === 200,
+    );
+    const piiPut = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/identities/current/pii',
+            token: DEV_TOKEN,
+            body: PII_FACET,
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.ok(
+        piiPut.status === 201 || piiPut.status === 200,
+    );
+    const pii = await GET<Record<string, unknown>>(
+        db, 'identities/current/pii', DEV_TOKEN,
+    );
+    assert.equal(pii['name'], 'Ada');
+    assert.equal('title' in pii, false);
+    const identity = await GET<Record<string, unknown>>(
+        db, 'identities/current', DEV_TOKEN,
+    );
+    assert.equal(identity['title'], 'CEO');
+    assert.equal('name' in identity, false);
 });

@@ -23,11 +23,8 @@ const WEB_CLIENT_ID = 'web-app';
 // keeping this free of the global session side effect so it is
 // testable.
 //
-// DEPLOYMENT CONSTRAINT (unchanged): the HMAC signing key is
-// still a client-shipped constant, so the token is real but
-// forgeable. The flow and algorithm are now real; only the key
-// location moves at the server tier. This wiring does NOT lift
-// the constraint.
+// The HMAC key lives on the server. This adapter only
+// drives authorize + token over the fetch facade.
 export async function postPasswordLogin(
     ctx: RequestContext,
     username: string,

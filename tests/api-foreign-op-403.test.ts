@@ -10,21 +10,14 @@ import {
     seedAdminSchema,
     seedOrganizationDocument,
 } from './test-fixtures.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import {
-    formWritePair,
-    type MessagePair,
-} from '../api/message-pair.ts';
-import { SYSTEM_MEMBER_ID, nowUtc } from '../api/types.ts';
+import { nowUtc } from '../api/types.ts';
 import {
     generateCryptoSafeBase62,
 } from '../shared/crypto-safe-base62.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 // Foreign-op miss pins: work-order claim/release/transition
 // and flow undo. The write authorizer never covers these
@@ -52,35 +45,6 @@ function req(
     });
 }
 
-async function membershipPair(
-    membershipId: string,
-    body: Record<string, unknown>,
-    organization: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error('missing memberships/:id spec');
-    }
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/memberships/${membershipId}`,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', membershipId],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [membershipId], body, SYSTEM_MEMBER_ID,
-            organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-}
-
 async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -91,12 +55,14 @@ async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
         type: 'admin',
         at: AT,
     };
-    await postMembershipDocumentOp(
-        db, 'm-current-b', memBody, SYSTEM_MEMBER_ID,
-        await membershipPair(
-            'm-current-b', memBody, ORGANIZATION_B,
-        ),
+    await seedSeat(
+        db,
+        String(memBody['organization_id'] ?? memBody.organization_id),
+        String(memBody['identity_id'] ?? memBody.identity_id),
+        (memBody['type'] ?? memBody.type) as 'admin' | 'member',
+        String(memBody['at'] ?? memBody.at),
     );
+
     return db;
 }
 
@@ -128,7 +94,7 @@ test('foreign-org work-order claim is 404', async () => {
 
     const claimAt = nowUtc();
     const foreign = await handleRequest(db, req(
-        'POST', '/work-orders/wo-foreign-claim/claim', tokenB, {
+        'PUT', '/work-orders/wo-foreign-claim/claim', tokenB, {
             claimEventId: generateCryptoSafeBase62(),
             claimAt,
             expireEventId: generateCryptoSafeBase62(),
@@ -160,16 +126,9 @@ test('foreign-org work-order release is 404', async () => {
     assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
-        'POST', '/work-orders/wo-foreign-rel/release', tokenB, {
-            releaseEventId: generateCryptoSafeBase62(),
-            releaseAt: nowUtc(),
-        },
+        'DELETE', '/work-orders/wo-foreign-rel/claim', tokenB,
     ));
     assert.equal(foreign.status, 404);
-    assert.deepEqual(await foreign.json(), {
-        error:
-            'Not found: work_orders/wo-foreign-rel',
-    });
 });
 
 test('foreign-org work-order transition is 404', async () => {

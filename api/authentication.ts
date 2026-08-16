@@ -67,8 +67,10 @@ import {
 } from './message-pair.ts';
 import { messageStore } from './message-store.ts';
 import type { MessagePair, AuthPairSeed } from './message-pair.ts';
-import { deriveMembershipsForIdentity } from
-    './derive-memberships.ts';
+import {
+    deriveMembershipsForIdentity,
+    membershipExistsFor,
+} from './derive-memberships.ts';
 import {
     deriveCredentialsFor,
     deriveClientRegistration,
@@ -87,7 +89,6 @@ import {
     HTTP_FORBIDDEN,
     HTTP_NOT_IMPLEMENTED,
 } from './http-errors.ts';
-import { isServerTier } from './request-auth.ts';
 
 // The OAuth 2.1 token + authorize logic, kept out of the route
 // table. Each function returns a RESULT (success | failure) — an
@@ -261,8 +262,9 @@ export async function subjectOrganizations(
 }
 
 // Claim roles baked at mint: one `{type}:{organization_id}`
-// per live membership. The gate projects these for the fenced
-// org; it never re-derives role grants.
+// per live seat. The
+// gate projects these for the fenced organization; it never
+// re-derives role grants.
 async function subjectRoles(
     adapter: DbAdapter,
     identityId: Id,
@@ -275,14 +277,12 @@ async function subjectRoles(
 }
 
 // The org a flat (un-exchanged) token resolves to, server-side:
-// the identity's SET default, else its PRIMARY membership, else
-// null. The gate denies a null — there is no global default left
-// to fall back on. Task 8 (Phase 11): the row source is the
-// derived /identities/:id/default-org/ message-pair ledger
-// (api/derive-default-organization.ts), never the
-// identity_default_organizations table directly — the reducer
-// below is UNCHANGED, and the primary-membership fallback stays
-// verbatim.
+// the SET default-organization document if that organization
+// is a live seat, else PRIMARY (earliest remaining join `at`,
+// lex organization id on tie), else null. The gate denies a
+// null — there is no global default left to fall back on.
+// Revoke does not rewrite the SET document; this read skips
+// a SET that is no longer a live seat.
 export async function identityDefaultOrganization(
     adapter: DbAdapter,
     identityId: Id,
@@ -290,9 +290,20 @@ export async function identityDefaultOrganization(
     const events = await deriveDefaultOrganization(
         adapter, identityId,
     );
-    const chosen = currentDefaultOrganizationFor(events, identityId);
-    if (chosen !== null) return chosen;
-    return await primaryMembershipOrganization(adapter, identityId);
+    const chosen = currentDefaultOrganizationFor(
+        events, identityId,
+    );
+    if (
+        chosen !== null
+        && await membershipExistsFor(
+            adapter, chosen, identityId,
+        )
+    ) {
+        return chosen;
+    }
+    return await primaryMembershipOrganization(
+        adapter, identityId,
+    );
 }
 
 // The earliest org an identity joined. Equal join moments
@@ -1437,37 +1448,34 @@ async function equalizeFailureTiming(
 }
 
 // The password loop: verify username + password, and on success
-// issue an authorization code bound to (identity, client). The
-// server ZIP rejects a request that lacks S256 before the
-// credential check — a 400 request fault, no pair. The browser
-// ZIP keeps the soft path. Every credential failure returns the
-// SAME 401 (no user enumeration) and appends nothing —
-// grant-first, no-op on failure. The code is recorded PAIR-ONLY
-// (Phase 13 Task 9: the row half retires here — nothing has
-// read authorization_codes rows since Task 7). The stored pair
-// holds the request and response verbatim (password, code, and
-// all) — accepted dev-tier plaintext ledger cost.
+// issue an authorization code bound to (identity, client). A
+// request that lacks S256 is a 400 request fault, no pair.
+// Every credential failure returns the SAME 401 (no user
+// enumeration) and appends nothing — grant-first, no-op on
+// failure. The code is recorded PAIR-ONLY (Phase 13 Task 9:
+// the row half retires here — nothing has read
+// authorization_codes rows since Task 7). The stored pair
+// holds the request and response verbatim (password, code,
+// and all) — accepted dev-tier plaintext ledger cost.
 async function authorizePassword(
     adapter: DbAdapter,
     body: Record<string, unknown>,
     seed: AuthPairSeed,
 ): Promise<AuthorizeResult> {
-    if (isServerTier()) {
-        const challenge =
-            typeof body.code_challenge === 'string'
-                ? body.code_challenge
-                : '';
-        const method =
-            typeof body.code_challenge_method === 'string'
-                ? body.code_challenge_method
-                : '';
-        if (challenge === '' || method !== 'S256') {
-            return {
-                ok: false,
-                status: HTTP_BAD_REQUEST,
-                error: 'S256 code_challenge is required',
-            };
-        }
+    const challenge =
+        typeof body.code_challenge === 'string'
+            ? body.code_challenge
+            : '';
+    const method =
+        typeof body.code_challenge_method === 'string'
+            ? body.code_challenge_method
+            : '';
+    if (challenge === '' || method !== 'S256') {
+        return {
+            ok: false,
+            status: HTTP_BAD_REQUEST,
+            error: 'S256 code_challenge is required',
+        };
     }
     const username = typeof body.username === 'string'
         ? body.username
@@ -1513,10 +1521,7 @@ async function authorizePassword(
         seed, body, identityId, HTTP_OK, response,
     );
     let rehashPair: MessagePair | undefined;
-    if (
-        isServerTier()
-        && secret.startsWith('$pbkdf2-sha256$')
-    ) {
+    if (secret.startsWith('$pbkdf2-sha256$')) {
         const at = nowUtc();
         const cid = generateCryptoSafeBase62();
         const hashed = await hashPassword(password);

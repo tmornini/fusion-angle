@@ -1,33 +1,42 @@
 import type { RequestContext } from './shared.ts';
 import {
-    generateCryptoSafeBase62,
-} from '../../../shared/crypto-safe-base62.ts';
-import { nowUtc } from '../../../api/types.ts';
+    RequestError,
+    HTTP_NOT_FOUND,
+} from '../../../api/http-errors.ts';
 
 // Addressed by the caller's own id — the server authorizes an
-// identity's default org by tree ownership. PUT is idempotent
-// (append-on-change server-side); a non-member org is refused
-// as a 403, surfaced here as a thrown error. The row id
-// (eventId) and timestamp (at) are caller-minted.
+// identity's default organization by tree ownership. PUT
+// { organization_id } must name a live seat (else 400). GET
+// returns the SET document or null when never SET (404).
 export async function putIdentityDefaultOrganization(
     ctx: RequestContext,
     organization: string,
 ): Promise<void> {
     await ctx.PUT<void>(
-        'identities/' + ctx.identity.id + '/default-org',
-        {
-            eventId: generateCryptoSafeBase62(),
-            organization_id: organization,
-            at: nowUtc(),
-        },
+        'identities/' + ctx.identity.id
+            + '/default-organization',
+        { organization_id: organization },
     );
 }
 
 export async function getIdentityDefaultOrganization(
     ctx: RequestContext,
 ): Promise<string | null> {
-    const res = await ctx.GET<{
-        organization_id: string | null;
-    }>('identities/' + ctx.identity.id + '/default-org');
-    return res.organization_id;
+    try {
+        const res = await ctx.GET<{
+            organization_id: string;
+        }>(
+            'identities/' + ctx.identity.id
+                + '/default-organization',
+        );
+        return res.organization_id;
+    } catch (err) {
+        if (
+            err instanceof RequestError
+            && err.status === HTTP_NOT_FOUND
+        ) {
+            return null;
+        }
+        throw err;
+    }
 }

@@ -15,6 +15,7 @@ afterEach(() => {
     setScryptDerive(null);
 });
 
+
 test('scryptHash then verifyPassword round-trips',
 async () => {
     setScryptDerive(scryptDerive);

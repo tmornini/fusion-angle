@@ -27,7 +27,6 @@ import {
 import type {
     MemberId,
     Member,
-    Id,
 } from '../api/types.ts';
 import {
     SYSTEM_MEMBER_NAME,
@@ -42,95 +41,11 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    postMemberDocumentOp,
-    postHumanMemberDocumentOp,
-    postMembershipDocumentOp,
-    memberDocumentBodyOf,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
     formWritePair,
-    type MessagePair,
 } from '../api/message-pair.ts';
-
-// Below-facade pair formation for this file's raw-write
-// re-points (finding 18's fixture budget) — the SAME mechanism
-// tests/member-fixtures.ts uses (Step 1), LOCAL here because
-// this file needs bodies member-fixtures.ts never forms: a
-// system-typed member document, and a human member with NO
-// identity_pii row (the erased-PII scenario below). 'members/:id'
-// and 'memberships/:id' share ONE flat WriteResponseSpec shape;
-// 'human-members/:id' carries a PER-VERB spec instead (the
-// ai-members/:id precedent) — the same split
-// tests/member-fixtures.ts's own memberDocumentPair/
-// detailDocumentPair pair draws, mirrored here rather than
-// forced into one shape.
-async function flatDocumentPair(
-    routePattern: 'members/:id' | 'memberships/:id',
-    id: Id,
-    body: Record<string, unknown>,
-    organization: Id | undefined,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS[routePattern];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for ' + routePattern,
-        );
-    }
-    const segment = routePattern.split('/')[0]!;
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/${segment}/${id}`,
-        routePattern,
-        routeSegments: [segment, ':id'],
-        pathSegments: [segment, id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-}
-
-async function humanDetailPair(
-    id: Id,
-    detail: Record<string, unknown>,
-): Promise<MessagePair> {
-    const entry = WRITE_RESPONSE_SPECS['human-members/:id'];
-    if (
-        entry === undefined
-        || 'status' in entry
-        || entry.put === undefined
-    ) {
-        throw new Error(
-            'no per-write response spec for human-members/:id',
-        );
-    }
-    const spec = entry.put;
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/human-members/${id}`,
-        routePattern: 'human-members/:id',
-        routeSegments: ['human-members', ':id'],
-        pathSegments: ['human-members', id],
-        headerFields: [],
-        body: detail,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: undefined,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], detail, SYSTEM_MEMBER_ID, undefined,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-}
-
 async function setupSeeded(): Promise<{
     db: MemoryDbAdapter;
 }> {
@@ -153,20 +68,6 @@ test(
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'hw_sarah', 'Sarah Chen',
-        );
-        // Lifecycle rides the members/:id document trio —
-        // the same path a live PUT members/:id state change
-        // would take (states-address retirement).
-        const systemBody = memberDocumentBodyOf('system', {
-            state: 'active',
-            stateAt: '2026-01-01T00:00:00.000000Z',
-            stateEventId: 'st-system',
-        });
-        await postMemberDocumentOp(
-            db, 'system', systemBody, SYSTEM_MEMBER_ID,
-            await flatDocumentPair(
-                'members/:id', 'system', systemBody, undefined,
-            ),
         );
         const ctx = createRequestContext(db, await devToken());
         const roster = await getMembers(ctx);
@@ -247,7 +148,7 @@ test(
         const { db } = await setupSeeded();
         const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);
-        assert.equal(map.size, 2);
+        assert.equal(map.size, 3);
         const human = map.get('hw_sarah_chen')!;
         const ai = map.get('ai_claude_opus')!;
         assert.ok(human);
@@ -321,46 +222,51 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        // Lifecycle rides the members/:id document trio —
-        // same path as the system-member seed above.
-        const memberBody = memberDocumentBodyOf('human', {
-            state: 'active',
-            stateAt: '2026-01-01T00:00:00.000000Z',
-            stateEventId: 'st-member_without_pii',
+        const { seedSeat } = await import(
+            './root-admin-fixture.ts'
+        );
+        const {
+            postIdentityDocumentOp,
+            identityDocumentBodyOf,
+        } = await import('../api/routes.ts');
+        const identityBody = identityDocumentBodyOf(
+            'person', {
+                title: 'product_manager',
+                department: 'Product',
+                strengths: [],
+                team_dimensions: {},
+            },
+        );
+        const spec = WRITE_RESPONSE_SPECS['identities/:id'];
+        if (spec === undefined || !('status' in spec)) {
+            throw new Error('no identities/:id spec');
+        }
+        const pair = await formWritePair({
+            method: 'PUT',
+            pathname: '/identities/member_without_pii',
+            routePattern: 'identities/:id',
+            routeSegments: ['identities', ':id'],
+            pathSegments: [
+                'identities', 'member_without_pii',
+            ],
+            headerFields: [],
+            body: identityBody,
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            requestAt: nowUtc(),
+            organization: undefined,
+            responseStatus: spec.status,
+            responseBody: spec.successBody?.(
+                ['member_without_pii'], identityBody,
+                SYSTEM_MEMBER_ID, undefined,
+            ),
+            operationId: TEST_OPERATION_ID,
         });
-        await postMemberDocumentOp(
-            db, 'member_without_pii', memberBody,
-            SYSTEM_MEMBER_ID,
-            await flatDocumentPair(
-                'members/:id', 'member_without_pii',
-                memberBody, undefined,
-            ),
+        await postIdentityDocumentOp(
+            db, 'member_without_pii', identityBody,
+            SYSTEM_MEMBER_ID, pair,
         );
-        const detail = {
-            title: 'product_manager',
-            department: 'Product',
-            strengths: [],
-            team_dimensions: {},
-        };
-        await postHumanMemberDocumentOp(
-            db, 'member_without_pii', detail, SYSTEM_MEMBER_ID,
-            await humanDetailPair('member_without_pii', detail),
-        );
-        // Erasure removes PII, not the membership — the member
-        // still belongs to the org, so the join still finds it.
-        const membershipBody = {
-            organization_id: '1',
-            identity_id: 'member_without_pii',
-        type: 'member',
-            at: '2020-01-01T00:00:00.000000Z',
-        };
-        await postMembershipDocumentOp(
-            db, 'mb-member_without_pii', membershipBody,
-            SYSTEM_MEMBER_ID,
-            await flatDocumentPair(
-                'memberships/:id', 'mb-member_without_pii',
-                membershipBody, '1',
-            ),
+        await seedSeat(
+            db, '1', 'member_without_pii', 'member',
         );
         const ctx = createRequestContext(db, await devToken());
         const map = await getMemberMap(ctx);

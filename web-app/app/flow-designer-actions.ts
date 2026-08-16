@@ -7,6 +7,7 @@ import type {
 import {
     DEFAULT_NODE_ATTRIBUTES,
     DEFAULT_NODE_MEMBER_IDS,
+    DEFAULT_NODE_AGENT_IDS,
     DEFAULT_NODE_TASK_INSTRUCTIONS,
 } from '../../api/types.ts';
 import {
@@ -125,6 +126,9 @@ export function applyAddNode(
             isArchive: false,
             memberIds: [
                 ...DEFAULT_NODE_MEMBER_IDS,
+            ],
+            agentIds: [
+                ...DEFAULT_NODE_AGENT_IDS,
             ],
             attributes: [
                 ...DEFAULT_NODE_ATTRIBUTES,

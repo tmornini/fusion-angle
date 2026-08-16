@@ -14,7 +14,6 @@ import {
     RequestError,
     HTTP_NOT_FOUND,
 } from '../../../api/http-errors.ts';
-import { hashPassword } from '../../../shared/password-hash.ts';
 import type { RequestContext } from './shared.ts';
 import {
     createSubscriptionChannel,
@@ -129,28 +128,21 @@ function serviceFacet(
 export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {
-    const [identities, piiRows, aiRows] =
+    const [identities, piiRows] =
         await Promise.all([
             ctx.GET<IdentityEntity[]>('identities'),
             ctx.GET<IdentityPiiEntity[]>('identity-pii'),
-            ctx.GET<AIMemberEntity[]>('ai-members'),
         ]);
     const piiById = new Map<Id, IdentityPiiEntity>();
     for (const row of piiRows) {
         piiById.set(row.id, row);
-    }
-    const aiById = new Map<Id, AIMemberEntity>();
-    for (const row of aiRows) {
-        aiById.set(row.id, row);
     }
     return identities.map(identity =>
         identity.kind === 'service'
             ? {
                 kind: 'service',
                 id: identity.id,
-                service: serviceFacet(
-                    aiById.get(identity.id),
-                ),
+                service: serviceFacet(undefined),
             }
             : {
                 kind: 'person',
@@ -187,13 +179,10 @@ export async function getMemberPii(
 // visible. Mirrors getMemberPii; the CALLER redacts an
 // absent name rather than leaking the id.
 export async function getServiceFacet(
-    ctx: RequestContext,
-    id: Id,
+    _ctx: RequestContext,
+    _id: Id,
 ): Promise<ServiceFacet> {
-    const all = await ctx.GET<AIMemberEntity[]>(
-        'ai-members',
-    );
-    return serviceFacet(all.find(r => r.id === id));
+    return serviceFacet(undefined);
 }
 
 export async function deleteIdentityPii(
@@ -320,9 +309,9 @@ export class IdentityPiiIntakeFailedError extends Error {
 // separate PUT identities/:id/pii (Phase 10 Task 2's intake
 // decomposition — the two hops are no longer one transaction,
 // so a bad PII sub-object can no longer roll the identity back);
-// service → identity + a hashed client_secret credential, still
-// one POST /identities transaction. The secret is hashed HERE
-// (client-side); the route touches no crypto.
+// service → identity + a client_secret credential, still
+// one POST /identities transaction. The secret is hashed
+// on the server write.
 export async function postIdentityCreation(
     ctx: RequestContext,
     id: Id,
@@ -353,7 +342,7 @@ export async function postIdentityCreation(
                 identity_id: id,
                 kind: 'client_secret',
                 status: 'set',
-                secret: await hashPassword(spec.secret),
+                secret: spec.secret,
                 at: nowUtc(),
             },
         });

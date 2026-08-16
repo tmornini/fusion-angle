@@ -1,23 +1,15 @@
-import { test, afterEach } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { setServerTier } from '../api/request-auth.ts';
 import { devToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedOrganizationMember } from
     './root-admin-fixture.ts';
 
-// Server ZIP: BOOTSTRAP_ROUTES are not bearer-exempt.
-// The browser ZIP (flag off) keeps the demo exemption.
-// Reset after every test so a leak cannot poison
-// browser-tier pins in the same process.
+// BOOTSTRAP_ROUTES are never bearer-exempt.
 
 const BASE = 'http://localhost';
-
-afterEach(() => {
-    setServerTier(false);
-});
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -25,9 +17,8 @@ async function freshDb() {
     return db;
 }
 
-test('server-tier snapshots reject a missing bearer',
+test('snapshots reject a missing bearer',
 async () => {
-    setServerTier(true);
     const db = await freshDb();
     const res = await handleRequest(db, new Request(
         `${BASE}/snapshots/schema`));
@@ -36,9 +27,8 @@ async () => {
     assert.equal(body.error, 'invalid_token');
 });
 
-test('server-tier snapshots forbid a member bearer',
+test('snapshots forbid a member bearer',
 async () => {
-    setServerTier(true);
     const db = await freshDb();
     await seedOrganizationMember(db, 'walt');
     const res = await handleRequest(db, new Request(
@@ -53,9 +43,8 @@ async () => {
     assert.match(body.error, /forbidden/);
 });
 
-test('server-tier snapshots admit an admin bearer',
+test('snapshots admit an admin bearer',
 async () => {
-    setServerTier(true);
     const db = await freshDb();
     const res = await handleRequest(db, new Request(
         `${BASE}/snapshots/schema`, {

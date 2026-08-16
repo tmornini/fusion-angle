@@ -11,21 +11,18 @@ import {
     getModelsByProvider,
 } from '../api/provider-models.ts';
 import {
-    postAiMemberCreationOp,
-    postHumanMemberCreationOp,
+    postIdentityDocumentOp,
     postIdentityPiiDocumentOp,
-    postMembershipDocumentOp,
-    memberDocumentBodyOf,
-    aiMemberDetailBodyOf,
-    humanMemberDetailBodyOf,
+    postAiAgentDocumentOp,
+    identityDocumentBodyOf,
     WRITE_RESPONSE_SPECS,
-    type MemberWritePairs,
 } from '../api/routes.ts';
 import {
     formWritePair,
     type MessagePair,
 } from '../api/message-pair.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 // The catalog's first model — the fixture default.
 export function firstProviderModel() {
@@ -118,44 +115,25 @@ export function makeAIMember(
     );
 }
 
-// Below-facade pair formation for the seeded writes below,
-// re-pointed onto the SAME mechanism the live routes use:
-// the shared members/:id document plus the kind's own
-// operation + detail document postAiMemberCreationOp /
-// postHumanMemberCreationOp append (api/routes.ts), formed
-// via the SAME body builders (memberDocumentBodyOf,
-// aiMemberDetailBodyOf, humanMemberDetailBodyOf) and the SAME
-// WRITE_RESPONSE_SPECS a live PUT would answer through — so a
-// later flip to message-derived reads sees a fixture-seeded
-// member exactly as it would a live-written one. Every id,
-// at, state, and field value stays IDENTICAL to the raw puts
-// this replaces — only the write MECHANISM changes.
-
 const MEMBER_ORGANIZATION: Id = '1';
 
-async function memberDocumentPair(
+async function identityDocumentPair(
     id: Id,
-    type: 'human' | 'ai',
+    body: Record<string, unknown>,
     requestAt: string,
-    trio: {
-        readonly state: MemberState;
-        readonly stateAt: string;
-        readonly stateEventId: string;
-    },
 ): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['members/:id'];
+    const spec = WRITE_RESPONSE_SPECS['identities/:id'];
     if (spec === undefined || !('status' in spec)) {
         throw new Error(
-            'no per-write response spec for members/:id',
+            'no per-write response spec for identities/:id',
         );
     }
-    const body = memberDocumentBodyOf(type, trio);
     return formWritePair({
         method: 'PUT',
-        pathname: `/members/${id}`,
-        routePattern: 'members/:id',
-        routeSegments: ['members', ':id'],
-        pathSegments: ['members', id],
+        pathname: `/identities/${id}`,
+        routePattern: 'identities/:id',
+        routeSegments: ['identities', ':id'],
+        pathSegments: ['identities', id],
         headerFields: [],
         body,
         requesterIdentityId: SYSTEM_MEMBER_ID,
@@ -169,47 +147,6 @@ async function memberDocumentPair(
     });
 }
 
-async function detailDocumentPair(
-    routePattern: 'ai-members/:id' | 'human-members/:id',
-    id: Id,
-    detail: Record<string, unknown>,
-    requestAt: string,
-): Promise<MessagePair> {
-    const entry = WRITE_RESPONSE_SPECS[routePattern];
-    if (
-        entry === undefined
-        || 'status' in entry
-        || entry.put === undefined
-    ) {
-        throw new Error(
-            'no per-write response spec for ' + routePattern,
-        );
-    }
-    const spec = entry.put;
-    const segment = routePattern.split('/')[0]!;
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/${segment}/${id}`,
-        routePattern,
-        routeSegments: [segment, ':id'],
-        pathSegments: [segment, id],
-        headerFields: [],
-        body: detail,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt,
-        organization: undefined,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], detail, SYSTEM_MEMBER_ID, undefined,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-}
-
-// The PII facet's own document pair (Phase 10 Task 2's intake
-// decomposition), mirroring detailDocumentPair's shape for the
-// one route whose successBody lives at the top level, not per-
-// verb (identities/:id/pii, like the identities/:id precedent).
 async function identityPiiDocumentPair(
     id: Id,
     pii: Record<string, unknown>,
@@ -241,158 +178,78 @@ async function identityPiiDocumentPair(
     });
 }
 
-async function memberCreateOperationPair(
-    routePattern: 'human-members' | 'ai-members',
+async function aiAgentDocumentPair(
+    id: Id,
     body: Record<string, unknown>,
     requestAt: string,
 ): Promise<MessagePair> {
+    const spec = WRITE_RESPONSE_SPECS['ai-agents/:id'];
+    if (spec === undefined || !('status' in spec)) {
+        throw new Error(
+            'no per-write response spec for ai-agents/:id',
+        );
+    }
     return formWritePair({
-        method: 'POST',
-        pathname: `/${routePattern}`,
-        routePattern,
-        routeSegments: [routePattern],
-        pathSegments: [routePattern],
+        method: 'PUT',
+        pathname: `/ai-agents/${id}`,
+        routePattern: 'ai-agents/:id',
+        routeSegments: ['ai-agents', ':id'],
+        pathSegments: ['ai-agents', id],
         headerFields: [],
         body,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
         organization: undefined,
-        responseStatus: 204,
-        responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
-    });
-}
-
-async function membershipDocumentPair(
-    membershipId: Id,
-    body: Record<string, unknown>,
-    requestAt: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for'
-            + ' memberships/:id',
-        );
-    }
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/memberships/${membershipId}`,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', membershipId],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt,
-        organization: MEMBER_ORGANIZATION,
         responseStatus: spec.status,
         responseBody: spec.successBody?.(
-            [membershipId], body, SYSTEM_MEMBER_ID,
-            MEMBER_ORGANIZATION,
+            [id], body, SYSTEM_MEMBER_ID, undefined,
         ),
         operationId: TEST_OPERATION_ID,
     });
-}
-
-// A member belongs to an org via the ledger — the member
-// list derives from it, so a seeded member needs one.
-async function seedMembership(
-    db: MemoryDbAdapter, id: Id, requestAt: string,
-): Promise<void> {
-    const membershipId = `mb-${id}`;
-    const body = {
-        organization_id: MEMBER_ORGANIZATION,
-        identity_id: id,
-        type: 'member',
-        at: '2020-01-01T00:00:00.000000Z',
-    };
-    await postMembershipDocumentOp(
-        db, membershipId, body, SYSTEM_MEMBER_ID,
-        await membershipDocumentPair(
-            membershipId, body, requestAt,
-        ),
-    );
 }
 
 export async function seedHumanMember(
     db: MemoryDbAdapter,
     id: string,
     name: string,
-    state: MemberState = 'active',
+    _state: MemberState = 'active',
 ): Promise<void> {
     const requestAt = nowUtc();
+    const detail = humanDetail();
+    const identityBody = identityDocumentBodyOf(
+        'person', detail,
+    );
     const pii = {
         name,
         email: `${id}@example.com`.toLowerCase(),
         phone: '',
         bio: '',
     };
-    const trio = memberStateDetailOf(id, state);
-    const body = {
-        id,
-        detail: humanDetail(),
-        initialState: state,
-        initialStateEventId: trio.stateEventId,
-        initialStateAt: trio.stateAt,
-    };
-    const pairs: MemberWritePairs = {
-        operation: await memberCreateOperationPair(
-            'human-members', body, requestAt,
+    await postIdentityDocumentOp(
+        db, id, identityBody, SYSTEM_MEMBER_ID,
+        await identityDocumentPair(
+            id, identityBody, requestAt,
         ),
-        memberDocument: await memberDocumentPair(
-            id, 'human', requestAt, trio,
-        ),
-        detailDocument: await detailDocumentPair(
-            'human-members/:id', id,
-            humanMemberDetailBodyOf(body), requestAt,
-        ),
-    };
-    await postHumanMemberCreationOp(
-        db, body, SYSTEM_MEMBER_ID, pairs,
     );
-    // Phase 10 Task 2: PII no longer rides the create body — the
-    // production seed's own two-step shape (member facets, then
-    // the PII document), mirrored here with IDENTICAL id/content
-    // so every fixture-seeded human keeps its PII row.
     await postIdentityPiiDocumentOp(
         db, id, pii, SYSTEM_MEMBER_ID,
         await identityPiiDocumentPair(id, pii, requestAt),
     );
-    await seedMembership(db, id, requestAt);
+    await seedSeat(db, MEMBER_ORGANIZATION, id, 'member');
 }
 
 export async function seedAIMember(
     db: MemoryDbAdapter,
     id: string,
     name: string,
-    state: MemberState = 'active',
+    _state: MemberState = 'active',
 ): Promise<void> {
     const requestAt = nowUtc();
-    const trio = memberStateDetailOf(id, state);
-    const body = {
-        id,
-        detail: { name, ...aiDetail() },
-        initialState: state,
-        initialStateEventId: trio.stateEventId,
-        initialStateAt: trio.stateAt,
-    };
-    const pairs: MemberWritePairs = {
-        operation: await memberCreateOperationPair(
-            'ai-members', body, requestAt,
-        ),
-        memberDocument: await memberDocumentPair(
-            id, 'ai', requestAt, trio,
-        ),
-        detailDocument: await detailDocumentPair(
-            'ai-members/:id', id,
-            aiMemberDetailBodyOf(body), requestAt,
-        ),
-    };
-    await postAiMemberCreationOp(
-        db, body, SYSTEM_MEMBER_ID, pairs,
+    const body = { name, ...aiDetail() };
+    await postAiAgentDocumentOp(
+        db, id, body, SYSTEM_MEMBER_ID,
+        await aiAgentDocumentPair(id, body, requestAt),
     );
-    await seedMembership(db, id, requestAt);
 }
 
 export async function seedCurrentMember(

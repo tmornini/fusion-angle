@@ -13,7 +13,6 @@ import {
     ORGANIZATION_TWO,
 } from '../api/mock-data/seed-constants.ts';
 import { buildMembers } from '../api/mock-data/members.ts';
-import { buildAiMembers } from '../api/mock-data/ai-members.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
 import {
@@ -54,14 +53,14 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     return seededMockDb();
 }
 
-// Every seeded identity that can hold a membership row: the 11
-// seeded humans (buildMembers, 'current' included), the system
-// actor (holds none — see leg 8), and the 4 seeded AI members.
+// Every seeded identity that can hold a seat: the 11
+// seeded humans (buildMembers, 'current' included) and the
+// system actor (holds none — see leg 8). Agents are not
+// identities and are not seated.
 function allSeededIdentityIds(): readonly Id[] {
     return [
         ...buildMembers().map((m) => m.id),
         SYSTEM_MEMBER_ID,
-        ...buildAiMembers().map((m) => m.id),
     ];
 }
 
@@ -91,12 +90,12 @@ function primaryOrganizationOf(
 
 // -- leg 1: per-identity derive for EVERY seeded identity ------
 
-test('leg 1: per-identity derive for EVERY seeded identity (11'
-+ ' humans + system + 4 AI ids) — 16 membership documents total',
+test('leg 1: per-identity derive for EVERY seeded identity'
++ ' (11 humans + system) — 12 seat documents total',
 async () => {
     const db = await seededDb();
     const ids = allSeededIdentityIds();
-    assert.equal(ids.length, 16);
+    assert.equal(ids.length, 12);
 
     let total = 0;
     for (const identityId of ids) {
@@ -108,7 +107,7 @@ async () => {
         }
         total += derived.length;
     }
-    assert.equal(total, 16);
+    assert.equal(total, 12);
     // Phase Final Stage B: roster tables retired.
 });
 
@@ -148,7 +147,10 @@ test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
     );
     assert.equal(derived.length, 2);
     assert.equal(derived[0]!.at, derived[1]!.at);
-    assert.ok(derived[0]!.id < derived[1]!.id);
+    assert.ok(
+        derived[0]!.organization_id
+            < derived[1]!.organization_id,
+    );
     assert.deepEqual(
         derived.map((m) => m.organization_id),
         [STARK_ORGANIZATION, ORGANIZATION_TWO],
@@ -268,8 +270,9 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
     assert.equal(after.length, 2);
     assert.equal(
         after.some(
-            (m) => m.id === membershipId
-                && m.organization_id === ORGANIZATION_TWO,
+            (m) => m.identity_id === sarahId
+                && m.organization_id === ORGANIZATION_TWO
+                && m.type === 'member',
         ),
         true,
     );
@@ -278,7 +281,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
 
 // -- leg 7: the REMOVAL leg ----------------------------------------
 
-test('leg 7: REMOVAL — DELETE /memberships/:id derives ABSENT'
+test('leg 7: REMOVAL — DELETE seat derives ABSENT'
 + ' on the pair plane', async () => {
     const db = await seededDb();
     const jessicaId = 'zyTbfbjcGEfbpCsNTP0XjX';
@@ -293,7 +296,9 @@ test('leg 7: REMOVAL — DELETE /memberships/:id derives ABSENT'
     );
 
     const del = await handleRequest(db, req(
-        'DELETE', '/memberships/' + target!.id,
+        'DELETE',
+        '/organizations/' + target!.organization_id
+            + '/members/' + jessicaId,
         await organizationToken(
             'current', target!.organization_id,
         ),
@@ -343,7 +348,7 @@ async () => {
 // identity filter — poisoning deriveMembershipsForIdentity for
 // EVERY identity sharing that row's organization.
 
-test('leg 9: an ECHOED id in a live PUT /memberships/:id body'
+test('leg 9: an ECHOED id in a live PUT seat body'
 + ' (the fetch-edit-PUT client pattern) still derives — the'
 + ' stray id never poisons deriveMembershipsForIdentity',
 async () => {
@@ -356,14 +361,14 @@ async () => {
     assert.ok(existing);
 
     const echoPut = await handleRequest(db, req(
-        'PUT', '/memberships/' + existing!.id,
+        'PUT',
+        '/organizations/' + existing!.organization_id
+            + '/members/' + davidId,
         await organizationToken(
             'current', existing!.organization_id,
         ),
         {
             id: existing!.id,
-            organization_id: existing!.organization_id,
-            identity_id: existing!.identity_id,
             type: existing!.type,
             at: existing!.at,
         },

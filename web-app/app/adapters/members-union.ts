@@ -1,21 +1,21 @@
 import type {
     MemberId,
     Member,
-    MemberEntity,
-    HumanMemberEntity,
-    AIMemberEntity,
     IdentityPiiEntity,
+    IdentityEntity,
+    MembershipEntity,
+    AIAgentEntity,
 } from '../../../api/types.ts';
 import {
     SystemMember,
+    SYSTEM_MEMBER_ID,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
 import {
     buildHumanMemberMap,
-    memberStateDetailFromRow,
 } from './members.ts';
 import {
-    buildAIMemberMap,
+    buildAIAgentMap,
 } from './ai-members.ts';
 
 export {
@@ -28,67 +28,54 @@ export type {
     Member,
 } from '../../../api/types.ts';
 
-// The system member has no detail row — it is a parent
-// row (type 'system') plus its lifecycle state. Read it
-// here so getMemberMap can resolve a system-authored
-// event's author; getMembers (the roster) omits it.
-// Lifecycle trio rides the parent GET row (Phase A).
-async function getSystemMembers(
-    ctx: RequestContext,
-): Promise<SystemMember[]> {
-    const parents =
-        await ctx.GET<MemberEntity[]>('members');
-    const out: SystemMember[] = [];
-    for (const parent of parents) {
-        if (parent.type !== 'system') continue;
-        out.push(
-            new SystemMember(
-                parent,
-                memberStateDetailFromRow(parent).state,
-            ),
-        );
-    }
-    return out;
+function getSystemMembers(): SystemMember[] {
+    return [
+        new SystemMember(
+            {
+                id: SYSTEM_MEMBER_ID,
+                type: 'system',
+                state: 'active',
+                state_at: '',
+                state_event_id: SYSTEM_MEMBER_ID,
+            },
+            'active',
+        ),
+    ];
 }
 
-// The roster. Reads members, human-members, identity-pii
-// and ai-members ONCE, then feeds both pure builders.
-// Lifecycle-current trio is stamped on each MemberEntity
-// GET row (Phase A) — no second hop to the states log.
 export async function getMembers(
     ctx: RequestContext,
 ): Promise<Member[]> {
+    const organization = ctx.identity.organization
+        ?? ctx.identity.organizations?.[0];
     const [
-        parents, humanDetails, piiRows, aiDetails,
+        seats, identities, piiRows, agents,
     ] = await Promise.all([
-        ctx.GET<MemberEntity[]>('members'),
-        ctx.GET<HumanMemberEntity[]>('human-members'),
+        organization === undefined
+            ? Promise.resolve([] as MembershipEntity[])
+            : ctx.GET<MembershipEntity[]>(
+                'organizations/' + organization
+                    + '/members',
+            ),
+        ctx.GET<IdentityEntity[]>('identities'),
         ctx.GET<IdentityPiiEntity[]>('identity-pii'),
-        ctx.GET<AIMemberEntity[]>('ai-members'),
+        ctx.GET<AIAgentEntity[]>('ai-agents'),
     ]);
     const humans = buildHumanMemberMap(
-        parents, humanDetails, piiRows,
+        seats, identities, piiRows,
     );
-    const ais = buildAIMemberMap(
-        parents, aiDetails,
-    );
+    const ais = buildAIAgentMap(agents);
     return [
         ...humans.values(),
         ...ais.values(),
     ];
 }
 
-// Resolve every member by id for name display. Unlike
-// getMembers (the roster), this includes the system
-// member so a system-authored event's author resolves
-// rather than throwing.
 export async function getMemberMap(
     ctx: RequestContext,
 ): Promise<Map<MemberId, Member>> {
-    const [members, system] = await Promise.all([
-        getMembers(ctx),
-        getSystemMembers(ctx),
-    ]);
+    const members = await getMembers(ctx);
+    const system = getSystemMembers();
     return new Map(
         [...members, ...system].map(
             member => [member.idForLink(), member],
@@ -96,9 +83,6 @@ export async function getMemberMap(
     );
 }
 
-// The display name for a member whose PII is absent — erased,
-// or never recorded. Member-domain vocabulary; the identity
-// surfaces use IDENTITY_WITHOUT_PII_NAME instead.
 export const MEMBER_WITHOUT_PII_NAME = 'Member without PII';
 
 export function memberName(

@@ -17,8 +17,8 @@ import {
 import {
     postWorkOrderCreation,
     postWorkOrderTransition,
-    postWorkOrderBinding,
-    postWorkOrderClaim,
+    putWorkOrderBinding,
+    putWorkOrderClaim,
     putWorkOrder,
 } from
 '../web-app/app/adapters/work-orders-mutations.ts';
@@ -231,7 +231,7 @@ async function seedClaim(
     workOrderId: string,
     claimAt: string,
 ): Promise<void> {
-    await ctx.POST(`work-orders/${workOrderId}/claim`, {
+    await ctx.PUT(`work-orders/${workOrderId}/claim`, {
         claimEventId: generateCryptoSafeBase62(),
         claimAt,
         expireEventId: generateCryptoSafeBase62(),
@@ -242,12 +242,11 @@ async function seedClaim(
 async function seedRelease(
     ctx: RequestContext,
     workOrderId: string,
-    releaseAt: string,
+    _releaseAt: string,
 ): Promise<void> {
-    await ctx.POST(`work-orders/${workOrderId}/release`, {
-        releaseEventId: generateCryptoSafeBase62(),
-        releaseAt,
-    });
+    await ctx.DELETE(
+        `work-orders/${workOrderId}/claim`,
+    );
 }
 
 async function seedBareWorkOrder(
@@ -638,7 +637,7 @@ test(
         await seedFlow(db, 'f1', buildLinearGraph());
         await seedTypeInstanceAndJoin(ctx, 'f1', 'v0');
         const woId = await createWorkOrder(ctx, 'f1');
-        await postWorkOrderBinding(
+        await putWorkOrderBinding(
             ctx, woId, INST_ID, RT_ID,
         );
         await pause(2);
@@ -673,7 +672,7 @@ test(
         await seedFlow(db, 'f1', buildLinearGraph());
         await seedTypeInstanceAndJoin(ctx, 'f1', 'v0');
         const woId = await createWorkOrder(ctx, 'f1');
-        await postWorkOrderBinding(
+        await putWorkOrderBinding(
             ctx, woId, INST_ID, RT_ID,
         );
         await pause(2);
@@ -701,7 +700,7 @@ test(
         await seedFlow(db, 'f1', buildLinearGraph());
         await seedTypeInstanceAndJoin(ctx, 'f1', 'v0');
         const woId = await createWorkOrder(ctx, 'f1');
-        await postWorkOrderBinding(
+        await putWorkOrderBinding(
             ctx, woId, INST_ID, RT_ID,
         );
         const before = await getRecordInstance(
@@ -734,14 +733,14 @@ test(
 );
 
 test(
-    'postWorkOrderBinding embeds instance on'
+    'putWorkOrderBinding embeds instance on'
     + ' the work-order GET',
     async () => {
         const { db, ctx } = await setupScopedDb();
         await seedFlow(db, 'f1', buildLinearGraph());
         await seedTypeInstanceAndJoin(ctx, 'f1');
         const woId = await createWorkOrder(ctx, 'f1');
-        await postWorkOrderBinding(
+        await putWorkOrderBinding(
             ctx, woId, INST_ID, RT_ID,
         );
         const wo = await getWorkOrder(ctx, woId);
@@ -750,10 +749,10 @@ test(
     },
 );
 
-// ── postWorkOrderClaim ────────────
+// ── putWorkOrderClaim ────────────
 
 test(
-    'postWorkOrderClaim records a fresh '
+    'putWorkOrderClaim records a fresh '
     + 'claimed state event',
     async () => {
         const { db, ctx } = await setupDb();
@@ -765,7 +764,7 @@ test(
         // without the expiration-notice branch.
         await seedRelease(ctx, woId, nowUtc());
         await pause(2);
-        await postWorkOrderClaim(ctx, woId);
+        await putWorkOrderClaim(ctx, woId);
 
         const claim =
             await getWorkOrderActiveClaim(
@@ -777,7 +776,7 @@ test(
 );
 
 test(
-    'postWorkOrderClaim is idempotent — a repeat '
+    'putWorkOrderClaim is idempotent — a repeat '
     + 'claim by the holder appends no duplicate',
     async () => {
         const { db, ctx } = await setupDb();
@@ -789,9 +788,9 @@ test(
         // only contributors to the count.
         await seedRelease(ctx, woId, nowUtc());
         await pause(2);
-        await postWorkOrderClaim(ctx, woId);
+        await putWorkOrderClaim(ctx, woId);
         await pause(2);
-        await postWorkOrderClaim(ctx, woId);
+        await putWorkOrderClaim(ctx, woId);
         const events =
             await workOrderLifecycleStatesFor(db, '1', woId);
         const claimed = events.filter(
@@ -969,14 +968,13 @@ test(
 );
 
 test(
-    'deleteWorkOrderClaim posts release with releaseEventId'
-    + ' + releaseAt and derives claim_released',
+    'deleteWorkOrderClaim DELETEs claim and '
+    + 'derives claim_released',
     async () => {
         const { db, ctx } = await setupDb();
         await seedFlow(db, 'f1', buildLinearGraph());
-        // Birth create leaves a live claim; the named release
-        // op ends it. Body shape is {releaseEventId,
-        // releaseAt} — both caller-minted.
+        // Birth create leaves a live claim; DELETE
+        // on the claim address ends it.
         const woId = await createWorkOrder(ctx, 'f1');
         await deleteWorkOrderClaim(ctx, woId);
         const events = await ctx.GET<StateEntity[]>(

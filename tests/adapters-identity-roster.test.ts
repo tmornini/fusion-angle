@@ -77,65 +77,21 @@ async () => {
     }
 });
 
-test('getIdentityRoster names a service from its ai-member',
+test('getIdentityRoster leaves a service unnamed'
++ ' (agents are not identities)',
 async () => {
     const { db, ctx } = await setup();
     await postIdentityCreation(ctx, 's2', {
         kind: 'service', secret: 'shh',
     });
-    // The ai-members detail write is re-pointed onto the message
-    // pair postAiMemberDocumentOp appends (finding 18's fixture
-    // budget): getIdentityRoster reads ctx.GET('ai-members'),
-    // which is now ledger-derived, so a raw row here would never
-    // surface in the round-trip this test exercises.
-    const detail = {
-        name: 'Grok 4.3',
-        description: 'Fast reasoning model',
-        skill_focus: '',
-        model: firstProviderModel().id,
-    };
-    const entry = WRITE_RESPONSE_SPECS['ai-members/:id'];
-    if (
-        entry === undefined
-        || 'status' in entry
-        || entry.put === undefined
-    ) {
-        throw new Error(
-            'no per-write response spec for ai-members/:id',
-        );
-    }
-    const spec = entry.put;
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/ai-members/s2',
-        routePattern: 'ai-members/:id',
-        routeSegments: ['ai-members', ':id'],
-        pathSegments: ['ai-members', 's2'],
-        headerFields: [],
-        body: detail,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: undefined,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            ['s2'], detail, SYSTEM_MEMBER_ID, undefined,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postAiMemberDocumentOp(
-        db, 's2', detail, SYSTEM_MEMBER_ID, pair,
-    );
     const roster = await getIdentityRoster(ctx);
     const row = roster.find(r => r.id === 's2');
     assert.ok(row, 'roster row for s2 exists');
     assert.equal(row.kind, 'service');
-    if (row.kind === 'service' && row.service.named) {
-        assert.equal(row.service.name, 'Grok 4.3');
-        assert.equal(
-            row.service.detail, 'Fast reasoning model',
-        );
+    if (row.kind === 'service') {
+        assert.equal(row.service.named, false);
     } else {
-        assert.fail('expected a named service row');
+        assert.fail('expected a service row');
     }
 });
 

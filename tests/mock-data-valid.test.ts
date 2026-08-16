@@ -5,6 +5,8 @@ import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
 import { deriveMemberParents } from
     '../api/derive-members.ts';
+import { deriveDocumentsAt } from
+    '../api/derive-documents.ts';
 import {
     validateIdeaEntity,
     validateProjectEntity,
@@ -606,12 +608,28 @@ test(
                 .filter(m => m.type === 'system')
                 .map(m => m.id),
         );
+        const [agentRequests, agentResponses] =
+            await Promise.all([
+                db.requests.getAllWhere(
+                    'uri_collection', '/ai-agents/',
+                ),
+                db.responses.getAllWhere(
+                    'uri_collection', '/ai-agents/',
+                ),
+            ]);
+        const agentIds = new Set(
+            deriveDocumentsAt(
+                agentRequests, agentResponses,
+                '/ai-agents/',
+            ).keys(),
+        );
         const violations = new Set<string>();
         for (const s of states) {
             const woOrganization =
                 organizationByWo.get(s.entity_id);
             if (woOrganization === undefined) continue;
             if (systemMembers.has(s.member_id)) continue;
+            if (agentIds.has(s.member_id)) continue;
             const organizations =
                 organizationsByMember.get(s.member_id);
             if (

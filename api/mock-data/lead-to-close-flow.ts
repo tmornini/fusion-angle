@@ -56,8 +56,9 @@ export const l2cReviseEdgeId =
     'L2cE09N3g0tPr0psL2cR09';
 
 // The members participating in the Lead-to-Close flow,
-// referenced by the graph nodes' memberIds and the workload
-// skill matrix.
+// referenced by the graph nodes' memberIds (person
+// identities), agentIds (Claude), and the workload skill
+// matrix.
 export const memberSarah = 'LhfaUUf4IumVsCSGB4xjdK';
 export const memberMarcus =
     'WxQn4LVWb76YkmqK5B0EPp';
@@ -85,9 +86,8 @@ export function buildLeadToCloseNodes(): GraphNode[] {
             positionY: 100,
             isCreate: false,
             isArchive: false,
-            memberIds: [
-                memberLisa, memberClaude,
-            ],
+            memberIds: [memberLisa],
+            agentIds: [memberClaude],
             attributes: [],
             taskInstructions: '',
         },

@@ -31,7 +31,8 @@ test(
         // DEV_TOKEN carries no `organization` claim, so
         // fenceRequest falls back to identityDefaultOrganization,
         // which derives from db.requests/db.responses at the
-        // identity's default-org address. Fault THAT read alone
+        // identity's default-organization address. Fault THAT
+        // read alone
         // — every other read passes through unaffected.
         const original = db.requests.getAllWhere.bind(db.requests);
         (db.requests as unknown as {
@@ -39,7 +40,8 @@ test(
                 column: string, key: string,
             ) => ReturnType<typeof original>;
         }).getAllWhere = async (column, key) => {
-            if (key === '/identities/current/default-org/') {
+            if (key === '/identities/current/'
+                + 'default-organization/') {
                 throw new Error('secret fence fault detail');
             }
             return original(column, key);
@@ -80,7 +82,8 @@ test(
                 column: string, key: string,
             ) => ReturnType<typeof original>;
         }).getAllWhere = async (column, key) => {
-            if (key === '/identities/current/default-org/') {
+            if (key === '/identities/current/'
+                + 'default-organization/') {
                 throw new MissingTableError('requests');
             }
             return original(column, key);

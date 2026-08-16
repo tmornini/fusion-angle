@@ -131,42 +131,31 @@ test('documentWriteResponseSpec produces the identities'
     assert.deepEqual(actual, { id: 'id-1', kind: 'person' });
 });
 
-test('documentWriteResponseSpec produces the memberships'
-+ ' successBody (G3 entityOf)', () => {
-    const wiring = documentFamilyWiring('memberships')!;
-    const body = {
-        organization_id: '1', identity_id: 'sarah',
-        type: 'member', at: AT,
-    };
-    const actual = documentWriteResponseSpec(wiring)
-        .successBody!(['ms-1'], body, 'current', '1');
-    assert.deepEqual(actual, { id: 'ms-1', ...body });
+test('leftover roster families have no document wiring',
+() => {
+    for (const family of [
+        'memberships', 'members',
+        'ai-members', 'human-members',
+    ]) {
+        assert.equal(
+            documentFamilyWiring(family), undefined,
+            family,
+        );
+    }
 });
 
-test('documentWriteResponseSpec produces the ai-members'
+test('documentWriteResponseSpec produces the ai-agents'
 + ' successBody (G3 entityOf, request-body key order)',
 () => {
-    const wiring = documentFamilyWiring('ai-members')!;
+    const wiring = documentFamilyWiring('ai-agents')!;
     const body = {
         name: 'A', description: 'd',
         model: 'mnte677fU2G1V2B9vJp9z7',
         skill_focus: 's',
     };
     const actual = documentWriteResponseSpec(wiring)
-        .successBody!(['ai-1'], body, 'current', '1');
-    assert.deepEqual(actual, { id: 'ai-1', ...body });
-});
-
-test('documentWriteResponseSpec produces the human-members'
-+ ' successBody (G3 entityOf)', () => {
-    const wiring = documentFamilyWiring('human-members')!;
-    const body = {
-        title: 'T', department: 'D',
-        strengths: [], team_dimensions: {},
-    };
-    const actual = documentWriteResponseSpec(wiring)
-        .successBody!(['hm-1'], body, 'current', '1');
-    assert.deepEqual(actual, { id: 'hm-1', ...body });
+        .successBody!(['ag-1'], body, 'current', '1');
+    assert.deepEqual(actual, { id: 'ag-1', ...body });
 });
 
 // -- (b) documentEntityRoute('simple') dispatches PUT to the

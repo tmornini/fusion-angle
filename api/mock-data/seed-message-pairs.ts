@@ -128,9 +128,9 @@ import type {
     OrganizationEntity,
 } from '../types.ts';
 import {
-    nowUtc,
     DEFAULT_LOCK_TIMEOUT,
     SYSTEM_MEMBER_ID,
+    storedGraph,
 } from '../types.ts';
 import {
     formWritePair,
@@ -151,13 +151,10 @@ import {
     recordAttributeDocumentBodyOf,
     objectiveDocumentBodyOf,
     objectiveRevisionBodyOf,
-    memberDocumentBodyOf,
-    aiMemberDetailBodyOf,
-    humanMemberDetailBodyOf,
     identityDocumentBodyOf,
 } from '../routes.ts';
-import type { MemberWritePairs } from '../routes.ts';
 import {
+    asStoredGraph,
     validateFlowCreateBody,
     validateRecordWriteBody,
     validateObjectiveCreateBody,
@@ -165,6 +162,7 @@ import {
 import {
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
+    ORGANIZATION_MEMBER_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../family-registry.ts';
@@ -846,6 +844,39 @@ export function buildScoreSeedProjects():
     );
 }
 
+// CREATE reduction rebuilds memberIds from memberEvents
+// and drops agentIds. Stamp the authored agentIds onto
+// the stored document graph so GET derive matches the
+// seed source.
+function seedFlowDocumentBody(
+    createBody: ReturnType<typeof validateFlowCreateBody>,
+    authored: FlowSeed['graph'],
+): Record<string, unknown> {
+    const document = flowCreateDocumentBody(createBody);
+    const reduced = asStoredGraph(
+        document['graph'], 'seed reduced graph',
+    );
+    const source = asStoredGraph(
+        authored, 'seed authored graph',
+    );
+    const agents = new Map(
+        source.nodes.map((node) => [node.id, node.agentIds]),
+    );
+    return {
+        ...document,
+        graph: storedGraph({
+            nodes: reduced.nodes.map((node) => {
+                const agentIds = agents.get(node.id);
+                return agentIds !== undefined
+                    && agentIds.length > 0
+                    ? { ...node, agentIds }
+                    : node;
+            }),
+            edges: reduced.edges,
+        }),
+    };
+}
+
 export function flowSeedBody(
     flow: FlowSeed,
     event: StateEntity,
@@ -1081,6 +1112,43 @@ export function membershipSeedBody(
     };
 }
 
+export function seatSeedBody(
+    type: 'admin' | 'member',
+    at: string = MOCK_SEED_TIMESTAMP,
+): Record<string, unknown> {
+    return { type, at };
+}
+
+export function identityPersonSeedBody(
+    member: SeedHumanMember,
+): Record<string, unknown> {
+    return identityDocumentBodyOf('person', {
+        title: member.title,
+        department: member.department,
+        strengths: member.strengths,
+        team_dimensions: member.team_dimensions,
+    });
+}
+
+export function bootstrapCurrentIdentityBody():
+    Record<string, unknown> {
+    return identityDocumentBodyOf('person', {
+        title: 'Admin',
+        department: 'Product',
+        strengths: [
+            'Strategic Planning',
+            'Data Analysis',
+            'Stakeholder Management',
+        ],
+        team_dimensions: {
+            driver: 80,
+            analytical: 80,
+            expressive: 80,
+            amiable: 80,
+        },
+    });
+}
+
 // The wire body a live PUT role-grants/:id would carry for this
 // SAME write: {organization_id, identity_id, role, action,
 // by_member_id, at} — the ONE shape every seeded role grant
@@ -1125,21 +1193,12 @@ export function identityCredentialSeedBody(
     };
 }
 
-// The wire body a live PUT identities/:id/default-org would carry
-// for this SAME write: {organization_id, eventId, at} — the ONE
-// shape every seeded default-org event (11 mock-data rows +
-// bootstrap's own) shares. `at` is always MOCK_SEED_TIMESTAMP, the
-// SAME fixed moment both mock-data.ts's raw
-// identityDefaultOrganizations.put sites already stamp their row
-// with (Path A: the row stays raw, unchanged by this task).
+// The wire body a live PUT identities/:id/default-organization
+// would carry: { organization_id }.
 export function defaultOrganizationSeedBody(
-    organizationId: Id, eventId: Id,
+    organizationId: Id,
 ): Record<string, unknown> {
-    return {
-        organization_id: organizationId,
-        eventId,
-        at: MOCK_SEED_TIMESTAMP,
-    };
+    return { organization_id: organizationId };
 }
 
 export function recordSeedBody(
@@ -1250,21 +1309,7 @@ export const bootstrapRoleGrantId = 'bootstrap-role-current-admin';
 // states/:id genesis pair is retired.
 export const bootstrapSystemStateEventId = 'bootstrap-system-active';
 
-// Bootstrap's own default-org event id — the SAME
-// bootstrapMembershipId precedent above, for the default-org
-// event Task 8 (Phase 11) gate-seeds (postBootstrapIn's own raw
-// identityDefaultOrganizations.put call, mock-data.ts).
-export const bootstrapDefaultOrganizationEventId =
-    'bootstrap-default-org-current';
 
-// Every seeded human member's own default-org event id — the ONE
-// construction both this file's pass 1 (the pair former below)
-// and mock-data.ts's pass 2 (the raw
-// identityDefaultOrganizations.put call) share, so neither can
-// drift from the other.
-export function defaultOrganizationSeedEventId(memberId: Id): string {
-    return 'seed-default-org-' + memberId;
-}
 
 // Every member's PRIMARY organization: 'current' orders Stark
 // first (alongside org Two, in postMockDataLoadIn's own
@@ -1430,72 +1475,29 @@ export function buildMockDataInvocations():
             ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
             : [assignOrganization(index)];
         organizations.forEach((organization, n) => {
-            const membershipId =
-                'seed-membership-' + member.id + '-' + n;
             const type = member.id === 'current'
                 ? 'admin' as const
                 : 'member' as const;
             invocations.push({
-                key: seedPairKey('memberships/:id', membershipId),
-                routePattern: 'memberships/:id',
-                idParams: [membershipId],
+                key: seedPairKey(
+                    ORGANIZATION_MEMBER_DETAIL_PATTERN,
+                    member.id + '-' + n,
+                ),
+                routePattern:
+                    ORGANIZATION_MEMBER_DETAIL_PATTERN,
+                idParams: [organization, member.id],
                 organization,
                 requesterIdentityId: SYSTEM_MEMBER_ID,
-                body: membershipSeedBody(
-                    organization, member.id, type,
-                ),
+                body: seatSeedBody(type),
             });
         });
-        const createBody = humanMemberSeedBody(member);
-        invocations.push({
-            key: seedPairKey('human-members', member.id),
-            routePattern: 'human-members',
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: createBody,
-        });
-        // Task 4: create appends the member-document pair (the
-        // shared members/:id address every member kind writes
-        // through) and the detail-document pair
-        // (human-members/:id), each keyed by its OWN
-        // deterministic invocation entry — the objectives
-        // document/revision precedent, the roster's own fixed
-        // 1+1+1 (now 1+1+1+1, Task 5 below). Bodies via the
-        // shared BODY builders (api/routes.ts) — never a second,
-        // hand-rolled copy. The SAME system author authors every
-        // invocation.
-        invocations.push({
-            key: seedPairKey('members/:id', member.id),
-            routePattern: 'members/:id',
-            idParams: [member.id],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: memberDocumentBodyOf('human', {
-                state: member.state,
-                stateAt: MOCK_SEED_TIMESTAMP,
-                stateEventId:
-                    `seed-member-${member.id}-${member.state}`,
-            }),
-        });
-        invocations.push({
-            key: seedPairKey('human-members/:id', member.id),
-            routePattern: 'human-members/:id',
-            idParams: [member.id],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: humanMemberDetailBodyOf(createBody),
-        });
-        // Task 5: the identities/:id document pair — a human
-        // member's own identity row, which an AI member never has
-        // (finding 10), so no sibling invocation exists in the
-        // ai-members loop below.
         invocations.push({
             key: seedPairKey('identities/:id', member.id),
             routePattern: 'identities/:id',
             idParams: [member.id],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: identityDocumentBodyOf('person'),
+            body: identityPersonSeedBody(member),
         });
         // Phase 10 Task 2: the PII facet's own document pair,
         // closing the intake decomposition's seed side — its own
@@ -1517,25 +1519,7 @@ export function buildMockDataInvocations():
             body: humanMemberPiiSeedBody(member),
         });
     });
-    // Task 5: the system member's own members/:id document
-    // pair — the roster's shared address every member kind
-    // writes through, now including the system actor itself,
-    // closing the last raw members.put site the mock-data seed
-    // still held (Path A, Phase 8 Task 5).
-    invocations.push({
-        key: seedPairKey('members/:id', SYSTEM_MEMBER_ID),
-        routePattern: 'members/:id',
-        idParams: [SYSTEM_MEMBER_ID],
-        organization: undefined,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        body: memberDocumentBodyOf('system', {
-            state: 'active',
-            stateAt: MOCK_SEED_TIMESTAMP,
-            stateEventId:
-                `seed-member-${SYSTEM_MEMBER_ID}-active`,
-        }),
-    });
-    // Task 6: the system identity's OWN identities/:id document
+    // The system identity's OWN identities/:id document
     // pair — the last raw identities.put site the mock-data seed
     // still held for the system actor (the human-member loop
     // above forms this SAME pair per human member already; the
@@ -1644,7 +1628,7 @@ export function buildMockDataInvocations():
             idParams: [flow.id],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
-            body: flowCreateDocumentBody(b),
+            body: seedFlowDocumentBody(b, flow.graph),
         });
         invocations.push({
             key: seedPairKey(
@@ -1756,70 +1740,14 @@ export function buildMockDataInvocations():
         });
     }
     for (const m of aiMembers) {
-        // Task 5: every AI member joins STARK_ORGANIZATION alone
-        // (mock-data.ts's own AI-members loop) — ordered before
-        // the ai-member triple below, the SAME write order
-        // postMockDataLoadIn uses (the membership lands before
-        // the member it joins is created).
-        const membershipId = 'seed-membership-' + m.id;
+        const { id: _id, ...fields } = m;
         invocations.push({
-            key: seedPairKey('memberships/:id', membershipId),
-            routePattern: 'memberships/:id',
-            idParams: [membershipId],
-            organization: STARK_ORGANIZATION,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: membershipSeedBody(
-                STARK_ORGANIZATION, m.id, 'member',
-            ),
-        });
-        // Task 6: the AI member's OWN identities/:id document
-        // pair — an AI member's identity row exists (finding 10
-        // only excludes AI members from the human-only PII
-        // facet), but its write sits OUTSIDE the ai-members
-        // triple below (mock-data.ts's own separate op call), so
-        // it forms its OWN standalone invocation rather than
-        // widening that triple. Its message pair shares its
-        // uri_id with the triple's operation/detail pairs — the
-        // H7/arrival-order hazard; tests/mock-data-pairs.test.ts's
-        // AI-member request lookups disambiguate by response
-        // status, never by arrival order.
-        invocations.push({
-            key: seedPairKey('identities/:id', m.id),
-            routePattern: 'identities/:id',
+            key: seedPairKey('ai-agents/:id', m.id),
+            routePattern: 'ai-agents/:id',
             idParams: [m.id],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: identityDocumentBodyOf('service'),
-        });
-        const createBody = aiMemberSeedBody(m);
-        invocations.push({
-            key: seedPairKey('ai-members', m.id),
-            routePattern: 'ai-members',
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: createBody,
-        });
-        // Task 4: the human-members precedent above, for the AI
-        // facet.
-        invocations.push({
-            key: seedPairKey('members/:id', m.id),
-            routePattern: 'members/:id',
-            idParams: [m.id],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: memberDocumentBodyOf('ai', {
-                state: 'active',
-                stateAt: MOCK_SEED_TIMESTAMP,
-                stateEventId: `seed-member-${m.id}-active`,
-            }),
-        });
-        invocations.push({
-            key: seedPairKey('ai-members/:id', m.id),
-            routePattern: 'ai-members/:id',
-            idParams: [m.id],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: aiMemberDetailBodyOf(createBody),
+            body: fields,
         });
     }
     mockRecords.forEach((r, i) => {
@@ -2145,36 +2073,25 @@ function documentSeedResponse(
     };
 }
 
-// The default-org side channel's OWN pair former (Task 8, Phase
-// 11 — closing the LAST "STAYS RAW" deferral mock-data.ts's two
-// direct identityDefaultOrganizations.put sites still name):
-// mirrors identityDefaultOrganizationRequest's own formWritePair
-// call (api/organization-requests.ts) byte-for-byte — routeSegments
-// carries a FABRICATED trailing :eventId segment no real URL ever
-// has (the live PUT's eventId is a BODY key, never a path
-// segment), so this cannot ride formSeedPair's generic
-// routePattern.split('/') convention above, the SAME reason the
-// invitations side channel forms its own pairs directly rather
-// than through buildMockDataInvocations. organization is
-// undefined (global plane); the response is always 204/no-body,
-// byte-identical to the live route's own shape for every write
-// regardless of whether the row's organization actually changed.
+// The default-organization side channel's own pair former:
+// mirrors identityDefaultOrganizationRequest's formWritePair
+// (api/organization-requests.ts) — a singleton document at
+// /identities/:id/default-organization/ (uriId '').
 async function formDefaultOrganizationSeedPair(
     identityId: Id,
-    eventId: Id,
     organizationId: Id,
     requestAt: string,
 ): Promise<MessagePair> {
     const pathSegments = [
-        'identities', identityId, 'default-org', eventId,
+        'identities', identityId, 'default-organization',
     ];
     const operationId = generateCryptoSafeBase62();
     return formWritePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
-        routePattern: 'identities/:id/default-org',
+        routePattern: 'identities/:id/default-organization',
         routeSegments: [
-            'identities', ':id', 'default-org', ':eventId',
+            'identities', ':id', 'default-organization',
         ],
         pathSegments,
         headerFields: [
@@ -2183,7 +2100,7 @@ async function formDefaultOrganizationSeedPair(
                 value: operationId,
             },
         ],
-        body: defaultOrganizationSeedBody(organizationId, eventId),
+        body: defaultOrganizationSeedBody(organizationId),
         requesterIdentityId: identityId,
         requestAt,
         organization: undefined,
@@ -2256,7 +2173,7 @@ export async function formInstanceChainPairs():
 
     const bindingId = generateCryptoSafeBase62();
     const binding = await formWritePair({
-        method: 'POST',
+        method: 'PUT',
         pathname:
             '/work-orders/' + woId + '/binding',
         routePattern: 'work-orders/:id/binding',
@@ -2420,17 +2337,15 @@ export async function formMockDataMessagePairs(
     for (const inv of buildMockDataInvocations()) {
         pairs.set(inv.key, await formSeedPair(inv, requestAt));
     }
-    // Task 8 (Phase 11): the identity_default_organizations
-    // family's own pair, one per seeded human member — kept
-    // OUTSIDE buildMockDataInvocations/formSeedPair (the
-    // formSeedCredentialPairs precedent) since its address
-    // fabricates a trailing :eventId segment no real URL carries.
+    // One default-organization document per seeded human.
     for (const [index, member] of buildMembers().entries()) {
         pairs.set(
-            seedPairKey('identities/:id/default-org', member.id),
+            seedPairKey(
+                'identities/:id/default-organization',
+                member.id,
+            ),
             await formDefaultOrganizationSeedPair(
                 member.id,
-                defaultOrganizationSeedEventId(member.id),
                 memberPrimaryOrganization(member.id, index),
                 requestAt,
             ),
@@ -2544,102 +2459,36 @@ export async function formSeedCredentialPairs(
 export async function formBootstrapMessagePair(
     requestAt: string,
 ): Promise<{
-    readonly body: Record<string, unknown>;
-    readonly pairs: MemberWritePairs;
-    readonly membershipPair: MessagePair;
-    readonly systemMemberPair: MessagePair;
+    readonly identityPair: MessagePair;
+    readonly seatPair: MessagePair;
     readonly piiPair: MessagePair;
     readonly systemIdentityPair: MessagePair;
-    readonly systemStateEventAt: string;
     readonly defaultOrganizationPair: MessagePair;
     readonly organizationPair: MessagePair;
 }> {
-    const body = bootstrapCurrentMemberBody(nowUtc());
-    const envelopeId = generateCryptoSafeBase62();
-    const operation = await formSeedPair(
-        {
-            key: seedPairKey('human-members', 'current'),
-            routePattern: 'human-members',
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body,
-        },
-        requestAt,
-        envelopeId,
-    );
-    const memberDocument = await formSeedPair(
-        {
-            key: seedPairKey('members/:id', 'current'),
-            routePattern: 'members/:id',
-            idParams: ['current'],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: memberDocumentBodyOf('human', {
-                state: body.initialState as
-                    'active' | 'pending' | 'archived',
-                stateAt: body.initialStateAt as string,
-                stateEventId:
-                    body.initialStateEventId as string,
-            }),
-        },
-        requestAt,
-        envelopeId,
-    );
-    const detailDocument = await formSeedPair(
-        {
-            key: seedPairKey('human-members/:id', 'current'),
-            routePattern: 'human-members/:id',
-            idParams: ['current'],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: humanMemberDetailBodyOf(body),
-        },
-        requestAt,
-        envelopeId,
-    );
-    // Task 5: the current member's own identities/:id document
-    // pair — the SAME fourth invocation the mock-data seed's own
-    // human-members loop now forms per member.
-    const identityDocument = await formSeedPair(
+    const identityPair = await formSeedPair(
         {
             key: seedPairKey('identities/:id', 'current'),
             routePattern: 'identities/:id',
             idParams: ['current'],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: identityDocumentBodyOf('person'),
+            body: bootstrapCurrentIdentityBody(),
         },
         requestAt,
-        envelopeId,
     );
-    const membershipPair = await formSeedPair(
+    const seatPair = await formSeedPair(
         {
-            key: seedPairKey('memberships/:id', bootstrapMembershipId),
-            routePattern: 'memberships/:id',
-            idParams: [bootstrapMembershipId],
+            key: seedPairKey(
+                ORGANIZATION_MEMBER_DETAIL_PATTERN,
+                'current-0',
+            ),
+            routePattern:
+                ORGANIZATION_MEMBER_DETAIL_PATTERN,
+            idParams: [STARK_ORGANIZATION, 'current'],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: membershipSeedBody(
-                STARK_ORGANIZATION, 'current', 'admin',
-            ),
-        },
-        requestAt,
-    );
-    // Task 8: system-member genesis rides the members/:id trio.
-    // Mint `at` once ABOVE the pair so pass 2 can echo it.
-    const systemStateEventAt = nowUtc();
-    const systemMemberPair = await formSeedPair(
-        {
-            key: seedPairKey('members/:id', SYSTEM_MEMBER_ID),
-            routePattern: 'members/:id',
-            idParams: [SYSTEM_MEMBER_ID],
-            organization: undefined,
-            requesterIdentityId: SYSTEM_MEMBER_ID,
-            body: memberDocumentBodyOf('system', {
-                state: 'active',
-                stateAt: systemStateEventAt,
-                stateEventId: bootstrapSystemStateEventId,
-            }),
+            body: seatSeedBody('admin', requestAt),
         },
         requestAt,
     );
@@ -2654,9 +2503,6 @@ export async function formBootstrapMessagePair(
         },
         requestAt,
     );
-    // Task 6: the system identity's OWN identities/:id document
-    // pair — the mock-data seed's own system-identity precedent
-    // above, mirrored here for bootstrap.
     const systemIdentityPair = await formSeedPair(
         {
             key: seedPairKey('identities/:id', SYSTEM_MEMBER_ID),
@@ -2668,21 +2514,10 @@ export async function formBootstrapMessagePair(
         },
         requestAt,
     );
-    // Role grants retired: bootstrap membership carries
-    // type:"admin"; mint bakes the claim role from it.
-    // Task 8 (Phase 11): bootstrap's own default-org event forms
-    // its OWN pair too — the mock-data seed's own per-member
-    // precedent above, mirrored here for bootstrap's lone
-    // identity.
-    const defaultOrganizationPair = await formDefaultOrganizationSeedPair(
-        'current', bootstrapDefaultOrganizationEventId,
-        STARK_ORGANIZATION, requestAt,
-    );
-    // Task 3 (Phase 12): bootstrap's own lone organizations row
-    // (STARK_ORGANIZATION — bootstrap seeds no second org) forms
-    // its OWN pair too — the mock-data seed's own organizations
-    // precedent above, mirrored here. Phase Final Task 2:
-    // organizations ROW half stripped — pair-plane only.
+    const defaultOrganizationPair =
+        await formDefaultOrganizationSeedPair(
+            'current', STARK_ORGANIZATION, requestAt,
+        );
     const organizationPair = await formSeedPair(
         {
             key: seedPairKey('organizations/:id', STARK_ORGANIZATION),
@@ -2698,16 +2533,10 @@ export async function formBootstrapMessagePair(
         requestAt,
     );
     return {
-        body,
-        pairs: {
-            operation, memberDocument, detailDocument,
-            identityDocument,
-        },
-        membershipPair,
-        systemMemberPair,
+        identityPair,
+        seatPair,
         piiPair,
         systemIdentityPair,
-        systemStateEventAt,
         defaultOrganizationPair,
         organizationPair,
     };

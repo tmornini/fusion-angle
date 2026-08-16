@@ -6,9 +6,8 @@ import {
     putSessionToken,
 } from './session-token.ts';
 
-// Cookie-session mode (server ZIP). Default is today's
-// localStorage pair (browser ZIP). server-core.ts enables
-// this; do not reuse setServerTier.
+// Cookie-session mode. Default is the localStorage
+// pair for tests. server-core.ts enables this.
 let cookieSession = false;
 
 export function setCookieSession(enabled: boolean): void {

@@ -1,4 +1,4 @@
-import { test, afterEach } from 'node:test';
+import { test, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     memoryDbAdapter,
@@ -7,7 +7,6 @@ import {
 import { GET, handleRequest } from '../api/api.ts';
 import { canonicalUriCollection } from '../api/message-pair.ts';
 import {
-    hashPassword,
     setPasswordHasher,
     setScryptDerive,
 } from '../shared/password-hash.ts';
@@ -19,7 +18,6 @@ import {
 import {
     MS_PER_SECOND, setClockForTest, resetClock,
 } from '../api/types.ts';
-import { setServerTier } from '../api/request-auth.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
 import { deriveCredentialsFor } from
@@ -28,13 +26,17 @@ import {
     scryptHash,
     scryptDerive,
 } from '../server/scrypt-hash.ts';
+import { testHashPassword } from './mock-seed.ts';
 
 const BASE = 'http://localhost';
 
 afterEach(() => {
-    setServerTier(false);
-    setPasswordHasher(null);
+    setPasswordHasher(testHashPassword);
     setScryptDerive(null);
+});
+
+beforeEach(() => {
+    setPasswordHasher(testHashPassword);
 });
 
 function jsonPost(path: string, body: unknown): Request {
@@ -49,6 +51,21 @@ const authorize = (b: unknown) =>
     jsonPost('authentication/authorize', b);
 const token = (b: unknown) =>
     jsonPost('authentication/token', b);
+
+async function s256Fields(): Promise<{
+    readonly verifier: string;
+    readonly code_challenge: string;
+    readonly code_challenge_method: 'S256';
+}> {
+    const verifier = 'pkce-verifier-test';
+    return {
+        verifier,
+        code_challenge: bytesToBase64Url(
+            await sha256Bytes(verifier),
+        ),
+        code_challenge_method: 'S256',
+    };
+}
 
 // The surviving-plane counterpart of the retired authorization_
 // codes row check (Phase 13 Task 9): a failed login appends NO
@@ -75,7 +92,8 @@ async function dbWithPasswordUser(): Promise<MemoryDbAdapter> {
     });
     await seedIdentityCredential(db, 'current', 'c1', {
         identity_id: 'current', kind: 'password',
-        status: 'set', secret: await hashPassword('s3cret'),
+        status: 'set',
+        secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
     });
     return db;
@@ -85,9 +103,12 @@ test('password login issues a code exchangeable for a token',
 async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);   // 'current' is admin
+    const pkce = await s256Fields();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',
         password: 's3cret', client_id: 'web',
+        code_challenge: pkce.code_challenge,
+        code_challenge_method: pkce.code_challenge_method,
     }));
     assert.equal(res.status, 201);
     const { code } = await res.json() as { code: string };
@@ -95,11 +116,12 @@ async () => {
     const tok = await handleRequest(db, token({
         grant_type: 'authorization_code', code,
         client_id: 'web',
+        code_verifier: pkce.verifier,
     }));
     assert.equal(tok.status, 201);
     const body = await tok.json() as { access_token: string };
     assert.ok(Array.isArray(
-        await GET(db, 'members', body.access_token)));
+        await GET(db, 'organizations/1/members', body.access_token)));
 });
 
 // authorization_code TTL: a code older than
@@ -109,9 +131,12 @@ async () => {
 test('an expired authorization code is a 401', async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
+    const pkce = await s256Fields();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',
         password: 's3cret', client_id: 'web',
+        code_challenge: pkce.code_challenge,
+        code_challenge_method: pkce.code_challenge_method,
     }));
     assert.equal(res.status, 201);
     const { code } = await res.json() as { code: string };
@@ -136,9 +161,12 @@ test('an expired authorization code is a 401', async () => {
 test('a wrong password is a 401 with no code issued',
 async () => {
     const db = await dbWithPasswordUser();
+    const pkce = await s256Fields();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',
         password: 'WRONG', client_id: 'web',
+        code_challenge: pkce.code_challenge,
+        code_challenge_method: pkce.code_challenge_method,
     }));
     assert.equal(res.status, 401);
     assert.deepEqual(
@@ -149,9 +177,12 @@ async () => {
 test('an unknown username is the same 401 (no enumeration)',
 async () => {
     const db = await dbWithPasswordUser();
+    const pkce = await s256Fields();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'nobody@example.com',
         password: 's3cret', client_id: 'web',
+        code_challenge: pkce.code_challenge,
+        code_challenge_method: pkce.code_challenge_method,
     }));
     assert.equal(res.status, 401);
 });
@@ -173,12 +204,15 @@ async () => {
     await seedIdentityCredential(db, 'current', 'c1', {
         identity_id: 'current', kind: 'password',
         status: 'revoked',
-        secret: await hashPassword('s3cret'),
+        secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
     });
+    const pkce = await s256Fields();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',
         password: 's3cret', client_id: 'web',
+        code_challenge: pkce.code_challenge,
+        code_challenge_method: pkce.code_challenge_method,
     }));
     assert.equal(res.status, 401);
     assert.ok(await noStoredAuthorizeResponse(db));
@@ -202,12 +236,10 @@ test('an unknown authorize method is a 400', async () => {
     assert.equal(res.status, 400);
 });
 
-// Server ZIP: authorize without S256 is a request fault
-// (400), grant-first — no code, no stored pair. Browser
-// ZIP (flag off) keeps the soft path. Reset is afterEach.
-test('server-tier authorize without S256 is rejected',
+// Authorize without S256 is a request fault (400),
+// grant-first — no code, no stored pair.
+test('authorize without S256 is rejected',
 async () => {
-    setServerTier(true);
     const db = await dbWithPasswordUser();
     const res = await handleRequest(db, authorize({
         method: 'password', username: 'demo@example.com',
@@ -221,9 +253,8 @@ async () => {
     assert.ok(await noStoredAuthorizeResponse(db));
 });
 
-test('server-tier authorize with S256 issues a code',
+test('authorize with S256 issues a code',
 async () => {
-    setServerTier(true);
     const db = await dbWithPasswordUser();
     const verifier = 'pkce-verifier-server-tier';
     const res = await handleRequest(db, authorize({
@@ -239,10 +270,9 @@ async () => {
     assert.ok(code.length > 0);
 });
 
-test('server-tier PBKDF2 login appends a scrypt secret',
+test('PBKDF2 login appends a scrypt secret',
 async () => {
     const db = await dbWithPasswordUser();
-    setServerTier(true);
     setPasswordHasher(scryptHash);
     setScryptDerive(scryptDerive);
     const verifier = 'pkce-verifier-rehash';

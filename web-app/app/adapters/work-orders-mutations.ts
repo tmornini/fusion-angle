@@ -14,6 +14,7 @@ import {
 import {
     latestClaimEvent,
     isClaimEventExpired,
+    addUtcSeconds,
 } from '../../../api/work-order-claims.ts';
 import {
     validateWorkOrderFlowGraph,
@@ -399,15 +400,14 @@ export async function postWorkOrderTransition(
 }
 
 // Bind a work order to one org-owned instance of one
-// record type. Claim-op adapter voice: mint nothing
-// client-side beyond the body; notify on success.
-export async function postWorkOrderBinding(
+// record type. Create-only PUT; notify on success.
+export async function putWorkOrderBinding(
     ctx: RequestContext,
     workOrderId: string,
     instanceId: string,
     recordTypeId: string,
 ): Promise<void> {
-    await ctx.POST(
+    await ctx.PUT(
         `work-orders/${workOrderId}/binding`,
         {
             instance_id: instanceId,
@@ -432,27 +432,38 @@ export async function putWorkOrder(
     workOrderChanges.notify();
 }
 
-// The claim decision lives server-side: POST
+// The claim decision lives server-side: PUT
 // work-orders/:id/claim reads the prior claim and
-// appends the new claim events in ONE transaction,
+// appends the new claim document in ONE transaction,
 // so two tabs racing the same claim cannot both
 // succeed — the duplicate-claim TOCTOU is closed at
 // the route, not papered over by a disabled button.
-// The caller mints all four values: expireAt is
-// minted BEFORE claimAt so it orders earlier in the
-// event log (nowUtc is strictly monotonic).
-export async function postWorkOrderClaim(
+// The caller mints event ids plus expires_at (the
+// stored fact). expireAt is minted BEFORE claimAt
+// so it orders earlier in the event log (nowUtc is
+// strictly monotonic).
+export async function putWorkOrderClaim(
     ctx: RequestContext,
     workOrderId: string,
 ): Promise<void> {
+    const wo = await ctx.GET<WorkOrderEntity>(
+        `work-orders/${workOrderId}`,
+    );
+    const graph = validateWorkOrderFlowGraph(
+        wo.flow_graph,
+    );
     const expireAt = nowUtc();
     const claimAt = nowUtc();
-    await ctx.POST(
+    const expiresAt = addUtcSeconds(
+        claimAt, graph.lockTimeout,
+    );
+    await ctx.PUT(
         `work-orders/${workOrderId}/claim`, {
             claimEventId: generateCryptoSafeBase62(),
             claimAt,
             expireEventId: generateCryptoSafeBase62(),
             expireAt,
+            expires_at: expiresAt,
         },
     );
     workOrderChanges.notify();

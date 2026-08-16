@@ -3,35 +3,24 @@ import type {
     Id, IdentityDefaultOrganizationEntity,
 } from './types.ts';
 import { pickString } from './validators.ts';
-import { documentPairsAt } from './derive-documents.ts';
+import {
+    deriveDocumentsAt,
+    documentPairsAt,
+} from './derive-documents.ts';
 
-// Task 8 (Phase 11): the default-organization read flip. An
-// identity's own default-org events live at a PER-IDENTITY
-// address — /identities/:id/default-org/ — mirroring
-// identityDefaultOrganizationRequest's own address construction
-// (api/organization-requests.ts): the eventId rides as a
-// FABRICATED trailing :param segment (the live PUT's eventId is
-// a BODY key; no real URL ever carries a fourth path segment),
-// so the family is identity-keyed even though it is never
-// organization-nested (canonicalUriCollection never nests it — the
-// route always forms the pair with organization: undefined).
+// Task 53: the SET default-organization document lives at
+// /identities/:id/default-organization/ — a singleton
+// (uriId '') like identities/:id/pii. GET returns that
+// document or 404; token resolution is a separate read.
 function defaultOrganizationPrefix(identityId: Id): string {
-    return '/identities/' + identityId + '/default-org/';
+    return '/identities/' + identityId
+        + '/default-organization/';
 }
 
-// The mapped rows currentDefaultOrganizationFor (api/
-// authorization.ts) reduces over — that pure reducer stays
-// UNCHANGED; this function only re-points its ROW SOURCE from the
-// identity_default_organizations table to the message-pair ledger
-// that already records every write to it. A no-op PUT resend
-// (organization_id unchanged) still forms its own pair
-// (identityDefaultOrganizationRequest's own comment: the pair is
-// unconditional, only the ledger ROW is conditional on `changes`),
-// but it always carries the SAME organization_id the identity
-// already held, so including it in the reduction changes nothing
-// the reducer would resolve. TARGETED read: one identity-keyed
-// prefix via the existing uri_collection index — never a full-ledger
-// scan (the E13 generic-scan abomination).
+// The current SET document, or empty when never written.
+// Head-reduced (deriveDocumentsAt): a later PUT at the same
+// address is the document. TARGETED read: one identity-keyed
+// prefix via the uri_collection index.
 export async function deriveDefaultOrganization(
     db: DbAdapter,
     identityId: Id,
@@ -41,13 +30,18 @@ export async function deriveDefaultOrganization(
         db.requests.getAllWhere('uri_collection', prefix),
         db.responses.getAllWhere('uri_collection', prefix),
     ]);
-    return documentPairsAt(requests, responses, prefix).map(
-        (pair) => ({
-            id: pair.uriId,
-            identity_id: identityId,
-            organization_id:
-                pickString(pair.body, 'organization_id'),
-            at: pickString(pair.body, 'at'),
-        }),
-    );
+    const document = deriveDocumentsAt(
+        requests, responses, prefix,
+    ).get('');
+    if (document === undefined) return [];
+    const head = documentPairsAt(
+        requests, responses, prefix,
+    ).find((pair) => pair.id === document.pairId);
+    return [{
+        id: identityId,
+        identity_id: identityId,
+        organization_id:
+            pickString(document.body, 'organization_id'),
+        at: head === undefined ? '' : head.at,
+    }];
 }

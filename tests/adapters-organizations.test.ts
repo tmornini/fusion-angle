@@ -15,6 +15,7 @@ import {
 import { formWritePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 test('putOrganization then getOrganization round-trips',
 async () => {
@@ -32,42 +33,17 @@ async () => {
 // the raw put this replaces — only the write mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     organization: string,
     identityId: string,
     at: string,
 ): Promise<void> {
-    const body = {
-        organization_id: organization,
-        identity_id: identityId,
-        type: identityId === 'current' ? 'admin' : 'member',
-        at,
-    };
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
+    await seedSeat(
+        db,
         organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+        identityId,
+        identityId === 'current' ? 'admin' : 'member',
+        at,
     );
 }
 

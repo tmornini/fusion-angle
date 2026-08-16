@@ -1,4 +1,4 @@
-// Node-only scrypt hasher. Isolated so the browser ZIP
+// Node-only scrypt hasher. Isolated so the client bundle
 // never statically imports node:crypto. Excluded from tsc
 // (no @types/node). boot() registers hasher + derive.
 

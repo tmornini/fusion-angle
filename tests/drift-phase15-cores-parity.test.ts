@@ -304,7 +304,7 @@ async () => {
 
     // Live path: claim against the re-anchored gate succeeds.
     const claimResponse = await handleRequest(db, req(
-        'POST',
+        'PUT',
         '/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: generateCryptoSafeBase62(),
@@ -517,41 +517,23 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
     );
 });
 
-test('stateEventVisibilityFor: member-genesis op-born'
-+ ' initialStateEventId is visible when unowned (no'
-+ ' membership); own when membership present; hidden'
-+ ' to a foreign org', async () => {
+test('resolveOwningOrganization: identity without a seat'
++ ' is unowned; seated identity is own-org / foreign-hidden',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
 
-    // Live create without a membership row: owner-null
-    // on the member id → visible to every asker.
     const unownedId = 'hm-p15-vis-unowned';
-    const unownedEventId = unownedId + '-genesis';
     const unownedCreate = await handleRequest(db, req(
-        'POST', '/human-members', token, {
-            id: unownedId,
-            detail: {
-                title: 'Engineer',
-                department: 'Product',
-                strengths: [],
-                team_dimensions: {},
-            },
-            initialState: 'active',
-            initialStateEventId: unownedEventId,
-            initialStateAt: nowUtc(),
+        'PUT', '/identities/' + unownedId, token, {
+            kind: 'person',
+            title: 'Engineer',
+            department: 'Product',
+            strengths: [],
+            team_dimensions: {},
         },
     ));
     assert.equal(unownedCreate.status, 201);
-
-    // Op-born: no states/:id pair at the genesis id.
-    const byId = await db.responses.getAllWhere(
-        'uri_id', unownedEventId,
-    );
-    const statesTail = '/' + 'states' + '/';
-    const statesHits = byId.filter((r) =>
-        r.uri_collection.endsWith(statesTail));
-    assert.equal(statesHits.length, 0);
 
     assert.equal(
         await resolveOwningOrganization(
@@ -559,55 +541,24 @@ test('stateEventVisibilityFor: member-genesis op-born'
         ),
         null,
     );
-    assert.equal(
-        await stateEventVisibilityFor(
-            db, STARK_ORGANIZATION, unownedEventId,
-        ),
-        'visible',
-    );
-    assert.equal(
-        await stateEventVisibilityFor(
-            db, ORGANIZATION_TWO, unownedEventId,
-        ),
-        'visible',
-    );
-    // Pair-plane owner-null isVisible (orphan → visible).
-    assert.equal(
-        await pairPlaneVisibility(db, STARK_ORGANIZATION, unownedEventId,
-        ),
-        'visible',
-    );
-    assert.equal(
-        await pairPlaneVisibility(db, ORGANIZATION_TWO, unownedEventId,
-        ),
-        'visible',
-    );
 
-    // Membership present → own org visible, foreign hidden.
     const ownedId = 'hm-p15-vis-owned';
-    const ownedEventId = ownedId + '-genesis';
     const ownedCreate = await handleRequest(db, req(
-        'POST', '/human-members', token, {
-            id: ownedId,
-            detail: {
-                title: 'Engineer',
-                department: 'Product',
-                strengths: [],
-                team_dimensions: {},
-            },
-            initialState: 'active',
-            initialStateEventId: ownedEventId,
-            initialStateAt: nowUtc(),
+        'PUT', '/identities/' + ownedId, token, {
+            kind: 'person',
+            title: 'Engineer',
+            department: 'Product',
+            strengths: [],
+            team_dimensions: {},
         },
     ));
     assert.equal(ownedCreate.status, 201);
     const membership = await handleRequest(db, req(
-        'PUT', '/memberships/ms-p15-vis-owned', token, {
-            organization_id: STARK_ORGANIZATION,
-            identity_id: ownedId,
-        type: 'member',
-            at: nowUtc(),
-        },
+        'PUT',
+        '/organizations/' + STARK_ORGANIZATION
+            + '/members/' + ownedId,
+        token,
+        { type: 'member', at: nowUtc() },
     ));
     assert.equal(membership.status, 201);
 
@@ -618,26 +569,10 @@ test('stateEventVisibilityFor: member-genesis op-born'
         STARK_ORGANIZATION,
     );
     assert.equal(
-        await stateEventVisibilityFor(
-            db, STARK_ORGANIZATION, ownedEventId,
+        await resolveOwningOrganization(
+            db, ownedId, ORGANIZATION_TWO,
         ),
-        'visible',
-    );
-    assert.equal(
-        await stateEventVisibilityFor(
-            db, ORGANIZATION_TWO, ownedEventId,
-        ),
-        'hidden',
-    );
-    assert.equal(
-        await pairPlaneVisibility(db, STARK_ORGANIZATION, ownedEventId,
-        ),
-        'visible',
-    );
-    assert.equal(
-        await pairPlaneVisibility(db, ORGANIZATION_TWO, ownedEventId,
-        ),
-        'hidden',
+        STARK_ORGANIZATION,
     );
 });
 

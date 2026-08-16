@@ -14,7 +14,6 @@ import type { DbAdapter } from '../api/db.ts';
 import type { NotificationEvent } from '../api/notifications.ts';
 import {
     validateInvitationEntity,
-    validateMembershipEntity,
 } from '../api/validators.ts';
 import {
     createRequestContext,
@@ -39,22 +38,13 @@ import {
     getSessionToken,
     deleteSessionToken,
 } from '../web-app/app/adapters/session-token.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import {
-    formWritePair,
-    canonicalUriCollection,
-} from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
-import { withoutId } from '../api/document-family.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
@@ -69,35 +59,15 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // replace — only the write mechanism changes.
 async function seedMembershipPair(
     db: DbAdapter,
-    id: string,
+    _id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+    await seedSeat(
+        db,
+        String(body.organization_id),
+        String(body.identity_id),
+        body.type as 'admin' | 'member',
+        String(body.at),
     );
 }
 
@@ -185,21 +155,26 @@ async function deriveMembershipsAll(db: DbAdapter) {
         at: string;
     }> = [];
     for (const organization of organizations) {
-        const prefix = canonicalUriCollection(
-            organization.id, '/memberships/',
-        );
-        const [requests, responses] = await Promise.all([
-            db.requests.getAllWhere('uri_collection', prefix),
-            db.responses.getAllWhere('uri_collection', prefix),
-        ]);
+        const seatPrefix = '/organizations/'
+            + organization.id + '/members/';
+        const [seatRequests, seatResponses] =
+            await Promise.all([
+                db.requests.getAllWhere(
+                    'uri_collection', seatPrefix,
+                ),
+                db.responses.getAllWhere(
+                    'uri_collection', seatPrefix,
+                ),
+            ]);
         for (const document of deriveDocumentsAt(
-            requests, responses, prefix,
+            seatRequests, seatResponses, seatPrefix,
         ).values()) {
             rows.push({
-                ...validateMembershipEntity(
-                    withoutId(document.body),
-                ),
                 id: document.uriId,
+                organization_id: organization.id,
+                identity_id: document.uriId,
+                type: String(document.body['type']),
+                at: String(document.body['at']),
             });
         }
     }

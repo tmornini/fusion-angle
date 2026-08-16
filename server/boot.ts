@@ -21,7 +21,6 @@ import {
     SEED_BOTH_FLAGS,
     SEED_NONEMPTY,
 } from './seed.ts';
-import { setServerTier } from '../api/request-auth.ts';
 import {
     setPasswordHasher,
     setScryptDerive,
@@ -168,7 +167,6 @@ export async function boot(
     env: EnvBag = process.env,
     argv: readonly string[] = process.argv,
 ): Promise<RunningHttp> {
-    setServerTier(true);
     setPasswordHasher(scryptHash);
     setScryptDerive(scryptDerive);
     const seedMode = readSeedMode(argv);

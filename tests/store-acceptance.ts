@@ -231,16 +231,24 @@ export function defineStoreAcceptance(
     test(name + ': DELETE head is gone', async () => {
         const { db, token } = await ready();
         const put = await handleRequest(db, req(
-            'PUT', '/memberships/sa-del', token,
-            membershipDocument('sa-del'),
+            'PUT', '/organizations/1/members/sa-del', token,
+            { type: 'member', at: '2026-01-01T00:00:00.000000Z' },
         ));
         assert.equal(put.status, 201);
         const del = await handleRequest(
-            db, req('DELETE', '/memberships/sa-del', token),
+            db, req(
+                'DELETE',
+                '/organizations/1/members/sa-del',
+                token,
+            ),
         );
         assert.equal(del.status, 204);
         const got = await handleRequest(
-            db, req('GET', '/memberships/sa-del', token),
+            db, req(
+                'GET',
+                '/organizations/1/members/sa-del',
+                token,
+            ),
         );
         assert.equal(got.status, 404);
     });
@@ -349,10 +357,10 @@ export function defineStoreAcceptance(
     });
 
     test(name + ': snapshot loud-reject', async () => {
-        const { db } = await ready();
+        const { db, token } = await ready();
         const before = (await db.requests.getAll()).length;
         const missingOp = await handleRequest(db, req(
-            'PUT', '/snapshots/import', undefined,
+            'PUT', '/snapshots/import', token,
             { json: snapshotWithoutOperationId() },
         ));
         assert.equal(missingOp.status, 400);
@@ -364,7 +372,7 @@ export function defineStoreAcceptance(
             missingBody.error, /Re-snapshot|reseed/,
         );
         const canon = await handleRequest(db, req(
-            'PUT', '/snapshots/import', undefined,
+            'PUT', '/snapshots/import', token,
             { json: snapshotCanonicalJson() },
         ));
         assert.equal(canon.status, 400);

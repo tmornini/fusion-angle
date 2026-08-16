@@ -8,35 +8,26 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
-import { EntityNotFoundError } from '../api/db.ts';
 import {
     validateMembershipDocumentBody,
     validateMembershipEntity,
 } from '../api/validators.ts';
 import {
     postMembershipDocumentOp,
-    membershipDocumentEntityOf,
 } from '../api/routes.ts';
-import {
-    formWritePair,
-    appendMessagePair,
-} from '../api/message-pair.ts';
-import {
-    documentFamilyWiring,
-    documentGetHandler,
-} from '../api/document-family.ts';
+
 import {
     TEST_OPERATION_ID,
     apiRequest,
     storedPutBodyText,
 } from './http-fixtures.ts';
+import {
+    seatDocumentPair,
+} from './root-admin-fixture.ts';
 
-// Phase 8 Task 2 (eighth family, 'stateless'): PUT
-// /memberships/:id takes the entity's OWN fields only — no
-// lifecycle trio. Membership carries privilege type (admin|
-// member) baked into claims at mint — not a pure join.
-// Every entity field (INCLUDING organization_id and type) is
-// REQUIRED on the wire.
+// Seat document body is type + at. Privilege type (admin|
+// member) bakes into claims at mint. Leftover /memberships
+// validators still gate the leftover join shape.
 
 function documentFields() {
     return {
@@ -113,199 +104,155 @@ test('validateMembershipDocumentBody rejects each missing key,'
 
 // -- 2. postMembershipDocumentOp (below-gate, MemoryDbAdapter) --
 
-test('postMembershipDocumentOp writes exactly the pair and'
-+ ' reconstructs the entity return (row half stripped)',
+test('postMembershipDocumentOp writes a seat pair',
 async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const body = documentFields();
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/ms-doc-op-1',
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', 'ms-doc-op-1'],
-        headerFields: [], body,
-        requesterIdentityId: 'current',
-        requestAt: '2026-01-01T00:00:00.000000Z',
-        organization: '1',
-        responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
-    });
-    // Phase Final Task 2: memberships ROW half stripped —
-    // op returns the reconstructed entity; only pairs land.
-    const written = await postMembershipDocumentOp(
-        db, 'ms-doc-op-1', body, 'current', pair,
+    const body = { type: 'member', at: documentFields().at };
+    const pair = await seatDocumentPair(
+        '1', 'sarah', body,
+        '2026-01-01T00:00:00.000000Z',
     );
-    assert.deepEqual(written, documentFields());
-    // Phase Final Stage B: roster tables retired.
+    const written = await postMembershipDocumentOp(
+        db, 'sarah', body, 'current', pair,
+    );
+    assert.deepEqual(written, body);
     assert.equal((await db.requests.getAll()).length, 1);
     assert.equal((await db.responses.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
 
-test('a byte-identical PUT resend to memberships/:id converges'
+test('a byte-identical PUT resend to a seat converges'
 + ' to one stored request/response pair', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const body = documentFields();
+    const body = { type: 'member', at: documentFields().at };
     const first = await PUT(
-        db, 'memberships/ms-resend-1', body, DEV_TOKEN,
+        db, 'organizations/1/members/sarah', body, DEV_TOKEN,
     );
     const second = await PUT(
-        db, 'memberships/ms-resend-1', body, DEV_TOKEN,
+        db, 'organizations/1/members/sarah', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    // seedAdminSchema: org + membership (no role-grant) = 2;
-    // one unique membership PUT = 3 (byte-identical resend
-    // dedups).
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
+    // seedAdminSchema: org + current seat; one unique
+    // sarah seat PUT. Byte-identical resend dedups.
+    assert.equal((await db.requests.getAll()).length, 4);
+    assert.equal((await db.responses.getAll()).length, 4);
 });
 
-// -- 4. below-route via the generic handlers (the drift-file
-// mirror idiom, against the REAL registered wiring row rather
-// than a synthetic stand-in — documentFamilyWiring returns
-// undefined until MEMBERSHIPS_WIRING registers, so this case
-// stays red until that commit lands): a PUT chain Supersedes-
-// chains and the head derives the LATEST body; a DELETE head
-// derives to absence. No states event is ever posted in this
-// test — the stateless arm's ONLY tombstone signal is the
-// DELETE-method head itself (derive-documents.ts), so a clean
-// pass here is itself proof no lifecycle walk ever runs for
-// this family. --------------------------------------------------
-
-async function putDocumentPair(
-    db: MemoryDbAdapter,
-    id: string,
-    body: Record<string, unknown>,
-    requestAt: string,
-): Promise<string> {
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [], body,
-        requesterIdentityId: 'current',
-        requestAt,
-        organization: '1',
-        responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
-    });
-    await db.transaction(
-        ['requests', 'responses'],
-        (view) => appendMessagePair(view, pair),
-    );
-    return pair.id;
-}
-
-async function deleteDocumentPair(
-    db: MemoryDbAdapter,
-    id: string,
-    requestAt: string,
-): Promise<void> {
-    const pair = await formWritePair({
-        method: 'DELETE',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [], body: {},
-        requesterIdentityId: 'current',
-        requestAt,
-        organization: '1',
-        responseStatus: 204, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
-    });
-    await db.transaction(
-        ['requests', 'responses'],
-        (view) => appendMessagePair(view, pair),
-    );
-}
-
-test('a PUT chain Supersedes-chains and the head derives the'
-+ ' LATEST body, through the generic document handlers',
-async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    const wiring = documentFamilyWiring('memberships')!;
-    const first = documentFields();
-    const firstId = await putDocumentPair(
-        db, 'ms-chain-1', first,
-        '2026-02-01T00:00:00.000000Z',
-    );
-    const headAfterFirst = await documentGetHandler(wiring)(
-        db, ['ms-chain-1'], 'current', '1',
-    );
-    assert.deepEqual(headAfterFirst, {
-        id: 'ms-chain-1', ...first,
-    });
-
-    const second = {
-        ...first, at: '2026-02-02T00:00:00.000000Z',
-    };
-    const secondId = await putDocumentPair(
-        db, 'ms-chain-1', second,
-        '2026-02-02T00:00:00.000000Z', firstId,
-    );
-    const secondResponse =
-        await db.responses.getById(secondId);
-    assert.equal('supersedes' in secondResponse, false);
-
-    const headAfterSecond = await documentGetHandler(wiring)(
-        db, ['ms-chain-1'], 'current', '1',
-    );
-    assert.deepEqual(headAfterSecond, {
-        id: 'ms-chain-1', ...second,
-    });
-});
-
-test('a DELETE-head derives absent through the generic'
-+ ' document handlers, carrying notFoundTable (never the'
-+ ' entity-store table name coincidence)', async () => {
-    const db = memoryDbAdapter();
-    await db.postSchemaCreation();
-    const wiring = documentFamilyWiring('memberships')!;
-    await putDocumentPair(
-        db, 'ms-del-1', documentFields(),
-        '2026-02-01T00:00:00.000000Z',
-    );
-    await deleteDocumentPair(
-        db, 'ms-del-1', '2026-02-02T00:00:00.000000Z',
-    );
-    await assert.rejects(
-        documentGetHandler(wiring)(
-            db, ['ms-del-1'], 'current', '1',
-        ),
-        (error: unknown) => {
-            assert.ok(error instanceof EntityNotFoundError);
-            assert.equal(
-                (error as EntityNotFoundError).table,
-                'memberships',
-            );
-            assert.equal(
-                (error as EntityNotFoundError).message,
-                'Not found: memberships/ms-del-1',
-            );
-            return true;
-        },
-    );
-});
-
-test('stored PUT body equals membershipDocumentEntityOf',
+test('a seat PUT chain derives the latest body',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'ms-g3-stream';
-    const body = documentFields();
+    const first = { type: 'member', at: documentFields().at };
+    const firstPut = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/organizations/1/members/sarah',
+            token: DEV_TOKEN,
+            body: first,
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.equal(firstPut.status, 201);
+    const firstGet = await handleRequest(
+        db,
+        apiRequest({
+            method: 'GET',
+            path: '/organizations/1/members/sarah',
+            token: DEV_TOKEN,
+        }),
+    );
+    assert.equal(firstGet.status, 200);
+    const firstBody = await firstGet.json() as {
+        type: string;
+        at: string;
+    };
+    assert.equal(firstBody.type, 'member');
+    const second = {
+        type: 'admin',
+        at: '2026-02-02T00:00:00.000000Z',
+    };
+    const secondPut = await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/organizations/1/members/sarah',
+            token: DEV_TOKEN,
+            body: second,
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.equal(secondPut.status, 201);
+    const secondGet = await handleRequest(
+        db,
+        apiRequest({
+            method: 'GET',
+            path: '/organizations/1/members/sarah',
+            token: DEV_TOKEN,
+        }),
+    );
+    const secondBody = await secondGet.json() as {
+        type: string;
+        at: string;
+    };
+    assert.equal(secondBody.type, 'admin');
+    assert.equal(secondBody.at, second.at);
+});
+
+test('a seat DELETE-head is absent', async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    await handleRequest(
+        db,
+        apiRequest({
+            method: 'PUT',
+            path: '/organizations/1/members/sarah',
+            token: DEV_TOKEN,
+            body: {
+                type: 'member',
+                at: documentFields().at,
+            },
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    const del = await handleRequest(
+        db,
+        apiRequest({
+            method: 'DELETE',
+            path: '/organizations/1/members/sarah',
+            token: DEV_TOKEN,
+            operationId: TEST_OPERATION_ID,
+        }),
+    );
+    assert.equal(del.status, 204);
+    const missing = await handleRequest(
+        db,
+        apiRequest({
+            method: 'GET',
+            path: '/organizations/1/members/sarah',
+            token: DEV_TOKEN,
+        }),
+    );
+    assert.equal(missing.status, 404);
+});
+
+test('stored PUT body equals the seat wire entity',
+async () => {
+    const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const id = 'sarah';
+    const body = {
+        type: 'member',
+        at: documentFields().at,
+    };
     const put = await handleRequest(
         db,
         apiRequest({
             method: 'PUT',
-            path: '/memberships/' + id,
+            path: '/organizations/1/members/' + id,
             token: DEV_TOKEN,
             body,
             operationId: TEST_OPERATION_ID,
@@ -314,19 +261,14 @@ async () => {
     assert.equal(put.status, 201);
     const stored = JSON.parse(
         await storedPutBodyText(
-            db, '/organizations/1/memberships/', id,
+            db, '/organizations/1/members/', id,
         ),
     );
-    assert.deepEqual(
-        stored,
-        membershipDocumentEntityOf(
-            {
-                uriId: id,
-                pairId: id,
-                method: 'PUT',
-                body,
-            },
-            '1',
-        ),
-    );
+    assert.deepEqual(stored, {
+        id,
+        organization_id: '1',
+        identity_id: id,
+        type: 'member',
+        at: documentFields().at,
+    });
 });

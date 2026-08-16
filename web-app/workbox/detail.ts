@@ -31,8 +31,8 @@ import {
     activeClaimFromHistory,
     getMemberMap,
     postWorkOrderTransition,
-    postWorkOrderClaim,
-    postWorkOrderBinding,
+    putWorkOrderClaim,
+    putWorkOrderBinding,
     deleteWorkOrderClaim,
     getCurrentHumanMember,
     sessionContext,
@@ -306,7 +306,7 @@ function initBindPicker(
                     );
                 const ctx = sessionContext();
                 try {
-                    await postWorkOrderBinding(
+                    await putWorkOrderBinding(
                         ctx,
                         workOrderId,
                         instanceId,
@@ -571,7 +571,7 @@ export async function init(
                     || !claim.byCurrentMember)
                 && !presenter.isArchive()
             ) {
-                await postWorkOrderClaim(
+                await putWorkOrderClaim(
                     ctx,
                     id,
                 );

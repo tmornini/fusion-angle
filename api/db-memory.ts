@@ -7,7 +7,7 @@ import type { LatencySimulation } from './latency.ts';
 // In-memory adapter for tests and the automated suite: a
 // synchronous backend, no latency, and no connection to
 // open. A construction preset over BackedDbAdapter — a
-// factory, not a subclass (matches indexedDbAdapter).
+// factory, not a subclass.
 export function memoryDbAdapter(
 ): GuardedDbAdapter & LatencySimulation {
     return new BackedDbAdapter(

@@ -135,17 +135,14 @@ function pairJsonOf(message: string): {
 // each with a revision — net +4 vs 1494) + 11 identity-default-
 // organization pairs (Phase 11 Task 8: one event-append pair
 // per seeded human member at its identity-keyed
-// /identities/:id/default-org/ address; Phase Final Task 2
+// /identities/:id/default-organization/ address; Phase Final
+// Task 2
 // strips the identity_default_organizations ROW half — pairs
 // alone remain) + 1 gate0001 Capture step (R1-FIX-A re-home)
-// = 1498 after WO-instance SoT seed (+4: instance genesis +
-// binding + 2 revisions — WO-instance SoT stack; the two new-
-// shape ops replace the two dropped legacy transitions).
-// System-member genesis folds into the members/:id document
-// trio (states-address retirement Task 8) — no bare states/:id
-// pair. A dropped or reordered invocation changes this count.
-// Bootstrap absolute is 12 (was 13).
-const EXPECTED_PAIR_COUNT = 1498;
+// Task 55 retires leftover members / memberships /
+// ai-members / human-members seed pairs. Measure after
+// seed — do not invent. Bootstrap absolute is 8.
+const EXPECTED_PAIR_COUNT = 1448;
 
 test('a mock-data seed populates balanced pairs',
 async () => {
@@ -222,13 +219,19 @@ async () => {
     // Phase Final Stage B: organizations table retired.
 });
 
-test('a seeded human-member create pair sits at the global'
-+ ' (non-org-nested) address', async () => {
+test('a seeded person identity pair sits at the global'
++ ' identities address', async () => {
     const db = await sharedMockDb();
     const requests = await db.requests.getAll();
-    const row = requests.find(r => r.uri_id === 'current');
-    assert.ok(row, 'no request row for the current member');
-    assert.equal(row!.uri_collection, '/human-members/');
+    const row = requests.find(
+        r => r.uri_collection === '/identities/'
+            && r.uri_id === 'current',
+    );
+    assert.ok(row, 'no request row for the current identity');
+    const embedded = pairJsonOf(row!.message) as {
+        body: Record<string, unknown>;
+    };
+    assert.equal(embedded.body['kind'], 'person');
 });
 
 test('a seeded human member\'s PII intake pair sits at its own'
@@ -268,7 +271,8 @@ test('a seeded human member\'s identities-document pair sits at'
     const embedded = pairJsonOf(row!.message) as {
         body: Record<string, unknown>;
     };
-    assert.deepEqual(embedded.body, { kind: 'person' });
+    assert.equal(embedded.body['kind'], 'person');
+    assert.equal(typeof embedded.body['title'], 'string');
 });
 
 test('a seeded flow create pair sits at its org-nested'
@@ -282,71 +286,17 @@ test('a seeded flow create pair sits at its org-nested'
     assert.equal(row!.uri_collection, '/organizations/1/flows/');
 });
 
-test('a seeded ai-member create pair sits at the global'
-+ ' (non-org-nested) address', async () => {
+test('a seeded AI agent pair sits at the global'
++ ' ai-agents address', async () => {
     const db = await sharedMockDb();
-    const firstAiMember = buildAiMembers()[0]!;
+    const firstAgent = buildAiMembers()[0]!;
     const requests = await db.requests.getAll();
-    // The operation pair shares its uri_id with its OWN detail-
-    // document pair (ai-members/:id) and, since Phase 10 Task 6,
-    // its OWN identities/:id document pair too — distinguish it
-    // by POST (the document pairs are PUT), the detail-document
-    // test's own precedent below (the H7/arrival-order hazard
-    // class).
     const row = requests.find(
-        r => r.uri_id === firstAiMember.id
-            && r.method === 'POST',
+        r => r.uri_id === firstAgent.id
+            && r.uri_collection === '/ai-agents/',
     );
-    assert.ok(row, 'no request row for the seeded ai member');
-    assert.equal(row!.uri_collection, '/ai-members/');
-});
-
-test('a seeded ai-member\'s member-document pair sits at the'
-+ ' shared members/:id address, its body carrying type plus'
-+ ' the lifecycle trio', async () => {
-    const db = await sharedMockDb();
-    const firstAiMember = buildAiMembers()[0]!;
-    const requests = await db.requests.getAll();
-    const memberRow = requests.find(
-        r => r.uri_id === firstAiMember.id
-            && r.uri_collection === '/members/',
-    );
-    assert.ok(
-        memberRow,
-        'no member-document pair for the seeded ai member',
-    );
-    const embedded = pairJsonOf(memberRow!.message) as {
-        body: Record<string, unknown>;
-    };
-    assert.deepEqual(embedded.body, {
-        type: 'ai',
-        state: 'active',
-        state_at: MOCK_SEED_TIMESTAMP,
-        state_event_id:
-            `seed-member-${firstAiMember.id}-active`,
-    });
-});
-
-test('a seeded ai-member\'s detail-document pair sits at its'
-+ ' entity address, its body carrying the four AI detail'
-+ ' keys', async () => {
-    const db = await sharedMockDb();
-    const firstAiMember = buildAiMembers()[0]!;
-    const requests = await db.requests.getAll();
-    // The detail-document pair shares its address with the
-    // operation pair (the create-address-collapse precedent —
-    // ai-members' own createBodyIdField), so distinguish it
-    // by PUT, the operation pair being POST.
-    const detailRow = requests.find(
-        r => r.uri_id === firstAiMember.id
-            && r.uri_collection === '/ai-members/'
-            && r.method === 'PUT',
-    );
-    assert.ok(
-        detailRow,
-        'no detail-document pair for the seeded ai member',
-    );
-    const embedded = pairJsonOf(detailRow!.message) as {
+    assert.ok(row, 'no request row for the seeded agent');
+    const embedded = pairJsonOf(row!.message) as {
         body: Record<string, unknown>;
     };
     assert.deepEqual(
@@ -355,72 +305,52 @@ test('a seeded ai-member\'s detail-document pair sits at its'
     );
 });
 
-test('a seeded system member\'s member-document pair sits at'
-+ ' the shared members/:id address, its body carrying type'
-+ ' plus the lifecycle trio (genesis folded in)', async () => {
+test('a seeded seat document pair sits at its org-nested'
++ ' members address', async () => {
     const db = await sharedMockDb();
-    const requests = await db.requests.getAll();
-    const memberRow = requests.find(
-        r => r.uri_id === SYSTEM_MEMBER_ID
-            && r.uri_collection === '/members/',
-    );
-    assert.ok(
-        memberRow,
-        'no member-document pair for the seeded system member',
-    );
-    const embedded = pairJsonOf(memberRow!.message) as {
-        body: Record<string, unknown>;
-    };
-    assert.deepEqual(embedded.body, {
-        type: 'system',
-        state: 'active',
-        state_at: MOCK_SEED_TIMESTAMP,
-        state_event_id:
-            `seed-member-${SYSTEM_MEMBER_ID}-active`,
-    });
-});
-
-test('a seeded membership document pair sits at its org-nested'
-+ ' entity address, its body carrying the four membership'
-+ ' keys', async () => {
-    const db = await sharedMockDb();
-    const firstAiMember = buildAiMembers()[0]!;
+    const firstMember = buildMembers()[0]!;
     const requests = await db.requests.getAll();
     const row = requests.find(
-        r => r.uri_id === 'seed-membership-' + firstAiMember.id,
+        r => r.uri_id === firstMember.id
+            && r.uri_collection
+                === '/organizations/'
+                + STARK_ORGANIZATION
+                + '/members/',
     );
-    assert.ok(row, 'no request row for the seeded membership');
-    assert.equal(
-        row!.uri_collection,
-        `/organizations/${STARK_ORGANIZATION}/memberships/`,
-    );
+    assert.ok(row, 'no request row for the seeded seat');
     const embedded = pairJsonOf(row!.message) as {
         body: Record<string, unknown>;
     };
     assert.deepEqual(
         Object.keys(embedded.body).sort(),
-        ['at', 'identity_id', 'organization_id', 'type'],
+        ['at', 'type'],
     );
 });
 
-test('a seeded default-org pair sits at its identity-keyed'
-+ ' address, its body carrying the three default-org keys',
+test('a seeded default-organization pair sits at its'
++ ' identity-keyed address, its body carrying'
++ ' organization_id',
 async () => {
     const db = await sharedMockDb();
     const firstMember = buildMembers()[0]!;
     const requests = await db.requests.getAll();
     const row = requests.find(
         r => r.uri_collection
-            === '/identities/' + firstMember.id + '/default-org/',
+            === '/identities/' + firstMember.id
+                + '/default-organization/',
     );
-    assert.ok(row, 'no request row for the seeded default-org event');
-    assert.equal(row!.uri_id, 'seed-default-org-' + firstMember.id);
+    assert.ok(
+        row,
+        'no request row for the seeded'
+            + ' default-organization document',
+    );
+    assert.equal(row!.uri_id, '');
     const embedded = pairJsonOf(row!.message) as {
         body: Record<string, unknown>;
     };
     assert.deepEqual(
         Object.keys(embedded.body).sort(),
-        ['at', 'eventId', 'organization_id'],
+        ['organization_id'],
     );
 });
 
@@ -824,22 +754,20 @@ test('a seeded state_field_value folds into its parent'
     );
 });
 
-test('the mock-data seed\'s system-member genesis rides the'
-+ ' members/:id document trio',
+test('the mock-data seed\'s system identity sits at'
++ ' /identities/',
 async () => {
     const db = await sharedMockDb();
-    const eventId =
-        `seed-member-${SYSTEM_MEMBER_ID}-active`;
     const requests = await db.requests.getAll();
-    const memberRow = requests.find(
-        r => r.uri_collection === '/members/'
+    const row = requests.find(
+        r => r.uri_collection === '/identities/'
             && r.uri_id === SYSTEM_MEMBER_ID,
     );
-    assert.ok(memberRow, 'no system members/:id pair');
-    const embedded = pairJsonOf(memberRow!.message) as {
+    assert.ok(row, 'no system identity pair');
+    const embedded = pairJsonOf(row!.message) as {
         body: Record<string, unknown>;
     };
-    assert.equal(embedded.body.state_event_id, eventId);
+    assert.equal(embedded.body.kind, 'service');
 });
 
 // Phase 7 Task 5: the scores half of the seed deferral closes —
@@ -970,7 +898,7 @@ test('a seeded credential\'s response body carries the full'
     );
 });
 
-test('seeded memberships carry type and no role-grant'
+test('seeded seats carry type and no role-grant'
 + ' pairs remain', async () => {
     const db = await sharedMockDb();
     const requests = await db.requests.getAll();
@@ -979,17 +907,19 @@ test('seeded memberships carry type and no role-grant'
             r.uri_collection.includes('/role-grants/')).length,
         0,
     );
-    const membershipReqs = requests.filter(r =>
-        r.uri_collection.includes('/memberships/'));
-    assert.ok(membershipReqs.length > 0);
-    for (const row of membershipReqs) {
+    const seatReqs = requests.filter(r =>
+        /\/organizations\/[^/]+\/members\//.test(
+            r.uri_collection,
+        ));
+    assert.ok(seatReqs.length > 0);
+    for (const row of seatReqs) {
         const embedded = pairJsonOf(row.message) as {
             body: Record<string, unknown>;
         };
         assert.ok(
             embedded.body.type === 'admin'
             || embedded.body.type === 'member',
-            'membership ' + row.uri_id + ' missing type',
+            'seat ' + row.uri_id + ' missing type',
         );
     }
 });
@@ -1004,77 +934,39 @@ test('seed pairs verify against their hashes', async () => {
     }
 });
 
-test('a bootstrap seed populates exactly twelve balanced,'
-+ ' hash-verified pairs for the current member and the system'
-+ ' member', async () => {
+test('a bootstrap seed populates exactly eight balanced,'
++ ' hash-verified pairs for the current identity and the'
++ ' system identity', async () => {
     const db = memoryDbAdapter();
     await postBootstrap(db);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    // Task 4: bootstrap's lone human-member create forms the
-    // SAME 1+1+1 bundle the mock-data seed's own human-members
-    // loop does — operation + detail document (shared
-    // human-members address) + member document (its own
-    // address). Task 5: the current member's OWN identities/:id
-    // document widens that bundle to 1+1+1+1 (4) — the SAME
-    // fourth invocation the mock-data seed's own human-members
-    // loop now forms per member. bootstrap's OWN membership
-    // document and the system member's OWN members/:id document
-    // close the last two raw bootstrap writes. Phase 10 Task 2:
-    // the current member's OWN PII document pair
-    // (identities/:id/pii) closes the intake decomposition's
-    // bootstrap side — 4 + 2 + 1 = 7. Phase 10 Task 6 mirrors
-    // the mock-data seed's own remaining raw writes: the system
-    // member's OWN identities/:id document and the current
-    // member's + the system member's OWN identity-credential
-    // documents (formed by seedHumanCredentials' local pass-1/
-    // pass-2 split, api/mock-data.ts) — 7 + 1 + 2 = 10. Role-
-    // grant pair retired (membership type:"admin" is privilege).
-    // Phase 11 Task 8: bootstrap's OWN default-org event
-    // ('bootstrap-default-org-current') — 10 + 1 = 11. Phase 12
-    // Task 3: bootstrap's OWN lone organizations pair
-    // (STARK_ORGANIZATION) — 11 + 1 = 12.
-    assert.equal(requests.length, 12);
-    assert.equal(responses.length, 12);
-    const atEntity = requests.filter(
-        r => r.uri_collection === '/human-members/'
-            && r.uri_id === 'current',
-    );
-    assert.equal(atEntity.length, 2);
-    const atMember = requests.filter(
-        r => r.uri_collection === '/members/' && r.uri_id === 'current',
-    );
-    assert.equal(atMember.length, 1);
+    assert.equal(requests.length, 8);
+    assert.equal(responses.length, 8);
     const atIdentity = requests.filter(
         r => r.uri_collection === '/identities/'
             && r.uri_id === 'current',
     );
     assert.equal(atIdentity.length, 1);
-    const atSystemMember = requests.filter(
-        r => r.uri_collection === '/members/'
+    const atSystem = requests.filter(
+        r => r.uri_collection === '/identities/'
             && r.uri_id === SYSTEM_MEMBER_ID,
     );
-    assert.equal(atSystemMember.length, 1);
-    const systemMemberEmbedded = pairJsonOf(
-        atSystemMember[0]!.message,
-    ) as { body: Record<string, unknown> };
-    assert.equal(
-        systemMemberEmbedded.body.state_event_id,
-        'bootstrap-system-active',
-    );
-    const atMembership = requests.filter(
+    assert.equal(atSystem.length, 1);
+    const atSeat = requests.filter(
         r => r.uri_collection
-            === `/organizations/${STARK_ORGANIZATION}/memberships/`
-            && r.uri_id === 'bootstrap-membership-current',
+            === `/organizations/${STARK_ORGANIZATION}/members/`
+            && r.uri_id === 'current',
     );
-    assert.equal(atMembership.length, 1);
+    assert.equal(atSeat.length, 1);
     const atPii = requests.filter(
         r => r.uri_collection === '/identities/current/pii/',
     );
     assert.equal(atPii.length, 1);
     const atDefaultOrganization = requests.filter(
-        r => r.uri_collection === '/identities/current/default-org/'
-            && r.uri_id === 'bootstrap-default-org-current',
+        r => r.uri_collection
+            === '/identities/current/default-organization/'
+            && r.uri_id === '',
     );
     assert.equal(atDefaultOrganization.length, 1);
     const atOrganization = requests.filter(

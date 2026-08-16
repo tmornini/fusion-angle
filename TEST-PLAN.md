@@ -170,12 +170,12 @@ ADDRESS family each agent mutates:
 
 | Agent | Mutation domain (pair-address families) |
 |---|---|
-| Agent-B | creates one human member via signup (identity + membership + human-member addresses) |
+| Agent-B | creates one human member via signup (identity + PII + seat at `organizations/:id/members`) |
 | Agent-D | `ideas` document + idea lifecycle state pairs |
 | Agent-E | `projects` document pairs (plus one flow via the project-detail New Flow path) |
 | Agent-F | `flows` document + undo operation pairs (graphDelta/revivals live in the flow document body) |
 | Agent-F2 | `work-orders` (claim/transition ops), work-order state pairs, field-values folded into transitions, plus its own private flow document pairs |
-| Agent-G | roster + identity spine + tenancy addresses: `members` / `human-members` / `ai-members`, `memberships`, `invitations`, `role-grants`, `organizations`, `identities` (+ credentials / pii / registration / token-revocations / default-organization). All GETs derive from the message ledger; invitation grant membership-dedup via `membershipExistsFor`; WP8 self-revoke still inside this agent |
+| Agent-G | roster + identity spine + tenancy addresses: seats (`organizations/:id/members`), `ai-agents`, `invitations`, `organizations`, `identities` (+ credentials / pii / registration / token-revocations / default-organization). All GETs derive from the message ledger; invitation accept writes a seat; WP8 self-revoke still inside this agent |
 | Agent-CH | none (read-only) |
 
 `identity_tokens` addresses stay un-domained: grant,
@@ -605,7 +605,7 @@ on. Run these in order.
 ### AA1. Create Pristine Environment
 
 - [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA2/AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
-- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly two: `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 12; demo seed 1498). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread (now also covers the dead clients store). Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
+- [ ] **AA2** Open DevTools → Application → IndexedDB → `fusion-ai`, verify an object store for every table listed in `TABLE_NAMES` (`api/db.ts` — exactly two: `requests`, `responses`) plus the `__schema__` marker. Bootstrap data lives as message pairs in `requests`/`responses` (EXPECTED bootstrap pair count 8; demo seed 1448). Pre-Final origins may also show inert orphan stores from deleted tables — ignore those; they are unread (now also covers the dead clients store). Verify derived state via the app (or by reading pair fixtures), not a `states` object store.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -621,41 +621,26 @@ on. Run these in order.
 - [ ] **AA5** With Human selected, fill all fields for
   "Sarah Chen" (Title: Project Lead, Department:
   Operations). Click Create. PASS: toast confirms
-  creation; the member is written but does NOT appear in
-  the membership-derived roster. NOTE (deferred
-  auto-membership): Add
-  Member creates an IDENTITY + member detail row but no
-  membership/org binding — that binding now arrives only
-  via the invitation flow (V1/V4). So a freshly Added
-  human does NOT appear on the Members list, which is
-  membership-joined via `deriveMembers` (a parent row
-  shows only when its identity holds a membership for
-  this org). New-identity auto-membership on creation is
-  DEFERRED, so this gap is EXPECTED, not a failure.
+  creation; `PUT /identities/:id` plus PII and a seat at
+  the active organization (`PUT organizations/:id/members/:identity-id`);
+  the person appears in the seat-derived roster.
 - [ ] **AA6** Repeat for all 10 humans: Sarah Chen, Mike
   Thompson, Jessica Park, David Martinez, Emily Rodriguez
   (pending), Alex Kim, Marcus Johnson, David Kim, Lisa
   Wang, James Miller (archived). PASS: all 10 are written
-  but, per the deferred note, do NOT appear in the
-  membership-derived roster. NOTE
-  (deferred auto-membership): as in AA5, Add Member binds
-  no org membership — the org-binding now comes via
-  invitation (V1/V4). Each freshly Added human is NOT yet
-  in the `memberships`-derived roster until invited and
-  accepted; that DEFERRED path is expected.
+  as identity + PII + seat and appear in the seat-derived
+  roster.
 - [ ] **AA7** Reload the Members page. PASS: the roster
-  is membership-derived, so the freshly Added humans (no
-  membership) do NOT re-render — only seeded and invited+
-  accepted members do. Same deferred path as AA5.
+  is seat-derived; the freshly Added humans re-render
+  with the seeded seats.
 - [ ] **AA7a** Click "+ Add Member", switch the Kind
   toggle to AI. PASS: the Human form hides and the AI
   form appears. Fill Name, pick a Model, fill
   Description and Skill Focus. PASS: Create is blocked
   until a Model is chosen; once chosen, click Create →
   toast confirms and the AI is written as a pair-plane
-  AI member document (POST `ai-members`); like a freshly
-  Added human it binds no membership, so it does NOT
-  appear in the roster.
+  AI agent document (`PUT /ai-agents/:id`); it appears in
+  the AIs group (agents are global, not seated).
   Repeat for 4 AIs matching mock data (Claude Opus 4.8,
   Claude Sonnet 4.6, GPT-5.5, Grok 4.3).
 
@@ -1580,20 +1565,21 @@ designer "tag current" action lands.)
   (alphabetized by name). When the checkbox list overflows
   the panel height, the fieldset scrolls inside its own
   region.
-- [ ] **F59** Tick one human checkbox and one AI checkbox.
-  Reload the page and reopen the same node panel. PASS:
-  the same two checkboxes are still ticked. Inspect the
-  flow's head document pair in `requests`/`responses`
-  (DevTools → Application → IndexedDB → `fusion-ai`) —
-  the stored graphDelta / graph body carries
-  `memberIds: [<humanId>, <aiId>]` on that node.
-- [ ] **F60** Untick one of the two checkboxes. Reload the
-  page and reopen the panel. PASS: only the remaining
-  ticked member persists in `memberIds`.
-- [ ] **F61** Untick all checkboxes so `memberIds` is `[]`.
-  Reload the page. PASS: every checkbox in the panel is
-  unticked. The node now displays the danger badge per
-  F73.
+- [ ] **F59** Tick one human checkbox. Reload the page
+  and reopen the same node panel. PASS: that human
+  checkbox is still ticked. Inspect the flow's head
+  document pair — the stored graph body carries
+  `memberIds: [<humanId>]`. AI checkboxes are
+  display-only (`data-ai-member-id`): they reflect
+  stored `agentIds` and do not write. A seeded
+  `agentIds` list survives this save.
+- [ ] **F60** Untick the human checkbox. Reload the page
+  and reopen the panel. PASS: the human is gone from
+  `memberIds`. Stored `agentIds` are unchanged.
+- [ ] **F61** Untick all human checkboxes so `memberIds`
+  is `[]`. Reload the page. PASS: every human checkbox
+  in the panel is unticked. The node now displays the
+  danger badge per F73 if no humans remain.
 - [ ] **F62** Lock the flow via the designer-header Locked switch.
   Open a regular-node panel. PASS: every checkbox in the
   Members fieldset is rendered with the `disabled`
@@ -1775,8 +1761,8 @@ designer "tag current" action lands.)
   the bind-instance dialog listing instances for
   the flow's record type (rows use
   `data-instance-pick`, never `data-attribute-id`);
-  picking an instance POSTs
-  `work-orders/:id/binding` (204), the dialog
+  picking an instance PUTs
+  `work-orders/:id/binding` (201), the dialog
   closes, and the screen re-presents with a bound
   Instance badge and pre-filled values from the
   instance head.
@@ -1790,17 +1776,19 @@ designer "tag current" action lands.)
 ### Workbox — Transitions
 
 - [ ] **WB11** Fill in required attributes and click
-  a transition button. PASS: transition is
-  recorded, work order moves to the next state,
-  browser navigates back to the inbox. The work
-  order appears in the Active tab (unclaimed).
+  a transition button. PASS: transition POSTs
+  `work-orders/:id/transition` (201), work order
+  moves to the next state, browser navigates back
+  to the inbox. The work order appears in the
+  Active tab (unclaimed).
 - [ ] **WB12** Click the work order row in the
-  Active tab. PASS: work order is claimed and
-  browser navigates to the action screen
-  showing the new state's attributes.
+  Active tab. PASS: work order PUTs
+  `work-orders/:id/claim` (201) and the browser
+  navigates to the action screen showing the new
+  state's attributes.
 - [ ] **WB13** Click "Release Work Order". PASS:
-  a single click posts `POST
-  work-orders/:id/release` (204), soft-releases
+  a single click DELETEs
+  `work-orders/:id/claim` (204), soft-releases
   the active claim, and the browser navigates to
   the inbox, where the work order reappears in the
   Active tab.
@@ -1808,7 +1796,7 @@ designer "tag current" action lands.)
   the Active tab, click the same work order again
   (claim). PASS: action screen opens under the
   caller's claim. Click "Release Work Order"
-  (unclaim via the release op). PASS: back on the
+  (unclaim via DELETE claim). PASS: back on the
   Active tab unclaimed. Click the row a third time
   (reclaim). PASS: claim succeeds again; the pair
   plane carries the sequence
@@ -1838,7 +1826,7 @@ designer "tag current" action lands.)
   `GET work-orders/:id/history` and the instance
   head). PASS: the work-order document pair head
   carries `display_id` and `flow_graph` JSON; the
-  binding op is at `work-orders/:id/binding` with
+  binding PUT is at `work-orders/:id/binding` with
   `{instance_id, record_type_id}`; value-bearing
   transitions are `work-orders/:id/transition` op
   pairs whose body is the **instance shape**
@@ -2085,11 +2073,11 @@ the claude-in-chrome MCP.
 > `tests/api-member-tier.test.ts` pins member 403). A
 > non-admin (e.g. Emily) therefore fails the Members list
 > load with `forbidden` on `identity-pii` while still
-> holding member-tier GETs on `/members` /
-> `/human-members`. Invite **grant** is also admin-gated
-> in `grantInvitation`. Known authz posture, not a
-> residual FAIL — do not re-litigate as product drift
-> without an intentional member-tier roster design.
+> holding member-tier GETs on seats and `/ai-agents`.
+> Invite **grant** is also admin-gated in
+> `grantInvitation`. Known authz posture, not a residual
+> FAIL — do not re-litigate as product drift without an
+> intentional member-tier roster design.
 
 - [ ] **G11** Navigate to `members/index.html` (reachable
   via the "Members" sidebar entry). PASS: page header reads
@@ -2123,35 +2111,31 @@ the claude-in-chrome MCP.
   visible, and the AI form hidden. Switch the toggle to
   AI. PASS: the Human form hides, the AI form appears
   with a Model pulldown and a Skill Focus textarea; no
-  Auth Token field or security warning. NOTE (deferred
-  auto-membership): Add Member creates an identity (and
-  member detail row) but NO org membership — the org-
-  binding now comes via the "Invite member" flow (V1) and
-  the invitee accepting (V4). A freshly Added member is
-  therefore not yet in the membership-derived org roster;
-  that DEFERRED path is expected, not a regression.
-  "Invite member" (V1) is the separate button that grants
-  the binding.
+  Auth Token field or security warning. Create Human
+  writes `PUT /identities/:id` plus PII and `PUT`s a
+  seat at the active organization so the person appears
+  in the seat-derived roster. "Invite member" (V1) still
+  grants a pending invitation for an EXISTING identity.
 - [ ] **G14a** With Kind=AI selected, leave the Model
   pulldown on its placeholder and click Create. PASS: a
   toast "Model is required" fires and no POST happens.
   Pick a Model, fill the other AI fields, click Create.
   PASS: toast confirms and the AI is written as a
-  pair-plane AI member document (POST `ai-members`);
-  it does NOT appear in the roster, as auto-membership is
-  deferred (same as G14).
+  pair-plane AI agent document (`PUT /ai-agents/:id`);
+  it appears in the AIs group (agents are global, not
+  seated).
 
 ### Membership invitations (V) — Members "Invite member"
 
-> The invitation flow is the org-binding path that "Add
-> Member" no longer performs (see the deferred-auto-membership
-> note on AA5/AA6/G14). An admin invites an EXISTING identity
-> by email → a pending invitation; the invitee reads it on
+> "Add Member" seats a new person at the active
+> organization (AA5/G14). Invite is the path that seats
+> an EXISTING identity in this org. An admin invites by
+> email → a pending invitation; the invitee reads it on
 > `invitations/` (reached via the top-bar bell) and Accepts
-> (writes a real membership in the invitation's org) or
+> (writes a seat in the invitation's org) or
 > Declines; an admin can Revoke an outstanding one from the
-> Organization page. DEFERRED (not built): new-identity auto-
-> membership on creation, and email delivery. Sources:
+> Organization page. DEFERRED (not built): email delivery.
+> Sources:
 > `web-app/members/index.ts` (`handleInviteSubmit`),
 > `web-app/app/adapters/invitations.ts`,
 > `api/invitations-domain.ts` (`grantInvitation` /
@@ -2201,7 +2185,7 @@ the claude-in-chrome MCP.
   so the bell works even for a member with no admin role.
   Source: `web-app/app/invitations-indicator.ts`
   (`mutateInvitationsBell`), `component-top-bar.html`.
-- [ ] **V4 — Accept writes a membership; invitee becomes
+- [ ] **V4 — Accept writes a seat; invitee becomes
   multi-org** On `invitations/index.html` (page header
   "Invitations", subtitle "Organizations inviting you to
   join"), confirm `#invitations-list` shows one card per
@@ -2209,20 +2193,20 @@ the claude-in-chrome MCP.
   {date}" sub-line, a state badge, and Accept / Decline
   buttons. Click Accept on the V1 invitation. PASS: an
   "Invitation accepted" toast fires and the row leaves the
-  pending list. A REAL membership is now written in the
+  pending list. A REAL seat is now written in the
   INVITATION's org (Stark), so the invitee becomes multi-org:
   reload any sidebar-layout page and the sidebar footer now
   shows the org `<select>` (G36) listing both their original
   org and Stark. Accept is idempotent — a re-accept is a 204
-  no-op, no duplicate membership. Source:
+  no-op, no duplicate seat. Source:
   `postInvitationAcceptance`, `acceptInvitation` (atomic
-  memberships/:id document pair + invitations/:id/acceptance
+  seat document pair + invitations/:id/acceptance
   op pair via `appendMessagePair`).
-- [ ] **V5 — Decline appends declined, writes no membership**
+- [ ] **V5 — Decline appends declined, writes no seat**
   As an invitee with a fresh pending invitation, on
   `invitations/` click Decline. PASS: an "Invitation declined"
   toast fires, the row leaves the pending list, and NO
-  membership is written (the declined org does NOT appear in
+  seat is written (the declined org does NOT appear in
   the sidebar switcher and its rows stay unreachable). With no
   pending invitations remaining, the list shows the empty
   state "No invitations." and the top-bar bell disappears
@@ -2232,11 +2216,11 @@ the claude-in-chrome MCP.
   accepted** While the V1 invitation is still PENDING (before
   V4), confirm the org fence holds: the invitee is NOT in the
   inviting org's Members roster (the roster derives from
-  `memberships`, and no membership exists yet), and the
+  seats, and no seat exists yet), and the
   inviting org is NOT reachable by the invitee — it does not
   appear in their sidebar org `<select>` and boot will not
   scope a token to it (a pending invitation grants no
-  membership). Only after Accept (V4) does the membership
+  seat). Only after Accept (V4) does the seat
   appear and the org become reachable. PASS: pending ⇒ not in
   roster, not reachable; accepted ⇒ both. Source: the org
   fence (`resolveOwningOrganization` via
@@ -2312,7 +2296,7 @@ the claude-in-chrome MCP.
 
 ### Identities (list & detail) (`identities/`, `identities/detail.html`)
 
-- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus either the AI member's name + description (a named service) or "Service account" + "—" (an unnamed/bare-credential service), then a "Service" badge. With mock data seeded and the demo admin's active organization (Stark), the identity-pii fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 5 service rows, including the system service identity. An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
+- [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. With mock data seeded and the demo admin's active organization (Stark), the identity-pii fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
 - [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `requests`/`responses` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the localStorage session-credentials JWT's name claim, and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
@@ -2357,9 +2341,10 @@ restored data.)
   Dashboard renders with zeroed-out metrics (empty
   database except for the required bootstrap seed). Empty
   bootstrap seeds only org `'1'` (Stark Industries) as
-  **12 message pairs** (absolute) covering System + Tony
-  Stark identity/PII/credentials/membership/role-grant/
-  organization/state events — derived reads, not entity
+  **8 message pairs** (absolute) covering System + Tony
+  Stark identity/PII/credentials/seat/
+  organization/default-organization — derived reads, not
+  entity
   tables. NOTE: pristine seeds NO Records. Source of
   truth: `postBootstrap` in `api/mock-data.ts`. IndexedDB
   stores each row as an object — no `gz1` compression —
@@ -2389,26 +2374,15 @@ restored data.)
   `tests/snapshot-wipe-on-fail.test.ts` (now atomic-rollback) —
   this case verifies the error toast/inline-error surfaces in the
   UI.)
-- [ ] **G41** Member lifecycle is recorded on the pair
-  plane. On a member detail page (human OR AI), click
-  Edit, change the State select (active / pending /
-  archived), and Save. PASS: the chosen state is written
-  via `postHumanMemberStateChange` /
-  `postAIMemberStateChange` — both kinds expose the same
-  State select and share the 3-value vocabulary per
-  Commandment III (Uniformity). The write is a
-  `members/:id` document-trio PUT (not a shared
-  event-append). Verify via
-  `GET members/:id/history` (DESC; index 0 = current)
-  or the matching `members/:id` document pairs in
-  `requests`/`responses`: an event with
-  `entity_id` = the member's id,
-  `state` = the chosen value, `member_id` = the actor
-  appears — and the member GET row itself embeds the
-  lifecycle trio (`state`, `state_at`,
-  `state_event_id`) for head state. After reload the
-  member's badge text and styling reflect the
-  persisted state.
+- [ ] **G41** Person and agent writes land on the pair
+  plane. On a human detail page, click Edit, change
+  Title or Bio, and Save. PASS: `PUT /identities/:id`
+  (and PII when contact fields change) persists the
+  profile; reload shows the new values. On an AI
+  detail page, change Description or Skill Focus and
+  Save. PASS: `PUT /ai-agents/:id` persists; reload
+  shows the new values. No composing POST writes
+  three pairs.
 - [ ] **G37 — Boot recovery from a missing schema** With the app loaded, open DevTools → Application → IndexedDB and delete the `fusion-ai` database (or clear the `__schema__` store). Reload a schema-requiring page (e.g. `dashboard/index.html`). PASS: boot reopens a fresh empty database, `hasSchema()` is false, and `core.ts` REDIRECTS to `snapshots/index.html` with the "Your database is empty." banner and the four recovery cards (Download Snapshot / Upload Snapshot / Wipe and Load Mock Data / Create Pristine) — never the terminal "Failed to initialize database" dead-end. Afterward, Wipe and Load Mock Data to restore a healthy DB before continuing. (Unlike the old localStorage tier, IndexedDB object stores always exist post-upgrade, so a hand-corrupted "partial table" shape is no longer reproducible; a genuinely missing store arises only on a schema version bump, where boot throws `MissingTableError` and `redirectIfMissingTable` routes to `snapshots/index.html?missing-table=<name>` with the matching "The schema is missing the \"<name>\" table" banner.) Source: `web-app/app/core.ts` (`redirectIfMissingTable` + the `initDatabase()` catch), `web-app/app/adapters/snapshots.ts` (`getHasAnyHumanMembers`), `web-app/snapshots/index.ts` (`mutateMissingTableBanner`).
 
 ### Billing (`billing/`) — STUB
@@ -2881,7 +2855,7 @@ Owner: Phase 4 (alone, after Phase 2). L1–L9 reopen, wipe, and reseed the `fus
 
 - [ ] **L1** Boot creates the database. Inspect `indexedDB.databases()` on the dashboard. PASS: `fusion-ai@v1` with 3 object stores (2 tables in `TABLE_NAMES` — `requests`, `responses` — plus `__schema__`). Pre-Final origins may also list inert orphan stores.
 - [ ] **L2** Missing-schema route. Open the dashboard against an empty database. PASS: it redirects to the Snapshots page.
-- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org. Absolute pair pin is **1498** balanced request/response pairs — single source of truth `EXPECTED_PAIR_COUNT` in `tests/mock-data-pairs.test.ts` (count `requests` length after seed; do not confuse with historical intermediate accounting notes that mention 1506 or 1513).
+- [ ] **L3** Atomic seed. Click "Wipe and Load Mock Data". PASS: the `__schema__` marker and pair rows persist; the dashboard renders the seeded org. Absolute pair pin is **1448** balanced request/response pairs — single source of truth `EXPECTED_PAIR_COUNT` in `tests/mock-data-pairs.test.ts` (count `requests` length after seed).
 - [ ] **L4** Persistence across reload. Reload the dashboard. PASS: it renders the seeded data without re-routing to Snapshots.
 - [ ] **L5** Cross-tab append survives (lost-update fix). From two connections (two tabs), append distinct pairs concurrently (e.g. two lifecycle state changes). PASS: both pairs survive (count grows by 2) — the old localStorage clobber is gone.
 - [ ] **L6** Cross-tab refresh. Commit a write in one of two open tabs. PASS: a `BroadcastChannel('fusion-ai:data')` message carrying a scoped notification event (organization/identity ids, or a full-refresh event) reaches the other tab; the poster is not echoed (no self-refresh).

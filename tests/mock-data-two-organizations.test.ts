@@ -36,14 +36,15 @@ import type {
 import { handleRequest } from '../api/api.ts';
 import { deriveMembershipsForIdentity } from
     '../api/derive-memberships.ts';
-import { deriveMemberParents } from
-    '../api/derive-members.ts';
 import {
     deriveCredentialsFor,
 } from '../api/derive-identity-spine.ts';
+import { deriveDocumentsAt } from
+    '../api/derive-documents.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
 import { organizationToken } from './token-fixtures.ts';
+import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import { assignOrganization } from
     '../api/mock-data/seed-constants.ts';
@@ -167,18 +168,34 @@ async function seed() {
 // Phase Final Task 2: every membership document on the pair
 // plane (both orgs), keyed by identity. Identities ROW half
 // stripped — parents alone enumerate directory ids.
+async function liveIdentityIds(
+    db: MemoryDbAdapter,
+): Promise<string[]> {
+    const [requests, responses] = await Promise.all([
+        db.requests.getAllWhere(
+            'uri_collection', '/identities/',
+        ),
+        db.responses.getAllWhere(
+            'uri_collection', '/identities/',
+        ),
+    ]);
+    return [...deriveDocumentsAt(
+        requests, responses, '/identities/',
+    ).keys()];
+}
+
 async function membershipsByIdentity(
     db: MemoryDbAdapter,
 ): Promise<Map<string, Set<string>>> {
-    const parents = await deriveMemberParents(db);
+    const ids = await liveIdentityIds(db);
     const byIdentity = new Map<string, Set<string>>();
-    for (const parent of parents) {
+    for (const id of ids) {
         const rows = await deriveMembershipsForIdentity(
-            db, parent.id,
+            db, id,
         );
         if (rows.length === 0) continue;
         byIdentity.set(
-            parent.id,
+            id,
             new Set(rows.map(m => m.organization_id)),
         );
     }
@@ -357,10 +374,8 @@ async () => {
     const byIdentity = await membershipsByIdentity(db);
     // Phase Final Task 2: identities ROW half stripped —
     // human parents from the pair plane.
-    const parents = await deriveMemberParents(db);
-    const persons = parents
-        .filter(m => m.type === 'human')
-        .map(m => m.id);
+    const persons = (await liveIdentityIds(db))
+        .filter(id => id !== SYSTEM_MEMBER_ID);
     for (const id of persons) {
         if (id === 'current') continue;
         const organizations = byIdentity.get(id) ?? new Set();
@@ -502,12 +517,12 @@ async () => {
     // stripped — pair-plane secrets; plaintext reveal is
     // only on the postMockDataLoad return (production pin
     // lives in credential-surfacing). Here assert PHC seed.
-    const parents = await deriveMemberParents(db);
+    const ids = await liveIdentityIds(db);
     let passwordCount = 0;
-    for (const parent of parents) {
-        if (parent.id === 'system') continue;
+    for (const id of ids) {
+        if (id === 'system') continue;
         const rows = await deriveCredentialsFor(
-            db, parent.id,
+            db, id,
         );
         const row = rows.find(r => r.kind === 'password');
         if (!row) continue;

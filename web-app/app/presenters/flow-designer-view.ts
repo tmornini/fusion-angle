@@ -217,14 +217,20 @@ class="text-xs text-muted"
             humanName(h),
             assigned.has(h.idForLink()),
             isLocked,
+            'data-member-id',
         ),
+    );
+    const assignedAgents = new Set(
+        node.agentIds ?? [],
     );
     const aiCheckboxes = sortedAis.map(
         a => buildMemberCheckbox(
             a.idForLink(),
             a.nameText(),
-            assigned.has(a.idForLink()),
+            assigned.has(a.idForLink())
+                || assignedAgents.has(a.idForLink()),
             isLocked,
+            'data-ai-member-id',
         ),
     );
     return html`<div
@@ -308,6 +314,7 @@ function buildMemberCheckbox(
     name: string,
     checked: boolean,
     isLocked: boolean,
+    idAttr: string,
 ): SafeHtml {
     const checkedAttr = trusted(
         checked ? ' checked' : '',
@@ -318,7 +325,7 @@ function buildMemberCheckbox(
     return html`<label
 class="member-checkbox-label">
 <input type="checkbox"
-    data-member-id="${memberId}"${
+    ${trusted(idAttr)}="${memberId}"${
     checkedAttr}${disabledAttr} />
 <span>${name}</span>
 </label>`;

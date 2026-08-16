@@ -112,6 +112,10 @@ const RETIRED_URI_PREFIX_PATTERNS:
     readonly RegExp[] = [
     /^\/organizations\/[^/]+\/records\//,
     /^\/organizations\/[^/]+\/record-attributes\//,
+    /^\/members\//,
+    /^\/human-members\//,
+    /^\/ai-members\//,
+    /^\/organizations\/[^/]+\/memberships\//,
 ];
 
 // Map table name → entity validator. Stored rows

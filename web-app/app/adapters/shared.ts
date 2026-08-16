@@ -570,7 +570,8 @@ async function rescopeToActiveOrganization(
 ): Promise<void> {
     const ctx = createRequestContext(adapter, flatToken);
     // Overlap independent rescope reads. Named delta: the
-    // default-org read now fires (and can surface errors)
+    // default-organization read now fires (and can surface
+    // errors)
     // on the empty-membership corner path too.
     const [
         organizations, defaultOrganization,

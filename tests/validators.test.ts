@@ -17,6 +17,7 @@ import {
     validateResponseEntity,
     asStoredGraph,
     asConstraint,
+    assertFlowGraphWriteLaw,
 } from '../api/validators.ts';
 import {
     DEFAULT_LOCK_TIMEOUT,
@@ -792,6 +793,98 @@ test(
         assert.deepEqual(
             n.memberIds,
             ['hw_sarah_chen', 'ai_claude_opus'],
+        );
+    },
+);
+
+test(
+    'asStoredGraph leaves missing agentIds absent',
+    () => {
+        const result = asStoredGraph(
+            {
+                nodes: [
+                    {
+                        ...baseNode,
+                        memberIds: [],
+                    },
+                ],
+                edges: [],
+            },
+            'graph',
+        );
+        const n = result.nodes[0]!;
+        assert.equal(n.agentIds, undefined);
+    },
+);
+
+test(
+    'asStoredGraph round-trips a populated'
+    + ' agentIds list',
+    () => {
+        const result = asStoredGraph(
+            {
+                nodes: [
+                    {
+                        ...baseNode,
+                        memberIds: [],
+                        agentIds: ['agent-1'],
+                    },
+                ],
+                edges: [],
+            },
+            'graph',
+        );
+        const n = result.nodes[0]!;
+        assert.deepEqual(n.agentIds, ['agent-1']);
+    },
+);
+
+test(
+    'assertFlowGraphWriteLaw rejects an AI agent'
+    + ' id in memberIds',
+    () => {
+        const graph = asStoredGraph(
+            {
+                nodes: [
+                    {
+                        ...baseNode,
+                        memberIds: ['ai-1'],
+                    },
+                ],
+                edges: [],
+            },
+            'graph',
+        );
+        assert.throws(
+            () => assertFlowGraphWriteLaw(
+                graph, new Set(['ai-1']),
+            ),
+            /not AI agents/,
+        );
+    },
+);
+
+test(
+    'assertFlowGraphWriteLaw accepts a live agent'
+    + ' in agentIds',
+    () => {
+        const graph = asStoredGraph(
+            {
+                nodes: [
+                    {
+                        ...baseNode,
+                        memberIds: ['person-1'],
+                        agentIds: ['agent-1'],
+                    },
+                ],
+                edges: [],
+            },
+            'graph',
+        );
+        assert.doesNotThrow(() =>
+            assertFlowGraphWriteLaw(
+                graph, new Set(['agent-1']),
+            ),
         );
     },
 );

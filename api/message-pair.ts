@@ -28,6 +28,7 @@ import {
     RECORD_TYPE_DETAIL_PATTERN,
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
+    ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from './family-registry.ts';
 import {
     HTTP_OK, HTTP_CREATED, HTTP_NO_CONTENT, HTTP_BAD_REQUEST,
@@ -883,7 +884,6 @@ export function createdEntityUriId(
 // write route — so no intermediate commit ever advertises a
 // Response-ID it did not store.
 export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
-    'members/:id',
     'ideas/:id',
     'ideas/:id/conversion',
     'ideas/:id/submissions/:sid',
@@ -898,7 +898,6 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'work-orders/:id',
     'work-orders/:id/claim',
     'work-orders/:id/transition',
-    'work-orders/:id/release',
     'work-orders/:id/binding',
     'flows/:id/work-orders/:woid',
     // Flat records + record-attributes retired (Task 23).
@@ -908,16 +907,12 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'objectives/:id/revisions/:rid',
     'projects/:id/objective-baseline-scores/:sid',
     'projects/:id/objective-actual-scores/:sid',
-    'ai-members',
-    'ai-members/:id',
-    'human-members',
-    'human-members/:id',
+    'ai-agents/:id',
     'identities',
     'identities/:id',
     'identities/:id/pii',
     'identities/:id/credentials/:cid',
     'identities/:id/registration',
-    'memberships/:id',
     'identity-tokens/:id',
     'identity-token-revocations/:id',
     'identity-tokens/:jti/rotation',
@@ -934,6 +929,7 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     // DELETE (PAIR_WIRED only — R10 keeps DOCUMENT_CLASS
     // clear). Public PUT is 405 (Task 20).
     INSTANCE_DETAIL_PATTERN,
+    ORGANIZATION_MEMBER_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
     // address via formSeedPair + WRITE_RESPONSE_SPECS.
@@ -985,7 +981,6 @@ export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
 // wired for pair STORAGE in PAIR_WIRED_ROUTE_PATTERNS above.
 export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
     new Set([
-        'members/:id',
         'ideas/:id',
         'ideas/:id/submissions/:sid',
         'projects/:id',
@@ -1003,6 +998,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'flows/:id/tags/:name',
         'work-orders',
         'work-orders/:id',
+        'work-orders/:id/claim',
         'flows/:id/work-orders/:woid',
         // Flat records + record-attributes retired (Task 23).
         'flows/:id/records/:frid',
@@ -1011,15 +1007,11 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         'objectives/:id/revisions/:rid',
         'projects/:id/objective-baseline-scores/:sid',
         'projects/:id/objective-actual-scores/:sid',
-        'ai-members',
-        'ai-members/:id',
-        'human-members',
-        'human-members/:id',
+        'ai-agents/:id',
         'identities',
         'identities/:id',
         'identities/:id/credentials/:cid',
         'identities/:id/registration',
-        'memberships/:id',
         'organizations/:id',
         // Nested record-types collection POST (Task 9): same
         // head-read class as flat `records` so op + document
@@ -1031,6 +1023,7 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         // Nested attributes detail (Task 7): simple class —
         // attributes never join the If-Match dialect.
         ATTRIBUTE_DETAIL_PATTERN,
+        ORGANIZATION_MEMBER_DETAIL_PATTERN,
         // states/:id/field-values/:fvid RETIRED from live wire
         // (Phase 15 Task 7); seed still forms pairs at that
         // address via formSeedPair + WRITE_RESPONSE_SPECS.

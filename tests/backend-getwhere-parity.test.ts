@@ -2,33 +2,13 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
-import { LocalStorageBackend }
-    from '../api/backend-localstorage.ts';
 import type { StorageBackend } from '../api/db.ts';
 
-// `getWhere` is the keyed-read seam. On the simulated tiers
-// it must be byte-identical to `getAll(table).filter` on the
-// indexed column — same matches, same per-tier order. These
-// tests pin that equivalence on BOTH bufferTx tiers (memory
-// and localStorage). The native IDBIndex path is exercised
-// only in the browser regression (TEST-PLAN.md).
+// `getWhere` is the keyed-read seam. On the memory tier
+// it must be byte-identical to `getAll(table).filter` on
+// the indexed column — same matches, same order.
 
 interface Row { id: string; fk: string; n: number }
-
-function installLocalStorageShim(): void {
-    const map = new Map<string, string>();
-    (globalThis as unknown as {
-        localStorage: {
-            getItem(k: string): string | null;
-            setItem(k: string, v: string): void;
-            removeItem(k: string): void;
-        };
-    }).localStorage = {
-        getItem(k) { return map.get(k) ?? null; },
-        setItem(k, v) { map.set(k, v); },
-        removeItem(k) { map.delete(k); },
-    };
-}
 
 const BACKENDS: {
     name: string;
@@ -37,13 +17,6 @@ const BACKENDS: {
     {
         name: 'memory',
         make: () => new MemoryStorageBackend(),
-    },
-    {
-        name: 'localStorage',
-        make: () => {
-            installLocalStorageShim();
-            return new LocalStorageBackend();
-        },
     },
 ];
 

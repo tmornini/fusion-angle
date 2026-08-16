@@ -3,7 +3,6 @@ import { strict as assert } from 'node:assert';
 import { PUT, handleRequest } from '../api/api.ts';
 import {
     memoryDbAdapter,
-    type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import {
     DEV_TOKEN,
@@ -12,7 +11,6 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import { firstProviderModel } from './member-fixtures.ts';
 import { ValidationError, nowUtc } from '../api/types.ts';
-import { EntityNotFoundError } from '../api/db.ts';
 import {
     validateMemberDocumentBody,
     validateMemberEntity,
@@ -25,26 +23,16 @@ import {
     postMemberDocumentOp,
     postAiMemberDocumentOp,
     postHumanMemberDocumentOp,
-    aiMemberDocumentEntityOf,
-    humanMemberDocumentEntityOf,
-    formDocumentPairFor,
 } from '../api/routes.ts';
 import {
     formWritePair,
-    appendMessagePair,
 } from '../api/message-pair.ts';
 import {
     documentFamilyWiring,
-    documentGetHandler,
 } from '../api/document-family.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
-    storedPutBodyText,
 } from './http-fixtures.ts';
-import {
-    deriveMemberParent,
-    memberParentOf,
-} from '../api/derive-members.ts';
 
 // Members are a lifecycle-trio family (states-address
 // retirement): PUT /members/:id carries {type} plus the trio
@@ -203,8 +191,7 @@ test('validateMemberDocumentBody rejects a state outside'
 
 // -- 1b. PUT members/:id wire trio ---------------------------
 
-test('PUT members/:id accepts the lifecycle trio and echoes'
-+ ' the entity fields', async () => {
+test('PUT members/:id is retired 404', async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
@@ -216,16 +203,11 @@ test('PUT members/:id accepts the lifecycle trio and echoes'
             state_event_id: 'mem-trio-1-ev1',
         },
     ));
-    assert.equal(res.status, 201);
-    const wire = await res.json() as Record<string, unknown>;
-    assert.equal(wire.id, 'mem-trio-1');
-    assert.equal(wire.type, 'human');
-    assert.equal(wire.state, 'active');
-    assert.ok('state_at' in wire);
-    assert.equal(wire.state_event_id, 'mem-trio-1-ev1');
+    assert.equal(res.status, 404);
 });
 
-test('PUT members/:id with {type} alone is 400', async () => {
+test('PUT members/:id with {type} alone is retired 404',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
@@ -233,11 +215,11 @@ test('PUT members/:id with {type} alone is 400', async () => {
         'PUT', '/members/mem-trio-2', token,
         { type: 'human' },
     ));
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 404);
 });
 
-test('PUT members/:id rejects a state outside the member'
-+ ' alphabet', async () => {
+test('PUT members/:id outside alphabet is retired 404',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
@@ -249,7 +231,7 @@ test('PUT members/:id rejects a state outside the member'
             state_event_id: 'mem-trio-3-ev1',
         },
     ));
-    assert.equal(res.status, 400);
+    assert.equal(res.status, 404);
 });
 
 test('validateAiMemberDocumentBody accepts the exact'
@@ -498,218 +480,47 @@ test('postHumanMemberDocumentOp writes exactly the pair and'
 // equivalent exists for human-members/:id — it has no live PUT
 // to resend against. ----------------------------------------
 
-test('a byte-identical PUT resend to members/:id converges to'
-+ ' one stored request/response pair', async () => {
+test('a PUT resend to retired members/:id is 404',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const body = memberFields();
-    const first = await PUT(
-        db, 'members/mem-resend-1', body, DEV_TOKEN,
+    await assert.rejects(
+        () => PUT(
+            db, 'members/mem-resend-1', memberFields(),
+            DEV_TOKEN,
+        ),
+        /Not found/,
     );
-    const second = await PUT(
-        db, 'members/mem-resend-1', body, DEV_TOKEN,
-    );
-    assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
 });
 
-test('a byte-identical PUT resend to ai-members/:id converges'
-+ ' to one stored request/response pair', async () => {
+test('a PUT resend to retired ai-members/:id is 404',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const body = aiMemberFields();
-    const first = await PUT(
-        db, 'ai-members/ai-resend-1', body, DEV_TOKEN,
+    await assert.rejects(
+        () => PUT(
+            db, 'ai-members/ai-resend-1',
+            aiMemberFields(), DEV_TOKEN,
+        ),
+        /Not found/,
     );
-    const second = await PUT(
-        db, 'ai-members/ai-resend-1', body, DEV_TOKEN,
-    );
-    assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
 });
 
-// -- 4. below-route via the generic handlers (the drift-file
-// mirror idiom, against the REAL registered wiring rows) — a
-// PUT chain Supersedes-chains and the head derives the LATEST
-// body; a DELETE head derives to absence. Members is the trio
-// family; ai-members/human-members stay facet-stateless. ----
-
-async function putDocumentPair(
-    db: MemoryDbAdapter,
-    family: string,
-    id: string,
-    body: Record<string, unknown>,
-    requestAt: string,
-): Promise<string> {
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/' + family + '/' + id,
-        routePattern: family + '/:id',
-        routeSegments: [family, ':id'],
-        pathSegments: [family, id],
-        headerFields: [], body,
-        requesterIdentityId: 'current',
-        requestAt,
-        organization: undefined,
-        responseStatus: 200, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
-    });
-    await db.transaction(
-        ['requests', 'responses'],
-        (view) => appendMessagePair(view, pair),
-    );
-    return pair.id;
-}
-
-async function deleteDocumentPair(
-    db: MemoryDbAdapter,
-    family: string,
-    id: string,
-    requestAt: string,
-): Promise<void> {
-    const pair = await formWritePair({
-        method: 'DELETE',
-        pathname: '/' + family + '/' + id,
-        routePattern: family + '/:id',
-        routeSegments: [family, ':id'],
-        pathSegments: [family, id],
-        headerFields: [], body: {},
-        requesterIdentityId: 'current',
-        requestAt,
-        organization: undefined,
-        responseStatus: 204, responseBody: undefined,
-        operationId: TEST_OPERATION_ID,
-    });
-    await db.transaction(
-        ['requests', 'responses'],
-        (view) => appendMessagePair(view, pair),
-    );
-}
-
-const FAMILY_CASES: readonly {
-    family: string;
-    notFoundTable: string;
-    fields: () => Record<string, unknown>;
-    revise: (
-        fields: Record<string, unknown>,
-    ) => Record<string, unknown>;
-}[] = [
-    {
-        family: 'members',
-        notFoundTable: 'members',
-        fields: () => memberFields(),
-        revise: (f) => ({ ...f, type: 'ai' }),
-    },
-    {
-        family: 'ai-members',
-        notFoundTable: 'ai_members',
-        fields: aiMemberFields,
-        revise: (f) => ({ ...f, description: 'revised' }),
-    },
-    {
-        family: 'human-members',
-        notFoundTable: 'human_members',
-        fields: humanMemberFields,
-        revise: (f) => ({ ...f, department: 'Revised' }),
-    },
-];
-
-for (const {
-    family, notFoundTable, fields, revise,
-} of FAMILY_CASES) {
-    test('a PUT chain Supersedes-chains and the head derives'
-    + ' the LATEST body, through the generic document handlers'
-    + ' (' + family + ')', async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        const wiring = documentFamilyWiring(family)!;
-        const first = fields();
-        const firstId = await putDocumentPair(
-            db, family, family + '-chain-1', first,
-            '2026-02-01T00:00:00.000000Z',
+test('leftover roster families have no document wiring',
+() => {
+    for (const family of [
+        'members', 'ai-members', 'human-members',
+        'memberships',
+    ]) {
+        assert.equal(
+            documentFamilyWiring(family), undefined,
+            family,
         );
-        const headAfterFirst = await documentGetHandler(wiring)(
-            db, [family + '-chain-1'], 'current', 'ignored',
-        );
-        // members entityOf stamps lifecycle-current trio
-        // (state ← event.state, state_at ← event.at,
-        // state_event_id ← event.id); facet families surface
-        // the full body as-is.
-        const expectedFirst = family === 'members'
-            ? {
-                id: family + '-chain-1',
-                type: first['type'],
-                state: first['state'],
-                state_at: first['state_at'],
-                state_event_id: first['state_event_id'],
-            }
-            : { id: family + '-chain-1', ...first };
-        assert.deepEqual(headAfterFirst, expectedFirst);
+    }
+});
 
-        const second = revise(first);
-        const secondId = await putDocumentPair(
-            db, family, family + '-chain-1', second,
-            '2026-02-02T00:00:00.000000Z', firstId,
-        );
-        const secondResponse =
-            await db.responses.getById(secondId);
-        assert.equal('supersedes' in secondResponse, false);
-
-        const headAfterSecond = await documentGetHandler(wiring)(
-            db, [family + '-chain-1'], 'current', 'ignored',
-        );
-        const expectedSecond = family === 'members'
-            ? {
-                id: family + '-chain-1',
-                type: second['type'],
-                state: second['state'],
-                state_at: second['state_at'],
-                state_event_id: second['state_event_id'],
-            }
-            : { id: family + '-chain-1', ...second };
-        assert.deepEqual(headAfterSecond, expectedSecond);
-    });
-
-    test('a DELETE-head derives absent through the generic'
-    + ' document handlers, carrying notFoundTable (never the'
-    + ' entity-store table name coincidence) (' + family + ')',
-    async () => {
-        const db = memoryDbAdapter();
-        await db.postSchemaCreation();
-        const wiring = documentFamilyWiring(family)!;
-        await putDocumentPair(
-            db, family, family + '-del-1', fields(),
-            '2026-02-01T00:00:00.000000Z',
-        );
-        await deleteDocumentPair(
-            db, family, family + '-del-1',
-            '2026-02-02T00:00:00.000000Z',
-        );
-        await assert.rejects(
-            documentGetHandler(wiring)(
-                db, [family + '-del-1'], 'current', 'ignored',
-            ),
-            (error: unknown) => {
-                assert.ok(error instanceof EntityNotFoundError);
-                assert.equal(
-                    (error as EntityNotFoundError).table,
-                    notFoundTable,
-                );
-                assert.equal(
-                    (error as EntityNotFoundError).message,
-                    'Not found: ' + notFoundTable + '/'
-                        + family + '-del-1',
-                );
-                return true;
-            },
-        );
-    });
-}
-
-test('stored PUT body equals memberDocumentEntityOf of the'
-+ ' same chain', async () => {
+test('stored PUT body members/:id route is retired',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const token = await organizationToken();
@@ -720,50 +531,11 @@ test('stored PUT body equals memberDocumentEntityOf of the'
     const put = await handleRequest(
         db, req('PUT', '/members/' + id, token, body),
     );
-    assert.equal(put.status, 201);
-    const stored = JSON.parse(
-        await storedPutBodyText(db, '/members/', id),
-    );
-    const expected = memberParentOf(
-        {
-            uriId: id,
-            pairId: id,
-            method: 'PUT',
-            body,
-        },
-        {
-            id: ev,
-            entity_id: id,
-            state: 'active',
-            member_id: 'current',
-            at,
-        },
-    );
-    assert.deepEqual(stored, expected);
-    assert.deepEqual(
-        stored, await deriveMemberParent(db, id),
-    );
-    const skewed = await handleRequest(db, req(
-        'PUT', '/members/' + id, token,
-        memberFields(
-            'ai', 'archived',
-            '2020-01-01T00:00:00.000000Z', 'ev-g1-skew',
-        ),
-    ));
-    assert.equal(skewed.status, 201);
-    const afterSkew = JSON.parse(
-        await storedPutBodyText(db, '/members/', id),
-    );
-    assert.deepEqual(
-        afterSkew,
-        await deriveMemberParent(db, id),
-    );
-    assert.equal(afterSkew.state, 'active');
-    assert.equal(afterSkew.state_event_id, ev);
-    assert.equal(afterSkew.type, 'ai');
+    assert.equal(put.status, 404);
 });
 
-test('stored PUT body equals aiMemberDocumentEntityOf',
+test('stored PUT body equals aiMemberDocumentEntityOf'
++ ' route is retired',
 async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -772,52 +544,21 @@ async () => {
     const put = await handleRequest(
         db, req('PUT', '/ai-members/' + id, DEV_TOKEN, body),
     );
-    assert.equal(put.status, 201);
-    const stored = JSON.parse(
-        await storedPutBodyText(db, '/ai-members/', id),
-    );
-    const expected = aiMemberDocumentEntityOf(
-        {
-            uriId: id,
-            pairId: id,
-            method: 'PUT',
-            body,
-        },
-        '',
-    );
-    assert.deepEqual(stored, expected);
+    assert.equal(put.status, 404);
 });
 
-test('synthesized human-members PUT equals '
-+ 'humanMemberDocumentEntityOf', async () => {
+test('a PUT to retired human-members/:id is 404',
+async () => {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    const id = 'hm-g3-stream';
-    const body = humanMemberFields();
-    const pair = await formDocumentPairFor(db, {
-        routePattern: 'human-members/:id',
-        params: [id],
-        body,
-        requesterIdentityId: 'current',
-        requestAt: AT,
-        organization: '1',
-        operationId: TEST_OPERATION_ID,
-    });
-    await db.transaction(
-        ['requests', 'responses'],
-        (view) => appendMessagePair(view, pair),
+    const put = await handleRequest(
+        db,
+        req(
+            'PUT',
+            '/human-members/hm-g3-stream',
+            DEV_TOKEN,
+            humanMemberFields(),
+        ),
     );
-    const stored = JSON.parse(
-        await storedPutBodyText(db, '/human-members/', id),
-    );
-    const expected = humanMemberDocumentEntityOf(
-        {
-            uriId: id,
-            pairId: id,
-            method: 'PUT',
-            body,
-        },
-        '',
-    );
-    assert.deepEqual(stored, expected);
+    assert.equal(put.status, 404);
 });

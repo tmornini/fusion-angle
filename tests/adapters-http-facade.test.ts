@@ -95,7 +95,7 @@ test(
                 'http://example.test',
             );
             await assert.rejects(
-                () => facade.GET('members', 'tok'),
+                () => facade.GET('organizations/1/members', 'tok'),
                 (err: unknown) => {
                     assert.ok(
                         err instanceof UnauthorizedError,

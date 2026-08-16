@@ -34,17 +34,14 @@ test('no token + unknown nested path → 401', async () => {
     assert.equal(body.error, 'invalid_token');
 });
 
-test('bearer-exempt snapshot route stays auth-free',
+test('snapshot route without bearer is 401',
 async () => {
     const db = memoryDbAdapter();
     const res = await handleRequest(
         db,
         new Request(`${BASE}/snapshots/schema`),
     );
-    // hasSchema is false on a bare adapter — the handler
-    // returns null JSON, proving the route was reached without
-    // a token (not gated to 401).
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body, null);
+    assert.equal(res.status, 401);
+    const body = await res.json() as { error: string };
+    assert.equal(body.error, 'invalid_token');
 });

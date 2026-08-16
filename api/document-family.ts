@@ -186,6 +186,23 @@ export function documentFamilyWiring(
     return DOCUMENT_FAMILY_WIRINGS[family];
 }
 
+// Live document ids at a global-plane family prefix.
+// Used by the flow write-path graph law to tell AI
+// member ids from person members and to confirm an
+// agentId names a live /ai-agents document.
+export async function liveGlobalDocumentIds(
+    db: DbAdapter,
+    family: string,
+): Promise<Set<string>> {
+    const prefix = canonicalUriCollection(
+        undefined, '/' + family + '/',
+    );
+    const live = await messageStore(db).getCollection(
+        prefix,
+    );
+    return new Set(live.map(liveHeadId));
+}
+
 // Organization-nested miss path: probe global existence so a
 // foreign id 403s and a genuine absence 404s. Global-plane
 // families (members, identities, …) stay EntityNotFoundError
@@ -531,15 +548,12 @@ const STREAM_TRIO_FAMILIES: ReadonlySet<string> = new Set([
     'ideas',
     'projects',
     'objectives',
-    'members',
 ]);
 
 const STREAM_STATELESS_FAMILIES: ReadonlySet<string> =
     new Set([
-        'ai-members',
-        'human-members',
         'identities',
-        'memberships',
+        'ai-agents',
     ]);
 
 const ID_PATTERN_SUFFIX = '/:id';
@@ -691,7 +705,7 @@ export async function resolveStreamedTrioWriteBody(
 }
 
 // The registration-first consult (Phase 8 Task 3, the first
-// global-plane families: members/ai-members/human-members,
+// global-plane families: identities/ai-agents,
 // organizationNested:false) — mirrors canonicalUriCollection's own
 // registration-first pattern (message-pair.ts): a family's
 // registration decides whether organization_id belongs on the

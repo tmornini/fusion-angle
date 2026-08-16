@@ -74,66 +74,39 @@ export const FAMILY_REGISTRY: readonly FamilyRegistration[] = [
         createBodyIdField: 'id',
     },
     {
-        family: 'memberships',
-        organizationNested: true,
-        concurrency: 'simple',
-        createBodyIdField: 'id', // INERT — no collection POST
-            // exists for memberships; a row is created only
-            // when an invitee accepts an invitation (see
-            // adapters/invitations.ts) — the projects-precedent
-            // inert slot (message-pair.ts): this lookup never
-            // fires.
-    },
-    {
-        family: 'members',
-        organizationNested: false, // the FIRST global-plane
-            // row: the members roster is derived from the
-            // memberships ledger across every organization,
-            // never an organization-scoped store.
-        concurrency: 'simple',
-        createBodyIdField: 'id', // INERT — no collection POST
-            // exists for members either; the same inert slot
-            // as memberships above.
-    },
-    {
-        family: 'ai-members',
-        organizationNested: false,
-        concurrency: 'simple',
-        createBodyIdField: 'id',
-    },
-    {
-        family: 'human-members',
-        organizationNested: false,
-        concurrency: 'simple',
-        createBodyIdField: 'id',
-    },
-    {
         family: 'identities',
-        organizationNested: false, // GLOBAL plane, like
-            // members/ai-members/human-members: the identity
-            // spine spans every organization, never scoped to
-            // one.
+        organizationNested: false, // GLOBAL plane: the
+            // identity spine spans every organization,
+            // never scoped to one.
         concurrency: 'simple',
         createBodyIdField: 'id', // LIVE — POST /identities
-            // consults this slot for its bare collection-POST
-            // create route (unlike the projects/members-family
-            // inert-slot precedent above).
+            // consults this slot for its bare collection-
+            // POST create route.
     },
     {
         family: 'organizations',
-        organizationNested: false, // the tenant ROOT itself:
-            // an organization can never be nested under
-            // another organization — global plane, like
-            // members/ai-members/human-members/identities.
+        organizationNested: false, // the tenant ROOT
+            // itself: an organization can never be nested
+            // under another organization — global plane,
+            // like identities.
         concurrency: 'simple', // routes.ts's own PUT
             // organizations/:id comment: "a repeat PUT
             // records Supersedes" — the simple-class chain
             // (spec §The two PUT classes), never
             // If-Match/Follows.
-        createBodyIdField: 'id', // INERT — no collection POST
-            // exists for organizations either (route(
-            // 'organizations', {get}) is GET-only); the same
-            // inert slot as memberships/members above.
+        createBodyIdField: 'id', // INERT — no collection
+            // POST exists for organizations (route(
+            // 'organizations', {get}) is GET-only).
+    },
+    {
+        family: 'ai-agents',
+        organizationNested: false, // GLOBAL plane: a
+            // standing agent is not a member and not an
+            // identity, and is not nested under an
+            // organization.
+        concurrency: 'simple',
+        createBodyIdField: 'id', // INERT — no collection
+            // POST exists; genesis is PUT /ai-agents/:id.
     },
 ];
 
@@ -171,3 +144,12 @@ export const INSTANCE_VERSIONS_PATTERN =
     INSTANCE_DETAIL_PATTERN + '/versions';
 export const INSTANCE_VERSION_PATTERN =
     INSTANCE_VERSIONS_PATTERN + '/:version';
+// Organization member seat (Task 52): the relationship
+// itself. Path carries organization + identity; body is
+// privilege type. Collection prefix slice is the roster
+// of seats. Kind stays on the identity.
+export const ORGANIZATION_MEMBERS_COLLECTION_PATTERN =
+    'organizations/:organization-id/members';
+export const ORGANIZATION_MEMBER_DETAIL_PATTERN =
+    ORGANIZATION_MEMBERS_COLLECTION_PATTERN
+        + '/:identity-id';

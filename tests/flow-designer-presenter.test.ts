@@ -3,8 +3,10 @@ import { strict as assert } from 'node:assert';
 import {
     FlowDesignerPresenter,
     buildInitialFlowSnapshot,
+    buildFlowSaveShape,
 } from
     '../web-app/app/presenters/flow-designer.ts';
+import { makeAIMember } from './member-fixtures.ts';
 import {
     buildFlowHistorySnapshot,
 } from '../web-app/app/flow-history.ts';
@@ -393,5 +395,65 @@ test(
             .find(n => n.id === 'n1')!;
         assert.equal(n1.positionX, 500);
         assert.equal(n1.positionY, 500);
+    },
+);
+
+test(
+    'buildFlowSaveShape keeps stored agentIds'
+    + ' and person memberIds',
+    () => {
+        const humanId = 'hw_1';
+        const agentId = 'ai_1';
+        const graph = {
+            ...emptyGraph,
+            nodes: [{
+                ...node('n1'),
+                memberIds: [humanId],
+                agentIds: [agentId],
+            }],
+        };
+        const snap = buildInitialFlowSnapshot(
+            graph, 800, 600, [],
+            [makeAIMember(agentId, 'Claude')],
+            [],
+        );
+        const saved = buildFlowSaveShape(snap)
+            .nodes[0]!;
+        assert.deepEqual(
+            saved.memberIds, [humanId],
+        );
+        assert.deepEqual(
+            saved.agentIds, [agentId],
+        );
+    },
+);
+
+test(
+    'buildFlowSaveShape lifts leftover mixed'
+    + ' agent ids out of memberIds',
+    () => {
+        const humanId = 'hw_1';
+        const agentId = 'ai_1';
+        const graph = {
+            ...emptyGraph,
+            nodes: [{
+                ...node('n1'),
+                memberIds: [humanId, agentId],
+                agentIds: [],
+            }],
+        };
+        const snap = buildInitialFlowSnapshot(
+            graph, 800, 600, [],
+            [makeAIMember(agentId, 'Claude')],
+            [],
+        );
+        const saved = buildFlowSaveShape(snap)
+            .nodes[0]!;
+        assert.deepEqual(
+            saved.memberIds, [humanId],
+        );
+        assert.deepEqual(
+            saved.agentIds, [agentId],
+        );
     },
 );

@@ -7,6 +7,8 @@ import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
+import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
+    '../api/family-registry.ts';
 import {
     formWritePair,
     appendMessagePair,
@@ -101,39 +103,64 @@ export async function seedOrganizationDocument(
     );
 }
 
-async function membershipDocumentPair(
-    membershipId: Id,
+export async function seatDocumentPair(
+    organization: Id,
+    identityId: Id,
     body: Record<string, unknown>,
     requestAt: string,
 ): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
+    const spec = WRITE_RESPONSE_SPECS[
+        ORGANIZATION_MEMBER_DETAIL_PATTERN
+    ];
     if (spec === undefined || !('status' in spec)) {
         throw new Error(
-            'no per-write response spec for memberships/:id',
+            'no per-write response spec for seat',
         );
     }
     return formWritePair({
         method: 'PUT',
-        pathname: `/memberships/${membershipId}`,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', membershipId],
+        pathname: '/organizations/' + organization
+            + '/members/' + identityId,
+        routePattern: ORGANIZATION_MEMBER_DETAIL_PATTERN,
+        routeSegments:
+            ORGANIZATION_MEMBER_DETAIL_PATTERN.split('/'),
+        pathSegments: [
+            'organizations', organization, 'members',
+            identityId,
+        ],
         headerFields: [],
         body,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         requestAt,
-        organization: ROOT_ADMIN_ORGANIZATION,
+        organization,
         responseStatus: spec.status,
         responseBody: spec.successBody?.(
-            [membershipId], body, SYSTEM_MEMBER_ID,
-            ROOT_ADMIN_ORGANIZATION,
+            [organization, identityId], body,
+            SYSTEM_MEMBER_ID, organization,
         ),
         operationId: TEST_OPERATION_ID,
     });
 }
 
+export async function seedSeat(
+    db: DbAdapter,
+    organization: Id,
+    identityId: Id,
+    type: 'admin' | 'member',
+    at: string = '2020-01-01T00:00:00.000000Z',
+): Promise<void> {
+    const requestAt = nowUtc();
+    const body = { type, at };
+    await postMembershipDocumentOp(
+        db, identityId, body, SYSTEM_MEMBER_ID,
+        await seatDocumentPair(
+            organization, identityId, body, requestAt,
+        ),
+    );
+}
+
 // Seed the demo `current` identity as a root admin directly at
-// the storage layer (below the gate): membership with
+// the storage layer (below the gate): seat with
 // type:"admin" in org '1'. Tokens bake claim roles from that
 // type at mint (tests/token-fixtures.ts).
 export async function seedRootAdmin(
@@ -142,24 +169,13 @@ export async function seedRootAdmin(
     await seedOrganizationDocument(
         db, ROOT_ADMIN_ORGANIZATION, 'Root Admin Org',
     );
-    const requestAt = nowUtc();
-    const membershipId = 'test-membership-current';
-    const membershipBody = {
-        organization_id: '1',
-        identity_id: 'current',
-        type: 'admin',
-        at: '2020-01-01T00:00:00.000000Z',
-    };
-    await postMembershipDocumentOp(
-        db, membershipId, membershipBody, SYSTEM_MEMBER_ID,
-        await membershipDocumentPair(
-            membershipId, membershipBody, requestAt,
-        ),
+    await seedSeat(
+        db, ROOT_ADMIN_ORGANIZATION, 'current', 'admin',
     );
 }
 
 // Seed an identity as a plain content-tier member of org '1':
-// membership with type:"member". The member-tier counterpart of
+// seat with type:"member". The member-tier counterpart of
 // seedRootAdmin above.
 export async function seedOrganizationMember(
     db: DbAdapter,
@@ -168,18 +184,7 @@ export async function seedOrganizationMember(
     await seedOrganizationDocument(
         db, ROOT_ADMIN_ORGANIZATION, 'Root Admin Org',
     );
-    const requestAt = nowUtc();
-    const membershipId = 'test-membership-' + identityId;
-    const membershipBody = {
-        organization_id: '1',
-        identity_id: identityId,
-        type: 'member',
-        at: '2020-01-01T00:00:00.000000Z',
-    };
-    await postMembershipDocumentOp(
-        db, membershipId, membershipBody, SYSTEM_MEMBER_ID,
-        await membershipDocumentPair(
-            membershipId, membershipBody, requestAt,
-        ),
+    await seedSeat(
+        db, ROOT_ADMIN_ORGANIZATION, identityId, 'member',
     );
 }

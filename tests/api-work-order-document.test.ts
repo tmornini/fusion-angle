@@ -318,8 +318,8 @@ test('a work-order create appends a PUT-shaped document pair'
     assert.equal(res.status, 201);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
-    assert.equal(requests.length, 5);
-    assert.equal(responses.length, 5);
+    assert.equal(requests.length, 6);
+    assert.equal(responses.length, 6);
 
     const documentRow =
         documentRowAt(requests, ENTITY_PREFIX, 'wo-c1');
@@ -430,7 +430,8 @@ test('a work-order create ignores a raw colliding states'
         ),
     ));
     assert.equal(res.status, 201);
-    // 2 seed pairs (org+membership) + 3 create pairs.
-    assert.equal((await db.requests.getAll()).length, 5);
-    assert.equal((await db.responses.getAll()).length, 5);
+    // 2 seed pairs (org+membership) + 4 create pairs
+    // (operation, document, join, genesis claim).
+    assert.equal((await db.requests.getAll()).length, 6);
+    assert.equal((await db.responses.getAll()).length, 6);
 });

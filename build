@@ -9,14 +9,14 @@ Options:
   path/      Output directory (trailing / required)
              Default: ~/Desktop/
   --no-zip   Create bundle directory without zipping
-             (browser entry — for ./serve)
+             (server-core + server.mjs — for ./serve)
   --help     Show this help message
 
 Examples:
-  ./build                          # two ZIPs to ~/Desktop/
-  ./build dist/                    # two ZIPs to dist/
-  ./build --no-zip /tmp/test/      # browser bundle to /tmp/test/
-  ./build --no-zip                 # browser bundle to ~/Desktop/
+  ./build                          # server ZIP to ~/Desktop/
+  ./build dist/                    # server ZIP to dist/
+  ./build --no-zip /tmp/test/      # server bundle to /tmp/test/
+  ./build --no-zip                 # server bundle to ~/Desktop/
 USAGE
 }
 
@@ -73,7 +73,8 @@ emitted() {
 }
 
 mkdir -p "$BUILD_DIR/assets"
-npx --no-install esbuild web-app/app/core.ts \
+npx --no-install esbuild \
+    web-app/app/server-core.ts \
     --bundle \
     --minify \
     --keep-names \
@@ -81,7 +82,8 @@ npx --no-install esbuild web-app/app/core.ts \
     --format=iife \
     --outfile="$BUILD_DIR/assets/app.js"
 
-emitted "Bundle created" "$BUILD_DIR/assets/app.js"
+emitted "Server bundle created" \
+    "$BUILD_DIR/assets/app.js"
 
 # Pre-app bootstrap scripts: extracted from former inline
 # <script> blocks so the page can run with a strict
@@ -131,40 +133,23 @@ cp web-app/index.html "$BUILD_DIR/"
 cp web-app/assets/favicon.ico "$BUILD_DIR/assets/"
 cp web-app/assets/favicon.svg "$BUILD_DIR/assets/"
 
+npx --no-install esbuild \
+    server/boot.ts \
+    --bundle \
+    --platform=node \
+    --format=esm \
+    --target=es2024 \
+    --keep-names \
+    --outfile="$BUILD_DIR/server.mjs"
+
+emitted "Server process created" \
+    "$BUILD_DIR/server.mjs"
+
 if [ "$NO_ZIP" = true ]; then
     echo "Bundle: $BUILD_DIR"
 else
     SHA=$(git rev-parse --short=7 HEAD)
     DEST_DIR="${DEST:-$HOME/Desktop/}"
-    BROWSER_ZIP="${DEST_DIR}fusion-ai-browser-${SHA}.zip"
-    (cd "$BUILD_DIR" && zip -r "$BROWSER_ZIP" .)
-    echo "Distribution: $BROWSER_ZIP" \
-        "($(wc -c < "$BROWSER_ZIP" | xargs) bytes)"
-
-    npx --no-install esbuild \
-        web-app/app/server-core.ts \
-        --bundle \
-        --minify \
-        --keep-names \
-        --target=es2024 \
-        --format=iife \
-        --outfile="$BUILD_DIR/assets/app.js"
-
-    emitted "Server bundle created" \
-        "$BUILD_DIR/assets/app.js"
-
-    npx --no-install esbuild \
-        server/boot.ts \
-        --bundle \
-        --platform=node \
-        --format=esm \
-        --target=es2024 \
-        --keep-names \
-        --outfile="$BUILD_DIR/server.mjs"
-
-    emitted "Server process created" \
-        "$BUILD_DIR/server.mjs"
-
     SERVER_ZIP="${DEST_DIR}fusion-ai-server-${SHA}.zip"
     (cd "$BUILD_DIR" && zip -r "$SERVER_ZIP" .)
     echo "Distribution: $SERVER_ZIP" \

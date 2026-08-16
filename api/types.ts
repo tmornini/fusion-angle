@@ -1,6 +1,7 @@
 export type Id = string;
 
 export type MemberId = Id;
+export type AgentId = Id;
 
 export type ModelId = Id;
 
@@ -475,6 +476,13 @@ export type IdentityKind = 'person' | 'service';
 export interface IdentityEntity {
     id: Id;
     kind: IdentityKind;
+    // Person-only human profile. Omitted on a service and
+    // on a person that has none — never null. Title is
+    // not PII; name/email/phone/bio stay on the pii facet.
+    title?: string;
+    department?: string;
+    strengths?: string[];
+    team_dimensions?: Record<string, number>;
 }
 
 // The person-PII facet, keyed by the shared identity id. A
@@ -531,11 +539,11 @@ export interface IdentityTokenRevocationEntity {
     at: string;
 }
 
-// An identity's chosen default org. Append-only: a change is
-// a NEW row; the current default is the LATEST `at` per
-// identity, and no row means unset (never a nullable column —
-// an identity is born org-less). The chosen org must be one
-// of the identity's memberships, fenced at the write.
+// An identity's chosen default organization. A simple
+// document: PUT { organization_id } (must be a live seat);
+// GET that document or 404 if never SET. Revoke does not
+// rewrite it. Token resolution uses the SET if it is a live
+// seat, else PRIMARY, else deny.
 export interface IdentityDefaultOrganizationEntity {
     id: Id;
     identity_id: Id;
@@ -809,6 +817,16 @@ export interface AIMemberEntity {
     model: ModelId;
 }
 
+// Standing AI agent document — not a member, not an
+// identity. Agents do not log in.
+export interface AIAgentEntity {
+    id: AgentId;
+    name: string;
+    description: string;
+    skill_focus: string;
+    model: ModelId;
+}
+
 export class AIMember {
     readonly kind = 'ai' as const;
     readonly #id: MemberId;
@@ -1075,6 +1093,8 @@ export interface GraphNode {
     isCreate: boolean;
     isArchive: boolean;
     memberIds: MemberId[];
+    // Write-path roster for /ai-agents ids.
+    agentIds?: AgentId[];
     attributes: NodeAttribute[];
     taskInstructions: string;
 }
@@ -1101,6 +1121,8 @@ export const DEFAULT_TRANSITION_NAME =
     'Transition';
 export const DEFAULT_NODE_MEMBER_IDS:
     readonly MemberId[] = [];
+export const DEFAULT_NODE_AGENT_IDS:
+    readonly AgentId[] = [];
 export const DEFAULT_NODE_TASK_INSTRUCTIONS = '';
 
 // The stored flow scalars. The live graph is NOT on this
@@ -1237,7 +1259,7 @@ function storedNodeAttribute(
 function storedGraphNode(
     node: GraphNode,
 ): Record<string, unknown> {
-    return {
+    const stored: Record<string, unknown> = {
         id: node.id,
         name: node.name,
         positionX: node.positionX,
@@ -1249,6 +1271,11 @@ function storedGraphNode(
             node.attributes.map(storedNodeAttribute),
         taskInstructions: node.taskInstructions,
     };
+    const agentIds = node.agentIds;
+    if (agentIds !== undefined && agentIds.length > 0) {
+        stored['agentIds'] = agentIds;
+    }
+    return stored;
 }
 
 function storedGraphEdge(

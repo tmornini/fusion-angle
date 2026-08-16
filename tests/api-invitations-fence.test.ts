@@ -14,29 +14,17 @@ import {
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
-import { seedIdentityPii } from './identity-fixtures.ts';
-import {
-    postMemberDocumentOp,
-    postMembershipDocumentOp,
-    memberDocumentBodyOf,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { seedPersonIdentity } from './identity-fixtures.ts';
 import { deriveInvitations } from
     '../api/derive-invitations.ts';
 import { deriveOrganizations } from
     '../api/derive-organizations.ts';
-import { canonicalUriCollection } from '../api/message-pair.ts';
 import { deriveDocumentsAt } from
     '../api/derive-documents.ts';
 import {
-    validateMembershipEntity,
-} from '../api/validators.ts';
-import { withoutId } from '../api/document-family.ts';
-import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 // Phase Final Task 2: memberships on the pair plane.
 async function allMemberships(db: MemoryDbAdapter) {
@@ -49,21 +37,26 @@ async function allMemberships(db: MemoryDbAdapter) {
         at: string;
     }> = [];
     for (const organization of organizations) {
-        const prefix = canonicalUriCollection(
-            organization.id, '/memberships/',
-        );
-        const [requests, responses] = await Promise.all([
-            db.requests.getAllWhere('uri_collection', prefix),
-            db.responses.getAllWhere('uri_collection', prefix),
-        ]);
+        const seatPrefix = '/organizations/'
+            + organization.id + '/members/';
+        const [seatRequests, seatResponses] =
+            await Promise.all([
+                db.requests.getAllWhere(
+                    'uri_collection', seatPrefix,
+                ),
+                db.responses.getAllWhere(
+                    'uri_collection', seatPrefix,
+                ),
+            ]);
         for (const document of deriveDocumentsAt(
-            requests, responses, prefix,
+            seatRequests, seatResponses, seatPrefix,
         ).values()) {
             rows.push({
-                ...validateMembershipEntity(
-                    withoutId(document.body),
-                ),
                 id: document.uriId,
+                organization_id: organization.id,
+                identity_id: document.uriId,
+                type: String(document.body['type']),
+                at: String(document.body['at']),
             });
         }
     }
@@ -81,35 +74,15 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // the raw puts these replace — only the write mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+    await seedSeat(
+        db,
+        String(body.organization_id),
+        String(body.identity_id),
+        body.type as 'admin' | 'member',
+        String(body.at),
     );
 }
 
@@ -157,57 +130,15 @@ async function seed(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-// The member document write is re-pointed onto the message
-// pair postMemberDocumentOp appends (finding 18's fixture
-// budget): rosterIds below reads GET /members, which is now
-// ledger-derived, so an identity absent from the message plane
-// would never surface as a member-parent regardless of its
-// membership. identities stays raw — no GET /identities (or
-// /identities/:id) reads it anywhere in this file. identityPii's
-// OWN stays-raw acceptance EXPIRES here: GET /invitations
-// (exercised below) enriches invited_by_name by reading the
-// identity_pii plane (api/invitations-domain.ts), which Task 8
-// Step 3 re-points onto deriveIdentityPiiRows — so PII forms
-// its pair below-facade via the SAME exported op the live PUT
-// identities/:id/pii route uses.
+// Person identities ride the live identities + PII documents.
+// GET /invitations enriches invited_by_name from identity_pii.
 async function person(
     db: MemoryDbAdapter,
     id: string,
     name: string,
     email: string,
 ): Promise<void> {
-    const body = memberDocumentBodyOf('human', {
-        state: 'active',
-        stateAt: AT,
-        stateEventId: 'seed-member-' + id + '-active',
-    });
-    const spec = WRITE_RESPONSE_SPECS['members/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for members/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/members/' + id,
-        routePattern: 'members/:id',
-        routeSegments: ['members', ':id'],
-        pathSegments: ['members', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization: undefined,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, undefined,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMemberDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
-    );
-    await seedIdentityPii(db, id, {
+    await seedPersonIdentity(db, id, {
         name, email, phone: '', bio: '',
     });
 }
@@ -290,7 +221,8 @@ async function rosterIds(
     db: MemoryDbAdapter,
 ): Promise<Set<string>> {
     const res = await handleRequest(db, req(
-        'GET', '/members', await organizationToken('current', '2')));
+        'GET', '/organizations/2/members',
+        await organizationToken('current', '2')));
     assert.equal(res.status, 200);
     const rows = await res.json() as { id: string }[];
     return new Set(rows.map(r => r.id));
@@ -690,7 +622,7 @@ test('a removed member who re-accepts gets a no-op — not a'
         }));
     assert.equal(accept.status, 201);
     const del = await handleRequest(db, req(
-        'DELETE', '/memberships/ms-sarah-removed',
+        'DELETE', '/organizations/2/members/sarah',
         await organizationToken('current', '2')));
     assert.equal(del.status, 204);
     const statesBefore = (await invitationLifecycleStatesFor(db, id)).length;

@@ -7,5 +7,10 @@ set -euo pipefail
 # instant-vs-calendar distinction under a fixed offset zone in
 # tests/tz/ (Honolulu, UTC-10, no DST). The tests/*.test.ts glob
 # is non-recursive, so it excludes tests/tz/.
-TZ=UTC node --test --strip-types tests/*.test.ts
-TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts
+export JWT_HMAC_SIGNING_KEY="${JWT_HMAC_SIGNING_KEY:-test-hmac-signing-key}"
+TZ=UTC node --strip-types \
+    --import ./tests/hmac-test-key.ts \
+    --test tests/*.test.ts
+TZ=Pacific/Honolulu node --strip-types \
+    --import ./tests/hmac-test-key.ts \
+    --test tests/tz/*.test.ts

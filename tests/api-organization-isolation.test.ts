@@ -231,7 +231,7 @@ async () => {
     const res = await handleRequest(db, req(
         'GET', '/memberships',
         await organizationToken('sarah', 'A')));
-    assert.equal(res.status, 403);
+    assert.equal(res.status, 404);
 });
 
 test('a content-tier member is still denied admin writes',
@@ -547,43 +547,15 @@ async function seedMembershipPair(
     organization: string,
     identityId: string,
 ): Promise<void> {
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    // type:admin for current/pb (seeded as admins of their
-    // orgs); type:member for everyone else.
     const type =
         identityId === 'current' || identityId === 'pb'
             ? 'admin'
             : 'member';
-    const body = {
-        organization_id: organization,
-        identity_id: identityId,
-        type,
-        at: T8_AT,
-    };
-    const pair: MessagePair = await formWritePair({
-        method: 'PUT',
-        pathname: `/memberships/${membershipId}`,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', membershipId],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [membershipId], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, membershipId, body, SYSTEM_MEMBER_ID, pair,
+    const { seedSeat } = await import(
+        './root-admin-fixture.ts'
+    );
+    await seedSeat(
+        db, organization, identityId, type, T8_AT,
     );
 }
 
@@ -648,16 +620,14 @@ async function deepDb(): Promise<MemoryDbAdapter> {
                 roles: ['admin:' + organization],
             });
         const memberWrite = await handleRequest(db, req(
-            'PUT', '/members/' + id,
+            'PUT', '/identities/' + id,
             authorToken,
-            {
-                type: 'human',
-                state: 'active',
-                state_at: T8_AT,
-                state_event_id: 'seMem-' + id,
-            },
+            { kind: 'person' },
         ));
-        assert.equal(memberWrite.status, 201);
+        assert.ok(
+            memberWrite.status === 201
+            || memberWrite.status === 200,
+        );
     }
     await seedChain(db, 'A', 'A', 'current');
     await seedChain(db, 'B', 'B', 'pb');

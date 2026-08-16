@@ -25,7 +25,7 @@ const QUOTA_HEADROOM_RATIO = 0.5;
 // the value is self-disclosing (Commandment III) and importing
 // canonicalUriCollection would drag the family registry in for one
 // constant. Matches api/derive-members.ts's own MEMBERS_PREFIX.
-const MEMBERS_PAIR_PREFIX = '/members/';
+const IDENTITIES_PAIR_PREFIX = '/identities/';
 
 export class SnapshotTooLargeError extends Error {
     readonly fileSize: number;
@@ -155,6 +155,10 @@ const RETIRED_URI_PREFIX_PATTERNS:
     readonly RegExp[] = [
     /^\/organizations\/[^/]+\/records\//,
     /^\/organizations\/[^/]+\/record-attributes\//,
+    /^\/members\//,
+    /^\/human-members\//,
+    /^\/ai-members\//,
+    /^\/organizations\/[^/]+\/memberships\//,
 ];
 
 export class SnapshotIncompatibleError extends Error {
@@ -400,6 +404,6 @@ export async function getHasAnyHumanMembers(
             typeof row === 'object'
             && row !== null
             && (row as { uri_collection?: unknown }).uri_collection
-                === MEMBERS_PAIR_PREFIX,
+                === IDENTITIES_PAIR_PREFIX,
     );
 }

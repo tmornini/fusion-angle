@@ -74,48 +74,22 @@ test('objectives is the seventh registered family, simple'
     });
 });
 
-test('memberships is the eighth registered family,'
-+ ' organization-nested like the rest', () => {
-    assert.deepEqual(familyRegistration('memberships'), {
-        family: 'memberships',
-        organizationNested: true,
-        concurrency: 'simple',
-        createBodyIdField: 'id',
-    });
+test('leftover roster families are not registered', () => {
+    assert.equal(
+        familyRegistration('memberships'), undefined,
+    );
+    assert.equal(
+        familyRegistration('members'), undefined,
+    );
+    assert.equal(
+        familyRegistration('ai-members'), undefined,
+    );
+    assert.equal(
+        familyRegistration('human-members'), undefined,
+    );
 });
 
-test('members is the ninth registered family, the first'
-+ ' global-plane (organizationNested false) row', () => {
-    assert.deepEqual(familyRegistration('members'), {
-        family: 'members',
-        organizationNested: false,
-        concurrency: 'simple',
-        createBodyIdField: 'id',
-    });
-});
-
-test('ai-members is the tenth registered family,'
-+ ' global-plane like members', () => {
-    assert.deepEqual(familyRegistration('ai-members'), {
-        family: 'ai-members',
-        organizationNested: false,
-        concurrency: 'simple',
-        createBodyIdField: 'id',
-    });
-});
-
-test('human-members is the eleventh registered family,'
-+ ' global-plane like ai-members', () => {
-    assert.deepEqual(familyRegistration('human-members'), {
-        family: 'human-members',
-        organizationNested: false,
-        concurrency: 'simple',
-        createBodyIdField: 'id',
-    });
-});
-
-test('identities is the twelfth registered family,'
-+ ' global-plane like members', () => {
+test('identities is a live global-plane family', () => {
     assert.deepEqual(familyRegistration('identities'), {
         family: 'identities',
         organizationNested: false,
@@ -124,11 +98,22 @@ test('identities is the twelfth registered family,'
     });
 });
 
-test('organizations is the thirteenth registered family,'
-+ ' the tenant root itself — global-plane like identities',
+test('organizations is the tenant root — global-plane'
++ ' like identities',
 () => {
     assert.deepEqual(familyRegistration('organizations'), {
         family: 'organizations',
+        organizationNested: false,
+        concurrency: 'simple',
+        createBodyIdField: 'id',
+    });
+});
+
+test('ai-agents is a live global-plane family,'
++ ' not a member and not an identity',
+() => {
+    assert.deepEqual(familyRegistration('ai-agents'), {
+        family: 'ai-agents',
         organizationNested: false,
         concurrency: 'simple',
         createBodyIdField: 'id',

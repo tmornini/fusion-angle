@@ -44,6 +44,8 @@ import {
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
 import { formDocumentPairFor } from './routes.ts';
+import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
+    './family-registry.ts';
 import {
     deriveInvitations,
     invitationOpStateFor,
@@ -705,11 +707,18 @@ async function acceptInvitation(
         return errorJson('Invalid JSON body', HTTP_BAD_REQUEST);
     }
     const body = parse.body;
-    let membershipId: string;
     let eventId: string;
     let at: string;
     try {
-        membershipId = pickString(body, 'membershipId');
+        // Seat uri_id is the invitee identity. membershipId
+        // stays required on the accept body (adapter still
+        // mints one) but does not address the seat.
+        if (pickString(body, 'membershipId') === '') {
+            return errorJson(
+                'membershipId must be non-empty',
+                HTTP_BAD_REQUEST,
+            );
+        }
         eventId = pickString(body, 'acceptEventId');
         at = validateTimestampField(
             body, 'acceptAt', 'accept',
@@ -719,12 +728,6 @@ async function acceptInvitation(
             return errorJson(e.message, HTTP_BAD_REQUEST);
         }
         throw e;
-    }
-    if (membershipId === '') {
-        return errorJson(
-            'membershipId must be non-empty',
-            HTTP_BAD_REQUEST,
-        );
     }
     if (eventId === '') {
         return errorJson(
@@ -739,32 +742,23 @@ async function acceptInvitation(
     if (replay !== undefined) {
         return sendWriteResponse(replay, 'POST', true);
     }
-    // The memberships DOCUMENT pair (Phase 8 Task 6, the B2
-    // closure — the third memberships writer to join the
-    // document plane, after the live PUT route and the seed):
-    // PUT-shaped, at the INVITATION's org-nested memberships
-    // address — never the caller's active org. Formed pre-tx
+    // Seat document (Task 52): PUT-shaped at the
+    // invitation's organization, identity-id in the path.
+    // Same Operation-ID as the accept. Formed pre-tx
     // (crypto cannot run inside a transaction body) but
-    // appended ONLY inside the `!already` branch — a no-op
-    // re-accept or a conflict writes no membership document,
-    // so it appends no document either. Phase Final Task 2:
-    // memberships ROW half stripped; the pair IS the write.
-    // Rides the shared former (Phase 9 Task 2), which resolves
-    // the SAME WRITE_RESPONSE_SPECS ['memberships/:id'] entry
-    // a live PUT /memberships/:id resolves.
-    // Accept writes type:"member" explicitly — closes the gap
-    // where accept wrote membership with no role grant.
-    const membershipDocumentBody = {
-        organization_id: inv.organization_id,
-        identity_id: ctx.principal.id,
+    // appended ONLY inside the `!already` branch.
+    const seatDocumentBody = {
         type: 'member',
         at,
     };
-    const membershipDocument = await formDocumentPairFor(
+    const seatDocument = await formDocumentPairFor(
         ctx.base, {
-            routePattern: 'memberships/:id',
-            params: [membershipId],
-            body: membershipDocumentBody,
+            routePattern:
+                ORGANIZATION_MEMBER_DETAIL_PATTERN,
+            params: [
+                inv.organization_id, ctx.principal.id,
+            ],
+            body: seatDocumentBody,
             requesterIdentityId: ctx.principal.id,
             requestAt: ctx.requestAt,
             organization: inv.organization_id,
@@ -773,8 +767,8 @@ async function acceptInvitation(
     );
     // The pending check rides INSIDE the write transaction so a
     // concurrent revoke/decline cannot slip between the check
-    // and the membership document write — a revoke must actually
-    // stop access (Commandment X / II).
+    // and the seat write — a revoke must actually stop access
+    // (Commandment X / II).
     let conflict = false;
     let noOp = false;
     // Phase Final Task 2: memberships ROW half stripped;
@@ -798,7 +792,7 @@ async function acceptInvitation(
             const already = await membershipExistsFor(
                 view, inv.organization_id, ctx.principal.id);
             if (!already) {
-                await appendMessagePair(view, membershipDocument);
+                await appendMessagePair(view, seatDocument);
             }
             await appendMessagePair(view, pair);
         },

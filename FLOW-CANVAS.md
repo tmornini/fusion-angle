@@ -69,16 +69,18 @@ file that names its special nodes `[Start]` / `[End]`
 imports with those literal names, surfacing the staleness
 rather than masking it via a shim. Regular
 nodes (not start/end) carry a `memberIds: MemberId[]` field
-(zero or more) persisted on the node and rendered in the
-panel body as a `<fieldset>` with two `<div class=
+(zero or more person members / identities) and an optional
+`agentIds: AgentId[]` field (live `/ai-agents` ids). The
+panel body renders a `<fieldset>` with two `<div class=
 "member-group">` children — HUMANS and AIs — each holding a
-labeled `<input type="checkbox">` per member carrying
-`data-member-id="<id>"`. The fieldset respects `isLocked`
-(every checkbox `disabled` when locked). On change, the
-panel collects every checked value into a `MemberId[]`
-and dispatches the node-property-update action via the
-pure helper `parseMemberIdsFromPanel(panelEl)` in
-`flows/detail.ts`.
+labeled `<input type="checkbox">`. Humans carry
+`data-member-id="<id>"`; AI checkboxes are display-only
+(`data-ai-member-id`) until a roster seat names an agent.
+The fieldset respects `isLocked` (every checkbox
+`disabled` when locked). On change, the panel collects
+every checked human into a `MemberId[]` and dispatches
+the node-property-update action via the pure helper
+`parseMemberIdsFromPanel(panelEl)` in `flows/detail.ts`.
 
 Regular nodes also carry `attributes: NodeAttribute[]`
 (`{ attributeId, mode, isRequired }`). Hidden is encoded
@@ -92,8 +94,9 @@ carries a Record-binding `<select>` driven by
 `deleteFlowRecordForFlow`.
 
 The canvas operates on the domain `GraphNode` /
-`GraphEdge` (`memberIds`, `attributes`). The live graph is
-pair-plane only — see [ARCHITECTURE.md](ARCHITECTURE.md)
+`GraphEdge` (`memberIds`, `agentIds`, `attributes`). The
+live graph is pair-plane only — see
+[ARCHITECTURE.md](ARCHITECTURE.md)
 § Flow-graph storage seam for storage, reassembly, and
 write semantics. `getFlowGraph` reads through `ctx.GET` and
 parses the returned graph into the domain `FlowGraph`.
@@ -152,7 +155,7 @@ Claim-expiration implementation:
 returns `null` for a `'claimed'` event older than
 `lockTimeout` seconds even when no `'claim_expired'` /
 `'claim_released'` event has yet superseded it.
-`postWorkOrderClaim` materializes that implicit expiration
+`putWorkOrderClaim` materializes that implicit expiration
 as an explicit `'claim_expired'` event when a new claim
 notices a stale prior, so the durable record converges on
 the reader's view.

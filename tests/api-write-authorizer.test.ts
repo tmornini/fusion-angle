@@ -11,17 +11,9 @@ import {
     seedOrganizationDocument,
 } from './test-fixtures.ts';
 import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import {
-    formWritePair,
-    type MessagePair,
-} from '../api/message-pair.ts';
-import { SYSTEM_MEMBER_ID, nowUtc } from '../api/types.ts';
-import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 // Pre-write authorizer: probe this address. Same id at two
 // collections is two documents. Foreign-id PUT geneses here;
@@ -65,35 +57,6 @@ function ideaDocument(
     };
 }
 
-async function membershipPair(
-    membershipId: string,
-    body: Record<string, unknown>,
-    organization: string,
-): Promise<MessagePair> {
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error('missing memberships/:id spec');
-    }
-    return formWritePair({
-        method: 'PUT',
-        pathname: `/memberships/${membershipId}`,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', membershipId],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [membershipId], body, SYSTEM_MEMBER_ID,
-            organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-}
-
 // Org A = seedRootAdmin's '1'; Org B is a second tenant that
 // `current` also administers — foreign-id probes always use the
 // B token against an A-owned document. Privilege is membership
@@ -108,10 +71,14 @@ async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
         type: 'admin',
         at: '2020-01-01T00:00:00.000000Z',
     };
-    await postMembershipDocumentOp(
-        db, 'm-current-b', memBody, SYSTEM_MEMBER_ID,
-        await membershipPair('m-current-b', memBody, ORGANIZATION_B),
+    await seedSeat(
+        db,
+        String(memBody['organization_id'] ?? memBody.organization_id),
+        String(memBody['identity_id'] ?? memBody.identity_id),
+        (memBody['type'] ?? memBody.type) as 'admin' | 'member',
+        String(memBody['at'] ?? memBody.at),
     );
+
     return db;
 }
 
@@ -220,36 +187,41 @@ async () => {
     assert.equal(row.name, 'A record');
 });
 
-test('foreign-id DELETE memberships/:id is 204', async () => {
+test('foreign-id DELETE seat is a miss in the caller org',
+async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
-    // A second membership row in A (not current's own).
     const created = await handleRequest(db, req(
-        'PUT', '/memberships/m-other-a', tokenA, {
-            organization_id: ORGANIZATION_A,
-            identity_id: 'someone-else',
-        type: 'member',
+        'PUT',
+        '/organizations/' + ORGANIZATION_A
+            + '/members/someone-else',
+        tokenA,
+        {
+            type: 'member',
             at: '2026-01-01T00:00:00.000000Z',
         },
     ));
     assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
-        'DELETE', '/memberships/m-other-a', tokenB,
+        'DELETE',
+        '/organizations/' + ORGANIZATION_B
+            + '/members/someone-else',
+        tokenB,
     ));
     assert.equal(foreign.status, 404);
-    // Phase Final Task 2: memberships ROW half stripped —
-    // surviving document is on the pair plane under org A.
     const stillThere = await handleRequest(db, req(
-        'GET', '/memberships/m-other-a', tokenA,
+        'GET',
+        '/organizations/' + ORGANIZATION_A
+            + '/members/someone-else',
+        tokenA,
     ));
     assert.equal(stillThere.status, 200);
     const row = await stillThere.json() as {
         organization_id: string;
     };
     assert.equal(row.organization_id, ORGANIZATION_A);
-    // Phase Final Stage B: roster tables retired.
 });
 
 test('foreign-id PUT projects/:id geneses at this address',

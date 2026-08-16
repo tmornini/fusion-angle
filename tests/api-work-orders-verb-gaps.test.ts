@@ -17,17 +17,11 @@ import {
 // the generic constructors replace the hand-written PUT
 // work-orders/:id scaffolding, never the sibling routes below,
 // but a gate-level regression could still shift these. A future
-// change to any of these eighteen statuses must re-derive the
-// covenant deliberately, not by accident of refactoring. The
-// list is exactly 18 (2+2+3+3+3+3+2): PUT/DELETE work-orders;
-// POST/DELETE work-orders/:id; GET/PUT/DELETE
-// work-orders/:id/claim; GET/PUT/DELETE
-// work-orders/:id/transition; GET/PUT/DELETE
-// work-orders/:id/binding; POST/PUT/DELETE
-// flows/:id/work-orders; GET/POST flows/:id/work-orders/:woid
-// (its DELETE 405 is already pinned in
-// api-flows-verb-gaps.test.ts — left there, not duplicated
-// here).
+// change to any of these statuses must re-derive the
+// covenant deliberately, not by accident of refactoring.
+// Task 61: claim is GET/PUT/DELETE (404 when unclaimed);
+// binding is create-only PUT (POST gone); release POST is
+// gone. Transition GET/PUT/DELETE stay 405.
 
 const BASE = 'http://localhost';
 
@@ -103,34 +97,54 @@ async () => {
     assert.equal(res.status, 405);
 });
 
-test('GET work-orders/:id/claim 405s (no get handler wired)',
+test('GET work-orders/:id/claim 404s when unclaimed',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('GET', '/work-orders/wo1/claim', token),
     );
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 404);
 });
 
-test('PUT work-orders/:id/claim 405s (no put handler wired)',
+test('PUT work-orders/:id/claim empty body is 400',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/work-orders/wo1/claim', token, {},
     ));
-    assert.equal(res.status, 405);
+    assert.equal(res.status, 400);
 });
 
-test('DELETE work-orders/:id/claim 405s (no delete handler'
-+ ' wired)', async () => {
+test('DELETE work-orders/:id/claim 404s when unclaimed',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
         db, req('DELETE', '/work-orders/wo1/claim', token),
     );
+    assert.equal(res.status, 404);
+});
+
+test('POST work-orders/:id/claim 405s (POST is gone)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'POST', '/work-orders/wo1/claim', token, {},
+    ));
     assert.equal(res.status, 405);
+});
+
+test('POST work-orders/:id/release 404s (address retired)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'POST', '/work-orders/wo1/release', token, {},
+    ));
+    assert.equal(res.status, 404);
 });
 
 test('GET work-orders/:id/transition 405s (no get handler'
@@ -173,12 +187,22 @@ test('GET work-orders/:id/binding 405s (no get handler'
     assert.equal(res.status, 405);
 });
 
-test('PUT work-orders/:id/binding 405s (no put handler'
-+ ' wired)', async () => {
+test('PUT work-orders/:id/binding on a missing WO is 404',
+async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT', '/work-orders/w1/binding', token, {},
+    ));
+    assert.equal(res.status, 404);
+});
+
+test('POST work-orders/:id/binding 405s (POST is gone)',
+async () => {
+    const db = await freshDb();
+    const token = await organizationToken();
+    const res = await handleRequest(db, req(
+        'POST', '/work-orders/w1/binding', token, {},
     ));
     assert.equal(res.status, 405);
 });

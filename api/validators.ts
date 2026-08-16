@@ -19,6 +19,7 @@ import type {
     MemberEntity,
     HumanMemberEntity,
     AIMemberEntity,
+    AIAgentEntity,
     MemberState,
     IdeaEntity,
     IdeaState,
@@ -35,6 +36,7 @@ import type {
     StateFieldValueEntity,
     OrganizationEntity,
     MembershipEntity,
+    MembershipType,
     InvitationEntity,
     IdeaSubmissionEntity,
     ProjectFlowEntity,
@@ -355,6 +357,13 @@ function asGraphNode(
         obj['memberIds'],
         label + '.memberIds',
     );
+    const agentIdsRaw = obj['agentIds'];
+    const agentIds = agentIdsRaw === undefined
+        ? undefined
+        : asMemberIds(
+            agentIdsRaw,
+            label + '.agentIds',
+        );
     return {
         id: asGraphId(
             obj['id'], label + '.id',
@@ -379,6 +388,9 @@ function asGraphNode(
             label + '.isArchive',
         ),
         memberIds,
+        ...(agentIds === undefined
+            ? {}
+            : { agentIds }),
         attributes: attrsArr.map((a, i) =>
             asNodeAttribute(
                 a,
@@ -414,6 +426,34 @@ function asGraphEdge(
             label + '.toNodeId',
         ),
     };
+}
+
+// Write-path graph law: memberIds may name person
+// identities only. agentIds must name live /ai-agents
+// documents.
+export function assertFlowGraphWriteLaw(
+    graph: StoredGraph,
+    liveAgentIds: ReadonlySet<string>,
+): void {
+    for (const node of graph.nodes) {
+        for (const id of node.memberIds) {
+            if (liveAgentIds.has(id)) {
+                throw new ValidationError(
+                    'memberIds may name person'
+                    + ' identities only, not AI'
+                    + ' agents',
+                );
+            }
+        }
+        for (const id of node.agentIds ?? []) {
+            if (!liveAgentIds.has(id)) {
+                throw new ValidationError(
+                    'agentIds must name a live AI'
+                    + ' agent',
+                );
+            }
+        }
+    }
 }
 
 export function asStoredGraph(
@@ -797,20 +837,60 @@ export function validateMemberDocumentBody(
 
 const IDENTITY_BODY_KEYS: readonly string[] = ['kind'];
 
+// Person-only. Same four fields HumanMemberEntity validates;
+// optional here so `{ kind }` still admits a person without
+// a profile. A service that names any of them is 400.
+const IDENTITY_PROFILE_KEYS: readonly string[] = [
+    'title', 'department',
+    'strengths', 'team_dimensions',
+];
+
 export function validateIdentityEntity(
     body: Record<string, unknown>,
 ): Omit<IdentityEntity, 'id'> {
     assertOnlyKeys(
         body, IDENTITY_BODY_KEYS, 'IdentityEntity',
+        IDENTITY_PROFILE_KEYS,
     );
     const kind = validateEnumField(
         body, 'kind', ['person', 'service'],
         'identity kind', 'IdentityEntity',
     );
-    return { kind };
+    if (kind === 'service') {
+        assertOnlyKeys(
+            body, IDENTITY_BODY_KEYS, 'IdentityEntity',
+        );
+        return { kind };
+    }
+    return {
+        kind,
+        ...('title' in body
+            ? { title: pickString(body, 'title') }
+            : {}),
+        ...('department' in body
+            ? {
+                department: pickString(
+                    body, 'department',
+                ),
+            }
+            : {}),
+        ...('strengths' in body
+            ? {
+                strengths: pickStringArray(
+                    body, 'strengths',
+                ),
+            }
+            : {}),
+        ...('team_dimensions' in body
+            ? {
+                team_dimensions:
+                    pickStringNumberRecord(
+                        body, 'team_dimensions',
+                    ),
+            }
+            : {}),
+    };
 }
-
-const IDENTITY_DOCUMENT_BODY_KEYS: readonly string[] = ['kind'];
 
 export interface IdentityDocumentBody {
     readonly entity: Omit<IdentityEntity, 'id'>;
@@ -825,31 +905,21 @@ export interface IdentityDocumentBody {
 // states/:id, so a document-address trio here would FREEZE that
 // lifecycle at genesis forever. THE LABEL MANDATE (the Phase 7
 // Objective precedent, a NAMED byte-parity-over-convention
-// choice): the assertOnlyKeys label is 'IdentityEntity', matching
-// TODAY'S store validator (validateIdentityEntity) byte-for-byte,
-// NOT the 'IdentityDocumentBody' naming convention every other
+// choice): this gate delegates to validateIdentityEntity, so
+// the assertOnlyKeys label stays 'IdentityEntity' — NOT the
+// 'IdentityDocumentBody' naming convention every other
 // *DocumentBody validator uses — the label appears in the wire
 // 400 body ("unexpected key ... for IdentityEntity"), and the
-// convention's label would change those bytes. `kind`'s own rule
-// (validateEnumField over the SAME two-member enum) is IDENTICAL
-// to validateIdentityEntity's, so the missing/stray-key 400s stay
-// byte-identical on both paths too. Global plane (family-
-// registry.ts: organizationNested:false) — no organization_id
-// exists on this entity, so nothing is tolerated beyond `kind`.
+// convention's label would change those bytes. A person may
+// carry the four HumanMemberEntity profile fields; a service
+// that names any of them is 400. Existing `{ kind }` PUTs
+// still admit a person without a profile. Global plane
+// (family-registry.ts: organizationNested:false).
 export function validateIdentityDocumentBody(
     body: Record<string, unknown>,
 ): IdentityDocumentBody {
-    assertOnlyKeys(
-        body, IDENTITY_DOCUMENT_BODY_KEYS, 'IdentityEntity',
-    );
-    const kind = validateEnumField(
-        body, 'kind', ['person', 'service'],
-        'identity kind', 'IdentityEntity',
-    );
     return {
-        entity: {
-            kind,
-        },
+        entity: validateIdentityEntity(body),
     };
 }
 
@@ -1227,6 +1297,82 @@ export function validateAiMemberDocumentBody(
         throw new ValidationError(
             'model must be a known provider'
             + ' model id on AIMemberEntity',
+        );
+    }
+    return {
+        entity: {
+            name: pickString(body, 'name'),
+            description: pickString(
+                body, 'description',
+            ),
+            skill_focus: pickString(
+                body, 'skill_focus',
+            ),
+            model,
+        },
+    };
+}
+
+const AI_AGENT_BODY_KEYS:
+    readonly string[] = [
+    'name', 'description', 'model', 'skill_focus',
+];
+
+export function validateAIAgentEntity(
+    body: Record<string, unknown>,
+): Omit<AIAgentEntity, 'id'> {
+    assertOnlyKeys(
+        body,
+        AI_AGENT_BODY_KEYS,
+        'AIAgentEntity',
+    );
+    const model = pickString(body, 'model');
+    if (!isProviderModelId(model)) {
+        throw new ValidationError(
+            'model must be a known provider'
+            + ' model id on AIAgentEntity',
+        );
+    }
+    return {
+        name: pickString(body, 'name'),
+        description: pickString(
+            body, 'description',
+        ),
+        skill_focus: pickString(
+            body, 'skill_focus',
+        ),
+        model,
+    };
+}
+
+const AI_AGENT_DOCUMENT_BODY_KEYS:
+    readonly string[] = [
+    'name', 'description', 'model', 'skill_focus',
+];
+
+export interface AiAgentDocumentBody {
+    readonly entity: Omit<AIAgentEntity, 'id'>;
+}
+
+// The HTTP-body gate for PUT /ai-agents/:id: a
+// standalone global-plane family, not a member and
+// not an identity. THE LABEL MANDATE: assertOnlyKeys
+// speaks 'AIAgentEntity', matching
+// validateAIAgentEntity byte-for-byte. model uses
+// the SAME catalog-membership gate.
+export function validateAiAgentDocumentBody(
+    body: Record<string, unknown>,
+): AiAgentDocumentBody {
+    assertOnlyKeys(
+        body,
+        AI_AGENT_DOCUMENT_BODY_KEYS,
+        'AIAgentEntity',
+    );
+    const model = pickString(body, 'model');
+    if (!isProviderModelId(model)) {
+        throw new ValidationError(
+            'model must be a known provider'
+            + ' model id on AIAgentEntity',
         );
     }
     return {
@@ -2000,6 +2146,35 @@ export function validateMembershipDocumentBody(
             type,
             at,
         },
+    };
+}
+
+const SEAT_DOCUMENT_BODY_KEYS: readonly string[] = [
+    'type', 'at',
+];
+
+export interface SeatDocumentBody {
+    readonly type: MembershipType;
+    readonly at: string;
+}
+
+// PUT organizations/:organization-id/members/:identity-id.
+// Organization and identity ride the path. Privilege type
+// and the moment of union ride the body.
+export function validateSeatDocumentBody(
+    body: Record<string, unknown>,
+): SeatDocumentBody {
+    assertOnlyKeys(
+        body, SEAT_DOCUMENT_BODY_KEYS, 'SeatDocumentBody',
+    );
+    return {
+        type: validateEnumField(
+            body, 'type', MEMBERSHIP_TYPES,
+            'membership type', 'SeatDocumentBody',
+        ),
+        at: validateTimestampField(
+            body, 'at', 'SeatDocumentBody',
+        ),
     };
 }
 
@@ -4280,25 +4455,32 @@ const WORK_ORDER_CLAIM_KEYS: readonly string[] = [
     'claimEventId', 'claimAt',
     'expireEventId', 'expireAt',
 ];
+const WORK_ORDER_CLAIM_OPTIONAL: readonly string[] = [
+    'expires_at',
+];
 
 export interface WorkOrderClaimBody {
     readonly claimEventId: string;
     readonly claimAt: string;
     readonly expireEventId: string;
     readonly expireAt: string;
+    readonly expiresAt?: string;
 }
 
-// Gate for POST /work-orders/:id/claim. The caller mints
+// Gate for PUT /work-orders/:id/claim. The caller mints
 // both event ids and timestamps; the route reads them via
 // this validator and never calls generateCryptoSafeBase62
 // for the claim events. Authorship is server-derived
 // (actor for 'claimed', prior.member_id for
 // 'claim_expired') — never supplied by the caller.
+// expires_at is the stored claim-document fact; "claimed
+// now" is judged at read against the clock.
 export function validateWorkOrderClaimBody(
     body: Record<string, unknown>,
 ): WorkOrderClaimBody {
     assertOnlyKeys(
         body, WORK_ORDER_CLAIM_KEYS, 'WorkOrderClaimBody',
+        WORK_ORDER_CLAIM_OPTIONAL,
     );
     const claimEventId = pickString(body, 'claimEventId');
     const expireEventId = pickString(
@@ -4315,7 +4497,20 @@ export function validateWorkOrderClaimBody(
     const expireAt = validateTimestampField(
         body, 'expireAt', 'WorkOrderClaimBody',
     );
-    return { claimEventId, claimAt, expireEventId, expireAt };
+    const expiresAt = Object.hasOwn(body, 'expires_at')
+        ? validateTimestampField(
+            body, 'expires_at', 'WorkOrderClaimBody',
+        )
+        : undefined;
+    if (expiresAt === undefined) {
+        return {
+            claimEventId, claimAt, expireEventId, expireAt,
+        };
+    }
+    return {
+        claimEventId, claimAt, expireEventId, expireAt,
+        expiresAt,
+    };
 }
 
 const WORK_ORDER_RELEASE_KEYS: readonly string[] = [
@@ -4327,10 +4522,11 @@ export interface WorkOrderReleaseBody {
     readonly releaseAt: string;
 }
 
-// Gate for POST /work-orders/:id/release. The caller mints
-// the event id and timestamp (the claim-body precedent);
-// authorship is server-derived (actor) — never supplied by
-// the caller. A single terminal event, so no expire pair.
+// Gate for the retired POST /work-orders/:id/release
+// body (legacy derive only). Live release is DELETE
+// /work-orders/:id/claim (no body). The caller minted
+// the event id and timestamp; authorship is server-
+// derived (actor).
 export function validateWorkOrderReleaseBody(
     body: Record<string, unknown>,
 ): WorkOrderReleaseBody {
@@ -4359,9 +4555,9 @@ export interface WorkOrderBindingBody {
     readonly recordTypeId: string;
 }
 
-// Gate for POST /work-orders/:id/binding. Two opaque ids only —
+// Gate for PUT /work-orders/:id/binding. Two opaque ids only —
 // no timestamps, no event ids. The CURRENT bind derives from
-// the op-pair prefix (workOrderBindingFor); rebind is 409.
+// the pair prefix (workOrderBindingFor); rebind is 409.
 export function validateWorkOrderBindingBody(
     body: Record<string, unknown>,
 ): WorkOrderBindingBody {

@@ -3,7 +3,7 @@
 // Excluded from browser tsc; uses Node APIs + global WebSocket.
 //
 // Flow: optional bare --visualize (disk only) → clean-tree
-// gate → (build → python serve → snapshots seed) or
+// gate → (build → node server.mjs --seed-mock-data) or
 // --base-url origin → Chrome → login → detail-URL
 // discovery → N-run sweep → report → optional
 // --check / --record / --visualize. Cleanup always in
@@ -51,12 +51,19 @@ import {
 import {
     DEFAULT_RUNS,
     DEFAULT_BUDGET_SIGMAS,
+    MEASURE_DEMO_EMAIL,
+    isVisualizeOnly,
+    lastJsonLogMessage,
+    measureServerArgs,
+    needsLocalMeasureServer,
     parseMeasureArgv,
+    passwordFromSeedReveal,
+    readMeasureServeEnv,
+    type MeasureServeEnv,
 } from './measure-cli.ts';
 
 const execFile = promisify(execFileCb);
 
-const DEMO_EMAIL = 'demo@example.com';
 const CHROME_READY_MS = 15_000;
 const SEED_TIMEOUT_MS = 120_000;
 const LOGIN_TIMEOUT_MS = 60_000;
@@ -125,8 +132,8 @@ function usageText(): string {
         '                       omitted, uses 1.',
         '  --base-url URL       Hit this origin instead',
         '                       of building and spawning',
-        '                       python http.server.',
-        '                       Skips snapshots seed.',
+        '                       node server.mjs.',
+        '                       Skips --seed-mock-data.',
         '  --password SECRET    Auth password when',
         '                       --base-url is set.',
         '                       MEASURE_PASSWORD also',
@@ -599,96 +606,7 @@ async function pageWsUrl(
     );
 }
 
-// ── Seed / login / discovery ──────
-
-type CredLine = {
-    user: string | null | undefined;
-    secret: string | null | undefined;
-};
-
-async function seedMockData(
-    cdp: CdpClient,
-    baseUrl: string,
-): Promise<string> {
-    const snapsUrl = registryUrl(
-        baseUrl, 'snapshots',
-    );
-    await pageNavigate(cdp, snapsUrl);
-    await waitForSelector(
-        cdp,
-        '#reload-btn',
-        'snapshots #reload-btn',
-        ELEMENT_TIMEOUT_MS,
-    );
-    // page:ready may already have fired; either way
-    // the seed control is the gate.
-    await clickSelector(cdp, '#reload-btn');
-    await waitForSelector(
-        cdp,
-        '#confirm-wipe-submit',
-        'snapshots confirm-wipe dialog',
-        ELEMENT_TIMEOUT_MS,
-    );
-    await clickSelector(
-        cdp, '#confirm-wipe-submit',
-    );
-    await waitForSelector(
-        cdp,
-        '#credential-continue-btn',
-        'seed credential reveal'
-        + ' (#credential-continue-btn)',
-        SEED_TIMEOUT_MS,
-    );
-    const creds = await evaluateJson<CredLine[]>(
-        cdp,
-        `Array.from(document.querySelectorAll(
-            '.credential-reveal-line'
-        )).map((line) => ({
-            user: line.querySelector(
-                '.credential-reveal-user'
-            )?.textContent?.trim(),
-            secret: line.querySelector(
-                '.credential-reveal-secret'
-            )?.textContent?.trim(),
-        }))`,
-    );
-    const demo = creds.find(
-        (c) => c.user === DEMO_EMAIL,
-    );
-    if (
-        demo === undefined
-        || demo.secret === undefined
-        || demo.secret === null
-        || demo.secret.length === 0
-    ) {
-        const available = creds
-            .map((c) => c.user ?? '(missing user)')
-            .join(', ');
-        throw new Error(
-            `Seed credentials missing ${DEMO_EMAIL}.`
-            + ` Available users: ${available
-                || '(none)'}`,
-        );
-    }
-    await clickSelector(
-        cdp, '#credential-continue-btn',
-    );
-    // Root redirect → auth when schema present.
-    await pollUntil(
-        'post-seed navigation off snapshots',
-        ELEMENT_TIMEOUT_MS,
-        async () => {
-            const href = await evaluateJson<string>(
-                cdp,
-                'location.href',
-            );
-            return href.includes('/snapshots/')
-                ? null
-                : href;
-        },
-    );
-    return demo.secret;
-}
+// ── Login / discovery ──────
 
 async function login(
     cdp: CdpClient,
@@ -713,7 +631,7 @@ async function login(
                 document.querySelector('#password');
             if (!email || !password) return false;
             email.focus();
-            email.value = ${JSON.stringify(DEMO_EMAIL)};
+            email.value = ${JSON.stringify(MEASURE_DEMO_EMAIL)};
             email.dispatchEvent(
                 new Event('input', { bubbles: true })
             );
@@ -980,17 +898,7 @@ async function main(): Promise<void> {
     const cli = parsed.cli;
     const repoRoot = process.cwd();
 
-    const visualizeOnly =
-        cli.visualize
-        && !cli.check
-        && !cli.record
-        && !cli.writeBudgets
-        && !cli.profile
-        && cli.pages === null
-        && !cli.runsExplicit
-        && cli.baseUrl === null;
-
-    if (visualizeOnly) {
+    if (isVisualizeOnly(cli)) {
         const out = generateMeasureViz(repoRoot);
         process.stderr.write(
             `Wrote visualizer → ${out}\n`,
@@ -1012,6 +920,17 @@ async function main(): Promise<void> {
                 + ' committed bytes)',
             );
         }
+    }
+
+    let localServe: MeasureServeEnv | null = null;
+    if (needsLocalMeasureServer(cli)) {
+        const serveEnv = readMeasureServeEnv(
+            process.env,
+        );
+        if (serveEnv.kind === 'error') {
+            throw new Error(serveEnv.message);
+        }
+        localServe = serveEnv.env;
     }
 
     const allKeys = Object.keys(PAGE_REGISTRY);
@@ -1054,7 +973,15 @@ async function main(): Promise<void> {
 
     try {
         let baseUrl: string;
+        let password: string;
         if (cli.baseUrl !== null) {
+            if (cli.password === null) {
+                throw new Error(
+                    '--base-url requires --password'
+                    + ' or MEASURE_PASSWORD',
+                );
+            }
+            password = cli.password;
             baseUrl = cli.baseUrl;
             process.stderr.write(
                 `Using origin ${baseUrl} …\n`,
@@ -1114,42 +1041,81 @@ async function main(): Promise<void> {
                 );
             }
 
-            // 2. Serve
+            // 2. Serve node server.mjs --seed-mock-data
+            if (localServe === null) {
+                throw new Error(
+                    'missing required env POSTGRES_URL',
+                );
+            }
             const port = await freePort();
             baseUrl = `http://127.0.0.1:${port}`;
+            process.stderr.write(
+                `Starting node server.mjs on ${baseUrl}`
+                + ' …\n',
+            );
             serverProc = spawn(
-                'python3',
-                [
-                    '-m',
-                    'http.server',
-                    String(port),
-                    '--directory',
-                    buildDir,
-                ],
+                'node',
+                measureServerArgs(),
                 {
-                    stdio: 'ignore',
+                    cwd: buildDir ?? undefined,
+                    env: {
+                        ...process.env,
+                        POSTGRES_URL:
+                            localServe.postgresUrl,
+                        JWT_HMAC_SIGNING_KEY:
+                            localServe.jwtHmacSigningKey,
+                        HTTP_SERVER_PORT: String(port),
+                    },
+                    stdio: ['ignore', 'ignore', 'pipe'],
                     detached: true,
                 },
             );
             serverProc.unref();
-            // Wait until the server accepts connections.
-            await pollUntil(
-                `http.server on port ${port}`,
-                10_000,
+            let stderrText = '';
+            const errStream = serverProc.stderr;
+            if (errStream !== null) {
+                errStream.setEncoding('utf8');
+                errStream.on('data', (chunk: string) => {
+                    stderrText += chunk;
+                });
+            }
+            const secret = await pollUntil(
+                `node server.mjs on port ${port}`,
+                SEED_TIMEOUT_MS,
                 async () => {
+                    if (serverProc?.exitCode !== null
+                        && serverProc?.exitCode
+                            !== undefined) {
+                        const boot = lastJsonLogMessage(
+                            stderrText,
+                        );
+                        throw new Error(
+                            'server.mjs exited'
+                            + (boot
+                                ? `: ${boot}`
+                                : ''),
+                        );
+                    }
+                    const parsed =
+                        passwordFromSeedReveal(
+                            stderrText,
+                            MEASURE_DEMO_EMAIL,
+                        );
+                    if (parsed === null) return null;
                     try {
                         const res = await fetch(
                             baseUrl + '/',
                         );
                         return res.ok
                             || res.status === 404
-                            ? true
+                            ? parsed
                             : null;
                     } catch {
                         return null;
                     }
                 },
             );
+            password = secret;
         }
 
         // 3. Launch Chrome
@@ -1183,33 +1149,14 @@ async function main(): Promise<void> {
         await cdp.send('Page.enable');
         await cdp.send('Runtime.enable');
 
-        // 4. Seed (browser ZIP only). Server first-light
-        // seeds below HTTP; login uses --password.
-        let password: string;
-        if (cli.baseUrl !== null) {
-            if (cli.password === null) {
-                throw new Error(
-                    '--base-url requires --password'
-                    + ' or MEASURE_PASSWORD',
-                );
-            }
-            password = cli.password;
-        } else {
-            process.stderr.write(
-                'Seeding mock data …\n',
-            );
-            password = await seedMockData(
-                cdp, baseUrl,
-            );
-        }
-
-        // 5. Login
+        // 4. Login (seed is --seed-mock-data on boot,
+        // or --password against --base-url).
         process.stderr.write(
-            `Logging in as ${DEMO_EMAIL} …\n`,
+            `Logging in as ${MEASURE_DEMO_EMAIL} …\n`,
         );
         await login(cdp, baseUrl, password);
 
-        // 6. Detail-URL discovery
+        // 5. Detail-URL discovery
         process.stderr.write(
             'Discovering detail URLs …\n',
         );

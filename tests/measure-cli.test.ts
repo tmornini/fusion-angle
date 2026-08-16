@@ -2,8 +2,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
     DEFAULT_RUNS,
+    MEASURE_DEMO_EMAIL,
+    MEASURE_SEED_FLAG,
+    MEASURE_SERVER_ENTRY,
     finalizeMeasureCli,
+    isVisualizeOnly,
+    lastJsonLogMessage,
+    measureServerArgs,
+    needsLocalMeasureServer,
     parseMeasureArgv,
+    passwordFromSeedReveal,
+    readMeasureServeEnv,
     type MeasureCliFlags,
 } from '../web-app/app/measure-cli.ts';
 
@@ -168,4 +177,122 @@ test('MEASURE_PASSWORD satisfies --base-url', () => {
     assert.equal(result.kind, 'ok');
     if (result.kind !== 'ok') return;
     assert.equal(result.cli.password, 'from-env');
+});
+
+test('visualize-only is disk-only, no local server', () => {
+    const cli = baseFlags({ visualize: true });
+    assert.equal(isVisualizeOnly(cli), true);
+    assert.equal(needsLocalMeasureServer(cli), false);
+});
+
+test('bare ceremony needs a local Node server', () => {
+    const result = finalizeMeasureCli(baseFlags());
+    assert.equal(result.kind, 'ok');
+    if (result.kind !== 'ok') return;
+    assert.equal(isVisualizeOnly(result.cli), false);
+    assert.equal(
+        needsLocalMeasureServer(result.cli),
+        true,
+    );
+});
+
+test('--base-url skips the local Node spawn', () => {
+    const cli = baseFlags({
+        baseUrl: 'http://127.0.0.1:8080',
+        password: 'secret',
+    });
+    assert.equal(needsLocalMeasureServer(cli), false);
+});
+
+test('local serve requires Postgres and HMAC env', () => {
+    const missingUrl = readMeasureServeEnv({
+        JWT_HMAC_SIGNING_KEY: 'k',
+    });
+    assert.equal(missingUrl.kind, 'error');
+    if (missingUrl.kind !== 'error') return;
+    assert.match(missingUrl.message, /POSTGRES_URL/);
+
+    const missingKey = readMeasureServeEnv({
+        POSTGRES_URL: 'postgres://x',
+    });
+    assert.equal(missingKey.kind, 'error');
+    if (missingKey.kind !== 'error') return;
+    assert.match(
+        missingKey.message,
+        /JWT_HMAC_SIGNING_KEY/,
+    );
+
+    const empty = readMeasureServeEnv({
+        POSTGRES_URL: '',
+        JWT_HMAC_SIGNING_KEY: 'k',
+    });
+    assert.equal(empty.kind, 'error');
+
+    const ok = readMeasureServeEnv({
+        POSTGRES_URL: 'postgres://x',
+        JWT_HMAC_SIGNING_KEY: 'k',
+    });
+    assert.equal(ok.kind, 'ok');
+    if (ok.kind !== 'ok') return;
+    assert.equal(ok.env.postgresUrl, 'postgres://x');
+    assert.equal(ok.env.jwtHmacSigningKey, 'k');
+});
+
+test('passwordFromSeedReveal reads tab lines', () => {
+    const text = [
+        'Save your demo sign-ins — shown once;',
+        '',
+        'sarah.chen@company.com\talice-secret',
+        'demo@example.com\tdemo-secret',
+    ].join('\n');
+    assert.equal(
+        passwordFromSeedReveal(
+            text,
+            MEASURE_DEMO_EMAIL,
+        ),
+        'demo-secret',
+    );
+});
+
+test('passwordFromSeedReveal misses empty secret', () => {
+    assert.equal(
+        passwordFromSeedReveal(
+            'demo@example.com\t',
+            MEASURE_DEMO_EMAIL,
+        ),
+        null,
+    );
+    assert.equal(
+        passwordFromSeedReveal(
+            'other@example.com\tx',
+            MEASURE_DEMO_EMAIL,
+        ),
+        null,
+    );
+});
+
+test('lastJsonLogMessage takes the last message', () => {
+    const text = [
+        'not json',
+        '{"level":"info","message":"listening"}',
+        '{"level":"error","message":'
+            + '"database is not empty; refuse to seed"}',
+    ].join('\n');
+    assert.equal(
+        lastJsonLogMessage(text),
+        'database is not empty; refuse to seed',
+    );
+    assert.equal(lastJsonLogMessage('plain'), null);
+});
+
+test('local Node spawn is server.mjs plus seed', () => {
+    assert.equal(MEASURE_SERVER_ENTRY, 'server.mjs');
+    assert.equal(
+        MEASURE_SEED_FLAG,
+        '--seed-mock-data',
+    );
+    assert.deepEqual(
+        measureServerArgs(),
+        ['server.mjs', '--seed-mock-data'],
+    );
 });

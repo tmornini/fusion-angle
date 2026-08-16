@@ -8,13 +8,15 @@ import {
     DELETE as httpDelete,
     POST as httpPost,
     type ClientFacadeAdapter,
-} from '../../../api/api.ts';
-import type { HttpFacade } from './http-facade.ts';
-import { registerInPageWrap } from './facade-holder.ts';
+} from '../api/api.ts';
+import type { HttpFacade } from
+    '../web-app/app/adapters/http-facade.ts';
+import { registerInPageWrap } from
+    '../web-app/app/adapters/facade-holder.ts';
 
-// Browser-ZIP / test wrap: in-page handleRequest verbs
-// presented as HttpFacade. Importing this file pulls
-// api/api.ts — the server entry must not import it.
+// Test wrap: in-process handleRequest verbs as HttpFacade.
+// Product boot uses the fetch facade; this stays off the
+// server-core graph.
 
 export function wrapInPageAdapter(
     adapter: ClientFacadeAdapter,

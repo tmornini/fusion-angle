@@ -1,4 +1,5 @@
-URI tree of the HTTP surface; source of record is api/routes.ts (the route table), api/api.ts (handleRequest pre-match + facades), api/invitations-domain.ts (the invitation sub-router), and api/organization-requests.ts (the org/default-org sub-routers).
+URI tree of the HTTP surface; source of record is api/routes.ts (the route table), api/api.ts (handleRequest pre-match + facades), api/invitations-domain.ts (the invitation sub-router), and api/organization-requests.ts (the
+organization/default-organization sub-routers).
 
 └─|─ /invitations/ • RECONCILED: derived view, but NOT a registered family — the permanent side channel (Author gate 2); grant/accept synthesize PUT-shaped document pairs off the route table, rows derive from PUT-method document heads at /invitations/ and state from op-address pair presence (accepted/declined/revoked/pending), the facade's 404-only verb regime preserved — Phase 15 gate 6 re-homes grant email onto deriveIdentityPiiRows and pendingInvitationFor/loadInvitation onto deriveInvitations (no live invitations-table decision read) — see the roster seam FLIPPED 2026-07-06 block + Phase 15 FLIPPED
   |  └── :id
@@ -9,19 +10,21 @@ URI tree of the HTTP surface; source of record is api/routes.ts (the route table
   |      └── /history
 └─|─ /ai-members/ • RECONCILED: tenth registered family, GLOBAL plane (detail facet, 'stateless'); GET collection; GET|PUT :id document; POST collection create + POST :id edit (admin)
   |  └── :id
+└─|─ /ai-agents/ • RECONCILED: fourteenth registered family, GLOBAL plane ('stateless'); not a member and not an identity; GET collection; GET|PUT :id document (name, description, skill_focus, model)
+  |  └── :id
 └─|─ /human-members/ • RECONCILED: eleventh registered family, GLOBAL plane (detail facet, 'stateless'); GET collection; GET :id; POST collection create + POST :id edit (admin); NO live PUT on :id (wiring/seed only)
   |  └── :id
 └─|─ /current-member • RECONCILED: GET actor's own member parent (global plane; deriveMemberParent)
 └─|─ /identity-pii • RECONCILED: GET collection roster (fenced via membership pair plane over deriveIdentityPiiRows) — distinct from nested identities/:id/pii
-└─|─ work-orders/ • RECONCILED: registered org-nested document family (organizationNested:true, concurrency:'simple', lifecycle:'stateless' — flat wire; storage uri_prefix nests org), collection + entity GETs with optional binding enrichment (instance_id + record_type_id), PUT via documentPutHandler, POST create, named ops claim/transition/release/binding; no DELETE
+└─|─ work-orders/ • RECONCILED: registered org-nested document family (organizationNested:true, concurrency:'simple', lifecycle:'stateless' — flat wire; storage uri_prefix nests org), collection + entity GETs with optional binding enrichment (instance_id + record_type_id), PUT via documentPutHandler, POST create, named ops PUT/GET/DELETE claim, POST transition, PUT binding (create-only); POST release retired (404); no document DELETE
   |  └── :id/
-  |      └── claim                            • RECONCILED: claim graph head from workOrderDocumentHeadFor (Phase 15 Task 2); contention 409 + nonexistent-WO 404 + foreign-WO 403 held — see Phase 15 FLIPPED + honest HTTP status covenant
+  |      └── claim                            • RECONCILED: PUT/GET/DELETE work-orders/:id/claim — first PUT 201; GET {member_id, expires_at} 200 / 404 only when unclaimed; DELETE releases 204; POST 405; contention 409 + nonexistent-WO 404 + foreign-WO 403 — see API.md §3.18
   |      └── transition                       • RECONCILED: POST work-orders/:id/transition — post-Phase-2 body (instance_id + record_type_id + set/clear); If-Match preconditions bound instance head (named RFC 9110 §13.1.1 deviation); op + revision one-tx; legacy fieldValues key → 400 at the gate; pure moves carry neither If-Match nor asserts — see API.md §3.19
-  |      └── release                          • RECONCILED: POST work-orders/:id/release — named unclaim op, 204, read-decide-append, replayed at derive; foreign-WO 403; nonexistent-WO 404
-  |      └── binding                          • RECONCILED: POST work-orders/:id/binding — named bind op, member-tier POST; current bind derived from op pairs (claim precedent); rebind 409; WO GET embeds instance_id + record_type_id — see API.md §3.34
+  |      └── release                          • RETIRED: POST work-orders/:id/release — router 404; unclaim is DELETE work-orders/:id/claim — see API.md §3.35
+  |      └── binding                          • RECONCILED: PUT work-orders/:id/binding — create-only bind, first 201, rebind 409, POST 405; current bind derived from op pairs (claim precedent); WO GET embeds instance_id + record_type_id — see API.md §3.34
 └─|─ /identities/
   |  └── :id
-  |      └─|─ /default-org                     • RECONCILED: GET|PUT side channel (api/organization-requests.ts) — self-only tree-ownership gate; pair-plane ledger at /identities/:id/default-org/; PUT appends only when org changes and membership holds
+  |      └─|─ /default-organization            • RECONCILED: GET|PUT simple document (api/organization-requests.ts) — self-only tree-ownership gate; pair-plane document at /identities/:id/default-organization/; PUT { organization_id } must be a live seat else 400; GET 404 if never SET; revoke does not rewrite it; token resolution uses SET if live seat else PRIMARY else deny
   |      └─|─ /credentials                     • RECONCILED: collection GET returns rows[]; not a singleton document
   |      |  └── :cid                           • GET|PUT per-credential document at identities/:id/credentials/:cid
   |      └─|─ /notifications                   • TARGET-STATE: postgres LISTEN/NOTIFY for all changes to identity
@@ -59,7 +62,8 @@ URI tree of the HTTP surface; source of record is api/routes.ts (the route table
   |    |          └── /conversion             • RECONCILED: POST ideas/:id/conversion — promote idea→project (+ baseline score pairs) in one tx
   |    |          └── /submissions/
   |    |              └── :sid                • RECONCILED: ideas/:id/submissions — GET collection under idea; PUT leaf only
-  |    |  └── /memberships/                   • canonical storage (tenancy covenant)
+  |    |  └── /members/:identity-id           • seat document (Task 52) — accept writes PUT /organizations/:organization-id/members/:identity-id at the invitation's organization, same Operation-ID; seats win leftover /memberships rows until Task 55
+  |    |  └── /memberships/                   • leftover join storage until Task 55 (tenancy dual-read)
   |    |  └── /projects/
   |    |      └── :id
   |    |          └── /flows/

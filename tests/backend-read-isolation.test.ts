@@ -2,9 +2,6 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
-import {
-    LocalStorageBackend,
-} from '../api/backend-localstorage.ts';
 import type { StorageBackend } from '../api/db.ts';
 
 // Reads must hand out copies, never the buffered or
@@ -14,21 +11,6 @@ import type { StorageBackend } from '../api/db.ts';
 // rewrite committed state.
 
 interface Row { id: string; n: number; k: string }
-
-function installLocalStorageShim(): void {
-    const map = new Map<string, string>();
-    (globalThis as unknown as {
-        localStorage: {
-            getItem(key: string): string | null;
-            setItem(key: string, value: string): void;
-            removeItem(key: string): void;
-        };
-    }).localStorage = {
-        getItem(key) { return map.get(key) ?? null; },
-        setItem(key, value) { map.set(key, value); },
-        removeItem(key) { map.delete(key); },
-    };
-}
 
 async function seeded(
     backend: StorageBackend,
@@ -59,13 +41,6 @@ const TIERS: ReadonlyArray<{
     {
         name: 'memory',
         make: () => new MemoryStorageBackend(),
-    },
-    {
-        name: 'localStorage',
-        make: () => {
-            installLocalStorageShim();
-            return new LocalStorageBackend();
-        },
     },
 ];
 

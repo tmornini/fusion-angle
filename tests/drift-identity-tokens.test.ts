@@ -6,8 +6,12 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest, PUT } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
-import { base64UrlDecode } from '../shared/base64url.ts';
-import { hashPassword } from '../shared/password-hash.ts';
+import {
+    base64UrlDecode,
+    bytesToBase64Url,
+} from '../shared/base64url.ts';
+import { sha256Bytes } from '../shared/digest.ts';
+import { testHashPassword } from './mock-seed.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedRootAdmin } from './root-admin-fixture.ts';
 import {
@@ -90,6 +94,21 @@ function tokenGrant(
             body: JSON.stringify(body),
         },
     ));
+}
+
+async function s256Fields(): Promise<{
+    readonly verifier: string;
+    readonly code_challenge: string;
+    readonly code_challenge_method: 'S256';
+}> {
+    const verifier = 'pkce-verifier-drift';
+    return {
+        verifier,
+        code_challenge: bytesToBase64Url(
+            await sha256Bytes(verifier),
+        ),
+        code_challenge_method: 'S256',
+    };
 }
 
 function authorize(
@@ -347,20 +366,24 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
     await seedIdentityCredential(
         db, 'current', 'cred-security-pin', {
             identity_id: 'current', kind: 'password',
-            status: 'set', secret: await hashPassword(PASSWORD),
+            status: 'set', secret: await testHashPassword(PASSWORD),
             at: AT,
         },
     );
 
+    const pkce = await s256Fields();
     const authorizeRes = await authorize(db, {
         method: 'password', username: 'security-pin@example.com',
         password: PASSWORD, client_id: 'web',
+        code_challenge: pkce.code_challenge,
+        code_challenge_method: pkce.code_challenge_method,
     });
     assert.equal(authorizeRes.status, 201);
     const { code } = await authorizeRes.json() as { code: string };
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
         client_id: 'web',
+        code_verifier: pkce.verifier,
     });
     assert.equal(grantRes.status, 201);
     const { access_token: accessToken } =
@@ -413,7 +436,7 @@ async function dbWithCodeLoginUser(): Promise<MemoryDbAdapter> {
         db, 'current', 'cred-gate3', {
             identity_id: 'current', kind: 'password',
             status: 'set',
-            secret: await hashPassword(CODE_PASSWORD),
+            secret: await testHashPassword(CODE_PASSWORD),
             at: AT,
         },
     );
@@ -426,9 +449,12 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
 + ' membershipExistsFor / deriveIdentityTokenEventsForJti'
 + ' precedent', async () => {
     const db = await dbWithCodeLoginUser();
+    const pkce = await s256Fields();
     const authorizeRes = await authorize(db, {
         method: 'password', username: CODE_EMAIL,
         password: CODE_PASSWORD, client_id: 'web',
+        code_challenge: pkce.code_challenge,
+        code_challenge_method: pkce.code_challenge_method,
     });
     assert.equal(authorizeRes.status, 201);
     const { code } = await authorizeRes.json() as { code: string };
@@ -447,6 +473,7 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
     const grantRes = await tokenGrant(db, {
         grant_type: 'authorization_code', code,
         client_id: 'web',
+        code_verifier: pkce.verifier,
     });
     assert.equal(grantRes.status, 201);
 

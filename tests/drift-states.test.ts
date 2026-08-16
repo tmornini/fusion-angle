@@ -343,18 +343,7 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
         family: 'work-order', routeFamily: 'work-orders',
         id: buildWorkOrders()[0]!.id,
     },
-    {
-        family: 'human member', routeFamily: 'members',
-        id: buildMembers()[0]!.id,
-    },
-    {
-        family: 'AI member', routeFamily: 'members',
-        id: buildAiMembers()[0]!.id,
-    },
-    {
-        family: 'system member', routeFamily: 'members',
-        id: SYSTEM_MEMBER_ID,
-    },
+
     {
         family: 'objective', routeFamily: 'objectives',
         id: OBJECTIVE_SEEDS[0]!.id,
@@ -362,9 +351,8 @@ const CASE_2_FAMILY_ENTITY_IDS: readonly {
 ];
 
 test('case 2: GET <family>/:id/history parity — one entity'
-+ ' per family (idea, project, record, flow, work-order, human'
-+ ' member, AI member, system member, objective) + the (at, id)'
-+ ' DESC order', async () => {
++ ' per family (idea, project, record, flow, work-order,'
++ ' objective) + the (at, id) DESC order', async () => {
     const db = await seededDb();
     for (const { family, routeFamily, id }
         of CASE_2_FAMILY_ENTITY_IDS
@@ -653,7 +641,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
 
     const freshClaimAt = nowUtc();
     const freshClaim = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim', token, {
+        'PUT', '/work-orders/' + workOrderId + '/claim', token, {
             claimEventId: workOrderId + '-ce1',
             claimAt: freshClaimAt,
             expireEventId: workOrderId + '-ee1',
@@ -672,7 +660,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
     ).length;
     const repeatClaimAt = nowUtc();
     const repeatClaim = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim', token, {
+        'PUT', '/work-orders/' + workOrderId + '/claim', token, {
             claimEventId: workOrderId + '-ce2',
             claimAt: repeatClaimAt,
             expireEventId: workOrderId + '-ee2',
@@ -696,7 +684,7 @@ test('case 4b: work-order live-write chain — birth-claimed'
     const takeoverExpireAt = nowUtc();
     const takeoverClaimAt = nowUtc();
     const takeover = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim', token, {
+        'PUT', '/work-orders/' + workOrderId + '/claim', token, {
             claimEventId: workOrderId + '-ce3',
             claimAt: takeoverClaimAt,
             expireEventId: workOrderId + '-ee3',
@@ -749,7 +737,7 @@ async () => {
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim', token, {
+        'PUT', '/work-orders/' + workOrderId + '/claim', token, {
             claimEventId: workOrderId + '-ce1',
             claimAt,
             expireEventId: workOrderId + '-ee1',
@@ -814,7 +802,7 @@ async () => {
 
     const claimAt = nowUtc();
     const claim = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim', token, {
+        'PUT', '/work-orders/' + workOrderId + '/claim', token, {
             claimEventId: workOrderId + '-ce1',
             claimAt,
             expireEventId: workOrderId + '-ee1',
@@ -824,21 +812,13 @@ async () => {
     assert.equal(claim.status, 201);
     await assertHistoryParity(db, STARK_ORGANIZATION, workOrderId);
 
-    // The named release: web-app/app/adapters/work-orders-
-    // deletions.ts's deleteWorkOrderClaim posts this EXACT
-    // shape — POST work-orders/:id/release with
-    // {releaseEventId, releaseAt}.
-    const releaseEventId = workOrderId + '-release1';
-    const releaseAt = nowUtc();
+    // The named release: DELETE work-orders/:id/claim.
     const released = await handleRequest(db, req(
-        'POST',
-        '/work-orders/' + workOrderId + '/release',
-        token, {
-            releaseEventId,
-            releaseAt,
-        },
+        'DELETE',
+        '/work-orders/' + workOrderId + '/claim',
+        token,
     ));
-    assert.equal(released.status, 201);
+    assert.equal(released.status, 204);
     const afterRelease = await assertDerivedHistory(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -857,7 +837,7 @@ async () => {
     // claim-vocabulary event).
     const reclaimAt = nowUtc();
     const reclaimed = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim', token, {
+        'PUT', '/work-orders/' + workOrderId + '/claim', token, {
             claimEventId: workOrderId + '-ce2',
             claimAt: reclaimAt,
             expireEventId: workOrderId + '-ee2',
@@ -1197,8 +1177,8 @@ async () => {
 
 // States-address retirement: archive/reactivate ride PUT
 // /members/:id with the lifecycle trio — pair-plane pin.
-test('case 7b: live-write chain — AI member create, archive,'
-+ ' reactivate — pair-plane pin via PUT members/:id',
+test('case 7b: live-write chain — AI agent create then'
++ ' update — pair-plane pin via PUT ai-agents/:id',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -1207,62 +1187,32 @@ async () => {
     const aiMemberId = 'drift-states-ai-chain-1';
 
     const created = await handleRequest(db, req(
-        'POST', '/ai-members', token, {
-            id: aiMemberId,
-            detail: aiMemberDetail('Drift Bot'),
-            initialState: 'active',
-            initialStateEventId: aiMemberId + '-genesis',
-            initialStateAt: '2026-04-03T00:00:00.000000Z',
-        },
+        'PUT', '/ai-agents/' + aiMemberId, token,
+        aiMemberDetail('Drift Bot'),
     ));
     assert.equal(created.status, 201);
-    // A membership so the write authorizer resolves this org-less
-    // identity to STARK, not an orphan.
-    const membership = await handleRequest(db, req(
-        'PUT', '/memberships/ms-' + aiMemberId, token, {
-            organization_id: STARK_ORGANIZATION,
-            identity_id: aiMemberId,
-        type: 'member', at: AT,
-        },
-    ));
-    assert.equal(membership.status, 201);
-    await assertHistoryParity(db, STARK_ORGANIZATION, aiMemberId);
-
-    // Archive/reactivate ride PUT /members/:id with the trio.
-    // Derived assertions stay identical to the states-address
-    // form — that is the parity contract.
-    const archived = await handleRequest(db, req(
-        'PUT', '/members/' + aiMemberId, token, {
-            type: 'ai',
-            state: 'archived',
-            state_at: '2026-04-03T00:00:00.000001Z',
-            state_event_id: aiMemberId + '-archive',
-        },
-    ));
-    assert.equal(archived.status, 201);
-    const afterArchive = await assertDerivedHistory(
-        db, STARK_ORGANIZATION, aiMemberId,
+    const got = await handleRequest(
+        db,
+        req('GET', '/ai-agents/' + aiMemberId, token),
     );
-    assert.deepEqual(
-        afterArchive.map((row) => row.state),
-        ['active', 'archived'],
+    assert.equal(got.status, 200);
+    assert.equal(
+        ((await got.json()) as { name: string }).name,
+        'Drift Bot',
     );
 
-    const reactivated = await handleRequest(db, req(
-        'PUT', '/members/' + aiMemberId, token, {
-            type: 'ai',
-            state: 'active',
-            state_at: '2026-04-03T00:00:00.000002Z',
-            state_event_id: aiMemberId + '-reactivate',
-        },
+    const updated = await handleRequest(db, req(
+        'PUT', '/ai-agents/' + aiMemberId, token,
+        aiMemberDetail('Drift Bot 2'),
     ));
-    assert.equal(reactivated.status, 201);
-    const derived = await assertDerivedHistory(
-        db, STARK_ORGANIZATION, aiMemberId,
+    assert.equal(updated.status, 201);
+    const after = await handleRequest(
+        db,
+        req('GET', '/ai-agents/' + aiMemberId, token),
     );
-    assert.deepEqual(
-        derived.map((row) => row.state),
-        ['active', 'archived', 'active'],
+    assert.equal(
+        ((await after.json()) as { name: string }).name,
+        'Drift Bot 2',
     );
 });
 

@@ -25,7 +25,10 @@ import {
 } from './derive-documents.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import { deriveOrganizations } from './derive-organizations.ts';
-import { latestClaimEvent } from './work-order-claims.ts';
+import {
+    latestClaimEvent,
+    addUtcSeconds,
+} from './work-order-claims.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 
@@ -187,10 +190,10 @@ async function resolveFlowGraphOwner(
 }
 
 // The org-less member/identity fallback (an ai-member/human-member
-// id, i.e. an identity id): memberships is organization-nested
-// (family-registry.ts), so there is no single address to scan —
-// THE GATE-15 PRECEDENT unions the same per-org derivation across
-// every known organization instead.
+// id, i.e. an identity id): seats are organization-nested, so
+// there is no single address to scan — THE GATE-15 PRECEDENT
+// unions the same per-org derivation across every known
+// organization instead.
 //
 // ASKER-RELATIVE BY NECESSITY: an identity can hold memberships in
 // MULTIPLE organizations at once. api/store-parent-scoped.ts's own
@@ -209,30 +212,19 @@ async function organizationHasMemberPair(
     organization: Id,
     identityId: Id,
 ): Promise<boolean> {
-    const prefix = canonicalUriCollection(
-        organization, '/memberships/',
-    );
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
+    const seatPrefix = '/organizations/' + organization
+        + '/members/';
+    const [seatRequests, seatResponses] = await Promise.all([
+        db.requests.getAllWhere(
+            'uri_collection', seatPrefix,
+        ),
+        db.responses.getAllWhere(
+            'uri_collection', seatPrefix,
+        ),
     ]);
-    // HEAD-REDUCED (deriveDocumentsAt), not raw pairs, unlike
-    // every other leg in this module: a membership REMOVAL is a
-    // genuine hard row-DELETE — no states-log soft-delete event
-    // exists for memberships — so a DELETE head must exclude the
-    // row here to reproduce old-plane parity. Do not swap this
-    // for documentPairsAt for "consistency" with the other legs.
-    const documents = deriveDocumentsAt(
-        requests, responses, prefix,
-    );
-    for (const document of documents.values()) {
-        if (
-            pickString(document.body, 'identity_id') === identityId
-        ) {
-            return true;
-        }
-    }
-    return false;
+    return deriveDocumentsAt(
+        seatRequests, seatResponses, seatPrefix,
+    ).has(identityId);
 }
 
 async function resolveViaMembershipPairPlane(
@@ -393,6 +385,10 @@ function ownerProbeCollection(
     }
     if (table === 'invitations') {
         return INVITATIONS_PREFIX;
+    }
+    if (table === 'organization_members') {
+        return '/organizations/' + organization
+            + '/members/';
     }
     if (table === 'role_grants') {
         return ROLE_GRANTS_URI_PREFIX;
@@ -864,10 +860,11 @@ const WORK_ORDERS_COLLECTION_PATTERN =
 // The claim/transition/release sub-resource addresses: UNLIKE
 // the collection prefix above, the work-order id rides the
 // PREFIX itself here (routes.ts: 'work-orders/:id/claim' /
-// 'work-orders/:id/transition' / 'work-orders/:id/release'), so
-// each distinct match names ONE work order directly —
-// captured, the organization segment is not (a work-order id
-// is globally unique, so it is never needed to disambiguate).
+// 'work-orders/:id/transition' / retired
+// 'work-orders/:id/release'), so each distinct match names
+// ONE work order directly — captured, the organization
+// segment is not (a work-order id is globally unique, so
+// it is never needed to disambiguate).
 const WORK_ORDER_CLAIM_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/claim\/$/;
 // Exported (Phase 14 Task 6): api/derive-state-field-values.ts
@@ -949,10 +946,16 @@ function atIdCompare(
 // reuses this SAME decode over the work-orders/:id/transition
 // address, rather than re-implementing the POST-only,
 // (at, id)-sorted read.
+const POST_ONLY: ReadonlySet<string> = new Set(['POST']);
+const POST_OR_PUT: ReadonlySet<string> = new Set([
+    'POST', 'PUT',
+]);
+
 export function operationPairsAt(
     requests: readonly RequestEntity[],
     responses: readonly ResponseEntity[],
     uriCollection: string,
+    methods: ReadonlySet<string> = POST_ONLY,
 ): OperationPair[] {
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
@@ -965,7 +968,7 @@ export function operationPairsAt(
         const request = requestById.get(response.id);
         if (request === undefined) continue;
         const decoded = decodeRequestOperation(request.message);
-        if (decoded.method !== 'POST') continue;
+        if (!methods.has(decoded.method)) continue;
         pairs.push({
             id: response.id,
             at: response.at,
@@ -975,6 +978,23 @@ export function operationPairsAt(
         });
     }
     return pairs.sort(atIdCompare);
+}
+
+function documentDeletesAsOperations(
+    pairs: readonly DocumentPair[],
+): OperationPair[] {
+    const out: OperationPair[] = [];
+    for (const pair of pairs) {
+        if (pair.method !== 'DELETE') continue;
+        out.push({
+            id: pair.id,
+            at: pair.at,
+            uriId: pair.uriId,
+            body: pair.body,
+            requesterIdentityId: pair.requesterIdentityId,
+        });
+    }
+    return out;
 }
 
 // A pure Date-parse subtraction — never Date.now() (EDGE 2).
@@ -1069,6 +1089,12 @@ function applyClaimPair(
         claim.body, 'expireEventId',
     );
     const expireAt = pickString(claim.body, 'expireAt');
+    // Genesis claim document reuses the create pair's
+    // claimed event id so GET/DELETE have a row; do not
+    // emit a second claimed event.
+    if (replayed.some((row) => row.id === claimEventId)) {
+        return;
+    }
     const lockTimeout = lockTimeoutAsOf(entityPairs, claim.at);
     const prior = latestClaimEvent(
         priorClaimCandidates(replayed, claim),
@@ -1153,21 +1179,38 @@ function applyReleasePair(
     release: OperationPair,
     workOrderId: Id,
 ): void {
-    const releaseEventId = pickString(
+    const legacy = Object.hasOwn(
         release.body, 'releaseEventId',
     );
-    const releaseAt = pickString(release.body, 'releaseAt');
-    const lockTimeout = lockTimeoutAsOf(
-        entityPairs, release.at,
-    );
+    const releaseEventId = legacy
+        ? pickString(release.body, 'releaseEventId')
+        : release.id;
+    const releaseAt = legacy
+        ? pickString(release.body, 'releaseAt')
+        : release.at;
     const prior = latestClaimEvent(
         priorClaimCandidates(replayed, release),
         workOrderId,
     );
-    const priorLive = prior !== null
-        && prior.state === 'claimed'
-        && !isExpiredAsOf(releaseAt, prior.at, lockTimeout);
-    if (!priorLive) return;
+    if (legacy) {
+        const lockTimeout = lockTimeoutAsOf(
+            entityPairs, release.at,
+        );
+        const priorLive = prior !== null
+            && prior.state === 'claimed'
+            && !isExpiredAsOf(
+                releaseAt, prior.at, lockTimeout,
+            );
+        if (!priorLive) return;
+    } else if (
+        prior === null
+        || prior.state !== 'claimed'
+    ) {
+        // DELETE head only forms after a PUT claim;
+        // a stray delete with no claimed prior is a
+        // no-op, matching the legacy empty derive.
+        return;
+    }
     replayed.push({
         id: releaseEventId,
         entity_id: workOrderId,
@@ -1355,12 +1398,23 @@ function workOrderLifecycleFromPlane(
             ? []
             : operationPairsAt(
                 requests, responses, claimPrefix,
+                POST_OR_PUT,
             );
-        const releasePairs = releasePrefix === undefined
+        const releasePosts = releasePrefix === undefined
             ? []
             : operationPairsAt(
                 requests, responses, releasePrefix,
             );
+        const releaseDeletes = claimPrefix === undefined
+            ? []
+            : documentDeletesAsOperations(
+                documentPairsAt(
+                    requests, responses, claimPrefix,
+                ),
+            );
+        const releasePairs = [
+            ...releasePosts, ...releaseDeletes,
+        ];
         const transitionPairs =
             transitionPrefix === undefined
                 ? []
@@ -1506,6 +1560,12 @@ async function workOrderClaimSourcesFor(
     ]);
     const claimPairs = operationPairsAt(
         claimRequests, claimResponses, claimPrefix,
+        POST_OR_PUT,
+    );
+    const releaseDeletes = documentDeletesAsOperations(
+        documentPairsAt(
+            claimRequests, claimResponses, claimPrefix,
+        ),
     );
 
     const releasePrefix = canonicalUriCollection(
@@ -1521,9 +1581,13 @@ async function workOrderClaimSourcesFor(
                 'uri_collection', releasePrefix,
             ),
         ]);
-    const releasePairs = operationPairsAt(
-        releaseRequests, releaseResponses, releasePrefix,
-    );
+    const releasePairs = [
+        ...operationPairsAt(
+            releaseRequests, releaseResponses,
+            releasePrefix,
+        ),
+        ...releaseDeletes,
+    ];
 
     const transitionPrefix = canonicalUriCollection(
         organization,
@@ -1751,10 +1815,10 @@ export async function workOrderClaimHistoryFor(
     return [...replayed].sort(atIdCompare);
 }
 
-// The CURRENT bind: latest binding op pair wins under
-// (at, id) — the claim derive's mechanism at the
-// /binding sub-address. Entity-scoped indexed reads;
-// in-tx safe (dbOrView).
+// The CURRENT bind: latest binding pair wins under
+// (at, id). Reads PUT (locked verb). POST still
+// accepted for pre-lock pairs.
+// Entity-scoped indexed reads; in-tx safe (dbOrView).
 export async function workOrderBindingFor(
     dbOrView: DbAdapter,
     organization: Id,
@@ -1775,7 +1839,7 @@ export async function workOrderBindingFor(
         ),
     ]);
     const pairs = operationPairsAt(
-        requests, responses, prefix,
+        requests, responses, prefix, POST_OR_PUT,
     );
     const latest = pairs[pairs.length - 1];
     if (latest === undefined) {
@@ -1788,6 +1852,71 @@ export async function workOrderBindingFor(
         recordTypeId: pickString(
             latest.body, 'record_type_id',
         ),
+    };
+}
+
+// GET work-orders/:id/claim facts. 404 only when
+// unclaimed: no row or DELETE head. An expired claim
+// is still a row — "claimed now" is judged at read.
+export interface WorkOrderClaimDocument {
+    readonly memberId: Id;
+    readonly expiresAt: string;
+    readonly claimedAt: string;
+}
+
+export async function workOrderClaimDocumentFor(
+    dbOrView: DbAdapter,
+    organization: Id,
+    workOrderId: Id,
+): Promise<WorkOrderClaimDocument | null> {
+    const prefix = canonicalUriCollection(
+        organization,
+        '/work-orders/' + workOrderId + '/claim/',
+    );
+    const [requests, responses] = await Promise.all([
+        dbOrView.requests.getAllWhere(
+            'uri_collection', prefix,
+        ),
+        dbOrView.responses.getAllWhere(
+            'uri_collection', prefix,
+        ),
+    ]);
+    const pairs = documentPairsAt(
+        requests, responses, prefix,
+    );
+    const latest = pairs[pairs.length - 1];
+    if (
+        latest === undefined
+        || latest.method === 'DELETE'
+    ) {
+        return null;
+    }
+    const claimedAt = pickString(
+        latest.body, 'claimAt',
+    );
+    const stored = latest.body['expires_at'];
+    let expiresAt: string;
+    if (typeof stored === 'string' && stored !== '') {
+        expiresAt = stored;
+    } else {
+        const wo = await workOrderDocumentHeadFor(
+            dbOrView, organization, workOrderId,
+        );
+        const lockTimeout = wo === null
+            ? 0
+            : asWorkOrderFlowGraph(
+                wo.flow_graph,
+                'work-order claim document'
+                    + ' flow_graph',
+            ).lockTimeout;
+        expiresAt = addUtcSeconds(
+            claimedAt, lockTimeout,
+        );
+    }
+    return {
+        memberId: latest.requesterIdentityId,
+        expiresAt,
+        claimedAt,
     };
 }
 

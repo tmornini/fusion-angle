@@ -5,7 +5,7 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { GET } from '../api/api.ts';
-import { hashPassword } from '../shared/password-hash.ts';
+import { testHashPassword } from './mock-seed.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
 import {
     createRequestContext,
@@ -29,6 +29,7 @@ import {
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { sha256Bytes } from '../shared/digest.ts';
 import { bytesToBase64Url } from '../shared/base64url.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -51,32 +52,14 @@ async function seedMembershipPair(
     // to deriveMembershipsForIdentity's own enumerate-then-probe
     // (via deriveOrganizations).
     await seedOrganizationDocument(db, organization, organization);
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+    await seedSeat(
+        db,
+        String(body['organization_id'] ?? body.organization_id),
+        String(body['identity_id'] ?? body.identity_id),
+        (body['type'] ?? body.type) as 'admin' | 'member',
+        String(body['at'] ?? body.at),
     );
+
 }
 
 async function passwordUserCtx() {
@@ -98,7 +81,8 @@ async function passwordUserCtx() {
     });
     await seedIdentityCredential(db, 'current', 'c1', {
         identity_id: 'current', kind: 'password',
-        status: 'set', secret: await hashPassword('s3cret'),
+        status: 'set',
+        secret: await testHashPassword('s3cret'),
         at: '2026-06-03T00:00:00.000000Z',
     });
     const ctx = createRequestContext(
@@ -113,7 +97,7 @@ async () => {
         ctx, 'demo@example.com', 's3cret');
     assert.ok(creds);
     assert.ok(Array.isArray(
-        await GET(db, 'members', creds.accessToken)));
+        await GET(db, 'organizations/1/members', creds.accessToken)));
 });
 
 test('postPasswordLogin issues a 30-day refresh token',

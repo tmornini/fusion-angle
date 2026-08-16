@@ -9,6 +9,15 @@ import {
 } from '../web-app/app/adapters/flow-stats.ts';
 import { now } from '../api/mock-data/seed-kit.ts';
 import { deriveFlows } from '../api/derive-flows.ts';
+import { asStoredGraph } from '../api/validators.ts';
+import { buildAiMembers } from '../api/mock-data/ai-members.ts';
+import { buildFlows } from '../api/mock-data/flows.ts';
+import {
+    buildLeadToCloseNodes,
+    l2cTriageNodeId,
+    memberLisa,
+    memberClaude,
+} from '../api/mock-data/lead-to-close-flow.ts';
 import { seededMockDb } from './mock-seed.ts';
 
 const FLOW_NAME = 'Lead-to-Close';
@@ -35,6 +44,48 @@ async function seededLeadToClose() {
     const ctx = createRequestContext(db, await devToken());
     return await getFlowStats(ctx, flow!.id, now.getTime());
 }
+
+test(
+    'L2C triage names Lisa in memberIds and'
+    + ' Claude in agentIds',
+    () => {
+        const triage = buildLeadToCloseNodes().find(
+            (node) => node.id === l2cTriageNodeId,
+        );
+        assert.ok(triage, 'Inbound Triage node');
+        assert.deepEqual(
+            triage.memberIds, [memberLisa],
+        );
+        assert.deepEqual(
+            triage.agentIds, [memberClaude],
+        );
+    },
+);
+
+test(
+    'no seed graph memberIds names an AI member',
+    () => {
+        const aiIds = new Set(
+            buildAiMembers().map((row) => row.id),
+        );
+        for (const flow of buildFlows()) {
+            const graph = asStoredGraph(
+                flow.graph, 'seed flow ' + flow.id,
+            );
+            for (const node of graph.nodes) {
+                for (const id of node.memberIds) {
+                    assert.equal(
+                        aiIds.has(id),
+                        false,
+                        flow.id + ' node ' + node.id
+                            + ' memberIds names AI '
+                            + id,
+                    );
+                }
+            }
+        }
+    },
+);
 
 test(
     'Lead-to-Close graph has 7 nodes, 9 edges,'

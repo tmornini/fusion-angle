@@ -55,3 +55,23 @@ export function isClaimEventExpired(
     return msSinceUtc(claim.at)
         >= lockTimeoutSeconds * MS_PER_SECOND;
 }
+
+// Stored claim-document fact vs the clock. A missing
+// expires_at is not judged here — callers fall back to
+// isClaimEventExpired (at + lockTimeout).
+export function isExpiresAtPassed(
+    expiresAt: string,
+): boolean {
+    return msSinceUtc(expiresAt) >= 0;
+}
+
+export function addUtcSeconds(
+    iso: string,
+    seconds: number,
+): string {
+    const ms = Date.parse(iso)
+        + seconds * MS_PER_SECOND;
+    return new Date(ms).toISOString().replace(
+        'Z', '000Z',
+    );
+}

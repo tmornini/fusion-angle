@@ -142,7 +142,7 @@ async () => {
     assert.equal(res.status, 201);
     // Access token still admits member-tier GET.
     const still = await handleRequest(
-        db, req('GET', '/members', memberToken),
+        db, req('GET', '/organizations/1/members', memberToken),
     );
     assert.equal(still.status, 200);
 });

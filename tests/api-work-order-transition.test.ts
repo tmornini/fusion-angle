@@ -204,7 +204,7 @@ test(
         // it and carried the release event in the body.
         // Claim rides the named op (states/:id retired).
         const claimAt = nowUtc();
-        await POST(
+        await PUT(
             db, 'work-orders/wo1/claim', {
                 claimEventId: 'cl-1',
                 claimAt,
@@ -460,7 +460,7 @@ test(
         const db = await seededDb();
         // Claim rides the named op (states/:id retired).
         const claimAt = nowUtc();
-        await POST(
+        await PUT(
             db, 'work-orders/wo1/claim', {
                 claimEventId: 'cl-1',
                 claimAt,

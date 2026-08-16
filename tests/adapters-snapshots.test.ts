@@ -14,7 +14,9 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import {
+    devToken, organizationToken,
+} from './token-fixtures.ts';
 import {
     MissingTableError,
 } from '../api/db.ts';
@@ -23,6 +25,8 @@ import {
     TOKEN_AUDIENCE,
     ANONYMOUS_ID,
 } from '../api/access-token.ts';
+import { UnauthorizedError } from
+    '../api/http-errors.ts';
 import { seedHumanMember } from './member-fixtures.ts';
 import {
     seedAdminSchema,
@@ -68,7 +72,12 @@ async function setup(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    return { db, ctx: createRequestContext(db, await devToken()) };
+    return {
+        db,
+        ctx: createRequestContext(
+            db, await organizationToken(),
+        ),
+    };
 }
 
 // Import REPLACES every table — a snapshot that omits the
@@ -266,7 +275,7 @@ test(
         // Phase Final Task 2: members ROW half stripped —
         // directory lives on the pair plane.
         const rows = await ctx.GET<Array<{ id: string }>>(
-            'members',
+            'organizations/1/members',
         );
         assert.ok(
             rows.length > 0,
@@ -462,46 +471,20 @@ async function anonToken(): Promise<string> {
     });
 }
 
-// The snapshots page reads data-existence via the PUBLIC
-// snapshot plane, so an anonymous (pre-session) viewer gets a
-// correct answer without a 401 at the gate.
+// Snapshots require a bearer. An anonymous token is
+// rejected at the gate.
 test(
-    'getHasAnyHumanMembers is false for an anonymous viewer'
-    + ' before a schema exists',
+    'getHasAnyHumanMembers rejects an anonymous viewer',
     async () => {
         const db = memoryDbAdapter();
-        const ctx = createRequestContext(db, await anonToken());
-        assert.equal(
-            await getHasAnyHumanMembers(ctx), false);
-    },
-);
-
-test(
-    'getHasAnyHumanMembers reads an admin-only schema as'
-    + ' no-data for an anonymous viewer',
-    async () => {
-        // The snapshot plane is auth-free, so an anonymous
-        // viewer reads the schema directly and counts members
-        // honestly: an admin-only schema has no human member,
-        // so the answer is false.
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await anonToken());
-        assert.equal(
-            await getHasAnyHumanMembers(ctx), false);
-    },
-);
-
-test(
-    'getHasAnyHumanMembers is true for an anonymous viewer'
-    + ' when a member exists',
-    async () => {
-        const db = memoryDbAdapter();
-        await seedAdminSchema(db);
-        await seedHumanMember(db, 'current', 'Demo');
-        const ctx = createRequestContext(db, await anonToken());
-        assert.equal(
-            await getHasAnyHumanMembers(ctx), true);
+        const ctx = createRequestContext(
+            db, await anonToken(),
+        );
+        await assert.rejects(
+            () => getHasAnyHumanMembers(ctx),
+            (err: unknown) =>
+                err instanceof UnauthorizedError,
+        );
     },
 );
 
@@ -550,7 +533,7 @@ test(
         const ctx = stubSnapshotCtx({
             members: [],
             requests: [{
-                id: 'r1', uri_collection: '/members/',
+                id: 'r1', uri_collection: '/identities/',
                 uri_id: 'm1',
                 at: '2026-01-01T00:00:00.000000Z',
                 requester_identity_id: 'system',

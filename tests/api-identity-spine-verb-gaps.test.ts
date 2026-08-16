@@ -38,8 +38,9 @@ import {
 // so an admin token is required to reach the 405 branch rather
 // than an earlier 403.
 //
-// (2) the default-org side channel regime — 2 combos on
-// /identities/:id/default-org (api/organization-requests.ts's
+// (2) the default-organization side channel regime — 2
+// combos on /identities/:id/default-organization
+// (api/organization-requests.ts's
 // identityDefaultOrganizationRequest): this side channel never
 // calls matchRoute — it dispatches off ctx.method directly
 // (GET, PUT, else) — so a POST or DELETE falls through its own
@@ -498,28 +499,32 @@ test('DELETE identity-providers/:id 405s (no delete handler'
     assert.equal(res.status, 405);
 });
 
-// ── regime 2: the default-org side channel's own inline
-// 405 terminal (2 combos) ──
+// ── regime 2: the default-organization side channel's own
+// inline 405 terminal (2 combos) ──
 
-test('POST identities/:id/default-org 405s (side channel'
-+ ' never matches routes)', async () => {
+test('POST identities/:id/default-organization 405s (side'
++ ' channel never matches routes)', async () => {
     const db = await freshDb();
     const token = await devToken('current');
     const res = await handleRequest(
         db, req(
-            'POST', '/identities/current/default-org', token, {},
+            'POST',
+            '/identities/current/default-organization',
+            token, {},
         ),
     );
     assert.equal(res.status, 405);
 });
 
-test('DELETE identities/:id/default-org 405s (side channel'
-+ ' never matches routes)', async () => {
+test('DELETE identities/:id/default-organization 405s (side'
++ ' channel never matches routes)', async () => {
     const db = await freshDb();
     const token = await devToken('current');
     const res = await handleRequest(
         db, req(
-            'DELETE', '/identities/current/default-org', token,
+            'DELETE',
+            '/identities/current/default-organization',
+            token,
         ),
     );
     assert.equal(res.status, 405);

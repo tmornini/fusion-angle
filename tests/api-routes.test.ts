@@ -19,9 +19,8 @@ import { seededMockDb } from './mock-seed.ts';
 // to end.
 const COLLECTION_ROUTES: readonly string[] = [
     'organizations',
-    'memberships',
-    'members',
-    'ai-members',
+    'organizations/1/members',
+    'ai-agents',
     'ideas',
     'projects',
     'flows',

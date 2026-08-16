@@ -36,9 +36,9 @@ export function projectClaimRolesForOrganization(
 }
 
 // The org an identity has CURRENTLY chosen as its default: the
-// latest event in its append-only default-org ledger, null when
-// it has none. The default (at, id) total order decides a
-// same-`at` tie deterministically on every backend.
+// SET default-organization document, null when it has none.
+// The default (at, id) total order decides a same-`at` tie
+// deterministically on every backend.
 export function currentDefaultOrganizationFor(
     rows: readonly IdentityDefaultOrganizationEntity[],
     identityId: Id,
@@ -83,8 +83,8 @@ export function matchesOnSegmentBoundary(
 // Admin surfaces — identities, credentials,
 // providers, memberships, organization and
 // member WRITES, snapshots — are absent: deny-by-default
-// keeps them at the root admin entries. members/ai-members/
-// human-members appear read-only here for author and roster
+// keeps them at the root admin entries. Seats and
+// ai-agents appear read-only here for author and roster
 // display; their writes stay admin (member management).
 // identity-tokens POST covers only its rotation/revocation
 // sub-routes — session management any member performs.
@@ -126,13 +126,11 @@ const MEMBER_VERBS: Readonly<
         ['GET', 'PUT', 'PATCH', 'DELETE'],
     // Nested field-values collection RETIRED (states-URI
     // elimination C4); field values fold on WO history.
-    '/work-orders': ['GET', 'PUT', 'POST'],
+    '/work-orders': ['GET', 'PUT', 'POST', 'DELETE'],
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3).
-    '/members': ['GET'],
-    '/ai-members': ['GET'],
-    '/human-members': ['GET'],
-    '/current-member': ['GET'],
+    '/ai-agents': ['GET'],
+    '/organizations/:id/members': ['GET'],
     '/organizations': ['GET'],
     '/identity-tokens': ['POST'],
     '/identity-token-revocations': ['PUT'],

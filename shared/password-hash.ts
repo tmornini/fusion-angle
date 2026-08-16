@@ -4,33 +4,23 @@
 //   $pbkdf2-sha256$i=<iterations>$<b64url-salt>$<b64url-digest>
 //   $scrypt$ln=17,r=8,p=1$<b64url-salt>$<b64url-digest>
 //
-// hashPassword writes with CURRENT_PASSWORD_HASH (one algorithm,
-// never a permanent second). verifyPassword parses the embedded
-// algo-id + params and dispatches through a REGISTRY of per-algo
-// verifiers — each a self-contained, deletable unit — and
-// degrades to false on any malformed input (a bad column must
-// never crash a login).
+// hashPassword writes with the registered hasher (scrypt
+// in production via setPasswordHasher). verifyPassword
+// parses the embedded algo-id + params and dispatches
+// through a REGISTRY of per-algo verifiers — each a
+// self-contained, deletable unit — and degrades to false
+// on any malformed input (a bad column must never crash
+// a login).
 //
-// PBKDF2 is TRANSITIONAL. At the server tier CURRENT_PASSWORD_HASH
-// flips to scrypt (Node's built-in crypto.scrypt — a
-// zero-dependency, memory-hard platform primitive). During a
-// bounded window the pbkdf2 verifier stays so any $pbkdf2-sha256$
-// row verifies-then-rehashes on next login; the self-describing
-// prefix makes "any PBKDF2 rows left?" a decidable query. Once
-// none remain — immediate here, because credentials are seed data
-// and snapshots wipe-first — the pbkdf2 verifier entry AND
-// pbkdf2Hash/pbkdf2Verify are DELETED. PBKDF2 never coexists
-// permanently; the registry makes deletion one edit + one removal.
+// pbkdf2Verify stays so old $pbkdf2-sha256$ secrets still
+// verify. New hashes are scrypt (Node crypto.scrypt via
+// server/scrypt-hash.ts). Tests use testHashPassword.
 
 import {
-    bytesToBase64Url,
     base64UrlToBytes,
 } from './base64url.ts';
 
 const ALGO_ID = 'pbkdf2-sha256';
-const PBKDF2_ITERATIONS = 600_000;
-const SALT_BYTES = 16;
-const DIGEST_BITS = 256;
 
 export const SCRYPT_LOG_N = 17;
 export const SCRYPT_R = 8;
@@ -142,18 +132,6 @@ function constantTimeEqual(
     return diff === 0;
 }
 
-async function pbkdf2Hash(plaintext: string): Promise<string> {
-    const salt = crypto.getRandomValues(
-        new Uint8Array(SALT_BYTES),
-    );
-    const digest = await pbkdf2Derive(
-        plaintext, salt, PBKDF2_ITERATIONS, DIGEST_BITS,
-    );
-    return '$' + ALGO_ID + '$i=' + PBKDF2_ITERATIONS
-        + '$' + bytesToBase64Url(salt)
-        + '$' + bytesToBase64Url(digest);
-}
-
 async function pbkdf2Verify(
     plaintext: string,
     parsed: ParsedPhc,
@@ -220,15 +198,15 @@ const VERIFIERS: Record<string, PhcVerifier> = {
 };
 
 // The single algorithm hashPassword uses for NEW credentials.
-// Default stays PBKDF2 so ./validate does not pay production
-// scrypt. boot() flips this via setPasswordHasher.
-let currentPasswordHash: PasswordHasher = pbkdf2Hash;
+// boot() registers scrypt. Tests register testHashPassword.
+// Unset hasher is a caller bug — throw, do not write PBKDF2.
+let currentPasswordHash: PasswordHasher | undefined;
 let scryptDerive: ScryptDerive | null = null;
 
 export function setPasswordHasher(
     hash: PasswordHasher | null,
 ): void {
-    currentPasswordHash = hash ?? pbkdf2Hash;
+    currentPasswordHash = hash ?? undefined;
 }
 
 export function setScryptDerive(
@@ -240,6 +218,11 @@ export function setScryptDerive(
 export async function hashPassword(
     plaintext: string,
 ): Promise<string> {
+    if (currentPasswordHash === undefined) {
+        throw new Error(
+            'password hasher is not configured',
+        );
+    }
     return currentPasswordHash(plaintext);
 }
 

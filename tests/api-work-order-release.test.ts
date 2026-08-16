@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import {
-    POST,
     PUT,
     handleRequest,
 } from '../api/api.ts';
@@ -96,77 +95,67 @@ function freshClaimBody() {
     };
 }
 
-function freshReleaseBody(overrides?: {
-    releaseEventId?: string;
-    releaseAt?: string;
-}) {
-    return {
-        releaseEventId: overrides?.releaseEventId
-            ?? generateCryptoSafeBase62(),
-        releaseAt: overrides?.releaseAt ?? nowUtc(),
-    };
-}
-
-// POST work-orders/:id/release is a named unclaim op. Gate
-// only guards body validity (400) and work-order existence
-// (404); pair always appends; live-or-not is applyReleasePair
-// at derive time.
+// DELETE work-orders/:id/claim releases. DELETE head =
+// unclaimed. Never-written and unknown addresses 404.
+// A second DELETE is 204 (already-gone).
 
 test(
     'release of a live claim is 204 and the claim history'
     + ' shows claim_released',
     async () => {
         const db = await seededDb();
-        await POST(
+        await PUT(
             db, 'work-orders/' + WO_ID + '/claim',
             freshClaimBody(), DEV_TOKEN,
         );
-        const releaseAt = nowUtc();
         const res = await handleRequest(db, req(
-            'POST',
-            '/work-orders/' + WO_ID + '/release',
+            'DELETE',
+            '/work-orders/' + WO_ID + '/claim',
             DEV_TOKEN,
-            {
-                releaseEventId: 'rel-ev-1',
-                releaseAt,
-            },
         ));
-        assert.equal(res.status, 201);
+        assert.equal(res.status, 204);
         const events = await claimEventsFor(db);
         const released = events.find(
-            (ev) => ev.id === 'rel-ev-1',
+            (ev) => ev.state === 'claim_released',
         );
         assert.ok(released !== undefined);
-        assert.equal(released!.state, 'claim_released');
         assert.equal(released!.member_id, 'current');
-        assert.equal(released!.at, releaseAt);
     },
 );
 
 test(
-    'release with no live claim is an idempotent 204'
-    + ' no-op (no claim_released event derives)',
+    'DELETE claim with no row is 404; a second DELETE'
+    + ' after release is 204',
     async () => {
         const db = await seededDb();
-        const releaseEventId = 'rel-ev-2';
-        const res = await handleRequest(db, req(
-            'POST',
-            '/work-orders/' + WO_ID + '/release',
+        const missing = await handleRequest(db, req(
+            'DELETE',
+            '/work-orders/' + WO_ID + '/claim',
             DEV_TOKEN,
-            {
-                releaseEventId,
-                releaseAt: nowUtc(),
-            },
         ));
-        assert.equal(res.status, 201);
-        // No live claim → pair derives zero events; history
-        // carries no event with id 'rel-ev-2'.
+        assert.equal(missing.status, 404);
+        await PUT(
+            db, 'work-orders/' + WO_ID + '/claim',
+            freshClaimBody(), DEV_TOKEN,
+        );
+        const first = await handleRequest(db, req(
+            'DELETE',
+            '/work-orders/' + WO_ID + '/claim',
+            DEV_TOKEN,
+        ));
+        assert.equal(first.status, 204);
+        const second = await handleRequest(db, req(
+            'DELETE',
+            '/work-orders/' + WO_ID + '/claim',
+            DEV_TOKEN,
+        ));
+        assert.equal(second.status, 204);
         const events = await claimEventsFor(db);
         assert.equal(
             events.filter(
-                (ev) => ev.id === releaseEventId,
+                (ev) => ev.state === 'claim_released',
             ).length,
-            0,
+            1,
         );
     },
 );
@@ -177,71 +166,35 @@ test(
     async () => {
         const db = await seededDb();
         await seedOrganizationMember(db, 'other');
-        await POST(
+        await PUT(
             db, 'work-orders/' + WO_ID + '/claim',
             freshClaimBody(), await devToken('other'),
         );
-        const releaseEventId = generateCryptoSafeBase62();
         const res = await handleRequest(db, req(
-            'POST',
-            '/work-orders/' + WO_ID + '/release',
+            'DELETE',
+            '/work-orders/' + WO_ID + '/claim',
             DEV_TOKEN,
-            {
-                releaseEventId,
-                releaseAt: nowUtc(),
-            },
         ));
-        assert.equal(res.status, 201);
+        assert.equal(res.status, 204);
         // claim_released authored by the releasing actor
         // (current), not the prior claimant (other).
         const events = await claimEventsFor(db);
         const released = events.find(
-            (ev) => ev.id === releaseEventId,
+            (ev) => ev.state === 'claim_released',
         );
         assert.ok(released !== undefined);
-        assert.equal(released!.state, 'claim_released');
         assert.equal(released!.member_id, 'current');
     },
 );
 
 test(
-    'release body validation: empty id and bad timestamp'
-    + ' are 400',
-    async () => {
-        const db = await seededDb();
-        for (const body of [
-            {
-                releaseEventId: '',
-                releaseAt: nowUtc(),
-            },
-            {
-                releaseEventId: 'rel-bad',
-                releaseAt: 'not-a-time',
-            },
-            { releaseEventId: 'rel-bad' },
-        ]) {
-            const res = await handleRequest(db, req(
-                'POST',
-                '/work-orders/' + WO_ID + '/release',
-                DEV_TOKEN,
-                body,
-            ));
-            assert.equal(res.status, 400);
-        }
-    },
-);
-
-test(
-    'release of an unknown work order is 404',
+    'DELETE claim of an unknown work order is 404',
     async () => {
         const db = await seededDb();
         const res = await handleRequest(db, req(
-            'POST',
-            '/work-orders/no-such-wo/release',
+            'DELETE',
+            '/work-orders/no-such-wo/claim',
             DEV_TOKEN,
-            freshReleaseBody({
-                releaseEventId: 'rel-ev-x',
-            }),
         ));
         assert.equal(res.status, 404);
     },

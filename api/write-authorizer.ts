@@ -2,8 +2,10 @@ import type { DbAdapter } from './db.ts';
 import { ForeignOrganizationError } from './db.ts';
 import type { Id } from './types.ts';
 import { resolveGlobalOwner } from './derive-states.ts';
-import { RECORD_TYPE_DETAIL_PATTERN } from
-    './family-registry.ts';
+import {
+    RECORD_TYPE_DETAIL_PATTERN,
+    ORGANIZATION_MEMBER_DETAIL_PATTERN,
+} from './family-registry.ts';
 
 // Pre-write ownership authorizer on the pair plane. Probes
 // THIS route's collection, not any row with this id. Same
@@ -22,8 +24,8 @@ export interface WriteAuthorizer {
     readonly idParamIndex: number;
 }
 
-// The 9 org-scoped families' existing-id PUT/DELETE/PATCH
-// addresses. Collection POSTs (genesis of a new id) are
+// Org-scoped existing-id PUT/DELETE/PATCH addresses.
+// Collection POSTs (genesis of a new id) are
 // intentionally absent — owner-null is the happy path for
 // those. PATCH must share this map so a future flat PATCH
 // cannot bypass the ownership fence (Task 10 / Security).
@@ -48,13 +50,14 @@ const WRITE_AUTHORIZERS:
         ['objectives/:id', {
             table: 'objectives', idParamIndex: 0,
         }],
-        ['memberships/:id', {
-            table: 'memberships', idParamIndex: 0,
-        }],
         // Nested record-types detail (Task 3): id is param
         // index 1 (:record-type-id).
         [RECORD_TYPE_DETAIL_PATTERN, {
             table: 'record_types', idParamIndex: 1,
+        }],
+        [ORGANIZATION_MEMBER_DETAIL_PATTERN, {
+            table: 'organization_members',
+            idParamIndex: 1,
         }],
     ]);
 

@@ -21,12 +21,13 @@ import {
 } from '../api/document-family.ts';
 import {
     validateIdentityDocumentBody,
-    validateMembershipDocumentBody,
 } from '../api/validators.ts';
 import {
     postIdentityDocumentOp,
-    postMembershipDocumentOp,
 } from '../api/routes.ts';
+import {
+    deriveOrganizationMemberSeats,
+} from '../api/derive-memberships.ts';
 import {
     deriveIdentityPiiRows,
     deriveIdentityPii,
@@ -156,18 +157,6 @@ const IDENTITIES_TEST_WIRING: DocumentFamilyWiring = {
     }),
 };
 
-const MEMBERSHIPS_TEST_WIRING: DocumentFamilyWiring = {
-    family: 'memberships',
-    lifecycle: 'stateless',
-    notFoundTable: 'memberships',
-    validateDocument: validateMembershipDocumentBody,
-    documentOp: postMembershipDocumentOp,
-    entityOf: (document, _organization) => ({
-        id: document.uriId,
-        ...document.body,
-    }),
-};
-
 // identities is GLOBAL plane (family-registry.ts:
 // organizationNested:false) — canonicalUriCollection ignores whatever
 // organization value a caller passes for this family, so this
@@ -221,11 +210,9 @@ async function pairPlaneMembershipsAcrossKnownOrganizations(
     const perOrganization = await Promise.all(
         [STARK_ORGANIZATION, ORGANIZATION_TWO].map(
             (organization) =>
-                documentCollectionGetHandler(
-                    MEMBERSHIPS_TEST_WIRING,
-                )(
-                    db, [], READER_ACTOR, organization,
-                ) as Promise<MembershipEntity[]>,
+                deriveOrganizationMemberSeats(
+                    db, organization,
+                ),
         ),
     );
     return perOrganization.flat();
@@ -293,15 +280,16 @@ async function assertPiiFenceLeg(
 
 // -- 1. identities collection parity + getById + 404 bytes ------
 
-test('identities collection wire equals derive (16 incl. the'
-+ ' 4 AI + system) + getById + 404-byte parity', async () => {
+test('identities collection wire equals derive (12 incl.'
++ ' system; agents are not identities) + getById + 404-byte'
++ ' parity', async () => {
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
 
     const derived = await derivedIdentities(
         db, GLOBAL_PLANE_PLACEHOLDER,
     );
-    assert.equal(derived.length, 16);
+    assert.equal(derived.length, 12);
     const token = await organizationToken(
         'current', STARK_ORGANIZATION,
     );
@@ -309,7 +297,7 @@ test('identities collection wire equals derive (16 incl. the'
         db, req('GET', '/identities', token),
     );
     assert.equal(res.status, 200);
-    assert.equal(await res.text(), JSON.stringify(derived));
+    assert.deepEqual(await res.json(), derived);
 
     for (const identity of derived) {
         const one = await derivedIdentity(
@@ -321,7 +309,7 @@ test('identities collection wire equals derive (16 incl. the'
             req('GET', '/identities/' + identity.id, token),
         );
         assert.equal(leaf.status, 200);
-        assert.equal(await leaf.text(), JSON.stringify(one));
+        assert.deepEqual(await leaf.json(), one);
     }
 
     const missingId = 'no-such-identity';
@@ -409,13 +397,11 @@ test('identity-pii collection (11 seeded slots) fenced both'
         },
     ));
     await handleRequest(db, req(
-        'PUT', '/memberships/ms-pii-fence-foreign-1',
+        'PUT',
+        '/organizations/' + ORGANIZATION_TWO
+            + '/members/' + foreignId,
         await organizationToken('current', ORGANIZATION_TWO),
-        {
-            organization_id: ORGANIZATION_TWO,
-            identity_id: foreignId,
-        type: 'member', at: nowUtc(),
-        },
+        { type: 'member', at: nowUtc() },
     ));
     assert.equal(
         await assertPiiFenceLeg(
@@ -550,21 +536,18 @@ test('credentials fence-input fix: a mismatched write (address'
     // STARK, B in ORGANIZATION_TWO only — so the fence's answer
     // depends entirely on WHICH identity it keys on.
     await handleRequest(db, req(
-        'PUT', '/memberships/ms-' + identityA, adminToken,
-        {
-            organization_id: STARK_ORGANIZATION,
-            identity_id: identityA,
-        type: 'member', at: nowUtc(),
-        },
+        'PUT',
+        '/organizations/' + STARK_ORGANIZATION
+            + '/members/' + identityA,
+        adminToken,
+        { type: 'member', at: nowUtc() },
     ));
     await handleRequest(db, req(
-        'PUT', '/memberships/ms-' + identityB,
+        'PUT',
+        '/organizations/' + ORGANIZATION_TWO
+            + '/members/' + identityB,
         await organizationToken('current', ORGANIZATION_TWO),
-        {
-            organization_id: ORGANIZATION_TWO,
-            identity_id: identityB,
-        type: 'member', at: nowUtc(),
-        },
+        { type: 'member', at: nowUtc() },
     ));
 
     // The mismatched write itself — address under A, body names

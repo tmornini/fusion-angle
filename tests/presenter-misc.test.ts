@@ -713,7 +713,7 @@ test(
         assert.match(out, /member-group-label[^>]*>HUMANS</);
         assert.match(out, /member-group-label[^>]*>AIs</);
         assert.match(out, /data-member-id="hw_1"/);
-        assert.match(out, /data-member-id="ai_1"/);
+        assert.match(out, /data-ai-member-id="ai_1"/);
         assert.match(out, /Ada L/);
         assert.match(out, /Sonnet/);
     },

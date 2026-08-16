@@ -6,13 +6,10 @@ import {
 } from '../api/db-memory.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
 import { formWritePair, appendMessagePair } from '../api/message-pair.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const T1 = '2026-01-01T00:00:00.000000Z';
 const T2 = '2026-02-01T00:00:00.000000Z';
@@ -43,70 +40,33 @@ async function seedMembershipPair(
     // to deriveMembershipsForIdentity's own enumerate-then-probe
     // (via deriveOrganizations).
     await seedOrganizationDocument(
-        db, organizationId, organizationId);
-    const body = {
-        organization_id: organizationId,
-        identity_id: identityId,
-        type: 'member',
-        at,
-    };
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: at,
-        organization: organizationId,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organizationId,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+        db, organizationId, organizationId,
+    );
+    await seedSeat(
+        db, organizationId, identityId, 'member', at,
     );
 }
 
-// Task 8 (Phase 11): identityDefaultOrganization now derives its
-// row source from the /identities/:id/default-org/ message-pair
-// ledger (api/derive-default-organization.ts), never the
-// identity_default_organizations table directly — so a seed for
-// this read must form the SAME pair the live PUT route would
-// (api/organization-requests.ts), not a raw table put. PLUMBING
-// ONLY: the assertions this helper feeds stay byte-identical.
+// A SET default-organization document at the live address.
 async function seedDefaultOrganizationEvent(
     db: MemoryDbAdapter,
-    eventId: string,
     identityId: string,
     organizationId: string,
     at: string,
 ) {
     const pathSegments = [
-        'identities', identityId, 'default-org', eventId,
+        'identities', identityId, 'default-organization',
     ];
     const pair = await formWritePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
-        routePattern: 'identities/:id/default-org',
+        routePattern: 'identities/:id/default-organization',
         routeSegments: [
-            'identities', ':id', 'default-org', ':eventId',
+            'identities', ':id', 'default-organization',
         ],
         pathSegments,
         headerFields: [],
-        body: {
-            organization_id: organizationId, eventId, at,
-        },
+        body: { organization_id: organizationId },
         requesterIdentityId: identityId,
         requestAt: at,
         organization: undefined,
@@ -128,7 +88,7 @@ test(
         const db = await freshDb();
         await seedMembershipPair(db, 'm1', '1', 'me', T1);
         await seedMembershipPair(db, 'm2', '2', 'me', T2);
-        await seedDefaultOrganizationEvent(db, 'd1', 'me', '2', T2);
+        await seedDefaultOrganizationEvent(db, 'me', '2', T2);
         assert.equal(await identityDefaultOrganization(db, 'me'), '2');
     },
 );
@@ -158,5 +118,50 @@ test(
     async () => {
         const db = await freshDb();
         assert.equal(await identityDefaultOrganization(db, 'me'), null);
+    },
+);
+
+test(
+    'identityDefaultOrganization skips a SET that is not a'
+    + ' live seat',
+    async () => {
+        const db = await freshDb();
+        await seedMembershipPair(db, 'm1', '1', 'me', T1);
+        await seedMembershipPair(db, 'm2', '2', 'me', T2);
+        await seedDefaultOrganizationEvent(
+            db, 'me', '2', T2,
+        );
+        const tombstone = await formWritePair({
+            method: 'DELETE',
+            pathname: '/organizations/2/members/me',
+            routePattern:
+                'organizations/:organization-id/members'
+                + '/:identity-id',
+            routeSegments: [
+                'organizations', ':organization-id',
+                'members', ':identity-id',
+            ],
+            pathSegments: [
+                'organizations', '2', 'members', 'me',
+            ],
+            headerFields: [],
+            body: {},
+            requesterIdentityId: SYSTEM_MEMBER_ID,
+            requestAt: T2,
+            organization: '2',
+            responseStatus: 204,
+            responseBody: undefined,
+            operationId: TEST_OPERATION_ID,
+        });
+        await db.transaction(
+            ['requests', 'responses'],
+            async (view) => {
+                await appendMessagePair(view, tombstone);
+            },
+        );
+        assert.equal(
+            await identityDefaultOrganization(db, 'me'),
+            '1',
+        );
     },
 );

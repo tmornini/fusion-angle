@@ -9,26 +9,23 @@ import {
     claimToken,
     devToken,
 } from './token-fixtures.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 
 function req(
     method: string, path: string, token: string,
+    body?: unknown,
 ): Request {
     return apiRequest({
         method,
         path,
         token,
+        body,
         operationId: TEST_OPERATION_ID,
     });
 }
@@ -37,36 +34,19 @@ function req(
 // exchange. Seed type:"admin" in A and type:"member" in B.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
-    const organization = body.organization_id as string;
-    await seedOrganizationDocument(db, organization, organization);
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
+    const organization = String(body.organization_id);
+    await seedOrganizationDocument(
+        db, organization, organization,
+    );
+    await seedSeat(
+        db,
         organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+        String(body.identity_id),
+        body.type as 'admin' | 'member',
+        String(body.at),
     );
 }
 
@@ -94,13 +74,18 @@ async function memberOfBothAdminInA(): Promise<MemoryDbAdapter> {
 test('admin type in org A does not authorize admin'
 + ' surfaces in org B', async () => {
     const db = await memberOfBothAdminInA();
-    // memberships is admin-only; member type in B must 403.
+    // Seat writes stay admin-only; member type in B must 403.
     const res = await handleRequest(db, req(
-        'GET', '/organizations/B/memberships',
+        'PUT', '/organizations/B/members/x',
         await claimToken({
             organizations: ['A', 'B'],
             roles: ['admin:A', 'member:B'],
-        })));
+        }),
+        {
+            type: 'member',
+            at: '2026-06-04T00:00:00.000000Z',
+        },
+    ));
     assert.equal(res.status, 403);
 });
 
@@ -108,12 +93,17 @@ test('the same admin type authorizes within its own org',
 async () => {
     const db = await memberOfBothAdminInA();
     const res = await handleRequest(db, req(
-        'GET', '/organizations/A/memberships',
+        'PUT', '/organizations/A/members/x',
         await claimToken({
             organizations: ['A', 'B'],
             roles: ['admin:A', 'member:B'],
-        })));
-    assert.equal(res.status, 200);
+        }),
+        {
+            type: 'member',
+            at: '2026-06-04T00:00:00.000000Z',
+        },
+    ));
+    assert.equal(res.status, 201);
 });
 
 test('a flat token authorizes via its resolved membership',
@@ -127,6 +117,6 @@ async () => {
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, req(
-        'GET', '/members', await devToken('current')));
+        'GET', '/organizations/1/members', await devToken('current')));
     assert.equal(res.status, 200);
 });

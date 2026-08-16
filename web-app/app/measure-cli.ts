@@ -6,6 +6,105 @@ import { DEFAULT_PROFILE_PAGES } from
 
 export const DEFAULT_RUNS = 25;
 export const DEFAULT_BUDGET_SIGMAS = 1.5;
+export const MEASURE_DEMO_EMAIL = 'demo@example.com';
+export const MEASURE_SERVER_ENTRY = 'server.mjs';
+export const MEASURE_SEED_FLAG = '--seed-mock-data';
+
+export type MeasureServeEnv = {
+    postgresUrl: string;
+    jwtHmacSigningKey: string;
+};
+
+export function measureServerArgs(): string[] {
+    return [MEASURE_SERVER_ENTRY, MEASURE_SEED_FLAG];
+}
+
+export function isVisualizeOnly(
+    f: MeasureCliFlags,
+): boolean {
+    return f.visualize
+        && !f.check
+        && !f.record
+        && !f.writeBudgets
+        && !f.profile
+        && f.pages === null
+        && !f.runsExplicit
+        && f.baseUrl === null;
+}
+
+export function needsLocalMeasureServer(
+    f: MeasureCliFlags,
+): boolean {
+    return !isVisualizeOnly(f) && f.baseUrl === null;
+}
+
+export function readMeasureServeEnv(
+    env: MeasureEnv,
+): { kind: 'ok'; env: MeasureServeEnv }
+    | { kind: 'error'; message: string } {
+    const postgresUrl = env.POSTGRES_URL;
+    if (postgresUrl === undefined || postgresUrl === '') {
+        return {
+            kind: 'error',
+            message: 'missing required env POSTGRES_URL',
+        };
+    }
+    const jwtHmacSigningKey = env.JWT_HMAC_SIGNING_KEY;
+    if (
+        jwtHmacSigningKey === undefined
+        || jwtHmacSigningKey === ''
+    ) {
+        return {
+            kind: 'error',
+            message:
+                'missing required env'
+                + ' JWT_HMAC_SIGNING_KEY',
+        };
+    }
+    return {
+        kind: 'ok',
+        env: { postgresUrl, jwtHmacSigningKey },
+    };
+}
+
+export function passwordFromSeedReveal(
+    text: string,
+    username: string,
+): string | null {
+    const prefix = username + '\t';
+    for (const raw of text.split('\n')) {
+        const line = raw.replace(/\r$/, '');
+        if (!line.startsWith(prefix)) continue;
+        const secret = line.slice(prefix.length);
+        if (secret.length === 0) return null;
+        return secret;
+    }
+    return null;
+}
+
+export function lastJsonLogMessage(
+    text: string,
+): string | null {
+    let found: string | null = null;
+    for (const raw of text.split('\n')) {
+        const line = raw.replace(/\r$/, '').trim();
+        if (!line.startsWith('{')) continue;
+        try {
+            const parsed = JSON.parse(line) as {
+                message?: unknown;
+            };
+            if (
+                typeof parsed.message === 'string'
+                && parsed.message.length > 0
+            ) {
+                found = parsed.message;
+            }
+        } catch {
+            // ignore non-JSON
+        }
+    }
+    return found;
+}
 
 export type MeasureCliFlags = {
     check: boolean;
@@ -26,6 +125,8 @@ export type MeasureCli = MeasureCliFlags & {
 
 export type MeasureEnv = {
     MEASURE_PASSWORD?: string;
+    POSTGRES_URL?: string;
+    JWT_HMAC_SIGNING_KEY?: string;
 };
 
 export type ParseMeasureResult =

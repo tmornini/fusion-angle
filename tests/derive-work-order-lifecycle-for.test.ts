@@ -270,7 +270,7 @@ async () => {
 
     const claimFreshAt = nowUtc();
     const claimFresh = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: workOrderId + '-ce1',
             claimAt: claimFreshAt,
@@ -282,7 +282,7 @@ async () => {
 
     const claimRepeatAt = nowUtc();
     const claimRepeat = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: workOrderId + '-ce2',
             claimAt: claimRepeatAt,
@@ -338,17 +338,12 @@ test('workOrderLifecycleStatesFor: a release op\'s'
     ));
     assert.equal(created.status, 201);
 
-    const releaseEventId = generateCryptoSafeBase62();
-    const releaseAt = nowUtc();
     const release = await handleRequest(db, req(
-        'POST',
-        '/work-orders/' + workOrderId + '/release',
-        token, {
-            releaseEventId,
-            releaseAt,
-        },
+        'DELETE',
+        '/work-orders/' + workOrderId + '/claim',
+        token,
     ));
-    assert.equal(release.status, 201);
+    assert.equal(release.status, 204);
 
     const scoped = sortByAtId(
         await workOrderLifecycleStatesFor(
@@ -358,12 +353,10 @@ test('workOrderLifecycleStatesFor: a release op\'s'
     assert.equal(scoped.length, 4);
     assert.deepEqual(scoped, await bulkRowsFor(db, workOrderId));
     const released = scoped.find(
-        (row) => row.id === releaseEventId,
+        (row) => row.state === 'claim_released',
     );
     assert.ok(released !== undefined);
-    assert.equal(released!.state, 'claim_released');
     assert.equal(released!.member_id, 'current');
-    assert.equal(released!.at, releaseAt);
     const claimHistory = sortByAtId(
         await workOrderClaimHistoryFor(
             db, STARK_ORGANIZATION, workOrderId,
@@ -371,7 +364,9 @@ test('workOrderLifecycleStatesFor: a release op\'s'
     );
     assert.equal(claimHistory.length, 4);
     assert.ok(
-        claimHistory.some((row) => row.id === releaseEventId),
+        claimHistory.some(
+            (row) => row.state === 'claim_released',
+        ),
         'claim history must include the release',
     );
 });
@@ -405,17 +400,12 @@ async () => {
     ));
     assert.equal(created.status, 201);
 
-    const releaseEventId = generateCryptoSafeBase62();
-    const releaseAt = nowUtc();
     const release = await handleRequest(db, req(
-        'POST',
-        '/work-orders/' + workOrderId + '/release',
-        token, {
-            releaseEventId,
-            releaseAt,
-        },
+        'DELETE',
+        '/work-orders/' + workOrderId + '/claim',
+        token,
     ));
-    assert.equal(release.status, 201);
+    assert.equal(release.status, 204);
 
     const afterRelease = sortByAtId(
         await workOrderClaimHistoryFor(
@@ -424,21 +414,19 @@ async () => {
     );
     assert.equal(afterRelease.length, 4);
     assert.deepEqual(
-        afterRelease.map((row) => row.id),
+        afterRelease.slice(0, 3).map((row) => row.id),
         [
             workOrderId + '-ev1',
             workOrderId + '-ev2',
             workOrderId + '-ev3',
-            releaseEventId,
         ],
     );
     assert.equal(afterRelease.at(-1)?.state, 'claim_released');
     assert.equal(afterRelease.at(-1)?.member_id, 'current');
-    assert.equal(afterRelease.at(-1)?.at, releaseAt);
 
     const claimAt = nowUtc();
     const reclaim = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: workOrderId + '-ce1',
             claimAt,
@@ -537,24 +525,18 @@ async () => {
         },
     );
 
-    const releaseEventId = generateCryptoSafeBase62();
-    const releaseAt = nowUtc();
     const release = await handleRequest(db, req(
-        'POST',
-        '/work-orders/' + workOrderId + '/release',
-        token, {
-            releaseEventId,
-            releaseAt,
-        },
+        'DELETE',
+        '/work-orders/' + workOrderId + '/claim',
+        token,
     ));
-    assert.equal(release.status, 201);
+    assert.equal(release.status, 204);
 
     const history = await workOrderHistoryFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
     // birth(3) + transition(1) + release(1) = 5, DESC.
     assert.equal(history.length, 5);
-    assert.equal(history[0]!.id, releaseEventId);
     assert.equal(history[0]!.state, 'claim_released');
     assert.deepEqual(history[0]!.field_values, []);
 

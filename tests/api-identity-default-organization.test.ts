@@ -5,15 +5,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
-import { devToken } from './token-fixtures.ts';
-import {
-    postMembershipDocumentOp,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-06-04T00:00:00.000000Z';
@@ -24,12 +19,9 @@ async function freshDb() {
     return db;
 }
 
-// Below-facade pair formation (the member-fixtures.ts idiom): the
-// PUT identities/:id/default-org route's own membership check
-// derives from the pair plane once memberships flips, so a raw
-// row here would go derivation-invisible. Every id/field value
-// stays IDENTICAL to the raw put this replaces — only the write
-// mechanism changes.
+// Below-facade pair formation (the member-fixtures.ts idiom):
+// PUT identities/:id/default-organization requires a live
+// seat, so a raw row here would go derivation-invisible.
 async function seedMembership(
     db: MemoryDbAdapter,
     identityId: string,
@@ -41,102 +33,65 @@ async function seedMembership(
     // with no document for its own org stays derivation-invisible
     // to deriveMembershipsForIdentity's own enumerate-then-probe
     // (via deriveOrganizations).
-    await seedOrganizationDocument(db, organization, organization);
-    const id = 'm-' + identityId + '-' + organization;
-    const body = {
-        organization_id: organization,
-        identity_id: identityId,
-        type: 'member',
-        at: AT,
-    };
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+    await seedOrganizationDocument(
+        db, organization, organization,
+    );
+    await seedSeat(
+        db, organization, identityId, 'member', AT,
     );
 }
-
-// eventId + at are now caller-minted; far-future AT is used so
-// timestamps are deterministic across timezones.
-const EVENT_AT = '2099-01-01T00:00:00.000000Z';
 
 function putDefaultOrganization(
     token: string,
     identityId: string,
     organization: string,
-    eventId?: string,
-    at?: string,
 ) {
-    const payload: Record<string, string> =
-        { organization_id: organization };
-    if (eventId !== undefined) payload['eventId'] = eventId;
-    if (at !== undefined) payload['at'] = at;
     return new Request(
-        `${BASE}/identities/${identityId}/default-org`, {
+        `${BASE}/identities/${identityId}`
+            + '/default-organization', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + token,
                 'operation-id': TEST_OPERATION_ID,
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+                organization_id: organization,
+            }),
         });
 }
 
 function getDefaultOrganization(token: string, identityId: string) {
     return new Request(
-        `${BASE}/identities/${identityId}/default-org`, {
+        `${BASE}/identities/${identityId}`
+            + '/default-organization', {
             headers: { 'Authorization': 'Bearer ' + token },
         });
 }
 
-test('PUT default-org sets it and GET returns it', async () => {
+test('PUT default-organization sets it and GET returns it',
+async () => {
     const db = await freshDb();
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const put = await handleRequest(
-        db, putDefaultOrganization(
-            token, 'current', '1', 'ev-set-1', EVENT_AT,
-        ));
+        db, putDefaultOrganization(token, 'current', '1'));
     assert.equal(put.status, 201);
     const got = await handleRequest(
         db, getDefaultOrganization(token, 'current'));
     assert.equal(got.status, 200);
     const body = await got.json() as
-        { organization_id: string | null };
+        { organization_id: string };
     assert.equal(body.organization_id, '1');
 });
 
-test('PUT a non-member org is forbidden', async () => {
+test('PUT a non-seat organization is 400', async () => {
     const db = await freshDb();
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const res = await handleRequest(
-        db, putDefaultOrganization(
-            token, 'current', '2', 'ev-forbid-1', EVENT_AT,
-        ));
-    assert.equal(res.status, 403);
+        db, putDefaultOrganization(token, 'current', '2'));
+    assert.equal(res.status, 400);
 });
 
 test('PUT to another identity tree is forbidden', async () => {
@@ -144,26 +99,19 @@ test('PUT to another identity tree is forbidden', async () => {
     await seedMembership(db, 'other', '1');
     const token = await devToken();   // sub = current
     const res = await handleRequest(
-        db, putDefaultOrganization(
-            token, 'other', '1', 'ev-tree-1', EVENT_AT,
-        ));
+        db, putDefaultOrganization(token, 'other', '1'));
     assert.equal(res.status, 403);
 });
 
-test('PUT the same org twice appends one event', async () => {
+test('PUT the same organization twice is one document',
+async () => {
     const db = await freshDb();
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     await handleRequest(
-        db, putDefaultOrganization(
-            token, 'current', '1', 'ev-dup-1', EVENT_AT,
-        ));
+        db, putDefaultOrganization(token, 'current', '1'));
     await handleRequest(
-        db, putDefaultOrganization(
-            token, 'current', '1', 'ev-dup-1', EVENT_AT,
-        ));
-    // Phase Final Task 2: identity_default_organizations ROW
-    // half stripped — count via derive.
+        db, putDefaultOrganization(token, 'current', '1'));
     const { deriveDefaultOrganization } = await import(
         '../api/derive-default-organization.ts'
     );
@@ -171,87 +119,95 @@ test('PUT the same org twice appends one event', async () => {
         db, 'current',
     );
     assert.equal(rows.length, 1);
-    // Phase Final Stage B: identity spine tables retired.
+    assert.equal(rows[0]!.organization_id, '1');
 });
 
-test('GET resolves to the primary membership when unset',
-async () => {
+test('GET 404s when never SET', async () => {
     const db = await freshDb();
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const got = await handleRequest(
         db, getDefaultOrganization(token, 'current'));
-    assert.equal(got.status, 200);
-    const body = await got.json() as
-        { organization_id: string | null };
-    assert.equal(body.organization_id, '1');
+    assert.equal(got.status, 404);
 });
 
-test('GET is null for an org-less identity', async () => {
+test('GET 404s for an organization-less identity', async () => {
     const db = await freshDb();
     const token = await devToken();
     const got = await handleRequest(
         db, getDefaultOrganization(token, 'current'));
-    assert.equal(got.status, 200);
-    const body = await got.json() as
-        { organization_id: string | null };
-    assert.equal(body.organization_id, null);
+    assert.equal(got.status, 404);
 });
 
-test('PUT persists the caller-supplied eventId as the'
-+ ' pair uriId', async () => {
-    const db = await freshDb();
-    await seedMembership(db, 'current', '1');
-    const token = await devToken();
-    const put = await handleRequest(
-        db, putDefaultOrganization(
-            token, 'current', '1', 'caller-id-1', EVENT_AT,
-        ));
-    assert.equal(put.status, 201);
-    // Phase Final Task 2: row half stripped — pair plane.
-    const { deriveDefaultOrganization } = await import(
-        '../api/derive-default-organization.ts'
-    );
-    const rows = await deriveDefaultOrganization(
-        db, 'current',
-    );
-    assert.equal(rows.length, 1);
-    assert.equal(rows[0]!.id, 'caller-id-1');
-    assert.equal(rows[0]!.at, EVENT_AT);
-});
-
-test('PUT with same eventId + org is idempotent (no-op)',
-async () => {
-    const db = await freshDb();
-    await seedMembership(db, 'current', '1');
-    const token = await devToken();
-    const req1 = putDefaultOrganization(
-        token, 'current', '1', 'caller-id-2', EVENT_AT,
-    );
-    const req2 = putDefaultOrganization(
-        token, 'current', '1', 'caller-id-2', EVENT_AT,
-    );
-    const r1 = await handleRequest(db, req1);
-    assert.equal(r1.status, 201);
-    const r2 = await handleRequest(db, req2);
-    assert.equal(r2.status, 201);
-    const { deriveDefaultOrganization } = await import(
-        '../api/derive-default-organization.ts'
-    );
-    const rows = await deriveDefaultOrganization(
-        db, 'current',
-    );
-    // org unchanged on second PUT — no new event appended
-    assert.equal(rows.length, 1);
-});
-
-test('PUT with empty eventId returns 400', async () => {
+test('PUT without organization_id returns 400', async () => {
     const db = await freshDb();
     await seedMembership(db, 'current', '1');
     const token = await devToken();
     const res = await handleRequest(
-        db, putDefaultOrganization(
-            token, 'current', '1', '', EVENT_AT,
-        ));
+        db, new Request(
+            `${BASE}/identities/current/default-organization`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'operation-id': TEST_OPERATION_ID,
+                },
+                body: JSON.stringify({}),
+            },
+        ),
+    );
     assert.equal(res.status, 400);
+});
+
+test('revoke leaves the SET default-organization document',
+async () => {
+    const db = await freshDb();
+    await seedMembership(db, 'current', '1');
+    await seedMembership(db, 'current', '2');
+    const token = await devToken();
+    const put = await handleRequest(
+        db, new Request(
+            `${BASE}/identities/current/default-organization`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'operation-id': TEST_OPERATION_ID,
+                },
+                body: JSON.stringify({
+                    organization_id: '2',
+                }),
+            },
+        ),
+    );
+    assert.equal(put.status, 201);
+    const revoked = await handleRequest(
+        db, new Request(
+            `${BASE}/organizations/2/members/current`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer '
+                        + await organizationToken(
+                            'current', '2',
+                        ),
+                    'operation-id': TEST_OPERATION_ID,
+                },
+            },
+        ),
+    );
+    assert.equal(revoked.status, 204);
+    const got = await handleRequest(
+        db, new Request(
+            `${BASE}/identities/current/default-organization`, {
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                },
+            },
+        ),
+    );
+    assert.equal(got.status, 200);
+    const body = await got.json() as {
+        organization_id: string;
+    };
+    assert.equal(body.organization_id, '2');
 });

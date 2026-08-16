@@ -6,26 +6,15 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { organizationRow } from './test-fixtures.ts';
 import { documentPairsAt } from '../api/derive-documents.ts';
-import {
-    documentFamilyWiring,
-    documentGetHandler,
-} from '../api/document-family.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
-import {
-    postMembershipDocumentOp,
-    membershipDocumentEntityOf,
-    WRITE_RESPONSE_SPECS,
-} from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
-import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
     storedPutBodyText,
 } from './http-fixtures.ts';
+import { seedSeat } from './root-admin-fixture.ts';
 
 // Phase 8 Task 6: the invitation document plane — the grant's
 // PUT-shaped invitation document (the entity minus id, NO email
@@ -78,35 +67,15 @@ async function person(
 // mechanism changes.
 async function seedMembershipPair(
     db: MemoryDbAdapter,
-    id: string,
+    _id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
-    const organization = body.organization_id as string;
-    const spec = WRITE_RESPONSE_SPECS['memberships/:id'];
-    if (spec === undefined || !('status' in spec)) {
-        throw new Error(
-            'no per-write response spec for memberships/:id',
-        );
-    }
-    const pair = await formWritePair({
-        method: 'PUT',
-        pathname: '/memberships/' + id,
-        routePattern: 'memberships/:id',
-        routeSegments: ['memberships', ':id'],
-        pathSegments: ['memberships', id],
-        headerFields: [],
-        body,
-        requesterIdentityId: SYSTEM_MEMBER_ID,
-        requestAt: nowUtc(),
-        organization,
-        responseStatus: spec.status,
-        responseBody: spec.successBody?.(
-            [id], body, SYSTEM_MEMBER_ID, organization,
-        ),
-        operationId: TEST_OPERATION_ID,
-    });
-    await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+    await seedSeat(
+        db,
+        String(body.organization_id),
+        String(body.identity_id),
+        body.type as 'admin' | 'member',
+        String(body.at),
     );
 }
 
@@ -242,9 +211,8 @@ async function accept(
     ));
 }
 
-test('a fresh accept appends its memberships document at the'
-+ ' invitation-org address, and the derived memberships plane'
-+ ' sees the new membership (the B2 closure)', async () => {
+test('a fresh accept appends its seat document at the'
++ ' invitation-org members address', async () => {
     const db = await freshDb();
     await grant(db, 'inv-doc-3');
     const res = await accept(
@@ -255,50 +223,35 @@ test('a fresh accept appends its memberships document at the'
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     const documents = documentPairsAt(
-        requests, responses, '/organizations/1/memberships/',
-    ).filter(pair => pair.uriId === 'ms-doc-3');
+        requests, responses, '/organizations/1/members/',
+    ).filter(pair => pair.uriId === 'sarah');
     assert.equal(documents.length, 1);
     assert.deepEqual(documents[0]!.body, {
-        organization_id: '1', identity_id: 'sarah',
         type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
     });
-    // The direct proof: the generic, family-agnostic document
-    // derivation (the SAME machinery a live GET /memberships/:id
-    // would use once Task 8 flips it) sees the membership the
-    // accept just synthesized.
-    const wiring = documentFamilyWiring('memberships')!;
-    const derived = await documentGetHandler(wiring)(
-        db, ['ms-doc-3'], 'sarah', '1',
-    );
+    const got = await handleRequest(db, req(
+        'GET', '/organizations/1/members/sarah',
+        await organizationToken('current', '1'),
+    ));
+    assert.equal(got.status, 200);
     const acceptBody = {
-        organization_id: '1', identity_id: 'sarah',
+        id: 'sarah',
+        organization_id: '1',
+        identity_id: 'sarah',
         type: 'member',
         at: '2026-01-01T00:00:01.000000Z',
     };
-    assert.deepEqual(derived, {
-        id: 'ms-doc-3', ...acceptBody,
-    });
+    assert.deepEqual(await got.json(), acceptBody);
     const stored = JSON.parse(
         await storedPutBodyText(
-            db, '/organizations/1/memberships/', 'ms-doc-3',
+            db, '/organizations/1/members/', 'sarah',
         ),
     );
-    assert.deepEqual(
-        stored,
-        membershipDocumentEntityOf(
-            {
-                uriId: 'ms-doc-3',
-                pairId: 'ms-doc-3',
-                method: 'PUT',
-                body: acceptBody,
-            },
-            '1',
-        ),
-    );
+    assert.deepEqual(stored, acceptBody);
 });
 
-test('a no-op re-accept appends no memberships document',
+test('a no-op re-accept appends no seat document',
 async () => {
     const db = await freshDb();
     await grant(db, 'inv-doc-4');
@@ -313,13 +266,10 @@ async () => {
     );
     assert.equal(second.status, 201);
     const documents = (await db.requests.getAll()).filter(
-        r => r.uri_collection === '/organizations/1/memberships/',
+        r => r.uri_collection === '/organizations/1/members/'
+            && r.uri_id === 'sarah',
     );
-    // 2: the fixture's own membership pair (Phase 13 Task 1)
-    // shares this SAME org-nested address, so it matches the
-    // filter too — at index 0, since it precedes the accept.
-    assert.equal(documents.length, 2);
-    assert.equal(documents[1]!.uri_id, 'ms-doc-4');
+    assert.equal(documents.length, 1);
 });
 
 // ── deriveInvitations: the message-plane reduction ──

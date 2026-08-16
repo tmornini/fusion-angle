@@ -1,40 +1,15 @@
 import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { localStorageDbAdapter } from '../api/db-localstorage.ts';
+import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
     TABLE_NAMES,
 } from '../api/db.ts';
 
-const KEY_PREFIX = 'fusion-ai:';
-
-function installShim(): Map<string, string> {
-    const map = new Map<string, string>();
-    (globalThis as unknown as {
-        localStorage: {
-            getItem(key: string): string | null;
-            setItem(key: string, value: string): void;
-            removeItem(key: string): void;
-        };
-    }).localStorage = {
-        getItem(key) {
-            return map.get(key) ?? null;
-        },
-        setItem(key, value) {
-            map.set(key, value);
-        },
-        removeItem(key) {
-            map.delete(key);
-        },
-    };
-    return map;
-}
-
 test(
     'rejects malformed JSON with not-valid-JSON message',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         await assert.rejects(
             () => adapter.putSnapshot(
                 '{not valid',
@@ -47,9 +22,8 @@ test(
 test(
     'rejects array root with object-with-table-keys message',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         await assert.rejects(
             () => adapter.putSnapshot(
                 '[]',
@@ -62,9 +36,8 @@ test(
 test(
     'rejects null root with object-with-table-keys message',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         await assert.rejects(
             () => adapter.putSnapshot(
                 'null',
@@ -77,9 +50,8 @@ test(
 test(
     'rejects scalar root with object-with-table-keys message',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         await assert.rejects(
             () => adapter.putSnapshot(
                 '"string"',
@@ -92,9 +64,8 @@ test(
 test(
     'accepts a version-free snapshot',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: [],
         });
@@ -108,9 +79,8 @@ test(
 test(
     'rejects table value that is not an array',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: { not: 'an array' },
         });
@@ -124,9 +94,8 @@ test(
 test(
     'rejects row that is not an object',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: ['not an object'],
         });
@@ -140,9 +109,8 @@ test(
 test(
     'rejects null row',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: [null],
         });
@@ -156,9 +124,8 @@ test(
 test(
     'rejects array row',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: [['not', 'an', 'object']],
         });
@@ -172,9 +139,8 @@ test(
 test(
     'rejects entity row with extra unknown key',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: [
                 {
@@ -205,9 +171,8 @@ test(
 test(
     'rejects response row with unknown key',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             responses: [{
                 id: 'o1',
@@ -232,9 +197,8 @@ test(
     'accepts valid request row through the'
     + ' snapshot-validation gate',
     async () => {
-        const map = installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: [{
                 id: 'o1',
@@ -251,19 +215,16 @@ test(
             }],
         });
         await adapter.putSnapshot(json);
-        assert.ok(
-            map.get(KEY_PREFIX + 'requests'),
-            'request row should persist',
-        );
+        const rows = await adapter.requests.getAll();
+        assert.equal(rows.length, 1);
     },
 );
 
 test(
     'happy-path import populates target table',
     async () => {
-        const map = installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         const json = JSON.stringify({
             requests: [
                 {
@@ -284,19 +245,16 @@ test(
             ],
         });
         await adapter.putSnapshot(json);
-        const stored = map.get(
-            KEY_PREFIX + 'requests',
-        );
-        assert.ok(stored, 'requests should persist');
+        const stored = await adapter.requests.getAll();
+        assert.equal(stored.length, 1);
     },
 );
 
 test(
     'putSnapshot materializes every known table as empty',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         await adapter.putSnapshot(
             JSON.stringify({}),
         );
@@ -316,9 +274,8 @@ test(
 test(
     'postSchemaCreation/hasSchema/deleteSchema lifecycle',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         assert.equal(
             await adapter.hasSchema(), false,
             'fresh storage has no schema',
@@ -339,9 +296,8 @@ test(
 test(
     'postSchemaCreation is idempotent on re-run',
     async () => {
-        const map = installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         await adapter.postSchemaCreation();
         await adapter.requests.put('u1', {
             uri_collection: '/organizations/1/ideas/',
@@ -362,18 +318,14 @@ test(
             requests.length, 1,
             'second postSchemaCreation preserves data',
         );
-        assert.ok(
-            map.get(KEY_PREFIX + 'requests'),
-        );
     },
 );
 
 test(
     'getSnapshot includes every known table',
     async () => {
-        installShim();
         const adapter =
-            localStorageDbAdapter();
+            memoryDbAdapter();
         await adapter.postSchemaCreation();
         // Pin export surface on requests
         // (message-plane survivor).

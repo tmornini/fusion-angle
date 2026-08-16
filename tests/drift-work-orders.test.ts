@@ -593,7 +593,7 @@ async () => {
     // Claim by A — fresh: prior is 'claim_released', not live.
     const claimFreshAt = nowUtc();
     const claimFresh = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         tokenA, {
             claimEventId: 'wo-drift-chain-1-ce1',
             claimAt: claimFreshAt,
@@ -613,7 +613,7 @@ async () => {
         0 /* states table retired */;
     const claimRepeatAt = nowUtc();
     const claimRepeat = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         tokenA, {
             claimEventId: 'wo-drift-chain-1-ce2',
             claimAt: claimRepeatAt,
@@ -633,7 +633,7 @@ async () => {
         (await db.requests.getAll()).length;
     const claimRejectAt = nowUtc();
     const claimReject = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         tokenB, {
             claimEventId: 'wo-drift-chain-1-ce3',
             claimAt: claimRejectAt,
@@ -648,18 +648,13 @@ async () => {
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // Unclaim by A via deleteWorkOrderClaim's wire path:
-    // POST work-orders/:id/release with caller-minted
-    // releaseEventId + releaseAt.
-    const unclaimEventId = generateCryptoSafeBase62();
+    // DELETE work-orders/:id/claim.
     const unclaim = await handleRequest(db, req(
-        'POST',
-        '/work-orders/' + workOrderId + '/release',
-        tokenA, {
-            releaseEventId: unclaimEventId,
-            releaseAt: nowUtc(),
-        },
+        'DELETE',
+        '/work-orders/' + workOrderId + '/claim',
+        tokenA,
     ));
-    assert.equal(unclaim.status, 201);
+    assert.equal(unclaim.status, 204);
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
     // The full chain: create(3) + transition1(1) +
@@ -1051,6 +1046,9 @@ function applyClaimPair(
         claim.body, 'expireEventId',
     );
     const expireAt = pickString(claim.body, 'expireAt');
+    if (replayed.some((row) => row.id === claimEventId)) {
+        return;
+    }
     const lockTimeout = lockTimeoutAsOf(entityPairs, claim.at);
     const prior = latestClaimEvent(replayed, workOrderId);
     const priorLive = prior !== null
@@ -1155,18 +1153,32 @@ function applyReleasePair(
     release: AnyPair,
     workOrderId: string,
 ): void {
-    const releaseEventId = pickString(
+    const legacy = Object.hasOwn(
         release.body, 'releaseEventId',
     );
-    const releaseAt = pickString(release.body, 'releaseAt');
-    const lockTimeout = lockTimeoutAsOf(
-        entityPairs, release.at,
-    );
+    const releaseEventId = legacy
+        ? pickString(release.body, 'releaseEventId')
+        : release.id;
+    const releaseAt = legacy
+        ? pickString(release.body, 'releaseAt')
+        : release.at;
     const prior = latestClaimEvent(replayed, workOrderId);
-    const priorLive = prior !== null
-        && prior.state === 'claimed'
-        && !isExpiredAsOf(releaseAt, prior.at, lockTimeout);
-    if (!priorLive) return;
+    if (legacy) {
+        const lockTimeout = lockTimeoutAsOf(
+            entityPairs, release.at,
+        );
+        const priorLive = prior !== null
+            && prior.state === 'claimed'
+            && !isExpiredAsOf(
+                releaseAt, prior.at, lockTimeout,
+            );
+        if (!priorLive) return;
+    } else if (
+        prior === null
+        || prior.state !== 'claimed'
+    ) {
+        return;
+    }
     replayed.push({
         id: releaseEventId,
         entity_id: workOrderId,
@@ -1220,7 +1232,12 @@ async function replayWorkOrderStates(
     ]);
     const claimPairs = allPairsAt(
         claimRequests, claimResponses, claimPrefix,
-    ).filter((p) => p.method === 'POST');
+    ).filter(
+        (p) => p.method === 'POST' || p.method === 'PUT',
+    );
+    const claimDeletes = allPairsAt(
+        claimRequests, claimResponses, claimPrefix,
+    ).filter((p) => p.method === 'DELETE');
 
     const releasePrefix = canonicalUriCollection(
         organization,
@@ -1235,9 +1252,13 @@ async function replayWorkOrderStates(
                 'uri_collection', releasePrefix,
             ),
         ]);
-    const releasePairs = allPairsAt(
-        releaseRequests, releaseResponses, releasePrefix,
-    ).filter((p) => p.method === 'POST');
+    const releasePairs = [
+        ...allPairsAt(
+            releaseRequests, releaseResponses,
+            releasePrefix,
+        ).filter((p) => p.method === 'POST'),
+        ...claimDeletes,
+    ];
 
     const transitionPrefix = canonicalUriCollection(
         organization,
@@ -1407,7 +1428,7 @@ async () => {
     // Leg 3: re-claim by A — fresh (prior is 'claim_released').
     const reclaimAt = nowUtc();
     const reclaim = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         tokenA, {
             claimEventId: 'wo-drift-trace-1-ce1',
             claimAt: reclaimAt,
@@ -1422,7 +1443,7 @@ async () => {
     // events.
     const idempotentAt = nowUtc();
     const idempotent = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         tokenA, {
             claimEventId: 'wo-drift-trace-1-ce2',
             claimAt: idempotentAt,
@@ -1444,7 +1465,7 @@ async () => {
     const takeoverExpireAt = nowUtc();
     const takeoverClaimAt = nowUtc();
     const takeover = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/work-orders/' + workOrderId + '/claim',
         tokenB, {
             claimEventId: 'wo-drift-trace-1-ce3',
             claimAt: takeoverClaimAt,
@@ -1500,18 +1521,14 @@ async () => {
     ));
     assert.equal(finish.status, 201);
 
-    // Leg 8: unclaim via POST work-orders/:id/release
+    // Leg 8: unclaim via DELETE work-orders/:id/claim
     // (deleteWorkOrderClaim's wire path), by A.
-    const unclaimEventId = generateCryptoSafeBase62();
     const unclaim = await handleRequest(db, req(
-        'POST',
-        '/work-orders/' + workOrderId + '/release',
-        tokenA, {
-            releaseEventId: unclaimEventId,
-            releaseAt: nowUtc(),
-        },
+        'DELETE',
+        '/work-orders/' + workOrderId + '/claim',
+        tokenA,
     ));
-    assert.equal(unclaim.status, 201);
+    assert.equal(unclaim.status, 204);
 
     const replay = await replayWorkOrderStates(
         db, STARK_ORGANIZATION, workOrderId,

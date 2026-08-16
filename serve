@@ -6,10 +6,24 @@ DEFAULT_PORT=8080
 if [ $# -gt 1 ]; then
     echo "Usage: ./serve [port]" >&2
     echo "  port   Default: $DEFAULT_PORT" >&2
+    echo "  Requires POSTGRES_URL and" \
+        "JWT_HMAC_SIGNING_KEY." >&2
+    exit 1
+fi
+
+if [ -z "${POSTGRES_URL:-}" ]; then
+    echo "Error: missing required env POSTGRES_URL" >&2
+    exit 1
+fi
+if [ -z "${JWT_HMAC_SIGNING_KEY:-}" ]; then
+    echo "Error: missing required env" \
+        "JWT_HMAC_SIGNING_KEY" >&2
     exit 1
 fi
 
 PORT="${1:-$DEFAULT_PORT}"
+export HTTP_SERVER_PORT="$PORT"
+
 BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fusion-serve.XXXXXX")
 trap 'rm -rf "$BUILD_DIR"' EXIT
 
@@ -17,4 +31,4 @@ trap 'rm -rf "$BUILD_DIR"' EXIT
 
 echo
 echo "Serving on http://localhost:$PORT/"
-cd "$BUILD_DIR" && python3 -m http.server "$PORT"
+cd "$BUILD_DIR" && node server.mjs

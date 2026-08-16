@@ -12,23 +12,19 @@ import {
     postFlowRecordDocumentOp,
     postRecordWriteOp,
     postObjectiveCreationOp,
-    postAiMemberCreationOp,
-    postHumanMemberCreationOp,
     postIdentityPiiDocumentOp,
     postBaselineScoreDocumentOp,
     postActualScoreDocumentOp,
     postMembershipDocumentOp,
-    postMemberDocumentOp,
-    memberDocumentBodyOf,
     postIdentityDocumentOp,
     postIdentityCredentialDocumentOp,
+    postAiAgentDocumentOp,
     identityDocumentBodyOf,
 } from './routes.ts';
 import type {
     FlowCreationPairs,
     RecordWritePairs,
     ObjectiveCreationPairs,
-    MemberWritePairs,
 } from './routes.ts';
 import {
     SYSTEM_MEMBER_ID,
@@ -85,7 +81,6 @@ import {
     recordStateEvents,
     mockProjectFlows,
     mockFlowRecords,
-    humanMemberSeedBody,
     ideaSeedBody,
     ideaSubmissionSeedBody,
     projectSeedBody,
@@ -98,7 +93,6 @@ import {
     transitionSeedBody,
     flowWorkOrderJoinSeedBody,
     flowRecordJoinSeedBody,
-    aiMemberSeedBody,
     recordSeedBody,
     objectiveSeedBody,
     formMockDataMessagePairs,
@@ -106,9 +100,9 @@ import {
     formSeedCredentialPairs,
     seedPairKey,
     ORGANIZATION_TWO_OBJECTIVE,
-    membershipSeedBody,
-    bootstrapMembershipId,
-    bootstrapSystemStateEventId,
+    seatSeedBody,
+    identityPersonSeedBody,
+    bootstrapCurrentIdentityBody,
     humanMemberPiiSeedBody,
     bootstrapCurrentMemberPiiBody,
     identityCredentialSeedBody,
@@ -122,6 +116,7 @@ import { buildSeedScoreRows } from './mock-data/scores.ts';
 import {
     ATTRIBUTE_DETAIL_PATTERN,
     INSTANCE_DETAIL_PATTERN,
+    ORGANIZATION_MEMBER_DETAIL_PATTERN,
     RECORD_TYPES_COLLECTION_PATTERN,
     RECORD_TYPE_DETAIL_PATTERN,
 } from './family-registry.ts';
@@ -342,21 +337,11 @@ async function postMockDataLoadIn(
                 ? [STARK_ORGANIZATION, ORGANIZATION_TWO]
                 : [assignOrganization(index)];
             return [
-                // Task 5: memberships close their LAST
-                // whole-slice seed deferral — the SAME row, now
-                // driven through postMembershipDocumentOp so it
-                // forms a message pair too (Path A). The body is
-                // membershipSeedBody's own construction — the
-                // SAME one seed-message-pairs.ts used to form
-                // this row's pair, so the two can never drift.
-                ...organizations.map((organization, n) =>
+                ...organizations.map((_organization, n) =>
                     postMembershipDocumentOp(
                         adapter,
-                        'seed-membership-'
-                        + member.id + '-' + n,
-                        membershipSeedBody(
-                            organization,
-                            member.id,
+                        member.id,
+                        seatSeedBody(
                             member.id === 'current'
                                 ? 'admin'
                                 : 'member',
@@ -365,60 +350,33 @@ async function postMockDataLoadIn(
                         requirePair(
                             pairs,
                             seedPairKey(
-                                'memberships/:id',
-                                'seed-membership-'
-                                + member.id + '-' + n,
+                                ORGANIZATION_MEMBER_DETAIL_PATTERN,
+                                member.id + '-' + n,
                             ),
                         ),
                     )),
-                // Phase Final Task 2: identity_default_
-                // organizations ROW half stripped — pair only.
                 appendMessagePair(
                     adapter,
                     requirePair(
                         pairs,
                         seedPairKey(
-                            'identities/:id/default-org',
+                            'identities/:id/default-organization',
                             member.id,
                         ),
                     ),
                 ),
-                postHumanMemberCreationOp(
+                postIdentityDocumentOp(
                     adapter,
-                    humanMemberSeedBody(member),
+                    member.id,
+                    identityPersonSeedBody(member),
                     SYSTEM_MEMBER_ID,
-                    {
-                        operation: requirePair(
-                            pairs,
-                            seedPairKey(
-                                'human-members', member.id,
-                            ),
+                    requirePair(
+                        pairs,
+                        seedPairKey(
+                            'identities/:id', member.id,
                         ),
-                        memberDocument: requirePair(
-                            pairs,
-                            seedPairKey(
-                                'members/:id', member.id,
-                            ),
-                        ),
-                        detailDocument: requirePair(
-                            pairs,
-                            seedPairKey(
-                                'human-members/:id', member.id,
-                            ),
-                        ),
-                        identityDocument: requirePair(
-                            pairs,
-                            seedPairKey(
-                                'identities/:id', member.id,
-                            ),
-                        ),
-                    },
+                    ),
                 ),
-                // Phase 10 Task 2: the PII facet's own write,
-                // nested in this SAME outer TABLE_NAMES
-                // transaction (the ordering constraint) so it
-                // commits before seedHumanCredentials' pii-
-                // presence filter runs after this transaction.
                 postIdentityPiiDocumentOp(
                     adapter,
                     member.id,
@@ -433,30 +391,6 @@ async function postMockDataLoadIn(
                 ),
             ];
         }),
-        // Task 5: the system member's own members/:id row closes
-        // the last raw members.put site — driven through
-        // postMemberDocumentOp so it forms a message pair too
-        // (Path A), the SAME op the human/AI member-document
-        // invocations above already ride.
-        postMemberDocumentOp(
-            adapter,
-            SYSTEM_MEMBER_ID,
-            memberDocumentBodyOf('system', {
-                state: 'active',
-                stateAt: MOCK_SEED_TIMESTAMP,
-                stateEventId:
-                    `seed-member-${SYSTEM_MEMBER_ID}-active`,
-            }),
-            SYSTEM_MEMBER_ID,
-            requirePair(
-                pairs, seedPairKey('members/:id', SYSTEM_MEMBER_ID),
-            ),
-        ),
-        // Task 6: the system identity's own identities/:id row —
-        // driven through postIdentityDocumentOp so it forms a
-        // message pair too (Path A), the SAME op the human-member
-        // loop's own identityDocument invocation above already
-        // rides.
         postIdentityDocumentOp(
             adapter,
             SYSTEM_MEMBER_ID,
@@ -767,77 +701,17 @@ async function postMockDataLoadIn(
                     ),
                 ),
             ),
-        // AI members start at 'active' on creation — same
-        // single-event seeding as humans, driven through
-        // postAiMemberCreationOp. POST /ai-members (and so
-        // the op) writes no identities row — only members +
-        // ai_members + the initial event — so the identities
-        // row rides a separate write, the same "leave and note"
-        // carve-out as projects. Task 6: that separate write now
-        // rides postIdentityDocumentOp (Path A) instead of the
-        // bare PUT /identities/:id primitive, so it forms a
-        // message pair too.
-        ...aiMembers.flatMap(m => {
-            return [
-                // Task 5: the same memberships closure as the
-                // human-members loop above, driven through
-                // postMembershipDocumentOp with membershipSeedBody's
-                // shared construction.
-                postMembershipDocumentOp(
-                    adapter,
-                    'seed-membership-' + m.id,
-                    membershipSeedBody(
-                        STARK_ORGANIZATION, m.id, 'member',
-                    ),
-                    SYSTEM_MEMBER_ID,
-                    requirePair(
-                        pairs,
-                        seedPairKey(
-                            'memberships/:id',
-                            'seed-membership-' + m.id,
-                        ),
-                    ),
+        ...aiMembers.map(m => {
+            const { id: _id, ...fields } = m;
+            return postAiAgentDocumentOp(
+                adapter,
+                m.id,
+                fields,
+                SYSTEM_MEMBER_ID,
+                requirePair(
+                    pairs, seedPairKey('ai-agents/:id', m.id),
                 ),
-                // Task 6: the AI member's own identities/:id row
-                // — re-pointed onto postIdentityDocumentOp so it
-                // forms a message pair too (Path A), the SAME op
-                // the system-identity site above and the human-
-                // members loop's own identityDocument invocation
-                // already ride. Its own message pair shares its
-                // uri_id with the ai-members operation/detail
-                // pairs below (the H7/arrival-order hazard —
-                // tests/mock-data-pairs.test.ts's AI-member
-                // request lookups disambiguate by response status,
-                // never by arrival order).
-                postIdentityDocumentOp(
-                    adapter,
-                    m.id,
-                    identityDocumentBodyOf('service'),
-                    SYSTEM_MEMBER_ID,
-                    requirePair(
-                        pairs, seedPairKey('identities/:id', m.id),
-                    ),
-                ),
-                postAiMemberCreationOp(
-                    adapter,
-                    aiMemberSeedBody(m),
-                    SYSTEM_MEMBER_ID,
-                    {
-                        operation: requirePair(
-                            pairs,
-                            seedPairKey('ai-members', m.id),
-                        ),
-                        memberDocument: requirePair(
-                            pairs,
-                            seedPairKey('members/:id', m.id),
-                        ),
-                        detailDocument: requirePair(
-                            pairs,
-                            seedPairKey('ai-members/:id', m.id),
-                        ),
-                    },
-                ),
-            ];
+            );
         }),
         ...leadToCloseData.workOrders.map(r =>
             postWorkOrderDocumentOp(
@@ -1139,17 +1013,15 @@ export async function postBootstrap(
     // ONCE inside formBootstrapMessagePair and reused verbatim
     // by pass 2 below, the SAME discipline currentMemberBody's
     // own nowUtc() already follows. Phase 11 Task 8: ALSO forms
-    // bootstrap's own default-org event pair — the mock-data
+    // bootstrap's own default-organization document pair —
+    // the mock-data
     // seed's own per-member precedent, mirrored here for
     // bootstrap's lone identity.
     const {
-        body: currentMemberBody,
-        pairs: currentMemberPairs,
-        membershipPair,
-        systemMemberPair,
+        identityPair,
+        seatPair,
         piiPair,
         systemIdentityPair,
-        systemStateEventAt,
         defaultOrganizationPair,
         organizationPair,
     } = await formBootstrapMessagePair(nowUtc());
@@ -1162,10 +1034,8 @@ export async function postBootstrap(
     await adapter.transaction(
         TABLE_NAMES,
         (view) => postBootstrapIn(
-            view, currentMemberBody, currentMemberPairs,
-            membershipPair, systemMemberPair, piiPair,
+            view, identityPair, seatPair, piiPair,
             systemIdentityPair,
-            systemStateEventAt,
             defaultOrganizationPair, organizationPair,
         ),
     );
@@ -1192,42 +1062,14 @@ export async function postBootstrap(
 
 async function postBootstrapIn(
     adapter: DbAdapter,
-    currentMemberBody: Record<string, unknown>,
-    currentMemberPairs: MemberWritePairs,
-    membershipPair: MessagePair,
-    systemMemberPair: MessagePair,
+    identityPair: MessagePair,
+    seatPair: MessagePair,
     piiPair: MessagePair,
     systemIdentityPair: MessagePair,
-    systemStateEventAt: string,
     defaultOrganizationPair: MessagePair,
     organizationPair: MessagePair,
 ): Promise<void> {
-    // The pristine seed plants only what the app needs
-    // to render its shell: the system actor that authors
-    // state events, the current user, and the singleton
-    // organization. No Records — an empty Records page is
-    // the correct pristine state; sample Records are demo
-    // content loaded by postMockDataLoad, not bootstrap.
     await Promise.all([
-        // Task 5/8: the system member's own members/:id row —
-        // genesis trio rides THIS pair (no bare states/:id
-        // append). Driven through postMemberDocumentOp, the
-        // SAME op postMockDataLoadIn's own system-member site
-        // rides. Body is byte-identical to pass 1's formation.
-        postMemberDocumentOp(
-            adapter,
-            SYSTEM_MEMBER_ID,
-            memberDocumentBodyOf('system', {
-                state: 'active',
-                stateAt: systemStateEventAt,
-                stateEventId: bootstrapSystemStateEventId,
-            }),
-            SYSTEM_MEMBER_ID,
-            systemMemberPair,
-        ),
-        // Task 6: the system identity's own identities/:id row —
-        // driven through postIdentityDocumentOp, the SAME op
-        // postMockDataLoadIn's own system-identity site now rides.
         postIdentityDocumentOp(
             adapter,
             SYSTEM_MEMBER_ID,
@@ -1235,47 +1077,25 @@ async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             systemIdentityPair,
         ),
-        // Task 5: bootstrap's own membership closes the SAME
-        // whole-slice deferral as postMockDataLoadIn's memberships
-        // — driven through postMembershipDocumentOp with
-        // membershipSeedBody's shared construction.
+        postIdentityDocumentOp(
+            adapter,
+            'current',
+            bootstrapCurrentIdentityBody(),
+            SYSTEM_MEMBER_ID,
+            identityPair,
+        ),
         postMembershipDocumentOp(
             adapter,
-            bootstrapMembershipId,
-            membershipSeedBody(
-                STARK_ORGANIZATION, 'current', 'admin',
-            ),
+            'current',
+            seatSeedBody('admin', seatPair.requestAt),
             SYSTEM_MEMBER_ID,
-            membershipPair,
+            seatPair,
         ),
-        // Phase Final Task 2: identity_default_organizations
-        // ROW half stripped — pair only.
         appendMessagePair(adapter, defaultOrganizationPair),
-        // The 'current' human member row shares its shape
-        // with postMockDataLoadIn's human-member seed —
-        // driven through postHumanMemberCreationOp with the
-        // explicit actor SYSTEM_MEMBER_ID (the named bootstrap
-        // genesis carve-out now exempts only the schema marker —
-        // the system member and the membership row closed this
-        // task). currentMemberBody is pass 1's frozen body (see
-        // postBootstrap) — never rebuilt here, so it can never
-        // drift from what currentMemberPairs was hashed from.
-        postHumanMemberCreationOp(
-            adapter, currentMemberBody,
-            SYSTEM_MEMBER_ID, currentMemberPairs,
-        ),
-        // Phase 10 Task 2: the current member's PII facet, nested
-        // in this SAME outer TABLE_NAMES transaction (the ordering
-        // constraint) so it commits before seedHumanCredentials'
-        // pii-presence filter runs after this transaction.
         postIdentityPiiDocumentOp(
             adapter, 'current', bootstrapCurrentMemberPiiBody(),
             SYSTEM_MEMBER_ID, piiPair,
         ),
-        // Phase Final Task 2: organizations ROW half stripped
-        // — pair-plane only, mirroring postMockDataLoadIn.
         appendMessagePair(adapter, organizationPair),
-        // Role grants retired: membership type:"admin" above
-        // is the privilege seed; mint bakes claim roles.
     ]);
 }

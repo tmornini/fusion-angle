@@ -27,6 +27,8 @@ import {
 } from '../api/derive-states.ts';
 import { HttpMessage } from
     '../shared/http-message/http-message.ts';
+import { parseWire } from
+    '../shared/http-message/wire-codec.ts';
 
 function pairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
@@ -132,6 +134,24 @@ async () => {
     assert.equal(
         body['record_type_id'], SEED_RECORD_TYPE_ID,
     );
+});
+
+test('WO01 bind seed pair is PUT (locked verb)',
+async () => {
+    const db = await seededDb();
+    const prefix =
+        '/organizations/' + STARK_ORGANIZATION
+        + '/work-orders/' + WO01_ID + '/binding/';
+    const requests = await db.requests.getAllWhere(
+        'uri_collection', prefix,
+    );
+    assert.equal(requests.length, 1);
+    const model = parseWire(requests[0]!.message);
+    assert.equal(model.startLine.kind, 'request');
+    if (model.startLine.kind !== 'request') {
+        return;
+    }
+    assert.equal(model.startLine.method, 'PUT');
 });
 
 test('WO01 history: Review 6 new-shape + Complete 1;'

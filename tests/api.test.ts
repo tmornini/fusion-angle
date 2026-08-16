@@ -10,7 +10,9 @@ import {
     seedHumanMember,
     seedAIMember,
 } from './member-fixtures.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import {
+    DEV_TOKEN, organizationToken,
+} from './token-fixtures.ts';
 import { captureConsole } from './console-capture.ts';
 import {
     seedAdminSchema,
@@ -98,34 +100,38 @@ test('GET ideas/ normalizes to collection', async () => {
 });
 
 test(
-    'GET members returns the persisted humans',
+    'GET seats returns the persisted humans',
     async () => {
         const db = await freshDb();
         await seedHumanMember(db, 'hw_1', 'Sarah Chen');
         const members =
-            await GET<unknown[]>(db, 'members', DEV_TOKEN);
-        assert.equal(members.length, 1);
+            await GET<{ id: string }[]>(
+                db, 'organizations/1/members',
+                await organizationToken());
+        assert.ok(
+            members.some(row => row.id === 'hw_1'),
+        );
     },
 );
 
 test(
-    'GET ai-members returns persisted AIs',
+    'GET ai-agents returns persisted agents',
     async () => {
         const db = await freshDb();
         await seedAIMember(db, 'ai_1', 'Opus');
         const ais =
             await GET<unknown[]>(
-                db, 'ai-members', DEV_TOKEN);
+                db, 'ai-agents', DEV_TOKEN);
         assert.equal(ais.length, 1);
     },
 );
 
 test(
-    'PUT ai-members/:id validates body',
+    'PUT ai-agents/:id validates body',
     async () => {
         const db = await freshDb();
         await assert.rejects(
-            () => PUT(db, 'ai-members/ai_1', {
+            () => PUT(db, 'ai-agents/ai_1', {
                 rogue_field: 'extra',
             }, DEV_TOKEN),
             /unexpected key|missing/,
@@ -142,7 +148,9 @@ test(
             db, 'snapshots/mock-data', {}, DEV_TOKEN,
         );
         const members =
-            await GET<unknown[]>(db, 'members', DEV_TOKEN);
+            await GET<unknown[]>(
+                db, 'organizations/1/members',
+                await organizationToken());
         assert.ok(members.length > 0);
     },
 );
@@ -234,6 +242,8 @@ test(
                             'application/json',
                         'Authorization':
                             'Bearer ' + DEV_TOKEN,
+                        'Operation-ID':
+                            TEST_OPERATION_ID,
                     },
                     body: '{not valid json',
                 },
@@ -256,7 +266,8 @@ test(
         // GET ideas is flipped (Phase 2 Task 5): it derives from
         // the message ledger, never db.ideas, so the fault must
         // be forced from the store the derivation actually reads.
-        // Task 8 (Phase 11): the fence's own default-org fallback
+        // Task 8 (Phase 11): the fence's own
+        // default-organization fallback
         // ALSO derives from db.requests now
         // (identityDefaultOrganization / deriveDefaultOrganization)
         // — so the fault is targeted at the ideas prefix alone,
