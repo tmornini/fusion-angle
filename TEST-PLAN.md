@@ -37,8 +37,8 @@ failure.
 
 Every agent dispatched by the orchestrator — Phase 1
 serial agent, all seven Phase 2 agents, the Phase 3
-cross-cutting agent, and the Phase 4 snapshot-lifecycle
-agent — MUST begin its turn by invoking the
+cross-cutting agent, and the Phase 4 agent — MUST
+begin its turn by invoking the
 `church-of-code:church-of-code` skill via the Skill tool
 and reading `CHURCH-OF-CODE-medium-context.md` in full.
 Subagents inherit no scripture and read no CLAUDE.md by
@@ -83,11 +83,7 @@ adapters (`tests/adapters-flow-publish.test.ts`,
 `tests/adapters-flow-queries.test.ts`); the workbox inbox
 aggregation (`tests/workbox-inbox.test.ts`); the mermaid round-trip
 (`tests/mermaid.test.ts`); the in-browser ZIP (`tests/zip-guards.test.ts`);
-snapshot import-validation, quota pre-flight, and atomic
-import/rollback (`tests/snapshot-import-validation.test.ts`,
-`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`
-(filename legacy; now atomic-rollback),
-`tests/db-localstorage-compression.test.ts`); every data adapter
+every data adapter
 (`tests/adapters-*.test.ts`); navigation
 (`tests/navigation.test.ts`); mock-data validity
 (`tests/mock-data-valid.test.ts`); and the SafeHtml output of the
@@ -139,11 +135,14 @@ mutation domains disjoint:
    start `node server.mjs --seed-mock-data` (A3 /
    SV1). Covers A1–A5.
 2. **Phase 1 — Data setup** (one agent, serial):
-   AA1–AA43 in tab 0. Creates pristine environment,
-   members (humans + AIs), ideas, projects, one flow.
-   Populates the shared database that Phase 2
-   verifies. A3 already mock-seeded; Phase 1 may
-   wipe to pristine and rebuild through the UI.
+   AA3–AA42 in tab 0. Rebuilds from a
+   bootstrap-only database, members (humans +
+   AIs), ideas, projects, one flow. Populates
+   the shared database that Phase 2 verifies.
+   A3 already mock-seeded; Phase 1 stops that
+   process and restarts with
+   `--seed-bootstrap`, then rebuilds through
+   the UI.
 3. **Phase 2 — Parallel verification** (7 agents
    concurrent, each in its own `isolatedContext`, no
    shared tabs):
@@ -162,15 +161,17 @@ mutation domains disjoint:
      read-only)
    - Agent-G — Admin (Members page, Member detail
      (human + AI), Identities (list + detail +
-     providers + tokens), Organization, Snapshots,
+     providers + tokens), Organization,
      Billing). The retired Teams / Roles / Crews /
      Activity Feed pages have no cases.
 4. **Phase 3 — Cross-cutting** (one agent, alone):
    I1–I30. Mutates global UI state (theme, sidebar,
    command palette) — no concurrent agents.
-5. **Phase 4 — Snapshot lifecycle** (one agent,
-   alone): G30–G35 and K8. Wipes and reloads the
-   shared database — strictly last before teardown.
+5. **Phase 4 — Operator re-seed** (one agent,
+   alone): K8. Replaces the shared database via
+   process restart (`--seed-bootstrap`, then
+   restore `--seed-mock-data`) — strictly last
+   before teardown.
 6. **Phase 5 — Teardown** (main): stop `server.mjs`
    (J1), remove the build directory, verify the
    distribution ZIP remains, aggregate results.
@@ -315,9 +316,10 @@ opens its page with Chrome `isolatedContext` set to
 a unique name so cookie jars (and that context's
 localStorage) do not clobber each other. They still
 share the database: mutation domains and the
-sign-out rule remain required. A3 (or an admin
-Snapshots → Wipe and Load Mock Data) is the seed;
-there is no per-agent private ledger.
+sign-out rule remain required. A3 (or an
+operator re-seed via `--seed-bootstrap` /
+`--seed-mock-data`) is the seed; there is no
+per-agent private ledger.
 
 **Fallback strategy — serial for session-bound
 sections.** When isolated contexts are impractical,
@@ -337,11 +339,10 @@ genuinely independent or read-only work.
    jar at a time; `isolatedContext` makes this
    automatic across agents.
 3. **Schema mutations need exclusive database
-   access.** Any wipe / seed / snapshot import runs
+   access.** Any operator seed / K8 restart runs
    with no sibling mutating the same Postgres.
    Phase 4 already honors this by running alone;
-   extend the rule to any in-run snapshot import
-   (Agent-G's Snapshots cases).
+   K8 is the exclusive-database case.
 
 #### Shared-origin parallel run — operational recipe
 
@@ -368,16 +369,17 @@ Postgres, many isolated Chrome contexts.
    screenshots — those are display-global and
    collide across concurrent agents.
 6. **Seed is shared.** A3 already mock-seeded.
-   Re-seed only as **admin** via Snapshots → Wipe
-   and Load Mock Data (or Create Pristine). That
-   wipe is global. No per-agent private ledger.
+   Re-seed only via operator flags (restart
+   `node server.mjs --seed-bootstrap` or
+   `--seed-mock-data`). That wipe is global. No
+   per-agent private ledger.
 7. **Sign in as the ADMIN for admin-only
    surfaces.** The stderr reveal lists a password
    for EVERY login-capable person, including
    emily.rodriguez@company.com — a seeded
    `member`-role human who reads org-scoped content
    fine but 403s on admin-only writes (members,
-   identities, organization, snapshots;
+   identities, organization;
    deny-by-default authz). For any section touching
    those admin surfaces, sign in as
    `demo@example.com` (Tony Stark, admin in both
@@ -479,7 +481,7 @@ Postgres, many isolated Chrome contexts.
 The same TEST-PLAN.md runs serially by one human in one
 browser following document order (A → AA → B → C → D →
 E → F → F2 → FS → G → H → I → K → R → SV6–SV10 → J).
-A3 **is** SV1; SV2–SV5 pin cookie-session / snapshots
+A3 **is** SV1; SV2–SV4 pin cookie-session
 on this same origin (not a second ceremony). The
 agent-scoped mutation domains and tolerance patterns
 apply only to the parallel run.
@@ -491,7 +493,8 @@ failure aborts the run before A1's build — the expensive
 browser layer never tests against a validate-broken tree.
 
 After AT passes, A1–A3 stand up Node + Postgres (A3 is
-SV1). AA may rebuild through the UI from pristine.
+SV1). AA may rebuild from a bootstrap-only database
+(stop A3, restart `--seed-bootstrap`).
 Sections B through J then verify every page against
 that origin. SV6–SV10 are the two-jar / two-tab /
 stale-until-nav pins on the **same** process.
@@ -500,8 +503,9 @@ In the serial run the plan is a single continuous
 regression pass. In the parallel run B–J split across
 seven agents each with its own `isolatedContext` and
 disjoint entity mutation domain; I runs alone (global
-UI state); G30–G35 and K8 run alone last (they wipe
-the database). See `CLAUDE.md` section `## Testing`.
+UI state); K8 runs alone last (it still replaces
+the database via process restart). See `CLAUDE.md`
+section `## Testing`.
 
 ## Summary
 
@@ -509,7 +513,7 @@ the database). See `CLAUDE.md` section `## Testing`.
 |---|--:|
 | AT. Automated Test Suite | 3 |
 | A. Build & Setup | 5 |
-| AA. Data Entry Workflow | 48 |
+| AA. Data Entry Workflow | 46 |
 | B. Entry Pages | 29 |
 | C. Core: Dashboard | 7 |
 | D. Core: Ideas Workflow | 38 |
@@ -517,14 +521,14 @@ the database). See `CLAUDE.md` section `## Testing`.
 | F. Tools | 77 |
 | F2. Workbox | 31 |
 | FS. Flow Statistics | 9 |
-| G. Admin Pages | 44 |
+| G. Admin Pages | 38 |
 | H. Reference & System | 2 |
-| I. Cross-Cutting Concerns | 30 |
+| I. Cross-Cutting Concerns | 29 |
 | J. Teardown | 3 |
 | K. Objectives & Scoring | 30 |
 | R. Records | 25 |
-| SV. Server (Node + Postgres) | 10 |
-| **Total** | **403** |
+| SV. Server (Node + Postgres) | 9 |
+| **Total** | **393** |
 
 ### Combined Totals (CLI + Browser)
 
@@ -534,8 +538,8 @@ only. Combined with the CLI automated suite:
 | Layer                  | Cases    |
 |------------------------|---------:|
 | CLI automated tests    |     3262 |
-| Browser regression     |      403 |
-| **Combined TOTAL**     | **3665** |
+| Browser regression     |      393 |
+| **Combined TOTAL**     | **3655** |
 
 CLI count = most recent `./validate` (AT2) report — the main
 `tests/*.test.ts` suite plus the `tests/tz/*.test.ts` timezone
@@ -557,8 +561,8 @@ Format` at the bottom of this file):
 | pending  | Default (`- [ ]`); not yet executed  |  n/a   |
 
 A fully green run reports:
-`PASS = 3665, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
-where the six status counts sum to **Combined TOTAL** (3665).
+`PASS = 3655, FAIL = 0, BLOCKED ≤ k, DEFERRED ≤ j, DRIFT = 0`,
+where the six status counts sum to **Combined TOTAL** (3655).
 `BLOCKED ≠ FAIL` and `DRIFT ≠ FAIL` — only `FAIL` indicates a
 regression.
 
@@ -579,22 +583,21 @@ run before A1's build. The single canonical invocation is
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-server-${SHA}.zip`.
-- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `snapshots`, `workbox`) with 29 HTML page files (including `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`.
+- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 17 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 28 HTML page files (including `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`.
 - [ ] **A3** From the A2 directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an **empty** Postgres, run `node server.mjs --seed-mock-data` (or `./serve` after commit). PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP. This pin **is** SV1.
-- [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser. PASS: root hops to `auth/index.html` after seed (`root-redirect.ts` reads schema-present → auth). Landing is a separate public marketing page, not the root target.
+- [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser. PASS: root hops to `auth/index.html` always. Landing is a separate public marketing page, not the root target.
 - [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /authentication/token` refresh 401 are acceptable.
 
 ---
 
 ## AA. Data Entry Workflow
 
-This section populates a pristine environment with all data
-through the UI. Each step creates data that later steps depend
-on. Run these in order.
+AA rebuilds from a bootstrap-only database. Stop the A3
+process. Restart with `node server.mjs --seed-bootstrap`.
+Sign in with the stderr admin credential. Then AA3+.
+Each later step creates data that subsequent steps
+depend on. Run AA3+ in order.
 
-### AA1. Create Pristine Environment
-
-- [ ] **AA1** Navigate to `snapshots/`. Click "Create Pristine Environment" and confirm the wipe dialog. PASS: any pre-existing data is wiped and the minimal bootstrap is seeded (verify via AA3), then the page surfaces a one-time "Save your demo sign-ins" panel (the seeded admin credential, shown once and never stored) gated by an "I have saved it — continue" button. The demo auto-login is retired, so creation no longer redirects straight to the dashboard — sign in with the surfaced credential to reach it.
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
 ### AA2. Create Members
@@ -850,42 +853,19 @@ on. Run these in order.
   Edit button, change Domain in the overview card. Save,
   navigate away, return. PASS: changed Domain persists.
 
-### AA12. Snapshot Round-Trip
-
-- [ ] **AA43** Navigate to Snapshots. Click
-  "Download Snapshot". PASS: JSON file downloads
-  with all manually-entered data. In **serial
-  mode** continue the round-trip: Click "Create
-  Pristine Environment", confirm. PASS: all data
-  wiped. Click "Upload Snapshot", select the
-  downloaded file. PASS: all data restored.
-  Spot-check 3 pages to confirm data matches. In
-  **parallel mode** stop after the download step
-  to preserve the Phase 2 baseline — the wipe +
-  upload round-trip is exercised again at I26
-  (Phase 3) and G34 (Phase 4) on a different
-  baseline. (Snapshot serialization/validation,
-  the quota pre-flight, and wipe-on-fail are
-  covered by
-  `tests/snapshot-import-validation.test.ts`,
-  `tests/snapshot-quota.test.ts`, and
-  `tests/snapshot-wipe-on-fail.test.ts` — this
-  case verifies the download/upload UI affordance
-  and the end-to-end page-level restore.)
-
 ---
 
 ## B. Entry Pages
 
 ### Landing Page (`landing/`)
 
-- [ ] **B1** Page renders with marketing hero content, feature sections, and call-to-action buttons, then auto-redirects to `dashboard/index.html` after ~2 seconds. PASS: layout renders briefly, redirect occurs.
-- [ ] **B2** "Start Free Trial" (hero CTA) and "Get Started" (navbar CTA) are present and navigate to `auth/index.html` if clicked before the auto-redirect. PASS: buttons exist with correct target.
-- [ ] **B3** "Sign In" button is present and navigates to `auth/index.html` if clicked before the auto-redirect. PASS: button exists with correct target.
+- [ ] **B1** Page renders with marketing hero content, feature sections, and call-to-action buttons, and stays. Wait ~3 seconds. PASS: still on `landing/index.html`. No hop to dashboard.
+- [ ] **B2** "Start Free Trial" (hero CTA) and "Get Started" (navbar CTA) are present and navigate to `auth/index.html`. PASS: buttons exist with correct target.
+- [ ] **B3** "Sign In" button is present and navigates to `auth/index.html`. PASS: button exists with correct target.
 
 ### Auth Page (`auth/`)
 
-> Note: the demo auto-login is RETIRED. Gated pages now require a signed-in session — after seeding (Create Pristine Environment / Load Mock Data), sign in with the surfaced admin credentials before exercising gated pages. Cases below that "navigate to `dashboard`" assume a valid sign-in.
+> Note: the demo auto-login is RETIRED. Gated pages now require a signed-in session — after seeding (`--seed-bootstrap` / `--seed-mock-data`), sign in with the stderr admin credentials before exercising gated pages. Cases below that "navigate to `dashboard`" assume a valid sign-in.
 
 - [ ] **B4** Page loads in **Sign In** mode by default. PASS: title is "Welcome back", submit button reads "Sign in" with an SVG arrow icon (matching the Sign Up button's "Create account" affordance per B10).
 - [ ] **B5** On desktop (≥1024px), left panel shows branded marketing stats (10K+ Active Users, 98% Satisfaction, 50+ Integrations). PASS: two-column layout visible.
@@ -908,12 +888,10 @@ on. Run these in order.
 - [ ] **B16** From the B15 bounce, sign in with the seeded admin credentials. PASS: lands on `dashboard/index.html` — the `?return=` target, not a generic default.
 - [ ] **B17** With no session, open `flows/detail.html?flowId=<id>` directly. PASS: bounced to `auth` with the flow preserved in `?return=`; after signing in, lands back on that exact flow with `flowId` intact.
 - [ ] **B18** After signing in on the dashboard, reload (Cmd-R). PASS: stays authenticated on the dashboard — no bounce to `auth` (boot cookie-refreshes via `POST /authentication/token` with `grant_type=refresh` and `credentials: 'same-origin'`).
-- [ ] **B19** With no session, open each public page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`. PASS: each renders normally with NO redirect to `auth`. Open `snapshots/` unsigned. PASS: bounced to `auth` — snapshots require a session (SV5).
+- [ ] **B19** With no session, open each public page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`. PASS: each renders normally with NO redirect to `auth`.
 - [ ] **B20** After signing in, close the tab, then reopen `dashboard/index.html` in a new tab in the **same** cookie jar. PASS: still authenticated — no bounce (the HttpOnly `refresh_token` cookie is shared by the jar; boot cookie-refreshes).
 - [ ] **B21** Silent refresh: after signing in, replace the in-memory access token with an expired JWT (keep the live `refresh_token` cookie), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was cookie-refreshed transparently.
 - [ ] **B22** Dead refresh: clear the `refresh_token` cookie and drop the in-memory access token, then open `dashboard/`. PASS: bounced once to `auth?return=dashboard` — no retry loop, no console error storm.
-
-> Note: `snapshots/` requires a session (SV5). Public pages remain `landing/`, `auth/`, `not-found/`, and `design-system/`. The bootstrap plane is not bearer-exempt.
 
 ### Sidebar Sign-out
 
@@ -928,7 +906,7 @@ on. Run these in order.
 - [ ] **B26** From the zero-membership state while signed in, open `dashboard/index.html` (or any org-gated page) directly and reload (Cmd-R). PASS: redirected to `invitations/index.html` by the boot org gate — no dashboard error card, no retry loop (the returning-user path, not just fresh login).
 - [ ] **B27** As the zero-membership identity, land on `invitations/index.html`. PASS: the page renders and STAYS — no redirect loop (the gate's self-guard exempts the invitations page); it shows pending invitations, or the "No invitations." empty state when none exist.
 - [ ] **B28** Restore the deleted membership row (or repeat with an untouched seeded member), then sign in. PASS: lands on the `?return=` target / dashboard as before — the org gate does not fire for an identity that reaches an org (B16/B18 unaffected by the new gate).
-- [ ] **B29** As the zero-membership identity, open `design-system/`. PASS: renders normally with NO redirect to invitations — the org gate guards auth-gated pages; public pages degrade to the unscoped sidebar (B19). Open `snapshots/` while still signed in. PASS: bounced to `invitations/` (snapshots is auth-gated, so the org gate fires). Unsigned `snapshots/` still bounces to `auth` (B19), not invitations.
+- [ ] **B29** As the zero-membership identity, open `design-system/`. PASS: renders normally with NO redirect to invitations — the org gate guards auth-gated pages; public pages degrade to the unscoped sidebar (B19).
 
 ---
 
@@ -939,7 +917,7 @@ on. Run these in order.
   links in this order: Dashboard,
   Organization, Ideas, Projects, Records,
   Flows, Workbox, Members, Identities, Billing,
-  Snapshots, Design System. PASS: all 12 links present,
+  Design System. PASS: all 11 links present,
   in order, and styled. Source of truth:
   `PAGE_REGISTRY` (entries with
   `inSidebarNav: true`) in
@@ -2131,7 +2109,7 @@ the claude-in-chrome MCP.
 
 - [ ] **V1 — Invite by email grants a pending invitation** On
   `members/index.html` as an org admin (Tony Stark on Stark
-  Industries after G33), click `+ Invite member` (`#invite-
+  Industries after A3 `--seed-mock-data`), click `+ Invite member` (`#invite-
   member-btn`, mail icon). PASS: the `invite-member` dialog
   opens with a single Email input (`#invite-email`), helper
   text "Invite an existing person to this organization", a
@@ -2293,65 +2271,9 @@ the claude-in-chrome MCP.
 - [ ] **G25** Navigate to `identity-tokens/index.html?identityId=current` (or open an identity from `identities/` and click its "Tokens" link). PASS: the page title is "Tokens" with muted subtitle "Refresh-token chains for this identity"; the page renders one card per chain, each showing the chain id, the event jti, `parent: —` for a root event (or the parent jti for a rotated one), an `issued`/`rotated`/`revoked` badge, and a LOCAL-time stamp; an identity with no tokens shows "No tokens." The presenter consumes the adapter's camelCase `TokenEvent` domain shape (`jti`, `parentJti`, `action`, `at`) — a snake_case storage leak would render `parent: undefined` instead of `parent: —`. Source: `GET identities/:id/tokens` via `web-app/app/adapters/identity-tokens.ts` (`TokenEvent`), `web-app/app/presenters/identity-tokens.ts`.
 - [ ] **G26** Navigate to `identity-providers/index.html?identityId=current` (or the identity's "Providers" link). PASS: the page title is "Identity Providers" with muted subtitle "External sign-in links for this identity"; the page renders one card per link/unlink event (provider name + the `providerSubject` + a `linked`/`unlinked` badge + local-time stamp), or "No linked providers." for an identity with none (the seeded `current` logs in by password, so its providers list is empty). The presenter consumes the adapter's camelCase `ProviderEvent` shape (`provider`, `providerSubject`, `action`, `at`). Source: `GET identities/:id/providers` via `web-app/app/adapters/identity-providers.ts` (`ProviderEvent`), `web-app/app/presenters/identity-providers.ts`.
 
-### Snapshots (`snapshots/`) — Phase 4 (Run These Last)
+### Sidebar org-switcher
 
-**Phase 4 — Snapshot lifecycle & objective wipe.** Cases
-G30–G35 (snapshot lifecycle) and K8 (pristine wipe →
-Organization empty-state → mock-data restore) all destroy
-and restore the shared database. They MUST run alone after
-Phase 3 completes — never concurrent with Phase 2.
-
-(Snapshot serialization, per-row import-validation, the quota
-pre-flight, the localStorage tier's column compression, and
-atomic import are covered by `tests/snapshot-import-validation.test.ts`,
-`tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`
-(now atomic-rollback, not wipe-on-fail), and
-`tests/db-localstorage-compression.test.ts`. The cases below
-verify the four operation cards, the file-picker affordance, the
-post-operation redirect, and that pages render against the
-restored data.)
-
-- [ ] **G30** Navigate to `snapshots/`. PASS: shows 4 operation cards (Download Snapshot, Upload Snapshot, Wipe and Load Mock Data, Create Pristine Environment). The Upload Snapshot card renders a `<button id="upload-btn">` and a separate hidden `<input type="file" id="upload-input" class="hidden">`; the button forwards its click to the input in JS (`importInput.click()`).
-- [ ] **G31** Click "Download Snapshot". PASS: browser downloads `fusion-ai-snapshot-YYYY-MM-DD.json`. File contains valid JSON with entity data.
-- [ ] **G32** Click "Create Pristine Environment", confirm
-  the dialog. PASS: the page does NOT navigate immediately — it
-  first renders the one-time demo-credentials reveal panel (a
-  `.credential-reveal` warning panel titled "Save your demo
-  sign-ins", listing the seeded sign-in(s) — for the empty
-  bootstrap only Tony Stark / `current` — in a monospace
-  `.credential-reveal-box`, with a "Copy all" button and an "I
-  have saved it — continue" button). Clicking "Copy all" copies
-  the credentials and toasts "Credentials copied". Click "I have
-  saved it — continue" → redirects to `dashboard/index.html`.
-  Dashboard renders with zeroed-out metrics (empty
-  database except for the required bootstrap seed). Empty
-  bootstrap seeds only org `'1'` (Stark Industries) as
-  **8 message pairs** (absolute) covering System + Tony
-  Stark identity/PII/credentials/seat/
-  organization/default-organization — derived reads, not
-  entity
-  tables. NOTE: pristine seeds NO Records. Source of
-  truth: `postBootstrap` in `api/mock-data.ts`.
-- [ ] **G33** Click "Wipe and Load Mock Data", then Confirm the dialog. PASS: a confirm dialog (`#confirm-wipe-dialog`, titled "Confirm Action") appears first warning the wipe cannot be undone — Cancel aborts with no change; on Confirm the page renders the one-time demo-credentials reveal panel (`.credential-reveal`, titled "Save your demo sign-ins") listing EVERY login-capable seeded identity's email + fresh password in the monospace `.credential-reveal-box`, one credential per line, with a "Copy all" button. (Mock data seeds two orgs — `'1'` Stark Industries and `'2'` Wayne Enterprises — so the list spans both orgs' seeded humans; Tony Stark / `current` is the multi-org admin.) The page does NOT navigate until "I have saved it — continue" is clicked; clicking it redirects to `dashboard/index.html`. Navigate to `ideas/` — Stark's 6 ideas are back (the seed plants 11 ideas total, split across both orgs via `assignOrganization`; the org fence shows only the active org's).
-- [ ] **G34** Return to `snapshots/`, wipe data, then use "Upload Snapshot" file input and select the previously downloaded JSON file. PASS: redirects to `dashboard/index.html`. Data matches the snapshot.
-- [ ] **G36 — Sidebar org-switcher (multi-org user)** After "Wipe and Load Mock Data" (G33) seeds two orgs and boot signs in as the multi-org admin Tony Stark (`current`), the SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`. (This case requires the two-org mock-data seed, so it runs in Phase 4 alongside G30–G35 — never concurrently with Phase 2 agents.)
-
-### Snapshot & User Lifecycle — Error/Edge Cases
-
-- [ ] **G35** On `snapshots/`, click "Upload Snapshot" and select a
-  malformed JSON file (e.g. truncated mid-object). PASS: a toast or
-  inline error reports the upload failed with a human-readable
-  message; existing data is untouched (re-open Ideas or Members
-  and confirm the pre-upload cards remain). Note: malformed JSON
-  is rejected at parse time — BEFORE the import transaction
-  opens — so no data is touched. A parse-success but
-  validator-throw is rejected at the gate too; Postgres commits
-  the clear+put whole or not at all (atomic import replaced
-  wipe-on-fail). Covered by
-  `tests/snapshot-import-validation.test.ts` and
-  `tests/snapshot-wipe-on-fail.test.ts` (now atomic-rollback) —
-  this case verifies the error toast/inline-error surfaces in the
-  UI.)
+- [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 `--seed-mock-data` seeds two orgs and Tony Stark (`current`) is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
 - [ ] **G41** Person and agent writes land on the pair
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`
@@ -2456,13 +2378,9 @@ feature is implemented.
 
 ### Toasts
 
-- [ ] **I23** Trigger a toast (e.g. save an idea, or use DB Admin reload). PASS: toast appears at top-center of the viewport (fixed to `top: var(--space-4); left: 50%; translateX(-50%)`), auto-dismisses after ~6 seconds with fade-out. (Toast position was migrated from bottom-right to top-center.)
+- [ ] **I23** Trigger a toast (e.g. save an idea). PASS: toast appears at top-center of the viewport (fixed to `top: var(--space-4); left: 50%; translateX(-50%)`), auto-dismisses after ~6 seconds with fade-out. (Toast position was migrated from bottom-right to top-center.)
 - [ ] **I24** While a toast is visible, click its close button (×). PASS: toast dismisses immediately without waiting for auto-dismiss timer.
 - [ ] **I25** Trigger multiple toasts in rapid succession (e.g. save an idea repeatedly). PASS: toasts stack visibly with the *newest at the top*, older ones flowing downward (`prepend` ordering, not `appendChild`). Up to 5 visible. When a 6th toast arrives, the *oldest* — at the bottom of the stack — is removed.
-
-### Snapshot Round-Trip
-
-- [ ] **I26** Download a snapshot, wipe data (Create Pristine), upload the snapshot. PASS: all data restored correctly — spot-check 3 pages to confirm content matches pre-wipe state. (Snapshot serialization/validation/compression is covered by `tests/snapshot-import-validation.test.ts`, `tests/snapshot-quota.test.ts`, `tests/snapshot-wipe-on-fail.test.ts`, and `tests/db-localstorage-compression.test.ts`; this case verifies the download → wipe → upload UI flow end-to-end.)
 
 ### General
 
@@ -2501,11 +2419,10 @@ domain delta:
 ### K1–K6 — Organization Objectives box (Agent-G, Phase 2)
 
 K7 has been reassigned to Agent-E and appears at the end of
-the K30 subsection. K8 has been moved to Phase 4 alongside
-G30–G35 (snapshot lifecycle) and is documented in the
-Snapshots section below — it MUST NOT run in Phase 2
-because it wipes the database, which is shared across the
-seven Phase 2 agents.
+the K30 subsection. K8 is Phase 4 / alone — it MUST NOT
+run in Phase 2 because it replaces the database via
+process restart, which is shared across the seven Phase 2
+agents.
 
 **K1.** Open Organization page; confirm Objectives box
 renders between the Overview and Usage cards with
@@ -2531,17 +2448,18 @@ if it returns to the active list.
 **K6.** Drag an objective to a new position. PASS if the
 new position persists across a page reload.
 
-**K8.** **Phase 4 case** — runs alone alongside G30–G35
-after Phase 2 and Phase 3 complete. Catastrophic if run
-in Phase 2 because it wipes the database, which is shared
-across all seven Phase 2 agents.
+**K8.** **Phase 4 case** — runs alone last after Phase 2
+and Phase 3. Catastrophic if run in Phase 2 because it
+replaces the database, which is shared across all seven
+Phase 2 agents.
 
-Empty state: as admin, Create Pristine Environment on
-`snapshots/`, then navigate to the Organization page.
-PASS if the empty-state copy "No objectives yet. Add one
-to get started." renders (pristine seeds org 1 with no
-objectives). Restore via Wipe and Load Mock Data
-afterward.
+Empty state: stop the A3 process. Restart with
+`node server.mjs --seed-bootstrap`. Sign in with the
+stderr admin credential. Open Organization. PASS: the
+empty-state copy "No objectives yet. Add one to get
+started." renders (bootstrap seeds org 1 with no
+objectives). Restore the shared garden by stopping
+again and restarting with `--seed-mock-data`.
 
 ### K9–K18 — Project detail: inline scoring + Approve (Agent-E)
 
@@ -2788,7 +2706,7 @@ every other agent, so no write-domain collision.
   current-node only when leaving Review).
 - [ ] **R14a** When a node references a `radio`-typed Record attribute, the workbox work-order detail renders it as a radio group — one `<input type="radio">` per option, all sharing the attribute name so only one is selectable — rather than a dropdown; selecting an option and transitioning records that value. NOTE: seeded mock data predates `radio`, so add a radio attribute, reference it Editable on a working node, and create a work order to exercise this.
 - [ ] **R15** Archive a Record from its detail page (if a
-  control exists in the toy) or via the snapshot wipe.
+  control exists in the toy).
   PASS: lifecycle state reads `archived`; the list page
   excludes the row from active counts.
 - [ ] **R16** Open Customer Profile detail. PASS: an
@@ -2833,9 +2751,8 @@ every other agent, so no write-domain collision.
 
 This is the default origin, not a second ceremony. A3
 **is** SV1. B15 / B18 / B19 / B23 pin cookie-session
-and the snapshots bounce on the same process. Keep
-SV6–SV10 as the two-jar / two-tab /
-stale-until-navigation pins.
+on the same process. Keep SV6–SV10 as the two-jar /
+two-tab / stale-until-navigation pins.
 
 Operator prerequisites:
 
@@ -2861,7 +2778,6 @@ regression.
 - [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the root hop to auth). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
 - [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-ai:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
 - [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
-- [ ] **SV5** In a signed-out profile (or after Sign out), open `snapshots/`. PASS: bounced to `auth` — snapshots require a session (same pin as B19).
 
 ### Two browsers / two identities / one database
 
@@ -2902,7 +2818,7 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Phase / Agent | Sections          | Pass | Blocked | Fail |
 |---------------|-------------------|-----:|--------:|-----:|
 | Preflight     | A1–A5 (Node)      |    5 |       0 |    0 |
-| Phase-1       | AA1–AA43+subs     |    X |       Y |    Z |
+| Phase-1       | AA3–AA42+subs     |    X |       Y |    Z |
 | Agent-B       | B1–B29 (less B23–B24) | 27 |       0 |    0 |
 | Agent-CH      | C1–C7 + H1–H2 + K27–K29 | 12 |       0 |    0 |
 | Agent-D       | D1–D37            |    X |       Y |    Z |
@@ -2911,9 +2827,9 @@ Total: <N> cases — PASS X · BLOCKED Y · FAIL Z
 | Agent-F2      | WB1–WB22 + subs, FS1–FS9, R1–R21 | X |    0 |    0 |
 | Agent-G       | G9–14,19–26,36–46 + K1–K6 | X | 0 | 0 |
 | Phase-3       | I1–I30            |    X |       Y |    Z |
-| Phase-4       | G30–G35 + K8 | X |       0 |    0 |
+| Phase-4       | K8                |    X |       0 |    0 |
 | Teardown      | J1–J3             |    3 |       0 |    0 |
-| Server        | SV2–SV10 (A3=SV1) |    9 |       0 |    0 |
+| Server        | SV2–SV4, SV6–SV10 (A3=SV1) | 8 |       0 |    0 |
 
 ## BLOCKED detail (known MCP limitations — NOT failures)
 - <case ID>: <one-line reason>

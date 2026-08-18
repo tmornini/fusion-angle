@@ -140,22 +140,6 @@ test(
 );
 
 test(
-    'POST snapshots/mock-data populates the'
-    + ' tables',
-    async () => {
-        const db = await freshDb();
-        await POST(
-            db, 'snapshots/mock-data', {}, DEV_TOKEN,
-        );
-        const members =
-            await GET<unknown[]>(
-                db, 'organizations/1/members',
-                await organizationToken());
-        assert.ok(members.length > 0);
-    },
-);
-
-test(
     'POST on a route with no post handler is'
     + ' 405 Method Not Allowed',
     async () => {
@@ -233,8 +217,7 @@ test(
         const response = await handleRequest(
             db,
             new Request(
-                'http://localhost/snapshots/'
-                + 'mock-data',
+                'http://localhost/identities',
                 {
                     method: 'POST',
                     headers: {

@@ -17,7 +17,6 @@ globalThis.localStorage = {
 
 const {
     MEASURE_BOOT_DB_OPEN,
-    MEASURE_BOOT_SCHEMA_GATE,
     MEASURE_BOOT_AUTH_GATE,
     MEASURE_BOOT_ORGANIZATION_SCOPE,
     MEASURE_BOOT_SIDEBAR_CHROME,
@@ -88,10 +87,6 @@ test(
             MEASURE_BOOT_DB_OPEN, 'boot:db-open',
         );
         assert.equal(
-            MEASURE_BOOT_SCHEMA_GATE,
-            'boot:schema-gate',
-        );
-        assert.equal(
             MEASURE_BOOT_AUTH_GATE,
             'boot:auth-gate',
         );
@@ -122,7 +117,6 @@ test(
             [...BOOT_PHASE_MEASURE_NAMES],
             [
                 'boot:db-open',
-                'boot:schema-gate',
                 'boot:auth-gate',
                 'boot:organization-scope',
                 'boot:sidebar-chrome',

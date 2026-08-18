@@ -26,7 +26,6 @@ export * from './identity-providers.ts';
 export * from './identity-tokens.ts';
 export * from './identity-credentials.ts';
 export * from './admin.ts';
-export * from './snapshots.ts';
 export * from './flow-queries.ts';
 export * from './flow-mutations.ts';
 export * from './flow-export.ts';

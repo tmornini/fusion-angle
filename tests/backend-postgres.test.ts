@@ -36,7 +36,6 @@ function fakeClient(): {
     readonly calls: QueryCall[];
     rows: Record<string, unknown>[];
     failWith: unknown;
-    beginOptions: string | undefined;
 } {
     const calls: QueryCall[] = [];
     const state = {
@@ -44,7 +43,6 @@ function fakeClient(): {
         failWith: undefined as unknown,
         sql: undefined as unknown as SqlClient,
         calls,
-        beginOptions: undefined as string | undefined,
     };
     const run = (
         strings: TemplateStringsArray,
@@ -71,8 +69,7 @@ function fakeClient(): {
             calls.push({ text: query, values: [] });
             return [] as T[];
         },
-        begin: async (fn, options) => {
-            state.beginOptions = options;
+        begin: async (fn) => {
             return fn(sql);
         },
         end: async () => {},
@@ -352,54 +349,6 @@ async () => {
     assert.notEqual(
         row?.message,
         new TextDecoder('latin1').decode(bytes),
-    );
-});
-
-test('exportSnapshot uses REPEATABLE READ', async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    await backend.exportSnapshot();
-    assert.equal(
-        fake.beginOptions,
-        'ISOLATION LEVEL REPEATABLE READ READ ONLY',
-    );
-});
-
-test('importSnapshot locks, writes, stamps, notifies',
-async () => {
-    const fake = fakeClient();
-    const backend = new PostgresBackend(fake.sql);
-    const tables = new Map<string, { id: string }[]>([
-        ['requests', [REQUEST_ROW]],
-        ['responses', []],
-    ]);
-    await backend.importSnapshot(tables);
-    const texts = fake.calls.map((call) => call.text);
-    assert.match(
-        texts[0] ?? '',
-        /pg_advisory_xact_lock\(/,
-    );
-    assert.ok(
-        texts.some((text) =>
-            /DELETE FROM requests/.test(text),
-        ),
-    );
-    assert.ok(
-        texts.some((text) =>
-            /INSERT INTO schema_marker/.test(text),
-        ),
-    );
-    assert.match(
-        texts[texts.length - 1] ?? '',
-        /pg_notify\(/,
-    );
-    assert.ok(
-        texts.some((text) =>
-            text.includes('fusion_events')
-            || fake.calls.some((call) =>
-                call.values.includes('fusion_events'),
-            ),
-        ),
     );
 });
 

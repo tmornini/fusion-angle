@@ -123,9 +123,6 @@ test('member tier: admin surfaces stay denied', () => {
         isPermitted('GET', '/identities', ['member']),
         false);
     assert.equal(
-        isPermitted('GET', '/snapshots/schema', ['member']),
-        false);
-    assert.equal(
         isPermitted('PUT', '/organizations/1', ['member']),
         false);
     assert.equal(

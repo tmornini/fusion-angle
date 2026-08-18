@@ -90,9 +90,9 @@ function initSignOut(): void {
 }
 
 async function initSidebarLayout(
-    hasSchema: boolean,
     bootOrganizations:
-        readonly OrganizationEntity[] | null = null,
+        readonly OrganizationEntity[] | null
+        = null,
 ): Promise<void> {
     initActiveNavItem();
     initSidebar();
@@ -107,7 +107,7 @@ async function initSidebarLayout(
     // an auth-exempt page with no logged-in visitor the holder is
     // the anonymous seed, so we skip every read rather than fire one
     // that 401s 'anonymous principal' or throws 'no active org'.
-    if (hasSchema && sessionIsAuthenticated()) {
+    if (sessionIsAuthenticated()) {
         // Each widget settles independently: a member with no admin
         // role is forbidden the org reads the chip and header strip
         // make, and a zero-membership identity is forbidden them

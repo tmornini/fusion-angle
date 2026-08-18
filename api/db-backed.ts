@@ -1,5 +1,4 @@
 import {
-    TABLE_NAMES,
     backendRunner,
     ambientRunner,
 } from './db.ts';
@@ -13,8 +12,6 @@ import type {
     TxRunner,
     WriteLocks,
 } from './db.ts';
-import { SNAPSHOT_IMPORT_LOCK_NAME } from
-    './advisory-lock.ts';
 import type {
     RequestEntity,
     ResponseEntity,
@@ -27,18 +24,15 @@ import type {
 import { HistoryEntityStore }
     from './store-history-entity.ts';
 import {
-    parseAndValidateSnapshot,
-} from './snapshot-validator.ts';
-import {
     validateRequestEntity,
     validateResponseEntity,
 } from './validators.ts';
 
-// One adapter over any StorageBackend. The store wiring,
-// the transaction view, and the tx-based snapshot ops live
-// here once (Commandment IX — the third backend, IndexedDB,
-// triggers the abstraction). The per-tier variation rides in
-// the constructor: the backend itself, a latency shim, and
+// One adapter over any StorageBackend. The store wiring
+// and the transaction view live here once (Commandment IX
+// — the third backend, IndexedDB, triggers the
+// abstraction). The per-tier variation rides in the
+// constructor: the backend itself, a latency shim, and
 // an open hook the async tiers (IndexedDB) use to connect
 // before any store op. Schema lifecycle delegates to the
 // backend, which signals "schema exists" its own way.
@@ -102,57 +96,6 @@ export class BackedDbAdapter
         return this.#backend.deleteSchema();
     }
 
-    async getSnapshot(): Promise<string> {
-        if (this.#backend.exportSnapshot !== undefined) {
-            return this.#backend.exportSnapshot();
-        }
-        const obj = await this.#backend.transaction(
-            TABLE_NAMES, 'readonly',
-            async (tx) => {
-                const out: Record<string, unknown[]> = {};
-                for (const table of TABLE_NAMES) {
-                    out[table] = await tx.getAll(table);
-                }
-                return out;
-            },
-        );
-        return JSON.stringify(obj, null, 2);
-    }
-
-    async putSnapshot(json: string): Promise<void> {
-        // Validators run at the gate, before any storage
-        // touch — a bad snapshot throws here, leaving prior
-        // data intact. The clear+put then runs in one
-        // transaction; a logic error discards the buffer
-        // (rollback). On IndexedDB the whole flush is a
-        // genuine atomic commit; localStorage's multi-key
-        // flush is not OS-atomic on a mid-write quota error.
-        // Postgres takes the exclusive import lock and
-        // stamps schema_marker in that same transaction.
-        const validated = parseAndValidateSnapshot(json);
-        await this.#backend.ensureTables(TABLE_NAMES);
-        if (this.#backend.importSnapshot !== undefined) {
-            await this.#backend.importSnapshot(validated);
-            return;
-        }
-        await this.#backend.transaction(
-            TABLE_NAMES, 'readwrite',
-            async (tx) => {
-                for (const [table, rows] of validated) {
-                    await tx.clear(table);
-                    for (const row of rows) {
-                        await tx.put(table, row);
-                    }
-                }
-            },
-        );
-        // Imported data IS a schema: stamp the marker after
-        // the commit so hasSchema() answers true after a
-        // restore onto a fresh origin. A failed import never
-        // stamps.
-        await this.#backend.postSchemaCreation();
-    }
-
     async transaction<R>(
         tables: readonly string[],
         fn: (view: GuardedDbAdapter) => Promise<R>,
@@ -202,9 +145,6 @@ export class BackedDbAdapter
             postSchemaCreation: () => this.postSchemaCreation(),
             ensureTables: (tables) =>
                 this.ensureTables(tables),
-            getSnapshot: () => this.getSnapshot(),
-            putSnapshot: (json) =>
-                this.putSnapshot(json),
             postNotification: (e) =>
                 this.postNotification(e),
             ...(locks === undefined
@@ -245,13 +185,11 @@ export class BackedDbAdapter
 
 function writeLocksOf(tx: Tx): WriteLocks | undefined {
     const lock = tx.lock;
-    const lockShared = tx.lockShared;
     const lockHead = tx.lockHead;
     const latestPutDelete = tx.latestPutDelete;
     const notify = tx.notify;
     if (
         lock === undefined
-        || lockShared === undefined
         || lockHead === undefined
         || latestPutDelete === undefined
         || notify === undefined
@@ -259,15 +197,12 @@ function writeLocksOf(tx: Tx): WriteLocks | undefined {
         return undefined;
     }
     return {
-        lockImportExclusive: () =>
-            lock(SNAPSHOT_IMPORT_LOCK_NAME),
-        lockImportShared: () =>
-            lockShared(SNAPSHOT_IMPORT_LOCK_NAME),
         lockDedup: (hash) =>
             lock('fusion.dedup.' + hash),
         lockAddress: (collection, uriId) =>
             lock(
-                'fusion.address.' + collection + uriId,
+                'fusion.address.' + collection
+                + uriId,
             ),
         lockHead,
         latestPutDelete,

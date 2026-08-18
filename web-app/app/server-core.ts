@@ -25,9 +25,6 @@ document.addEventListener(
         putClientFacade(
             createHttpFacade(serverOrigin()),
         );
-        await bootApp({
-            hasSchema: true,
-            recoverMissingTable: false,
-        });
+        await bootApp();
     },
 );

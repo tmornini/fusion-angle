@@ -18,8 +18,6 @@ import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 const AT = '2026-01-01T00:00:00.000000Z';
 const IDEA_PREFIX = '/organizations/1/ideas/';
 const FLOW_PREFIX = '/organizations/1/flows/';
-const WIRE_REQUEST =
-    'PUT /organizations/1/ideas/42 HTTP/1.1\r\n\r\n';
 
 function req(
     method: string,
@@ -137,52 +135,6 @@ function flowDocument(
         graphDelta: emptyDelta(),
         revivals: [],
     };
-}
-
-function currentRequestRow(): Record<string, unknown> {
-    return {
-        id: 'rq1',
-        uri_collection: '/organizations/1/ideas/',
-        uri_id: '42',
-        at: AT,
-        requester_identity_id: 'current',
-        message_hash: 'a'.repeat(64),
-        message: WIRE_REQUEST,
-        method: 'PUT',
-        operation_id: TEST_OPERATION_ID,
-    };
-}
-
-function omit(
-    row: Record<string, unknown>,
-    key: string,
-): Record<string, unknown> {
-    const { [key]: _dropped, ...rest } = row;
-    return rest;
-}
-
-function snapshotWithoutOperationId(): string {
-    return JSON.stringify({
-        requests: [
-            omit(currentRequestRow(), 'operation_id'),
-        ],
-    });
-}
-
-function snapshotCanonicalJson(): string {
-    return JSON.stringify({
-        requests: [{
-            ...currentRequestRow(),
-            message: JSON.stringify({
-                startLine: {
-                    kind: 'request',
-                    method: 'PUT',
-                    target: '/organizations/1/ideas/42',
-                    version: 'HTTP/1.1',
-                },
-            }),
-        }],
-    });
 }
 
 async function pairsAt(
@@ -354,39 +306,5 @@ export function defineStoreAcceptance(
             name: string;
         };
         assert.equal(againBody.name, liveBody.name);
-    });
-
-    test(name + ': snapshot loud-reject', async () => {
-        const { db, token } = await ready();
-        const before = (await db.requests.getAll()).length;
-        const missingOp = await handleRequest(db, req(
-            'PUT', '/snapshots/import', token,
-            { json: snapshotWithoutOperationId() },
-        ));
-        assert.equal(missingOp.status, 400);
-        const missingBody = await missingOp.json() as {
-            error: string;
-        };
-        assert.match(missingBody.error, /operation_id/);
-        assert.match(
-            missingBody.error, /Re-snapshot|reseed/,
-        );
-        const canon = await handleRequest(db, req(
-            'PUT', '/snapshots/import', token,
-            { json: snapshotCanonicalJson() },
-        ));
-        assert.equal(canon.status, 400);
-        const canonBody = await canon.json() as {
-            error: string;
-        };
-        assert.match(
-            canonBody.error, /serializeWire|message/,
-        );
-        assert.match(
-            canonBody.error, /Re-snapshot|reseed/,
-        );
-        assert.equal(
-            (await db.requests.getAll()).length, before,
-        );
     });
 }

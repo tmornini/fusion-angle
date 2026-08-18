@@ -82,7 +82,7 @@ export function matchesOnSegmentBoundary(
 // The verbs the `member` role may use, per content prefix.
 // Admin surfaces — identities, credentials,
 // providers, memberships, organization and
-// member WRITES, snapshots — are absent: deny-by-default
+// member WRITES — are absent: deny-by-default
 // keeps them at the root admin entries. Seats and
 // ai-agents appear read-only here for author and roster
 // display; their writes stay admin (member management).

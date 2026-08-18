@@ -53,7 +53,8 @@ export class MissingTableError extends Error {
     constructor(table: string) {
         super(
             `Schema is missing table "${table}".`
-            + ' Recreate the schema from snapshots.',
+            + ' Reseed with --seed-bootstrap or'
+            + ' --seed-mock-data.',
         );
         this.table = table;
         this.name = 'MissingTableError';
@@ -203,8 +204,6 @@ export interface Tx {
 }
 
 export interface WriteLocks {
-    lockImportExclusive(): Promise<void>;
-    lockImportShared(): Promise<void>;
     lockDedup(hash: string): Promise<void>;
     lockAddress(
         collection: string,
@@ -242,10 +241,6 @@ export interface StorageBackend {
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
     deleteSchema(): Promise<void>;
-    exportSnapshot?(): Promise<string>;
-    importSnapshot?(
-        tables: Map<string, { id: string }[]>,
-    ): Promise<void>;
 }
 
 // How a store reaches storage. Standalone, a store opens a
@@ -283,21 +278,19 @@ export interface DbStores {
         EntityStore<ResponseEntity>;
 }
 
-// Schema/connection lifecycle plus the snapshot plane — the
-// non-row surface every adapter face serves identically.
+// Schema/connection lifecycle — the non-row surface every
+// adapter face serves identically.
 export interface DbLifecycle {
     initialize(): Promise<void>;
     deleteSchema(): Promise<void>;
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
     // Make the named tables writable without declaring the
-    // schema present: the installer primitive data loads
-    // (seeds, snapshot import) run before their writes.
+    // schema present: the installer primitive for seeds,
+    // not snapshot import.
     ensureTables(
         tables: readonly string[],
     ): Promise<void>;
-    getSnapshot(): Promise<string>;
-    putSnapshot(json: string): Promise<void>;
     // The Decision 5 post hook: fired AFTER a write commits,
     // so cross-tab (and future cross-process) subscribers are
     // informed of state changes — never polled. Carried on the

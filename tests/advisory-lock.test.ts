@@ -8,11 +8,9 @@ import { Octets } from
     '../shared/http-message/octets.ts';
 import {
     ADVISORY_KEY_HEX_DIGITS,
-    SNAPSHOT_IMPORT_LOCK_NAME,
     FUSION_EVENTS_CHANNEL,
     PG_NOTIFY_PAYLOAD_MAX_BYTES,
     POOL_MAX,
-    SNAPSHOT_EXPORT_ISOLATION,
     advisoryKey,
     notifyPayload,
 } from '../api/advisory-lock.ts';
@@ -30,7 +28,6 @@ test(
         assert.ok(16n ** 14n - 1n >= SIGN_BIT_FLOOR);
 
         const labels = [
-            SNAPSHOT_IMPORT_LOCK_NAME,
             'fusion.dedup.' + 'a'.repeat(64),
             'fusion.address./ideas/42',
         ];
@@ -44,7 +41,7 @@ test(
 
 test('advisoryKey is the first 13 hex of sha256Hex',
 async () => {
-    const label = SNAPSHOT_IMPORT_LOCK_NAME;
+    const label = 'fusion.dedup.x';
     const hex = (await sha256Hex(label))
         .slice(0, ADVISORY_KEY_HEX_DIGITS);
     assert.equal(
@@ -79,17 +76,9 @@ async () => {
 });
 
 test('lock and notify constants stay named', () => {
-    assert.equal(
-        SNAPSHOT_IMPORT_LOCK_NAME,
-        'fusion.snapshot.import',
-    );
     assert.equal(FUSION_EVENTS_CHANNEL, 'fusion_events');
     assert.equal(PG_NOTIFY_PAYLOAD_MAX_BYTES, 8000);
     assert.equal(POOL_MAX, 10);
-    assert.equal(
-        SNAPSHOT_EXPORT_ISOLATION,
-        'ISOLATION LEVEL REPEATABLE READ READ ONLY',
-    );
 });
 
 test('notifyPayload emits full when over 8000 bytes',

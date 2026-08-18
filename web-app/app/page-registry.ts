@@ -25,10 +25,9 @@ export interface PageEntry {
     icon?: IconFn;
     keywords?: string;
     searchable?: boolean;
-    requiresSchema?: boolean;
     // Auth-gated by default: a page is exempt only when this is
-    // explicitly false (mirrors requiresSchema). The boot gate
-    // reads `requiresAuth !== false`, so the 23 app pages that
+    // explicitly false. The boot gate reads
+    // `requiresAuth !== false`, so the 23 app pages that
     // omit it inherit true; only the public surface opts out.
     requiresAuth?: boolean;
     cssBundles?: string[];
@@ -316,20 +315,6 @@ export const PAGE_REGISTRY: Record<
             + ' payment',
         loader: () => import('../billing/index'),
     },
-    snapshots: {
-        title: 'Snapshots',
-        layout: 'sidebar',
-        inSidebarNav: true,
-        sourceDir: 'snapshots',
-        sourceFile: 'index',
-        icon: iconDatabase,
-        keywords:
-            'data export import wipe',
-        requiresSchema: false,
-        requiresAuth: true,
-        cssBundles: ['pages-snapshots'],
-        loader: () => import('../snapshots/index'),
-    },
     'design-system': {
         title: 'Design System',
         layout: 'sidebar',
@@ -339,7 +324,6 @@ export const PAGE_REGISTRY: Record<
         icon: iconPalette,
         keywords:
             'components ui reference',
-        requiresSchema: false,
         requiresAuth: false,
         cssBundles: ['pages-design-system'],
         loader: () => import('../design-system/index'),
@@ -350,7 +334,6 @@ export const PAGE_REGISTRY: Record<
         sourceDir: 'auth',
         sourceFile: 'index',
         searchable: false,
-        requiresSchema: false,
         requiresAuth: false,
         cssBundles: ['pages-auth'],
         loader: () => import('../auth/index'),
@@ -361,7 +344,6 @@ export const PAGE_REGISTRY: Record<
         sourceDir: 'landing',
         sourceFile: 'index',
         searchable: false,
-        requiresSchema: false,
         requiresAuth: false,
         cssBundles: ['pages-landing'],
         loader: () => import('../landing/index'),
@@ -372,7 +354,6 @@ export const PAGE_REGISTRY: Record<
         sourceDir: 'not-found',
         sourceFile: 'index',
         searchable: false,
-        requiresSchema: false,
         requiresAuth: false,
         loader: () => import('../not-found/index'),
     },

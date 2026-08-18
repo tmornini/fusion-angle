@@ -6094,53 +6094,6 @@ export const routes: Route[] = [
     // (inline fold on WO history). bare states/:id is
     // already a router 404 (states-address retirement
     // Task 13). Per-entity history alias retired with C2.
-
-    route('snapshots/schema', {
-        get: async (db) =>
-            (await db.hasSchema())
-                ? db.getSnapshot()
-                : null,
-        delete: (db) => db.deleteSchema(),
-    }),
-    // DEMO-ONLY: these seed routes return SeededCredentials —
-    // freshly-minted plaintext sign-ins surfaced in-band, once.
-    // Domain credentials store PBKDF2 hashes; the message plane
-    // holds login traffic verbatim after first use (API.md
-    // §5.2). The in-band plaintext return is deleted at the
-    // server tier.
-    route('snapshots/mock-data', {
-        post: async (db) => {
-            const { postMockDataLoad } =
-                await import('./mock-data.ts');
-            return postMockDataLoad(db);
-        },
-    }),
-    route('snapshots/bootstrap', {
-        post: async (db) => {
-            const {
-                postBootstrap,
-            } = await import('./mock-data.ts');
-            return postBootstrap(db);
-        },
-    }),
-    route('snapshots/import', {
-        put: (db, _, payload) => {
-            if (
-                typeof payload.json
-                    !== 'string'
-            ) {
-                throw new ApiError(
-                    'Missing or invalid'
-                    + ' "json" field:'
-                    + ' expected a string.',
-                    HTTP_BAD_REQUEST,
-                );
-            }
-            return db.putSnapshot(
-                payload.json,
-            );
-        },
-    }),
 ];
 
 export function matchRoute(

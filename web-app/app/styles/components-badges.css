@@ -197,7 +197,7 @@
     background-color: hsl(var(--primary));
 }
 
-/* Page header / title (used by snapshots and similar pages) */
+/* Page header / title */
 .page-header {
     display: flex;
     align-items: center;

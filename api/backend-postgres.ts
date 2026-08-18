@@ -1,9 +1,8 @@
 // Fourth StorageBackend. postgres.js stays behind
-// postgres-client. Write lock order is import, dedup,
-// address, then FOR UPDATE. Notify is in-transaction.
+// postgres-client. Write lock order is dedup, address,
+// then FOR UPDATE. Notify is in-transaction.
 
 import {
-    TABLE_NAMES,
     assertGetWhereColumn,
     type StorageBackend,
     type Tx,
@@ -17,8 +16,6 @@ import { Octets } from '../shared/http-message/octets.ts';
 import type { NotificationEvent } from
     './notifications.ts';
 import {
-    SNAPSHOT_EXPORT_ISOLATION,
-    SNAPSHOT_IMPORT_LOCK_NAME,
     FUSION_EVENTS_CHANNEL,
     advisoryKey,
     notifyPayload,
@@ -61,7 +58,6 @@ export class PostgresBackend implements StorageBackend {
         tables: readonly string[],
         mode: TxMode,
         fn: (tx: Tx) => Promise<R>,
-        isolation?: string,
     ): Promise<R> {
         for (const table of tables) {
             assertMessageTable(table);
@@ -69,48 +65,10 @@ export class PostgresBackend implements StorageBackend {
         try {
             return await this.#sql.begin(
                 (sql) => fn(postgresTx(sql, mode)),
-                isolation,
             );
         } catch (error) {
             throw mapPostgresError(error);
         }
-    }
-
-    async exportSnapshot(): Promise<string> {
-        const obj = await this.transaction(
-            TABLE_NAMES,
-            'readonly',
-            async (tx) => {
-                const out: Record<string, unknown[]> = {};
-                for (const table of TABLE_NAMES) {
-                    out[table] = await tx.getAll(table);
-                }
-                return out;
-            },
-            SNAPSHOT_EXPORT_ISOLATION,
-        );
-        return JSON.stringify(obj, null, 2);
-    }
-
-    async importSnapshot(
-        tables: Map<string, { id: string }[]>,
-    ): Promise<void> {
-        await this.transaction(
-            TABLE_NAMES,
-            'readwrite',
-            async (tx) => {
-                const pg = tx as PostgresTx;
-                await pg.lock(SNAPSHOT_IMPORT_LOCK_NAME);
-                for (const [table, rows] of tables) {
-                    await tx.clear(table);
-                    for (const row of rows) {
-                        await tx.put(table, row);
-                    }
-                }
-                await pg.stampSchemaMarker();
-                await pg.notify({ kind: 'full' });
-            },
-        );
     }
 
     async ensureTables(

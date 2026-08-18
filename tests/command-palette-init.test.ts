@@ -13,8 +13,7 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 // global adapter at a pristine in-memory tier
 // (IndexedDB has no Node stub), and asserts the
 // call completes without throwing — guarding
-// against a regression to eager loading without a
-// schema gate.
+// against a regression to eager loading.
 test(
     'initCommandPalette does not throw'
     + ' when schema is absent',
@@ -124,7 +123,7 @@ function installGlobals(
     // dialog-build paths that fire on first open.
     // A future init-time touch of those would fail
     // with "undefined is not a function" — signal
-    // worth keeping, but unrelated to the schema-gate
+    // worth keeping, but unrelated to the lazy-init
     // behavior under test.
     g.document = {
         addEventListener: () => {},

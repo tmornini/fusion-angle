@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
+import { devToken } from './token-fixtures.ts';
 
 const BASE = 'http://localhost';
 
@@ -34,14 +35,17 @@ test('no token + unknown nested path → 401', async () => {
     assert.equal(body.error, 'invalid_token');
 });
 
-test('snapshot route without bearer is 401',
-async () => {
+test('bearer + unknown path → 404', async () => {
     const db = memoryDbAdapter();
+    await seedAdminSchema(db);
+    const token = await devToken();
     const res = await handleRequest(
         db,
-        new Request(`${BASE}/snapshots/schema`),
+        new Request(`${BASE}/no-such-door`, {
+            headers: {
+                Authorization: 'Bearer ' + token,
+            },
+        }),
     );
-    assert.equal(res.status, 401);
-    const body = await res.json() as { error: string };
-    assert.equal(body.error, 'invalid_token');
+    assert.equal(res.status, 404);
 });

@@ -14,7 +14,6 @@ import {
 } from './page-loader.ts';
 import { log } from './logger.ts';
 import {
-    MissingTableError,
     UnauthorizedError,
 } from './adapters/index.ts';
 import {
@@ -64,9 +63,6 @@ import {
     postSessionRefresh,
 } from './adapters/session-refresh.ts';
 import { initErrorSurfacing } from './error-helpers.ts';
-import {
-    putSchemaPresent,
-} from './adapters/schema-marker.ts';
 import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
 import { PAGE_REGISTRY } from './page-registry.ts';
@@ -74,17 +70,11 @@ import {
     markStart,
     markEnd,
     recordPageReady,
-    MEASURE_BOOT_SCHEMA_GATE,
     MEASURE_BOOT_AUTH_GATE,
     MEASURE_BOOT_ORGANIZATION_SCOPE,
     MEASURE_BOOT_SIDEBAR_CHROME,
     MEASURE_BOOT_COMMAND_PALETTE,
 } from './page-performance.ts';
-
-export interface BootOptions {
-    readonly hasSchema: boolean;
-    readonly recoverMissingTable: boolean;
-}
 
 async function loadAndInitCommandPalette(): Promise<void> {
     const cp = await import('./command-palette');
@@ -101,32 +91,6 @@ function bounceTo(
 ): boolean {
     if (getPageName() === page) return false;
     navigateTo(page, params);
-    return true;
-}
-
-export function redirectIfMissingTable(
-    err: unknown,
-): boolean {
-    if (!(err instanceof MissingTableError)) {
-        return false;
-    }
-    if (
-        !bounceTo('snapshots', {
-            'missing-table': err.table,
-        })
-    ) {
-        log.warn(
-            'missing table on snapshots page',
-            'core',
-            err,
-        );
-        return false;
-    }
-    log.warn(
-        'missing table; redirecting to snapshots',
-        'core',
-        err,
-    );
     return true;
 }
 
@@ -170,7 +134,7 @@ async function scopeBootToActiveOrganization(
 }
 
 // Best-effort scoping for an auth-EXEMPT page that still
-// renders the shared sidebar (snapshots, design-system). A
+// renders the shared sidebar (design-system). A
 // logged-in visitor gets an organization-scoped session so
 // the sidebar shows their real member and organization —
 // installing a live access token OR silently refreshing a
@@ -372,65 +336,37 @@ async function installRefreshedSession(
     return false;
 }
 
-export async function bootApp(
-    options: BootOptions,
-): Promise<void> {
-    const recoverMissing = options.recoverMissingTable;
+export async function bootApp(): Promise<void> {
     initErrorSurfacing();
     initState();
     initListeners();
 
-    const hasSchema = options.hasSchema;
-    markStart(MEASURE_BOOT_SCHEMA_GATE);
-    putSchemaPresent(hasSchema);
-
     const pageName = getPageName();
-
-    const needsSchemaRedirect =
-        !hasSchema
-        && PAGE_REGISTRY[pageName]?.requiresSchema
-            !== false;
-    markEnd(MEASURE_BOOT_SCHEMA_GATE);
-    if (needsSchemaRedirect) {
-        navigateTo('snapshots');
-        return;
-    }
 
     let bootOrganizations:
         readonly OrganizationEntity[] = [];
-    if (hasSchema) {
-        if (
-            PAGE_REGISTRY[pageName]?.requiresAuth
-                !== false
-        ) {
-            markStart(MEASURE_BOOT_AUTH_GATE);
-            const authOk = await bootAuthGate();
-            markEnd(MEASURE_BOOT_AUTH_GATE);
-            if (!authOk) {
-                return;   // bounced to login
-            }
-            markStart(
-                MEASURE_BOOT_ORGANIZATION_SCOPE,
-            );
-            const scoped =
-                await bootOrganizationGate();
-            markEnd(
-                MEASURE_BOOT_ORGANIZATION_SCOPE,
-            );
-            if (scoped === null) {
-                return;   // bounced to invitations
-            }
-            bootOrganizations = scoped;
-        } else {
-            markStart(
-                MEASURE_BOOT_ORGANIZATION_SCOPE,
-            );
-            bootOrganizations =
-                await scopeBootIfCredentialed();
-            markEnd(
-                MEASURE_BOOT_ORGANIZATION_SCOPE,
-            );
+    if (
+        PAGE_REGISTRY[pageName]?.requiresAuth
+            !== false
+    ) {
+        markStart(MEASURE_BOOT_AUTH_GATE);
+        const authOk = await bootAuthGate();
+        markEnd(MEASURE_BOOT_AUTH_GATE);
+        if (!authOk) {
+            return;   // bounced to login
         }
+        markStart(MEASURE_BOOT_ORGANIZATION_SCOPE);
+        const scoped = await bootOrganizationGate();
+        markEnd(MEASURE_BOOT_ORGANIZATION_SCOPE);
+        if (scoped === null) {
+            return;   // bounced to invitations
+        }
+        bootOrganizations = scoped;
+    } else {
+        markStart(MEASURE_BOOT_ORGANIZATION_SCOPE);
+        bootOrganizations =
+            await scopeBootIfCredentialed();
+        markEnd(MEASURE_BOOT_ORGANIZATION_SCOPE);
     }
 
     // Three self-contained branches — sidebar chrome,
@@ -438,35 +374,21 @@ export async function bootApp(
     // its own marks and error handler. Joined by bare
     // Promise.all before recordPageReady so readyMs still
     // covers chrome (Commandment I). NOT fire-and-forget.
-    // Gated pageReady && !bounced so aborted boots never
-    // record ready. Boot spans may overlap (see
+    // Gated pageReady so aborted boots never record
+    // ready. Boot spans may overlap (see
     // page-performance.ts); readyMs is the summable truth.
-    let bounced = false;
     let pageReady = false;
     const branches: Array<Promise<void>> = [];
 
-    if (
-        PAGE_REGISTRY[pageName]?.layout
-            === 'sidebar'
-    ) {
+    if (PAGE_REGISTRY[pageName]?.layout === 'sidebar') {
         branches.push((async () => {
             markStart(MEASURE_BOOT_SIDEBAR_CHROME);
             try {
                 await initSidebarLayout(
-                    hasSchema,
                     bootOrganizations,
                 );
-                markEnd(
-                    MEASURE_BOOT_SIDEBAR_CHROME,
-                );
+                markEnd(MEASURE_BOOT_SIDEBAR_CHROME);
             } catch (err) {
-                if (
-                    recoverMissing
-                    && redirectIfMissingTable(err)
-                ) {
-                    bounced = true;
-                    return;
-                }
                 log.warn(
                     'sidebar layout init failed',
                     'core',
@@ -480,17 +402,8 @@ export async function bootApp(
         markStart(MEASURE_BOOT_COMMAND_PALETTE);
         try {
             await loadAndInitCommandPalette();
-            markEnd(
-                MEASURE_BOOT_COMMAND_PALETTE,
-            );
+            markEnd(MEASURE_BOOT_COMMAND_PALETTE);
         } catch (err) {
-            if (
-                recoverMissing
-                && redirectIfMissingTable(err)
-            ) {
-                bounced = true;
-                return;
-            }
             log.warn(
                 'command palette init failed',
                 'core',
@@ -504,21 +417,12 @@ export async function bootApp(
             await initPageModule(pageName);
             pageReady = true;
         } catch (err) {
-            if (
-                recoverMissing
-                && redirectIfMissingTable(err)
-            ) {
-                bounced = true;
-                return;
-            }
-            handlePageLoadError(
-                pageName, err,
-            );
+            handlePageLoadError(pageName, err);
         }
     })());
 
     await Promise.all(branches);
-    if (pageReady && !bounced) {
+    if (pageReady) {
         recordPageReady(pageName);
     }
 }

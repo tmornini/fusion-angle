@@ -111,7 +111,6 @@ import {
 } from './http-errors.ts';
 import {
     AUTHENTICATION_ROUTES,
-    BOOTSTRAP_ROUTES,
     authenticateRequest,
     unauthorizedBearerResponse,
     fenceRequest,
@@ -220,12 +219,11 @@ async function facadeRequest(
 // The gate-side Decision 5 post: fired once per successful
 // write, AFTER the route handler's promise resolves (so on
 // IndexedDB the commit has already reached `oncomplete`).
-// BOOTSTRAP_ROUTES (the snapshot plane) replace the whole
-// store, so they post a full-refresh event rather than a
-// scoped one; every other write posts the fenced organization,
-// identity targets the route/body name, and the actor so the
-// writer's other tabs refresh even when the session is a flat
-// (un-exchanged) token that cannot match on organization.
+// Every write posts the fenced organization, identity
+// targets the route/body name, and the actor so the
+// writer's other tabs refresh even when the session is a
+// flat (un-exchanged) token that cannot match on
+// organization.
 function postWriteNotification(
     adapter: GuardedDbAdapter,
     routePattern: string,
@@ -234,10 +232,6 @@ function postWriteNotification(
     organization: Id | undefined,
     actor: Id,
 ): void {
-    if (BOOTSTRAP_ROUTES.has(routePattern)) {
-        adapter.postNotification({ kind: 'full' });
-        return;
-    }
     const identityIds = new Set(
         identityTargetsFor(routePattern, params, body),
     );
@@ -432,10 +426,8 @@ async function advertisedForRevisionPair(
 // corruption territory, not a domain outcome — it gets the SAME
 // fixed 500 body the domain-boundary catch (below, ~:938)
 // already gives every other unmapped fault, console-logged with
-// the request identity for correlation. MissingTableError is
-// the one designed exception: it re-raises FIRST, exactly as
-// the domain-boundary catch re-raises it, so
-// web-app/core.ts's redirectIfMissingTable recovery still fires.
+// the request identity for correlation. A missing table is a
+// failed request; product boot does not recover it.
 function redactedFenceFailure(
     ctx: IncomingContext,
     error: unknown,
@@ -542,9 +534,9 @@ export async function handleRequest(
     // Empty for bearer-exempt routes (no fence ran).
     let roles: readonly string[] = [];
     // AUTHENTICATION_ROUTES stay bearer-exempt.
-    // BOOTSTRAP_ROUTES require a bearer. An unmatched
-    // path can never be exempt — bearerExempt requires
-    // a defined route pattern.
+    // An unmatched path can never be exempt —
+    // bearerExempt requires a defined route
+    // pattern.
     const bearerExempt = matchedRoutePattern !== undefined
         && AUTHENTICATION_ROUTES.has(matchedRoutePattern);
     if (!bearerExempt) {

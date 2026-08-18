@@ -12,8 +12,6 @@ import { log } from './logger.ts';
 
 export const MEASURE_BOOT_DB_OPEN =
     'boot:db-open';
-export const MEASURE_BOOT_SCHEMA_GATE =
-    'boot:schema-gate';
 export const MEASURE_BOOT_AUTH_GATE =
     'boot:auth-gate';
 export const MEASURE_BOOT_ORGANIZATION_SCOPE =
@@ -35,7 +33,6 @@ export const MEASURE_PAGE_READY = 'page:ready';
  *  add phase medians expecting wall time. */
 export const BOOT_PHASE_MEASURE_NAMES = [
     MEASURE_BOOT_DB_OPEN,
-    MEASURE_BOOT_SCHEMA_GATE,
     MEASURE_BOOT_AUTH_GATE,
     MEASURE_BOOT_ORGANIZATION_SCOPE,
     MEASURE_BOOT_SIDEBAR_CHROME,

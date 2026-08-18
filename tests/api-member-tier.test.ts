@@ -58,10 +58,8 @@ async () => {
 test('a member is denied the admin surfaces', async () => {
     const db = await memberDb();
     const token = await devToken(MEMBER);
-    // snapshots/* are intentionally auth-free — a dev-tier
-    // surface removed at the Postgres server tier — so they
-    // are not probed here even though the policy table would
-    // deny them.
+    // Admin surfaces stay deny-by-default. The
+    // retired snapshot plane is gone, not probed.
     for (const [method, path] of [
         ['GET', '/identities'],
         ['PUT', '/organizations/1'],

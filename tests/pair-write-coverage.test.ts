@@ -9,7 +9,6 @@ import {
 } from '../api/message-pair.ts';
 import {
     AUTHENTICATION_ROUTES,
-    BOOTSTRAP_ROUTES,
 } from '../api/request-auth.ts';
 
 // The B4 discharge (Phase 1 exit checklist, Task 6a): every
@@ -45,15 +44,14 @@ function writtenPattern(entry: Route): string | undefined {
     return entry.segments.join('/');
 }
 
-// BOOTSTRAP_ROUTES (the snapshot plane) and
-// AUTHENTICATION_ROUTES (the dedicated grant arm) never
-// reach the generic pair block. AUTHENTICATION_ROUTES
-// are bearer-exempt; BOOTSTRAP_ROUTES still skip pair
-// wiring. Named, not inferred.
-const NAMED_EXEMPT_ROUTE_PATTERNS: ReadonlySet<string> = new Set([
-    ...BOOTSTRAP_ROUTES,
-    ...AUTHENTICATION_ROUTES,
-]);
+// AUTHENTICATION_ROUTES (the dedicated grant arm) stay
+// named-exempt and never reach the generic pair block.
+// There is no snapshot plane to skip. Named, not
+// inferred.
+const NAMED_EXEMPT_ROUTE_PATTERNS:
+    ReadonlySet<string> = new Set([
+        ...AUTHENTICATION_ROUTES,
+    ]);
 
 test('every write-verb route is pair-wired or named exempt',
 () => {
@@ -66,7 +64,7 @@ test('every write-verb route is pair-wired or named exempt',
     // A sanity floor: fails loudly if route parsing regresses
     // to near-zero (e.g. an import returns the wrong shape)
     // instead of silently passing on an empty list.
-    assert.ok(writeRoutePatterns.length > 40);
+    assert.ok(writeRoutePatterns.length > 36);
     for (const pattern of writeRoutePatterns) {
         assert.ok(
             PAIR_WIRED_ROUTE_PATTERNS.has(pattern)

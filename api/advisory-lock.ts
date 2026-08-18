@@ -8,17 +8,11 @@ import type { NotificationEvent } from
 
 export const ADVISORY_KEY_HEX_DIGITS = 13;
 
-export const SNAPSHOT_IMPORT_LOCK_NAME =
-    'fusion.snapshot.import';
-
 export const FUSION_EVENTS_CHANNEL = 'fusion_events';
 
 export const PG_NOTIFY_PAYLOAD_MAX_BYTES = 8000;
 
 export const POOL_MAX = 10;
-
-export const SNAPSHOT_EXPORT_ISOLATION =
-    'ISOLATION LEVEL REPEATABLE READ READ ONLY';
 
 export function notifyPayload(
     event: NotificationEvent,

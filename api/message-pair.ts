@@ -722,8 +722,8 @@ async function writePairRows(
     });
 }
 
-// Lock order: import (shared), dedup if hash-deduped,
-// address if gated, then FOR UPDATE + a new latest SELECT.
+// Lock order: dedup if hash-deduped, address if
+// gated, then FOR UPDATE + a new latest SELECT.
 async function coordinateWrite(
     view: DbAdapter,
     pair: MessagePair,
@@ -731,7 +731,6 @@ async function coordinateWrite(
 ): Promise<void> {
     const locks = view.writeLocks;
     if (locks === undefined) return;
-    await locks.lockImportShared();
     if (hashDeduped) {
         await locks.lockDedup(pair.requestHash);
     }

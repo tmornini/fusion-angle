@@ -53,3 +53,14 @@ test(
         );
     },
 );
+
+test('DbAdapter has no snapshot dump or restore',
+() => {
+    const adapter = memoryDbAdapter();
+    assert.equal(
+        'getSnapshot' in adapter, false,
+    );
+    assert.equal(
+        'putSnapshot' in adapter, false,
+    );
+});

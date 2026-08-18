@@ -19,7 +19,6 @@ import { generateCryptoSafeBase62 } from
     '../shared/crypto-safe-base62.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
-    SNAPSHOT_IMPORT_LOCK_NAME,
     advisoryKey,
 } from '../api/advisory-lock.ts';
 import {
@@ -29,7 +28,7 @@ import {
 } from '../api/http-errors.ts';
 
 // Live Postgres races: first-writer, If-Match, hash
-// dedup, import vs append, deadlock 500, timeout 504.
+// dedup, deadlock 500, timeout 504.
 // Skip when POSTGRES_URL is unset so ./validate stays
 // Postgres-free.
 
@@ -373,65 +372,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             await pairsAt(db, IDEA_PREFIX, 'race-dedup'),
             1,
         );
-    });
-
-    test('import lock is taken before append',
-    async () => {
-        const token = await organizationToken();
-        const holder = connectPostgres(
-            urlWithSearchPath(POSTGRES_URL, schema),
-        );
-        const importKey = Number(await advisoryKey(
-            SNAPSHOT_IMPORT_LOCK_NAME,
-        ));
-        let appendDone = false;
-        let importDone = false;
-        let appendP: Promise<Response> | undefined;
-        let importP: Promise<void> | undefined;
-        try {
-            await holder.begin(async (tx) => {
-                await tx.query`
-                    SELECT pg_advisory_xact_lock(
-                        ${importKey}
-                    )
-                `;
-                appendP = handleRequest(db, req(
-                    'PUT', '/ideas/race-import', token,
-                    ideaDocument(
-                        'Held', 'ev-race-import',
-                    ),
-                    undefined,
-                    generateCryptoSafeBase62(),
-                )).then((response) => {
-                    appendDone = true;
-                    return response;
-                });
-                const snapshot = await db.getSnapshot();
-                importP = db.putSnapshot(snapshot)
-                    .then(() => {
-                        importDone = true;
-                    });
-                await delay(400);
-                assert.equal(appendDone, false);
-                assert.equal(importDone, false);
-            });
-            assert.ok(appendP !== undefined);
-            assert.ok(importP !== undefined);
-            const appended = await appendP;
-            await importP;
-            assert.equal(appended.status, 201);
-            assert.equal(await db.hasSchema(), true);
-            const requests = await db.requests.getAll();
-            const responses = await db.responses.getAll();
-            const requestIds = new Set(
-                requests.map((row) => row.id),
-            );
-            for (const row of responses) {
-                assert.ok(requestIds.has(row.id));
-            }
-        } finally {
-            await holder.end();
-        }
     });
 
     test('live deadlock maps to loud 500',

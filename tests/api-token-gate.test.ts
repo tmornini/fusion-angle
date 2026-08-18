@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import {
-    GET, POST, PUT, handleRequest,
+    GET, PUT, handleRequest,
 } from '../api/api.ts';
 import {
     devToken, expiredToken, notYetValidToken,
@@ -14,7 +14,6 @@ import {
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
-import { seedOrganizationMember } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 
@@ -71,35 +70,6 @@ async () => {
     });
     await assert.rejects(
         () => GET(db, 'organizations/1/members', anon), /invalid_token/);
-});
-
-test('anonymous token is rejected on snapshots', async () => {
-    const db = memoryDbAdapter();
-    const anon = await mintAccessToken({
-        aud: TOKEN_AUDIENCE,
-        sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
-        iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
-        jti: 'anon2',
-    });
-    await assert.rejects(
-        () => GET(db, 'snapshots/schema', anon),
-        /invalid_token/,
-    );
-});
-
-test('anonymous may not seed snapshots',
-async () => {
-    const db = memoryDbAdapter();
-    const anon = await mintAccessToken({
-        aud: TOKEN_AUDIENCE,
-        sub: ANONYMOUS_ID, roles: [], name: 'Anonymous',
-        iat: 1_700_000_000, ttlSeconds: 10_000_000_000,
-        jti: 'anon-boot',
-    });
-    await assert.rejects(
-        () => POST(db, 'snapshots/mock-data', {}, anon),
-        /invalid_token/,
-    );
 });
 
 // Per-request access-token revocation is RETIRED. Mint /
@@ -187,29 +157,4 @@ test('a jti revoked in the ledger still admits the access'
         db, 'organizations/1/members', await devToken(),
     );
     assert.ok(Array.isArray(rows));
-});
-
-test('snapshots/schema requires a bearer',
-async () => {
-    const db = await freshDb();
-    const bare = await handleRequest(db, new Request(
-        `${BASE}/snapshots/schema`));
-    assert.equal(bare.status, 401);
-    const snap = await GET(
-        db, 'snapshots/schema', await devToken());
-    assert.ok(typeof snap === 'string');
-});
-
-test('a non-admin member is forbidden on snapshots',
-async () => {
-    const db = await freshDb();
-    await seedOrganizationMember(db, 'walt');
-    const res = await handleRequest(db, new Request(
-        `${BASE}/snapshots/schema`, {
-            headers: {
-                'Authorization':
-                    'Bearer ' + await devToken('walt'),
-            },
-        }));
-    assert.equal(res.status, 403);
 });

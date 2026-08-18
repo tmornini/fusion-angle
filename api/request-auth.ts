@@ -43,18 +43,6 @@ export const AUTHENTICATION_ROUTES: ReadonlySet<string> =
         'authentication/authorize',
     ]);
 
-// The snapshot/bootstrap plane. The set still names that
-// plane (postWriteNotification posts a full-refresh).
-// These routes are never bearer-exempt.
-// AUTHENTICATION_ROUTES stay exempt.
-export const BOOTSTRAP_ROUTES: ReadonlySet<string> =
-    new Set([
-        'snapshots/schema',
-        'snapshots/mock-data',
-        'snapshots/bootstrap',
-        'snapshots/import',
-    ]);
-
 export async function authenticateRequest(
     ctx: IncomingContext,
     request: Request,
