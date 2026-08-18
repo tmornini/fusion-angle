@@ -27,7 +27,11 @@ import {
 import type {
     RequestContext,
 } from './shared.ts';
-import { filterByField } from './shared.ts';
+import {
+    filterByField,
+    organizationCollection,
+    organizationItem,
+} from './shared.ts';
 import {
     validateFlowForCreation,
     formatFlowProblem,
@@ -96,10 +100,14 @@ export async function postWorkOrderCreation(
     const [flow, displayId, existing] =
         await Promise.all([
             ctx.GET<FlowWithGraph>(
-                `flows/${input.flowId}`,
+                organizationItem(
+                    ctx, 'flows', input.flowId,
+                ),
             ),
             generateDisplayId(input.workOrderId),
-            ctx.GET<WorkOrderEntity[]>('work-orders'),
+            ctx.GET<WorkOrderEntity[]>(
+                organizationCollection(ctx, 'work-orders'),
+            ),
         ]);
     const readiness = validateFlowForCreation(flow);
     if (!readiness.ready) {
@@ -164,7 +172,9 @@ export async function postWorkOrderCreation(
     // event ids are minted client-side so a retry hits the same
     // rows; their authorship is stamped server-side from the
     // token, never the body.
-    await ctx.POST('work-orders', {
+    await ctx.POST(
+        organizationCollection(ctx, 'work-orders'),
+        {
         id: input.workOrderId,
         workOrder: {
             display_id: displayId,
@@ -252,7 +262,9 @@ export async function postWorkOrderTransition(
     const [wo, history, recordId] =
         await Promise.all([
             ctx.GET<WorkOrderEntity>(
-                `work-orders/${workOrderId}`,
+                organizationItem(
+                    ctx, 'work-orders', workOrderId,
+                ),
             ),
             getWorkOrderHistory(ctx, workOrderId),
             getRecordForWorkOrder(ctx, workOrderId),
@@ -384,14 +396,18 @@ export async function postWorkOrderTransition(
         body['clear'] = clear;
         // NO auto-retry on 412 — the page owns recovery.
         await ctx.POSTWithHeaders(
-            `work-orders/${workOrderId}/transition`,
+            organizationItem(
+                ctx, 'work-orders', workOrderId,
+            ) + '/transition',
             body,
             [['If-Match', '"' + etag + '"']],
         );
     } else {
         // Pure move: neither delta nor If-Match.
         await ctx.POST(
-            `work-orders/${workOrderId}/transition`,
+            organizationItem(
+                ctx, 'work-orders', workOrderId,
+            ) + '/transition',
             body,
         );
     }
@@ -408,7 +424,9 @@ export async function putWorkOrderBinding(
     recordTypeId: string,
 ): Promise<void> {
     await ctx.PUT(
-        `work-orders/${workOrderId}/binding`,
+        organizationItem(
+            ctx, 'work-orders', workOrderId,
+        ) + '/binding',
         {
             instance_id: instanceId,
             record_type_id: recordTypeId,
@@ -422,7 +440,9 @@ export async function putWorkOrder(
     id: string,
     workOrder: Omit<WorkOrder, 'id' | 'organizationId'>,
 ): Promise<void> {
-    await ctx.PUT(`work-orders/${id}`, {
+    await ctx.PUT(
+        organizationItem(ctx, 'work-orders', id),
+        {
         display_id: workOrder.displayId,
         flow_graph: storedWorkOrderFlowGraph(
             workOrder.flowGraph,
@@ -447,7 +467,9 @@ export async function putWorkOrderClaim(
     workOrderId: string,
 ): Promise<void> {
     const wo = await ctx.GET<WorkOrderEntity>(
-        `work-orders/${workOrderId}`,
+        organizationItem(
+            ctx, 'work-orders', workOrderId,
+        ),
     );
     const graph = validateWorkOrderFlowGraph(
         wo.flow_graph,
@@ -458,7 +480,9 @@ export async function putWorkOrderClaim(
         claimAt, graph.lockTimeout,
     );
     await ctx.PUT(
-        `work-orders/${workOrderId}/claim`, {
+        organizationItem(
+            ctx, 'work-orders', workOrderId,
+        ) + '/claim', {
             claimEventId: generateCryptoSafeBase62(),
             claimAt,
             expireEventId: generateCryptoSafeBase62(),

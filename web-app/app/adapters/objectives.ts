@@ -4,7 +4,6 @@ import type {
     ObjectiveId,
     ObjectiveRevisionEntity,
     ObjectiveStateDetail,
-    StateEntity,
 } from '../../../api/types.ts';
 import {
     assertObjectiveState,
@@ -12,6 +11,8 @@ import {
 } from '../../../api/types.ts';
 import {
     type RequestContext,
+    organizationCollection,
+    organizationItem,
     withLifecycleTrio,
     withLifecycleTrios,
 } from './shared.ts';
@@ -43,7 +44,9 @@ export async function getObjectives(
 ): Promise<ObjectiveEntity[]> {
     return withLifecycleTrios(
         ctx, 'objectives',
-        await ctx.GET<ObjectiveEntity[]>('objectives'),
+        await ctx.GET<ObjectiveEntity[]>(
+            organizationCollection(ctx, 'objectives'),
+        ),
     );
 }
 
@@ -54,7 +57,7 @@ export async function getObjective(
     return withLifecycleTrio(
         ctx, 'objectives',
         await ctx.GET<ObjectiveEntity>(
-            `objectives/${id}`,
+            organizationItem(ctx, 'objectives', id),
         ),
     );
 }
@@ -69,8 +72,6 @@ export function objectiveStateDetailFromRow(
         state: assertObjectiveState(
             row.state, 'objective ' + row.id,
         ),
-        stateAt: row.state_at,
-        stateEventId: row.state_event_id,
     };
 }
 
@@ -103,39 +104,51 @@ export async function getArchivedObjectiveIds(
     );
 }
 
-// Org-scoped bulk lifecycle versions (GET objectives/versions)
-// — StateEntity rows, (at, id) DESC overall. Source for the
-// project score-history archival stream.
+// Parallel GET objectives/:id/versions/ for each live
+// objective. Rows are collection-item shape (state, not
+// StateEntity). Source for the archival stream.
 export async function getObjectiveHistories(
     ctx: RequestContext,
-): Promise<StateEntity[]> {
-    return ctx.GET<StateEntity[]>('objectives/versions');
+): Promise<Map<Id, ObjectiveEntity[]>> {
+    const rows = await ctx.GET<{ id: Id }[]>(
+        organizationCollection(ctx, 'objectives'),
+    );
+    const pairs = await Promise.all(
+        rows.map(async (row) => {
+            const versions = await ctx.GET<
+                ObjectiveEntity[]
+            >(
+                organizationItem(ctx, 'objectives', row.id)
+                    + '/versions/',
+            );
+            return [row.id, versions] as const;
+        }),
+    );
+    return new Map(pairs);
 }
 
 export interface ObjectiveArchivalEvent {
     objectiveId: ObjectiveId;
-    memberId: Id;
-    at: string;
 }
 
-// Streams every `state='archived'` event from the
-// objectives history route — one event per archival,
+// Streams every `state='archived'` version from the
+// per-item versions door — one event per archival,
 // including re-archivals after reactivation. Consumed
-// by the project score-history presenter which renders
-// each event chronologically alongside scoring rows.
-// The history route is objectives-only, so no client
-// id filter is required.
+// by the project score-history presenter. Versions
+// carry no member or at; those facts live on the pair.
 export async function getObjectiveArchivalEvents(
     ctx: RequestContext,
 ): Promise<ObjectiveArchivalEvent[]> {
-    const rows = await getObjectiveHistories(ctx);
-    return rows
-        .filter(r => r.state === 'archived')
-        .map(r => ({
-            objectiveId: r.entity_id as ObjectiveId,
-            memberId: r.member_id,
-            at: r.at,
-        }));
+    const histories = await getObjectiveHistories(ctx);
+    const events: ObjectiveArchivalEvent[] = [];
+    for (const [objectiveId, versions] of histories) {
+        for (const row of versions) {
+            if (row.state === 'archived') {
+                events.push({ objectiveId });
+            }
+        }
+    }
+    return events;
 }
 
 // The camelCase domain shape of an objective revision.
@@ -172,7 +185,8 @@ async function getRevisionsForObjective(
     objectiveId: ObjectiveId,
 ): Promise<ObjectiveRevisionEntity[]> {
     return ctx.GET<ObjectiveRevisionEntity[]>(
-        'objectives/' + objectiveId + '/revisions',
+        organizationItem(ctx, 'objectives', objectiveId)
+            + '/revisions/',
     );
 }
 
@@ -272,7 +286,9 @@ export async function postObjectiveCreation(
     // definition), supplied here. Genesis trio mints with the
     // create body (states-address retirement) — no separate
     // states/:id event.
-    await ctx.POST('objectives', {
+    await ctx.POST(
+        organizationCollection(ctx, 'objectives'),
+        {
         id,
         objective: {
             position,
@@ -302,7 +318,8 @@ export async function postObjectiveRevision(
     const member = await getCurrentHumanMember(ctx);
     const revisionId = generateCryptoSafeBase62();
     await ctx.PUT(
-        `objectives/${id}/revisions/${revisionId}`,
+        organizationItem(ctx, 'objectives', id)
+            + '/revisions/' + revisionId,
         {
             objective_id: id,
             name,
@@ -325,11 +342,11 @@ export async function postObjectiveArchival(
     id: ObjectiveId,
 ): Promise<void> {
     const current = await getObjective(ctx, id);
-    await ctx.PUT(`objectives/${id}`, {
+    await ctx.PUT(
+        organizationItem(ctx, 'objectives', id),
+        {
         position: current.position,
         state: 'archived',
-        state_at: nowUtc(),
-        state_event_id: generateCryptoSafeBase62(),
     });
     notifyObjectiveChange();
 }
@@ -339,11 +356,11 @@ export async function postObjectiveReactivation(
     id: ObjectiveId,
 ): Promise<void> {
     const current = await getObjective(ctx, id);
-    await ctx.PUT(`objectives/${id}`, {
+    await ctx.PUT(
+        organizationItem(ctx, 'objectives', id),
+        {
         position: current.position,
         state: 'active',
-        state_at: nowUtc(),
-        state_event_id: generateCryptoSafeBase62(),
     });
     notifyObjectiveChange();
 }
@@ -354,11 +371,11 @@ export async function putObjectivePosition(
     position: number,
     stateDetail: ObjectiveStateDetail,
 ): Promise<void> {
-    await ctx.PUT(`objectives/${id}`, {
+    await ctx.PUT(
+        organizationItem(ctx, 'objectives', id),
+        {
         position,
         state: stateDetail.state,
-        state_at: stateDetail.stateAt,
-        state_event_id: stateDetail.stateEventId,
     });
     notifyObjectiveChange();
 }

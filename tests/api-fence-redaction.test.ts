@@ -3,7 +3,8 @@ import { strict as assert } from 'node:assert';
 import { handleRequest } from '../api/api.ts';
 import { MissingTableError } from '../api/db.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
-import { DEV_TOKEN } from './token-fixtures.ts';
+import { reachableToken } from
+    './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { captureConsole } from './console-capture.ts';
 
@@ -46,15 +47,16 @@ test(
             }
             return original(column, key);
         };
+        const flatToken = await reachableToken();
         const { result: response, calls } =
             await captureConsole(
                 'error',
                 () => handleRequest(
                     db,
-                    new Request('http://localhost/ideas', {
+                    new Request('http://localhost/organizations/1/ideas/', {
                         headers: {
                             'Authorization':
-                                'Bearer ' + DEV_TOKEN,
+                                'Bearer ' + flatToken,
                         },
                     }),
                 ),
@@ -88,12 +90,14 @@ test(
             }
             return original(column, key);
         };
+        const flatToken = await reachableToken();
         await assert.rejects(
             () => handleRequest(
                 db,
-                new Request('http://localhost/ideas', {
+                new Request('http://localhost/organizations/1/ideas/', {
                     headers: {
-                        'Authorization': 'Bearer ' + DEV_TOKEN,
+                        'Authorization':
+                            'Bearer ' + flatToken,
                     },
                 }),
             ),

@@ -38,8 +38,6 @@ function ideaPutBody(ideaId: string, title: string) {
     return {
         ...ideaFields(title),
         state: 'active',
-        state_at: '2026-01-01T00:00:00.000000Z',
-        state_event_id: 'ev-' + ideaId,
     };
 }
 
@@ -50,7 +48,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await PUT(
-        db, 'ideas/idea-hdr-1',
+        db, 'organizations/1/ideas/idea-hdr-1',
         ideaPutBody('idea-hdr-1', 'Headers'), token,
         [['if-match', '"probe-value-123"']],
     );
@@ -69,25 +67,25 @@ test('PUT with no headerFields behaves exactly as before —'
     const db = await freshDb();
     const token = await organizationToken();
     const written = await PUT<{ id: string; title: string }>(
-        db, 'ideas/idea-hdr-2',
+        db, 'organizations/1/ideas/idea-hdr-2',
         ideaPutBody('idea-hdr-2', 'No Headers'), token,
     );
     assert.equal(written.title, 'No Headers');
 });
 
 test('GETWithEtag returns the parsed body and the'
-+ ' stored PUT version as ETag (streamed ideas/:id)',
++ ' stored PUT version as ETag (streamed organizations/:id/ideas/:id)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await PUT(
-        db, 'ideas/idea-hdr-3',
+        db, 'organizations/1/ideas/idea-hdr-3',
         ideaPutBody('idea-hdr-3', 'Plain'), token,
     );
     const { body, etag } =
         await GETWithEtag<{
             id: string; title: string;
-        }>(db, 'ideas/idea-hdr-3', token);
+        }>(db, 'organizations/1/ideas/idea-hdr-3', token);
     assert.equal(body.title, 'Plain');
     assert.ok(etag !== undefined && HEX64.test(etag));
 });
@@ -98,16 +96,16 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await PUT(
-        db, 'ideas/idea-hdr-4',
+        db, 'organizations/1/ideas/idea-hdr-4',
         ideaPutBody('idea-hdr-4', 'Agree'), token,
     );
     const viaGet = await GET<{ id: string; title: string }>(
-        db, 'ideas/idea-hdr-4', token,
+        db, 'organizations/1/ideas/idea-hdr-4', token,
     );
     const { body: viaGetWithEtag } =
         await GETWithEtag<{
             id: string; title: string;
-        }>(db, 'ideas/idea-hdr-4', token);
+        }>(db, 'organizations/1/ideas/idea-hdr-4', token);
     assert.deepEqual(viaGetWithEtag, viaGet);
 });
 

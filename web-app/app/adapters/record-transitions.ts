@@ -6,6 +6,7 @@ import type {
     WorkOrderHistoryEventEntity,
 } from '../../../api/types.ts';
 import type { RequestContext } from './shared.ts';
+import { organizationItem } from './shared.ts';
 import {
     validateWorkOrderFlowGraph,
     getWorkOrderHistory,
@@ -147,7 +148,9 @@ export async function validateRecordTransition(
     const [wo, history, recordId] =
         await Promise.all([
             ctx.GET<WorkOrderEntity>(
-                `work-orders/${workOrderId}`,
+                organizationItem(
+                    ctx, 'work-orders', workOrderId,
+                ),
             ),
             getWorkOrderHistory(ctx, workOrderId),
             getRecordForWorkOrder(ctx, workOrderId),

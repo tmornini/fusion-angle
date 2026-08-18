@@ -31,7 +31,6 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
-const AT2 = '2026-01-02T00:00:00.000000Z';
 const PATH_ORGANIZATION_MISMATCH_ERROR =
     'forbidden: path organization does '
     + 'not match the token organization';
@@ -43,16 +42,6 @@ interface RecordTypeWireRow {
     description: string;
     position: number;
     state: string;
-    state_at: string;
-    state_event_id: string;
-}
-
-interface HistoryEvent {
-    id: string;
-    entity_id: string;
-    state: string;
-    member_id: string;
-    at: string;
 }
 
 function req(
@@ -88,16 +77,12 @@ function recordTypeBody(
     name: string,
     position: number,
     state: string,
-    stateAt: string,
-    stateEventId: string,
 ): Record<string, unknown> {
     return {
         name,
         description: name + ' desc',
         position,
         state,
-        state_at: stateAt,
-        state_event_id: stateEventId,
     };
 }
 
@@ -166,7 +151,7 @@ async () => {
         db, '1', 'member1', 'Org One', 'm-1', 'member',
     );
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/record-types', token,
+        'GET', '/organizations/1/record-types/', token,
     ));
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), []);
@@ -183,18 +168,14 @@ async () => {
     // Seed out of id-lex order so (at, id) is observable.
     await seedRecordTypePair(
         db, '1', 'rt-b',
-        recordTypeBody(
-            'Beta', 2, 'active', AT, 'rt-b-genesis',
-        ),
+        recordTypeBody('Beta', 2, 'active'),
     );
     await seedRecordTypePair(
         db, '1', 'rt-a',
-        recordTypeBody(
-            'Alpha', 1, 'active', AT, 'rt-a-genesis',
-        ),
+        recordTypeBody('Alpha', 1, 'active'),
     );
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/record-types', token,
+        'GET', '/organizations/1/record-types/', token,
     ));
     assert.equal(res.status, 200);
     const rows = await res.json() as RecordTypeWireRow[];
@@ -208,8 +189,6 @@ async () => {
         description: 'Beta desc',
         position: 2,
         state: 'active',
-        state_at: AT,
-        state_event_id: 'rt-b-genesis',
     });
 });
 
@@ -222,9 +201,7 @@ async () => {
     );
     await seedRecordTypePair(
         db, '1', 'rt-1',
-        recordTypeBody(
-            'Rental', 0, 'active', AT, 'rt-1-genesis',
-        ),
+        recordTypeBody('Rental', 0, 'active'),
     );
     const res = await handleRequest(db, req(
         'GET',
@@ -238,7 +215,7 @@ async () => {
     assert.equal(row.organization_id, '1');
     assert.equal(row.name, 'Rental');
     assert.equal(row.state, 'active');
-    assert.equal(row.state_event_id, 'rt-1-genesis');
+    assert.equal('state_at' in row, false);
     assert.equal(
         'attributes' in row,
         false,
@@ -273,39 +250,27 @@ async () => {
     const token = await seedOrganizationWithMember(
         db, '1', 'member1', 'Org One', 'm-1', 'member',
     );
-    const headId = await seedRecordTypePair(
+    await seedRecordTypePair(
         db, '1', 'rt-1',
-        recordTypeBody(
-            'Rental', 0, 'active', AT, 'rt-1-genesis',
-        ),
+        recordTypeBody('Rental', 0, 'active'),
     );
     await seedRecordTypePair(
         db, '1', 'rt-1',
-        recordTypeBody(
-            'Rental', 0, 'archived', AT2, 'rt-1-archive',
-        ),
-        headId,
+        recordTypeBody('Rental', 0, 'archived'),
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/1/record-types/rt-1/versions',
+        '/organizations/1/record-types/rt-1/versions/',
         token,
     ));
     assert.equal(res.status, 200);
-    const rows = await res.json() as HistoryEvent[];
+    const rows = await res.json() as RecordTypeWireRow[];
     assert.equal(rows.length, 2);
-    assert.equal(rows[0]!.id, 'rt-1-archive');
+    assert.equal(rows[0]!.id, 'rt-1');
     assert.equal(rows[0]!.state, 'archived');
-    assert.equal(rows[1]!.id, 'rt-1-genesis');
+    assert.equal(rows[1]!.id, 'rt-1');
     assert.equal(rows[1]!.state, 'active');
-    for (let i = 1; i < rows.length; i++) {
-        const prev = rows[i - 1]!;
-        const cur = rows[i]!;
-        const ordered =
-            prev.at > cur.at
-            || (prev.at === cur.at && prev.id > cur.id);
-        assert.ok(ordered, 'history must be (at, id) DESC');
-    }
+    assert.equal('state_at' in rows[0]!, false);
 });
 
 test('GET path org ≠ token org → 403 (member of A '
@@ -321,13 +286,11 @@ async () => {
     );
     await seedRecordTypePair(
         db, 'B', 'rt-b',
-        recordTypeBody(
-            'Foreign', 0, 'active', AT, 'rt-b-genesis',
-        ),
+        recordTypeBody('Foreign', 0, 'active'),
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/B/record-types',
+        '/organizations/B/record-types/',
         tokenA,
     ));
     assert.equal(res.status, 403);
@@ -345,7 +308,7 @@ async () => {
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/organizations/no-such-org/record-types',
+        '/organizations/no-such-org/record-types/',
         token,
     ));
     assert.equal(res.status, 403);
@@ -363,12 +326,10 @@ async () => {
     );
     await seedRecordTypePair(
         db, '1', 'rt-1',
-        recordTypeBody(
-            'Rental', 0, 'active', AT, 'rt-1-genesis',
-        ),
+        recordTypeBody('Rental', 0, 'active'),
     );
     const collection = await handleRequest(db, req(
-        'GET', '/organizations/1/record-types', token,
+        'GET', '/organizations/1/record-types/', token,
     ));
     assert.equal(collection.status, 200);
     const detail = await handleRequest(db, req(
@@ -379,7 +340,7 @@ async () => {
     assert.equal(detail.status, 200);
     const history = await handleRequest(db, req(
         'GET',
-        '/organizations/1/record-types/rt-1/versions',
+        '/organizations/1/record-types/rt-1/versions/',
         token,
     ));
     assert.equal(history.status, 200);

@@ -8,7 +8,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -39,7 +39,7 @@ async function setupMemDb(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -54,7 +54,8 @@ const EMPTY_GRAPH_DELTA = {
     attributeEvents: [],
 };
 
-// flows/:id is locked-class (Task 3): a raw ctx.PUT that hand-
+// organizations/:id/flows/:id is locked-class (Task 3): a raw ctx.PUT that
+// hand-
 // crafts its wire body (rather than riding putFlow's own C6
 // retry loop) must echo the current head itself, or a
 // non-genesis save 428s. Read once via GETWithEtag and
@@ -116,7 +117,7 @@ test(
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
         const flow = await ctx.GET<FlowWithGraph>(
-            'flows/flow-1',
+            'organizations/1/flows/flow-1',
         );
         assert.equal(flow.id, 'flow-1');
         assert.equal(flow.name, 'Test Flow');
@@ -130,7 +131,7 @@ test(
                 project_id: string;
                 flow_id: string;
             }[]>(
-                'projects/project-1/flows',
+                'organizations/1/projects/project-1/flows/',
             );
         const link = links.find(
             l => l.flow_id === 'flow-1',
@@ -149,7 +150,7 @@ test(
         await createBaseFlow(ctx, 'flow-1');
         const events =
             await ctx.GET<StateEntity[]>(
-                'flows/flow-1/versions',
+                'organizations/1/flows/flow-1/versions/',
             );
         assert.equal(events.length, 1);
         const ev = events[0]!;
@@ -174,7 +175,7 @@ test(
         });
         const events =
             await ctx.GET<StateEntity[]>(
-                'flows/flow-1/versions',
+                'organizations/1/flows/flow-1/versions/',
             );
         assert.equal(events.length, 2);
         // Family history is DESC — current first.
@@ -210,7 +211,7 @@ test(
             edges: [edge],
         });
         const flow = await ctx.GET<FlowWithGraph>(
-            'flows/flow-1',
+            'organizations/1/flows/flow-1',
         );
         assert.equal(flow.name, 'Renamed');
         assert.equal(flow.is_locked, true);
@@ -255,7 +256,7 @@ test(
             edges: [],
         });
         const flow = await ctx.GET<FlowWithGraph>(
-            'flows/flow-1',
+            'organizations/1/flows/flow-1',
         );
         const graph =
             flow.graph as unknown as StoredGraph;
@@ -297,7 +298,7 @@ test(
             edges: [],
         });
         const flow = await ctx.GET<FlowWithGraph>(
-            'flows/flow-1',
+            'organizations/1/flows/flow-1',
         );
         assert.equal(flow.name, 'caller-B');
         const graph =
@@ -320,13 +321,14 @@ test(
 // with the versions routes.
 
 test(
-    'PUT flows/:id replays identically as one updated event',
+    'PUT organizations/:id/flows/:id replays identically'
+    + ' as one updated event',
     async () => {
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
         const { etag } =
             await ctx.GETWithEtag<FlowWithGraph>(
-                'flows/flow-1',
+                'organizations/1/flows/flow-1',
             );
         const body = {
             ...buildFlowBody({
@@ -346,10 +348,10 @@ test(
             revivals: [],
         };
         const headers = ifMatchHeaders(etag);
-        await ctx.PUT('flows/flow-1', body, headers);
-        await ctx.PUT('flows/flow-1', body, headers);
+        await ctx.PUT('organizations/1/flows/flow-1', body, headers);
+        await ctx.PUT('organizations/1/flows/flow-1', body, headers);
         const events = await ctx.GET<StateEntity[]>(
-            'flows/flow-1/versions',
+            'organizations/1/flows/flow-1/versions/',
         );
         assert.equal(events.length, 2);
     },
@@ -358,14 +360,15 @@ test(
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the old body
 // carried a client-computed `flow`/`graph`/`graphDelta`/
 // `revivals` and a `consumedVersionId` to delete — all retired.
-// Undo now resolves its own restore target from the flows/:id
+// Undo now resolves its own restore target from the
+// organizations/:id/flows/:id
 // document-pair history (api/derive-flows.ts's
 // resolveFlowUndoTarget), so the setup needs a genuine PRIOR
 // SAVE to restore to (a flow_versions row is no longer read at
 // all) and the POST body shrinks to the state trio's two free
 // fields.
 test(
-    'POST flows/:id/undo posts the updated event'
+    'POST organizations/:id/flows/:id/undo posts the updated event'
     + ' at the caller time',
     async () => {
         const { ctx } = await setupMemDb();
@@ -379,12 +382,12 @@ test(
             nodes: [],
             edges: [],
         });
-        await ctx.POST('flows/flow-1/undo', {
+        await ctx.POST('organizations/1/flows/flow-1/undo', {
             eventId: 'undo-ev',
             at: '2099-01-02T00:00:00.000000Z',
         });
         const events = await ctx.GET<StateEntity[]>(
-            'flows/flow-1/versions',
+            'organizations/1/flows/flow-1/versions/',
         );
         // Family history is DESC — index 0 is current.
         assert.equal(
@@ -404,10 +407,10 @@ test(
         // client-side document PUT only (performRedo).
         const { etag } =
             await ctx.GETWithEtag<FlowWithGraph>(
-                'flows/flow-1',
+                'organizations/1/flows/flow-1',
             );
         await ctx.PUT(
-            'flows/flow-1',
+            'organizations/1/flows/flow-1',
             {
                 ...buildFlowBody({
                     name: 'redone',
@@ -428,7 +431,7 @@ test(
             ifMatchHeaders(etag),
         );
         const events = await ctx.GET<StateEntity[]>(
-            'flows/flow-1/versions',
+            'organizations/1/flows/flow-1/versions/',
         );
         // Family history is DESC — index 0 is current.
         assert.equal(
@@ -466,7 +469,7 @@ test(
         const { ctx } = await setupMemDb();
         await createBaseFlow(ctx, 'flow-1');
         const flow0 = await ctx.GET<FlowWithGraph>(
-            'flows/flow-1',
+            'organizations/1/flows/flow-1',
         );
         const baseline0 =
             flow0.graph as unknown as StoredGraph;
@@ -505,7 +508,7 @@ test(
                 headerFields?:
                     readonly (readonly [string, string])[],
             ): Promise<T> => {
-                if (path === 'flows/flow-1') {
+                if (path === 'organizations/1/flows/flow-1') {
                     putCalls += 1;
                     if (putCalls === 1) {
                         await putFlow(ctx, 'flow-1', {
@@ -561,7 +564,7 @@ test(
 
         // Behavioral confirmation: 'mid' is visible again.
         const flow = await ctx.GET<FlowWithGraph>(
-            'flows/flow-1',
+            'organizations/1/flows/flow-1',
         );
         const graph =
             flow.graph as unknown as StoredGraph;

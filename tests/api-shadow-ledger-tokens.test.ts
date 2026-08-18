@@ -16,6 +16,7 @@ import {
 } from '../api/message-pair.ts';
 import type { AuthPairSeed } from '../api/message-pair.ts';
 import {
+    exchangeBearerForOrganization,
     rotateRefreshJti,
     revokeTokenChain,
     tokenRevocationReason,
@@ -722,9 +723,10 @@ test('two concurrent rotations of one jti: exactly one'
 // (Phase 13 Task 5's fourth commit) — exchangeBearerForOrganization
 // forms no AUTH pair (it is never a real /authentication/token
 // request), but the chain root it mints still gets its own event
-// pair, decoupled from that seed.
+// pair, decoupled from that seed. Task 7 deleted the rematch
+// facade; the hop is the function, not an HTTP rewrite.
 
-test('the org-exchange facade hop mints its OWN chain root and'
+test('the org-exchange hop mints its OWN chain root and'
 + ' appends that root\'s own event pair — even though it forms'
 + ' NO auth pair (never a real /authentication/token request)',
 async () => {
@@ -733,13 +735,10 @@ async () => {
     const flatToken = await devToken('current');
     const before = await deriveIdentityTokens(db);
     const beforeIds = new Set(before.map(r => r.id));
-    const res = await handleRequest(db, new Request(
-        `${BASE}/organizations/1/identities/current/tokens`, {
-            method: 'GET',
-            headers: { 'Authorization': 'Bearer ' + flatToken },
-        },
-    ));
-    assert.equal(res.status, 200);
+    const exchanged = await exchangeBearerForOrganization(
+        db, flatToken, '1',
+    );
+    assert.equal(exchanged.ok, true);
     const after = await deriveIdentityTokens(db);
     const newRows = after.filter(r => !beforeIds.has(r.id));
     assert.equal(newRows.length, 1);

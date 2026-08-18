@@ -144,7 +144,7 @@ test('a flow write with an AI member id in memberIds'
     }, DEV_TOKEN);
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/flows/flow-ai-member', token,
+        'PUT', '/organizations/1/flows/flow-ai-member', token,
         flowDocument(
             'Blocked',
             'ev-flow-1',
@@ -170,7 +170,7 @@ test('a flow write with agentIds naming a live'
     );
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/flows/flow-agent', token,
+        'PUT', '/organizations/1/flows/flow-agent', token,
         flowDocument(
             'With agent',
             'ev-flow-2',
@@ -188,7 +188,7 @@ test('a flow write with agentIds naming a live'
         graph: {
             nodes: { agentIds?: string[] }[];
         };
-    }>(db, 'flows/flow-agent', token);
+    }>(db, 'organizations/1/flows/flow-agent', token);
     const node = flow.graph.nodes[0]!;
     assert.deepEqual(node.agentIds, ['agent-live']);
 });

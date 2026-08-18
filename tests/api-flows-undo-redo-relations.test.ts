@@ -19,7 +19,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -74,7 +74,7 @@ async function setupMemDb(): Promise<{
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
     await seedHumanMember(db, 'm1', 'Member One');
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId: FLOW_ID,
         linkId: FLOW_ID + '-link',
@@ -161,7 +161,8 @@ function snapOf(
 }
 
 // Persist `graph` as the CURRENT flow state — a genuine save,
-// so it lands its OWN document pair at flows/:id. Undo-as-replay
+// so it lands its OWN document pair at organizations/:id/flows/:id.
+// Undo-as-replay
 // resolves its restore target by walking that document-pair
 // history.
 async function saveGraph(
@@ -172,12 +173,12 @@ async function saveGraph(
     await putFlow(ctx, FLOW_ID, save(nodes, edges));
 }
 
-// Pair-plane working graph (GET /flows/:id).
+// Pair-plane working graph (GET /organizations/:id/flows/:id).
 async function pairGraph(
     ctx: RequestContext,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'flows/' + FLOW_ID,
+        'organizations/1/flows/' + FLOW_ID,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',

@@ -84,7 +84,7 @@ test('foreign-org work-order claim is 404', async () => {
         'current', ORGANIZATION_B,
     );
     const created = await handleRequest(db, req(
-        'PUT', '/work-orders/wo-foreign-claim', tokenA, {
+        'PUT', '/organizations/1/work-orders/wo-foreign-claim', tokenA, {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -94,7 +94,9 @@ test('foreign-org work-order claim is 404', async () => {
 
     const claimAt = nowUtc();
     const foreign = await handleRequest(db, req(
-        'PUT', '/work-orders/wo-foreign-claim/claim', tokenB, {
+        'PUT',
+        '/organizations/B/work-orders/wo-foreign-claim/claim',
+        tokenB, {
             claimEventId: generateCryptoSafeBase62(),
             claimAt,
             expireEventId: generateCryptoSafeBase62(),
@@ -117,7 +119,7 @@ test('foreign-org work-order release is 404', async () => {
         'current', ORGANIZATION_B,
     );
     const created = await handleRequest(db, req(
-        'PUT', '/work-orders/wo-foreign-rel', tokenA, {
+        'PUT', '/organizations/1/work-orders/wo-foreign-rel', tokenA, {
             display_id: 'efgh',
             flow_graph: graphJson(),
             position: 2,
@@ -126,7 +128,9 @@ test('foreign-org work-order release is 404', async () => {
     assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
-        'DELETE', '/work-orders/wo-foreign-rel/claim', tokenB,
+        'DELETE',
+        '/organizations/B/work-orders/wo-foreign-rel/claim',
+        tokenB,
     ));
     assert.equal(foreign.status, 404);
 });
@@ -140,7 +144,7 @@ test('foreign-org work-order transition is 404', async () => {
         'current', ORGANIZATION_B,
     );
     const created = await handleRequest(db, req(
-        'PUT', '/work-orders/wo-foreign-tx', tokenA, {
+        'PUT', '/organizations/1/work-orders/wo-foreign-tx', tokenA, {
             display_id: 'ijkl',
             flow_graph: graphJson(),
             position: 3,
@@ -150,7 +154,7 @@ test('foreign-org work-order transition is 404', async () => {
 
     const foreign = await handleRequest(db, req(
         'POST',
-        '/work-orders/wo-foreign-tx/transition',
+        '/organizations/B/work-orders/wo-foreign-tx/transition',
         tokenB,
         {
             transitionEventId: generateCryptoSafeBase62(),
@@ -175,7 +179,7 @@ test('foreign-org flow undo is 404', async () => {
         'current', ORGANIZATION_B,
     );
     const created = await handleRequest(db, req(
-        'POST', '/flows', tokenA, {
+        'POST', '/organizations/1/flows/', tokenA, {
             id: 'flow-foreign-undo',
             flow: {
                 name: 'Foreign Undo',
@@ -205,7 +209,9 @@ test('foreign-org flow undo is 404', async () => {
     );
 
     const foreign = await handleRequest(db, req(
-        'POST', '/flows/flow-foreign-undo/undo', tokenB, {
+        'POST',
+        '/organizations/B/flows/flow-foreign-undo/undo',
+        tokenB, {
             eventId: 'flow-foreign-undo-undo-ev',
             at: AT,
         },

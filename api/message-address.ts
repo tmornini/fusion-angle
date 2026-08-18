@@ -29,8 +29,13 @@ export function messageAddress(
     const uriId = idTailed
         ? pathSegments[pathSegments.length - 1]!
         : '';
+    // A slashed collection is ['family', '']; the empty
+    // tail is the collection match, not a prefix segment.
+    const prefix = prefixSegments.filter(
+        (seg) => seg !== '',
+    );
     return {
-        uriCollection: '/' + prefixSegments.join('/') + '/',
+        uriCollection: '/' + prefix.join('/') + '/',
         uriId,
     };
 }

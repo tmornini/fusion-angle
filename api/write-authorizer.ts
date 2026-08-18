@@ -31,24 +31,24 @@ export interface WriteAuthorizer {
 // cannot bypass the ownership fence (Task 10 / Security).
 const WRITE_AUTHORIZERS:
     ReadonlyMap<string, WriteAuthorizer> = new Map([
-        ['ideas/:id', {
-            table: 'ideas', idParamIndex: 0,
+        ['organizations/:id/ideas/:id', {
+            table: 'ideas', idParamIndex: 1,
         }],
-        ['projects/:id', {
-            table: 'projects', idParamIndex: 0,
+        ['organizations/:id/projects/:id', {
+            table: 'projects', idParamIndex: 1,
         }],
-        ['flows/:id', {
-            table: 'flows', idParamIndex: 0,
+        ['organizations/:id/flows/:id', {
+            table: 'flows', idParamIndex: 1,
         }],
-        ['work-orders/:id', {
-            table: 'work_orders', idParamIndex: 0,
+        ['organizations/:id/work-orders/:id', {
+            table: 'work_orders', idParamIndex: 1,
         }],
         // Flat records/:id + record-attributes/:id retired
         // (Task 23). Nested types use RECORD_TYPE_DETAIL_
         // PATTERN below; nested attributes have no row
         // (parent type 404 + path org gate).
-        ['objectives/:id', {
-            table: 'objectives', idParamIndex: 0,
+        ['organizations/:id/objectives/:id', {
+            table: 'objectives', idParamIndex: 1,
         }],
         // Nested record-types detail (Task 3): id is param
         // index 1 (:record-type-id).

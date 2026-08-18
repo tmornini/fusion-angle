@@ -45,8 +45,6 @@ function buildView() {
         position: 1,
     }, {
         state: 'approved',
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'ev-p1',
     });
     return new ProjectView(project, [], [], []);
 }

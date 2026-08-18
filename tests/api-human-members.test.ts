@@ -66,7 +66,7 @@ test(
         assert.equal(row.kind, 'person');
         assert.equal(row.title, 'Engineer');
         const seats = await GET<{ id: string }[]>(
-            db, 'organizations/1/members', token,
+            db, 'organizations/1/members/', token,
         );
         assert.ok(seats.some(s => s.id === 'w1'));
     },

@@ -53,9 +53,9 @@ export async function getMembers(
             ? Promise.resolve([] as MembershipEntity[])
             : ctx.GET<MembershipEntity[]>(
                 'organizations/' + organization
-                    + '/members',
+                    + '/members/',
             ),
-        ctx.GET<AIAgentEntity[]>('ai-agents'),
+        ctx.GET<AIAgentEntity[]>('ai-agents/'),
     ]);
     const humans = buildHumanMemberMap(seats);
     const ais = buildAIAgentMap(agents);

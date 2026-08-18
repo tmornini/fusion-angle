@@ -140,11 +140,6 @@ function onRecordsLoaded(
                 description: fresh.description,
                 position: newPosition,
                 state: found.record.stateValue(),
-                stateAt:
-                    found.record.stateAtValue(),
-                stateEventId:
-                    found.record
-                        .stateEventIdValue(),
             });
         },
     );

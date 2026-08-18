@@ -684,13 +684,9 @@ async function handleSave(): Promise<void> {
                 id: _id,
                 organization_id: _org,
                 state: _priorState,
-                state_at: _priorAt,
-                state_event_id: _priorEventId,
                 ...entityFields
             } = entity;
             void _priorState;
-            void _priorAt;
-            void _priorEventId;
             await postProjectStateChange(
                 ctx, projectId,
                 {

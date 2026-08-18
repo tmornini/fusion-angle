@@ -11,7 +11,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     validateFlowForCreation,
     getFlowsForCreation,
@@ -254,7 +254,7 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const goodGraph = readyGraph('good-');
         const badGraph: StoredGraph = {
             nodes: [
@@ -298,7 +298,7 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await seedFlowWithRelations(
             ctx,
             buildFlowEntity(

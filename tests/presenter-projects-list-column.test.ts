@@ -47,8 +47,6 @@ function makeProject(id: string): InstanceType<
         position: 0,
     }, {
         state: 'under_review',
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'ev-' + id,
     });
 }
 

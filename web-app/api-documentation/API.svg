@@ -1,0 +1,811 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 766 1768" width="766" height="1768">
+  <defs>
+    <style>
+      .legend, .wing, .col { font-family:
+        ui-sans-serif, system-ui, sans-serif;
+      }
+      .legend { fill: hsl(217 38% 38%);
+        font-size: 11px; }
+      .wing { fill: hsl(217 45% 15%);
+        font-size: 12px; font-weight: 700; }
+      .col { fill: hsl(217 12% 40%);
+        font-size: 8px; text-anchor: middle;
+      }
+      .uri { font-family: ui-monospace,
+        SFMono-Regular, Menlo, monospace;
+        font-size: 8.5px;
+        fill: hsl(217 45% 15%); }
+      .filled { fill: hsl(217 45% 15%); }
+      .empty { fill: none;
+        stroke: hsl(217 30% 40%);
+        stroke-width: 1; }
+    </style>
+  </defs>
+  <rect x="0" y="0" width="766" height="1768" fill="hsl(217 30% 97%)"/>
+  <text class="legend" x="16" y="28">filled circle = offered verb (item or operation)</text>
+  <text class="col" x="34" y="50">GET</text>
+  <text class="col" x="74" y="50">PUT</text>
+  <text class="col" x="114" y="50">POST</text>
+  <text class="col" x="154" y="50">PATCH</text>
+  <text class="col" x="194" y="50">DELETE</text>
+  <text class="wing" x="16" y="72">ai-agents</text>
+  <a href="get/ai-agents/index.html">
+    <circle class="filled" cx="34" cy="88" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="83" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="83" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="83" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="83" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="91">/ai-agents/</text>
+  <a href="get/ai-agents/id/index.html">
+    <circle class="filled" cx="34" cy="106" r="5"/>
+  </a>
+  <a href="put/ai-agents/id/index.html">
+    <circle class="filled" cx="74" cy="106" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="101" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="101" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="101" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="109">/ai-agents/:id</text>
+  <a href="get/ai-agents/id/versions/index.html">
+    <circle class="filled" cx="34" cy="124" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="119" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="119" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="119" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="119" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="127">/ai-agents/:id/versions/</text>
+  <a href="get/ai-agents/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="142" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="137" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="137" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="137" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="137" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="145">/ai-agents/:id/versions/:etag</text>
+  <text class="wing" x="16" y="174">authentication</text>
+  <rect class="empty" x="29" y="185" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="185" width="10" height="10" fill="none"/>
+  <a href="post/authentication/authorize/index.html">
+    <circle class="filled" cx="114" cy="190" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="185" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="185" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="193">/authentication/authorize</text>
+  <rect class="empty" x="29" y="203" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="203" width="10" height="10" fill="none"/>
+  <a href="post/authentication/token/index.html">
+    <circle class="filled" cx="114" cy="208" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="203" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="203" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="211">/authentication/token</text>
+  <text class="wing" x="16" y="240">identities</text>
+  <a href="get/identities/index.html">
+    <circle class="filled" cx="34" cy="256" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="251" width="10" height="10" fill="none"/>
+  <a href="post/identities/index.html">
+    <circle class="filled" cx="114" cy="256" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="251" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="251" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="259">/identities/</text>
+  <a href="get/identities/id/index.html">
+    <circle class="filled" cx="34" cy="274" r="5"/>
+  </a>
+  <a href="put/identities/id/index.html">
+    <circle class="filled" cx="74" cy="274" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="269" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="269" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="269" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="277">/identities/:id</text>
+  <a href="get/identities/id/credentials/index.html">
+    <circle class="filled" cx="34" cy="292" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="287" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="287" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="287" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="287" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="295">/identities/:id/credentials/</text>
+  <a href="get/identities/id/credentials/cid/index.html">
+    <circle class="filled" cx="34" cy="310" r="5"/>
+  </a>
+  <a href="put/identities/id/credentials/cid/index.html">
+    <circle class="filled" cx="74" cy="310" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="305" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="305" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="305" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="313">/identities/:id/credentials/:cid</text>
+  <a href="get/identities/id/default-organization/index.html">
+    <circle class="filled" cx="34" cy="328" r="5"/>
+  </a>
+  <a href="put/identities/id/default-organization/index.html">
+    <circle class="filled" cx="74" cy="328" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="323" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="323" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="323" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="331">/identities/:id/default-organization</text>
+  <a href="get/identities/id/invitations/index.html">
+    <circle class="filled" cx="34" cy="346" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="341" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="341" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="341" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="341" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="349">/identities/:id/invitations/</text>
+  <a href="get/identities/id/invitations/id/index.html">
+    <circle class="filled" cx="34" cy="364" r="5"/>
+  </a>
+  <a href="put/identities/id/invitations/id/index.html">
+    <circle class="filled" cx="74" cy="364" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="359" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="359" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="359" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="367">/identities/:id/invitations/:id</text>
+  <a href="get/identities/id/invitations/id/versions/index.html">
+    <circle class="filled" cx="34" cy="382" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="377" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="377" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="377" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="377" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="385">/identities/:id/invitations/:id/versions/</text>
+  <a href="get/identities/id/invitations/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="400" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="395" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="395" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="395" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="395" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="403">/identities/:id/invitations/:id/versions/:etag</text>
+  <a href="get/identities/id/organizations/index.html">
+    <circle class="filled" cx="34" cy="418" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="413" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="413" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="413" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="413" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="421">/identities/:id/organizations/</text>
+  <a href="get/identities/id/pii/index.html">
+    <circle class="filled" cx="34" cy="436" r="5"/>
+  </a>
+  <a href="put/identities/id/pii/index.html">
+    <circle class="filled" cx="74" cy="436" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="431" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="431" width="10" height="10" fill="none"/>
+  <a href="delete/identities/id/pii/index.html">
+    <circle class="filled" cx="194" cy="436" r="5"/>
+  </a>
+  <text class="uri" x="224" y="439">/identities/:id/pii</text>
+  <a href="get/identities/id/providers/index.html">
+    <circle class="filled" cx="34" cy="454" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="449" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="449" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="449" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="449" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="457">/identities/:id/providers/</text>
+  <a href="get/identities/id/providers/eid/index.html">
+    <circle class="filled" cx="34" cy="472" r="5"/>
+  </a>
+  <a href="put/identities/id/providers/eid/index.html">
+    <circle class="filled" cx="74" cy="472" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="467" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="467" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="467" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="475">/identities/:id/providers/:eid</text>
+  <a href="get/identities/id/registration/index.html">
+    <circle class="filled" cx="34" cy="490" r="5"/>
+  </a>
+  <a href="put/identities/id/registration/index.html">
+    <circle class="filled" cx="74" cy="490" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="485" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="485" width="10" height="10" fill="none"/>
+  <a href="delete/identities/id/registration/index.html">
+    <circle class="filled" cx="194" cy="490" r="5"/>
+  </a>
+  <text class="uri" x="224" y="493">/identities/:id/registration</text>
+  <a href="get/identities/id/token-revocations/rid/index.html">
+    <circle class="filled" cx="34" cy="508" r="5"/>
+  </a>
+  <a href="put/identities/id/token-revocations/rid/index.html">
+    <circle class="filled" cx="74" cy="508" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="503" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="503" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="503" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="511">/identities/:id/token-revocations/:rid</text>
+  <a href="get/identities/id/tokens/index.html">
+    <circle class="filled" cx="34" cy="526" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="521" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="521" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="521" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="521" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="529">/identities/:id/tokens/</text>
+  <rect class="empty" x="29" y="539" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="539" width="10" height="10" fill="none"/>
+  <a href="post/identities/id/tokens/jti/revocation/index.html">
+    <circle class="filled" cx="114" cy="544" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="539" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="539" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="547">/identities/:id/tokens/:jti/revocation</text>
+  <rect class="empty" x="29" y="557" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="557" width="10" height="10" fill="none"/>
+  <a href="post/identities/id/tokens/jti/rotation/index.html">
+    <circle class="filled" cx="114" cy="562" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="557" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="557" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="565">/identities/:id/tokens/:jti/rotation</text>
+  <a href="get/identities/id/tokens/tid/index.html">
+    <circle class="filled" cx="34" cy="580" r="5"/>
+  </a>
+  <a href="put/identities/id/tokens/tid/index.html">
+    <circle class="filled" cx="74" cy="580" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="575" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="575" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="575" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="583">/identities/:id/tokens/:tid</text>
+  <a href="get/identities/id/versions/index.html">
+    <circle class="filled" cx="34" cy="598" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="593" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="593" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="593" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="593" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="601">/identities/:id/versions/</text>
+  <a href="get/identities/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="616" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="611" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="611" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="611" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="611" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="619">/identities/:id/versions/:etag</text>
+  <text class="wing" x="16" y="648">organizations</text>
+  <a href="get/organizations/id/index.html">
+    <circle class="filled" cx="34" cy="664" r="5"/>
+  </a>
+  <a href="put/organizations/id/index.html">
+    <circle class="filled" cx="74" cy="664" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="659" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="659" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="659" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="667">/organizations/:id</text>
+  <a href="get/organizations/id/flows/index.html">
+    <circle class="filled" cx="34" cy="682" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="677" width="10" height="10" fill="none"/>
+  <a href="post/organizations/id/flows/index.html">
+    <circle class="filled" cx="114" cy="682" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="677" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="677" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="685">/organizations/:id/flows/</text>
+  <a href="get/organizations/id/flows/id/index.html">
+    <circle class="filled" cx="34" cy="700" r="5"/>
+  </a>
+  <a href="put/organizations/id/flows/id/index.html">
+    <circle class="filled" cx="74" cy="700" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="695" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="695" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="695" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="703">/organizations/:id/flows/:id</text>
+  <a href="get/organizations/id/flows/id/records/index.html">
+    <circle class="filled" cx="34" cy="718" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="713" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="713" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="713" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="713" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="721">/organizations/:id/flows/:id/records/</text>
+  <a href="get/organizations/id/flows/id/records/frid/index.html">
+    <circle class="filled" cx="34" cy="736" r="5"/>
+  </a>
+  <a href="put/organizations/id/flows/id/records/frid/index.html">
+    <circle class="filled" cx="74" cy="736" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="731" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="731" width="10" height="10" fill="none"/>
+  <a href="delete/organizations/id/flows/id/records/frid/index.html">
+    <circle class="filled" cx="194" cy="736" r="5"/>
+  </a>
+  <text class="uri" x="224" y="739">/organizations/:id/flows/:id/records/:frid</text>
+  <a href="get/organizations/id/flows/id/tags/name/index.html">
+    <circle class="filled" cx="34" cy="754" r="5"/>
+  </a>
+  <a href="put/organizations/id/flows/id/tags/name/index.html">
+    <circle class="filled" cx="74" cy="754" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="749" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="749" width="10" height="10" fill="none"/>
+  <a href="delete/organizations/id/flows/id/tags/name/index.html">
+    <circle class="filled" cx="194" cy="754" r="5"/>
+  </a>
+  <text class="uri" x="224" y="757">/organizations/:id/flows/:id/tags/:name</text>
+  <rect class="empty" x="29" y="767" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="767" width="10" height="10" fill="none"/>
+  <a href="post/organizations/id/flows/id/undo/index.html">
+    <circle class="filled" cx="114" cy="772" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="767" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="767" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="775">/organizations/:id/flows/:id/undo</text>
+  <a href="get/organizations/id/flows/id/versions/index.html">
+    <circle class="filled" cx="34" cy="790" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="785" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="785" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="785" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="785" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="793">/organizations/:id/flows/:id/versions/</text>
+  <a href="get/organizations/id/flows/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="808" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="803" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="803" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="803" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="803" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="811">/organizations/:id/flows/:id/versions/:etag</text>
+  <a href="get/organizations/id/flows/id/work-orders/index.html">
+    <circle class="filled" cx="34" cy="826" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="821" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="821" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="821" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="821" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="829">/organizations/:id/flows/:id/work-orders/</text>
+  <rect class="empty" x="29" y="839" width="10" height="10" fill="none"/>
+  <a href="put/organizations/id/flows/id/work-orders/woid/index.html">
+    <circle class="filled" cx="74" cy="844" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="839" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="839" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="839" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="847">/organizations/:id/flows/:id/work-orders/:woid</text>
+  <a href="get/organizations/id/ideas/index.html">
+    <circle class="filled" cx="34" cy="862" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="857" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="857" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="857" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="857" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="865">/organizations/:id/ideas/</text>
+  <a href="get/organizations/id/ideas/id/index.html">
+    <circle class="filled" cx="34" cy="880" r="5"/>
+  </a>
+  <a href="put/organizations/id/ideas/id/index.html">
+    <circle class="filled" cx="74" cy="880" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="875" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="875" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="875" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="883">/organizations/:id/ideas/:id</text>
+  <rect class="empty" x="29" y="893" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="893" width="10" height="10" fill="none"/>
+  <a href="post/organizations/id/ideas/id/conversion/index.html">
+    <circle class="filled" cx="114" cy="898" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="893" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="893" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="901">/organizations/:id/ideas/:id/conversion</text>
+  <a href="get/organizations/id/ideas/id/submissions/index.html">
+    <circle class="filled" cx="34" cy="916" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="911" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="911" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="911" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="911" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="919">/organizations/:id/ideas/:id/submissions/</text>
+  <rect class="empty" x="29" y="929" width="10" height="10" fill="none"/>
+  <a href="put/organizations/id/ideas/id/submissions/sid/index.html">
+    <circle class="filled" cx="74" cy="934" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="929" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="929" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="929" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="937">/organizations/:id/ideas/:id/submissions/:sid</text>
+  <a href="get/organizations/id/ideas/id/versions/index.html">
+    <circle class="filled" cx="34" cy="952" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="947" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="947" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="947" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="947" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="955">/organizations/:id/ideas/:id/versions/</text>
+  <a href="get/organizations/id/ideas/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="970" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="965" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="965" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="965" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="965" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="973">/organizations/:id/ideas/:id/versions/:etag</text>
+  <a href="get/organizations/id/invitations/index.html">
+    <circle class="filled" cx="34" cy="988" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="983" width="10" height="10" fill="none"/>
+  <a href="post/organizations/id/invitations/index.html">
+    <circle class="filled" cx="114" cy="988" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="983" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="983" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="991">/organizations/:id/invitations/</text>
+  <a href="get/organizations/id/invitations/id/index.html">
+    <circle class="filled" cx="34" cy="1006" r="5"/>
+  </a>
+  <a href="put/organizations/id/invitations/id/index.html">
+    <circle class="filled" cx="74" cy="1006" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1001" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1001" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1001" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1009">/organizations/:id/invitations/:id</text>
+  <a href="get/organizations/id/invitations/id/versions/index.html">
+    <circle class="filled" cx="34" cy="1024" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1019" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1019" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1019" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1019" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1027">/organizations/:id/invitations/:id/versions/</text>
+  <a href="get/organizations/id/invitations/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="1042" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1037" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1037" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1037" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1037" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1045">/organizations/:id/invitations/:id/versions/:etag</text>
+  <a href="get/organizations/id/objectives/index.html">
+    <circle class="filled" cx="34" cy="1060" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1055" width="10" height="10" fill="none"/>
+  <a href="post/organizations/id/objectives/index.html">
+    <circle class="filled" cx="114" cy="1060" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="1055" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1055" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1063">/organizations/:id/objectives/</text>
+  <a href="get/organizations/id/objectives/id/index.html">
+    <circle class="filled" cx="34" cy="1078" r="5"/>
+  </a>
+  <a href="put/organizations/id/objectives/id/index.html">
+    <circle class="filled" cx="74" cy="1078" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1073" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1073" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1073" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1081">/organizations/:id/objectives/:id</text>
+  <a href="get/organizations/id/objectives/id/revisions/index.html">
+    <circle class="filled" cx="34" cy="1096" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1091" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1091" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1091" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1091" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1099">/organizations/:id/objectives/:id/revisions/</text>
+  <rect class="empty" x="29" y="1109" width="10" height="10" fill="none"/>
+  <a href="put/organizations/id/objectives/id/revisions/rid/index.html">
+    <circle class="filled" cx="74" cy="1114" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1109" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1109" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1109" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1117">/organizations/:id/objectives/:id/revisions/:rid</text>
+  <a href="get/organizations/id/objectives/id/versions/index.html">
+    <circle class="filled" cx="34" cy="1132" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1127" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1127" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1127" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1127" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1135">/organizations/:id/objectives/:id/versions/</text>
+  <a href="get/organizations/id/objectives/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="1150" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1145" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1145" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1145" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1145" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1153">/organizations/:id/objectives/:id/versions/:etag</text>
+  <a href="get/organizations/id/projects/index.html">
+    <circle class="filled" cx="34" cy="1168" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1163" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1163" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1163" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1163" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1171">/organizations/:id/projects/</text>
+  <a href="get/organizations/id/projects/id/index.html">
+    <circle class="filled" cx="34" cy="1186" r="5"/>
+  </a>
+  <a href="put/organizations/id/projects/id/index.html">
+    <circle class="filled" cx="74" cy="1186" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1181" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1181" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1181" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1189">/organizations/:id/projects/:id</text>
+  <a href="get/organizations/id/projects/id/flows/index.html">
+    <circle class="filled" cx="34" cy="1204" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1199" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1199" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1199" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1199" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1207">/organizations/:id/projects/:id/flows/</text>
+  <rect class="empty" x="29" y="1217" width="10" height="10" fill="none"/>
+  <a href="put/organizations/id/projects/id/flows/pfid/index.html">
+    <circle class="filled" cx="74" cy="1222" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1217" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1217" width="10" height="10" fill="none"/>
+  <a href="delete/organizations/id/projects/id/flows/pfid/index.html">
+    <circle class="filled" cx="194" cy="1222" r="5"/>
+  </a>
+  <text class="uri" x="224" y="1225">/organizations/:id/projects/:id/flows/:pfid</text>
+  <a href="get/organizations/id/projects/id/objective-actual-scores/index.html">
+    <circle class="filled" cx="34" cy="1240" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1235" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1235" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1235" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1235" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1243">/organizations/:id/projects/:id/objective-actual-scores/</text>
+  <rect class="empty" x="29" y="1253" width="10" height="10" fill="none"/>
+  <a href="put/organizations/id/projects/id/objective-actual-scores/sid/index.html">
+    <circle class="filled" cx="74" cy="1258" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1253" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1253" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1253" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1261">/organizations/:id/projects/:id/objective-actual-scores/:sid</text>
+  <a href="get/organizations/id/projects/id/objective-baseline-scores/index.html">
+    <circle class="filled" cx="34" cy="1276" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1271" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1271" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1271" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1271" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1279">/organizations/:id/projects/:id/objective-baseline-scores/</text>
+  <rect class="empty" x="29" y="1289" width="10" height="10" fill="none"/>
+  <a href="put/organizations/id/projects/id/objective-baseline-scores/sid/index.html">
+    <circle class="filled" cx="74" cy="1294" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1289" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1289" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1289" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1297">/organizations/:id/projects/:id/objective-baseline-scores/:sid</text>
+  <a href="get/organizations/id/projects/id/versions/index.html">
+    <circle class="filled" cx="34" cy="1312" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1307" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1307" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1307" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1307" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1315">/organizations/:id/projects/:id/versions/</text>
+  <a href="get/organizations/id/projects/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="1330" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1325" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1325" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1325" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1325" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1333">/organizations/:id/projects/:id/versions/:etag</text>
+  <a href="get/organizations/id/versions/index.html">
+    <circle class="filled" cx="34" cy="1348" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1343" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1343" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1343" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1343" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1351">/organizations/:id/versions/</text>
+  <a href="get/organizations/id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="1366" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1361" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1361" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1361" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1361" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1369">/organizations/:id/versions/:etag</text>
+  <a href="get/organizations/id/work-orders/index.html">
+    <circle class="filled" cx="34" cy="1384" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1379" width="10" height="10" fill="none"/>
+  <a href="post/organizations/id/work-orders/index.html">
+    <circle class="filled" cx="114" cy="1384" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="1379" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1379" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1387">/organizations/:id/work-orders/</text>
+  <a href="get/organizations/id/work-orders/id/index.html">
+    <circle class="filled" cx="34" cy="1402" r="5"/>
+  </a>
+  <a href="put/organizations/id/work-orders/id/index.html">
+    <circle class="filled" cx="74" cy="1402" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1397" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1397" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1397" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1405">/organizations/:id/work-orders/:id</text>
+  <rect class="empty" x="29" y="1415" width="10" height="10" fill="none"/>
+  <a href="put/organizations/id/work-orders/id/binding/index.html">
+    <circle class="filled" cx="74" cy="1420" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1415" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1415" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1415" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1423">/organizations/:id/work-orders/:id/binding</text>
+  <a href="get/organizations/id/work-orders/id/claim/index.html">
+    <circle class="filled" cx="34" cy="1438" r="5"/>
+  </a>
+  <a href="put/organizations/id/work-orders/id/claim/index.html">
+    <circle class="filled" cx="74" cy="1438" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1433" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1433" width="10" height="10" fill="none"/>
+  <a href="delete/organizations/id/work-orders/id/claim/index.html">
+    <circle class="filled" cx="194" cy="1438" r="5"/>
+  </a>
+  <text class="uri" x="224" y="1441">/organizations/:id/work-orders/:id/claim</text>
+  <a href="get/organizations/id/work-orders/id/history/index.html">
+    <circle class="filled" cx="34" cy="1456" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1451" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1451" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1451" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1451" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1459">/organizations/:id/work-orders/:id/history</text>
+  <rect class="empty" x="29" y="1469" width="10" height="10" fill="none"/>
+  <rect class="empty" x="69" y="1469" width="10" height="10" fill="none"/>
+  <a href="post/organizations/id/work-orders/id/transition/index.html">
+    <circle class="filled" cx="114" cy="1474" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="1469" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1469" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1477">/organizations/:id/work-orders/:id/transition</text>
+  <a href="get/organizations/organization-id/members/index.html">
+    <circle class="filled" cx="34" cy="1492" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1487" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1487" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1487" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1487" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1495">/organizations/:organization-id/members/</text>
+  <a href="get/organizations/organization-id/members/identity-id/index.html">
+    <circle class="filled" cx="34" cy="1510" r="5"/>
+  </a>
+  <a href="put/organizations/organization-id/members/identity-id/index.html">
+    <circle class="filled" cx="74" cy="1510" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1505" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1505" width="10" height="10" fill="none"/>
+  <a href="delete/organizations/organization-id/members/identity-id/index.html">
+    <circle class="filled" cx="194" cy="1510" r="5"/>
+  </a>
+  <text class="uri" x="224" y="1513">/organizations/:organization-id/members/:identity-id</text>
+  <a href="get/organizations/organization-id/members/identity-id/versions/index.html">
+    <circle class="filled" cx="34" cy="1528" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1523" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1523" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1523" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1523" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1531">/organizations/:organization-id/members/:identity-id/versions/</text>
+  <a href="get/organizations/organization-id/members/identity-id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="1546" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1541" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1541" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1541" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1541" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1549">/organizations/:organization-id/members/:identity-id/versions/:etag</text>
+  <a href="get/organizations/organization-id/record-types/index.html">
+    <circle class="filled" cx="34" cy="1564" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1559" width="10" height="10" fill="none"/>
+  <a href="post/organizations/organization-id/record-types/index.html">
+    <circle class="filled" cx="114" cy="1564" r="5"/>
+  </a>
+  <rect class="empty" x="149" y="1559" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1559" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1567">/organizations/:organization-id/record-types/</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/index.html">
+    <circle class="filled" cx="34" cy="1582" r="5"/>
+  </a>
+  <a href="put/organizations/organization-id/record-types/record-type-id/index.html">
+    <circle class="filled" cx="74" cy="1582" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1577" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1577" width="10" height="10" fill="none"/>
+  <a href="delete/organizations/organization-id/record-types/record-type-id/index.html">
+    <circle class="filled" cx="194" cy="1582" r="5"/>
+  </a>
+  <text class="uri" x="224" y="1585">/organizations/:organization-id/record-types/:record-type-id</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/attributes/index.html">
+    <circle class="filled" cx="34" cy="1600" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1595" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1595" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1595" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1595" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1603">/organizations/:organization-id/record-types/:record-type-id/attributes/</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/attributes/attribute-id/index.html">
+    <circle class="filled" cx="34" cy="1618" r="5"/>
+  </a>
+  <a href="put/organizations/organization-id/record-types/record-type-id/attributes/attribute-id/index.html">
+    <circle class="filled" cx="74" cy="1618" r="5"/>
+  </a>
+  <rect class="empty" x="109" y="1613" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1613" width="10" height="10" fill="none"/>
+  <a href="delete/organizations/organization-id/record-types/record-type-id/attributes/attribute-id/index.html">
+    <circle class="filled" cx="194" cy="1618" r="5"/>
+  </a>
+  <text class="uri" x="224" y="1621">/organizations/:organization-id/record-types/:record-type-id/attributes/:attribute-id</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/instances/index.html">
+    <circle class="filled" cx="34" cy="1636" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1631" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1631" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1631" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1631" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1639">/organizations/:organization-id/record-types/:record-type-id/instances/</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/instances/instance-id/index.html">
+    <circle class="filled" cx="34" cy="1654" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1649" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1649" width="10" height="10" fill="none"/>
+  <a href="patch/organizations/organization-id/record-types/record-type-id/instances/instance-id/index.html">
+    <circle class="filled" cx="154" cy="1654" r="5"/>
+  </a>
+  <a href="delete/organizations/organization-id/record-types/record-type-id/instances/instance-id/index.html">
+    <circle class="filled" cx="194" cy="1654" r="5"/>
+  </a>
+  <text class="uri" x="224" y="1657">/organizations/:organization-id/record-types/:record-type-id/instances/:instance-id</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/instances/instance-id/versions/index.html">
+    <circle class="filled" cx="34" cy="1672" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1667" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1667" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1667" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1667" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1675">/organizations/:organization-id/record-types/:record-type-id/instances/:instance-id/versions</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/instances/instance-id/versions/version/index.html">
+    <circle class="filled" cx="34" cy="1690" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1685" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1685" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1685" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1685" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1693">/organizations/:organization-id/record-types/:record-type-id/instances/:instance-id/versions/:version</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/versions/index.html">
+    <circle class="filled" cx="34" cy="1708" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1703" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1703" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1703" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1703" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1711">/organizations/:organization-id/record-types/:record-type-id/versions/</text>
+  <a href="get/organizations/organization-id/record-types/record-type-id/versions/etag/index.html">
+    <circle class="filled" cx="34" cy="1726" r="5"/>
+  </a>
+  <rect class="empty" x="69" y="1721" width="10" height="10" fill="none"/>
+  <rect class="empty" x="109" y="1721" width="10" height="10" fill="none"/>
+  <rect class="empty" x="149" y="1721" width="10" height="10" fill="none"/>
+  <rect class="empty" x="189" y="1721" width="10" height="10" fill="none"/>
+  <text class="uri" x="224" y="1729">/organizations/:organization-id/record-types/:record-type-id/versions/:etag</text>
+</svg>

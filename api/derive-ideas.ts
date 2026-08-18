@@ -63,7 +63,7 @@ function submissionsUriPrefix(
 export function ideaEntityOf(
     document: DerivedDocument,
     organization: Id,
-    current: StateEntity,
+    current: { readonly state: string },
 ): IdeaEntity {
     const body = document.body;
     return {
@@ -77,8 +77,6 @@ export function ideaEntityOf(
         expected_outcome: pickString(body, 'expected_outcome'),
         success_metrics: pickString(body, 'success_metrics'),
         state: current.state,
-        state_at: current.at,
-        state_event_id: current.id,
     };
 }
 

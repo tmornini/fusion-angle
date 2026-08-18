@@ -82,15 +82,13 @@ async function seedProject(
     await putProject(ctx, id, {
         ...entity,
         state,
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'sp-' + id,
     });
 }
 
 // Seeds an idea through the SAME document PUT the live route
 // uses (putIdea) and its submission through the live
 // submissions PUT, so both message pairs exist — required for
-// the flipped GET ideas / GET ideas/:id/submissions routes
+// the flipped GET ideas / GET organizations/:id/ideas/:id/submissions routes
 // (Phase 2 Task 5), which getIdeas (getOrganizationStats' idea
 // count) reads, to derive them. A fixed historical stateAt
 // (matching the old seedIdeaState idiom this replaces) rather
@@ -107,10 +105,8 @@ async function seedIdea(
     await putIdea(ctx, id, {
         ...entity,
         state,
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'si-' + id,
     });
-    await ctx.PUT('ideas/' + id + '/submissions/sub-' + id, {
+    await ctx.PUT('organizations/1/ideas/' + id + '/submissions/sub-' + id, {
         idea_id: id,
         member_id: submitter,
         at: '2026-04-01T00:00:00.000000Z',
@@ -232,16 +228,12 @@ test(
         await putProject(ctx, 'p1', {
             ...pFields,
             state: 'declined',
-            stateAt: '2026-01-02T00:00:00.000000Z',
-            stateEventId: 'sp1-next',
         });
         const { organization_id: _ideaOrganizationId, ...iFields } =
             buildIdea('i1');
         await putIdea(ctx, 'i1', {
             ...iFields,
             state: 'archived',
-            stateAt: '2026-01-02T00:00:01.000000Z',
-            stateEventId: 'si1-next',
         });
         stats = await getOrganizationStats(ctx);
         assert.equal(stats.projectsCurrent, 0);

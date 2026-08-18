@@ -23,8 +23,8 @@ const AT = '2026-06-15T09:30:00.123456Z';
 
 const validInput = {
     method: 'PUT',
-    pathname: '/ideas/42',
-    routePattern: 'ideas/:id',
+    pathname: '/organizations/1/ideas/42',
+    routePattern: 'organizations/:id/ideas/:id',
     routeSegments: ['ideas', ':id'],
     pathSegments: ['ideas', '42'],
     headerFields: [],
@@ -41,7 +41,7 @@ test('canonical JSON is stable across key permutations',
 () => {
     const a = buildRequestModel({
         method: 'PUT',
-        target: '/ideas/42',
+        target: '/organizations/1/ideas/42',
         fields: [
             { name: 'idempotency-key', value: 'k1' },
             { name: 'authorization', value: 'Bearer x' },
@@ -50,7 +50,7 @@ test('canonical JSON is stable across key permutations',
     });
     const b = buildRequestModel({
         method: 'PUT',
-        target: '/ideas/42',
+        target: '/organizations/1/ideas/42',
         fields: [
             { name: 'authorization', value: 'Bearer x' },
             { name: 'idempotency-key', value: 'k1' },

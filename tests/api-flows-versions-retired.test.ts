@@ -9,7 +9,7 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 
-// Succession pin: pair-chain GET /flows/:id/versions is
+// Succession pin: pair-chain GET /organizations/:id/flows/:id/versions is
 // 200/404 by document existence. Old table-backed :vid
 // stays a miss (404). Writes stay unwired (405).
 
@@ -57,13 +57,13 @@ async () => {
     const token = await organizationToken();
     const put = await handleRequest(
         db,
-        req('PUT', '/flows/flow-ver-1', token, flowBody()),
+        req('PUT', '/organizations/1/flows/flow-ver-1', token, flowBody()),
     );
     assert.equal(put.status, 201);
 
     const index = await handleRequest(
         db,
-        req('GET', '/flows/flow-ver-1/versions', token),
+        req('GET', '/organizations/1/flows/flow-ver-1/versions/', token),
     );
     assert.equal(index.status, 200);
     const rows = await index.json() as { id: string }[];
@@ -71,14 +71,14 @@ async () => {
 
     const retired = await handleRequest(
         db,
-        req('GET', '/flows/flow-ver-1/history', token),
+        req('GET', '/organizations/1/flows/flow-ver-1/history', token),
     );
     assert.equal(retired.status, 404);
 
     const tableVid = await handleRequest(
         db,
         req(
-            'GET', '/flows/flow-ver-1/versions/vid-1',
+            'GET', '/organizations/1/flows/flow-ver-1/versions/vid-1',
             token,
         ),
     );
@@ -86,13 +86,13 @@ async () => {
 
     const missing = await handleRequest(
         db,
-        req('GET', '/flows/missing-flow/versions', token),
+        req('GET', '/organizations/1/flows/missing-flow/versions/', token),
     );
     assert.equal(missing.status, 404);
 
     const writePaths = [
-        '/flows/flow-ver-1/versions',
-        '/flows/flow-ver-1/versions/vid-1',
+        '/organizations/1/flows/flow-ver-1/versions/',
+        '/organizations/1/flows/flow-ver-1/versions/vid-1',
     ];
     for (const path of writePaths) {
         for (const method of ['POST', 'PUT', 'DELETE']) {

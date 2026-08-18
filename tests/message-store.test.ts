@@ -34,8 +34,8 @@ async function writePair(
     const deleted = input.method === 'DELETE';
     const pair = await formWritePair({
         method: input.method,
-        pathname: '/ideas/' + input.uriId,
-        routePattern: 'ideas/:id',
+        pathname: '/organizations/1/ideas/' + input.uriId,
+        routePattern: 'organizations/:id/ideas/:id',
         routeSegments: ['ideas', ':id'],
         pathSegments: ['ideas', input.uriId],
         headerFields: [],

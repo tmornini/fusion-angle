@@ -28,13 +28,13 @@ import {
 } from './http-fixtures.ts';
 
 // Phase 5 Task 2 (fourth-family, 'stateless' evidence): PUT
-// /work-orders/:id takes the entity's OWN fields only — no
-// lifecycle trio, unlike ideas/projects/flows (Decision 7). A
-// work order's lifecycle is written ONLY by the create/claim/
-// transition/release ops, so a body carrying state/state_at/
-// state_event_id 400s at the gate
-// (validateWorkOrderDocumentBody), and the op posts no states
-// event of its own.
+// /organizations/:id/work-orders/:id takes the entity's OWN
+// fields only — no lifecycle trio, unlike ideas, projects,
+// and flows (Decision 7). A work order's lifecycle is
+// written ONLY by the create/claim/transition/release ops,
+// so a body carrying state/state_at/state_event_id 400s at
+// the gate (validateWorkOrderDocumentBody), and the op
+// posts no states event of its own.
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -140,8 +140,8 @@ test('postWorkOrderDocumentOp returns the entity and the'
     };
     const pair = await formWritePair({
         method: 'PUT',
-        pathname: '/work-orders/wo-doc-op-1',
-        routePattern: 'work-orders/:id',
+        pathname: '/organizations/1/work-orders/wo-doc-op-1',
+        routePattern: 'organizations/:id/work-orders/:id',
         routeSegments: ['work-orders', ':id'],
         pathSegments: ['work-orders', 'wo-doc-op-1'],
         headerFields: [], body,
@@ -166,21 +166,23 @@ test('postWorkOrderDocumentOp returns the entity and the'
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
 // at the op level — see tests/api-idea-document.test.ts's own
 // "a byte-identical resend converges" case). This exercises the
-// CURRENT hand-written work-orders/:id PUT (unchanged until the
+// CURRENT hand-written organizations/:id/work-orders/:id PUT (unchanged until
+// the
 // absorption commit registers WORK_ORDERS_WIRING) — the fast
 // path lives at the gate (api.ts), agnostic to which op serves
 // the route, so this pin holds unchanged straight through the
 // absorption (finding 11: wire-byte parity). -----------------
 
-test('a byte-identical PUT resend to work-orders/:id converges'
+test('a byte-identical PUT resend to'
+    + ' organizations/:id/work-orders/:id converges'
 + ' to one stored request/response pair', async () => {
     const db = await freshDb();
     const body = documentFields();
     const first = await PUT(
-        db, 'work-orders/wo-resend-1', body, DEV_TOKEN,
+        db, 'organizations/1/work-orders/wo-resend-1', body, DEV_TOKEN,
     );
     const second = await PUT(
-        db, 'work-orders/wo-resend-1', body, DEV_TOKEN,
+        db, 'organizations/1/work-orders/wo-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
     assert.equal((await db.requests.getAll()).length, 3);
@@ -194,7 +196,8 @@ test('a byte-identical PUT resend to work-orders/:id converges'
 // the registry-driven create-address override), a synthesized
 // document pair (PUT-shaped, at the WO's own address), and a
 // synthesized join pair (PUT-shaped, at the
-// flows/:id/work-orders/:woid address). ----------------------
+// organizations/:id/flows/:id/work-orders/:woid address).
+// ----------------------
 
 function req(
     method: string,
@@ -312,7 +315,7 @@ test('a work-order create appends a PUT-shaped document pair'
 + ' address, all three sharing one requestAt', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
-        'POST', '/work-orders', DEV_TOKEN,
+        'POST', '/organizations/1/work-orders/', DEV_TOKEN,
         workOrderCreateBody('wo-c1', 'wo-c1-fwo', 'flow-c1'),
     ));
     assert.equal(res.status, 201);
@@ -351,7 +354,7 @@ test('a duplicate work-order create (same WO id) records'
 async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
-        'POST', '/work-orders', DEV_TOKEN,
+        'POST', '/organizations/1/work-orders/', DEV_TOKEN,
         workOrderCreateBody('wo-c2', 'wo-c2-fwo-a', 'flow-c2'),
     ));
     assert.equal(first.status, 201);
@@ -364,7 +367,7 @@ async () => {
     const firstDocumentId = firstDocumentRow!.id;
 
     const second = await handleRequest(db, req(
-        'POST', '/work-orders', DEV_TOKEN,
+        'POST', '/organizations/1/work-orders/', DEV_TOKEN,
         workOrderCreateBody(
             'wo-c2', 'wo-c2-fwo-b', 'flow-c2', 'wo-c2-revised',
         ),
@@ -391,7 +394,7 @@ test('a duplicate work-order create\'s own OPERATION pair'
 + ' stores no predecessor column', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
-        'POST', '/work-orders', DEV_TOKEN,
+        'POST', '/organizations/1/work-orders/', DEV_TOKEN,
         workOrderCreateBody('wo-c3', 'wo-c3-fwo-a', 'flow-c3'),
     ));
     assert.equal(first.status, 201);
@@ -402,7 +405,7 @@ test('a duplicate work-order create\'s own OPERATION pair'
     const firstDocumentId = firstDocumentRow!.id;
 
     const second = await handleRequest(db, req(
-        'POST', '/work-orders', DEV_TOKEN,
+        'POST', '/organizations/1/work-orders/', DEV_TOKEN,
         workOrderCreateBody('wo-c3', 'wo-c3-fwo-b', 'flow-c3'),
     ));
     assert.equal(second.status, 201);
@@ -424,7 +427,7 @@ test('a work-order create ignores a raw colliding states'
     // collision no longer aborts the pair-plane create.
     // Phase Final Stage B: states table retired.
     const res = await handleRequest(db, req(
-        'POST', '/work-orders', DEV_TOKEN,
+        'POST', '/organizations/1/work-orders/', DEV_TOKEN,
         workOrderCreateBody(
             'wo-c4-survives', flowWorkOrderId, 'flow-c4',
         ),

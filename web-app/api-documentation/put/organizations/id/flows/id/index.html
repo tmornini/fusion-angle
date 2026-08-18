@@ -1,0 +1,45 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PUT /organizations/:id/flows/:id</title>
+<h1>PUT /organizations/:id/flows/:id</h1>
+<h2>Request body</h2>
+<pre>
+{
+  "name": "name",
+  "is_locked": false,
+  "is_auto_layout": false,
+  "is_auto_fit": false,
+  "lock_timeout": 0,
+  "state": "active",
+  "state_at": "2020-01-01T00:00:00.000Z",
+  "state_event_id": "id",
+  "graph": {
+    "nodes": [],
+    "edges": []
+  },
+  "graphDelta": {
+    "nodes": [],
+    "edges": [],
+    "deletions": [],
+    "memberEvents": [],
+    "attributeEvents": []
+  },
+  "revivals": []
+}
+</pre>
+<h2>Headers</h2>
+<ul>
+  <li>Authorization: Bearer …</li>
+  <li>Operation-ID: on writes</li>
+  <li>If-Match: strong etag</li>
+</ul>
+<h2>Status</h2>
+<ul>
+  <li><a href="../../../../../statuses/200/">200</a></li>
+  <li><a href="../../../../../statuses/400/">400</a></li>
+  <li><a href="../../../../../statuses/401/">401</a></li>
+  <li><a href="../../../../../statuses/403/">403</a></li>
+  <li><a href="../../../../../statuses/404/">404</a></li>
+  <li><a href="../../../../../statuses/412/">412</a></li>
+  <li><a href="../../../../../statuses/428/">428</a></li>
+</ul>

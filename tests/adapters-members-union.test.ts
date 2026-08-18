@@ -14,7 +14,7 @@ import {
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getMembers,
@@ -70,7 +70,7 @@ test(
         await seedHumanMember(
             db, 'hw_sarah', 'Sarah Chen',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const roster = await getMembers(ctx);
         assert.ok(
             !roster.some(
@@ -91,7 +91,7 @@ test(
     + ' with correct kind discriminator',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const members = await getMembers(ctx);
         assert.equal(members.length, 3);
         const human = members.find(
@@ -117,9 +117,9 @@ test(
     async () => {
         const { db } = await setupSeeded();
         const ctx = createRequestContext(
-            db, await devToken(),
+            db, await organizationToken(),
         );
-        await ctx.PUT('ideas/i1', {
+        await ctx.PUT('organizations/1/ideas/i1', {
             title: 'I',
             position: 1,
             problem_statement: 'p',
@@ -128,8 +128,6 @@ test(
             expected_outcome: 'o',
             success_metrics: 'm',
             state: 'active',
-            state_at: '2026-01-01T00:00:00.000000Z',
-            state_event_id: 'ev-i1',
         });
         const members = await getMembers(ctx);
         const ids = members.map(m => m.idForLink());
@@ -147,7 +145,7 @@ test(
     + ' present',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assert.equal(map.size, 4);
         const human = map.get('hw_sarah_chen')!;
@@ -164,7 +162,7 @@ test(
     + ' both human and AI kinds',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
@@ -182,7 +180,7 @@ test(
     + ' and AI kinds',
     async () => {
         const { db } = await setupSeeded();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
@@ -282,7 +280,7 @@ test(
         await seedSeat(
             db, '1', 'member_without_pii', 'member',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'member_without_pii'),

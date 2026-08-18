@@ -48,33 +48,33 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('PATCH /ideas/idea-1 admin → 405 (known verb, no'
+test('PATCH /organizations/1/ideas/idea-1 admin → 405 (known verb, no'
 + ' handler)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PATCH', '/ideas/idea-1', token, { set: {} },
+        'PATCH', '/organizations/1/ideas/idea-1', token, { set: {} },
     ));
     assert.equal(res.status, 405);
     const body = await res.json() as { error: string };
     assert.equal(
         body.error,
-        'Method PATCH not allowed on /ideas/idea-1',
+        'Method PATCH not allowed on /organizations/1/ideas/idea-1',
     );
 });
 
-test('PATCH /ideas/idea-1 member → 403 (policy before'
+test('PATCH /organizations/1/ideas/idea-1 member → 403 (policy before'
 + ' verb gap)', async () => {
     const db = await freshDb();
     const token = await organizationToken('member1');
     const res = await handleRequest(db, req(
-        'PATCH', '/ideas/idea-1', token, { set: {} },
+        'PATCH', '/organizations/1/ideas/idea-1', token, { set: {} },
     ));
     assert.equal(res.status, 403);
     const body = await res.json() as { error: string };
     assert.equal(
         body.error,
-        'forbidden: PATCH /ideas/idea-1 requires a role'
+        'forbidden: PATCH /organizations/1/ideas/idea-1 requires a role'
         + ' this principal lacks',
     );
 });
@@ -91,22 +91,22 @@ test('PATCH /nowhere admin → 404', async () => {
 test('PATCH unauthenticated → 401', async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
-        'PATCH', '/ideas/idea-1', undefined, {},
+        'PATCH', '/organizations/1/ideas/idea-1', undefined, {},
     ));
     assert.equal(res.status, 401);
 });
 
-test('writeAuthorizerFor includes PATCH on ideas/:id',
+test('writeAuthorizerFor includes PATCH on organizations/:id/ideas/:id',
 () => {
-    const put = writeAuthorizerFor('ideas/:id', 'PUT');
+    const put = writeAuthorizerFor('organizations/:id/ideas/:id', 'PUT');
     const patch = writeAuthorizerFor(
-        'ideas/:id', 'PATCH',
+        'organizations/:id/ideas/:id', 'PATCH',
     );
     const post = writeAuthorizerFor(
-        'ideas/:id', 'POST',
+        'organizations/:id/ideas/:id', 'POST',
     );
     assert.deepEqual(put, {
-        table: 'ideas', idParamIndex: 0,
+        table: 'ideas', idParamIndex: 1,
     });
     assert.deepEqual(patch, put);
     assert.equal(post, undefined);

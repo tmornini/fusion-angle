@@ -40,18 +40,16 @@ async () => {
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const put = await handleRequest(db, req(
-        'PUT', '/ideas/i1', token, {
+        'PUT', '/organizations/1/ideas/i1', token, {
             ...ideaBody('1', 'mine'),
             state: 'active',
-            state_at: '2026-01-01T00:00:00.000000Z',
-            state_event_id: 'ev-i1',
         }));
     assert.equal(put.status, 201);
     const list = await handleRequest(
-        db, req('GET', '/ideas', token));
+        db, req('GET', '/organizations/1/ideas/', token));
     assert.equal(list.status, 200);
     const roster = await handleRequest(
-        db, req('GET', '/organizations/1/members', token));
+        db, req('GET', '/organizations/1/members/', token));
     assert.equal(roster.status, 200);
 });
 
@@ -61,7 +59,7 @@ test('a member is denied the admin surfaces', async () => {
     // Admin surfaces stay deny-by-default. The
     // retired snapshot plane is gone, not probed.
     for (const [method, path] of [
-        ['GET', '/identities'],
+        ['GET', '/identities/'],
         ['PUT', '/organizations/1'],
         ['PUT', '/ai-agents/agent-1'],
     ] as const) {
@@ -108,7 +106,7 @@ test('GET /identities/:id/tokens 403s for a member'
     const db = await memberDb();
     const token = await devToken(MEMBER);
     const res = await handleRequest(
-        db, req('GET', '/identities/current/tokens', token));
+        db, req('GET', '/identities/current/tokens/', token));
     assert.equal(res.status, 403);
 });
 

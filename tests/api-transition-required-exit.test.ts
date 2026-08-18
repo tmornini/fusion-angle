@@ -25,7 +25,7 @@ import {
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
-// POST work-orders/:id/transition — W10 required-at-exit
+// POST organizations/:id/work-orders/:id/transition — W10 required-at-exit
 // gate (Task 9). Gate tier only: every transition leaving
 // a node with isRequired refs validates the MERGED
 // instance state; unbound at such a node → 400 naming
@@ -50,13 +50,13 @@ const FWO_FREE = 'fwo-req-exit-free';
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
-const ATTRS = TYPE_DETAIL + '/attributes';
-const INSTANCES = TYPE_DETAIL + '/instances';
-const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
+const ATTRS = TYPE_DETAIL + '/attributes/';
+const INSTANCES = TYPE_DETAIL + '/instances/';
+const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 const TRANSITION =
-    '/work-orders/' + WO_ID + '/transition';
+    '/organizations/1/work-orders/' + WO_ID + '/transition';
 const TRANSITION_FREE =
-    '/work-orders/' + WO_FREE + '/transition';
+    '/organizations/1/work-orders/' + WO_FREE + '/transition';
 
 function req(
     method: string,
@@ -236,7 +236,7 @@ async function seedFlow(
     token: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: FLOW_ID,
             flow: {
                 name: 'Req Exit Flow',
@@ -274,7 +274,7 @@ async function seedWorkOrder(
     flowGraph: Record<string, unknown>,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', '/work-orders/' + woId, token, {
+        'PUT', '/organizations/1/work-orders/' + woId, token, {
             display_id: 'abcd',
             flow_graph: flowGraph,
             position: 1,
@@ -283,7 +283,7 @@ async function seedWorkOrder(
     assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/work-orders/' + fwoId,
+        '/organizations/1/flows/' + FLOW_ID + '/work-orders/' + fwoId,
         token,
         {
             flow_id: FLOW_ID,
@@ -304,8 +304,6 @@ async function seedLiveType(
             description: '',
             position: 1,
             state: 'active',
-            state_at: AT,
-            state_event_id: TYPE_ID + '-genesis',
         },
     ));
     assert.equal(put.status, 201);
@@ -318,7 +316,7 @@ async function seedAttribute(
     body: Record<string, unknown>,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', ATTRS + '/' + attrId, token, body,
+        'PUT', ATTRS + attrId, token, body,
     ));
     assert.equal(put.status, 201);
 }
@@ -360,7 +358,7 @@ async function seedFlowTypeJoin(
 ): Promise<void> {
     const put = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/records/' + FR_ID,
+        '/organizations/1/flows/' + FLOW_ID + '/records/' + FR_ID,
         token,
         {
             id: FR_ID,
@@ -379,7 +377,7 @@ async function bindInstance(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'PUT',
-        '/work-orders/' + woId + '/binding',
+        '/organizations/1/work-orders/' + woId + '/binding',
         token,
         {
             instance_id: INSTANCE_ID,
@@ -398,7 +396,7 @@ async function placeOnStep(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'POST',
-        '/work-orders/' + woId + '/transition',
+        '/organizations/1/work-orders/' + woId + '/transition',
         token,
         pureMoveBody(eventId, 'n-step'),
     ));

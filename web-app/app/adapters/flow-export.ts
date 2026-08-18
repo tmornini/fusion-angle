@@ -37,6 +37,10 @@ import {
 import type { FlowGraph } from './flow-queries.ts';
 import type { RequestContext } from './shared.ts';
 import {
+    organizationCollection,
+    organizationItem,
+} from './shared.ts';
+import {
     generateMermaid,
 } from '../mermaid-generate.ts';
 import { parseMermaid } from '../mermaid-parse.ts';
@@ -241,7 +245,7 @@ async function getFlowBackupData(
     const [flow, projectFlows] =
         await Promise.all([
             ctx.GET<FlowWithGraph>(
-                'flows/' + flowId,
+                organizationItem(ctx, 'flows', flowId),
             ),
             getProjectFlowEntities(ctx),
         ]);
@@ -458,9 +462,11 @@ export async function computeFlowBackupResolution(
     // no second hop to the states log.
     const [flows, projects] =
         await Promise.all([
-            ctx.GET<FlowWithGraph[]>('flows'),
+            ctx.GET<FlowWithGraph[]>(
+                organizationCollection(ctx, 'flows'),
+            ),
             ctx.GET<ProjectEntity[]>(
-                'projects',
+                organizationCollection(ctx, 'projects'),
             ),
         ]);
     const flowExists = flows.some(
@@ -552,7 +558,9 @@ export async function postFlowFromBackup(
         now,
     );
     const linkId = generateCryptoSafeBase62();
-    await ctx.POST('flows', {
+    await ctx.POST(
+        organizationCollection(ctx, 'flows'),
+        {
         id: flowId,
         flow: {
             name: backup.flow.name,
@@ -861,7 +869,9 @@ export async function postFlowFromMermaid(
         now,
     );
     const linkId = generateCryptoSafeBase62();
-    await ctx.POST('flows', {
+    await ctx.POST(
+        organizationCollection(ctx, 'flows'),
+        {
         id: flowId,
         flow: {
             name: firstNode.name + ' (import)',
@@ -1207,7 +1217,9 @@ export async function postFlowFromZip(
         now,
     );
     const linkId = generateCryptoSafeBase62();
-    await ctx.POST('flows', {
+    await ctx.POST(
+        organizationCollection(ctx, 'flows'),
+        {
         id: flowId,
         flow: {
             name: flowName,

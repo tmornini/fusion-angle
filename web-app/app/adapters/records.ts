@@ -12,6 +12,7 @@ import {
 } from '../../../api/types.ts';
 import {
     activeOrganization,
+    organizationItem,
     type RequestContext,
 } from './shared.ts';
 import {
@@ -36,7 +37,8 @@ async function getAllFlowRecords(
     const flows = await getFlowEntities(ctx);
     const perFlow = await Promise.all(
         flows.map(f => ctx.GET<FlowRecordEntity[]>(
-            'flows/' + f.id + '/records',
+            organizationItem(ctx, 'flows', f.id)
+                + '/records/',
         )),
     );
     return perFlow.flat();
@@ -77,14 +79,14 @@ export function notifyRecordChange(): void {
 function recordTypesPath(ctx: RequestContext): string {
     return 'organizations/'
         + activeOrganization(ctx)
-        + '/record-types';
+        + '/record-types/';
 }
 
 function recordTypePath(
     ctx: RequestContext,
     id: RecordId,
 ): string {
-    return recordTypesPath(ctx) + '/' + id;
+    return recordTypesPath(ctx) + id;
 }
 
 export async function getRecordEntities(
@@ -114,8 +116,6 @@ function recordStateDetailFromRow(
         state: assertRecordState(
             row.state, 'record ' + row.id,
         ),
-        stateAt: row.state_at,
-        stateEventId: row.state_event_id,
     };
 }
 
@@ -149,7 +149,7 @@ export async function getRecords(
             RecordAttributeEntity[]
         >(
             recordTypePath(ctx, row.id)
-            + '/attributes',
+            + '/attributes/',
         )),
     );
     const attrCountByRecord = new Map<
@@ -200,28 +200,17 @@ export type RecordDocumentFields =
         RecordEntity,
         | 'id'
         | 'organization_id'
-        | 'state'
-        | 'state_at'
-        | 'state_event_id'
-    > & {
-        readonly state: RecordState;
-        readonly stateAt: string;
-        readonly stateEventId: string;
-    };
+    >;
 
 export async function putRecord(
     ctx: RequestContext,
     id: RecordId,
     document: RecordDocumentFields,
 ): Promise<void> {
-    const {
-        state, stateAt, stateEventId, ...entity
-    } = document;
+    const { state, ...entity } = document;
     await ctx.PUT(recordTypePath(ctx, id), {
         ...entity,
         state,
-        state_at: stateAt,
-        state_event_id: stateEventId,
     });
     recordChanges.notify();
 }
@@ -233,8 +222,6 @@ export interface RecordChangeCreate {
         | 'id'
         | 'organization_id'
         | 'state'
-        | 'state_at'
-        | 'state_event_id'
     >;
     readonly attributes: readonly Omit<
         RecordAttributeEntity, 'organization_id'
@@ -249,20 +236,12 @@ export interface RecordChangeEdit {
         | 'id'
         | 'organization_id'
         | 'state'
-        | 'state_at'
-        | 'state_event_id'
     >;
     readonly attributes: readonly Omit<
         RecordAttributeEntity, 'organization_id'
     >[];
     readonly removedAttributeIds: readonly string[];
-    // The echoed trio (Phase 6 Task 4): the caller already
-    // holds the detail model (Task 2's plumbing), so this is a
-    // zero-extra-fetch echo of the stored head, exactly like
-    // putRecord's own RecordDocumentFields — never a fresh mint.
     readonly state: RecordState;
-    readonly stateAt: string;
-    readonly stateEventId: string;
 }
 
 export type RecordChange =
@@ -303,8 +282,6 @@ export async function postRecordChange(
             record,
             attributes,
             state: change.state,
-            state_at: change.stateAt,
-            state_event_id: change.stateEventId,
             removedAttributeIds:
                 change.removedAttributeIds,
         });
@@ -326,17 +303,11 @@ export async function postRecordStateChange(
     const {
         id,
         state: _priorState,
-        state_at: _priorAt,
-        state_event_id: _priorEventId,
         ...entity
     } = record;
     void _priorState;
-    void _priorAt;
-    void _priorEventId;
     await putRecord(ctx, id, {
         ...entity,
         state,
-        stateAt: nowUtc(),
-        stateEventId: generateCryptoSafeBase62(),
     });
 }

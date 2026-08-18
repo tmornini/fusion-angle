@@ -16,6 +16,10 @@ import {
     isClaimState,
 } from '../../../api/work-order-claims.ts';
 import type { RequestContext } from './shared.ts';
+import {
+    organizationCollection,
+    organizationItem,
+} from './shared.ts';
 
 export type {
     WorkOrderEntity,
@@ -162,33 +166,31 @@ export function fieldValuesByEventFromHistory(
     return byEvent;
 }
 
-/* ── Bulk history ────────── */
+/* ── Per-item history fan-in ────────── */
 
-// GET work-orders/history — every org-scoped lifecycle
-// event with field_values folded, (at, id) DESC overall.
-// Group by entity_id preserving relative order so each
-// group's list stays DESC (index 0 is current per WO).
+// Parallel GET work-orders/:id/history for each live
+// work-order. Same Map shape as the retired bulk door.
 export async function getWorkOrderHistories(
     ctx: RequestContext,
 ): Promise<Map<Id, WorkOrderHistoryEventEntity[]>> {
-    const all = await ctx.GET<
-        WorkOrderHistoryEventEntity[]
-    >('work-orders/history');
-    const byEntity = new Map<
-        Id, WorkOrderHistoryEventEntity[]
-    >();
-    for (const ev of all) {
-        const list = byEntity.get(ev.entity_id);
-        if (list) {
-            list.push(ev);
-        } else {
-            byEntity.set(ev.entity_id, [ev]);
-        }
-    }
-    return byEntity;
+    const orders = await ctx.GET<{ id: Id }[]>(
+        organizationCollection(ctx, 'work-orders'),
+    );
+    const pairs = await Promise.all(
+        orders.map(async (row) => {
+            const history = await ctx.GET<
+                WorkOrderHistoryEventEntity[]
+            >(
+                organizationItem(ctx, 'work-orders', row.id)
+                    + '/history',
+            );
+            return [row.id, history] as const;
+        }),
+    );
+    return new Map(pairs);
 }
 
-// Bulk active claim: one history read, then per-WO
+// Active claims: fan-in per-item history, then per-WO
 // activeClaimFromHistory against that order's lockTimeout
 // (passed in — timeout lives in the frozen flow_graph the
 // caller already parses). Orders without a timeout entry
@@ -256,8 +258,8 @@ export function projectTransitions(
     return out;
 }
 
-// Bulk transitions for flow-stats and the workbox
-// inbox: one history read, then per-entity projection.
+// Transitions for flow-stats and the workbox inbox:
+// fan-in per-item history, then per-entity projection.
 // Groups with only claim events produce no map entry
 // (empty transition list is not useful to callers).
 export async function getTransitionEventsByWorkOrder(
@@ -286,7 +288,8 @@ export async function getWorkOrderHistory(
     id: Id,
 ): Promise<WorkOrderHistoryEventEntity[]> {
     return ctx.GET<WorkOrderHistoryEventEntity[]>(
-        `work-orders/${id}/history`,
+        organizationItem(ctx, 'work-orders', id)
+            + '/history',
     );
 }
 
@@ -377,7 +380,7 @@ async function getWorkOrderEntities(
     ctx: RequestContext,
 ): Promise<WorkOrderEntity[]> {
     return ctx.GET<WorkOrderEntity[]>(
-        'work-orders',
+        organizationCollection(ctx, 'work-orders'),
     );
 }
 
@@ -394,7 +397,10 @@ export async function getFlowWorkOrderEntities(
 ): Promise<FlowWorkOrderEntity[]> {
     return ctx.GET<
         FlowWorkOrderEntity[]
-    >('flows/' + flowId + '/work-orders');
+    >(
+        organizationItem(ctx, 'flows', flowId)
+            + '/work-orders/',
+    );
 }
 
 export async function getWorkOrder(
@@ -402,7 +408,7 @@ export async function getWorkOrder(
     id: string,
 ): Promise<WorkOrder> {
     const row = await ctx.GET<WorkOrderEntity>(
-        `work-orders/${id}`,
+        organizationItem(ctx, 'work-orders', id),
     );
     return toWorkOrder(row);
 }

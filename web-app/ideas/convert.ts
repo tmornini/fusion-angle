@@ -605,15 +605,11 @@ async function performConversion(
         id: _id,
         organization_id: _organizationId,
         state: _state,
-        state_at: _stateAt,
-        state_event_id: _stateEventId,
         ...promotedIdea
     } = ideaEntity;
     void _id;
     void _organizationId;
     void _state;
-    void _stateAt;
-    void _stateEventId;
     await postIdeaConversion(
         ctx,
         ideaId,

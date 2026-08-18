@@ -122,24 +122,24 @@ export function familyRegistration(
 // primary; the path org is never authorization alone — the
 // gate's org-match arm compares it to the fenced token org.
 export const RECORD_TYPES_COLLECTION_PATTERN =
-    'organizations/:organization-id/record-types';
+    'organizations/:organization-id/record-types/';
 export const RECORD_TYPE_DETAIL_PATTERN =
-    RECORD_TYPES_COLLECTION_PATTERN + '/:record-type-id';
+    RECORD_TYPES_COLLECTION_PATTERN + ':record-type-id';
 export const RECORD_TYPE_VERSIONS_PATTERN =
-    RECORD_TYPE_DETAIL_PATTERN + '/versions';
+    RECORD_TYPE_DETAIL_PATTERN + '/versions/';
 export const RECORD_TYPE_VERSION_PATTERN =
-    RECORD_TYPE_VERSIONS_PATTERN + '/:version';
+    RECORD_TYPE_VERSIONS_PATTERN + ':etag';
 // Nested attributes under a record type (Task 7).
 export const ATTRIBUTES_COLLECTION_PATTERN =
-    RECORD_TYPE_DETAIL_PATTERN + '/attributes';
+    RECORD_TYPE_DETAIL_PATTERN + '/attributes/';
 export const ATTRIBUTE_DETAIL_PATTERN =
-    ATTRIBUTES_COLLECTION_PATTERN + '/:attribute-id';
+    ATTRIBUTES_COLLECTION_PATTERN + ':attribute-id';
 // Nested instances under a record type (Task 20: public
 // PUT is 405; PATCH creates and updates).
 export const INSTANCES_COLLECTION_PATTERN =
-    RECORD_TYPE_DETAIL_PATTERN + '/instances';
+    RECORD_TYPE_DETAIL_PATTERN + '/instances/';
 export const INSTANCE_DETAIL_PATTERN =
-    INSTANCES_COLLECTION_PATTERN + '/:instance-id';
+    INSTANCES_COLLECTION_PATTERN + ':instance-id';
 export const INSTANCE_VERSIONS_PATTERN =
     INSTANCE_DETAIL_PATTERN + '/versions';
 export const INSTANCE_VERSION_PATTERN =
@@ -149,7 +149,7 @@ export const INSTANCE_VERSION_PATTERN =
 // privilege type. Collection prefix slice is the roster
 // of seats. Kind stays on the identity.
 export const ORGANIZATION_MEMBERS_COLLECTION_PATTERN =
-    'organizations/:organization-id/members';
+    'organizations/:organization-id/members/';
 export const ORGANIZATION_MEMBER_DETAIL_PATTERN =
     ORGANIZATION_MEMBERS_COLLECTION_PATTERN
-        + '/:identity-id';
+        + ':identity-id';

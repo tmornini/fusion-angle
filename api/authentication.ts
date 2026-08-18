@@ -961,7 +961,7 @@ async function grantTokenExchange(
 // bearer for a token scoped to `org` (subject == actor == the
 // caller). Returns 403, minting nothing, when the caller is
 // not a member — the gate's tenant fence. This is an INTERNAL
-// hop (api.ts's facadeRequest), never a real
+// hop, never a real
 // /authentication/token request, so it supplies no seed —
 // issueTokenPair forms no AUTH pair for it, exactly as before
 // Task 3. Its issued root STILL gets its own event pair (Phase

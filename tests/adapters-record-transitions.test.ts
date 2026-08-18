@@ -86,7 +86,7 @@ function buildFlowGraph(
 }
 
 // NAMED re-pin (Task 7): validateRecordTransition reads
-// work-orders/:id through the flipped GET (this commit), so
+// organizations/:id/work-orders/:id through the flipped GET (this commit), so
 // the fixture must land through the SAME wire-reachable PUT
 // the live route serves — a raw db.workOrders.put leaves no
 // message pair at this address. The genesis transition ALSO
@@ -108,7 +108,7 @@ async function seedWorkOrder(
     });
     // Genesis transition via the named op (states/:id
     // retired). pure-move instance shape; no claim release.
-    await ctx.POST('work-orders/' + id + '/transition', {
+    await ctx.POST('organizations/1/work-orders/' + id + '/transition', {
         transitionEventId: 't-create-' + id,
         targetState: currentNodeId,
         release: null,
@@ -116,12 +116,13 @@ async function seedWorkOrder(
     });
 }
 
-// NAMED re-pin (Task 7): the flipped GET flows/:id/records
-// derives from the message ledger too, the SAME reason as
-// seedFlowLink's own flows/:id/work-orders re-pin above — a
-// raw db.flowRecords.put leaves no pair at this address, so
-// the binding must land through the SAME wire-reachable PUT
-// the live route serves.
+// NAMED re-pin (Task 7): the flipped GET
+// organizations/:id/flows/:id/records derives from the
+// message ledger too, the SAME reason as seedFlowLink's
+// own organizations/:id/flows/:id/work-orders re-pin
+// above — a raw db.flowRecords.put leaves no pair at
+// this address, so the binding must land through the
+// SAME wire-reachable PUT the live route serves.
 async function seedBinding(
     db: MemoryDbAdapter,
     flowId: string,
@@ -129,7 +130,7 @@ async function seedBinding(
 ): Promise<void> {
     const ctx = createRequestContext(db, await organizationToken());
     await ctx.PUT(
-        'flows/' + flowId + '/records/fr-' + flowId,
+        'organizations/1/flows/' + flowId + '/records/fr-' + flowId,
         {
             flow_id: flowId,
             record_id: recordId,
@@ -162,12 +163,12 @@ async function seedFlowLink(
         name: flowId,
     });
     // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
-    // flows/:id/work-orders through the flipped GET (this
+    // organizations/:id/flows/:id/work-orders through the flipped GET (this
     // commit) — a raw db.flowWorkOrders.put leaves no message
     // pair at this address, so the join must land through the
     // SAME wire-reachable PUT the live route serves.
     await ctx.PUT(
-        'flows/' + flowId + '/work-orders/fwo-' + workOrderId,
+        'organizations/1/flows/' + flowId + '/work-orders/fwo-' + workOrderId,
         {
             flow_id: flowId,
             work_order_id: workOrderId,

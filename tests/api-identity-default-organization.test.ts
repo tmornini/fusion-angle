@@ -5,6 +5,10 @@ import {
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
+import { routes, matchRoute } from
+    '../api/routes.ts';
+import { pathSegmentsOf } from
+    '../api/path-segments.ts';
 import { devToken, organizationToken } from './token-fixtures.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
@@ -210,4 +214,17 @@ async () => {
         organization_id: string;
     };
     assert.equal(body.organization_id, '2');
+});
+
+test('GET identities/:id/default-organization'
+    + ' matches the table', () => {
+    const match = matchRoute(
+        routes,
+        pathSegmentsOf(
+            '/identities/abc/default-organization',
+        ),
+    );
+    assert.ok(match);
+    assert.equal(typeof match.route.get, 'function');
+    assert.equal(typeof match.route.put, 'function');
 });

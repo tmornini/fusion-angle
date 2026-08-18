@@ -124,7 +124,7 @@ async () => {
         'current', STARK_ORGANIZATION,
     );
     const res = await handleRequest(db, req(
-        'GET', '/work-orders/' + WO01_ID, token,
+        'GET', '/organizations/1/work-orders/' + WO01_ID, token,
     ));
     assert.equal(res.status, 200);
     const body = await res.json() as Record<

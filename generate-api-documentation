@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+node --strip-types \
+    web-app/app/generate-api-documentation.ts "$@"

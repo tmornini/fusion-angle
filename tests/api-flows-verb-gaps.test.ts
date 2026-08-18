@@ -15,11 +15,13 @@ import {
 // Pins the CURRENT status of every deliberate flows-family
 // verb gap, through handleRequest, so the third-family
 // absorption (api/document-family.ts) cannot silently move
-// one — the generic constructors replace ideas/projects route
-// scaffolding, never flows/:id (Task 3 flips flows), but a
-// gate-level regression could still shift these. A future
-// change to any of these five statuses must re-derive the
-// covenant deliberately, not by accident of refactoring.
+// one — the generic constructors replace
+// organizations/:id/ideas|projects route scaffolding,
+// never organizations/:id/flows/:id (Task 3 flips
+// flows), but a gate-level regression could still
+// shift these. A future change to any of these five
+// statuses must re-derive the covenant deliberately,
+// not by accident of refactoring.
 
 const BASE = 'http://localhost';
 
@@ -44,72 +46,72 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('DELETE flows/:id 405s (no delete handler wired)',
+test('DELETE organizations/:id/flows/:id 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/flows/f1', token),
+        db, req('DELETE', '/organizations/1/flows/f1', token),
     );
     assert.equal(res.status, 405);
 });
 
 // Task 10: PATCH alphabet — no flows-family patch yet.
-test('PATCH flows/:id 405s (no patch handler wired)',
+test('PATCH organizations/:id/flows/:id 405s (no patch handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PATCH', '/flows/f1', token, {},
+        'PATCH', '/organizations/1/flows/f1', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-// POST flows/:id/versions/:vid verb-gap RETIRED with the
+// POST organizations/:id/flows/:id/versions/:vid verb-gap RETIRED with the
 // versions routes (Phase 15 Task 7) — router 404, not 405.
 
-test('GET projects/:id/flows/:pfid 405s (no get handler'
+test('GET organizations/:id/projects/:id/flows/:pfid 405s (no get handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/projects/p1/flows/pf1', token),
+        db, req('GET', '/organizations/1/projects/p1/flows/pf1', token),
     );
     assert.equal(res.status, 405);
 });
 
-test('DELETE flows/:id/work-orders/:woid 405s (no delete'
+test('DELETE organizations/:id/flows/:id/work-orders/:woid 405s (no delete'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'DELETE', '/flows/f1/work-orders/wo1', token,
+        'DELETE', '/organizations/1/flows/f1/work-orders/wo1', token,
     ));
     assert.equal(res.status, 405);
 });
 
-test('PUT flows/:id/undo 405s (no put handler wired)',
+test('PUT organizations/:id/flows/:id/undo 405s (no put handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/flows/f1/undo', token, {},
+        'PUT', '/organizations/1/flows/f1/undo', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
 // Task 4 (R1/E5): redo folds into the locked save — the
-// POST /flows/:id/redo route leaves the URI tree entirely,
+// POST /organizations/:id/flows/:id/redo route leaves the URI tree entirely,
 // so a request against it now finds no matching pattern at
 // all (404), not a method-absent 405 against a still-live
 // segment. Additive pin: today (pre-fold) this same request
 // still 204s.
-test('POST flows/:id/redo 404s (route retired; redo now'
+test('POST organizations/:id/flows/:id/redo 404s (route retired; redo now'
 + ' rides client document-PUT only)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/flows/f1/redo', token, {
+        'POST', '/organizations/1/flows/f1/redo', token, {
             version: {
                 id: 'ver-redo',
                 version: {

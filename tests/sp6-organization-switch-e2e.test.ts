@@ -52,14 +52,14 @@ async () => {
 
     const membersA = idsOf(
         await GET<{ id: string }[]>(
-            db, 'organizations/1/members', tokA));
+            db, 'organizations/1/members/', tokA));
     const membersB = idsOf(
         await GET<{ id: string }[]>(
-            db, 'organizations/2/members', tokB));
+            db, 'organizations/2/members/', tokB));
     const ideasA = idsOf(
-        await GET<{ id: string }[]>(db, 'ideas', tokA));
+        await GET<{ id: string }[]>(db, 'organizations/1/ideas/', tokA));
     const ideasB = idsOf(
-        await GET<{ id: string }[]>(db, 'ideas', tokB));
+        await GET<{ id: string }[]>(db, 'organizations/2/ideas/', tokB));
 
     assert.ok(
         membersA.length > 0 && membersB.length > 0,
@@ -83,11 +83,11 @@ async () => {
     const db = await seeded();
     const flat = await devToken('current');
     const flatIdeas = idsOf(
-        await GET<{ id: string }[]>(db, 'ideas', flat));
+        await GET<{ id: string }[]>(db, 'organizations/1/ideas/', flat));
     const ctx = createRequestContext(db, flat);
     const tokA = await postOrganizationSessionExchange(ctx, flat, '1');
     const organization1Ideas = idsOf(
-        await GET<{ id: string }[]>(db, 'ideas', tokA));
+        await GET<{ id: string }[]>(db, 'organizations/1/ideas/', tokA));
     // a flat token resolves to its primary org '1' (same view)
     assert.deepEqual(flatIdeas, organization1Ideas);
 });

@@ -9,7 +9,7 @@ import {
 } from '../api/validators.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     getArchivedObjectiveIds,
     getObjectives,
@@ -55,7 +55,7 @@ async function projectIdsByState(
 test('seeds every objective seed plus the org-2 objective',
 async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     const rows = await getObjectives(ctx);
     // getObjectives is org-scoped to the token's org (Stark).
     assert.equal(rows.length, OBJECTIVE_SEEDS.length);
@@ -65,28 +65,13 @@ async () => {
         const {
             id: _id,
             state: _s,
-            state_at: _at,
-            state_event_id: _ev,
             ...body
         } = r;
         void _s;
-        void _at;
-        void _ev;
         assert.ok(
             typeof r.state === 'string'
             && r.state.length > 0,
             'objective ' + r.id + ' missing state',
-        );
-        assert.ok(
-            typeof r.state_at === 'string'
-            && r.state_at.length > 0,
-            'objective ' + r.id + ' missing state_at',
-        );
-        assert.ok(
-            typeof r.state_event_id === 'string'
-            && r.state_event_id.length > 0,
-            'objective ' + r.id
-            + ' missing state_event_id',
         );
         validateObjectiveEntity(body);
     }
@@ -128,7 +113,7 @@ test('postMockDataLoad seeds one revision per objective',
 test('postMockDataLoad seeds zero archived objectives',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const ids = await getArchivedObjectiveIds(ctx);
         assert.equal(ids.size, 0);
     });
@@ -136,7 +121,7 @@ test('postMockDataLoad seeds zero archived objectives',
 test('approved projects have full baseline coverage',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -181,7 +166,7 @@ test('approved projects have full baseline coverage',
 test('completed projects have at least one actual per pair',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const completed = await projectIdsByState(
             ctx, 'archived',
         );
@@ -215,7 +200,7 @@ test('completed projects have at least one actual per pair',
 test('approved projects have an actual for every pair',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const approved = await projectIdsByState(
             ctx, 'approved',
         );
@@ -248,7 +233,7 @@ test('approved projects have an actual for every pair',
 
 test('submitted projects have zero scores', async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     const submitted = await projectIdsByState(
         ctx, 'submitted',
     );
@@ -271,7 +256,7 @@ test('submitted projects have zero scores', async () => {
 test('a seeded baseline score\'s author matches the pinned'
 + ' pre-hoist pick', async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     const baselines = await getBaselineScoresForProject(
         ctx, 'u6YkHhlGc91oDMkr3x0isa',
     );
@@ -285,7 +270,7 @@ test('a seeded baseline score\'s author matches the pinned'
 test('a seeded actual-score triple\'s per-index authors match'
 + ' the pinned pre-hoist picks', async () => {
     const db = await sharedMockDb();
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     const actuals = await getActualScoresForProject(
         ctx, 'jRE2Tj32NHsFGZIeEADp0p',
     );

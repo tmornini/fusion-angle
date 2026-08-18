@@ -113,7 +113,7 @@ async function deriveOrganizationFacts(
         ? []
         : await ctx.GET<MembershipEntity[]>(
             'organizations/' + organization
-                + '/members',
+                + '/members/',
         );
     const identities = new Set(
         seats.map(m => m.identity_id),

@@ -290,7 +290,7 @@ async () => {
 
     const collectionRes = await handleRequest(
         db, req(
-            'GET', '/identities/current/tokens', DEV_TOKEN,
+            'GET', '/identities/current/tokens/', DEV_TOKEN,
         ),
     );
     assert.equal(collectionRes.status, 200);
@@ -414,7 +414,7 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
     // Live BEFORE revocation: access token reaches admin route.
     const before = await handleRequest(
         db, req(
-            'GET', '/identities/current/tokens', accessToken,
+            'GET', '/identities/current/tokens/', accessToken,
         ),
     );
     assert.equal(before.status, 200);
@@ -430,7 +430,7 @@ test('SECURITY NAMED COVENANT: a revoked chain\'s ACCESS'
     // ACCESS still passes the gate (≤15-min staleness covenant).
     const afterAccess = await handleRequest(
         db, req(
-            'GET', '/identities/current/tokens', accessToken,
+            'GET', '/identities/current/tokens/', accessToken,
         ),
     );
     assert.equal(afterAccess.status, 200);
@@ -526,7 +526,7 @@ test('GET /identities/current/tokens is a 200 array',
 async () => {
     const db = await freshDb();
     const res = await handleRequest(
-        db, req('GET', '/identities/current/tokens', DEV_TOKEN),
+        db, req('GET', '/identities/current/tokens/', DEV_TOKEN),
     );
     assert.equal(res.status, 200);
     const rows = await res.json() as unknown;
@@ -556,7 +556,7 @@ async () => {
     ));
     assert.ok(put.status === 200 || put.status === 201);
     const list = await handleRequest(
-        db, req('GET', '/identities/current/tokens', DEV_TOKEN),
+        db, req('GET', '/identities/current/tokens/', DEV_TOKEN),
     );
     assert.equal(list.status, 200);
     const rows = await list.json() as readonly {
@@ -611,7 +611,7 @@ async () => {
         },
     );
     const res = await handleRequest(
-        db, req('GET', '/identities/current/tokens', DEV_TOKEN),
+        db, req('GET', '/identities/current/tokens/', DEV_TOKEN),
     );
     assert.equal(res.status, 200);
     const rows = await res.json() as readonly {

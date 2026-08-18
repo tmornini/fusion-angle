@@ -52,6 +52,7 @@ import { seededMockDb } from './mock-seed.ts';
 
 const RECORDS_WIRING: DocumentFamilyWiring = {
     family: 'record-types',
+    httpNest: 'organization',
     lifecycle: 'trio',
     notFoundTable: 'record_types',
     validateDocument: validateRecordDocumentBody,
@@ -90,7 +91,7 @@ async function derivedRecordAttributes(
         db,
         new Request(
             'http://localhost/organizations/'
-            + organization + '/record-types',
+            + organization + '/record-types/',
             {
                 headers: {
                     Authorization: 'Bearer ' + token,
@@ -113,7 +114,7 @@ async function derivedRecordAttributes(
             new Request(
                 'http://localhost/organizations/'
                 + organization + '/record-types/'
-                + type.id + '/attributes',
+                + type.id + '/attributes/',
                 {
                     headers: {
                         Authorization: 'Bearer ' + token,
@@ -136,6 +137,7 @@ async function derivedRecordAttributes(
 
 const OBJECTIVES_WIRING: DocumentFamilyWiring = {
     family: 'objectives',
+    httpNest: 'organization',
     lifecycle: 'trio',
     notFoundTable: 'objectives',
     validateDocument: validateObjectiveDocumentBody,
@@ -303,7 +305,7 @@ test('every work order belongs to org 1', async () => {
     );
     const res = await handleRequest(
         db,
-        new Request('http://localhost/work-orders', {
+        new Request('http://localhost/organizations/1/work-orders/', {
             headers: {
                 Authorization: 'Bearer ' + token,
             },
@@ -324,7 +326,10 @@ test('every work order belongs to org 1', async () => {
     );
     const empty = await handleRequest(
         db,
-        new Request('http://localhost/work-orders', {
+        new Request(
+            'http://localhost/organizations/'
+                + ORGANIZATION_TWO + '/work-orders/',
+            {
             headers: {
                 Authorization: 'Bearer ' + tokenTwo,
             },

@@ -18,26 +18,26 @@ import { seededMockDb } from './mock-seed.ts';
 // store to exist too — the GET round-trips end
 // to end.
 const COLLECTION_ROUTES: readonly string[] = [
-    'organizations',
-    'organizations/1/members',
-    'ai-agents',
-    'ideas',
-    'projects',
-    'flows',
-    'projects/any-project/flows',
-    'work-orders',
-    'work-orders/history',
-    'flows/any-flow/work-orders',
+    'identities/any-id/organizations/',
+    'organizations/1/members/',
+    'ai-agents/',
+    'organizations/1/ideas/',
+    'organizations/1/projects/',
+    'organizations/1/flows/',
+    'organizations/1/projects/any-project/flows/',
+    'organizations/1/work-orders/',
+    'organizations/1/flows/any-flow/work-orders/',
     // GET states/:id/field-values RETIRED (C4); field values
     // fold on work-orders/:id/history.
-    'organizations/1/record-types',
-    'flows/any-flow/records',
-    'ideas/any-idea/submissions',
-    'objectives',
-    'objectives/versions',
-    'objectives/any-objective/revisions',
-    'projects/any-project/objective-baseline-scores',
-    'projects/any-project/objective-actual-scores',
+    'organizations/1/record-types/',
+    'organizations/1/flows/any-flow/records/',
+    'organizations/1/ideas/any-idea/submissions/',
+    'organizations/1/objectives/',
+    'organizations/1/objectives/any-objective/revisions/',
+    'organizations/1/projects/any-project'
+        + '/objective-baseline-scores/',
+    'organizations/1/projects/any-project'
+        + '/objective-actual-scores/',
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3).
 ];
@@ -60,24 +60,18 @@ for (const route of COLLECTION_ROUTES) {
     );
 }
 
-// GET /organizations routes through the pre-matchRoute guard in
-// handleRequest (api.ts), never the route('organizations', {get})
-// table entry — that entry was dead code, unreachable by
-// construction, and is now REMOVED (API.md §5.18 carries the
-// control-flow argument). Proof: a SINGLE-organization caller
-// sees ONLY their own
-// membership org here, never every seeded org — the surviving
-// path (organizationsEnumerationRequest) self-fences to the
-// caller's memberships; the removed table entry's own handler
-// (db.organizations.getAll(), unfenced) would have returned BOTH
-// seeded orgs had it ever been reached.
-test('GET /organizations self-fences to the caller\'s own'
-+ ' memberships — the membership-filtered path, never the'
-+ ' removed unfenced route table entry', async () => {
+// Enumeration lives on the identity nest. A
+// SINGLE-organization caller sees only their own
+// membership org, never every seeded org.
+test('GET /identities/:id/organizations/ self-fences'
++ ' to the path identity\'s own memberships',
+async () => {
     const db = await seededMockDb();
     const singleOrganizationIdentityId = buildMembers()[0]!.id;
     const rows = await GET<OrganizationEntity[]>(
-        db, 'organizations',
+        db,
+        'identities/' + singleOrganizationIdentityId
+            + '/organizations/',
         await devToken(singleOrganizationIdentityId),
     );
     assert.equal(rows.length, 1);

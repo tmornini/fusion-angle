@@ -1,4 +1,7 @@
 {
+    "api-documentation": {
+        "readyMs": 120
+    },
     "auth": {
         "readyMs": 94
     },

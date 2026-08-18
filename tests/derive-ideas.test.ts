@@ -39,8 +39,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 function ideaDocument(
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
 ): Record<string, unknown> {
     return {
         title,
@@ -51,8 +49,6 @@ function ideaDocument(
         expected_outcome: 'o',
         success_metrics: 'm',
         state,
-        state_at: stateAt,
-        state_event_id: stateEventId,
     };
 }
 
@@ -62,12 +58,10 @@ function putIdea(
     id: string,
     title: string,
     state: string,
-    stateAt: string,
-    stateEventId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', '/ideas/' + id, token,
-        ideaDocument(title, state, stateAt, stateEventId),
+        'PUT', '/organizations/1/ideas/' + id, token,
+        ideaDocument(title, state),
     ));
 }
 
@@ -76,7 +70,6 @@ test('a created idea derives', async () => {
     const token = await organizationToken();
     const res = await putIdea(
         db, token, 'idea-drv-created', 'Fresh Idea', 'active',
-        '2026-02-01T00:00:00.000000Z', 'ev-drv-created',
     );
     assert.equal(res.status, 201);
     const derived = await deriveIdea(
@@ -93,8 +86,6 @@ test('a created idea derives', async () => {
         expected_outcome: 'o',
         success_metrics: 'm',
         state: 'active',
-        state_at: '2026-02-01T00:00:00.000000Z',
-        state_event_id: 'ev-drv-created',
     });
 });
 
@@ -103,13 +94,10 @@ test('an edited idea derives the edit body', async () => {
     const token = await organizationToken();
     await putIdea(
         db, token, 'idea-drv-edited', 'Before Edit', 'active',
-        '2026-02-01T00:00:00.000000Z', 'ev-drv-edited',
     );
-    // Same trio (state/state_at/state_event_id unchanged) — the
-    // MEMBER_ID CAVEAT edit shape: only the entity fields move.
+    // Same domain state — only the entity fields move.
     const res = await putIdea(
         db, token, 'idea-drv-edited', 'After Edit', 'active',
-        '2026-02-01T00:00:00.000000Z', 'ev-drv-edited',
     );
     assert.equal(res.status, 201);
     const derived = await deriveIdea(
@@ -131,11 +119,9 @@ test(
         const token = await organizationToken();
         await putIdea(
             db, token, 'idea-drv-deleted', 'Doomed', 'active',
-            '2026-02-01T00:00:00.000000Z', 'ev-drv-deleted-genesis',
         );
         const res = await putIdea(
             db, token, 'idea-drv-deleted', 'Doomed', 'deleted',
-            '2026-02-02T00:00:00.000000Z', 'ev-drv-deleted-tomb',
         );
         assert.equal(res.status, 201);
 
@@ -154,68 +140,36 @@ test(
 );
 
 test(
-    'a clock-skewed transition does NOT displace genesis',
+    'a later deleted PUT tombs the idea',
     async () => {
         const db = await seededDb();
         const token = await organizationToken();
-        // Genesis claims a LATER state_at than the skewed
-        // transition below — exactly the clock-skew scenario the
-        // (state_at, id) reduction must resist.
         await putIdea(
-            db, token, 'idea-drv-skew', 'Genesis Title', 'active',
-            '2026-06-01T00:00:00.000000Z', 'ev-drv-skew-genesis',
+            db, token, 'idea-drv-tomb', 'Genesis Title',
+            'active',
         );
         const res = await putIdea(
-            db, token, 'idea-drv-skew', 'Skewed Title', 'deleted',
-            '2020-01-01T00:00:00.000000Z', 'ev-drv-skew-later',
+            db, token, 'idea-drv-tomb', 'Tomb Title',
+            'deleted',
         );
         assert.equal(res.status, 201);
-
-        // Genesis must still win the lifecycle reduction: the
-        // idea stays visible despite the later-arriving 'deleted'
-        // transition, because that transition's OWN state_at is
-        // older than genesis's.
-        const derived = await deriveIdea(
-            db, STARK_ORGANIZATION, 'idea-drv-skew',
-        );
-        // Arrival order still governs the entity's OTHER fields —
-        // the two reductions are independent.
-        assert.equal(derived.title, 'Skewed Title');
         const ideas = await deriveIdeas(db, STARK_ORGANIZATION);
         assert.equal(
-            ideas.some((idea) => idea.id === 'idea-drv-skew'),
-            true,
+            ideas.some((idea) => idea.id === 'idea-drv-tomb'),
+            false,
         );
-
+        await assert.rejects(
+            () => deriveIdea(
+                db, STARK_ORGANIZATION, 'idea-drv-tomb',
+            ),
+            EntityNotFoundError,
+        );
         const history = await deriveIdeaStateHistory(
-            db, STARK_ORGANIZATION, 'idea-drv-skew',
+            db, STARK_ORGANIZATION, 'idea-drv-tomb',
         );
-        // Order- AND content-sensitive: (state_at, id)
-        // ascending — the SAME order store-state.ts's
-        // getAllForIn returns. The later-ARRIVED but earlier-
-        // STAMPED 'deleted' event sorts FIRST; genesis SECOND.
-        assert.deepEqual(
-            history.map((entry) => ({
-                id: entry.id,
-                entity_id: entry.entity_id,
-                state: entry.state,
-                at: entry.at,
-            })),
-            [
-                {
-                    id: 'ev-drv-skew-later',
-                    entity_id: 'idea-drv-skew',
-                    state: 'deleted',
-                    at: '2020-01-01T00:00:00.000000Z',
-                },
-                {
-                    id: 'ev-drv-skew-genesis',
-                    entity_id: 'idea-drv-skew',
-                    state: 'active',
-                    at: '2026-06-01T00:00:00.000000Z',
-                },
-            ],
-        );
+        assert.equal(history.length, 2);
+        assert.equal(history[0]!.state, 'active');
+        assert.equal(history[1]!.state, 'deleted');
     },
 );
 
@@ -228,7 +182,6 @@ test('ordering is oldest live head (at, id)', async () => {
     for (const id of ids) {
         await putIdea(
             db, token, id, 'Order ' + id, 'active',
-            '2026-02-01T00:00:00.000000Z', 'ev-' + id,
         );
     }
     const derived = await deriveIdeas(db, STARK_ORGANIZATION);

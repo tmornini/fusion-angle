@@ -271,24 +271,27 @@ test('grant -> accept -> human-member create -> edit -> erase'
     ));
     assert.equal(intake.status, 201);
     const grantRes = await handleRequest(db, req(
-        'POST', '/invitations', await organizationToken(),
+        'POST', '/organizations/1/invitations/',
+        await organizationToken(),
         {
             email: ERASED_EMAIL, invitationId: 'inv-erasee-1',
             grantEventId: 'ev-grant-erasee-1', grantAt: AT,
         },
     ));
-    assert.equal(grantRes.status, 201);
+    assert.equal(grantRes.status, 200);
     const invitationId =
         ((await grantRes.json()) as { id: string }).id;
     const acceptRes = await handleRequest(db, req(
-        'POST', '/invitations/' + invitationId + '/acceptance',
+        'PUT',
+        '/identities/' + id + '/invitations/' + invitationId,
         await organizationToken(id, '1'),
         {
+            state: 'accepted',
             membershipId: 'ms-erasee-1',
-            acceptEventId: 'ev-accept-erasee-1', acceptAt: AT,
+            eventId: 'ev-accept-erasee-1', at: AT,
         },
     ));
-    assert.equal(acceptRes.status, 201);
+    assert.equal(acceptRes.status, 204);
     const edit = await handleRequest(db, req(
         'PUT', '/identities/' + id + '/pii', DEV_TOKEN,
         {

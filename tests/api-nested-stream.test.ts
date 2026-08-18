@@ -83,8 +83,6 @@ function ideaDocument(title: string, ev: string) {
         expected_outcome: 'o',
         success_metrics: 'm',
         state: 'active',
-        state_at: AT,
-        state_event_id: ev,
     };
 }
 
@@ -105,7 +103,7 @@ async function createFlow(
     projectId: string,
 ): Promise<void> {
     const created = await handleRequest(db, req(
-        'POST', '/flows', token,
+        'POST', '/organizations/1/flows/', token,
         {
             id: flowId,
             flow: {
@@ -148,7 +146,7 @@ async () => {
     const ideaId = 'idea-g6';
     const sid = 'sub-g6';
     const putIdea = await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, token,
+        'PUT', '/organizations/1/ideas/' + ideaId, token,
         ideaDocument('G6 Idea', 'ev-g6'),
     ));
     assert.equal(putIdea.status, 201);
@@ -159,7 +157,7 @@ async () => {
     };
     const put = await handleRequest(db, req(
         'PUT',
-        '/ideas/' + ideaId + '/submissions/' + sid,
+        '/organizations/1/ideas/' + ideaId + '/submissions/' + sid,
         token, fields,
     ));
     assert.equal(put.status, 201);
@@ -179,7 +177,7 @@ async () => {
     );
     assert.deepEqual(derived, [expected]);
     const got = await handleRequest(db, req(
-        'GET', '/ideas/' + ideaId + '/submissions', token,
+        'GET', '/organizations/1/ideas/' + ideaId + '/submissions/', token,
     ));
     assert.equal(got.status, 200);
     assert.deepEqual(await got.json(), [stored]);
@@ -197,7 +195,7 @@ async () => {
     };
     const put = await handleRequest(db, req(
         'PUT',
-        '/projects/' + projectId + '/flows/' + pfid,
+        '/organizations/1/projects/' + projectId + '/flows/' + pfid,
         token, fields,
     ));
     assert.equal(put.status, 201);
@@ -217,7 +215,7 @@ async () => {
     );
     assert.deepEqual(derived, [expected]);
     const got = await handleRequest(db, req(
-        'GET', '/projects/' + projectId + '/flows', token,
+        'GET', '/organizations/1/projects/' + projectId + '/flows/', token,
     ));
     assert.equal(got.status, 200);
     assert.deepEqual(await got.json(), [stored]);
@@ -236,7 +234,7 @@ async () => {
     };
     const put = await handleRequest(db, req(
         'PUT',
-        '/flows/' + flowId + '/work-orders/' + woid,
+        '/organizations/1/flows/' + flowId + '/work-orders/' + woid,
         token, fields,
     ));
     assert.equal(put.status, 201);
@@ -256,7 +254,7 @@ async () => {
     );
     assert.deepEqual(derived, [expected]);
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId + '/work-orders', token,
+        'GET', '/organizations/1/flows/' + flowId + '/work-orders/', token,
     ));
     assert.equal(got.status, 200);
     assert.deepEqual(await got.json(), [stored]);
@@ -275,7 +273,7 @@ async () => {
     };
     const put = await handleRequest(db, req(
         'PUT',
-        '/flows/' + flowId + '/records/' + frid,
+        '/organizations/1/flows/' + flowId + '/records/' + frid,
         token, fields,
     ));
     assert.equal(put.status, 201);
@@ -301,13 +299,13 @@ async () => {
         ),
     );
     const list = await handleRequest(db, req(
-        'GET', '/flows/' + flowId + '/records', token,
+        'GET', '/organizations/1/flows/' + flowId + '/records/', token,
     ));
     assert.equal(list.status, 200);
     assert.deepEqual(await list.json(), [stored]);
     const got = await handleRequest(db, req(
         'GET',
-        '/flows/' + flowId + '/records/' + frid,
+        '/organizations/1/flows/' + flowId + '/records/' + frid,
         token,
     ));
     assert.equal(got.status, 200);
@@ -320,7 +318,7 @@ async () => {
     const flowId = 'flow-g6-tag';
     await createFlow(db, token, flowId, 'proj-g6-tag');
     const head = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
+        'GET', '/organizations/1/flows/' + flowId, token,
     ));
     const responseId = head.headers.get('Response-ID');
     assert.ok(responseId);
@@ -328,7 +326,7 @@ async () => {
     const fields = { flow_response_id: responseId };
     const put = await handleRequest(db, req(
         'PUT',
-        '/flows/' + flowId + '/tags/' + name,
+        '/organizations/1/flows/' + flowId + '/tags/' + name,
         token, fields,
     ));
     assert.equal(put.status, 201);
@@ -350,7 +348,7 @@ async () => {
         ),
     );
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId + '/tags/' + name, token,
+        'GET', '/organizations/1/flows/' + flowId + '/tags/' + name, token,
     ));
     assert.equal(got.status, 200);
     assert.deepEqual(await got.json(), stored);
@@ -371,8 +369,6 @@ async () => {
             description: 'd',
             position: 1,
             state: 'active',
-            state_at: AT,
-            state_event_id: typeId + '-genesis',
         },
     ));
     assert.equal(typePut.status, 201);
@@ -409,7 +405,7 @@ async () => {
     const list = await handleRequest(db, req(
         'GET',
         '/organizations/' + ORGANIZATION
-        + '/record-types/' + typeId + '/attributes',
+        + '/record-types/' + typeId + '/attributes/',
         token,
     ));
     assert.equal(list.status, 200);
@@ -422,7 +418,7 @@ async () => {
     const objectiveId = 'obj-g6';
     const rid = 'rev-g6';
     const created = await handleRequest(db, req(
-        'POST', '/objectives', token,
+        'POST', '/organizations/1/objectives/', token,
         {
             id: objectiveId,
             objective: { position: 1 },
@@ -463,7 +459,7 @@ async () => {
     assert.deepEqual(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET',
-        '/objectives/' + objectiveId + '/revisions',
+        '/organizations/1/objectives/' + objectiveId + '/revisions/',
         token,
     ));
     assert.equal(got.status, 200);
@@ -484,7 +480,7 @@ async () => {
     };
     const put = await handleRequest(db, req(
         'PUT',
-        '/projects/' + projectId
+        '/organizations/1/projects/' + projectId
         + '/objective-baseline-scores/' + sid,
         token, fields,
     ));
@@ -505,8 +501,8 @@ async () => {
     assert.deepEqual(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET',
-        '/projects/' + projectId
-        + '/objective-baseline-scores',
+        '/organizations/1/projects/' + projectId
+        + '/objective-baseline-scores/',
         token,
     ));
     assert.equal(got.status, 200);
@@ -527,7 +523,7 @@ async () => {
     };
     const put = await handleRequest(db, req(
         'PUT',
-        '/projects/' + projectId
+        '/organizations/1/projects/' + projectId
         + '/objective-actual-scores/' + sid,
         token, fields,
     ));
@@ -548,8 +544,8 @@ async () => {
     assert.deepEqual(derived, [expected]);
     const got = await handleRequest(db, req(
         'GET',
-        '/projects/' + projectId
-        + '/objective-actual-scores',
+        '/organizations/1/projects/' + projectId
+        + '/objective-actual-scores/',
         token,
     ));
     assert.equal(got.status, 200);

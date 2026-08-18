@@ -36,14 +36,14 @@ test('GET on unknown route throws', async () => {
 test('GET ideas returns array', async () => {
     const db = await freshDb();
     const ideas =
-        await GET<unknown[]>(db, 'ideas', DEV_TOKEN);
+        await GET<unknown[]>(db, 'organizations/1/ideas/', DEV_TOKEN);
     assert.deepEqual(ideas, []);
 });
 
-test('GET ideas/:id throws on missing', async () => {
+test('GET organizations/:id/ideas/:id throws on missing', async () => {
     const db = await freshDb();
     await assert.rejects(
-        () => GET(db, 'ideas/missing-id', DEV_TOKEN),
+        () => GET(db, 'organizations/1/ideas/missing-id', DEV_TOKEN),
         /Not found|404/,
     );
 });
@@ -61,13 +61,11 @@ test('PUT then GET round-trips an entity', async () => {
         expected_outcome: 'o',
         success_metrics: 'm',
         state: 'active',
-        state_at: '2026-01-01T00:00:00.000000Z',
-        state_event_id: 'ev-i1',
     };
-    await PUT(db, 'ideas/i1', payload, DEV_TOKEN);
+    await PUT(db, 'organizations/1/ideas/i1', payload, DEV_TOKEN);
     const fetched =
         await GET<{ title: string }>(
-            db, 'ideas/i1', DEV_TOKEN,
+            db, 'organizations/1/ideas/i1', DEV_TOKEN,
         );
     assert.equal(fetched.title, 'Test');
 });
@@ -92,10 +90,10 @@ test(
     },
 );
 
-test('GET ideas/ normalizes to collection', async () => {
+test('GET organizations/1/ideas/ normalizes to collection', async () => {
     const db = await freshDb();
     const result =
-        await GET<unknown[]>(db, 'ideas/', DEV_TOKEN);
+        await GET<unknown[]>(db, 'organizations/1/ideas/', DEV_TOKEN);
     assert.deepEqual(result, []);
 });
 
@@ -106,7 +104,7 @@ test(
         await seedHumanMember(db, 'hw_1', 'Sarah Chen');
         const members =
             await GET<{ id: string }[]>(
-                db, 'organizations/1/members',
+                db, 'organizations/1/members/',
                 await organizationToken());
         assert.ok(
             members.some(row => row.id === 'hw_1'),
@@ -121,7 +119,7 @@ test(
         await seedAIMember(db, 'ai_1', 'Opus');
         const ais =
             await GET<unknown[]>(
-                db, 'ai-agents', DEV_TOKEN);
+                db, 'ai-agents/', DEV_TOKEN);
         assert.equal(ais.length, 1);
     },
 );
@@ -145,7 +143,7 @@ test(
     async () => {
         const db = await freshDb();
         await assert.rejects(
-            () => POST(db, 'projects', {}, DEV_TOKEN),
+            () => POST(db, 'organizations/1/projects/', {}, DEV_TOKEN),
             /not allowed/i,
         );
     },
@@ -184,7 +182,7 @@ test(
         const response = await handleRequest(
             db,
             new Request(
-                'http://localhost/ideas/i1',
+                'http://localhost/organizations/1/ideas/i1',
                 {
                     method: 'PUT',
                     headers: {
@@ -217,7 +215,7 @@ test(
         const response = await handleRequest(
             db,
             new Request(
-                'http://localhost/identities',
+                'http://localhost/identities/',
                 {
                     method: 'POST',
                     headers: {
@@ -272,7 +270,7 @@ test(
                 'error',
                 () => handleRequest(
                     db,
-                    new Request('http://localhost/ideas', {
+                    new Request('http://localhost/organizations/1/ideas/', {
                         headers: {
                             'Authorization':
                                 'Bearer ' + DEV_TOKEN,
@@ -306,7 +304,7 @@ test(
             const response = await handleRequest(
                 db,
                 new Request(
-                    'http://localhost/ideas/i1',
+                    'http://localhost/organizations/1/ideas/i1',
                     {
                         method: 'PUT',
                         headers: {

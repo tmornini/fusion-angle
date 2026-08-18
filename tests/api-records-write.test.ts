@@ -10,6 +10,8 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
+import { deriveRecordTypeStateHistory } from
+    '../api/derive-record-types.ts';
 
 async function freshDb() {
     const db = memoryDbAdapter();
@@ -26,7 +28,7 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -62,11 +64,11 @@ test(
         // surviving /versions.
         const history = await GET<{
             state: string;
-        }[]>(db, 'organizations/1/record-types/rec-1/versions', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-1/versions/', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
         const attrs = await GET<unknown[]>(
-            db, 'organizations/1/record-types/rec-1/attributes', DEV_TOKEN,
+            db, 'organizations/1/record-types/rec-1/attributes/', DEV_TOKEN,
         );
         assert.equal(attrs.length, 1);
     },
@@ -79,7 +81,7 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'create',
             id: 'rec-2',
             record: {
@@ -102,13 +104,10 @@ test(
         // (Phase 15 Task 7).
         const history = await GET<{
             state: string;
-            member_id: string;
-        }[]>(db, 'organizations/1/record-types/rec-2/versions', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-2/versions/', DEV_TOKEN);
         assert.equal(history.length, 1);
         assert.equal(history[0]!.state, 'active');
-        assert.equal(
-            history[0]!.member_id, 'current',
-        );
+        assert.equal('member_id' in history[0]!, false);
     },
 );
 
@@ -120,7 +119,7 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -135,7 +134,7 @@ test(
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -150,8 +149,6 @@ test(
             // and this edit genuinely proves no state event was
             // emitted.
             state: 'active',
-            state_at: '2025-01-01T00:00:00.000000Z',
-            state_event_id: 'ev-1',
             removedAttributeIds: [],
         }, DEV_TOKEN);
         const record = await GET<{
@@ -162,11 +159,11 @@ test(
         assert.equal(
             record.description, 'updated',
         );
-        const history = await GET<unknown[]>(
-            db, 'organizations/1/record-types/rec-1/versions', DEV_TOKEN,
+        const events = await deriveRecordTypeStateHistory(
+            db, '1', 'rec-1',
         );
         assert.equal(
-            history.length, 1,
+            events.length, 1,
             'edit must not emit a state event',
         );
     },
@@ -178,7 +175,7 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -204,7 +201,7 @@ test(
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -227,14 +224,12 @@ test(
             ],
             // Echoed from the create's own known head above.
             state: 'active',
-            state_at: '2025-01-01T00:00:00.000000Z',
-            state_event_id: 'ev-1',
             removedAttributeIds: ['a-old'],
         }, DEV_TOKEN);
         const all = await GET<{
             id: string;
             name: string;
-        }[]>(db, 'organizations/1/record-types/rec-1/attributes', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-1/attributes/', DEV_TOKEN);
         assert.equal(all.length, 1);
         assert.equal(all[0]!.id, 'a-new');
         assert.equal(all[0]!.name, 'New');
@@ -247,7 +242,7 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'create',
             id: 'rec-1',
             record: {
@@ -272,7 +267,7 @@ test(
             initialStateAt:
                 '2025-01-01T00:00:00.000000Z',
         }, DEV_TOKEN);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'edit',
             id: 'rec-1',
             record: {
@@ -294,8 +289,6 @@ test(
             ],
             // Echoed from the create's own known head above.
             state: 'active',
-            state_at: '2025-01-01T00:00:00.000000Z',
-            state_event_id: 'ev-1',
             removedAttributeIds: [],
         }, DEV_TOKEN);
         const stored = await GET<{
@@ -323,7 +316,7 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types', {
+            () => POST(db, 'organizations/1/record-types/', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -361,7 +354,7 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types', {
+            () => POST(db, 'organizations/1/record-types/', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -398,7 +391,7 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types', {
+            () => POST(db, 'organizations/1/record-types/', {
                 kind: 'destroy',
                 id: 'rec-1',
                 record: {
@@ -420,7 +413,7 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types', {
+            () => POST(db, 'organizations/1/record-types/', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -446,7 +439,7 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types', {
+            () => POST(db, 'organizations/1/record-types/', {
                 kind: 'create',
                 id: 'rec-1',
                 record: {
@@ -473,7 +466,7 @@ test(
         const db = await freshDb();
         await seedCurrentMember(db);
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types', {
+            () => POST(db, 'organizations/1/record-types/', {
                 kind: 'edit',
                 id: 'rec-1',
                 record: {
@@ -494,7 +487,7 @@ test(
     async () => {
         const db = await freshDb();
         await seedCurrentMember(db);
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'create',
             id: 'rec-at',
             record: {
@@ -515,20 +508,14 @@ test(
         // bare per-entity current-state alias RETIRED
         // (Phase 15 Task 7).
         const history = await GET<{
+            id: string;
             state: string;
-            member_id: string;
-            at: string;
-        }[]>(db, 'organizations/1/record-types/rec-at/versions', DEV_TOKEN);
+        }[]>(db, 'organizations/1/record-types/rec-at/versions/', DEV_TOKEN);
         assert.equal(history.length, 1);
         const current = history[0]!;
+        assert.equal(current.id, 'rec-at');
         assert.equal(current.state, 'active');
-        // Authorship is the verified caller, never the body.
-        assert.equal(current.member_id, 'current');
-        // The event carries the caller-supplied at, not server time.
-        assert.equal(
-            current.at,
-            '2099-07-01T00:00:00.000000Z',
-        );
+        assert.equal('state_at' in current, false);
     },
 );
 
@@ -541,7 +528,7 @@ test(
         // a raw colliding states row no longer aborts the
         // pair-plane create.
     // Phase Final Stage B: states table retired.
-        await POST(db, 'organizations/1/record-types', {
+        await POST(db, 'organizations/1/record-types/', {
             kind: 'create',
             id: 'rec-survives',
             record: {

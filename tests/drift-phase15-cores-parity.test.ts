@@ -145,7 +145,7 @@ async () => {
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token, {
+        'POST', '/organizations/1/work-orders/', token, {
             id: workOrderId,
             workOrder: {
                 display_id: 'p15-' + workOrderId,
@@ -170,7 +170,7 @@ async () => {
     assert.equal(created.status, 201);
 
     const getRes = await handleRequest(
-        db, req('GET', '/work-orders/' + workOrderId, token),
+        db, req('GET', '/organizations/1/work-orders/' + workOrderId, token),
     );
     assert.equal(getRes.status, 200);
     const wire = await getRes.json();
@@ -202,7 +202,7 @@ async () => {
     assert.equal(inTxMissing, null);
     const missRes = await handleRequest(
         db,
-        req('GET', '/work-orders/no-such-work-order', token),
+        req('GET', '/organizations/1/work-orders/no-such-work-order', token),
     );
     assert.equal(missRes.status, 404);
 });
@@ -217,7 +217,7 @@ async () => {
     const graph2 = workOrderFlowGraph(12 * 60 * 60);
 
     const put1 = await handleRequest(db, req(
-        'PUT', '/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
             display_id: 'before',
             flow_graph: graph1,
             position: 1,
@@ -226,7 +226,7 @@ async () => {
     assert.equal(put1.status, 201);
 
     const put2 = await handleRequest(db, req(
-        'PUT', '/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
             display_id: 'after',
             flow_graph: graph2,
             position: 3,
@@ -235,7 +235,7 @@ async () => {
     assert.equal(put2.status, 201);
 
     const getRes = await handleRequest(
-        db, req('GET', '/work-orders/' + workOrderId, token),
+        db, req('GET', '/organizations/1/work-orders/' + workOrderId, token),
     );
     assert.equal(getRes.status, 200);
     const wire = await getRes.json() as {
@@ -265,7 +265,7 @@ async () => {
     const graph = workOrderFlowGraph(lockTimeoutSeconds);
 
     const put = await handleRequest(db, req(
-        'PUT', '/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
             display_id: 'p15-cg-' + workOrderId,
             flow_graph: graph,
             position: 2,
@@ -305,7 +305,7 @@ async () => {
     // Live path: claim against the re-anchored gate succeeds.
     const claimResponse = await handleRequest(db, req(
         'PUT',
-        '/work-orders/' + workOrderId + '/claim',
+        '/organizations/1/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: generateCryptoSafeBase62(),
             claimAt: nowUtc(),
@@ -330,7 +330,7 @@ async () => {
     assert.equal(preMissing, null);
     assert.equal(inMissing, null);
     const missRes = await handleRequest(
-        db, req('GET', '/work-orders/' + missingId, token),
+        db, req('GET', '/organizations/1/work-orders/' + missingId, token),
     );
     assert.equal(missRes.status, 404);
     const missBody = await missRes.json() as {
@@ -456,7 +456,7 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
     const transitionEventId = workOrderId + '-te1';
 
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token, {
+        'POST', '/organizations/1/work-orders/', token, {
             id: workOrderId,
             workOrder: {
                 display_id: 'vis-' + workOrderId,
@@ -482,7 +482,7 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
 
     const transitioned = await handleRequest(db, req(
         'POST',
-        '/work-orders/' + workOrderId + '/transition',
+        '/organizations/1/work-orders/' + workOrderId + '/transition',
         token,
         {
             transitionEventId,
@@ -683,7 +683,7 @@ async () => {
         'current', STARK_ORGANIZATION,
     );
     const listRes = await handleRequest(
-        db, req('GET', '/work-orders', token),
+        db, req('GET', '/organizations/1/work-orders/', token),
     );
     assert.equal(listRes.status, 200);
     const rows = await listRes.json() as {
@@ -692,7 +692,7 @@ async () => {
     assert.ok(rows.length > 0);
     for (const row of rows) {
         const getRes = await handleRequest(
-            db, req('GET', '/work-orders/' + row.id, token),
+            db, req('GET', '/organizations/1/work-orders/' + row.id, token),
         );
         assert.equal(getRes.status, 200);
         // Wire GET attaches bind embeds (instance_id /
@@ -816,7 +816,7 @@ async () => {
     );
     const recordsRes = await handleRequest(
         db, req('GET', '/organizations/' + STARK_ORGANIZATION
-            + '/record-types', recordToken),
+            + '/record-types/', recordToken),
     );
     assert.equal(recordsRes.status, 200);
     const recordsStark = await recordsRes.json() as {
@@ -961,7 +961,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
 
     // Create with the binding already 'added'.
     const created = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: flowId,
             flow: {
                 name: 'P15 Bind Flow',
@@ -1018,14 +1018,14 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
 
     // Chain a remove off the create's document head.
     const headGet = await handleRequest(
-        db, req('GET', '/flows/' + flowId, token),
+        db, req('GET', '/organizations/1/flows/' + flowId, token),
     );
     assert.equal(headGet.status, 200);
     const headId = headGet.headers.get('Response-ID');
     assert.ok(headId);
 
     const putRemove = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         {
             name: 'P15 Bind Flow',
             is_locked: false,
@@ -1072,7 +1072,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
         { 'if-match': (
             await handleRequest(
                 db,
-                req('GET', '/flows/' + flowId, token),
+                req('GET', '/organizations/1/flows/' + flowId, token),
             )
         ).headers.get('ETag')! },
     ));
@@ -1127,7 +1127,7 @@ test('residual pin: soft-deleted node drops from'
     assert.equal(attrPut.status, 201);
 
     const created = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: flowId,
             flow: {
                 name: 'P15 SoftDel Flow',
@@ -1178,7 +1178,7 @@ test('residual pin: soft-deleted node drops from'
     );
 
     const headGet = await handleRequest(
-        db, req('GET', '/flows/' + flowId, token),
+        db, req('GET', '/organizations/1/flows/' + flowId, token),
     );
     assert.equal(headGet.status, 200);
     const headId = headGet.headers.get('Response-ID');
@@ -1187,7 +1187,7 @@ test('residual pin: soft-deleted node drops from'
     // Soft-delete the bound node only — residual 'added'
     // attributeEvent remains; no attributeEvents 'removed'.
     const putDelete = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         {
             name: 'P15 SoftDel Flow',
             is_locked: false,
@@ -1217,7 +1217,7 @@ test('residual pin: soft-deleted node drops from'
         { 'if-match': (
             await handleRequest(
                 db,
-                req('GET', '/flows/' + flowId, token),
+                req('GET', '/organizations/1/flows/' + flowId, token),
             )
         ).headers.get('ETag')! },
     ));
@@ -1275,7 +1275,7 @@ async function transitionWithFieldValue(
     const token = await organizationToken();
     const graph = workOrderFlowGraph(8 * 60 * 60);
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token, {
+        'POST', '/organizations/1/work-orders/', token, {
             id: workOrderId,
             workOrder: {
                 display_id: 'fv-' + workOrderId,
@@ -1309,8 +1309,6 @@ async function transitionWithFieldValue(
             name: 'P15 FV Parent', description: '',
             position: 0,
             state: 'active',
-            state_at: nowUtc(),
-            state_event_id: 'rec-p15-fv-genesis',
         },
     ));
     assert.equal(typePut.status, 201);
@@ -1349,7 +1347,7 @@ async function transitionWithFieldValue(
     );
 }
 
-// Wire-shape pin (C4): GET work-orders/:id/history is
+// Wire-shape pin (C4): GET organizations/:id/work-orders/:id/history is
 // 200 / 404 by address (own → rows with field_values;
 // never written here → 404; absent → 404). Field values
 // fold inline; the retired GET states/:id/field-values
@@ -1376,7 +1374,7 @@ test('work-order history GET: 200/404 two-way for'
         db,
         req(
             'GET',
-            '/work-orders/' + workOrderId + '/history',
+            '/organizations/1/work-orders/' + workOrderId + '/history',
             starkToken,
         ),
     );
@@ -1398,7 +1396,8 @@ test('work-order history GET: 200/404 two-way for'
         db,
         req(
             'GET',
-            '/work-orders/' + workOrderId + '/history',
+            '/organizations/' + ORGANIZATION_TWO
+                + '/work-orders/' + workOrderId + '/history',
             twoToken,
         ),
     );
@@ -1415,7 +1414,7 @@ test('work-order history GET: 200/404 two-way for'
         db,
         req(
             'GET',
-            '/work-orders/ghost-p15-nowhere/history',
+            '/organizations/1/work-orders/ghost-p15-nowhere/history',
             starkToken,
         ),
     );
@@ -1567,7 +1566,7 @@ async () => {
         'current', STARK_ORGANIZATION,
     );
     const woListRes = await handleRequest(
-        db, req('GET', '/work-orders', woToken),
+        db, req('GET', '/organizations/1/work-orders/', woToken),
     );
     assert.equal(woListRes.status, 200);
     const workOrders = await woListRes.json() as {
@@ -1598,7 +1597,7 @@ async () => {
         db, STARK_ORGANIZATION, attributeIds, 'seed-type',
     );
     const inTx = await db.transaction(
-        // Stage B: roster + objectives/records retired.
+        // Stage B: roster + organizations/1/objectives/records retired.
         [
             'requests', 'responses',
         ],
@@ -1646,7 +1645,7 @@ async () => {
     assert.equal(attrPut.status, 201);
 
     const created = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: flowId,
             flow: {
                 name: 'P15 Restrict Flow',
@@ -1707,7 +1706,7 @@ async () => {
         edges: [],
     };
     const woCreated = await handleRequest(db, req(
-        'POST', '/work-orders', token, {
+        'POST', '/organizations/1/work-orders/', token, {
             id: woId,
             workOrder: {
                 display_id: 'p15-restrict-wo',

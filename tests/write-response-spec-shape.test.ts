@@ -35,28 +35,26 @@ const GRAPH_DELTA = {
 const DUMMY_BODIES: Readonly<
     Record<string, Record<string, unknown>>
 > = {
-    'ideas/:id': {
+    'organizations/:id/ideas/:id': {
         title: 'T', position: 1,
         problem_statement: 'p', target_users: 't',
         proposed_solution: 's', expected_outcome: 'o',
         success_metrics: 'm', state: 'active',
-        state_at: AT, state_event_id: 'ev-1',
     },
-    'ideas/:id/submissions/:sid': {
+    'organizations/:id/ideas/:id/submissions/:sid': {
         idea_id: 'id', member_id: 'id', at: AT,
     },
-    'projects/:id': {
+    'organizations/:id/projects/:id': {
         title: 'T', description: 'd', progress: 5,
         start_date: '2026-01-01',
         target_end_date: '2026-02-01',
         estimated_cost: 100, actual_cost: 50,
         position: 1, state: 'submitted',
-        state_at: AT, state_event_id: 'ev-1',
     },
-    'projects/:id/flows/:pfid': {
+    'organizations/:id/projects/:id/flows/:pfid': {
         project_id: 'id', flow_id: 'id', at: AT,
     },
-    'flows/:id': {
+    'organizations/:id/flows/:id': {
         name: 'F', is_locked: false,
         is_auto_layout: true, is_auto_fit: true,
         lock_timeout: 1, state: 'active',
@@ -64,7 +62,7 @@ const DUMMY_BODIES: Readonly<
         graph: GRAPH, graphDelta: GRAPH_DELTA,
         revivals: [],
     },
-    'work-orders/:id': {
+    'organizations/:id/work-orders/:id': {
         display_id: 'wo',
         flow_graph: {
             name: 'F', lockTimeout: 1,
@@ -72,13 +70,12 @@ const DUMMY_BODIES: Readonly<
         },
         position: 1,
     },
-    'flows/:id/work-orders/:woid': {
+    'organizations/:id/flows/:id/work-orders/:woid': {
         flow_id: 'id', work_order_id: 'id', at: AT,
     },
     [RECORD_TYPE_DETAIL_PATTERN]: {
         name: 'R', description: 'd', position: 1,
-        state: 'active', state_at: AT,
-        state_event_id: 'ev-1',
+        state: 'active',
     },
     [ATTRIBUTE_DETAIL_PATTERN]: {
         name: 'A', attribute_type: 'text',
@@ -87,25 +84,24 @@ const DUMMY_BODIES: Readonly<
     [INSTANCE_DETAIL_PATTERN]: {
         set: [{ attribute_id: 'a', value: 'v' }],
     },
-    'flows/:id/records/:frid': {
+    'organizations/:id/flows/:id/records/:frid': {
         flow_id: 'id', record_id: 'id', at: AT,
     },
-    'flows/:id/tags/:name': {
+    'organizations/:id/flows/:id/tags/:name': {
         flow_response_id: 'rid',
     },
-    'objectives/:id': {
+    'organizations/:id/objectives/:id': {
         position: 1, state: 'active',
-        state_at: AT, state_event_id: 'ev-1',
     },
-    'objectives/:id/revisions/:rid': {
+    'organizations/:id/objectives/:id/revisions/:rid': {
         objective_id: 'id', name: 'N',
         description: 'd', member_id: 'id', at: AT,
     },
-    'projects/:id/objective-baseline-scores/:sid': {
+    'organizations/:id/projects/:id/objective-baseline-scores/:sid': {
         project_id: 'id', objective_id: 'id',
         score: 0, member_id: 'id', at: AT,
     },
-    'projects/:id/objective-actual-scores/:sid': {
+    'organizations/:id/projects/:id/objective-actual-scores/:sid': {
         project_id: 'id', objective_id: 'id',
         score: 0, member_id: 'id', at: AT,
     },

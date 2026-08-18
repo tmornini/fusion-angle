@@ -13,6 +13,10 @@ import {
     asStoredGraph,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
+import {
+    organizationCollection,
+    organizationItem,
+} from './shared.ts';
 import { getProjectEntities } from './projects.ts';
 import { withRenderableLayout } from '../flow-graph-layout.ts';
 
@@ -66,7 +70,8 @@ async function getProjectFlowsForProject(
     projectId: string,
 ): Promise<ProjectFlowEntity[]> {
     return ctx.GET<ProjectFlowEntity[]>(
-        'projects/' + projectId + '/flows',
+        organizationItem(ctx, 'projects', projectId)
+            + '/flows/',
     );
 }
 
@@ -97,9 +102,13 @@ getFlowsWithProjectNames(
     const [
         flows, projectFlows, allProjects,
     ] = await Promise.all([
-        ctx.GET<FlowWithGraph[]>('flows'),
+        ctx.GET<FlowWithGraph[]>(
+            organizationCollection(ctx, 'flows'),
+        ),
         getProjectFlowEntities(ctx),
-        ctx.GET<ProjectEntity[]>('projects'),
+        ctx.GET<ProjectEntity[]>(
+            organizationCollection(ctx, 'projects'),
+        ),
     ]);
     const projectNameById = new Map(
         allProjects.map(
@@ -145,7 +154,9 @@ export async function getFlowsByProject(
     const [projectFlows, flows] =
         await Promise.all([
             getProjectFlowsForProject(ctx, projectId),
-            ctx.GET<FlowWithGraph[]>('flows'),
+            ctx.GET<FlowWithGraph[]>(
+                organizationCollection(ctx, 'flows'),
+            ),
         ]);
 
     const flowIds = new Set(
@@ -177,7 +188,7 @@ export async function getFlowGraph(
 ): Promise<FlowGraph> {
     const flow =
         await ctx.GET<FlowWithGraph>(
-            `flows/${flowId}`,
+            organizationItem(ctx, 'flows', flowId),
         );
     const g = parseGraph(flow.graph);
     return withRenderableLayout({

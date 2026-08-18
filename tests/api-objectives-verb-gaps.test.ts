@@ -17,13 +17,14 @@ import {
 // one — dispatch keys on the STATIC route objects, so every
 // pinned status is stable across every later objectives task in
 // this phase. The list is exactly 22 (2+2+3+3+3+3+3+3): PUT/
-// DELETE objectives; POST/DELETE objectives/:id; POST/PUT/
-// DELETE objectives/:id/revisions; GET/POST/DELETE
-// objectives/:id/revisions/:rid; POST/PUT/DELETE
-// projects/:id/objective-baseline-scores; GET/POST/DELETE
-// projects/:id/objective-baseline-scores/:sid; POST/PUT/DELETE
-// projects/:id/objective-actual-scores; GET/POST/DELETE
-// projects/:id/objective-actual-scores/:sid.
+// DELETE objectives; POST/DELETE organizations/:id/objectives/:id; POST/PUT/
+// DELETE organizations/:id/objectives/:id/revisions; GET/POST/DELETE
+// organizations/:id/objectives/:id/revisions/:rid; POST/PUT/DELETE
+// organizations/:id/projects/:id/objective-baseline-scores; GET/POST/DELETE
+// organizations/:id/projects/:id/objective-baseline-scores/:sid;
+// POST/PUT/DELETE
+// organizations/:id/projects/:id/objective-actual-scores; GET/POST/DELETE
+// organizations/:id/projects/:id/objective-actual-scores/:sid.
 
 const BASE = 'http://localhost';
 
@@ -53,18 +54,18 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/objectives', token, {},
+        'PUT', '/organizations/1/objectives/', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
 // Task 10: PATCH alphabet — no objectives-family patch yet.
-test('PATCH objectives/:id 405s (no patch handler'
+test('PATCH organizations/:id/objectives/:id 405s (no patch handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PATCH', '/objectives/o1', token, {},
+        'PATCH', '/organizations/1/objectives/o1', token, {},
     ));
     assert.equal(res.status, 405);
 });
@@ -74,230 +75,235 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/objectives', token),
+        db, req('DELETE', '/organizations/1/objectives/', token),
     );
     assert.equal(res.status, 405);
 });
 
-test('POST objectives/:id 405s (no post handler wired)',
+test('POST organizations/:id/objectives/:id 405s (no post handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/objectives/o1', token, {},
+        'POST', '/organizations/1/objectives/o1', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE objectives/:id 405s (no delete handler wired)',
+test('DELETE organizations/:id/objectives/:id 405s (no delete handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/objectives/o1', token),
+        db, req('DELETE', '/organizations/1/objectives/o1', token),
     );
     assert.equal(res.status, 405);
 });
 
-test('POST objectives/:id/revisions 405s (no post handler'
+test('POST organizations/:id/objectives/:id/revisions 405s (no post handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/objectives/o1/revisions', token, {},
+        'POST', '/organizations/1/objectives/o1/revisions/', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('PUT objectives/:id/revisions 405s (no put handler'
+test('PUT organizations/:id/objectives/:id/revisions 405s (no put handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/objectives/o1/revisions', token, {},
+        'PUT', '/organizations/1/objectives/o1/revisions/', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE objectives/:id/revisions 405s (no delete handler'
+test('DELETE organizations/:id/objectives/:id/revisions'
+    + ' 405s (no delete handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/objectives/o1/revisions', token),
+        db, req('DELETE', '/organizations/1/objectives/o1/revisions/', token),
     );
     assert.equal(res.status, 405);
 });
 
-test('GET objectives/:id/revisions/:rid 405s (no get handler'
+test('GET organizations/:id/objectives/:id/revisions/:rid'
+    + ' 405s (no get handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/objectives/o1/revisions/r1', token),
+        db, req('GET', '/organizations/1/objectives/o1/revisions/r1', token),
     );
     assert.equal(res.status, 405);
 });
 
-test('POST objectives/:id/revisions/:rid 405s (no post'
+test('POST organizations/:id/objectives/:id/revisions/:rid 405s (no post'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/objectives/o1/revisions/r1', token, {},
+        'POST', '/organizations/1/objectives/o1/revisions/r1', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE objectives/:id/revisions/:rid 405s (no delete'
+test('DELETE organizations/:id/objectives/:id/revisions/:rid 405s (no delete'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/objectives/o1/revisions/r1', token),
+        db, req('DELETE', '/organizations/1/objectives/o1/revisions/r1',
+            token),
     );
     assert.equal(res.status, 405);
 });
 
-test('POST projects/:id/objective-baseline-scores 405s (no'
+test('POST organizations/:id/projects/:id/objective-baseline-scores 405s (no'
 + ' post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST',
-        '/projects/p1/objective-baseline-scores',
+        '/organizations/1/projects/p1/objective-baseline-scores/',
         token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('PUT projects/:id/objective-baseline-scores 405s (no'
+test('PUT organizations/:id/projects/:id/objective-baseline-scores 405s (no'
 + ' put handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT',
-        '/projects/p1/objective-baseline-scores',
+        '/organizations/1/projects/p1/objective-baseline-scores/',
         token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE projects/:id/objective-baseline-scores 405s (no'
+test('DELETE organizations/:id/projects/:id'
+    + '/objective-baseline-scores 405s (no'
 + ' delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE',
-        '/projects/p1/objective-baseline-scores',
+        '/organizations/1/projects/p1/objective-baseline-scores/',
         token,
     ));
     assert.equal(res.status, 405);
 });
 
-test('GET projects/:id/objective-baseline-scores/:sid 405s'
+test('GET organizations/:id/projects/:id/objective-baseline-scores/:sid 405s'
 + ' (no get handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'GET',
-        '/projects/p1/objective-baseline-scores/s1',
+        '/organizations/1/projects/p1/objective-baseline-scores/s1',
         token,
     ));
     assert.equal(res.status, 405);
 });
 
-test('POST projects/:id/objective-baseline-scores/:sid 405s'
+test('POST organizations/:id/projects/:id/objective-baseline-scores/:sid 405s'
 + ' (no post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST',
-        '/projects/p1/objective-baseline-scores/s1',
+        '/organizations/1/projects/p1/objective-baseline-scores/s1',
         token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE projects/:id/objective-baseline-scores/:sid'
+test('DELETE organizations/:id/projects/:id/objective-baseline-scores/:sid'
 + ' 405s (no delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE',
-        '/projects/p1/objective-baseline-scores/s1',
+        '/organizations/1/projects/p1/objective-baseline-scores/s1',
         token,
     ));
     assert.equal(res.status, 405);
 });
 
-test('POST projects/:id/objective-actual-scores 405s (no'
+test('POST organizations/:id/projects/:id/objective-actual-scores 405s (no'
 + ' post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST',
-        '/projects/p1/objective-actual-scores',
+        '/organizations/1/projects/p1/objective-actual-scores/',
         token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('PUT projects/:id/objective-actual-scores 405s (no put'
+test('PUT organizations/:id/projects/:id/objective-actual-scores 405s (no put'
 + ' handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'PUT',
-        '/projects/p1/objective-actual-scores',
+        '/organizations/1/projects/p1/objective-actual-scores/',
         token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE projects/:id/objective-actual-scores 405s (no'
+test('DELETE organizations/:id/projects/:id/objective-actual-scores 405s (no'
 + ' delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE',
-        '/projects/p1/objective-actual-scores',
+        '/organizations/1/projects/p1/objective-actual-scores/',
         token,
     ));
     assert.equal(res.status, 405);
 });
 
-test('GET projects/:id/objective-actual-scores/:sid 405s (no'
+test('GET organizations/:id/projects/:id'
+    + '/objective-actual-scores/:sid 405s (no'
 + ' get handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'GET',
-        '/projects/p1/objective-actual-scores/s1',
+        '/organizations/1/projects/p1/objective-actual-scores/s1',
         token,
     ));
     assert.equal(res.status, 405);
 });
 
-test('POST projects/:id/objective-actual-scores/:sid 405s'
+test('POST organizations/:id/projects/:id/objective-actual-scores/:sid 405s'
 + ' (no post handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'POST',
-        '/projects/p1/objective-actual-scores/s1',
+        '/organizations/1/projects/p1/objective-actual-scores/s1',
         token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE projects/:id/objective-actual-scores/:sid 405s'
+test('DELETE organizations/:id/projects/:id/objective-actual-scores/:sid 405s'
 + ' (no delete handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
         'DELETE',
-        '/projects/p1/objective-actual-scores/s1',
+        '/organizations/1/projects/p1/objective-actual-scores/s1',
         token,
     ));
     assert.equal(res.status, 405);

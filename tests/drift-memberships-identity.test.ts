@@ -240,27 +240,30 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
         'current', ORGANIZATION_TWO,
     );
     const grant = await handleRequest(db, req(
-        'POST', '/invitations', adminToken, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', adminToken, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-ms-drift-identity-sarah',
             grantEventId: 'ev-ms-drift-identity-sarah-grant',
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 201);
+    assert.equal(grant.status, 200);
 
     const membershipId = 'ms-drift-identity-sarah';
     const accept = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-ms-drift-identity-sarah/acceptance',
+        'PUT',
+        '/identities/' + sarahId
+            + '/invitations/inv-ms-drift-identity-sarah',
         await organizationToken(sarahId, STARK_ORGANIZATION),
         {
+            state: 'accepted',
             membershipId,
-            acceptEventId: 'ev-ms-drift-identity-sarah-accept',
-            acceptAt: '2026-06-01T00:00:01.000000Z',
+            eventId: 'ev-ms-drift-identity-sarah-accept',
+            at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 201);
+    assert.equal(accept.status, 204);
 
     // Phase Final Task 2: memberships ROW half stripped —
     // accept lands on the pair plane only.

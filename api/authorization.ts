@@ -100,20 +100,29 @@ export function matchesOnSegmentBoundary(
 const MEMBER_VERBS: Readonly<
     Record<string, readonly string[]>
 > = {
-    '/ideas': ['GET', 'PUT', 'POST'],
-    '/ideas/:id/submissions': ['GET', 'PUT'],
-    '/projects': ['GET', 'PUT'],
-    '/projects/:id/flows': ['GET', 'PUT', 'DELETE'],
-    '/projects/:id/objective-baseline-scores': ['GET', 'PUT'],
-    '/projects/:id/objective-actual-scores': ['GET', 'PUT'],
-    '/objectives': ['GET', 'PUT', 'POST'],
-    '/objectives/:id/revisions': ['GET', 'PUT'],
-    '/flows': ['GET', 'PUT', 'POST'],
+    '/organizations/:id/ideas': ['GET', 'PUT', 'POST'],
+    '/organizations/:id/ideas/:id/submissions':
+        ['GET', 'PUT'],
+    '/organizations/:id/projects': ['GET', 'PUT'],
+    '/organizations/:id/projects/:id/flows':
+        ['GET', 'PUT', 'DELETE'],
+    ['/organizations/:id/projects/:id'
+        + '/objective-baseline-scores']: ['GET', 'PUT'],
+    ['/organizations/:id/projects/:id'
+        + '/objective-actual-scores']: ['GET', 'PUT'],
+    '/organizations/:id/objectives':
+        ['GET', 'PUT', 'POST'],
+    '/organizations/:id/objectives/:id/revisions':
+        ['GET', 'PUT'],
+    '/organizations/:id/flows': ['GET', 'PUT', 'POST'],
     // GET /flows/:id/versions is pair-chain (member GET
     // rides '/flows'). Writes stay unwired (405).
-    '/flows/:id/work-orders': ['GET', 'PUT'],
-    '/flows/:id/records': ['GET', 'PUT', 'DELETE'],
-    '/flows/:id/tags': ['GET', 'PUT', 'DELETE'],
+    '/organizations/:id/flows/:id/work-orders':
+        ['GET', 'PUT'],
+    '/organizations/:id/flows/:id/records':
+        ['GET', 'PUT', 'DELETE'],
+    '/organizations/:id/flows/:id/tags':
+        ['GET', 'PUT', 'DELETE'],
     // Nested record-types schema READ (decision 16): one
     // MEMBER_VERBS row covers the whole subtree's GETs via
     // matchesOnSegmentBoundary (`:id` is a one-segment
@@ -128,14 +137,28 @@ const MEMBER_VERBS: Readonly<
         ['GET', 'PUT', 'PATCH', 'DELETE'],
     // Nested field-values collection RETIRED (states-URI
     // elimination C4); field values fold on WO history.
-    '/work-orders': ['GET', 'PUT', 'POST', 'DELETE'],
+    '/organizations/:id/work-orders':
+        ['GET', 'PUT', 'POST', 'DELETE'],
     // Bulk lifecycle collection RETIRED (states-URI
     // elimination C3).
     '/ai-agents': ['GET'],
     '/organizations/:id/members': ['GET'],
-    '/organizations': ['GET'],
+    // :id only — the root collection is retired.
+    // The old '/organizations' prefix also matched
+    // GET /organizations/:id; keep that document.
+    '/organizations/:id': ['GET'],
     '/identities/:id/tokens': ['POST'],
     '/identities/:id/token-revocations': ['PUT'],
+    // Self-only stays in the handler. This row only
+    // clears the member-tier policy after the
+    // pre-match died; admin-everywhere is not a
+    // substitute for naming another identity.
+    '/identities/:id/default-organization':
+        ['GET', 'PUT'],
+    '/identities/:id/organizations': ['GET'],
+    // Invitee (or admin) may read and answer. Org
+    // nest stays admin-only via `/` — no row here.
+    '/identities/:id/invitations': ['GET', 'PUT'],
 };
 
 const MEMBER_TIER: readonly PolicyEntry[] =

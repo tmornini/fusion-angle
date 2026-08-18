@@ -70,11 +70,11 @@ pure modules and the `api/`, `adapters/`, and `presenters/`
 layers via `node --test --strip-types`), then enforces a
 78-character maximum line length on all `.ts`, `.html`, and
 `.css` files (excluding `compose.ts`), on every `.md` file
-at the repo root except [TEST-PLAN.md](TEST-PLAN.md) and
-[API-TREE.md](API-TREE.md) — both exempted because their
-entries are meant to scan as one self-contained line — and
-on the root scripts `build`, `serve`, `test`, `validate`,
-and `generate-schema-svg`. It then rejects the `org`
+at the repo root except [TEST-PLAN.md](TEST-PLAN.md)
+(exempted because its entries are meant to scan as one
+self-contained line), and on the root scripts `build`,
+`serve`, `test`, `validate`, `generate-schema-svg`, and
+`generate-api-documentation`. It then rejects the `org`
 abbreviation in identifiers under `api/`, `web-app/`,
 `tests/`, and `shared/` (`.ts`/`.html`/`.css`; `compose.ts`
 exempt) — forms matching `org[A-Z]`, camel/Pascal
@@ -84,7 +84,9 @@ URLs, and CSS class names may keep the short form. Finally
 it runs the
 `generate-schema-svg --check` gate, which fails on
 `SCHEMA.svg` drift from the schema of record (`api/db.ts` +
-`api/types.ts`).
+`api/types.ts`), then the
+`generate-api-documentation --check` gate, which fails on
+`API.svg` / room drift from `routes[]`.
 
 For what each test layer covers, see `## Testing`.
 
@@ -179,7 +181,8 @@ dashboard-design.md`.
 Target: **ES2024** · Strict mode with
 `noUncheckedIndexedAccess`. Config at
 `web-app/app/tsconfig.json`. The `compose.ts`,
-`generate-schema-svg.ts`, `measure.ts`, and
+`generate-schema-svg.ts`,
+`generate-api-documentation.ts`, `measure.ts`, and
 `measure-viz.ts` Node entrypoints are excluded from
 type checking (they run in Node).
 
@@ -289,18 +292,17 @@ Every page is a standalone HTML file served by
   freezes its own `flow_graph` inside the work-order
   document pair. Flow undo resolves its restore target
   from the flow's own document-pair history (Phase 14
-  Task 8). Lifecycle history is eight GET registrations
-  plus one value-history
-  (`GET <family>/:id/versions` for ideas / projects /
-  record-types / flows / objectives;
-  work-orders stay `GET work-orders/:id/history` plus
-  bulk `GET work-orders/history`;
-  `GET objectives/versions`; plus
+  Task 8). Lifecycle history is per-entity GET
+  (`GET organizations/:id/<family>/:id/versions/`
+  for ideas / projects / record-types / flows /
+  objectives; work-orders stay
+  `GET organizations/:id/work-orders/:id/history`; plus
   `GET .../record-types/:type/instances/:id/versions`
   for value revisions) — wire `(at, id)` DESC; work-
   order routes fold `field_values` inline. Ideas /
-  projects / record-types / objectives GET rows embed
-  the lifecycle trio. Flat `/records` and
+  projects / record-types / objectives GET rows keep
+  domain `state` and do not embed `state_at` /
+  `state_event_id`. Flat `/records` and
   `/record-attributes` are RETIRED (router 404). Phase
   15 retired table-backed `flows/:id/versions[...]`
   writes; pair-chain GET is live. Instance public PUT
@@ -511,11 +513,11 @@ Phase 15 cores: `drift-phase15-cores-parity.test.ts`,
 `api-history-ownership-fence.test.ts` (family-history
 ownership fence; own-org 200 / foreign 403). States-URI
 elimination pins: `api-work-order-history.test.ts` (per-id
-+ bulk DESC, inline `field_values`),
+DESC, inline `field_values`; bulk 404),
 `api-entity-history-routes.test.ts` (trio-family per-id),
 `api-members-history.test.ts`,
-`api-objective-history.test.ts` (bulk). Phase Final adds
-the write authorizer pin
+`api-objective-history.test.ts` (per-id; bulk 404). Phase
+Final adds the write authorizer pin
 (`api-write-authorizer.test.ts`); organization-scoped
 store/decorator tests and dual-write shadow-ledger row
 oracles retired with their subjects; HistoryEntityStore
@@ -602,21 +604,21 @@ apply to it (RED is the audit's first finding).
   entity's current state is the latest derived event on its
   `entity_id` under the `(at, id)` total order. Reversal is
   a *new* event with the new state, not an edit of a prior
-  pair. Surviving HTTP surface (reads only, eight
-  lifecycle + one value-history, wire DESC): per-entity
-  `GET <family>/:id/versions` for ideas / projects /
-  record-types / flows / objectives;
-  work-orders stay `/history` (org-nested empty →
-  foreign 403 / absent 404), bulk
-  `GET work-orders/history` and `GET objectives/versions`
-  (always 200 arrays),
+  pair. Surviving HTTP surface (reads only, per-entity
+  history + one value-history, wire DESC):
+  `GET organizations/:id/<family>/:id/versions/` for
+  ideas / projects / record-types / flows / objectives;
+  work-orders stay
+  `GET organizations/:id/work-orders/:id/history`
+  (org-nested empty → foreign 403 / absent 404),
   work-order `field_values` folded **inline** on the WO
-  history routes (no successor field-values GET), and
+  history route (no successor field-values GET), and
   instance value-revision history at
   `GET .../record-types/:type/instances/:id/versions`
   (`{at, etag, values}` DESC by current read ACL). Entity
   GET rows for ideas / projects / record-types /
-  objectives embed the lifecycle trio.
+  objectives keep domain `state` and do not embed
+  `state_at` / `state_event_id`.
   Lifecycle writes are document-trio PUTs
   (ideas/projects/record-types/flows/objectives)
   and named ops (work-order create/claim/transition/

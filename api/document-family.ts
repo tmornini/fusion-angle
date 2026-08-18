@@ -111,6 +111,9 @@ export function withoutId(
 // evidence.
 export interface DocumentFamilyWiring {
     readonly family: string;
+    // HTTP nest. Storage prefix is still
+    // /${family}/ under the fenced organization.
+    readonly httpNest: 'global' | 'organization';
     // Fourth-family evidence (work-orders): 'trio' families
     // carry the Decision 7 lifecycle trio in every document
     // body and get the lifecycle walk + DELETED filter;
@@ -143,7 +146,7 @@ export interface DocumentFamilyWiring {
     readonly entityOf: (
         document: DerivedDocument,
         organization: Id,
-        current?: StateEntity,
+        current?: { readonly state: string },
     ) => unknown;
 }
 
@@ -276,13 +279,46 @@ async function derivedDocumentEntity(
     return wiring.entityOf(document, organization);
 }
 
+function collectionSegments(
+    wiring: DocumentFamilyWiring,
+): string[] {
+    if (wiring.httpNest === 'organization') {
+        return [
+            'organizations', ':id',
+            wiring.family, '',
+        ];
+    }
+    return [wiring.family, ''];
+}
+
+function entitySegments(
+    wiring: DocumentFamilyWiring,
+): string[] {
+    if (wiring.httpNest === 'organization') {
+        return [
+            'organizations', ':id',
+            wiring.family, ':id',
+        ];
+    }
+    return [wiring.family, ':id'];
+}
+
+export function entityIdParam(
+    wiring: DocumentFamilyWiring,
+    params: string[],
+): string {
+    const index =
+        wiring.httpNest === 'organization' ? 1 : 0;
+    return param(params, index);
+}
+
 export function documentGetHandler(
     wiring: DocumentFamilyWiring,
 ): GetHandler {
     return (db, params, _actor, organization) =>
         derivedDocumentEntity(
             wiring, db, requireOrganization(organization),
-            param(params, 0),
+            entityIdParam(wiring, params),
         );
 }
 
@@ -311,7 +347,8 @@ export function documentPutHandler(
 ): PutHandler {
     return (db, params, body, actor, pair) =>
         wiring.documentOp(
-            db, param(params, 0), body, actor, pair,
+            db, entityIdParam(wiring, params),
+            body, actor, pair,
         );
 }
 
@@ -319,17 +356,19 @@ export function documentEntityRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
     return {
-        segments: [wiring.family, ':id'],
+        segments: entitySegments(wiring),
         get: documentGetHandler(wiring),
         put: documentPutHandler(wiring),
     };
 }
 
-// GET <family>/:id/versions: wrap a family derive*StateHistory
+// GET <family>/:id/versions/: wrap a family derive*StateHistory
 // (ASC StateEntity[]) with (at, id) DESC so index 0 is
 // current, and empty → missedReadError (403 foreign / 404
 // absent) using the family's table name for an honest body.
 // Does NOT change the derive's own ASC for other callers.
+// Task 9 replaces the StateEntity[] list with entityOf
+// snapshots. Stateless families already return entityOf.
 export type DocumentStateHistoryDerive = (
     db: DbAdapter,
     organization: Id,
@@ -337,12 +376,13 @@ export type DocumentStateHistoryDerive = (
 ) => Promise<StateEntity[]>;
 
 export function documentStateHistoryHandler(
+    wiring: DocumentFamilyWiring,
     deriveFn: DocumentStateHistoryDerive,
     tableName: string,
 ): GetHandler {
     return async (db, params, _actor, organization) => {
         const org = requireOrganization(organization);
-        const id = param(params, 0);
+        const id = entityIdParam(wiring, params);
         const history = await deriveFn(db, org, id);
         if (history.length === 0) {
             throw await missedReadError(
@@ -381,18 +421,92 @@ export async function lookupStoredRevision(
     };
 }
 
+export async function storedRevisionDocument(
+    db: DbAdapter,
+    prefix: string,
+    id: Id,
+    etag: string,
+): Promise<DerivedDocument | undefined> {
+    const found = await lookupStoredRevision(
+        db, prefix, id, etag,
+    );
+    if (
+        found === undefined
+        || found.request.method !== PUT_METHOD
+    ) {
+        return undefined;
+    }
+    return {
+        uriId: id,
+        pairId: found.response.id,
+        method: found.request.method,
+        body: requestBodyOf(found.request.message),
+    };
+}
+
+export async function versionSnapshotsAt(
+    db: DbAdapter,
+    prefix: string,
+    id: Id,
+    toEntity: (document: DerivedDocument) => unknown,
+): Promise<unknown[]> {
+    const stored = await messageStore(db).getPairs(
+        prefix, id,
+    );
+    const requests = stored.map((pair) => pair.request);
+    const responses = stored.map((pair) => pair.response);
+    const pairs = documentPairsAt(
+        requests, responses, prefix,
+    ).filter((pair) => pair.uriId === id);
+    const snapshots: unknown[] = [];
+    for (const pair of pairs.toReversed()) {
+        if (pair.method !== PUT_METHOD) continue;
+        snapshots.push(toEntity({
+            uriId: id,
+            pairId: pair.id,
+            method: pair.method,
+            body: pair.body,
+        }));
+    }
+    return snapshots;
+}
+
+async function documentStateHistoryAt(
+    wiring: DocumentFamilyWiring,
+    db: DbAdapter,
+    organization: Id,
+    id: Id,
+): Promise<StateEntity[]> {
+    const prefix = canonicalUriCollection(
+        organization, '/' + wiring.family + '/',
+    );
+    const stored = await messageStore(db).getPairs(
+        prefix, id,
+    );
+    const requests = stored.map((pair) => pair.request);
+    const responses = stored.map((pair) => pair.response);
+    return stateHistoryFrom(
+        documentLifecycleEvents(
+            documentPairsAt(
+                requests, responses, prefix,
+            ).filter((pair) => pair.uriId === id),
+        ),
+        id,
+    );
+}
+
 async function serveDocumentRevision(
     wiring: DocumentFamilyWiring,
     db: DbAdapter,
     organization: Id,
     id: Id,
-    version: string,
+    etag: string,
 ): Promise<unknown> {
     const prefix = canonicalUriCollection(
         organization, '/' + wiring.family + '/',
     );
     const found = await lookupStoredRevision(
-        db, prefix, id, version,
+        db, prefix, id, etag,
     );
     if (
         found === undefined
@@ -410,16 +524,9 @@ async function serveDocumentRevision(
         body,
     };
     if (wiring.lifecycle === 'trio') {
-        const current: StateEntity = {
-            id: pickString(body, 'state_event_id'),
-            entity_id: id,
-            state: pickString(body, 'state'),
-            member_id: found.request.requester_identity_id,
-            at: pickString(body, 'state_at'),
-            version: found.response.version,
-        };
         return wiring.entityOf(
-            document, organization, current,
+            document, organization,
+            stateFromDocument(document),
         );
     }
     return wiring.entityOf(document, organization);
@@ -433,16 +540,80 @@ export function documentVersionGetHandler(
             wiring,
             db,
             requireOrganization(organization),
-            param(params, 0),
-            param(params, 1),
+            entityIdParam(wiring, params),
+            param(params, params.length - 1),
         );
+}
+
+function stateFromDocument(
+    document: DerivedDocument,
+): { readonly state: string } {
+    return { state: pickString(document.body, 'state') };
+}
+
+export function documentVersionListHandler(
+    wiring: DocumentFamilyWiring,
+): GetHandler {
+    // Flow keeps StateEntity[] (deferred). The four
+    // families return entityOf snapshots so list items
+    // match GET collection / GET :id.
+    if (
+        wiring.lifecycle === 'trio'
+        && wiring.family === 'flows'
+    ) {
+        return documentStateHistoryHandler(
+            wiring,
+            (db, organization, id) =>
+                documentStateHistoryAt(
+                    wiring, db, organization, id,
+                ),
+            wiring.notFoundTable,
+        );
+    }
+    return async (db, params, _actor, organization) => {
+        const org = requireOrganization(organization);
+        const id = entityIdParam(wiring, params);
+        const prefix = canonicalUriCollection(
+            org, '/' + wiring.family + '/',
+        );
+        const snapshots = await versionSnapshotsAt(
+            db, prefix, id,
+            (document) => wiring.lifecycle === 'trio'
+                ? wiring.entityOf(
+                    document, org,
+                    stateFromDocument(document),
+                )
+                : wiring.entityOf(document, org),
+        );
+        if (snapshots.length === 0) {
+            throw await throwDocumentMiss(
+                wiring, db, org, id,
+            );
+        }
+        return snapshots;
+    };
+}
+
+export function documentVersionListRoute(
+    wiring: DocumentFamilyWiring,
+): Route {
+    return {
+        segments: [
+            ...entitySegments(wiring),
+            'versions', '',
+        ],
+        get: documentVersionListHandler(wiring),
+    };
 }
 
 export function documentVersionRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
     return {
-        segments: [wiring.family, ':id', 'versions', ':version'],
+        segments: [
+            ...entitySegments(wiring),
+            'versions', ':etag',
+        ],
         get: documentVersionGetHandler(wiring),
     };
 }
@@ -535,7 +706,7 @@ export function documentCollectionRoute(
     wiring: DocumentFamilyWiring,
 ): Route {
     return {
-        segments: [wiring.family],
+        segments: collectionSegments(wiring),
         get: documentCollectionGetHandler(wiring),
     };
 }
@@ -564,29 +735,34 @@ const ID_PATTERN_SUFFIX = '/:id';
 const INCOMING_PAIR_AT = '9999-12-31T23:59:59.999999Z';
 const INCOMING_PAIR_ID = '\uffff';
 
-function idFamilyOf(pattern: string): string | undefined {
+const ORGANIZATION_NEST_PREFIX = 'organizations/:id/';
+
+export function idFamilyOf(
+    pattern: string,
+): string | undefined {
     if (!pattern.endsWith(ID_PATTERN_SUFFIX)) {
         return undefined;
     }
-    const family = pattern.slice(
+    const rest = pattern.slice(
         0, -ID_PATTERN_SUFFIX.length,
     );
-    if (family.includes('/')) return undefined;
-    return family;
+    if (rest.startsWith(ORGANIZATION_NEST_PREFIX)) {
+        const family = rest.slice(
+            ORGANIZATION_NEST_PREFIX.length,
+        );
+        if (family.includes('/')) return undefined;
+        return family;
+    }
+    if (rest.includes('/')) return undefined;
+    return rest;
 }
 
 function trioCurrentFromBody(
-    id: Id,
+    _id: Id,
     body: Record<string, unknown>,
-    actor: Id,
-): StateEntity {
-    return {
-        id: pickString(body, 'state_event_id'),
-        entity_id: id,
-        state: pickString(body, 'state'),
-        member_id: actor,
-        at: pickString(body, 'state_at'),
-    };
+    _actor: Id,
+): { readonly state: string } {
+    return { state: pickString(body, 'state') };
 }
 
 function trioDocumentFromBody(
@@ -697,7 +873,7 @@ export async function resolveStreamedTrioWriteBody(
     return streamedTrioWriteBody(
         db,
         wiring,
-        param(params, 0),
+        entityIdParam(wiring, params),
         body,
         actor,
         organization ?? '',
@@ -750,8 +926,8 @@ export function documentWriteResponseSpec(
             const doc = wiring.validateDocument(raw) as {
                 entity: Record<string, unknown>;
             };
+            const id = entityIdParam(wiring, params);
             if (streamTrio) {
-                const id = param(params, 0);
                 return wiring.entityOf(
                     trioDocumentFromBody(id, raw),
                     organization ?? '',
@@ -760,28 +936,24 @@ export function documentWriteResponseSpec(
             }
             if (wiring.family === 'flows') {
                 return flowStoredEntityOf(
-                    trioDocumentFromBody(
-                        param(params, 0), raw,
-                    ),
+                    trioDocumentFromBody(id, raw),
                     organization ?? '',
                 );
             }
             if (streamStateless) {
                 return wiring.entityOf(
-                    trioDocumentFromBody(
-                        param(params, 0), raw,
-                    ),
+                    trioDocumentFromBody(id, raw),
                     organization ?? '',
                 );
             }
             return organizationNested
                 ? {
-                    id: param(params, 0),
+                    id,
                     organization_id: organization,
                     ...doc.entity,
                 }
                 : {
-                    id: param(params, 0),
+                    id,
                     ...doc.entity,
                 };
         },

@@ -357,7 +357,7 @@ async () => {
         undefined,
     );
     // the minted access token passes the SP-3 gate
-    const rows = await GET(db, 'organizations/1/members', body.access_token);
+    const rows = await GET(db, 'organizations/1/members/', body.access_token);
     assert.ok(Array.isArray(rows));
 });
 
@@ -522,7 +522,7 @@ async () => {
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert.ok(Array.isArray(
         await GET(
-            db, 'organizations/1/members',
+            db, 'organizations/1/members/',
             body['access_token'] as string,
         )));
 });
@@ -555,7 +555,7 @@ async () => {
         access_token: string;
     };
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members', body.access_token)));
+        await GET(db, 'organizations/1/members/', body.access_token)));
 });
 
 test('refresh rotates to a new pair', async () => {
@@ -573,7 +573,7 @@ test('refresh rotates to a new pair', async () => {
     assert.notEqual(
         refreshTokenFromSetCookie(res), pair1.refresh_token);
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members', pair2.access_token)));
+        await GET(db, 'organizations/1/members/', pair2.access_token)));
 });
 
 test('replaying a rotated refresh token revokes the chain',
@@ -628,7 +628,7 @@ async () => {
     assert.equal(claims.act?.sub, 'current');
     // the delegated token passes the gate (current = admin)
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members', body.access_token)));
+        await GET(db, 'organizations/1/members/', body.access_token)));
 });
 
 test('token-exchange 201 has no refresh Set-Cookie',
@@ -805,7 +805,7 @@ test('client_credentials issues a gate-valid token', async () => {
     assert.equal(res.status, 201);
     const body = await res.json() as { access_token: string };
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members', body.access_token)));
+        await GET(db, 'organizations/1/members/', body.access_token)));
     assert.notEqual(
         decodeAccessToken(body.access_token).jti, 'assert-1',
     );

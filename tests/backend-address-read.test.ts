@@ -20,25 +20,25 @@ interface Row {
 const ROWS: Row[] = [
     {
         id: 'b',
-        uri_collection: '/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '1',
         at: '2026-01-01T00:00:00.000002Z',
     },
     {
         id: 'a',
-        uri_collection: '/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '1',
         at: '2026-01-01T00:00:00.000001Z',
     },
     {
         id: 'c',
-        uri_collection: '/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '2',
         at: '2026-01-01T00:00:00.000001Z',
     },
     {
         id: 'd',
-        uri_collection: '/flows/',
+        uri_collection: '/organizations/1/flows/',
         uri_id: '1',
         at: '2026-01-01T00:00:00.000001Z',
     },
@@ -59,7 +59,7 @@ async () => {
     const got = await backend.transaction(
         ['t'], 'readonly',
         (tx) => tx.getAddress<Row>(
-            't', '/ideas/', '1',
+            't', '/organizations/1/ideas/', '1',
         ),
     );
     assert.deepEqual(
@@ -78,17 +78,17 @@ async () => {
         (body) => body as Omit<Row, 'id'>,
     );
     await store.put('a', {
-        uri_collection: '/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '1',
         at: '2026-01-01T00:00:00.000001Z',
     });
     await store.put('c', {
-        uri_collection: '/ideas/',
+        uri_collection: '/organizations/1/ideas/',
         uri_id: '2',
         at: '2026-01-01T00:00:00.000001Z',
     });
     const got = await store.getAllAtAddress(
-        '/ideas/', '1',
+        '/organizations/1/ideas/', '1',
     );
     assert.deepEqual(got.map((row) => row.id), ['a']);
 });
@@ -102,21 +102,21 @@ async () => {
         async (tx) => {
             await tx.put('responses', {
                 id: 'old',
-                uri_collection: '/ideas/',
+                uri_collection: '/organizations/1/ideas/',
                 uri_id: '1',
                 at: '2026-01-01T00:00:00.000001Z',
                 version: 'aa',
             });
             await tx.put('responses', {
                 id: 'new',
-                uri_collection: '/ideas/',
+                uri_collection: '/organizations/1/ideas/',
                 uri_id: '1',
                 at: '2026-01-01T00:00:00.000002Z',
                 version: 'aa',
             });
             await tx.put('responses', {
                 id: 'other',
-                uri_collection: '/ideas/',
+                uri_collection: '/organizations/1/ideas/',
                 uri_id: '1',
                 at: '2026-01-01T00:00:00.000003Z',
                 version: 'bb',
@@ -126,7 +126,7 @@ async () => {
     const got = await backend.transaction(
         ['responses'], 'readonly',
         (tx) => tx.getAddressVersion(
-            'responses', '/ideas/', '1', 'aa',
+            'responses', '/organizations/1/ideas/', '1', 'aa',
         ),
     );
     assert.deepEqual(
@@ -178,7 +178,7 @@ async () => {
             });
             await tx.put('responses', {
                 id: 'other',
-                uri_collection: '/ideas/',
+                uri_collection: '/organizations/1/ideas/',
                 uri_id: '1',
                 at: '2026-01-01T00:00:00.000001Z',
                 message: jsonWire({ code: 'abc' }),
@@ -261,7 +261,7 @@ async () => {
             ['requests'],
             'readonly',
             (tx) => tx.getAddressVersion(
-                'requests', '/ideas/', '1', 'aa',
+                'requests', '/organizations/1/ideas/', '1', 'aa',
             ),
         ),
         (error: unknown) =>
@@ -281,7 +281,7 @@ async () => {
             ['requests'],
             'readonly',
             (tx) => tx.getWhereBody(
-                'requests', '/ideas/', { n: 1 },
+                'requests', '/organizations/1/ideas/', { n: 1 },
             ),
         ),
         (error: unknown) =>

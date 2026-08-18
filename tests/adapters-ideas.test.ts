@@ -57,7 +57,8 @@ function buildIdea(
 // Seeds an idea through the SAME document PUT the live route
 // uses (postIdeaCreation), so a message pair exists at this
 // idea's address — required for the flipped GET ideas / GET
-// ideas/:id routes (Phase 2 Task 5) to derive it. Phase Final
+// organizations/:id/ideas/:id routes (Phase 2 Task 5) to derive it. Phase
+// Final
 // Task 2 stripped the ideas row half: every test that needs a
 // readable idea must go through this path (or putIdea), never
 // a raw db.ideas.put.
@@ -73,8 +74,10 @@ async function seedIdea(
 }
 
 // Seeds a submission through the live PUT
-// ideas/:id/submissions/:sid route, so its message pair exists
-// for the flipped GET ideas/:id/submissions (Phase 2 Task 5) to
+// organizations/:id/ideas/:id/submissions/:sid route, so its message pair
+// exists
+// for the flipped GET organizations/:id/ideas/:id/submissions (Phase 2 Task
+// 5) to
 // derive it. Takes an explicit memberId (unlike the
 // putIdeaSubmission adapter, which always stamps the CURRENT
 // actor) so a submission can be attributed to a co-member.
@@ -86,7 +89,7 @@ async function seedIdeaSubmission(
     at: string,
 ): Promise<void> {
     await ctx.PUT(
-        'ideas/' + ideaId + '/submissions/' + submissionId,
+        'organizations/1/ideas/' + ideaId + '/submissions/' + submissionId,
         { idea_id: ideaId, member_id: memberId, at },
     );
 }
@@ -184,8 +187,6 @@ test('putIdea persists changes', async () => {
         ...fields,
         title: 'Updated',
         state: 'active',
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'ev-i1',
     });
     const stored = await getIdeaEntity(ctx, 'i1');
     assert.equal(stored.title, 'Updated');
@@ -267,21 +268,12 @@ test(
             before.problem_statement,
         );
         assert.equal(after.state, 'approved');
-        assert.notEqual(
-            after.state_event_id, before.state_event_id,
-        );
         const events =
             await deriveIdeaStateHistory(db, '1', 'i1');
         // genesis + transition
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'approved',
-        );
-        assert.equal(
-            after.state_event_id, events.at(-1)?.id,
-        );
-        assert.equal(
-            after.state_at, events.at(-1)?.at,
         );
     },
 );
@@ -327,9 +319,9 @@ test(
         );
 
         // Phase Final Task 2: projects row half stripped —
-        // read via GET /projects/:id.
+        // read via GET /organizations/:id/projects/:id.
         const project = await ctx.GET<{ title: string }>(
-            'projects/p1',
+            'organizations/1/projects/p1',
         );
         assert.equal(project.title, 'P1');
 
@@ -350,8 +342,8 @@ test(
             await ctx.GET<
                 ProjectObjectiveBaselineScoreEntity[]
             >(
-                'projects/p1/objective'
-                + '-baseline-scores',
+                'organizations/1/projects/p1/objective'
+                + '-baseline-scores/',
             );
         assert.equal(mine.length, 2);
         const byObj = new Map(

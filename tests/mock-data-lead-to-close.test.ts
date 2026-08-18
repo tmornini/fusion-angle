@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import {
     createRequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     getFlowStats,
 } from '../web-app/app/adapters/flow-stats.ts';
@@ -41,7 +41,7 @@ async function seededLeadToClose() {
         flow,
         `flow "${FLOW_NAME}" not seeded`,
     );
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     return await getFlowStats(ctx, flow!.id, now.getTime());
 }
 

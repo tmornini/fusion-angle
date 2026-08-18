@@ -82,7 +82,7 @@ test('seat collection stays live', async () => {
         db,
         req(
             'GET',
-            '/organizations/1/members',
+            '/organizations/1/members/',
             token,
         ),
     );

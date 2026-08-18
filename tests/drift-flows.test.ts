@@ -197,10 +197,10 @@ async function headResponseId(
     flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
+        'GET', '/organizations/1/flows/' + flowId, token,
     ));
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /flows/' + flowId);
+    assert.ok(id, 'no Response-ID on GET /organizations/1/flows/' + flowId);
     return id!;
 }
 
@@ -210,10 +210,10 @@ async function headEtag(
     flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
+        'GET', '/organizations/1/flows/' + flowId, token,
     ));
     const tag = got.headers.get('ETag');
-    assert.ok(tag, 'no ETag on GET /flows/' + flowId);
+    assert.ok(tag, 'no ETag on GET /organizations/1/flows/' + flowId);
     return tag!;
 }
 
@@ -226,7 +226,7 @@ async function createFlow(
     eventId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: flowId,
             flow: flowFields('Fresh Flow'),
             projectFlowId,
@@ -254,7 +254,12 @@ async function wireFlowText(
         'current', organization,
     );
     const res = await handleRequest(
-        db, req('GET', '/flows/' + flowId, token),
+        db, req(
+            'GET',
+            '/organizations/' + organization
+                + '/flows/' + flowId,
+            token,
+        ),
     );
     assert.equal(res.status, 200);
     return res.text();
@@ -268,7 +273,11 @@ async function wireFlowsText(
         'current', organization,
     );
     const res = await handleRequest(
-        db, req('GET', '/flows', token),
+        db, req(
+            'GET',
+            '/organizations/' + organization + '/flows/',
+            token,
+        ),
     );
     assert.equal(res.status, 200);
     return res.text();
@@ -398,7 +407,12 @@ async () => {
         'current', otherOrganization,
     );
     const res = await handleRequest(
-        db, req('GET', '/flows/' + foreign.id, token),
+        db, req(
+            'GET',
+            '/organizations/' + otherOrganization
+                + '/flows/' + foreign.id,
+            token,
+        ),
     );
     assert.equal(res.status, 404);
     const body = await res.json() as { error: string };
@@ -433,7 +447,8 @@ test('project-flows wire equals derive across every'
     );
     for (const projectId of SEEDED_PROJECT_FLOW_PROJECT_IDS) {
         const res = await handleRequest(db, req(
-            'GET', '/projects/' + projectId + '/flows', token,
+            'GET', '/organizations/1/projects/' + projectId +
+                '/flows/', token,
         ));
         assert.equal(res.status, 200);
         const wireText = await res.text();
@@ -452,7 +467,7 @@ test('the two-flows project orders both join rows'
     );
     const res = await handleRequest(db, req(
         'GET',
-        '/projects/' + TWO_FLOWS_PROJECT_ID + '/flows',
+        '/organizations/1/projects/' + TWO_FLOWS_PROJECT_ID + '/flows/',
         token,
     ));
     assert.equal(res.status, 200);
@@ -497,7 +512,7 @@ test('live-write chain: create, save, node delete, undo, '
 
     // Create: two nodes, one edge.
     const created = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: flowId,
             flow: flowFields('Chain Flow'),
             projectFlowId: flowId + '-pf',
@@ -537,7 +552,7 @@ test('live-write chain: create, save, node delete, undo, '
     let headId = await headResponseId(db, token, flowId);
     const saveAt = '2026-03-02T00:00:00.000000Z';
     const saved = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         documentBody('Chain Flow Saved', flowId + '-save', {
             state_at: saveAt, graph: fullGraph,
         }),
@@ -550,7 +565,7 @@ test('live-write chain: create, save, node delete, undo, '
     // Further save (versions POST retired Phase 15 Task 7).
     const versionAt = '2026-03-03T00:00:00.000000Z';
     const versionedSave = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         documentBody(
             'Chain Flow Versioned', flowId + '-versioned', {
                 state_at: versionAt, graph: fullGraph,
@@ -568,7 +583,7 @@ test('live-write chain: create, save, node delete, undo, '
         [wireNode(n1, 'Create', true)], [],
     );
     const deletedSave = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         documentBody(
             'Chain Flow Trimmed', flowId + '-delete-node', {
                 state_at: deleteAt, graph: deletedGraph,
@@ -601,7 +616,7 @@ test('live-write chain: create, save, node delete, undo, '
     // Undo-as-replay: reverts to Versioned (fullGraph).
     const undoAt = '2026-03-05T00:00:00.000000Z';
     const undone = await handleRequest(db, req(
-        'POST', '/flows/' + flowId + '/undo', token, {
+        'POST', '/organizations/1/flows/' + flowId + '/undo', token, {
             eventId: flowId + '-undo-ev',
             at: undoAt,
         },
@@ -619,7 +634,7 @@ test('live-write chain: create, save, node delete, undo, '
     // Redo-as-save: re-apply the node deletion.
     const redoAt = '2026-03-06T00:00:01.000000Z';
     const redone = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         documentBody('Chain Flow Redone', flowId + '-redo', {
             state_at: redoAt, graph: deletedGraph,
             graphDelta: {
@@ -646,7 +661,7 @@ test('live-write chain: create, save, node delete, undo, '
     // list, 404s on GET and derive.
     const tombstoneAt = '2026-03-07T00:00:00.000000Z';
     const tombstoned = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         documentBody('Chain Flow Deleted', flowId + '-tomb', {
             state: 'deleted', state_at: tombstoneAt,
             graph: deletedGraph,
@@ -660,7 +675,7 @@ test('live-write chain: create, save, node delete, undo, '
         EntityNotFoundError,
     );
     const gone = await handleRequest(
-        db, req('GET', '/flows/' + flowId, token),
+        db, req('GET', '/organizations/1/flows/' + flowId, token),
     );
     assert.equal(gone.status, 404);
     const derivedList = await deriveFlows(
@@ -690,10 +705,10 @@ test('live join-row chain: PUT appears on wire/derive, '
     const token = await organizationToken();
     const projectId = l2cProjectId;
     const pfid = 'pf-drift-join-1';
-    const listPath = '/projects/' + projectId + '/flows';
+    const listPath = '/organizations/1/projects/' + projectId + '/flows/';
 
     const putRes = await handleRequest(db, req(
-        'PUT', listPath + '/' + pfid,
+        'PUT', listPath + pfid,
         token,
         {
             project_id: projectId,
@@ -721,7 +736,7 @@ test('live join-row chain: PUT appears on wire/derive, '
 
     const delRes = await handleRequest(db, req(
         'DELETE',
-        listPath + '/' + pfid, token,
+        listPath + pfid, token,
     ));
     assert.equal(delRes.status, 204);
 
@@ -791,7 +806,7 @@ async () => {
     // TWO join rows on wire and derive (Phase Final Task 2:
     // project_flows row half stripped).
     const joinsRes = await handleRequest(db, req(
-        'GET', '/projects/' + projectId + '/flows', token,
+        'GET', '/organizations/1/projects/' + projectId + '/flows/', token,
     ));
     const wireJoins = (await joinsRes.json() as {
         id: string;
@@ -873,7 +888,7 @@ test('sidecar insensitivity: graphDelta/revivals disagreeing '
         [wireNode('sidecar-graph-node', 'Graph Node')], [],
     );
     const res = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token, {
+        'PUT', '/organizations/1/flows/' + flowId, token, {
             ...flowFields('Sidecar Flow'),
             state: 'active',
             state_at: AT,
@@ -925,7 +940,7 @@ test('the lock-head terminal reaches exactly the derived '
     const flowId = 'flow-drift-lock-head-chain';
 
     const genesis = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         documentBody('Genesis', 'flow-drift-lock-head-genesis'),
     ));
     assert.equal(genesis.status, 201);
@@ -935,7 +950,7 @@ test('the lock-head terminal reaches exactly the derived '
     const saveCount = 4; // N >= 3 sequential saves beyond genesis
     for (let i = 0; i < saveCount; i++) {
         const saved = await handleRequest(db, req(
-            'PUT', '/flows/' + flowId, token,
+            'PUT', '/organizations/1/flows/' + flowId, token,
             documentBody(
                 'Save ' + i, 'flow-drift-lock-head-ev-' + i,
             ),
@@ -1012,7 +1027,7 @@ async () => {
     };
 
     const res = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token, {
+        'PUT', '/organizations/1/flows/' + flowId, token, {
             ...flowFields('Multi-Member Flow'),
             state: 'active', state_at: AT,
             state_event_id: 'flow-drift-multi-node-ev',
@@ -1084,7 +1099,7 @@ test('same-join-id retry: two different flow creates reusing '
 
     const joinPrefix = canonicalUriCollection(
         STARK_ORGANIZATION,
-        '/projects/' + projectId + '/flows/',
+        '/organizations/1/projects/' + projectId + '/flows/',
     );
     const joinResponses = await db.responses.getAllAtAddress(
         joinPrefix, sharedPfid,

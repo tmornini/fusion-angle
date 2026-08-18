@@ -17,7 +17,7 @@ import { Octets } from
 const POSTGRES_URL = process.env['POSTGRES_URL'];
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-const IDEA_COLLECTION = '/ideas/';
+const IDEA_COLLECTION = '/organizations/1/ideas/';
 const FILLER_COLLECTION = '/filler/';
 const AUTH_COLLECTION = '/authentication/authorize/';
 const VERSION_COLLECTION = '/versioned/';
@@ -200,7 +200,7 @@ async function seedRows(
             // Fat address (81 versions at one uri_id):
             // version triple beats address + filter;
             // address ORDER BY prefers responses_address.
-            // Keep /ideas/ small for the collection pin.
+            // Keep /organizations/1/ideas/ small for the collection pin.
             await putPair(
                 tx,
                 VERSION_N,

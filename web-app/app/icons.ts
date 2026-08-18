@@ -179,6 +179,16 @@ export function iconGitBranch(
     );
 }
 
+export function iconBook(size: IconSize, cssClass: string) {
+    return icon(
+        '<path d="M4 19.5v-15A2.5 2.5 0 0 1'
+        + ' 6.5 2H20v20H6.5a2.5 2.5 0 0 1'
+        + ' 0-5H20"/>',
+        size,
+        cssClass,
+    );
+}
+
 export function iconPalette(size: IconSize, cssClass: string) {
     return icon(
         '<circle cx="13.5" cy="6.5" r=".5"'

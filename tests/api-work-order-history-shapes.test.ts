@@ -37,7 +37,7 @@ import {
 
 const BASE = 'http://localhost';
 const ORGANIZATION = STARK_ORGANIZATION;
-const TRANSITION_PATTERN = 'work-orders/:id/transition';
+const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 
 function req(
     method: string,
@@ -139,7 +139,7 @@ async function createWorkOrder(
         db,
         req(
             'POST',
-            '/work-orders',
+            '/organizations/1/work-orders/',
             DEV_TOKEN,
             createBody(workOrderId),
         ),
@@ -148,7 +148,7 @@ async function createWorkOrder(
 }
 
 // Below-gate transition append (appendInstancePair idiom).
-// routePattern work-orders/:id/transition; POST; 204.
+// routePattern organizations/:id/work-orders/:id/transition; POST; 204.
 async function appendTransitionPair(
     db: MemoryDbAdapter,
     organization: string,
@@ -158,6 +158,7 @@ async function appendTransitionPair(
 ): Promise<string> {
     const routeSegments = TRANSITION_PATTERN.split('/');
     const pathSegments = [
+        'organizations', organization,
         'work-orders', workOrderId, 'transition',
     ];
     const pair = await formWritePair({

@@ -5,7 +5,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getFlowStats,
@@ -63,7 +63,7 @@ function buildEdge(
 // Seed a flow through the SAME gate-driven create/document-PUT
 // idiom the live route uses (postFlowCreation + putFlow), so a
 // message pair exists at this flow's address — required for the
-// flipped GET flows/:id route (Phase 4 Task 8), which
+// flipped GET organizations/:id/flows/:id route (Phase 4 Task 8), which
 // getFlowStats reads via getFlowGraph, to derive it.
 // postFlowCreation seeds a default start/complete graph; the
 // immediate putFlow overwrites it with the caller's own graph.
@@ -112,7 +112,7 @@ async function transitionWorkOrder(
     targetState: string,
     at: string,
 ): Promise<void> {
-    await ctx.POST(`work-orders/${workOrderId}/transition`, {
+    await ctx.POST(`organizations/1/work-orders/${workOrderId}/transition`, {
         transitionEventId: eventId,
         targetState,
         release: null,
@@ -147,7 +147,7 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
 
         // Flow f1 with an Onboarding graph, seeded through the
         // gate-driven create/document-PUT idiom.
@@ -160,7 +160,7 @@ test(
         // not from work-order.flow_graph
         // Phase Final Stage B: work_orders table retired —
         // seed through the live document PUT.
-        await ctx.PUT('work-orders/wo1', {
+        await ctx.PUT('organizations/1/work-orders/wo1', {
             display_id: 'WO-1',
             flow_graph: {
                 name: 'Onboarding',
@@ -168,7 +168,7 @@ test(
             },
             position: 1,
         });
-        await ctx.PUT('work-orders/wo2', {
+        await ctx.PUT('organizations/1/work-orders/wo2', {
             display_id: 'WO-2',
             flow_graph: {
                 name: 'Onboarding',
@@ -178,14 +178,15 @@ test(
         });
 
         // wo1 belongs to f1; wo2 belongs to OTHER. NAMED re-pin
-        // (Task 7): getFlowStats reads flows/:id/work-orders
+        // (Task 7): getFlowStats reads
+        // organizations/:id/flows/:id/work-orders
         // through the flipped GET.
-        await ctx.PUT('flows/f1/work-orders/fwo1', {
+        await ctx.PUT('organizations/1/flows/f1/work-orders/fwo1', {
             flow_id: 'f1',
             work_order_id: 'wo1',
             at: daysAgo(45),
         });
-        await ctx.PUT('flows/OTHER/work-orders/fwo2', {
+        await ctx.PUT('organizations/1/flows/OTHER/work-orders/fwo2', {
             flow_id: 'OTHER',
             work_order_id: 'wo2',
             at: daysAgo(45),
@@ -242,13 +243,13 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         // seedFlow saves is_auto_layout true; buildTestGraph
         // seeds c→a→z all at (0,0).
         const autoGraph = buildTestGraph();
         await seedFlow(ctx, 'f1', 'AutoLayout', autoGraph);
         // Phase Final Stage B: work_orders table retired.
-        await ctx.PUT('work-orders/wo1', {
+        await ctx.PUT('organizations/1/work-orders/wo1', {
             display_id: 'WO-1',
             flow_graph: {
                 name: 'AutoLayout',
@@ -257,7 +258,7 @@ test(
             position: 1,
         });
         // NAMED re-pin (Task 7): same reason as above.
-        await ctx.PUT('flows/f1/work-orders/fwo1', {
+        await ctx.PUT('organizations/1/flows/f1/work-orders/fwo1', {
             flow_id: 'f1',
             work_order_id: 'wo1',
             at: daysAgo(10),

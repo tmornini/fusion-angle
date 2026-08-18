@@ -102,13 +102,9 @@ export async function postProjectApproval(
         id: _id,
         organization_id: _org,
         state: _state,
-        state_at: _stateAt,
-        state_event_id: _stateEventId,
         ...fields
     } = entity;
     void _state;
-    void _stateAt;
-    void _stateEventId;
     const v = validateProjectForApproval(
         active, scoring.baseline,
     );
@@ -132,13 +128,9 @@ export async function postProjectArchival(
         id: _id,
         organization_id: _org,
         state: _state,
-        state_at: _stateAt,
-        state_event_id: _stateEventId,
         ...fields
     } = entity;
     void _state;
-    void _stateAt;
-    void _stateEventId;
     const v = validateProjectForArchival(
         scoring.baseline, scoring.actual,
     );

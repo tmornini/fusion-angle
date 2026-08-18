@@ -122,10 +122,12 @@ export async function notYetValidToken(sub = 'current'): Promise<string> {
     });
 }
 
-// Pre-minted 'current' dev token for the common case. Minting
-// is async now, but devToken() is deterministic, so one value
-// equals every call. Tests that need the token as a plain
-// string — e.g. inside a synchronous assert.throws thunk —
-// import this instead of awaiting at each call site. Minted
-// once here via top-level await; the async module graph waits.
-export const DEV_TOKEN = await devToken();
+// Pre-minted 'current' org-scoped token for the common case.
+// Minting is async now, but organizationToken() is
+// deterministic, so one value equals every call. Tests that
+// need the token as a plain string — e.g. inside a
+// synchronous assert.throws thunk — import this instead of
+// awaiting at each call site. Minted once here via top-level
+// await; the async module graph waits. Product adapters
+// read the org claim via activeOrganization.
+export const DEV_TOKEN = await organizationToken();

@@ -177,9 +177,9 @@ export function authorizeIdentityPii(
 }
 
 // The orgs a caller can reach, from the token's organizations
-// claim (mint-time membership snapshot). Shared by GET
-// /organizations and the organizations/:id read fence in
-// handleRequest. Staleness is the NAMED ≤15-min covenant.
+// claim (mint-time membership snapshot). Shared by the
+// organizations/:id read fence in handleRequest.
+// Staleness is the NAMED ≤15-min covenant.
 export function callerOrganizationIdsFromClaims(
     principal: Principal,
 ): Set<Id> {

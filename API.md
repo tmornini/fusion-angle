@@ -1,37 +1,43 @@
 # API.md — URI Catalog & POST Composition
 
-The `api/` layer is a REST-style HTTP API. The browser ZIP
-runs it in-page over IndexedDB. The server ZIP runs the
-same handlers in Node over Postgres. Every
-operation is an HTTP operation against a relative resource URI;
-single-noun primitives (`GET`/`PUT`/`DELETE` on `/noun/:id`) are the
-leaves, and multi-noun operations (`POST /noun/operation`) are interior
-nodes composed from those leaves.
+The `api/` layer is a REST-style HTTP API. The server ZIP
+runs the handlers in Node over Postgres. Every operation
+is an HTTP operation against a relative resource URI;
+single-noun primitives (`GET`/`PUT`/`DELETE` on a
+document) are the leaves, and multi-noun operations
+(`POST …/operation`) are interior nodes composed from
+those leaves.
 
-This document answers three questions:
+The live surface is `routes[]` in `api/routes.ts`. Browse
+it at `/api-documentation/` (API.svg plus one room per
+offered verb). If a URI is not on the table, it does not
+exist. This file is the composition and ledger guide —
+not a second catalog. On any disagreement, the table
+wins.
 
-1. **What URIs exist?** — the complete route catalog (§2).
-2. **What does each POST do internally?** — the per-POST composition,
-   shown both as the *actual* store-operation sequence and as the
-   *doctrinal* single-noun-primitive decomposition (§3).
-3. **What does the shadow ledger add to the wire?** — the pair
-   formation step every write runs through, the response headers
-   it produces, and the seed's own pre-formed pairs (§5).
+This document answers two questions:
 
-The single most important fact: **POST endpoints here do not issue
-internal HTTP sub-requests.** They compose store-level primitives
-inside one `db.transaction([...tables])`. Why this is so — and the one
-genuine exception (`facadeRequest`) — is §4.
+1. **What does each POST do internally?** — the per-POST
+   composition, shown both as the *actual* store-operation
+   sequence and as the *doctrinal* single-noun-primitive
+   decomposition (§3).
+2. **What does the shadow ledger add to the wire?** — the
+   pair formation step every write runs through, the
+   response headers it produces, and the seed's own
+   pre-formed pairs (§5).
+
+POST endpoints here do not issue internal HTTP
+sub-requests. They compose store-level primitives inside
+one `db.transaction([...tables])`. Why this is so is §4.
 
 The source of record is `api/routes.ts` (the route table),
-`api/api.ts` (`handleRequest` + facades), `api/request-auth.ts` (the
+`api/api.ts` (`handleRequest`), `api/request-auth.ts` (the
 gate), `api/authentication.ts` (the OAuth grants),
-`api/invitations-domain.ts` (the invitation sub-router),
-`api/organization-requests.ts` (the
-organization/default-organization sub-routers), and
+`api/invitations-domain.ts` (invitation nest handlers),
+`api/organization-requests.ts` (identity-organization
+reads and default-organization), and
 `api/message-pair.ts` (shadow-ledger pair
-formation — §5). This file summarizes them; on any
-disagreement, the code wins.
+formation — §5).
 
 ---
 
@@ -39,30 +45,21 @@ disagreement, the code wins.
 
 ### 1.1 Request flow
 
-`handleRequest(adapter, request)` (`api/api.ts` `handleRequest`)
-resolves a request in this order:
+`handleRequest(adapter, request)` (`api/api.ts`
+`handleRequest`) resolves a request in this order:
 
-1. **Three pre-match special routes**, before `matchRoute`:
-   - `/identities/:id/default-organization` (3
-     segments) → `identityDefaultOrganizationRequest`.
-   - `/invitations/...` (first segment `invitations`) →
-     `invitationsRequest` (its own sub-router; see §2.12).
-   - bare `GET /organizations` →
-     `organizationsEnumerationRequest`.
-2. **`matchRoute(routeTable, segments)`** (`api/routes.ts`
-   `matchRoute`) — a linear scan over the flat `routes[]`
-   array. A route matches when segment counts are equal and
-   every literal segment matches; a `:` segment captures a
-   positional param. First match wins. **Unmatched** org-
-   nested paths (`/organizations/:org/:entity[/:id]`, ≥3
-   segments) fall through to `facadeRequest` (the org-scoping
-   facade; see §4) — in-table `organizations/...` patterns
-   win over the facade when registered. Unmatched org-nested
-   paths return from `facadeRequest` before the main gate
-   (re-enter on the flat resource). Only non-facade match
-   failures continue: authentication runs first (step 3),
-   then 404 for an unmatched authenticated path.
-3. **The gate** (skipped for bearer-exempt routes):
+1. **`matchRoute(routeTable, segments)`**
+   (`api/routes.ts` `matchRoute`) — a linear scan over
+   the flat `routes[]` array. A route matches when
+   segment counts are equal and every literal segment
+   matches; a `:` segment captures a non-empty
+   positional param. A trailing slash is a collection
+   segment (`identities/` ≠ `identities`). First match
+   wins. There is no facade rematch and no
+   `GET /organizations` list. Unmatched paths continue
+   to authentication, then 404 for an unmatched
+   authenticated path.
+2. **The gate** (skipped for bearer-exempt routes):
    `authenticateRequest` (verify the Bearer JWT; reject
    missing, invalid, or anonymous — per-request revocation
    is retired; a revoked access token works until `exp`,
@@ -75,16 +72,17 @@ resolves a request in this order:
    Bearer 401 body is `{ error: 'invalid_token' }`. Grant
    401s use `invalid_client` or `invalid_grant` (see §3.8).
    → **nested path-org fence** (after fence, before
-   authorize: for `organizations/...` other than bare
-   `organizations/:id`, path org must equal the fenced
-   token org — mismatch including a nonexistent path org
-   is **403** with a fixed body; path org never authorizes
-   alone) → `authorizeRequest` (per-org role check). After a
+   authorize: for `organizations/...` other than the
+   organization document and its `versions` leaves, path
+   org must equal the fenced token org — mismatch
+   including a nonexistent path org is **403** with a
+   fixed body; path org never authorizes alone) →
+   `authorizeRequest` (per-org role check). After a
    successful auth, no route match is **404**.
-4. **Body parse** (`PUT`/`POST`/`PATCH`): `parseObjectBody` —
+3. **Body parse** (`PUT`/`POST`/`PATCH`): `parseObjectBody` —
    a malformed or non-object JSON body is a `400` here, before
    either the pair or the handler ever sees it.
-5. **Region B + pre-pair write guards** (after body parse):
+4. **Region B + pre-pair write guards** (after body parse):
    the self-only identity-token-revocation target guard
    (`PUT identities/:id/token-revocations/:rid` — path
    identity must be the actor unless admin) runs for
@@ -94,7 +92,7 @@ resolves a request in this order:
    `Operation-ID` (22-char); missing or malformed → **400**.
    The server does not mint that header. Inner PUTs copy
    the outer id. GET may send it; it is ignored.
-6. **Shadow-ledger pair formation + idempotency + post-
+5. **Shadow-ledger pair formation + idempotency + post-
    replay gates**, for a write verb whose route pattern is
    in `PAIR_WIRED_ROUTE_PATTERNS` (skipped for bearer-exempt
    routes and for a verb the matched route has no handler
@@ -121,7 +119,7 @@ resolves a request in this order:
    malformed → **400**, stale → **412**). Public instance
    PUT is **405**. See §5 for what pair formation produces
    on the wire.
-7. Only then does the matched handler run, receiving the base
+6. Only then does the matched handler run, receiving the base
    adapter (`effective` / `ctx.base`), the verified `actor`
    id, the fenced organization, and — for a pair-wired write —
    the formed pair, appended as the LAST act of the handler's own
@@ -159,62 +157,61 @@ handler — the client makes one call per adapter method.
 
 ## 2. URI Catalog
 
+The complete offered-verb map is `/api-documentation/`.
+This section names families and the live nest. Slash
+marks a collection. Product families nest under
+`/organizations/:id/`.
+
 Legend for classification:
 
 - **primitive** — single-noun CRUD leaf (`get`/`put`/`delete`).
 - **operation** — multi-noun `POST` that composes primitives (§3).
-- **nested** — collection/leaf filtered to a parent id (param 0).
+- **nested** — collection/leaf filtered to a parent id.
 - Auth: most routes are authenticated + org-scoped. Exceptions are
   called out (admin, self-or-admin, self-only, identity-scoped,
   bearer-exempt).
 
-### 2.1 Members & current member
+### 2.1 Members, seats & agents
 
-- `GET /members` — roster derived from the membership ledger (plus the
-  system member). primitive (derived).
-- `GET|PUT /members/:id` — member by id. primitive (§3.30). `PUT`
-  is a document write (§5.10) — the ninth family, and the FIRST
-  `organizationNested:false` one: no `organization_id` exists on
-  this entity at all.
-- `GET /members/:id/versions/:version` — document
-  version leaf (§2.10).
-- `GET /current-member` — the verified caller's own member row.
-- `GET /ai-members` · `GET|PUT /ai-members/:id` — primitive.
-  `PUT /ai-members/:id` is a document write (§5.10) — the tenth
-  family, joining `MEMBERS_WIRING`'s shared-log-with-genesis
-  bucket. `GET /ai-members/:id/versions/:version` —
-  document version leaf (§2.10).
-- `POST /ai-members` · `POST /ai-members/:id` — operation (§3.1, §3.2).
-  Admin-only.
-- `GET /ai-agents` · `GET|PUT /ai-agents/:id` — primitive.
-  `PUT /ai-agents/:id` is a document write — the fourteenth
-  family, global-plane, not a member and not an identity.
-  Body is `name`, `description`, `skill_focus`, `model`.
-  `GET /ai-agents/:id/versions/:version` — document version
-  leaf (§2.10).
-- `GET /human-members` · `GET /human-members/:id` — primitive.
-  `human-members/:id` is registered for the document wiring
-  (§5.10) — the eleventh family — but carries no live `PUT`, the
-  first registered family without one.
-  `GET /human-members/:id/versions/:version` — document
-  version leaf (§2.10).
-- `POST /human-members` · `POST /human-members/:id` — operation (§3.3,
-  §3.4). Admin-only.
+Flat `/members`, `/current-member`, `/ai-members`,
+`/human-members`, and `/memberships` are RETIRED
+(router 404). Seats live on the organization nest.
+
+- `GET /organizations/:organization-id/members/` —
+  seat roster. primitive (derived).
+- `GET|PUT|DELETE /organizations/:organization-id/members/:identity-id`
+  — seat document. `PUT` is a document write (§5.10).
+  `GET …/versions/` plus `GET …/versions/:etag` —
+  version list and leaf (§2.10).
+- `GET /ai-agents/` · `GET|PUT /ai-agents/:id` —
+  primitive. Global-plane, not a member and not an
+  identity. Body is `name`, `description`,
+  `skill_focus`, `model`. `GET /ai-agents/:id/versions/`
+  plus `GET /ai-agents/:id/versions/:etag` — version
+  list and leaf (§2.10).
 
 ### 2.2 Identities & subtree
 
-- `GET /identities` · `GET|PUT /identities/:id` — primitive. `PUT`
-  is a document write (§5.13) — the TWELFTH registered family,
-  joining `MEMBERS_WIRING`'s shared-log-with-genesis bucket.
-- `GET /identities/:id/versions/:version` — document
-  version leaf (§2.10).
-- `POST /identities` — operation (§3.5). Admin-only.
+- `GET|POST /identities/` · `GET|PUT /identities/:id`
+  — primitive. `POST` is operation (§3.5), admin-only.
+  `PUT` is a document write (§5.13).
+- `GET /identities/:id/versions/` plus
+  `GET /identities/:id/versions/:etag` — version list
+  and leaf (§2.10).
+- `GET|PUT /identities/:id/default-organization` —
+  singleton SET document. Self-only. See §2.11.
+- `GET /identities/:id/organizations/` — the identity's
+  reachable organizations. Identity-scoped. There is
+  no `GET /organizations` list.
+- `GET /identities/:id/invitations/` ·
+  `GET|PUT /identities/:id/invitations/:id` — receive
+  nest. See §2.12.
 - `GET|PUT|DELETE /identities/:id/pii` — facet. GET is
   self-or-admin; PUT/DELETE are self-or-admin. The only
   PII HTTP (flat `/identity-pii` is RETIRED, router 404).
   PUT/DELETE ride the message plane's sanctioned
   hard-delete zone (§5.12).
-- `GET /identities/:id/credentials` ·
+- `GET /identities/:id/credentials/` ·
   `GET|PUT /identities/:id/credentials/:cid` — nested; the opaque
   `secret` is projected out on every read. Admin-only. `PUT`'s
   closure is extracted to `postIdentityCredentialDocumentOp`
@@ -226,7 +223,7 @@ Legend for classification:
 
 ### 2.3 Auth spine — tokens, providers, grants
 
-- `GET /identities/:id/tokens` (derived) ·
+- `GET /identities/:id/tokens/` (derived) ·
   `GET|PUT /identities/:id/tokens/:tid` — nested under the
   identity. Admin-only GET. `PUT` is pair-only and stamps
   `identity_id` from the path. Flat `GET /identity-tokens` ·
@@ -244,7 +241,7 @@ Legend for classification:
   still requires admin. Path stamps `identity_id`.
   Flat `GET|PUT /identity-token-revocations/:id` is
   RETIRED (router 404). No collection route.
-- `GET /identities/:id/providers` ·
+- `GET /identities/:id/providers/` ·
   `GET|PUT /identities/:id/providers/:eid` — nested under the
   identity. Admin-only. Flat `GET /identity-providers` ·
   `GET|PUT /identity-providers/:id` are RETIRED (router 404).
@@ -258,103 +255,109 @@ Legend for classification:
 
 ### 2.4 Ideas
 
-- `GET /ideas` · `GET|PUT /ideas/:id` — primitive (§3.10).
-  Member-tier. `GET /ideas/:id/versions/:version` —
-  document version leaf (§2.10).
-- `POST /ideas` — retired (Phase 2 Task 3, R1): the composed
-  create folded into the PUT above; the route now 405s like
-  any other method-absent verb.
-- `POST /ideas/:id/conversion` — operation, idea→project (§3.11).
-  Member-tier.
-- `GET /ideas/:id/submissions` ·
-  `PUT /ideas/:id/submissions/:sid` — nested.
+Org-nested. No flat `/ideas` collection.
+
+- `GET /organizations/:id/ideas/` ·
+  `GET|PUT /organizations/:id/ideas/:id` — primitive
+  (§3.10). Member-tier. `GET …/versions/` plus
+  `GET …/versions/:etag` — version list and leaf
+  (§2.10). GET rows do not embed the lifecycle trio.
+- `POST /organizations/:id/ideas/:id/conversion` —
+  operation, idea→project (§3.11). Member-tier.
+- `GET /organizations/:id/ideas/:id/submissions/` ·
+  `PUT /organizations/:id/ideas/:id/submissions/:sid`
+  — nested.
 
 ### 2.5 Projects
 
-- `GET /projects` · `GET|PUT /projects/:id` — primitive
-  (§3.32). Member-tier. `GET /projects/:id/versions/:version`
-  — document version leaf (§2.10).
-- `GET /projects/:id/flows` · `PUT|DELETE /projects/:id/flows/:pfid` —
-  nested (project↔flow join).
-- `GET /projects/:id/objective-baseline-scores` ·
+Org-nested. No flat `/projects` collection.
+
+- `GET /organizations/:id/projects/` ·
+  `GET|PUT /organizations/:id/projects/:id` —
+  primitive (§3.32). Member-tier. `GET …/versions/`
+  plus `GET …/versions/:etag` — version list and
+  leaf (§2.10). GET rows do not embed the lifecycle
+  trio.
+- `GET /organizations/:id/projects/:id/flows/` ·
+  `PUT|DELETE /organizations/:id/projects/:id/flows/:pfid`
+  — nested (project↔flow join).
+- `GET /organizations/:id/projects/:id/objective-baseline-scores/` ·
   `PUT .../objective-baseline-scores/:sid` — nested.
-- `GET /projects/:id/objective-actual-scores` ·
+- `GET /organizations/:id/projects/:id/objective-actual-scores/` ·
   `PUT .../objective-actual-scores/:sid` — nested.
 
 ### 2.6 Flows
 
-- `GET /flows` · `GET|PUT /flows/:id` — primitive. `PUT` is a
-  document write (§3.13) and the FIRST locked-class route
-  (§5.4) — a save on an existing flow must echo the current
-  `ETag` via `If-Match` or 428/412s.
-- `POST /flows` — operation (§3.12). Member-tier.
-- `POST /flows/:id/undo` — operation (§3.14).
-- `POST /flows/:id/redo` — retired (Phase 4 Task 4, R1/E5):
-  the route leaves the URI tree entirely, so a request
-  against it 404s (no pattern match) — never a 405
-  method-absent gap. Live redo is a single locked
-  `PUT /flows/:id` (§3.13).
-- `GET /flows/:id/versions` — pair-chain lifecycle
-  index (live). Wire `StateEntity` rows include
-  `version` (the lookup token).
-- `GET /flows/:id/versions/:version` — live
-  document version leaf (`documentVersionRoute`).
-  Table-backed PUT/DELETE on this address stay
-  unwired (405). Writes on the pair-chain index
-  stay unwired (405). Phase Final DELETED the
-  `flow_versions` table. Historical prose for the
-  dead table-backed write surface lives at §3.16 /
-  §3.31.
-- `GET /flows/:id/work-orders` ·
-  `PUT /flows/:id/work-orders/:woid` — nested.
-- `GET /flows/:id/records` ·
-  `GET|PUT|DELETE /flows/:id/records/:frid` — nested.
-- `GET|PUT|DELETE /flows/:id/tags/:name` — nested, PAIR-PLANE
-  ONLY (Phase 14 Task 9): the codebase's FIRST document family
-  with no backing table — `flow_response_id` (the pinned
-  response id of a `flows/:id` document pair) is the tag's only
-  body field. SIMPLE class, not locked (§5.4's locked arm
-  exact-matches `flows/:id`, never this 4-segment address).
-  `DELETE` is marked, like every other family.
+Org-nested. No flat `/flows` collection.
+
+- `GET|POST /organizations/:id/flows/` ·
+  `GET|PUT /organizations/:id/flows/:id` —
+  primitive. `PUT` is a document write (§3.13) and
+  the FIRST locked-class route (§5.4) — a save on
+  an existing flow must echo the current `ETag` via
+  `If-Match` or 428/412s. `POST` is operation
+  (§3.12). Member-tier.
+- `POST /organizations/:id/flows/:id/undo` —
+  operation (§3.14).
+- `POST …/redo` — retired: no pattern match, so a
+  request 404s. Live redo is a locked
+  `PUT /organizations/:id/flows/:id` (§3.13).
+- `GET /organizations/:id/flows/:id/versions/` —
+  pair-chain index (live). Flows keep
+  `StateEntity[]` on the list (deferred).
+- `GET /organizations/:id/flows/:id/versions/:etag`
+  — document version leaf (`documentVersionRoute`).
+- `GET /organizations/:id/flows/:id/work-orders/` ·
+  `PUT /organizations/:id/flows/:id/work-orders/:woid`
+  — nested.
+- `GET /organizations/:id/flows/:id/records/` ·
+  `GET|PUT|DELETE /organizations/:id/flows/:id/records/:frid`
+  — nested.
+- `GET|PUT|DELETE /organizations/:id/flows/:id/tags/:name`
+  — nested, PAIR-PLANE ONLY: first document family
+  with no backing table — `flow_response_id` is the
+  tag's only body field. SIMPLE class, not locked.
 
 ### 2.7 Work orders
 
-- `GET /work-orders` · `GET|PUT /work-orders/:id` — primitive.
-  `PUT` is a document write (§5.6) — the fourth family, and the
-  FIRST `'stateless'` one (§5.6): unlike ideas/projects/flows,
-  its body carries no lifecycle trio. `GET` now rides the SAME generic
-  document machinery `PUT` does — both the list (`GET /work-orders`) and the
-  entity read (`GET /work-orders/:id`) derive from the message ledger (Task
-  7, Phase 5), not a hand-written dispatch.
-- `POST /work-orders` — operation (§3.17). Member-tier.
-- `PUT|GET|DELETE /work-orders/:id/claim` — claim
-  document (§3.18). First PUT **201**. GET
+Org-nested. No flat `/work-orders` collection. No
+bulk history.
+
+- `GET|POST /organizations/:id/work-orders/` ·
+  `GET|PUT /organizations/:id/work-orders/:id` —
+  primitive. `PUT` is a document write (§5.6) —
+  `'stateless'`: the body carries no lifecycle trio.
+  `POST` is operation (§3.17). Member-tier.
+- `PUT|GET|DELETE /organizations/:id/work-orders/:id/claim`
+  — claim document (§3.18). First PUT **201**. GET
   `{member_id, expires_at}`; 404 only when unclaimed.
   DELETE releases (**204**). POST 405.
-- `POST /work-orders/:id/transition` — operation (§3.19).
-- `PUT /work-orders/:id/binding` — create-only bind
-  (§3.34). First **201**; rebind 409; POST 405.
-- `POST /work-orders/:id/release` — RETIRED (router
-  404). Unclaim is `DELETE /work-orders/:id/claim`
-  (§3.18 / §3.35).
+- `POST /organizations/:id/work-orders/:id/transition`
+  — operation (§3.19).
+- `PUT /organizations/:id/work-orders/:id/binding` —
+  create-only bind (§3.34). First **201**; rebind
+  409; POST 405.
+- `GET /organizations/:id/work-orders/:id/history` —
+  per-id history (§2.10). There is no
+  `GET …/work-orders/history` bulk.
+- `POST …/release` — RETIRED (router 404). Unclaim
+  is `DELETE …/claim` (§3.18 / §3.35).
 
 ### 2.8 Record types, attributes & instances
 
 Org-nested primary wire (no dual-wire flat `/records`
 facade). Base path:
 
-`organizations/:organization-id/record-types`
+`/organizations/:organization-id/record-types/`
 
 Nested under `:record-type-id`:
-`/versions`, `/attributes[/:attribute-id]`,
-`/instances[/:instance-id[/versions]]`.
+`/versions/`, `/versions/:etag`,
+`/attributes/` and `/:attribute-id`,
+`/instances/` and `/:instance-id[/versions/]`.
 
-In-table nested routes match via `matchRoute` **before** the
-org facade swallows unmatched org-nested paths (dispatch
-inversion — ARCHITECTURE.md § Facade). Path
-`:organization-id` must equal the fenced claim org else
-**403** (no auto-exchange; nonexistent path org is also
-403 — no route-topology oracle). Flat
+Path `:organization-id` must equal the fenced claim org
+else **403** (no auto-exchange; nonexistent path org is
+also 403 — no route-topology oracle). Flat
 `/records[/:id[/history]]` and
 `/record-attributes[/:id]` are RETIRED (router 404;
 unauth → 401 first).
@@ -372,9 +375,10 @@ If-Match this wave):
 - `DELETE .../record-types/:id` — admin; tombstone;
   RESTRICT if live instances or `flows/:id/records`
   joins
-- `GET .../record-types/:id/versions` — member;
-  lifecycle-trio history (§2.10). No document
-  version leaf.
+- `GET .../record-types/:id/versions/` plus
+  `GET .../record-types/:id/versions/:etag` —
+  member; version list and leaf (§2.10). GET
+  rows do not embed the lifecycle trio.
 
 **Attributes** (nested under type; `'stateless'` SIMPLE
 PUT; admin mutation; body drops `record_id` — type id
@@ -414,120 +418,70 @@ accepted debt, not this family's wire.
 
 ### 2.9 Objectives
 
-- `GET /objectives` · `GET|PUT /objectives/:id` — primitive
-  (§3.29). `PUT` is a document write (§5.8) — the seventh
-  family, lifecycle **`'trio'`** (genesis at create;
-  archive/reactivate via the document PUT — not
-  `'stateless'`). Both `GET`s DERIVE from the ledger
-  (§3.29): the collection via
-  `documentCollectionGetHandler(OBJECTIVES_WIRING)`, the entity
-  via `documentEntityRoute(OBJECTIVES_WIRING)`.
-  `GET /objectives/:id/versions/:version` — document
-  version leaf (§2.10).
-- `POST /objectives` — operation (§3.21).
-- `GET /objectives/:id/revisions` ·
-  `PUT /objectives/:id/revisions/:rid` — nested.
+Org-nested. No flat `/objectives` collection. No bulk
+`GET /objectives/versions`.
+
+- `GET|POST /organizations/:id/objectives/` ·
+  `GET|PUT /organizations/:id/objectives/:id` —
+  primitive (§3.29). `PUT` is a document write
+  (§5.8) — lifecycle **`'trio'`** (genesis at
+  create; archive/reactivate via the document PUT).
+  `POST` is operation (§3.21). `GET …/versions/`
+  plus `GET …/versions/:etag` — version list and
+  leaf (§2.10). GET rows do not embed the
+  lifecycle trio.
+- `GET /organizations/:id/objectives/:id/revisions/` ·
+  `PUT /organizations/:id/objectives/:id/revisions/:rid`
+  — nested.
 
 ### 2.10 Lifecycle history — the per-URI event log
 
-Lifecycle is pair-plane only. The `states` table and every
-verb on the shared event-append address are RETIRED
-(states-address retirement + Phase Final). **Nine
-lifecycle GET registrations + one value-history
-(instances)** replace the retired bulk collection,
-per-entity history alias, and field-values read surface.
-Wire order is `(at, id)`
-**DESC** on every registration (index 0 = current). No
-new authorization entries —
-`matchesOnSegmentBoundary` extends existing family GET
-grants under `/versions` (work-orders stay
-`/history`). Route order is load-bearing:
-literal `work-orders/history` and `objectives/versions`
-register **before** the `:id` document routes so
-`matchRoute` does not treat the literal as an id.
+Lifecycle is pair-plane only. The `states` table and
+every verb on the shared event-append address are
+RETIRED. There is **no** bulk
+`GET work-orders/history` and **no** bulk
+`GET objectives/versions`. Per-entity history is
+`GET …/versions/` (list) plus `GET …/versions/:etag`
+(leaf). Work-orders stay `/history` on the item.
 
-**Nine lifecycle registrations**
+Live version lists + `:etag` leaves:
 
-1. `GET ideas/:id/versions` —
-   `documentStateHistoryHandler(deriveIdeaStateHistory,
-   'ideas')`. Wire: `StateEntity[]`
-   `{id, entity_id, state, member_id, at,
-   version}` DESC. `version` is the lookup
-   token for `GET .../versions/:version`.
-   Empty → `missedReadError` → foreign **403** /
-   absent **404** (honest family body).
-2. `GET projects/:id/versions` — same builder over
-   `deriveProjectStateHistory` / `'projects'`.
-3. `GET organizations/:org/record-types/:id/versions` —
-   same builder over
-   `deriveRecordStateHistory` / `'record_types'`
-   (nested address; flat `records/:id/history` is
-   router 404).
-4. `GET flows/:id/versions` — same builder over
-   `deriveFlowStateHistory` / `'flows'`.
-5. `GET objectives/:id/versions` — same builder over
-   `deriveObjectiveStateHistory` / `'objectives'`.
-6. `GET members/:id/versions` — `deriveMemberStates`
-   filtered to `entity_id`, sorted DESC. Global-family
-   miss: empty → `EntityNotFoundError('members', id)`
-   → **404** only (no org write authorizer).
-7. `GET work-orders/:id/history` —
-   `workOrderHistoryFor` (entity-scoped op-pair replay
-   + transition fold). Wire:
-   `WorkOrderHistoryEventEntity extends StateEntity
-   { field_values: TransitionFieldValueEntity[] }`
-   with `{id, attribute_id, value}` (no
-   `state_event_id` on the wire — the parent event
-   already carries `id`). Transition rows fold values;
-   claim / birth / release rows carry
-   `field_values: []`. Empty → `missedReadError(...,
-   'work_orders')` → foreign **403** / absent **404**.
-8. `GET work-orders/history` —
-   `deriveWorkOrderHistories(db, org)`. Org-prefix
-   bulk of (7), same
-   `WorkOrderHistoryEventEntity` shape, DESC overall.
-   **Always 200** array (empty when the org has no
-   work-order lifecycle).
-9. `GET objectives/versions` —
-   `deriveObjectiveHistories(db, org)`. Org-prefix
-   bulk of objective document-trio events,
-   `StateEntity` only (no `field_values`), DESC
-   overall. **Always 200** array.
+- `/identities/:id/versions/`
+- `/ai-agents/:id/versions/`
+- `/organizations/:id/versions/`
+- `/organizations/:organization-id/members/:identity-id/versions/`
+- `/identities/:id/invitations/:id/versions/`
+- `/organizations/:id/invitations/:id/versions/`
+- `/organizations/:id/ideas/:id/versions/`
+- `/organizations/:id/projects/:id/versions/`
+- `/organizations/:id/flows/:id/versions/`
+- `/organizations/:organization-id/record-types/:record-type-id/versions/`
+- `/organizations/:id/objectives/:id/versions/`
 
-**Document version leaves** (`documentVersionRoute`).
-`GET /:family/:id/versions/:version` is live for
-identities, ai-members, human-members, memberships,
-flows, members, ideas, projects, and objectives.
-The `:version` token is the stored response
-`version` (64-hex) advertised on the index row
-where the family has one. Instance leaf
-`GET .../instances/:id/versions/:version` is also
-live (§5.20). Record-types and work-orders have
-no document version leaf.
+The four families (ideas, projects, record-types,
+objectives) return `entityOf` snapshots on the list
+and the `:etag` leaf so items match GET collection /
+GET `:id`. They do **not** embed trio metadata
+(`state`, `state_at`, `state_event_id`) on those
+GET rows. Flows keep `StateEntity[]` on the list
+(deferred).
 
-**One value-history registration (not a lifecycle
-clone).**
-`GET organizations/:org/record-types/:type/instances/:id/versions`
-— value-revision chain:
-`{ at, etag, version, values }[]` DESC,
-projected by the caller's **current** read ACL (never
-ACL-as-of-then). `version` is the lookup token for
-`GET .../instances/:id/versions/:version`. Foreign
-403 / absent 404 / tombstone 404. Full dialect: §5.20.
+`GET /organizations/:id/work-orders/:id/history` —
+`workOrderHistoryFor` (entity-scoped op-pair replay
++ transition fold). Wire:
+`WorkOrderHistoryEventEntity` with inline
+`field_values`. Empty → `missedReadError` → foreign
+**403** / absent **404**.
 
-**Head-state on entity GETs (lifecycle trio).** Ideas,
-projects, record-types, objectives, and members GET
-rows embed `state`, `state_at`, `state_event_id` stamped
-from the lifecycle-current event (genesis-wins-under-
-skew), never the head PUT body alone. Flows skip the
-embed (no consumer). Work-orders stay `'stateless'` —
-lifecycle lives only on create / claim / transition /
-binding ops and the history routes above. Unclaim is
-DELETE on the claim address. Instances carry
-`values` (full-state head), not the lifecycle trio.
+Instance value-revision history
+(`GET …/instances/:id/versions/` plus
+`…/versions/:version`) is not a lifecycle clone:
+`{ at, etag, version, values }[]` DESC, projected
+by the caller's **current** read ACL. Full dialect:
+§5.20.
 
 **Field values have no successor route.** Product
-reads fold them inline on work-order history (7)/(8).
+reads fold them inline on work-order item history.
 `stateFieldValuesFrom` /
 `deriveStateFieldValueReferrers` remain for the
 record-attributes RESTRICT gate only;
@@ -570,29 +524,19 @@ RETIRED with the address itself (see
 
 ### 2.11 Organizations & memberships
 
-- `GET /organizations` — the caller's reachable orgs (identity-scoped;
-  runs above the admin gate so a roleless member can boot). The row
-  list is the pair-plane derivation (Phase 12 Task 5):
-  `deriveOrganizations` (`api/derive-organizations.ts`, §5.18); the
-  membership filter is ALSO derived now (Phase 13 Task 3):
-  `callerOrganizationIds` (`api/request-auth.ts`) reads
-  token claims via `callerOrganizationIdsFromClaims` (the
-  adapter arg is unused), never a live memberships ledger
-  or `memberships.getAllWhere`.
-- `GET|PUT /organizations/:id` — primitive (global passthrough; reads
-  fence to the caller's memberships). `GET` is FLIPPED too (Phase 12
-  Task 5): a bespoke `deriveOrganization` call in the route closure
-  (§5.18), not the generic `documentGetHandler` every other flipped
-  family rides. `PUT` stays hand-written old-plane.
-- `GET /memberships` · `GET|PUT|DELETE /memberships/:id` —
-  primitive. `PUT` is a document write (§5.9) — the eighth
-  family, `'stateless'` (a pure join with no lifecycle
-  concept). Collection and entity `GET` ride the generic
-  document handlers over `MEMBERSHIPS_WIRING`. `DELETE` is
-  hand-written: a pure pair-plane tombstone append on
-  `['requests','responses']`.
-  `GET /memberships/:id/versions/:version` — document
-  version leaf (§2.10).
+There is no `GET /organizations` list.
+
+- `GET /identities/:id/organizations/` — the identity's
+  reachable organizations (`getIdentityOrganizations`).
+  Identity-scoped; org-less tokens may read this nest.
+- `GET|PUT /organizations/:id` — primitive (global
+  passthrough; reads fence to the caller's memberships).
+  `GET /organizations/:id/versions/` plus
+  `GET /organizations/:id/versions/:etag` — version
+  list and leaf (§2.10).
+- Flat `/memberships` is RETIRED (router 404). Seats
+  live at
+  `/organizations/:organization-id/members/` (§2.1).
 - `GET|PUT /identities/:id/default-organization` — a
   simple document. Self-only. `GET` returns the SET
   document or 404 if never SET. `PUT { organization_id }`
@@ -603,19 +547,28 @@ RETIRED with the address itself (see
   else deny. Derived via `deriveDefaultOrganization`
   at `/identities/:id/default-organization/`.
 
-### 2.12 Invitations (sub-router)
+### 2.12 Invitations (dual nest)
 
-Handled inside `invitationsRequest` (`api/invitations-domain.ts`),
-never through the main table — the workflow spans identity and org and
-runs on the base adapter with explicit guards:
+Two HTTP nests over one storage prefix `/invitations/`.
+Both nests are on `routes[]` (`api/invitations-domain.ts`
+handlers). They are filters and authorization, not two
+documents.
 
-- `GET /invitations` — the caller's own invitations (invitee view).
-- `GET /invitations/sent` — the active org's pending invitations
-  (admin roster).
-- `POST /invitations` — grant (§3.22). Admin-only.
-- `POST /invitations/:id/acceptance` — accept (§3.23). Invitee-only.
-- `POST /invitations/:id/decline` — decline (§3.24). Invitee-only.
-- `POST /invitations/:id/revocation` — revoke (§3.25). Admin-only.
+Receive nest (invitee):
+
+- `GET /identities/:id/invitations/`
+- `GET|PUT /identities/:id/invitations/:id` — PUT
+  sets `accepted` or `declined` from pending
+  (§3.23 / §3.24). Invitee-only.
+- `GET …/versions/` plus `GET …/versions/:etag`
+
+Send nest (admin):
+
+- `GET|POST /organizations/:id/invitations/` — POST
+  grants pending (§3.22). Admin-only.
+- `GET|PUT /organizations/:id/invitations/:id` — PUT
+  sets `revoked` from pending (§3.25). Admin-only.
+- `GET …/versions/` plus `GET …/versions/:etag`
 
 ---
 
@@ -2070,24 +2023,10 @@ This is forced, not stylistic:
   facade once per method; the fan-out is entirely server-side, within
   the handler's transaction.
 
-### The one genuine internal HTTP sub-request: `facadeRequest`
-
-`facadeRequest` (`api/api.ts`) is the sole place a request
-re-enters `handleRequest`. For `/organizations/:org/:entity/...` it:
-
-1. takes the caller's Bearer token,
-2. calls `exchangeBearerForOrganization` (a self-delegation
-   token exchange; a non-member is 403 — the tenant fence),
-3. rewrites the path to the flat `/:entity/...`, swaps in the
-   org-scoped access token, preserves the request id, and
-4. **re-enters `handleRequest`** with the flat request.
-
-Note what it is and isn't: it is method-agnostic (it forwards
-`GET`/`PUT`/`POST`/`DELETE` alike), and it runs **before** any handler
-or transaction opens — it is a routing/auth rewrite, not a POST
-composing other operations. So even the one true internal request is
-not a POST issuing sub-requests; it is the org fence re-dispatching the
-*same* user request against the flat resource path.
+There is no `facadeRequest` rematch. Org-nested
+families live on `routes[]` under
+`/organizations/:id/`. Path organization must equal
+the fenced token organization else **403**.
 
 ---
 
@@ -2442,9 +2381,9 @@ now declares:
   `'stateless'` wiring (its only tombstone signal is a
   DELETE-method head, already absent via `deriveDocumentsAt`
   — the SAME reduction every family shares). History reads
-  live on `GET work-orders/:id/history` and
-  `GET work-orders/history` (§2.10) with inline
-  `field_values`.
+  live on `GET /organizations/:id/work-orders/:id/history`
+  (§2.10) with inline `field_values`. There is no bulk
+  `GET work-orders/history`.
 - **`notFoundTable`: the identifier the wire 404 body speaks**
   (`EntityNotFoundError`'s table, rendered `Not found:
   <table>/<id>`). Family name for ideas/projects/flows;
@@ -2561,9 +2500,10 @@ genesis is an explicit minted event, and there is no shared
   (`position`) plus `state` / `state_at` / `state_event_id`
   (`validateObjectiveDocumentBody`). PUT **response** still
   returns entity fields only (`{id, organization_id,
-  position}` via the write-response spec). GET embeds the
-  lifecycle trio on the derived row
-  (`objectiveDocumentEntityOf`).
+  position}` via the write-response spec). GET keeps
+  domain `state` on the derived row
+  (`objectiveDocumentEntityOf`) and does **not**
+  embed `state_at` / `state_event_id`.
 - **Concurrency:** `'simple'` (§5.4) — last-writer-wins,
   no `If-Match`. Same-body → 200 no append.
 - **Archived inclusion:** `GET /objectives` INCLUDES archived
@@ -3381,9 +3321,10 @@ pairs. Work-order historical traces reseed as
 with the system-member genesis path accounted in the member
 document plane); field values fold into those transition
 bodies as `fieldValues: [{id, fields}]`. Product reads expose
-them inline on `GET work-orders/:id/history` and
-`GET work-orders/history` as `field_values: [{id,
-attribute_id, value}]` (§2.10). No
+them inline on
+`GET /organizations/:id/work-orders/:id/history` as
+`field_values: [{id, attribute_id, value}]` (§2.10).
+There is no bulk `GET work-orders/history`. No
 `WRITE_RESPONSE_SPECS` leaf entry remains for a field-values
 write address. See §5.19 for the full surviving-route list
 and seed reshape pin.
@@ -3647,10 +3588,9 @@ removed:**
   derivation, not one `deriveOrganization` call per invitation)
   — sources from `deriveOrganizations` in place of
   `ctx.base.organizations.getAll()`.
-- The DEAD `route('organizations', {get: ...})` table entry is
-  REMOVED: unreachable since `GET /organizations` is intercepted
-  PRE-`matchRoute` in `api/api.ts` (the `pathSegments.length ===
-  1 && GET` guard, §1.1) — the route-table row never dispatched.
+- There is no `GET /organizations` collection on the
+  table. Reachable orgs are
+  `GET /identities/:id/organizations/`.
 
 **What stayed old-plane (at Task 5's own close).** The
 `organizations` is pair-plane only after Phase Final —
@@ -3670,9 +3610,10 @@ Phase 15 Task 7 retired zero-caller route families; states-
 address retirement made **every verb** on the shared
 event-append address a router **404** (unauthenticated →
 401 first). Product callers were already zero. Surviving
-live history surfaces (§2.10 — **nine lifecycle + one
+live history surfaces (§2.10 — **seven lifecycle + one
 value-history**, wire `(at, id)` DESC, index 0 =
-current):
+current). There is **no** bulk `GET work-orders/history`
+and **no** bulk `GET objectives/versions`:
 
 1. `GET ideas/:id/versions`
 2. `GET projects/:id/versions`
@@ -3682,11 +3623,7 @@ current):
 5. `GET objectives/:id/versions`
 6. `GET members/:id/versions` (global; absent → 404)
 7. `GET work-orders/:id/history` (inline `field_values`)
-8. `GET work-orders/history` (bulk; always 200; inline
-   `field_values`)
-9. `GET objectives/versions` (bulk; always 200;
-   `StateEntity` only)
-10. (value-history, not lifecycle)
+8. (value-history, not lifecycle)
     `GET .../record-types/:type/instances/:id/versions`
     → `{ at, etag, version, values }[]` projected by
     current read ACL (§5.20). Leaf
@@ -3694,15 +3631,18 @@ current):
 
 Per-entity org-nested legs (1–5, 7) empty →
 `missedReadError` → foreign **403** / absent **404**.
-Bulk legs (8–9) always return an array. Field values have
-no successor GET route — product reads fold them on (7)
-and (8). `stateEventVisibilityFor` remains the RESTRICT /
-ownership 3-tier probe, not a public collection.
+Field values have no successor GET route — product
+reads fold them on (7). `stateEventVisibilityFor`
+remains the RESTRICT / ownership 3-tier probe, not a
+public collection.
 
-Head-state trio (`state`, `state_at`, `state_event_id`)
-embeds on GET rows for ideas / projects / record-types /
-objectives / members (not flows; work-orders stay
-stateless; instances carry `values`, not trio).
+The four families (ideas, projects, record-types,
+objectives) keep domain `state` on GET rows and do
+**not** embed `state_at` / `state_event_id`. Members
+GET still embeds the lifecycle trio. Flows keep
+`StateEntity[]` on the versions list (deferred).
+Work-orders stay stateless; instances carry `values`,
+not trio.
 
 `flow_versions` table and table-backed write routes
 are GONE (Phase 15 retired writes; Phase Final

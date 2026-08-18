@@ -40,9 +40,9 @@ const INSTANCE_ID = 'inst-restrict-1';
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
-const ATTRS = TYPE_DETAIL + '/attributes';
-const INSTANCES = TYPE_DETAIL + '/instances';
-const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
+const ATTRS = TYPE_DETAIL + '/attributes/';
+const INSTANCES = TYPE_DETAIL + '/instances/';
+const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 
 function req(
     method: string,
@@ -105,8 +105,6 @@ function typeBody(): Record<string, unknown> {
         description: 'Rental desc',
         position: 1,
         state: 'active',
-        state_at: AT,
-        state_event_id: TYPE_ID + '-genesis',
     };
 }
 
@@ -125,7 +123,7 @@ async function seedWritableTextAttr(
     adminToken: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', ATTRS + '/' + ATTR_ID, adminToken, {
+        'PUT', ATTRS + ATTR_ID, adminToken, {
             name: 'Title',
             attribute_type: 'text',
             sort_order: 0,

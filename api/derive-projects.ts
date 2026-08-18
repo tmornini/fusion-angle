@@ -48,7 +48,7 @@ function projectsUriPrefix(organization: Id): string {
 export function projectEntityOf(
     document: DerivedDocument,
     organization: Id,
-    current: StateEntity,
+    current: { readonly state: string },
 ): ProjectEntity {
     const body = document.body;
     return {
@@ -64,8 +64,6 @@ export function projectEntityOf(
         actual_cost: pickNumber(body, 'actual_cost'),
         position: pickNumber(body, 'position'),
         state: current.state,
-        state_at: current.at,
-        state_event_id: current.id,
     };
 }
 

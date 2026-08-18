@@ -461,6 +461,32 @@ async function dispatch(
             status = await serveStatic(req, res, filePath);
             return;
         }
+        if (
+            pathname === '/api-documentation'
+            || pathname.startsWith(
+                '/api-documentation/',
+            )
+        ) {
+            const indexed = pathname.endsWith('/')
+                ? pathname + 'index.html'
+                : pathname + '/index.html';
+            const filePath = safeStaticPath(
+                options.staticRoot, indexed,
+            );
+            if (filePath === undefined) {
+                writeJson(
+                    res,
+                    HTTP_NOT_FOUND,
+                    { error: 'Not found' },
+                );
+                status = HTTP_NOT_FOUND;
+                return;
+            }
+            status = await serveStatic(
+                req, res, filePath,
+            );
+            return;
+        }
         const requestPathname = new URL(
             'http://'
                 + requestHost(req)

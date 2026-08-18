@@ -8,7 +8,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -50,7 +50,7 @@ async function setupMemDb(): Promise<{
     await seedHumanMember(db, 'current', 'Demo User');
     await seedHumanMember(db, 'm1', 'Member One');
     await seedHumanMember(db, 'm2', 'Member Two');
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -113,7 +113,7 @@ async function pairPlaneGraph(
     flowId: string,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'flows/' + flowId,
+        'organizations/1/flows/' + flowId,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',
@@ -295,7 +295,7 @@ async function seedKnownBaseline(
 }
 
 test(
-    'PUT /flows/:id ROUND-TRIP: pair-plane graph'
+    'PUT /organizations/:id/flows/:id ROUND-TRIP: pair-plane graph'
     + ' equals the intended saved graph',
     async () => {
         const { ctx } = await setupMemDb();
@@ -351,7 +351,7 @@ test(
 );
 
 test(
-    'PUT /flows/:id APPEND-ONLY: removed/re-added/'
+    'PUT /organizations/:id/flows/:id APPEND-ONLY: removed/re-added/'
     + 'changed leave new graphDelta events, never splice',
     async () => {
         const { db, ctx } = await setupMemDb();
@@ -419,7 +419,7 @@ test(
 );
 
 test(
-    'PUT /flows/:id IDEMPOTENCY: replaying one delta'
+    'PUT /organizations/:id/flows/:id IDEMPOTENCY: replaying one delta'
     + ' body twice leaves pair graph unchanged',
     async () => {
         const { ctx } = await setupMemDb();
@@ -442,7 +442,7 @@ test(
                 headerFields?:
                     readonly (readonly [string, string])[],
             ): Promise<T> => {
-                if (path === 'flows/' + flowId
+                if (path === 'organizations/1/flows/' + flowId
                     && captured === null) {
                     captured =
                         body as Record<string, unknown>;
@@ -462,7 +462,7 @@ test(
 
         // Replay the EXACT captured body (and its echo header).
         await origPut(
-            'flows/' + flowId, captured, capturedHeaders,
+            'organizations/1/flows/' + flowId, captured, capturedHeaders,
         );
 
         // Derived state identical (byte-identical resend).
@@ -474,7 +474,7 @@ test(
 );
 
 test(
-    'PUT /flows/:id pair-plane graph equals the'
+    'PUT /organizations/:id/flows/:id pair-plane graph equals the'
     + ' intended working graph after save',
     async () => {
         const { ctx } = await setupMemDb();
@@ -487,7 +487,7 @@ test(
         ));
 
         const flow = await ctx.GET<FlowWithGraph>(
-            'flows/' + flowId,
+            'organizations/1/flows/' + flowId,
         );
         const blob = asStoredGraph(
             flow.graph, 'flow.graph',
@@ -501,7 +501,7 @@ test(
 );
 
 test(
-    'PUT /flows/:id still emits exactly one updated event'
+    'PUT /organizations/:id/flows/:id still emits exactly one updated event'
     + ' (existing covenant intact)',
     async () => {
         const { ctx } = await setupMemDb();
@@ -512,7 +512,7 @@ test(
             working.nodes, working.edges,
         ));
         const events = await ctx.GET<StateEntity[]>(
-            'flows/' + flowId + '/versions',
+            'organizations/1/flows/' + flowId + '/versions/',
         );
         // Family history is DESC — current first.
         assert.deepEqual(

@@ -161,7 +161,8 @@ function buildLinearGraph(): StoredGraph {
 // Seed (or re-save) a flow through the SAME gate-driven create/
 // document-PUT idiom the live route uses (postFlowCreation +
 // putFlow), so a message pair exists at this flow's address —
-// required for the flipped GET flows/:id route (Phase 4 Task
+// required for the flipped GET organizations/:id/flows/:id route (Phase 4
+// Task
 // 8), which postWorkOrderCreation reads before creating, to
 // derive it. A first call creates (postFlowCreation seeds a
 // default start/complete graph; the immediate putFlow overwrites
@@ -175,7 +176,7 @@ async function seedFlow(
     flowId: string,
     graph: StoredGraph,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     const save = {
         name: 'Test flow',
         isLocked: false,
@@ -188,7 +189,7 @@ async function seedFlow(
     // Phase Final Stage B: flows table retired — probe
     // existence via GET; create on miss.
     try {
-        await ctx.GET('flows/' + flowId);
+        await ctx.GET('organizations/1/flows/' + flowId);
         await putFlow(ctx, flowId, save);
         return;
     } catch {
@@ -210,7 +211,7 @@ async function setupDb(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo Test');
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -231,7 +232,7 @@ async function seedClaim(
     workOrderId: string,
     claimAt: string,
 ): Promise<void> {
-    await ctx.PUT(`work-orders/${workOrderId}/claim`, {
+    await ctx.PUT(`organizations/1/work-orders/${workOrderId}/claim`, {
         claimEventId: generateCryptoSafeBase62(),
         claimAt,
         expireEventId: generateCryptoSafeBase62(),
@@ -245,7 +246,7 @@ async function seedRelease(
     _releaseAt: string,
 ): Promise<void> {
     await ctx.DELETE(
-        `work-orders/${workOrderId}/claim`,
+        `organizations/1/work-orders/${workOrderId}/claim`,
     );
 }
 
@@ -619,7 +620,7 @@ async function seedTypeInstanceAndJoin(
         ],
     );
     await ctx.PUT(
-        'flows/' + flowId + '/records/fr-'
+        'organizations/1/flows/' + flowId + '/records/fr-'
         + flowId,
         {
             flow_id: flowId,
@@ -823,20 +824,21 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
-        const ctx = createRequestContext(db, await devToken());
-        // NAMED re-pin (Task 7, the projects/:id/flows
+        const ctx = createRequestContext(db, await organizationToken());
+        // NAMED re-pin (Task 7, the organizations/:id/projects/:id/flows
         // precedent in tests/adapters-flow-queries.test.ts): the
-        // flipped GET flows/:id/work-orders derives from the
+        // flipped GET organizations/:id/flows/:id/work-orders derives from
+        // the
         // message ledger, not the raw flow_work_orders table —
         // a raw db.flowWorkOrders.put leaves no pair at this
         // address, so each join must land through the SAME
         // wire-reachable PUT the live route serves.
-        await ctx.PUT('flows/flow1/work-orders/fwo1', {
+        await ctx.PUT('organizations/1/flows/flow1/work-orders/fwo1', {
             flow_id: 'flow1',
             work_order_id: 'wo1',
             at: '2024-01-01T00:00:00.000000Z',
         });
-        await ctx.PUT('flows/flow2/work-orders/fwo2', {
+        await ctx.PUT('organizations/1/flows/flow2/work-orders/fwo2', {
             flow_id: 'flow2',
             work_order_id: 'wo2',
             at: '2024-01-01T00:00:00.000000Z',
@@ -865,7 +867,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const woId = generateCryptoSafeBase62();
         await seedBareWorkOrder(ctx, woId);
         // Backdate ten seconds; lockTimeout=1s
@@ -891,7 +893,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const woId = generateCryptoSafeBase62();
         await seedBareWorkOrder(ctx, woId);
         await seedClaim(ctx, woId, nowUtc());
@@ -903,19 +905,19 @@ test(
     },
 );
 
-// ── bulk getActiveClaimsByWorkOrder ────
+// ── fan-in getActiveClaimsByWorkOrder ────
 
 test(
     'getActiveClaimsByWorkOrder resolves every '
-    + 'order claim in one read, honoring per-order '
-    + 'lockTimeout and the work-order set',
+    + 'order claim via per-item history, honoring '
+    + 'per-order lockTimeout and the work-order set',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const fresh1 = generateCryptoSafeBase62();
         const fresh2 = generateCryptoSafeBase62();
         const stale = generateCryptoSafeBase62();
@@ -978,7 +980,7 @@ test(
         const woId = await createWorkOrder(ctx, 'f1');
         await deleteWorkOrderClaim(ctx, woId);
         const events = await ctx.GET<StateEntity[]>(
-            'work-orders/' + woId + '/history',
+            'organizations/1/work-orders/' + woId + '/history',
         );
         const released = events.filter(
             (e) => e.state === 'claim_released',

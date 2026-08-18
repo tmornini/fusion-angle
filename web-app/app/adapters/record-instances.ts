@@ -50,7 +50,7 @@ function instancesPath(
         + activeOrganization(ctx)
         + '/record-types/'
         + recordTypeId
-        + '/instances';
+        + '/instances/';
 }
 
 function instancePath(
@@ -58,7 +58,7 @@ function instancePath(
     recordTypeId: string,
     id: string,
 ): string {
-    return instancesPath(ctx, recordTypeId) + '/' + id;
+    return instancesPath(ctx, recordTypeId) + id;
 }
 
 function valuesMap(

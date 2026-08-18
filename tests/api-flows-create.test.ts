@@ -89,13 +89,13 @@ test(
     + " 'active' state event in one operation",
     async () => {
         const db = await freshDb();
-        await POST(db, 'flows', createBody(), DEV_TOKEN);
+        await POST(db, 'organizations/1/flows/', createBody(), DEV_TOKEN);
 
         const flow = await GET<{
             id: string;
             name: string;
             organization_id: string;
-        }>(db, 'flows/flow-1', DEV_TOKEN);
+        }>(db, 'organizations/1/flows/flow-1', DEV_TOKEN);
         assert.equal(flow.name, 'My Flow');
         // The fence stamped the bound org — never the body.
         assert.equal(flow.organization_id, '1');
@@ -106,7 +106,7 @@ test(
             id: string;
             project_id: string;
             flow_id: string;
-        }[]>(db, 'projects/p1/flows', DEV_TOKEN);
+        }[]>(db, 'organizations/1/projects/p1/flows/', DEV_TOKEN);
         assert.equal(links.length, 1);
         assert.equal(links[0]!.id, 'pf-1');
         assert.equal(links[0]!.project_id, 'p1');
@@ -134,9 +134,9 @@ test(
         // pair-plane create (immutability is pair-plane only
         // on states/:id PUT).
     // Phase Final Stage B: states table retired.
-        await POST(db, 'flows', createBody(), DEV_TOKEN);
+        await POST(db, 'organizations/1/flows/', createBody(), DEV_TOKEN);
         const flow = await GET<{ id: string }>(
-            db, 'flows/flow-1', DEV_TOKEN,
+            db, 'organizations/1/flows/flow-1', DEV_TOKEN,
         );
         assert.equal(flow.id, 'flow-1');
         const flowEvents = await deriveFlowStateHistory(
@@ -156,14 +156,14 @@ test(
         // index-independent if prior tests grow the fixture.
         const AT = '2099-06-17T12:00:00.000000Z';
         const db = await freshDb();
-        await POST(db, 'flows', {
+        await POST(db, 'organizations/1/flows/', {
             ...createBody(),
             initialStateAt: AT,
         }, DEV_TOKEN);
 
         const events = await GET<StateEntity[]>(
             db,
-            'flows/flow-1/versions',
+            'organizations/1/flows/flow-1/versions/',
             DEV_TOKEN,
         );
         assert.equal(events.length, 1);

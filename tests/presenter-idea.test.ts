@@ -138,8 +138,6 @@ function makeStateDetail(
 ): IdeaStateDetail {
     return {
         state,
-        stateAt: '2026-01-15T09:00:00.000000Z',
-        stateEventId: 'ev-fixture',
     };
 }
 

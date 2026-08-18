@@ -46,12 +46,12 @@ const INSTANCE_ID = 'inst-attr-restrict-1';
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
-const ATTRS = TYPE_DETAIL + '/attributes';
-const ATTR_DETAIL = ATTRS + '/' + ATTR_ID;
+const ATTRS = TYPE_DETAIL + '/attributes/';
+const ATTR_DETAIL = ATTRS + ATTR_ID;
 const COLLECTION =
-    '/organizations/' + ORGANIZATION + '/record-types';
-const INSTANCES = TYPE_DETAIL + '/instances';
-const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
+    '/organizations/' + ORGANIZATION + '/record-types/';
+const INSTANCES = TYPE_DETAIL + '/instances/';
+const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 
 interface AttributeWireRow {
     id: string;
@@ -127,8 +127,6 @@ function typeBody(): Record<string, unknown> {
         description: 'Rental desc',
         position: 1,
         state: 'active',
-        state_at: AT,
-        state_event_id: TYPE_ID + '-genesis',
     };
 }
 
@@ -330,7 +328,7 @@ async () => {
         'PUT', ATTR_DETAIL, adminToken, attrCore(),
     ));
     const flowCreate = await handleRequest(db, req(
-        'POST', '/flows', adminToken, {
+        'POST', '/organizations/1/flows/', adminToken, {
             id: 'flow-attr-restrict-1',
             flow: {
                 name: 'Intake',
@@ -523,8 +521,6 @@ async () => {
             },
             attributes: [],
             state: 'active',
-            state_at: AT,
-            state_event_id: TYPE_ID + '-genesis',
             removedAttributeIds: [ATTR_ID],
         },
     ));

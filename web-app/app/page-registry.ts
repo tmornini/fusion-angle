@@ -13,6 +13,7 @@ import {
     iconCreditCard,
     iconDatabase,
     iconPalette,
+    iconBook,
 } from './icons.ts';
 
 export interface PageEntry {
@@ -314,6 +315,18 @@ export const PAGE_REGISTRY: Record<
             'billing plan invoices'
             + ' payment',
         loader: () => import('../billing/index'),
+    },
+    'api-documentation': {
+        title: 'API',
+        layout: 'sidebar',
+        inSidebarNav: true,
+        sourceDir: 'api-documentation',
+        sourceFile: 'index',
+        icon: iconBook,
+        keywords: 'api http routes documentation',
+        requiresAuth: false,
+        cssBundles: ['pages-api-documentation'],
+        loader: () => import('../api-documentation/index'),
     },
     'design-system': {
         title: 'Design System',

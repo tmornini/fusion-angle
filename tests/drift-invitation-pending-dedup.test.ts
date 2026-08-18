@@ -56,14 +56,15 @@ async () => {
 
     // Fresh grant: the new invitation is pending.
     const grant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: inviteeEmail,
             invitationId: 'inv-dedup-step0-first',
             grantEventId: 'inv-dedup-step0-first-grant',
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 201);
+    assert.equal(grant.status, 200);
     const afterGrant = await pendingInvitationFor(
         db, ORGANIZATION_TWO, inviteeId);
     assert.equal(afterGrant?.id, 'inv-dedup-step0-first');
@@ -72,15 +73,17 @@ async () => {
     const invitee = await organizationToken(
         inviteeId, ORGANIZATION_TWO);
     const decline = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-dedup-step0-first/decline',
+        'PUT',
+        '/identities/' + inviteeId
+            + '/invitations/inv-dedup-step0-first',
         invitee,
         {
-            declineEventId: 'inv-dedup-step0-first-decline',
-            declineAt: '2026-06-01T00:00:01.000000Z',
+            state: 'declined',
+            eventId: 'inv-dedup-step0-first-decline',
+            at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 201);
+    assert.equal(decline.status, 204);
     assert.equal(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,
@@ -93,14 +96,15 @@ async () => {
     // document — the stale declined one must not be mistaken
     // for pending, and the FRESH one must be found as pending.
     const regrant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: inviteeEmail,
             invitationId: 'inv-dedup-step0-second',
             grantEventId: 'inv-dedup-step0-second-grant',
             grantAt: '2026-06-01T00:00:02.000000Z',
         },
     ));
-    assert.equal(regrant.status, 201);
+    assert.equal(regrant.status, 200);
     const candidates = (await deriveInvitations(db))
         .filter(inv => inv.organization_id === ORGANIZATION_TWO
             && inv.identity_id === inviteeId);
@@ -111,16 +115,18 @@ async () => {
 
     // Accept the fresh one: no pending again.
     const accept = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-dedup-step0-second/acceptance',
+        'PUT',
+        '/identities/' + inviteeId
+            + '/invitations/inv-dedup-step0-second',
         invitee,
         {
+            state: 'accepted',
             membershipId: 'inv-dedup-step0-second-ms',
-            acceptEventId: 'inv-dedup-step0-second-accept',
-            acceptAt: '2026-06-01T00:00:03.000000Z',
+            eventId: 'inv-dedup-step0-second-accept',
+            at: '2026-06-01T00:00:03.000000Z',
         },
     ));
-    assert.equal(accept.status, 201);
+    assert.equal(accept.status, 204);
     assert.equal(
         await pendingInvitationFor(
             db, ORGANIZATION_TWO, inviteeId,

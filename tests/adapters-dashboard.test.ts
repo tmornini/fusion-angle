@@ -96,8 +96,6 @@ async function seedProject(
     await putProject(ctx, id, {
         ...entity,
         state,
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: `st-${id}`,
     });
 }
 
@@ -132,10 +130,10 @@ async function tombstoneFlow(
     await seedFlow(ctx, id);
     const { body: current, etag } =
         await ctx.GETWithEtag<FlowWithGraph>(
-            'flows/' + id,
+            'organizations/1/flows/' + id,
         );
     await ctx.PUT(
-        'flows/' + id,
+        'organizations/1/flows/' + id,
         {
             name: current.name,
             is_locked: current.is_locked,

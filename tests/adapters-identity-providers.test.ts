@@ -149,7 +149,7 @@ async () => {
     assert.ok(put.status === 200 || put.status === 201);
     const list = await handleRequest(db, apiRequest({
         method: 'GET',
-        path: '/identities/current/providers',
+        path: '/identities/current/providers/',
         token: DEV_TOKEN,
         operationId: TEST_OPERATION_ID,
     }));

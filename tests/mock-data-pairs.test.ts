@@ -398,7 +398,7 @@ test('a seeded record\'s document pair sits at its'
         Object.keys(embedded.body).sort(),
         [
             'description', 'name', 'position',
-            'state', 'state_at', 'state_event_id',
+            'state',
         ],
     );
 });
@@ -490,13 +490,9 @@ test('a seeded objective\'s document pair sits at its'
     };
     assert.deepEqual(
         Object.keys(embedded.body),
-        ['position', 'state', 'state_at', 'state_event_id'],
+        ['position', 'state'],
     );
     assert.equal(embedded.body.state, 'active');
-    assert.equal(
-        embedded.body.state_event_id,
-        'seed-objective-' + starkSeed.id + '-active',
-    );
 });
 
 test('a seeded objective\'s revision pair sits at its own'

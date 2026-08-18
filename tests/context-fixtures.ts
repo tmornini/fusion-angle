@@ -7,12 +7,12 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 
 // The canonical admin-session bootstrap: a fresh in-memory
 // db carrying schema + root admin, and a request context
-// bearing the dev token. One home for the idiom the adapter
+// bearing an org-scoped token. One home for the idiom the adapter
 // suites repeat — seed further rows on `db` after the call.
 export async function adminContext(): Promise<{
     db: MemoryDbAdapter;
@@ -21,7 +21,7 @@ export async function adminContext(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     const ctx = createRequestContext(
-        db, await devToken(),
+        db, await organizationToken(),
     );
     return { db, ctx };
 }

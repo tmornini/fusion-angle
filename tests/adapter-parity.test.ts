@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 import { createRequestContext }
     from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { organizationToken } from './token-fixtures.ts';
 import {
     postObjectiveCreation,
     postObjectiveArchival,
@@ -20,7 +20,7 @@ test('K5 reactivation on the memory adapter',
         await seedAdminSchema(db);
         await seedHumanMember(db, 'current', 'Demo User');
         const ctx = createRequestContext(
-            db, await devToken(),
+            db, await organizationToken(),
         );
         await postObjectiveCreation(
             ctx, 'o1', 'Rev', 'd', 0,

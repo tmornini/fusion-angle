@@ -36,7 +36,7 @@ import { seedIdentityProvider } from './identity-fixtures.ts';
 // retired and assert 404. Every live pattern here is
 // admin-only for any verb this suite exercises (none of their
 // prefixes appear in authorization.ts's MEMBER_VERBS, aside
-// from '/identities/:id/tokens' POST and
+// from '/identities/:id/tokens/' POST and
 // '/identities/:id/token-revocations' PUT, neither of
 // which this regime's POST/DELETE combos exercise), so an
 // admin token is required to reach the 405 branch rather
@@ -127,7 +127,7 @@ test('PUT identities 405s (no put handler wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('PUT', '/identities', token, {}),
+        db, req('PUT', '/identities/', token, {}),
     );
     assert.equal(res.status, 405);
 });
@@ -137,7 +137,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/identities', token),
+        db, req('DELETE', '/identities/', token),
     );
     assert.equal(res.status, 405);
 });
@@ -207,7 +207,7 @@ test('PUT identities/:id/credentials 405s (no put handler'
     const token = await organizationToken();
     const res = await handleRequest(
         db, req(
-            'PUT', '/identities/i1/credentials', token, {},
+            'PUT', '/identities/i1/credentials/', token, {},
         ),
     );
     assert.equal(res.status, 405);
@@ -219,7 +219,7 @@ test('POST identities/:id/credentials 405s (no post handler'
     const token = await organizationToken();
     const res = await handleRequest(
         db, req(
-            'POST', '/identities/i1/credentials', token, {},
+            'POST', '/identities/i1/credentials/', token, {},
         ),
     );
     assert.equal(res.status, 405);
@@ -230,7 +230,7 @@ test('DELETE identities/:id/credentials 405s (no delete'
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/identities/i1/credentials', token),
+        db, req('DELETE', '/identities/i1/credentials/', token),
     );
     assert.equal(res.status, 405);
 });
@@ -521,7 +521,7 @@ async () => {
         db, 'sarah', 'ip-sarah-1', SARAH_PROVIDER,
     );
     const res = await handleRequest(
-        db, req('GET', '/identities/sarah/providers', token),
+        db, req('GET', '/identities/sarah/providers/', token),
     );
     assert.equal(res.status, 200);
     const rows = await res.json() as readonly {
@@ -543,7 +543,7 @@ async () => {
     const token = await devToken('sarah');
     const res = await handleRequest(
         db, req(
-            'GET', '/identities/current/providers', token,
+            'GET', '/identities/current/providers/', token,
         ),
     );
     assert.equal(res.status, 403);
@@ -685,7 +685,7 @@ async () => {
     ));
     assert.ok(put.status === 200 || put.status === 201);
     const res = await handleRequest(
-        db, req('GET', '/identities/current/tokens', token),
+        db, req('GET', '/identities/current/tokens/', token),
     );
     assert.equal(res.status, 200);
     const rows = await res.json() as readonly {
@@ -716,7 +716,7 @@ async () => {
     await seedOrganizationMember(db, 'member1');
     const token = await organizationToken('member1');
     const res = await handleRequest(
-        db, req('GET', '/identities/current/tokens', token),
+        db, req('GET', '/identities/current/tokens/', token),
     );
     assert.equal(res.status, 403);
 });

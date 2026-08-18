@@ -65,8 +65,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await PUT(db, TYPE_PATH, {
         name: 'Asset', description: 'd', position: 1,
         state: 'active',
-        state_at: AT,
-        state_event_id: 'r1-genesis',
     }, DEV_TOKEN);
     await PUT(db, ATTR1_PATH, {
         name: 'Priority',
@@ -103,7 +101,7 @@ async function seedFlowNodeAttribute(
         extraAttributeEvents = [],
         extraNodes = [],
     } = opts;
-    await POST(db, 'flows', {
+    await POST(db, 'organizations/1/flows/', {
         id: flowId,
         flow: {
             name: 'Intake',
@@ -304,7 +302,7 @@ async function seedFieldValueReferrer(
     // Phase Final Stage B: work_orders table retired — seed
     // through the live document PUT so the pair plane owns it.
     await PUT(
-        db, 'work-orders/wo-restrict-fv', {
+        db, 'organizations/1/work-orders/wo-restrict-fv', {
             display_id: 'rfv1',
             flow_graph: {
                 name: 'Restrict FV',
@@ -331,9 +329,10 @@ async function seedFieldValueReferrer(
         transitionAt: AT,
     };
     const pathSegments = [
+        'organizations', STARK_ORGANIZATION,
         'work-orders', 'wo-restrict-fv', 'transition',
     ];
-    const pattern = 'work-orders/:id/transition';
+    const pattern = 'organizations/:id/work-orders/:id/transition';
     const pair = await formWritePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
@@ -493,7 +492,7 @@ test(
         const db = await seededDb();
         // Bare host flow (no attribute binding) for the WO
         // join — WO referrers ride the frozen flow_graph head.
-        await POST(db, 'flows', {
+        await POST(db, 'organizations/1/flows/', {
             id: 'f-wo-host',
             flow: {
                 name: 'Host',
@@ -525,7 +524,7 @@ test(
                 attributeEvents: [],
             },
         }, DEV_TOKEN);
-        await POST(db, 'work-orders', {
+        await POST(db, 'organizations/1/work-orders/', {
             id: 'wo1',
             workOrder: {
                 display_id: 'WO',
@@ -582,7 +581,7 @@ test(
         const requestsBefore = await db.requests.getAll();
         const responsesBefore = await db.responses.getAll();
         await assert.rejects(
-            () => POST(db, 'organizations/1/record-types', {
+            () => POST(db, 'organizations/1/record-types/', {
                 kind: 'edit',
                 id: 'r1',
                 record: {
@@ -596,8 +595,6 @@ test(
                 // admits this body and the 409 below still
                 // proves the RESTRICT mechanism, not validation.
                 state: 'active',
-                state_at: AT,
-                state_event_id: 'ev1',
                 removedAttributeIds: ['attr1'],
             }, DEV_TOKEN),
             (err: unknown) =>

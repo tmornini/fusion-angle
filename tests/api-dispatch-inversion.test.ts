@@ -22,7 +22,7 @@ function req(
     });
 }
 
-test('an in-table organizations route wins over the facade',
+test('an in-table nested organizations route matches',
     async () => {
         const probe = route(
             'organizations/:organization-id/dispatch-probe',
@@ -47,13 +47,24 @@ test('an in-table organizations route wins over the facade',
         }
     });
 
-test('unmatched organizations paths still take the facade',
+test('unmatched slashless organizations ideas is 404',
     async () => {
         const db = memoryDbAdapter();
         await seedAdminSchema(db);
         const token = await organizationToken();
         const res = await handleRequest(db, req(
             'GET', '/organizations/1/ideas', token,
+        ));
+        assert.equal(res.status, 404);
+    });
+
+test('in-table slashed organizations ideas is 200',
+    async () => {
+        const db = memoryDbAdapter();
+        await seedAdminSchema(db);
+        const token = await organizationToken();
+        const res = await handleRequest(db, req(
+            'GET', '/organizations/1/ideas/', token,
         ));
         assert.equal(res.status, 200);
     });

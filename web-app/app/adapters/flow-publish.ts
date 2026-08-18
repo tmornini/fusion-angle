@@ -7,6 +7,7 @@ import {
     asStoredGraph,
 } from '../../../api/validators.ts';
 import type { RequestContext } from './shared.ts';
+import { organizationCollection } from './shared.ts';
 import { shouldShowMemberHazard } from '../flow-graph.ts';
 import type { ValidationResult } from './validation.ts';
 
@@ -81,7 +82,7 @@ export async function getFlowsForCreation(
     ctx: RequestContext,
 ): Promise<FlowsForCreation> {
     const flows = await ctx.GET<FlowWithGraph[]>(
-        'flows',
+        organizationCollection(ctx, 'flows'),
     );
     const ready: FlowPickerEntry[] = [];
     const notReady: NotReadyFlowEntry[] = [];

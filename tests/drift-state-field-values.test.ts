@@ -42,7 +42,7 @@ import {
 
 const BASE = 'http://localhost';
 const LOCK_TIMEOUT_SECONDS = 300;
-const TRANSITION_PATTERN = 'work-orders/:id/transition';
+const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 
 function req(
     method: string,
@@ -73,7 +73,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     await PUT(
-        db, 'work-orders/wo1', {
+        db, 'organizations/1/work-orders/wo1', {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -85,8 +85,6 @@ async function seededDb(): Promise<MemoryDbAdapter> {
         db, 'organizations/1/record-types/rec-1', {
             name: 'Parent', description: '', position: 0,
             state: 'active',
-            state_at: '2026-01-01T00:00:00.000000Z',
-            state_event_id: 'rec-1-genesis',
         },
         DEV_TOKEN,
     );
@@ -108,6 +106,7 @@ async function appendLegacyTransition(
     body: Record<string, unknown>,
 ): Promise<void> {
     const pathSegments = [
+        'organizations', STARK_ORGANIZATION,
         'work-orders', 'wo1', 'transition',
     ];
     const pair = await formWritePair({
@@ -164,7 +163,7 @@ async () => {
 
 // C4: route parity re-homes onto work-order history
 // (inline field_values fold), not GET states/:id/field-values.
-test('GET work-orders/:id/history wire equals'
+test('GET organizations/:id/work-orders/:id/history wire equals'
 + ' workOrderHistoryFor over a live fold',
 async () => {
     const db = await seededDb();
@@ -185,7 +184,7 @@ async () => {
 
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/work-orders/wo1/history', token),
+        db, req('GET', '/organizations/1/work-orders/wo1/history', token),
     );
     assert.equal(res.status, 200);
     const wireText = await res.text();
@@ -241,7 +240,7 @@ test('work-order history field_values are id-lex ordered'
     });
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('GET', '/work-orders/wo1/history', token),
+        db, req('GET', '/organizations/1/work-orders/wo1/history', token),
     );
     assert.equal(res.status, 200);
     const list = await res.json() as {

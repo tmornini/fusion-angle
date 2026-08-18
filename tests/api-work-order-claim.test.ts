@@ -43,7 +43,7 @@ function req(
     });
 }
 
-// PUT work-orders/:id/claim decides and appends in ONE
+// PUT organizations/:id/work-orders/:id/claim decides and appends in ONE
 // transaction: a live foreign claim is a 409, a live own
 // claim an idempotent no-op, an expired claim is superseded
 // by 'claim_expired' + 'claimed' atomically. GET returns
@@ -61,7 +61,7 @@ function graphJson(): Record<string, unknown> {
 }
 
 // wo1 is seeded via a REAL PUT (never a raw db.workOrders.put)
-// so it carries a genuine work-orders/:id document pair —
+// so it carries a genuine organizations/:id/work-orders/:id document pair —
 // Phase 14 Task 4's flip needs one: applyClaimPair's
 // lockTimeoutAsOf requires a document head before ANY claim
 // pair (api/derive-states.ts), an invariant every real work
@@ -76,7 +76,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     await PUT(
-        db, 'work-orders/wo1', {
+        db, 'organizations/1/work-orders/wo1', {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -88,7 +88,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 // workOrderClaimHistoryFor is the claim gate's sole source
 // (create/claim/transition/release pairs). Releases ride
-// DELETE work-orders/:id/claim (states/:id retired).
+// DELETE organizations/:id/work-orders/:id/claim (states/:id retired).
 function claimEventsFor(
     db: MemoryDbAdapter,
 ): Promise<{ state: string; member_id: string }[]> {
@@ -113,7 +113,7 @@ function freshClaimBody() {
 test('a fresh claim appends one claimed event', async () => {
     const db = await seededDb();
     await PUT(
-        db, 'work-orders/wo1/claim',
+        db, 'organizations/1/work-orders/wo1/claim',
         freshClaimBody(), DEV_TOKEN,
     );
     const events = await claimEventsFor(db);
@@ -127,11 +127,11 @@ test(
     async () => {
         const db = await seededDb();
         await PUT(
-            db, 'work-orders/wo1/claim',
+            db, 'organizations/1/work-orders/wo1/claim',
             freshClaimBody(), DEV_TOKEN,
         );
         await PUT(
-            db, 'work-orders/wo1/claim',
+            db, 'organizations/1/work-orders/wo1/claim',
             freshClaimBody(), DEV_TOKEN,
         );
         const events = await claimEventsFor(db);
@@ -150,12 +150,12 @@ test(
         // row-only write leaves no trace in.
         await seedOrganizationMember(db, 'other');
         await PUT(
-            db, 'work-orders/wo1/claim',
+            db, 'organizations/1/work-orders/wo1/claim',
             freshClaimBody(), await devToken('other'),
         );
         await assert.rejects(
             () => PUT(
-                db, 'work-orders/wo1/claim',
+                db, 'organizations/1/work-orders/wo1/claim',
                 freshClaimBody(), DEV_TOKEN,
             ),
             (err: unknown) =>
@@ -179,7 +179,7 @@ test(
         // gate).
         await seedOrganizationMember(db, 'other');
         await PUT(
-            db, 'work-orders/wo1/claim', {
+            db, 'organizations/1/work-orders/wo1/claim', {
                 claimEventId: generateCryptoSafeBase62(),
                 claimAt: '2020-01-01T00:00:00.000000Z',
                 expireEventId: generateCryptoSafeBase62(),
@@ -188,7 +188,7 @@ test(
             await devToken('other'),
         );
         await PUT(
-            db, 'work-orders/wo1/claim',
+            db, 'organizations/1/work-orders/wo1/claim',
             freshClaimBody(), DEV_TOKEN,
         );
         const events = await claimEventsFor(db);
@@ -208,7 +208,7 @@ test(
     async () => {
         const db = await seededDb();
         // A live claim by 'other', released via the SAME
-        // DELETE work-orders/:id/claim address the live
+        // DELETE organizations/:id/work-orders/:id/claim address the live
         // deleteWorkOrderClaim adapter uses (workbox's
         // "release claim" action) — never a raw row poke, so
         // the release is visible to the flipped gate's own
@@ -218,11 +218,11 @@ test(
         // derive layer.
         await seedOrganizationMember(db, 'other');
         await PUT(
-            db, 'work-orders/wo1/claim',
+            db, 'organizations/1/work-orders/wo1/claim',
             freshClaimBody(), await devToken('other'),
         );
         await DELETE(
-            db, 'work-orders/wo1/claim',
+            db, 'organizations/1/work-orders/wo1/claim',
             await devToken('other'),
         );
         // 'current's fresh claim succeeds THROUGH THE LIVE
@@ -230,7 +230,7 @@ test(
         // sibling test above), so success alone proves the
         // release was seen.
         await PUT(
-            db, 'work-orders/wo1/claim',
+            db, 'organizations/1/work-orders/wo1/claim',
             freshClaimBody(), DEV_TOKEN,
         );
         const events = await claimEventsFor(db);
@@ -254,7 +254,7 @@ test(
         const expireEventId = generateCryptoSafeBase62();
         const expireAt = '2099-01-01T00:00:00.000000Z';
         await PUT(
-            db, 'work-orders/wo1/claim', {
+            db, 'organizations/1/work-orders/wo1/claim', {
                 claimEventId,
                 claimAt,
                 expireEventId,
@@ -281,7 +281,7 @@ test(
         // a raw row poke no longer reaches the gate).
         await seedOrganizationMember(db, 'prior-holder');
         await PUT(
-            db, 'work-orders/wo1/claim', {
+            db, 'organizations/1/work-orders/wo1/claim', {
                 claimEventId: generateCryptoSafeBase62(),
                 claimAt: '2020-01-01T00:00:00.000000Z',
                 expireEventId: generateCryptoSafeBase62(),
@@ -295,7 +295,7 @@ test(
         // far-future expireAt; ordering: expireAt < claimAt.
         const expireAt = '2099-01-01T00:00:00.000000Z';
         await PUT(
-            db, 'work-orders/wo1/claim', {
+            db, 'organizations/1/work-orders/wo1/claim', {
                 claimEventId,
                 claimAt,
                 expireEventId,
@@ -348,11 +348,11 @@ test(
         const tokenOther = await devToken('other');
         const [a, b] = await Promise.all([
             handleRequest(db, req(
-                'PUT', '/work-orders/wo1/claim',
+                'PUT', '/organizations/1/work-orders/wo1/claim',
                 DEV_TOKEN, freshClaimBody(),
             )),
             handleRequest(db, req(
-                'PUT', '/work-orders/wo1/claim',
+                'PUT', '/organizations/1/work-orders/wo1/claim',
                 tokenOther, freshClaimBody(),
             )),
         ]);
@@ -382,7 +382,7 @@ test(
         const missingId = 'no-such-work-order';
         const response = await handleRequest(db, req(
             'PUT',
-            '/work-orders/' + missingId + '/claim',
+            '/organizations/1/work-orders/' + missingId + '/claim',
             DEV_TOKEN,
             freshClaimBody(),
         ));
@@ -400,7 +400,7 @@ test(
 test('GET claim 404s when unclaimed', async () => {
     const db = await seededDb();
     const res = await handleRequest(db, req(
-        'GET', '/work-orders/wo1/claim', DEV_TOKEN,
+        'GET', '/organizations/1/work-orders/wo1/claim', DEV_TOKEN,
     ));
     assert.equal(res.status, 404);
     assert.deepEqual(await res.json(), {
@@ -413,13 +413,13 @@ async () => {
     const db = await seededDb();
     const expiresAt = '2099-12-31T00:00:00.000000Z';
     await PUT(
-        db, 'work-orders/wo1/claim', {
+        db, 'organizations/1/work-orders/wo1/claim', {
             ...freshClaimBody(),
             expires_at: expiresAt,
         }, DEV_TOKEN,
     );
     const live = await handleRequest(db, req(
-        'GET', '/work-orders/wo1/claim', DEV_TOKEN,
+        'GET', '/organizations/1/work-orders/wo1/claim', DEV_TOKEN,
     ));
     assert.equal(live.status, 200);
     assert.deepEqual(await live.json(), {
@@ -429,7 +429,7 @@ async () => {
 
     await seedOrganizationMember(db, 'stale');
     await PUT(
-        db, 'work-orders/wo2', {
+        db, 'organizations/1/work-orders/wo2', {
             display_id: 'efgh',
             flow_graph: graphJson(),
             position: 2,
@@ -437,7 +437,7 @@ async () => {
         DEV_TOKEN,
     );
     await PUT(
-        db, 'work-orders/wo2/claim', {
+        db, 'organizations/1/work-orders/wo2/claim', {
             claimEventId: generateCryptoSafeBase62(),
             claimAt: '2020-01-01T00:00:00.000000Z',
             expireEventId: generateCryptoSafeBase62(),
@@ -447,7 +447,7 @@ async () => {
         await devToken('stale'),
     );
     const expired = await handleRequest(db, req(
-        'GET', '/work-orders/wo2/claim', DEV_TOKEN,
+        'GET', '/organizations/1/work-orders/wo2/claim', DEV_TOKEN,
     ));
     assert.equal(expired.status, 200);
     const body = await expired.json() as {
@@ -463,15 +463,15 @@ async () => {
 test('DELETE claim releases; GET then 404s', async () => {
     const db = await seededDb();
     await PUT(
-        db, 'work-orders/wo1/claim',
+        db, 'organizations/1/work-orders/wo1/claim',
         freshClaimBody(), DEV_TOKEN,
     );
     const del = await handleRequest(db, req(
-        'DELETE', '/work-orders/wo1/claim', DEV_TOKEN,
+        'DELETE', '/organizations/1/work-orders/wo1/claim', DEV_TOKEN,
     ));
     assert.equal(del.status, 204);
     const get = await handleRequest(db, req(
-        'GET', '/work-orders/wo1/claim', DEV_TOKEN,
+        'GET', '/organizations/1/work-orders/wo1/claim', DEV_TOKEN,
     ));
     assert.equal(get.status, 404);
 });

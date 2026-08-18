@@ -1,4 +1,5 @@
 import type { RequestContext } from './shared.ts';
+import { organizationItem } from './shared.ts';
 import {
     notifyWorkOrderChanges,
 } from './work-orders-mutations.ts';
@@ -12,7 +13,8 @@ export async function deleteWorkOrderClaim(
     workOrderId: string,
 ): Promise<void> {
     await ctx.DELETE(
-        `work-orders/${workOrderId}/claim`,
+        organizationItem(ctx, 'work-orders', workOrderId)
+            + '/claim',
     );
     notifyWorkOrderChanges();
 }

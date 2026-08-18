@@ -4,7 +4,7 @@ import type { MemoryDbAdapter } from '../api/db-memory.ts';
 import { adminContext } from './context-fixtures.ts';
 import { createRequestContext } from
 '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     putFlowRecord,
     deleteFlowRecord,
@@ -39,7 +39,7 @@ async function seedFlow(
     id: string,
     name: string,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId: id,
         linkId: id + '-link',
@@ -58,7 +58,7 @@ async function seedWorkOrder(
     // The flow↔work-order join now nests under its parent flow,
     // so the parent flow must exist to be enumerated.
     await seedFlow(db, flowId, flowId);
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     const flowGraph: WorkOrderFlowGraph = {
         name: 'Flow',
         lockTimeout: DEFAULT_LOCK_TIMEOUT,
@@ -76,10 +76,11 @@ async function seedWorkOrder(
         position,
     });
     // NAMED re-pin (Task 7): getAllFlowWorkOrderEntities reads
-    // flows/:id/work-orders through the flipped GET too — same
+    // organizations/:id/flows/:id/work-orders through the flipped GET too —
+    // same
     // reason, different address.
     await ctx.PUT(
-        'flows/' + flowId + '/work-orders/fwo-' + id,
+        'organizations/1/flows/' + flowId + '/work-orders/fwo-' + id,
         {
             flow_id: flowId,
             work_order_id: id,

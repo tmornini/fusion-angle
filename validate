@@ -16,10 +16,10 @@ LONG_LINES=$( {
         -exec awk "$AWK_LINT" {} +
     find . -maxdepth 1 -type f -name '*.md' \
         ! -name 'TEST-PLAN.md' \
-        ! -name 'API-TREE.md' \
         -exec awk "$AWK_LINT" {} +
     awk "$AWK_LINT" build serve test test-postgres \
-        validate generate-schema-svg
+        validate generate-schema-svg \
+        generate-api-documentation
 } )
 
 if [ -n "$LONG_LINES" ]; then
@@ -51,3 +51,7 @@ fi
 
 # SCHEMA.svg is derived from the schema; fail if it has drifted.
 ./generate-schema-svg --check
+
+# API.svg and rooms are derived from routes[];
+# fail if they have drifted.
+./generate-api-documentation --check

@@ -7,7 +7,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import { adminContext } from './context-fixtures.ts';
 import {
     getProjectEntities,
@@ -68,7 +68,8 @@ function buildProject(
 // Seeds a project through the SAME document PUT the live route
 // uses (putProject), so a message pair exists at this project's
 // address — required for the flipped GET projects / GET
-// projects/:id routes (Phase 3 Task 6) to derive it. A fixed
+// organizations/:id/projects/:id routes (Phase 3 Task 6) to derive it. A
+// fixed
 // historical stateAt (matching the old raw-postEvent idiom this
 // replaces) rather than a real clock, mirroring
 // tests/adapters-ideas.test.ts's seedIdea precedent.
@@ -84,8 +85,6 @@ async function seedProject(
     await putProject(ctx, id, {
         ...entity,
         state,
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: `st-${id}`,
     });
 }
 
@@ -210,8 +209,6 @@ test(
 
 const TRIO = {
     state: 'approved' as ProjectState,
-    stateAt: '2026-01-01T00:00:00.000000Z',
-    stateEventId: 'ev-p1',
 };
 
 test('putProject persists a new project', async () => {
@@ -250,7 +247,7 @@ test(
             ...entity,
             ...TRIO,
         });
-        const fresh = createRequestContext(db, await devToken());
+        const fresh = createRequestContext(db, await organizationToken());
         const row = await getProjectEntity(fresh, 'p1');
         assert.equal(row.title, 'Persisted');
     },
@@ -357,13 +354,9 @@ test(
             id: _id,
             organization_id: _org,
             state: _priorState,
-            state_at: _priorAt,
-            state_event_id: _priorEventId,
             ...fields
         } = before;
         void _priorState;
-        void _priorAt;
-        void _priorEventId;
 
         await postProjectStateChange(
             ctx, 'p1', fields, 'archived',
@@ -378,20 +371,11 @@ test(
             after.description, before.description,
         );
         assert.equal(after.state, 'archived');
-        assert.notEqual(
-            after.state_event_id, before.state_event_id,
-        );
         const events = await deriveProjectStateHistory(db, '1', 'p1');
         // genesis + transition
         assert.equal(events.length, 2);
         assert.equal(
             events.at(-1)?.state, 'archived',
-        );
-        assert.equal(
-            after.state_event_id, events.at(-1)?.id,
-        );
-        assert.equal(
-            after.state_at, events.at(-1)?.at,
         );
     },
 );

@@ -73,7 +73,7 @@ test('a flow write with an AI agent id in memberIds'
         '../api/types.ts'
     );
     const res = await handleRequest(db, req(
-        'PUT', '/flows/flow-ai-agent', token, {
+        'PUT', '/organizations/1/flows/flow-ai-agent', token, {
             name: 'Blocked',
             is_locked: false,
             is_auto_layout: false,

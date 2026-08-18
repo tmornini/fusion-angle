@@ -11,14 +11,16 @@ test('a :id segment in a prefix matches any path segment',
 () => {
     assert.equal(
         matchesOnSegmentBoundary(
-            '/flows/f1/versions/v1', '/flows/:id/versions',
+            '/organizations/1/flows/f1/versions/v1',
+                '/organizations/:id/flows/:id/versions',
         ), true);
 });
 
 test('a nested prefix does not match a shallower path', () => {
     assert.equal(
         matchesOnSegmentBoundary(
-            '/flows/f1', '/flows/:id/versions',
+            '/organizations/1/flows/f1',
+                '/organizations/:id/flows/:id/versions',
         ), false);
 });
 
@@ -91,16 +93,18 @@ test('deny-by-default: no held role is forbidden', () => {
 
 test('member tier: content surfaces are permitted', () => {
     assert.equal(
-        isPermitted('GET', '/ideas', ['member']), true);
+        isPermitted(
+            'GET', '/organizations/1/ideas', ['member'],
+        ), true);
     assert.equal(
-        isPermitted('PUT', '/ideas/i1', ['member']), true);
+        isPermitted('PUT', '/organizations/1/ideas/i1', ['member']), true);
     assert.equal(
         isPermitted(
-            'PUT', '/work-orders/w1/claim', ['member']),
+            'PUT', '/organizations/1/work-orders/w1/claim', ['member']),
         true);
     assert.equal(
         isPermitted(
-            'DELETE', '/work-orders/w1/claim', ['member']),
+            'DELETE', '/organizations/1/work-orders/w1/claim', ['member']),
         true);
     assert.equal(
         isPermitted(

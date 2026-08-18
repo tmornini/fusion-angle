@@ -36,7 +36,8 @@ import { messageStore } from '../api/message-store.ts';
 
 // The flows-specific below-gate op + locked-class e2e coverage
 // for Task 3's document PUT (the generic locked arm itself is
-// already Task-2-tested against ideas/projects-shaped synthetic
+// already Task-2-tested against organizations/1/ideas/projects-shaped
+// synthetic
 // families in tests/document-family.test.ts).
 
 const BASE = 'http://localhost';
@@ -83,7 +84,8 @@ function emptyGraph() {
     return { nodes: [], edges: [] };
 }
 
-// The full wire document PUT /flows/:id now takes (Decision 7):
+// The full wire document PUT /organizations/:id/flows/:id now takes (Decision
+// 7):
 // the entity fields, the lifecycle trio, the client-authored
 // graph snapshot, and the two transitional decomposition
 // sidecars (graphDelta/revivals).
@@ -116,7 +118,7 @@ async function createFlow(
     flowId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/flows', token,
+        'POST', '/organizations/1/flows/', token,
         {
             id: flowId,
             flow: flowFields('Fresh Flow'),
@@ -145,10 +147,10 @@ async function headResponseId(
     flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
+        'GET', '/organizations/1/flows/' + flowId, token,
     ));
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /flows/' + flowId);
+    assert.ok(id, 'no Response-ID on GET /organizations/1/flows/' + flowId);
     return id!;
 }
 
@@ -159,7 +161,7 @@ async function headEtag(
 ): Promise<string> {
     const res = await handleRequest(
         db,
-        req('GET', '/flows/' + flowId, token),
+        req('GET', '/organizations/1/flows/' + flowId, token),
     );
     assert.equal(res.status, 200);
     const raw = res.headers.get('ETag');
@@ -213,12 +215,12 @@ test('postFlowDocumentOp returns the entity, exactly one'
         revivals: [],
     };
     const create = await handleRequest(db, req(
-        'PUT', '/flows/flow-op-1', token, createBody,
+        'PUT', '/organizations/1/flows/flow-op-1', token, createBody,
     ));
     assert.equal(create.status, 201);
     const headId = create.headers.get('Response-ID')!;
     const update = await handleRequest(db, req(
-        'PUT', '/flows/flow-op-1', token,
+        'PUT', '/organizations/1/flows/flow-op-1', token,
         documentBody('Renamed', 'flow-op-1-upd', {
             graphDelta: {
                 ...emptyDelta(),
@@ -283,12 +285,12 @@ test('postFlowDocumentOp with revivals posts the restored'
         revivals: [],
     };
     const create = await handleRequest(db, req(
-        'PUT', '/flows/flow-op-2', token, createBody,
+        'PUT', '/organizations/1/flows/flow-op-2', token, createBody,
     ));
     assert.equal(create.status, 201);
     const headId = create.headers.get('Response-ID')!;
     const update = await handleRequest(db, req(
-        'PUT', '/flows/flow-op-2', token,
+        'PUT', '/organizations/1/flows/flow-op-2', token,
         {
             ...documentBody('Revived', 'flow-op-2-upd'),
             revivals: [
@@ -378,7 +380,8 @@ test('the document body carries state/state_at/graph while'
     }
 });
 
-// --- e2e locked-class tests (through handleRequest — flows/:id
+// --- e2e locked-class tests (through handleRequest —
+// organizations/:id/flows/:id
 // is now wired onto documentPutHandler(FLOWS_WIRING)) ---
 
 test('locked PUT with no If-Match over a head is 428',
@@ -387,7 +390,7 @@ async () => {
     const token = await organizationToken();
     await createFlow(db, token, 'flow-if-match-428');
     const res = await handleRequest(db, req(
-        'PUT', '/flows/flow-if-match-428', token,
+        'PUT', '/organizations/1/flows/flow-if-match-428', token,
         documentBody('No Match', 'flow-if-match-428-a'),
     ));
     assert.equal(res.status, 428);
@@ -408,7 +411,7 @@ async () => {
     await createFlow(db, token, 'flow-if-match-400');
     for (const bad of ['*', 'W/"x"', '"a", "b"', 'bare']) {
         const res = await handleRequest(db, req(
-            'PUT', '/flows/flow-if-match-400', token,
+            'PUT', '/organizations/1/flows/flow-if-match-400', token,
             documentBody('Bad Match', 'flow-if-match-400-a'),
             { 'if-match': bad },
         ));
@@ -427,7 +430,7 @@ async () => {
     const token = await organizationToken();
     await createFlow(db, token, 'flow-if-match-412');
     const res = await handleRequest(db, req(
-        'PUT', '/flows/flow-if-match-412', token,
+        'PUT', '/organizations/1/flows/flow-if-match-412', token,
         documentBody('Stale Match', 'flow-if-match-412-a'),
         { 'if-match': '"' + 'b'.repeat(64) + '"' },
     ));
@@ -447,7 +450,7 @@ async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/flows/flow-if-match-none', token,
+        'PUT', '/organizations/1/flows/flow-if-match-none', token,
         documentBody('Ghost', 'flow-if-match-none-a'),
         { 'if-match': '"' + 'b'.repeat(64) + '"' },
     ));
@@ -455,7 +458,7 @@ async () => {
     assert.equal(
         (await res.json()).error,
         'If-Match does not match the current document at '
-        + '/flows/flow-if-match-none',
+        + '/organizations/1/flows/flow-if-match-none',
     );
 });
 
@@ -470,7 +473,7 @@ test('e2e: a byte-identical resend converges (one event, one'
         'if-match': await headEtag(db, token, 'flow-locked-3'),
     };
     const first = await handleRequest(db, req(
-        'PUT', '/flows/flow-locked-3', token, body, headers,
+        'PUT', '/organizations/1/flows/flow-locked-3', token, body, headers,
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
@@ -479,7 +482,7 @@ test('e2e: a byte-identical resend converges (one event, one'
     const requestsAfterFirst = await db.requests.getAll();
 
     const second = await handleRequest(db, req(
-        'PUT', '/flows/flow-locked-3', token, body, headers,
+        'PUT', '/organizations/1/flows/flow-locked-3', token, body, headers,
     ));
     assert.equal(second.status, 201);
     assert.equal(second.headers.get('Response-ID'), firstId);
@@ -511,20 +514,20 @@ async () => {
     const headId = await headResponseId(db, token, 'flow-locked-1');
 
     const noEcho = await handleRequest(db, req(
-        'PUT', '/flows/flow-locked-1', token,
+        'PUT', '/organizations/1/flows/flow-locked-1', token,
         documentBody('No Echo', 'flow-locked-1-a'),
     ));
     assert.equal(noEcho.status, 428);
 
     const staleEcho = await handleRequest(db, req(
-        'PUT', '/flows/flow-locked-1', token,
+        'PUT', '/organizations/1/flows/flow-locked-1', token,
         documentBody('Stale Echo', 'flow-locked-1-b'),
         { 'if-match': '"' + 'b'.repeat(64) + '"' },
     ));
     assert.equal(staleEcho.status, 412);
 
     const fresh = await handleRequest(db, req(
-        'PUT', '/flows/flow-locked-1', token,
+        'PUT', '/organizations/1/flows/flow-locked-1', token,
         documentBody('Fresh Echo', 'flow-locked-1-c'),
         { 'if-match': await headEtag(
             db, token, 'flow-locked-1',
@@ -536,11 +539,13 @@ async () => {
 });
 
 // Task 5: create's own 204 operation pair and its synthesized
-// document pair are now TWO rows at flows/:id's address — the
+// document pair are now TWO rows at organizations/:id/flows/:id's address —
+// the
 // GET-attached head is the DOCUMENT pair (appended strictly
 // later; a live PUT chains Follows/Supersedes off it), never
 // the create response's own operation Response-ID.
-test('e2e: GET flows/:id carries Response-ID == the head pair'
+test('e2e: GET organizations/:id/flows/:id carries'
+    + ' Response-ID == the head pair'
 + ' id — create\'s own synthesized document pair, never its'
 + ' operation response (Task 8: ledger-derived handler)',
 async () => {
@@ -550,7 +555,7 @@ async () => {
     const createdId = created.headers.get('Response-ID');
     assert.ok(createdId);
     const got = await handleRequest(
-        db, req('GET', '/flows/flow-locked-2', token),
+        db, req('GET', '/organizations/1/flows/flow-locked-2', token),
     );
     assert.equal(got.status, 200);
     const headId = got.headers.get('Response-ID');
@@ -569,7 +574,8 @@ async () => {
     assert.ok(atAddress.some(r => r.id === headId));
 });
 
-// Task 8: the flows/:id GET's Response-ID source switched from
+// Task 8: the organizations/:id/flows/:id GET's Response-ID source switched
+// from
 // headPairIdAt (message-pair.ts's ANY-method LOCK head) to
 // documentHeadPairId (document-family.ts's DOCUMENT head — the
 // SAME deriveDocumentsAt reduction the GET already runs to build
@@ -578,14 +584,15 @@ async () => {
 // — this proves the wire Response-ID equals headPairIdAt's own,
 // independently computed value, not merely that the route
 // returns SOME header.
-test('e2e: the flows/:id Response-ID equals headPairIdAt\'s own'
+test('e2e: the organizations/:id/flows/:id Response-ID'
+    + ' equals headPairIdAt\'s own'
 + ' reduction over the same address (documentHeadPairId parity)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     await createFlow(db, token, 'flow-parity-1');
     const got = await handleRequest(
-        db, req('GET', '/flows/flow-parity-1', token),
+        db, req('GET', '/organizations/1/flows/flow-parity-1', token),
     );
     assert.equal(got.status, 200);
     const headId = got.headers.get('Response-ID');
@@ -604,7 +611,7 @@ test('e2e: an old-shape PUT body 400s (validateFlowPutBody'
     const token = await organizationToken();
     await createFlow(db, token, 'flow-old-shape');
     const res = await handleRequest(db, req(
-        'PUT', '/flows/flow-old-shape', token,
+        'PUT', '/organizations/1/flows/flow-old-shape', token,
         {
             flow: flowFields('Old Shape'),
             eventId: 'ev-1',
@@ -616,7 +623,8 @@ test('e2e: an old-shape PUT body 400s (validateFlowPutBody'
     assert.equal(res.status, 400);
 });
 
-test('e2e: an old-shape POST flows/:id/undo body (missing the'
+test('e2e: an old-shape POST organizations/:id/flows/:id'
+    + '/undo body (missing the'
 + ' new required graph field) 400s and stores nothing',
 async () => {
     const db = await freshDb();
@@ -632,7 +640,7 @@ async () => {
     );
 
     const res = await handleRequest(db, req(
-        'POST', '/flows/flow-undo-old-shape/undo', token, {
+        'POST', '/organizations/1/flows/flow-undo-old-shape/undo', token, {
             flow: flowFields('Old Shape Undo'),
             eventId: 'flow-undo-old-shape-undo-ev',
             at: AT,
@@ -740,7 +748,7 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
     const token = await organizationToken();
 
     const first = await handleRequest(db, req(
-        'POST', '/flows', token,
+        'POST', '/organizations/1/flows/', token,
         {
             id: 'flow-dup-1',
             flow: flowFields('Fresh Flow'),
@@ -778,7 +786,7 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
 
     const SECOND_AT = '2026-01-01T00:00:01.000000Z';
     const second = await handleRequest(db, req(
-        'POST', '/flows', token,
+        'POST', '/organizations/1/flows/', token,
         {
             id: 'flow-dup-1',
             flow: flowFields('Fresh Flow'),
@@ -829,13 +837,13 @@ test('e2e: a duplicate POST flows (same id) succeeds — the'
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the old body
 // carried a client-computed target (`flow`/`graph`/`graphDelta`/
 // `revivals`) plus `consumedVersionId`. The restore target is
-// now resolved SERVER-SIDE from the flows/:id document-pair
+// now resolved SERVER-SIDE from the organizations/:id/flows/:id document-pair
 // history, so the setup needs a genuine PRIOR SAVE (the
 // one-node graph) followed by a SECOND save that moves the head
 // away from it — undo must revert exactly that second save,
 // landing back on the first save's own graph, never a
 // client-supplied one.
-test('e2e: POST flows/:id/undo forms a document pair with'
+test('e2e: POST organizations/:id/flows/:id/undo forms a document pair with'
 + ' graph matching the post-undo reassembly', async () => {
     const db = await freshDb();
     const token = await organizationToken();
@@ -855,7 +863,7 @@ test('e2e: POST flows/:id/undo forms a document pair with'
         edges: [],
     };
     const firstSave = await handleRequest(db, req(
-        'PUT', '/flows/flow-undo-pairs-1', token,
+        'PUT', '/organizations/1/flows/flow-undo-pairs-1', token,
         documentBody('One Node', 'flow-undo-pairs-1-ev-1', {
             graph: undoneGraph,
             graphDelta: {
@@ -881,7 +889,7 @@ test('e2e: POST flows/:id/undo forms a document pair with'
     // graph — undo must revert THIS, landing back on the
     // first save's own one-node graph.
     const secondSave = await handleRequest(db, req(
-        'PUT', '/flows/flow-undo-pairs-1', token,
+        'PUT', '/organizations/1/flows/flow-undo-pairs-1', token,
         documentBody('Back To Empty', 'flow-undo-pairs-1-ev-2'),
         { 'if-match': await headEtag(
             db, token, 'flow-undo-pairs-1',
@@ -893,7 +901,7 @@ test('e2e: POST flows/:id/undo forms a document pair with'
     const responsesBeforeUndo = await db.responses.getAll();
 
     const undone = await handleRequest(db, req(
-        'POST', '/flows/flow-undo-pairs-1/undo', token, {
+        'POST', '/organizations/1/flows/flow-undo-pairs-1/undo', token, {
             eventId: 'flow-undo-pairs-1-undo-ev',
             at: AT,
         },
@@ -946,7 +954,7 @@ test('e2e: POST flows/:id/undo forms a document pair with'
     );
 
     const after = await handleRequest(
-        db, req('GET', '/flows/flow-undo-pairs-1', token),
+        db, req('GET', '/organizations/1/flows/flow-undo-pairs-1', token),
     );
     const afterBody = await after.json() as {
         graph: Record<string, unknown>;
@@ -959,7 +967,7 @@ test('e2e: POST flows/:id/undo forms a document pair with'
 
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): no
 // flow_versions row is published or consumed at all any more —
-// undo resolves its target from the flows/:id document-pair
+// undo resolves its target from the organizations/:id/flows/:id document-pair
 // history, so the setup needs a genuine PRIOR SAVE (giving undo
 // a target: genesis) before the race, and the post-race
 // assertions drop every flow_versions check (there is no
@@ -972,7 +980,7 @@ async () => {
     const token = await organizationToken();
     await createFlow(db, token, 'flow-race-1');
     const before = await handleRequest(db, req(
-        'PUT', '/flows/flow-race-1', token,
+        'PUT', '/organizations/1/flows/flow-race-1', token,
         documentBody('Before Race', 'flow-race-1-ev-1'),
         { 'if-match': await headEtag(
             db, token, 'flow-race-1',
@@ -985,13 +993,13 @@ async () => {
 
     const [undo, save] = await Promise.all([
         handleRequest(db, req(
-            'POST', '/flows/flow-race-1/undo', token, {
+            'POST', '/organizations/1/flows/flow-race-1/undo', token, {
                 eventId: 'flow-race-1-undo-ev',
                 at: AT,
             },
         )),
         handleRequest(db, req(
-            'PUT', '/flows/flow-race-1', token,
+            'PUT', '/organizations/1/flows/flow-race-1', token,
             documentBody('Saved', 'flow-race-1-save-ev'),
             { 'if-match': headEtagValue },
         )),
@@ -1015,7 +1023,7 @@ async () => {
 
     // Phase Final Task 2: flow name lives on the pair plane.
     const got = await handleRequest(
-        db, req('GET', '/flows/flow-race-1', token),
+        db, req('GET', '/organizations/1/flows/flow-race-1', token),
     );
     assert.equal(got.status, 200);
     const flow = await got.json() as { name: string };
@@ -1100,7 +1108,7 @@ async function assertStoredPutOmitsUndoHistory(
     );
     assert.deepEqual(stored, expected);
     const got = await handleRequest(
-        db, req('GET', '/flows/' + flowId, token),
+        db, req('GET', '/organizations/1/flows/' + flowId, token),
     );
     assert.equal(got.status, 200);
     const wire = await got.json() as Record<string, unknown>;
@@ -1157,7 +1165,7 @@ async () => {
         },
     );
     const saved = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token, saveBody,
+        'PUT', '/organizations/1/flows/' + flowId, token, saveBody,
         { 'if-match': await headEtag(db, token, flowId) },
     ));
     assert.equal(saved.status, 201);
@@ -1173,7 +1181,7 @@ async () => {
     assert.ok(putJson.graph);
 
     const undone = await handleRequest(db, req(
-        'POST', '/flows/' + flowId + '/undo', token, {
+        'POST', '/organizations/1/flows/' + flowId + '/undo', token, {
             eventId: flowId + '-undo',
             at: AT,
         },

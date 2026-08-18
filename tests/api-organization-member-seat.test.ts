@@ -68,27 +68,30 @@ test('accept writes the seat at the invitation'
     const admin = await organizationToken(
         'current', ORGANIZATION_TWO);
     const grant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-seat-accept',
             grantEventId: 'inv-seat-accept-grant',
             grantAt: '2026-06-05T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 201);
+    assert.equal(grant.status, 200);
 
     const accept = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-seat-accept/acceptance',
+        'PUT',
+        '/identities/' + SARAH_ID
+            + '/invitations/inv-seat-accept',
         await organizationToken(
             SARAH_ID, ORGANIZATION_TWO),
         {
+            state: 'accepted',
             membershipId: 'inv-seat-accept-ms',
-            acceptEventId: 'inv-seat-accept-event',
-            acceptAt: '2026-06-05T00:00:01.000000Z',
+            eventId: 'inv-seat-accept-event',
+            at: '2026-06-05T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 201);
+    assert.equal(accept.status, 204);
 
     const prefix = seatsPrefix(ORGANIZATION_TWO);
     const [requests, responses] = await Promise.all([

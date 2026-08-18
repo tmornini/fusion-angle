@@ -74,7 +74,7 @@ async function seed(): Promise<{
     // Own-org idea document — family-history reads target it.
     const token = await organizationToken('memberA', 'A');
     const idea = await handleRequest(db, req(
-        'PUT', '/ideas/idea-a', token, {
+        'PUT', '/organizations/A/ideas/idea-a', token, {
             title: 'Idea A',
             position: 1,
             problem_statement: 'p',
@@ -83,28 +83,29 @@ async function seed(): Promise<{
             expected_outcome: 'o',
             success_metrics: 'm',
             state: 'active',
-            state_at: AT,
-            state_event_id: 'idea-a-genesis',
         },
     ));
     assert.equal(idea.status, 201);
     return { db, token };
 }
 
-test('GET /ideas/:id/versions is 200', async () => {
+test('GET /organizations/:id/ideas/:id/versions/ is 200', async () => {
     const { db, token } = await seed();
     const res = await handleRequest(db, req(
-        'GET', '/ideas/idea-a/versions', token,
+        'GET', '/organizations/A/ideas/idea-a/versions/', token,
     ));
     assert.equal(res.status, 200);
-    const rows = await res.json() as { id: string }[];
+    const rows = await res.json() as {
+        id: string;
+        state: string;
+    }[];
     assert.ok(
-        rows.some(r => r.id === 'idea-a-genesis'),
-        'own-org history carries the document-trio genesis',
+        rows.some(r => r.id === 'idea-a' && r.state === 'active'),
+        'own-org versions list the idea collection item',
     );
 });
 
-test('GET /ideas/:id/versions foreign miss is 404'
+test('GET /organizations/:id/ideas/:id/versions/ foreign miss is 404'
 + ' at this address',
 async () => {
     const { db, token } = await seed();
@@ -117,7 +118,7 @@ async () => {
     });
     const tokenB = await organizationToken('memberB', 'B');
     const foreignIdea = await handleRequest(db, req(
-        'PUT', '/ideas/idea-b', tokenB, {
+        'PUT', '/organizations/B/ideas/idea-b', tokenB, {
             title: 'Idea B',
             position: 1,
             problem_statement: 'p',
@@ -126,13 +127,11 @@ async () => {
             expected_outcome: 'o',
             success_metrics: 'm',
             state: 'active',
-            state_at: AT,
-            state_event_id: 'idea-b-genesis',
         },
     ));
     assert.equal(foreignIdea.status, 201);
     const res = await handleRequest(db, req(
-        'GET', '/ideas/idea-b/versions', token,
+        'GET', '/organizations/A/ideas/idea-b/versions/', token,
     ));
     assert.equal(res.status, 404);
     assert.deepEqual(

@@ -67,39 +67,38 @@ export function filterByField<T, K extends keyof T>(
     return rows.filter(row => row[field] === value);
 }
 
-// G1 stores trio on the PUT; GET streams it. Pre-G1
-// rows still fill lifecycle from GET :id/versions.
+// Ideas / projects / objectives / record-types carry domain
+// `state` on the GET row. This helper is a pass-through.
 interface TrioRow {
     readonly id: string;
     readonly state?: string;
-    readonly state_at?: string;
-    readonly state_event_id?: string;
 }
 
-interface VersionRow {
-    readonly id: string;
-    readonly state: string;
-    readonly at: string;
-    readonly version?: string;
+export function organizationCollection(
+    ctx: RequestContext,
+    family: string,
+): string {
+    return 'organizations/'
+        + activeOrganization(ctx)
+        + '/' + family + '/';
+}
+
+export function organizationItem(
+    ctx: RequestContext,
+    family: string,
+    id: string,
+): string {
+    return 'organizations/'
+        + activeOrganization(ctx)
+        + '/' + family + '/' + id;
 }
 
 export async function withLifecycleTrio<T extends TrioRow>(
-    ctx: RequestContext,
-    family: string,
+    _ctx: RequestContext,
+    _family: string,
     row: T,
 ): Promise<T> {
-    if (row.state !== undefined) return row;
-    const history = await ctx.GET<readonly VersionRow[]>(
-        family + '/' + row.id + '/versions',
-    );
-    const current = history[0];
-    if (current === undefined) return row;
-    return {
-        ...row,
-        state: current.state,
-        state_at: current.at,
-        state_event_id: current.id,
-    };
+    return row;
 }
 
 export async function withLifecycleTrios<T extends TrioRow>(

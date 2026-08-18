@@ -989,12 +989,9 @@ export interface IdeaEntity {
     proposed_solution: string;
     expected_outcome: string;
     success_metrics: string;
-    // Lifecycle-current event trio (GET stamp only — not the
-    // head PUT body's fields). state ← event.state, state_at ←
-    // event.at, state_event_id ← event.id.
+    // Domain lifecycle state. Ledger facts (at, event id)
+    // live on the pair / etag / versions list, not here.
     state: string;
-    state_at: string;
-    state_event_id: string;
 }
 
 export type ObjectiveId = Id;
@@ -1003,12 +1000,9 @@ export interface ObjectiveEntity {
     id: ObjectiveId;
     organization_id: Id;
     position: number;
-    // Lifecycle-current event trio (GET stamp only — not the
-    // head PUT body's fields). state ← event.state, state_at ←
-    // event.at, state_event_id ← event.id.
+    // Domain lifecycle state. Ledger facts (at, event id)
+    // live on the pair / etag / versions list, not here.
     state: string;
-    state_at: string;
-    state_event_id: string;
 }
 
 export interface ObjectiveRevisionEntity {
@@ -1077,12 +1071,9 @@ export interface ProjectEntity {
     estimated_cost: number;
     actual_cost: number;
     position: number;
-    // Lifecycle-current event trio (GET stamp only — not the
-    // head PUT body's fields). state ← event.state, state_at ←
-    // event.at, state_event_id ← event.id.
+    // Domain lifecycle state. Ledger facts (at, event id)
+    // live on the pair / etag / versions list, not here.
     state: string;
-    state_at: string;
-    state_event_id: string;
 }
 
 export interface GraphNode {
@@ -1333,12 +1324,9 @@ export interface RecordEntity {
     name: string;
     description: string;
     position: number;
-    // Lifecycle-current event trio (GET stamp only — not the
-    // head PUT body's fields). state ← event.state, state_at ←
-    // event.at, state_event_id ← event.id.
+    // Domain lifecycle state. Ledger facts (at, event id)
+    // live on the pair / etag / versions list, not here.
     state: string;
-    state_at: string;
-    state_event_id: string;
 }
 
 export interface RecordAttributeEntity {
@@ -1450,16 +1438,10 @@ export interface ProjectFlowEntity {
     at: string;
 }
 
-// The lifecycle trio Decision 7 folds into the idea document:
-// the current state plus its creator-minted `at` and the
-// (transitional — retires with the states log) event id. A
-// bare IdeaState alone no longer carries enough to round-trip
-// a document PUT, so every reader that feeds an Idea gains
-// this shape.
+// Domain lifecycle state for an idea. Ledger facts stay
+// on the pair / etag / versions list.
 export interface IdeaStateDetail {
     readonly state: IdeaState;
-    readonly stateAt: string;
-    readonly stateEventId: string;
 }
 
 // The lifecycle trio Decision 7 folds into the member
@@ -1474,16 +1456,10 @@ export interface MemberStateDetail {
     readonly stateEventId: string;
 }
 
-// The lifecycle trio Decision 7 folds into the objective
-// document: current state plus its creator-minted `at` and
-// the (transitional — retires with the states log) event id.
-// A bare ObjectiveState alone no longer carries enough to
-// round-trip a document PUT, so every writer that echoes
-// an objective gains this shape.
+// Domain lifecycle state for an objective. Ledger facts
+// stay on the pair / etag / versions list.
 export interface ObjectiveStateDetail {
     readonly state: ObjectiveState;
-    readonly stateAt: string;
-    readonly stateEventId: string;
 }
 
 export class Idea {
@@ -1491,8 +1467,6 @@ export class Idea {
     readonly #title: string;
     readonly #position: number;
     readonly #state: IdeaState;
-    readonly #stateAt: string;
-    readonly #stateEventId: string;
     readonly #problemStatement: string;
     readonly #targetUsers: string;
     readonly #proposedSolution: string;
@@ -1507,8 +1481,6 @@ export class Idea {
         this.#title = entity.title;
         this.#position = entity.position;
         this.#state = detail.state;
-        this.#stateAt = detail.stateAt;
-        this.#stateEventId = detail.stateEventId;
         this.#problemStatement =
             entity.problem_statement;
         this.#targetUsers =
@@ -1572,14 +1544,6 @@ export class Idea {
         return this.#state;
     }
 
-    stateAtValue(): string {
-        return this.#stateAt;
-    }
-
-    stateEventIdValue(): string {
-        return this.#stateEventId;
-    }
-
     problemStatementText(): string {
         return this.#problemStatement;
     }
@@ -1601,16 +1565,10 @@ export class Idea {
     }
 }
 
-// The lifecycle trio Decision 7 folds into the project
-// document: the current state plus its creator-minted `at` and
-// the (transitional — retires with the states log) event id. A
-// bare ProjectState alone no longer carries enough to
-// round-trip a document PUT, so every reader that feeds a
-// Project gains this shape.
+// Domain lifecycle state for a project. Ledger facts stay
+// on the pair / etag / versions list.
 export interface ProjectStateDetail {
     readonly state: ProjectState;
-    readonly stateAt: string;
-    readonly stateEventId: string;
 }
 
 export class Project {
@@ -1618,8 +1576,6 @@ export class Project {
     readonly #title: string;
     readonly #description: string;
     readonly #state: ProjectState;
-    readonly #stateAt: string;
-    readonly #stateEventId: string;
     readonly #progress: number;
     readonly #startDate: string;
     readonly #targetEndDate: string;
@@ -1636,8 +1592,6 @@ export class Project {
         this.#description =
             entity.description;
         this.#state = detail.state;
-        this.#stateAt = detail.stateAt;
-        this.#stateEventId = detail.stateEventId;
         this.#progress = entity.progress;
         this.#startDate =
             entity.start_date;
@@ -1710,14 +1664,6 @@ export class Project {
         return this.#state;
     }
 
-    stateAtValue(): string {
-        return this.#stateAt;
-    }
-
-    stateEventIdValue(): string {
-        return this.#stateEventId;
-    }
-
     progressPercent(): number {
         return this.#progress;
     }
@@ -1750,16 +1696,10 @@ export class Project {
     }
 }
 
-// The lifecycle trio Decision 7 folds into the record
-// document: the current state plus its creator-minted `at` and
-// the (transitional — retires with the states log) event id. A
-// bare RecordState alone no longer carries enough to round-trip
-// a document PUT, so every reader that feeds a RecordModel
-// gains this shape.
+// Domain lifecycle state for a record-type. Ledger facts
+// stay on the pair / etag / versions list.
 export interface RecordStateDetail {
     readonly state: RecordState;
-    readonly stateAt: string;
-    readonly stateEventId: string;
 }
 
 export class RecordModel {
@@ -1768,8 +1708,6 @@ export class RecordModel {
     readonly #description: string;
     readonly #position: number;
     readonly #state: RecordState;
-    readonly #stateAt: string;
-    readonly #stateEventId: string;
 
     constructor(
         entity: RecordEntity,
@@ -1780,8 +1718,6 @@ export class RecordModel {
         this.#description = entity.description;
         this.#position = entity.position;
         this.#state = detail.state;
-        this.#stateAt = detail.stateAt;
-        this.#stateEventId = detail.stateEventId;
     }
 
     idForLink(): string {
@@ -1790,14 +1726,6 @@ export class RecordModel {
 
     stateValue(): RecordState {
         return this.#state;
-    }
-
-    stateAtValue(): string {
-        return this.#stateAt;
-    }
-
-    stateEventIdValue(): string {
-        return this.#stateEventId;
     }
 
     isActive(): boolean {

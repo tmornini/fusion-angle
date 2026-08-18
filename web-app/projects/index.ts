@@ -181,9 +181,6 @@ async function onProjectsLoaded(
                 newPosition,
                 {
                     state: project.stateValue(),
-                    stateAt: project.stateAtValue(),
-                    stateEventId:
-                        project.stateEventIdValue(),
                 },
             );
         },

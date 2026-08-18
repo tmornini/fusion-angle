@@ -174,8 +174,6 @@ async () => {
     await PUT(db, 'organizations/1/record-types/rec-fixture-1', {
         name: 'Fixture', description: '', position: 1,
         state: 'active',
-        state_at: '2026-01-01T00:00:00.000000Z',
-        state_event_id: 'rec-fixture-1-g',
     }, DEV_TOKEN);
     const body = {
         name: 'Priority',

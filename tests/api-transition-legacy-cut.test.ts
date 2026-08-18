@@ -45,8 +45,8 @@ const BASE = 'http://localhost';
 const ORGANIZATION = STARK_ORGANIZATION;
 const WO_ID = 'wo-legacy-cut-1';
 const TRANSITION =
-    '/work-orders/' + WO_ID + '/transition';
-const TRANSITION_PATTERN = 'work-orders/:id/transition';
+    '/organizations/1/work-orders/' + WO_ID + '/transition';
+const TRANSITION_PATTERN = 'organizations/:id/work-orders/:id/transition';
 const RETIRED_MESSAGE =
     'WorkOrderTransitionBody.fieldValues'
     + ' is retired: send set/clear against'
@@ -99,7 +99,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     await PUT(
-        db, 'work-orders/' + WO_ID, {
+        db, 'organizations/1/work-orders/' + WO_ID, {
             display_id: 'cut1',
             flow_graph: graphJson(),
             position: 1,
@@ -191,6 +191,7 @@ async () => {
         transitionEventId: 'te-seed-legacy',
     });
     const pathSegments = [
+        'organizations', ORGANIZATION,
         'work-orders', WO_ID, 'transition',
     ];
     const pair = await formWritePair({

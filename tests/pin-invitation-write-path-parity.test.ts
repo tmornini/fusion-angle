@@ -106,27 +106,30 @@ test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
     );
 
     const grant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-parity-write-first',
             grantEventId: 'inv-parity-write-first-grant',
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 201);
+    assert.equal(grant.status, 200);
     const afterGrant = await assertPendingWritePathParity(
         db, ORGANIZATION_TWO, inviteeId);
     assert.equal(afterGrant?.id, 'inv-parity-write-first');
 
     const decline = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-parity-write-first/decline',
+        'PUT',
+        '/identities/' + inviteeId
+            + '/invitations/inv-parity-write-first',
         inviteeToken, {
-            declineEventId: 'inv-parity-write-first-decline',
-            declineAt: '2026-06-02T00:00:01.000000Z',
+            state: 'declined',
+            eventId: 'inv-parity-write-first-decline',
+            at: '2026-06-02T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 201);
+    assert.equal(decline.status, 204);
     assert.equal(
         await assertPendingWritePathParity(
             db, ORGANIZATION_TWO, inviteeId),
@@ -138,14 +141,15 @@ test('pendingInvitationFor: pre-tx vs in-tx (grantInvitation\'s'
     // candidate case pendingInvitationFor's loop must resolve
     // identically pre-tx and in-tx.
     const regrant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-parity-write-second',
             grantEventId: 'inv-parity-write-second-grant',
             grantAt: '2026-06-02T00:00:02.000000Z',
         },
     ));
-    assert.equal(regrant.status, 201);
+    assert.equal(regrant.status, 200);
     const afterRegrant = await assertPendingWritePathParity(
         db, ORGANIZATION_TWO, inviteeId);
     assert.equal(afterRegrant?.id, 'inv-parity-write-second');
@@ -162,12 +166,13 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
         id: string, email: string, at: string,
     ): Promise<void> {
         const res = await handleRequest(db, req(
-            'POST', '/invitations', admin, {
+            'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
                 email, invitationId: id,
                 grantEventId: id + '-grant', grantAt: at,
             },
         ));
-        assert.equal(res.status, 201);
+        assert.equal(res.status, 200);
     }
 
     async function assertStateWritePathParity(
@@ -203,15 +208,17 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
     const jessicaToken = await organizationToken(
         jessicaId, ORGANIZATION_TWO);
     const accept = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-parity-write-accepted/acceptance',
+        'PUT',
+        '/identities/' + jessicaId
+            + '/invitations/inv-parity-write-accepted',
         jessicaToken, {
+            state: 'accepted',
             membershipId: 'inv-parity-write-accepted-ms',
-            acceptEventId: 'inv-parity-write-accepted-accept',
-            acceptAt: '2026-06-03T00:00:02.000000Z',
+            eventId: 'inv-parity-write-accepted-accept',
+            at: '2026-06-03T00:00:02.000000Z',
         },
     ));
-    assert.equal(accept.status, 201);
+    assert.equal(accept.status, 204);
     assert.equal(
         await assertStateWritePathParity(
             'inv-parity-write-accepted', ACCEPT_TX_TABLES,
@@ -229,14 +236,16 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
     const emilyToken = await organizationToken(
         emilyId, ORGANIZATION_TWO);
     const decline = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-parity-write-declined/decline',
+        'PUT',
+        '/identities/' + emilyId
+            + '/invitations/inv-parity-write-declined',
         emilyToken, {
-            declineEventId: 'inv-parity-write-declined-decline',
-            declineAt: '2026-06-03T00:00:04.000000Z',
+            state: 'declined',
+            eventId: 'inv-parity-write-declined-decline',
+            at: '2026-06-03T00:00:04.000000Z',
         },
     ));
-    assert.equal(decline.status, 201);
+    assert.equal(decline.status, 204);
     assert.equal(
         await assertStateWritePathParity(
             'inv-parity-write-declined',
@@ -251,14 +260,16 @@ test('currentInvitationState: pre-tx vs in-tx agree across'
         '2026-06-03T00:00:05.000000Z',
     );
     const revoke = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-parity-write-revoked/revocation',
+        'PUT',
+        '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/inv-parity-write-revoked',
         admin, {
-            revokeEventId: 'inv-parity-write-revoked-revoke',
-            revokeAt: '2026-06-03T00:00:06.000000Z',
+            state: 'revoked',
+            eventId: 'inv-parity-write-revoked-revoke',
+            at: '2026-06-03T00:00:06.000000Z',
         },
     ));
-    assert.equal(revoke.status, 201);
+    assert.equal(revoke.status, 204);
     assert.equal(
         await assertStateWritePathParity(
             'inv-parity-write-revoked',
@@ -310,25 +321,28 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
     );
 
     const grant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-parity-membership-exists',
             grantEventId: 'inv-parity-membership-exists-grant',
             grantAt: '2026-06-04T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 201);
+    assert.equal(grant.status, 200);
 
     const accept = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-parity-membership-exists/acceptance',
+        'PUT',
+        '/identities/' + inviteeId
+            + '/invitations/inv-parity-membership-exists',
         inviteeToken, {
+            state: 'accepted',
             membershipId: 'inv-parity-membership-exists-ms',
-            acceptEventId: 'inv-parity-membership-exists-accept',
-            acceptAt: '2026-06-04T00:00:01.000000Z',
+            eventId: 'inv-parity-membership-exists-accept',
+            at: '2026-06-04T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 201);
+    assert.equal(accept.status, 204);
 
     assert.equal(
         await assertMembershipExistsWritePathParity(

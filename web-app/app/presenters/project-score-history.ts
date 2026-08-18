@@ -26,15 +26,17 @@ export type MemberNameResolver = (
     memberId: Id,
 ) => string;
 
-type Event =
+type DatedEvent =
     | { kind: 'baseline'; at: string; memberId: Id;
         objectiveId: ObjectiveId; score: number }
     | { kind: 'actual'; at: string; memberId: Id;
         objectiveId: ObjectiveId; score: number }
     | { kind: 'revision'; at: string; memberId: Id;
-        objectiveId: ObjectiveId; name: string }
-    | { kind: 'archival'; at: string; memberId: Id;
-        objectiveId: ObjectiveId };
+        objectiveId: ObjectiveId; name: string };
+
+type Event =
+    | DatedEvent
+    | { kind: 'archival'; objectiveId: ObjectiveId };
 
 export class ProjectScoreHistoryPresenter {
     readonly #baselines: ObjectiveScore[];
@@ -115,16 +117,32 @@ export class ProjectScoreHistoryPresenter {
         for (const d of this.#archivals) {
             events.push({
                 kind: 'archival',
-                at: d.at,
-                memberId: d.memberId,
                 objectiveId: d.objectiveId,
             });
         }
-        events.sort((a, b) => a.at.localeCompare(b.at));
-        return events;
+        const dated: DatedEvent[] = [];
+        const archivals: Event[] = [];
+        for (const e of events) {
+            if (e.kind === 'archival') {
+                archivals.push(e);
+            } else {
+                dated.push(e);
+            }
+        }
+        dated.sort((a, b) => a.at.localeCompare(b.at));
+        return [...dated, ...archivals];
     }
 
     #row(e: Event): SafeHtml {
+        if (e.kind === 'archival') {
+            return html`<tr>
+                <td>${DISPLAY_ABSENT}</td>
+                <td>${DISPLAY_ABSENT}</td>
+                <td>Objective archived</td>
+                <td>${DISPLAY_ABSENT}</td>
+                <td>${DISPLAY_ABSENT}</td>
+            </tr>`;
+        }
         const dateLabel = formatDateTime(e.at);
         const dateCell = html`<td>
             <time datetime="${e.at}">${dateLabel}</time>
@@ -183,18 +201,6 @@ export class ProjectScoreHistoryPresenter {
                     <td>${e.name}</td>
                     <td>renamed/edited</td>
                 </tr>`;
-            case 'archival': {
-                const def = this.#resolver(
-                    e.objectiveId, e.at,
-                );
-                return html`<tr>
-                    ${dateCell}
-                    ${whoCell}
-                    <td>Objective archived</td>
-                    <td>${def?.name ?? DISPLAY_ABSENT}</td>
-                    <td>${DISPLAY_ABSENT}</td>
-                </tr>`;
-            }
         }
     }
 }

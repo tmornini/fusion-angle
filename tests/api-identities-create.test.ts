@@ -71,7 +71,7 @@ test(
     + ' (Phase 10 Task 2 intake decomposition)',
     async () => {
         const db = await freshDb();
-        await POST(db, 'identities', {
+        await POST(db, 'identities/', {
             id: 'p1',
             kind: 'person',
         }, DEV_TOKEN);
@@ -98,7 +98,7 @@ test(
     + ' client_secret credential in one operation',
     async () => {
         const db = await freshDb();
-        await POST(db, 'identities', {
+        await POST(db, 'identities/', {
             id: 's1',
             kind: 'service',
             credential: credential('s1'),
@@ -126,7 +126,7 @@ test(
     async () => {
         const db = await freshDb();
         await assert.rejects(
-            () => POST(db, 'identities', {
+            () => POST(db, 'identities/', {
                 id: 'doomed',
                 kind: 'person',
                 pii: {
@@ -150,7 +150,7 @@ test(
     + ' acceptance the intake decomposition names',
     async () => {
         const db = await freshDb();
-        await POST(db, 'identities', {
+        await POST(db, 'identities/', {
             id: 'torn', kind: 'person',
         }, DEV_TOKEN);
         await assert.rejects(
@@ -180,7 +180,7 @@ test(
             // identity_credentials store rejects it mid-tx,
             // AFTER the identities put has landed, so both must
             // roll back.
-            () => POST(db, 'identities', {
+            () => POST(db, 'identities/', {
                 id: 'doomed',
                 kind: 'service',
                 credential: {
@@ -202,7 +202,7 @@ test(
     async () => {
         const adminDb = await freshDb();
         const create = await handleRequest(adminDb, req(
-            'POST', '/identities', DEV_TOKEN, {
+            'POST', '/identities/', DEV_TOKEN, {
                 id: 'p1',
                 kind: 'person',
             }));
@@ -213,7 +213,7 @@ test(
         await seedOrganizationMember(memberDb, MEMBER);
         const token = await devToken(MEMBER);
         const denied = await handleRequest(
-            memberDb, req('POST', '/identities', token, {
+            memberDb, req('POST', '/identities/', token, {
                 id: 'p2',
                 kind: 'person',
             }));
@@ -230,7 +230,7 @@ test('identity creation stores identityDocumentEntityOf',
 async () => {
     const db = await freshDb();
     const id = 'id-g3-create';
-    await POST(db, 'identities', {
+    await POST(db, 'identities/', {
         id,
         kind: 'person',
     }, DEV_TOKEN);

@@ -11,7 +11,8 @@ import {
 } from './test-fixtures.ts';
 
 // Phase 2 Task 3 (R1, Decision 7): create dissolved into the
-// SAME genesis-capable document PUT ideas/:id Task 2 built —
+// SAME genesis-capable document PUT organizations/:id/ideas/:id Task 2 built
+// —
 // genesis is head-presence-defined, "the first document
 // version." The composed POST /ideas retired; it now 405s like
 // any other method-absent route (self-review requirement).
@@ -62,8 +63,6 @@ function ideaGenesisBody(
     return {
         ...ideaFields(title),
         state: 'active',
-        state_at: at,
-        state_event_id: 'ev-' + ideaId,
     };
 }
 
@@ -73,7 +72,7 @@ test(
     async () => {
         const db = await freshDb();
         const res = await handleRequest(db, req(
-            'PUT', '/ideas/idea-1', DEV_TOKEN,
+            'PUT', '/organizations/1/ideas/idea-1', DEV_TOKEN,
             // Far-future timestamp forces a distinct, verifiable
             // at value so the test can confirm the caller's time
             // was threaded to the event — not a server nowUtc().
@@ -84,7 +83,7 @@ test(
         ));
         assert.equal(res.status, 201);
         const ideaRes = await handleRequest(
-            db, req('GET', '/ideas/idea-1', DEV_TOKEN),
+            db, req('GET', '/organizations/1/ideas/idea-1', DEV_TOKEN),
         );
         const idea = await ideaRes.json() as {
             title: string;
@@ -97,24 +96,20 @@ test(
         // (Phase 15 Task 7); post-write check rides
         // surviving /versions.
         const stateRes = await handleRequest(db, req(
-            'GET', '/ideas/idea-1/versions',
+            'GET', '/organizations/1/ideas/idea-1/versions/',
             DEV_TOKEN,
         ));
         const history = await stateRes.json() as {
+            id: string;
+            title: string;
             state: string;
-            member_id: string;
-            at: string;
         }[];
         assert.equal(history.length, 1);
         const current = history[0]!;
+        assert.equal(current.id, 'idea-1');
+        assert.equal(current.title, 'Fresh Idea');
         assert.equal(current.state, 'active');
-        // Authorship is the verified caller, never the body.
-        assert.equal(current.member_id, 'current');
-        // The event carries the caller-supplied at, not server
-        // time.
-        assert.equal(
-            current.at, '2099-01-01T00:00:00.000000Z',
-        );
+        assert.equal('state_at' in current, false);
     },
 );
 
@@ -128,17 +123,15 @@ test(
         // pair-plane genesis PUT.
     // Phase Final Stage B: states table retired.
         const res = await handleRequest(db, req(
-            'PUT', '/ideas/idea-survives', DEV_TOKEN,
+            'PUT', '/organizations/1/ideas/idea-survives', DEV_TOKEN,
             {
                 ...ideaFields('Survives'),
                 state: 'active',
-                state_at: '2099-01-02T00:00:00.000000Z',
-                state_event_id: 'ev-x',
             },
         ));
         assert.equal(res.status, 201);
         const getRes = await handleRequest(db, req(
-            'GET', '/ideas/idea-survives', DEV_TOKEN,
+            'GET', '/organizations/1/ideas/idea-survives', DEV_TOKEN,
         ));
         assert.equal(getRes.status, 200);
     },
@@ -161,11 +154,11 @@ test(
             '2026-01-01T00:00:00.000000Z',
         );
         const first = await handleRequest(db, req(
-            'PUT', '/ideas/idea-retry', DEV_TOKEN, body,
+            'PUT', '/organizations/1/ideas/idea-retry', DEV_TOKEN, body,
         ));
         assert.equal(first.status, 201);
         const second = await handleRequest(db, req(
-            'PUT', '/ideas/idea-retry', DEV_TOKEN, body,
+            'PUT', '/organizations/1/ideas/idea-retry', DEV_TOKEN, body,
         ));
         assert.equal(second.status, 201);
         assert.equal(
@@ -190,7 +183,7 @@ test(
     async () => {
         const db = await freshDb();
         const res = await handleRequest(db, req(
-            'POST', '/ideas', DEV_TOKEN,
+            'POST', '/organizations/1/ideas/', DEV_TOKEN,
             ideaGenesisBody(
                 'idea-405', 'Should Not Create',
                 '2026-01-01T00:00:00.000000Z',

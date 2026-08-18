@@ -14,7 +14,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     seedAdminSchema,
 } from './test-fixtures.ts';
@@ -48,7 +48,7 @@ async function setup(): Promise<{
     );
     await seedHumanMember(db, 'm1', 'Member One');
     const ctx = createRequestContext(
-        db, await devToken(),
+        db, await organizationToken(),
     );
     return { db, ctx };
 }
@@ -116,7 +116,7 @@ async function readPairGraph(
     flowId: string,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'flows/' + flowId,
+        'organizations/1/flows/' + flowId,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',

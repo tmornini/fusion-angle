@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { createRequestContext } from
     '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import { getDashboardGauges } from
     '../web-app/app/adapters/dashboard.ts';
 import {
@@ -21,7 +21,7 @@ import { sharedMockDb } from './mock-seed.ts';
 test('mock seed produces portfolio Impact baseline +50',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const gauges = await getDashboardGauges(ctx);
         const impact = gauges.find(
             g => g.title === 'Impact',
@@ -34,7 +34,7 @@ test('mock seed produces portfolio Impact baseline +50',
 test('mock seed produces per-objective baseline means',
     async () => {
         const db = await sharedMockDb();
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         const aggs = buildObjectiveAggregates(
             await getObjectiveScoringInputs(ctx),
         );

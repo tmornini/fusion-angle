@@ -47,7 +47,11 @@ import {
 import type {
     RequestContext,
 } from './shared.ts';
-import { jitteredBackoff } from './shared.ts';
+import {
+    jitteredBackoff,
+    organizationCollection,
+    organizationItem,
+} from './shared.ts';
 
 const flowChanges =
     createSubscriptionChannel();
@@ -88,7 +92,9 @@ export async function postFlowCreation(
         now,
     );
 
-    await ctx.POST('flows', {
+    await ctx.POST(
+        organizationCollection(ctx, 'flows'),
+        {
         id: input.flowId,
         flow: {
             name: input.name,
@@ -397,7 +403,7 @@ async function buildFlowPutBody(
     const now = nowUtc();
     const { body: current, etag } =
         await ctx.GETWithEtag<FlowWithGraph>(
-            'flows/' + id,
+            organizationItem(ctx, 'flows', id),
         );
     const baseline = asStoredGraph(
         current.graph, 'flow.graph',
@@ -516,7 +522,7 @@ export async function putFlow(
             );
         try {
             await ctx.PUT(
-                `flows/${id}`,
+                organizationItem(ctx, 'flows', id),
                 body,
                 etag === undefined
                     ? undefined

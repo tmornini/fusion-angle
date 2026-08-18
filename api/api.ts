@@ -17,6 +17,7 @@ import {
 } from './types.ts';
 import type { Id } from './types.ts';
 import { messageAddress } from './message-address.ts';
+import { pathSegmentsOf } from './path-segments.ts';
 import {
     formWritePair,
     appendMessagePair,
@@ -51,6 +52,8 @@ import {
 import {
     documentFamilyWiring,
     documentHeadPairId,
+    entityIdParam,
+    idFamilyOf,
     lookupStoredRevision,
     throwDocumentMiss,
     requireOrganization,
@@ -85,7 +88,6 @@ import {
     assertWritableInOrganization,
 } from './write-authorizer.ts';
 import {
-    exchangeBearerForOrganization,
     postToken,
     postAuthorize,
     attachSetCookie,
@@ -128,13 +130,7 @@ import {
     type Route,
     type WriteResponseSpec,
 } from './routes.ts';
-import {
-    invitationsRequest,
-} from './invitations-domain.ts';
-import {
-    identityDefaultOrganizationRequest,
-    organizationsEnumerationRequest,
-} from './organization-requests.ts';
+
 import {
     incomingContext,
     REQUEST_ID_HEADER,
@@ -167,55 +163,6 @@ const routeTable: readonly Route[] = routes;
 
 const BASE_URL = 'http://localhost';
 
-// Facade rewrite: exchange the caller's bearer for a token
-// scoped to segments[1], then re-enter the gate against the
-// flat resource path (segments[2:]). A non-member's exchange
-// is a 403 — the tenant fence — and mints nothing.
-async function facadeRequest(
-    ctx: IncomingContext,
-    request: Request,
-    segments: readonly string[],
-): Promise<Response> {
-    const header = request.headers.get('authorization');
-    if (header === null
-        || !header.startsWith('Bearer ')) {
-        return Response.json(
-            { error: 'facade requires a bearer token' },
-            { status: HTTP_UNAUTHORIZED },
-        );
-    }
-    const bearer = header.slice('Bearer '.length);
-    const exchanged = await exchangeBearerForOrganization(
-        ctx.base, bearer, segments[1]!,
-    );
-    if (!exchanged.ok) {
-        return Response.json(
-            { error: exchanged.error },
-            { status: exchanged.status },
-        );
-    }
-    const flatUrl = new URL(request.url);
-    flatUrl.pathname = '/' + segments.slice(2).join('/');
-    const headers = new Headers(request.headers);
-    headers.set(
-        'authorization',
-        'Bearer ' + exchanged.response.access_token,
-    );
-    // The inner hop is the SAME user request — it keeps the
-    // outer vessel's id across the re-entry.
-    headers.set(REQUEST_ID_HEADER, ctx.requestId);
-    const hasBody = ctx.method === 'PUT'
-        || ctx.method === 'POST'
-        || ctx.method === 'PATCH';
-    const flatRequest = new Request(flatUrl.toString(), {
-        method: ctx.method,
-        headers,
-        ...(hasBody
-            ? { body: await request.text() } : {}),
-    });
-    return handleRequest(ctx.base, flatRequest);
-}
-
 // The gate-side Decision 5 post: fired once per successful
 // write, AFTER the route handler's promise resolves (so on
 // IndexedDB the commit has already reached `oncomplete`).
@@ -224,6 +171,28 @@ async function facadeRequest(
 // writer's other tabs refresh even when the session is a
 // flat (un-exchanged) token that cannot match on
 // organization.
+function invitationWriteOwnsNotification(
+    routePattern: string,
+): boolean {
+    return routePattern
+            === 'organizations/:id/invitations/'
+        || routePattern
+            === 'organizations/:id/invitations/:id'
+        || routePattern
+            === 'identities/:id/invitations/:id';
+}
+
+// Tenant-root document and its version reads. Path org
+// is the document id, not a nested product fence.
+function isOrganizationDocumentPath(
+    pattern: string,
+): boolean {
+    return pattern === 'organizations/:id'
+        || pattern === 'organizations/:id/versions/'
+        || pattern
+            === 'organizations/:id/versions/:etag';
+}
+
 function postWriteNotification(
     adapter: GuardedDbAdapter,
     routePattern: string,
@@ -454,52 +423,11 @@ export async function handleRequest(
 ): Promise<Response> {
     const ctx = incomingContext(adapter, request);
     const { method, pathname } = ctx;
-    const pathSegments = pathname
-        .split('/')
-        .filter(Boolean);
-    if (pathSegments[0] === 'identities'
-        && pathSegments.length === 3
-        && pathSegments[2] === 'default-organization') {
-        return identityDefaultOrganizationRequest(
-            ctx, request, pathSegments,
-        );
-    }
-    // The invitation surface is identity/org-spanning, so it
-    // runs on the BASE adapter with explicit guards rather than
-    // the org-scoped route table — see invitationsRequest.
-    if (pathSegments[0] === 'invitations') {
-        return invitationsRequest(
-            ctx, request, pathSegments,
-        );
-    }
-    // Enumerating one's own orgs is identity-scoped, not
-    // org-owned: it runs above the admin gate so a roleless
-    // member can boot. Only the bare GET — PUT (create) and
-    // /organizations/:id keep the org-scoped route handling.
-    if (pathSegments[0] === 'organizations'
-        && pathSegments.length === 1
-        && method === 'GET') {
-        return organizationsEnumerationRequest(ctx, request);
-    }
+    const pathSegments = pathSegmentsOf(pathname);
     // Match first (pure, no I/O). Authentication runs before
     // the no-match 404 so an unauthenticated caller never maps
     // route topology (unknown path and real route both 401).
-    // In-table organizations/... patterns win over the facade
-    // when registered; the facade swallows only unmatched
-    // nested org paths (length ≥ 3).
     const match = matchRoute(routeTable, pathSegments);
-    // Facade: /organizations/:org/:entity[/:id] — exchange the
-    // caller's bearer for an org-scoped token and re-enter the
-    // gate against the flat resource path, so the existing
-    // handler is fenced automatically. Organization rides the
-    // one verified token, never the path.
-    if (
-        match === null
-        && pathSegments[0] === 'organizations'
-        && pathSegments.length >= 3
-    ) {
-        return facadeRequest(ctx, request, pathSegments);
-    }
     const matchedRoutePattern = match !== null
         ? match.route.segments.join('/')
         : undefined;
@@ -568,89 +496,125 @@ export async function handleRequest(
         try {
             const fence = await fenceRequest(authed);
             if (!fence.ok) {
-                return Response.json(
-                    { error: fence.error },
-                    { status: fence.status },
-                );
+                // Org-less identity-scoped GET reaches
+                // the handler; fence would 403 first.
+                if (
+                    fencePattern
+                        !== 'identities/:id/'
+                            + 'default-organization'
+                    && fencePattern
+                        !== 'identities/:id/'
+                            + 'organizations/'
+                    && fencePattern
+                        !== 'identities/:id/'
+                            + 'invitations/'
+                    && fencePattern
+                        !== 'identities/:id/'
+                            + 'invitations/:id'
+                    && fencePattern
+                        !== 'identities/:id/'
+                            + 'invitations/:id/versions/'
+                    && fencePattern
+                        !== 'identities/:id/'
+                            + 'invitations/:id/versions/'
+                            + ':etag'
+                ) {
+                    return Response.json(
+                        { error: fence.error },
+                        { status: fence.status },
+                    );
+                }
+                actor = authed.principal.id;
             }
-            const fenced = fence.ctx;
-            // Nested org path fence: after fenceRequest and
-            // before authorizeRequest. Path org never authorizes
-            // alone — mismatch (incl. nonexistent path org)
-            // is 403 with a fixed body. No auto-exchange.
-            // Bare organizations/:id keeps its own membership
-            // fence below; every other organizations/... match
-            // takes this arm.
-            if (
-                match !== null
-                && match.route.segments[0]
-                    === 'organizations'
-                && fencePattern !== 'organizations/:id'
-                && fenceParams[0]
-                    !== fenced.organization
-            ) {
-                return Response.json(
-                    {
-                        error: 'forbidden: path organization'
-                            + ' does not match the token'
-                            + ' organization',
-                    },
-                    { status: HTTP_FORBIDDEN },
-                );
-            }
-            const authzFailure =
-                fencePattern === 'identities/:id/pii'
-                    ? authorizeIdentityPii(
-                        fenced, param(fenceParams, 0))
-                    : authorizeRequest(fenced);
-            if (authzFailure !== null) {
-                return Response.json(
-                    { error: authzFailure },
-                    { status: HTTP_FORBIDDEN },
-                );
-            }
-            // organizations/:id is global passthrough; fence
-            // READS to the caller's memberships. A real org the
-            // caller is not a member of is 403 (honest); a
-            // genuinely absent id stays 404. PUT is not gated
-            // here — a new org is created before its first
-            // membership exists.
-            if (method === 'GET'
-                && fencePattern === 'organizations/:id'
-                && !fenced.memberOrganizations
-                    .has(param(fenceParams, 0))) {
-                const organizationId =
-                    param(fenceParams, 0);
-                // Orgs self-own (resolveGlobalOwner →
-                // resolveOwningOrganization returns the org
-                // id when the document exists).
-                const owner = await resolveGlobalOwner(
-                    adapter,
-                    organizationId,
-                    fenced.organization,
-                    'organizations',
-                );
-                if (owner !== null) {
+            if (fence.ok) {
+                const fenced = fence.ctx;
+                // Nested org path fence: after fenceRequest and
+                // before authorizeRequest. Path org never
+                // authorizes alone — mismatch (incl.
+                // nonexistent path org) is 403 with a fixed
+                // body. No auto-exchange. The organization
+                // document and its versions keep the
+                // membership fence below; every other
+                // organizations/... match takes this arm.
+                if (
+                    match !== null
+                    && match.route.segments[0]
+                        === 'organizations'
+                    && !isOrganizationDocumentPath(
+                        fencePattern,
+                    )
+                    && fenceParams[0]
+                        !== fenced.organization
+                ) {
                     return Response.json(
                         {
-                            error:
-                                foreignOrganizationMessage(
-                                    'organizations',
-                                    organizationId,
-                                ),
+                            error: 'forbidden: path'
+                                + ' organization does not'
+                                + ' match the token'
+                                + ' organization',
                         },
                         { status: HTTP_FORBIDDEN },
                     );
                 }
-                return Response.json(
-                    { error: 'Not found: ' + pathname },
-                    { status: HTTP_NOT_FOUND },
-                );
+                const authzFailure =
+                    fencePattern === 'identities/:id/pii'
+                        ? authorizeIdentityPii(
+                            fenced, param(fenceParams, 0))
+                        : authorizeRequest(fenced);
+                if (authzFailure !== null) {
+                    return Response.json(
+                        { error: authzFailure },
+                        { status: HTTP_FORBIDDEN },
+                    );
+                }
+                // Organization document reads (item and
+                // versions) are global passthrough;
+                // fence READS to the caller's memberships.
+                // A real org the caller is not a member of
+                // is 403 (honest); a genuinely absent id
+                // stays 404. PUT is not gated here — a new
+                // org is created before its first membership
+                // exists.
+                if (method === 'GET'
+                    && isOrganizationDocumentPath(
+                        fencePattern,
+                    )
+                    && !fenced.memberOrganizations
+                        .has(param(fenceParams, 0))) {
+                    const organizationId =
+                        param(fenceParams, 0);
+                    // Orgs self-own (resolveGlobalOwner →
+                    // resolveOwningOrganization returns the
+                    // org id when the document exists).
+                    const owner = await resolveGlobalOwner(
+                        adapter,
+                        organizationId,
+                        fenced.organization,
+                        'organizations',
+                    );
+                    if (owner !== null) {
+                        return Response.json(
+                            {
+                                error:
+                                    foreignOrganizationMessage(
+                                        'organizations',
+                                        organizationId,
+                                    ),
+                            },
+                            { status: HTTP_FORBIDDEN },
+                        );
+                    }
+                    return Response.json(
+                        { error: 'Not found: ' + pathname },
+                        { status: HTTP_NOT_FOUND },
+                    );
+                }
+                actor = fenced.principal.id;
+                organization = fenced.organization;
+                roles = fenced.roles;
+                callerIsAdmin =
+                    fenced.roles.includes('admin');
             }
-            actor = fenced.principal.id;
-            organization = fenced.organization;
-            roles = fenced.roles;
-            callerIsAdmin = fenced.roles.includes('admin');
         } catch (error) {
             return redactedFenceFailure(ctx, error);
         }
@@ -834,12 +798,13 @@ export async function handleRequest(
             // documentEntityRoute's own pattern is always exactly
             // `${family}/:id`. PUT-only: the two PUT classes govern PUT,
             // never POST/DELETE.
-            const wiring = documentFamilyWiring(
-                matched.segments[0] ?? '',
+            const wiring = wiringForSegments(
+                matched.segments,
             );
             const isDocumentPut = method === 'PUT'
                 && wiring !== undefined
-                && routePattern === wiring.family + '/:id';
+                && routePattern
+                    === documentEntityPattern(wiring);
             const isLockedWrite = isDocumentPut
                 && wiring !== undefined
                 && familyRegistration(wiring.family)
@@ -1499,13 +1464,15 @@ export async function handleRequest(
                 // threshold with the write side's own inline
                 // check (Commandment IX Generality) — kept
                 // duplicated rather than prematurely shared.
-                const readWiring = documentFamilyWiring(
-                    matched.segments[0] ?? '',
+                const readWiring = wiringForSegments(
+                    matched.segments,
                 );
                 if (
                     readWiring !== undefined
                     && routePattern
-                        === readWiring.family + '/:id'
+                        === documentEntityPattern(
+                            readWiring,
+                        )
                     && familyRegistration(readWiring.family)
                         ?.concurrency === 'locked'
                 ) {
@@ -1522,7 +1489,8 @@ export async function handleRequest(
                     // class address (tests/api-flow-document.test.ts
                     // pins the equality); one mechanism now.
                     const headPairId = await documentHeadPairId(
-                        effective, prefix, param(params, 0),
+                        effective, prefix,
+                        entityIdParam(readWiring, params),
                     );
                     if (headPairId !== undefined) {
                         const stored = await effective
@@ -1540,11 +1508,11 @@ export async function handleRequest(
                         }
                     }
                 }
-                // Document /versions/:version: ETag is the
+                // Document /versions/:etag: ETag is the
                 // column hash (same as the path token).
                 if (
                     routePattern.endsWith(
-                        '/versions/:version',
+                        '/versions/:etag',
                     )
                     && routePattern
                         !== INSTANCE_VERSION_PATTERN
@@ -1643,6 +1611,10 @@ export async function handleRequest(
                         pair,
                         organization,
                         roles,
+                        ctx.requestAt,
+                        request.headers.get(
+                            OPERATION_ID_HEADER,
+                        ) ?? '',
                     );
                 if (pair !== undefined) {
                     const stored = await storedResponseFor(
@@ -1670,13 +1642,15 @@ export async function handleRequest(
                             refreshClearCookie(request),
                         );
                     }
-                    const putWiring = documentFamilyWiring(
-                        matched.segments[0] ?? '',
+                    const putWiring = wiringForSegments(
+                        matched.segments,
                     );
                     if (
                         putWiring !== undefined
                         && routePattern
-                            === putWiring.family + '/:id'
+                            === documentEntityPattern(
+                                putWiring,
+                            )
                     ) {
                         return attachEtag(
                             response, stored.version,
@@ -1684,10 +1658,14 @@ export async function handleRequest(
                     }
                     return response;
                 }
-                postWriteNotification(
-                    adapter, routePattern, params,
-                    body, organization, actor,
-                );
+                if (!invitationWriteOwnsNotification(
+                    routePattern,
+                )) {
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization, actor,
+                    );
+                }
                 if (result === undefined) {
                     return new Response(null, {
                         status: HTTP_NO_CONTENT,
@@ -1825,12 +1803,13 @@ export async function handleRequest(
                 // The dedicated authentication arm (Task 3, C1
                 // discharge): both grant routes are bearerExempt,
                 // so the generic pair block above never fires
-                // for them, and neither carries a `post` closure
-                // in routes.ts any more (retired into this arm —
-                // matchRoute still matches both patterns, so an
-                // unknown path still 404s and a non-POST verb
-                // still 405s via the ordinary matched.get/put/
-                // delete checks). The seed carries everything
+                // for them. The table offers `post` so the verb
+                // is visible; this arm still intercepts before
+                // `matched.post` runs (matchRoute still matches
+                // both patterns, so an unknown path still 404s
+                // and a non-POST verb still 405s via the
+                // ordinary matched.get/put/delete checks). The
+                // seed carries everything
                 // WritePairInput needs except the requester
                 // identity and the response — only the grant
                 // itself, deep inside postToken/postAuthorize,
@@ -1968,6 +1947,10 @@ export async function handleRequest(
                     pair,
                     organization,
                     roles,
+                    ctx.requestAt,
+                    request.headers.get(
+                        OPERATION_ID_HEADER,
+                    ) ?? '',
                 );
                 if (pair !== undefined) {
                     const stored = await storedResponseFor(
@@ -1987,10 +1970,14 @@ export async function handleRequest(
                         stored, 'POST', true,
                     );
                 }
-                postWriteNotification(
-                    adapter, routePattern, params,
-                    body, organization, actor,
-                );
+                if (!invitationWriteOwnsNotification(
+                    routePattern,
+                )) {
+                    postWriteNotification(
+                        adapter, routePattern, params,
+                        body, organization, actor,
+                    );
+                }
                 if (result === undefined) {
                     return new Response(null, {
                         status: HTTP_NO_CONTENT,
@@ -2215,7 +2202,24 @@ async function bodyWriteResponse(
     );
 }
 
-const ID_SUFFIX = '/:id';
+function wiringForSegments(
+    segments: readonly string[],
+): ReturnType<typeof documentFamilyWiring> {
+    const family = segments[0] === 'organizations'
+        ? (segments[2] ?? '')
+        : (segments[0] ?? '');
+    return documentFamilyWiring(family);
+}
+
+function documentEntityPattern(
+    wiring: NonNullable<
+        ReturnType<typeof documentFamilyWiring>
+    >,
+): string {
+    return wiring.httpNest === 'organization'
+        ? 'organizations/:id/' + wiring.family + '/:id'
+        : wiring.family + '/:id';
+}
 
 // Stream families (ideas, projects, …). Work-orders still
 // assemble (binding). Flows stay on derive: stored PUT has
@@ -2225,28 +2229,46 @@ const ID_SUFFIX = '/:id';
 function streamFamilyWiring(
     routePattern: string,
 ): ReturnType<typeof documentFamilyWiring> {
-    if (!routePattern.endsWith(ID_SUFFIX)) {
-        return undefined;
-    }
-    const family = routePattern.slice(0, -ID_SUFFIX.length);
+    const family = idFamilyOf(routePattern);
     if (
-        family === 'work-orders'
+        family === undefined
+        || family === 'work-orders'
         || family === 'flows'
-        || family.includes('/')
     ) {
         return undefined;
     }
     return documentFamilyWiring(family);
 }
 
+function collectionFamilyOf(
+    routePattern: string,
+): string | undefined {
+    if (!routePattern.endsWith('/')) return undefined;
+    const rest = routePattern.slice(0, -1);
+    if (rest.startsWith('organizations/:id/')) {
+        const family = rest.slice(
+            'organizations/:id/'.length,
+        );
+        if (family.includes('/')) return undefined;
+        return family;
+    }
+    if (rest.includes('/')) return undefined;
+    return rest;
+}
+
 function streamCollectionWiring(
     routePattern: string,
 ): ReturnType<typeof documentFamilyWiring> {
-    if (routePattern === 'work-orders') return undefined;
-    if (routePattern === 'flows') return undefined;
-    if (routePattern === 'members') return undefined;
-    if (routePattern.includes('/')) return undefined;
-    return documentFamilyWiring(routePattern);
+    const family = collectionFamilyOf(routePattern);
+    if (
+        family === undefined
+        || family === 'work-orders'
+        || family === 'flows'
+        || family === 'members'
+    ) {
+        return undefined;
+    }
+    return documentFamilyWiring(family);
 }
 
 async function streamStoredDocumentGet(
@@ -2258,7 +2280,7 @@ async function streamStoredDocumentGet(
     const wiring = streamFamilyWiring(routePattern);
     if (wiring === undefined) return undefined;
     const organizationId = requireOrganization(organization);
-    const id = param(params, 0);
+    const id = entityIdParam(wiring, params);
     const prefix = canonicalUriCollection(
         organizationId, '/' + wiring.family + '/',
     );
@@ -2294,11 +2316,14 @@ async function streamStoredCollectionGet(
 function isLiveHeadCollectionGet(
     routePattern: string,
 ): boolean {
-    if (routePattern === 'members') return false;
     if (routePattern === RECORD_TYPES_COLLECTION_PATTERN) {
         return true;
     }
-    return documentFamilyWiring(routePattern) !== undefined;
+    const family = collectionFamilyOf(routePattern);
+    if (family === undefined || family === 'members') {
+        return false;
+    }
+    return documentFamilyWiring(family) !== undefined;
 }
 
 // Strong ETag header → unquoted 64-hex version token

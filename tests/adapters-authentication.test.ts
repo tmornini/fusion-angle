@@ -97,7 +97,7 @@ async () => {
         ctx, 'demo@example.com', 's3cret');
     assert.ok(creds);
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members', creds.accessToken)));
+        await GET(db, 'organizations/1/members/', creds.accessToken)));
 });
 
 test('postPasswordLogin issues a 30-day refresh token',

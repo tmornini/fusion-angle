@@ -23,8 +23,8 @@ async function storedPairAt(
 }> {
     const pair = await formWritePair({
         method,
-        pathname: '/ideas/doc-1',
-        routePattern: 'ideas/:id',
+        pathname: '/organizations/1/ideas/doc-1',
+        routePattern: 'organizations/:id/ideas/:id',
         routeSegments: ['ideas', ':id'],
         pathSegments: ['ideas', 'doc-1'],
         headerFields: [],
@@ -63,7 +63,8 @@ async function storedPairAt(
 // design decision 6: a document-address pair's method decides
 // whether it is a DOCUMENT (PUT/DELETE) or an OPERATION (POST,
 // e.g. a create-shaped genesis pair sharing the document's own
-// address). No-op for ideas/projects today (neither ever POSTs
+// address). No-op for organizations/1/ideas/projects today (neither ever
+// POSTs
 // at its own document address); load-bearing once a family's
 // create pair shares the document address (flows).
 

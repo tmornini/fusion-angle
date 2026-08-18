@@ -32,7 +32,7 @@ import {
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
-// POST work-orders/:id/transition — instance-head shape
+// POST organizations/:id/work-orders/:id/transition — instance-head shape
 // (Task 4 dual-accept; Task 8 gate cut). Value-bearing
 // set/clear dialect + If-Match ladder against the bound
 // instance head; pure moves remain one-pair; legacy
@@ -56,11 +56,11 @@ const FWO_ID = 'fwo-tx-inst-1';
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
-const ATTRS = TYPE_DETAIL + '/attributes';
-const INSTANCES = TYPE_DETAIL + '/instances';
-const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
+const ATTRS = TYPE_DETAIL + '/attributes/';
+const INSTANCES = TYPE_DETAIL + '/instances/';
+const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 const TRANSITION =
-    '/work-orders/' + WO_ID + '/transition';
+    '/organizations/1/work-orders/' + WO_ID + '/transition';
 
 function req(
     method: string,
@@ -217,7 +217,7 @@ async function seedFlow(
     token: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: FLOW_ID,
             flow: {
                 name: 'Tx Inst Flow',
@@ -254,7 +254,7 @@ async function seedWorkOrder(
     fwoId: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', '/work-orders/' + woId, token, {
+        'PUT', '/organizations/1/work-orders/' + woId, token, {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -263,7 +263,7 @@ async function seedWorkOrder(
     assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/work-orders/' + fwoId,
+        '/organizations/1/flows/' + FLOW_ID + '/work-orders/' + fwoId,
         token,
         {
             flow_id: FLOW_ID,
@@ -284,8 +284,6 @@ async function seedLiveType(
             description: '',
             position: 1,
             state: 'active',
-            state_at: AT,
-            state_event_id: TYPE_ID + '-genesis',
         },
     ));
     assert.equal(put.status, 201);
@@ -298,7 +296,7 @@ async function seedAttribute(
     body: Record<string, unknown>,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', ATTRS + '/' + attrId, token, body,
+        'PUT', ATTRS + attrId, token, body,
     ));
     assert.equal(put.status, 201);
 }
@@ -342,7 +340,7 @@ async function seedFlowTypeJoin(
 ): Promise<void> {
     const put = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/records/' + FR_ID,
+        '/organizations/1/flows/' + FLOW_ID + '/records/' + FR_ID,
         token,
         {
             id: FR_ID,
@@ -363,7 +361,7 @@ async function bindInstance(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'PUT',
-        '/work-orders/' + woId + '/binding',
+        '/organizations/1/work-orders/' + woId + '/binding',
         token,
         {
             instance_id: instanceId,
@@ -713,7 +711,7 @@ async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
         'POST',
-        '/work-orders/' + WO_UNBOUND + '/transition',
+        '/organizations/1/work-orders/' + WO_UNBOUND + '/transition',
         adminToken,
         valueBody({ eventId: 'te-unbound' }),
         { [IF_MATCH_HEADER]: etag },
@@ -1033,7 +1031,7 @@ async () => {
     const { db, adminToken, etag } = await seededBound();
     const res = await handleRequest(db, req(
         'POST',
-        '/work-orders/wo-absent/transition',
+        '/organizations/1/work-orders/wo-absent/transition',
         adminToken,
         valueBody({ eventId: 'te-absent' }),
         { [IF_MATCH_HEADER]: etag },
@@ -1046,7 +1044,7 @@ async () => {
     const { db, adminToken } = await seededBound();
     const res = await handleRequest(db, req(
         'POST',
-        '/work-orders/wo-absent/transition',
+        '/organizations/1/work-orders/wo-absent/transition',
         adminToken,
         pureMoveBody('te-absent-pure'),
     ));

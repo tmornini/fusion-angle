@@ -1400,8 +1400,7 @@ const IDEA_BODY_KEYS: readonly string[] = [
 // document-body, never part of this validator's key set.
 export type IdeaEntityFields = Omit<
     IdeaEntity,
-    'id' | 'organization_id' | 'state' | 'state_at'
-        | 'state_event_id'
+    'id' | 'organization_id' | 'state'
 >;
 
 export function validateIdeaEntity(
@@ -1444,19 +1443,16 @@ const IDEA_DOCUMENT_ENTITY_KEYS: readonly string[] = [
 
 const IDEA_DOCUMENT_BODY_KEYS: readonly string[] = [
     ...IDEA_DOCUMENT_ENTITY_KEYS,
-    'state', 'state_at', 'state_event_id',
+    'state',
 ];
 
 export interface IdeaDocumentBody {
     readonly entity: IdeaEntityFields;
     readonly state: IdeaState;
-    readonly state_at: string;
-    readonly state_event_id: string;
 }
 
-// The HTTP-body gate for PUT /ideas/:id (Decision 7): the full
-// wire document — the entity's own fields plus the lifecycle
-// trio folded in. organization_id is deliberately absent from
+// The HTTP-body gate for PUT /ideas/:id: entity fields plus
+// domain `state`. organization_id is deliberately absent from
 // the expected set (like every other org-owned write, the
 // client never supplies it; the org fence stamps it downstream
 // when the write path stamps organization_id from the bound
@@ -1464,13 +1460,9 @@ export interface IdeaDocumentBody {
 // `expected` — a caller-forged organization_id is
 // tolerated-but-ignored, not rejected, because the bound org
 // always overrides (the forged-body isolation test relies on
-// this). The trio holds to the SAME rules the bare states/:id
-// route applies to an event (assertIdeaState, an RFC-3339
-// `at`, a non-empty event id), so a folded document and a bare
-// event share one shape. Entity fields are picked directly
-// rather than delegated to validateIdeaEntity — that function
-// REQUIRES organization_id, which this body never carries
-// pre-stamp.
+// this). Entity fields are picked directly rather than
+// delegated to validateIdeaEntity — that function REQUIRES
+// organization_id, which this body never carries pre-stamp.
 export function validateIdeaDocumentBody(
     body: Record<string, unknown>,
 ): IdeaDocumentBody {
@@ -1478,17 +1470,6 @@ export function validateIdeaDocumentBody(
         body, IDEA_DOCUMENT_BODY_KEYS, 'IdeaDocumentBody',
         ['organization_id'],
     );
-    const state = assertIdeaState(
-        pickString(body, 'state'),
-        'IdeaDocumentBody.state',
-    );
-    const stateEventId = pickString(body, 'state_event_id');
-    if (stateEventId === '') {
-        throw new ValidationError(
-            'IdeaDocumentBody.state_event_id must be'
-            + ' non-empty',
-        );
-    }
     return {
         entity: {
             title: pickString(body, 'title'),
@@ -1503,11 +1484,10 @@ export function validateIdeaDocumentBody(
             success_metrics:
                 pickString(body, 'success_metrics'),
         },
-        state,
-        state_at: validateTimestampField(
-            body, 'state_at', 'IdeaDocumentBody.state_at',
+        state: assertIdeaState(
+            pickString(body, 'state'),
+            'IdeaDocumentBody.state',
         ),
-        state_event_id: stateEventId,
     };
 }
 
@@ -1522,8 +1502,7 @@ const PROJECT_BODY_KEYS: readonly string[] = [
 // document-body, never part of this validator's key set.
 export type ProjectEntityFields = Omit<
     ProjectEntity,
-    'id' | 'organization_id' | 'state' | 'state_at'
-        | 'state_event_id'
+    'id' | 'organization_id' | 'state'
 >;
 
 export function validateProjectEntity(
@@ -1571,31 +1550,25 @@ const PROJECT_DOCUMENT_ENTITY_KEYS: readonly string[] = [
 
 const PROJECT_DOCUMENT_BODY_KEYS: readonly string[] = [
     ...PROJECT_DOCUMENT_ENTITY_KEYS,
-    'state', 'state_at', 'state_event_id',
+    'state',
 ];
 
 export interface ProjectDocumentBody {
     readonly entity: ProjectEntityFields;
     readonly state: ProjectState;
-    readonly state_at: string;
-    readonly state_event_id: string;
 }
 
-// The HTTP-body gate for PUT /projects/:id (Decision 7): the
-// full wire document — the entity's own fields plus the
-// lifecycle trio folded in. organization_id is deliberately
+// The HTTP-body gate for PUT /projects/:id: entity fields
+// plus domain `state`. organization_id is deliberately
 // absent from the expected set (like every other org-owned
 // write, the client never supplies it; the org fence stamps it
 // downstream when view.projects.put re-validates through
 // validateProjectEntity) yet rides the `optional` allowance
 // rather than `expected` — a caller-forged organization_id is
 // tolerated-but-ignored, not rejected, because the fence's
-// stamp always overrides whatever key it finds. The trio holds
-// to the SAME rules the bare states/:id route applies to an
-// event (assertProjectState, an RFC-3339 `at`, a non-empty
-// event id), so a folded document and a bare event share one
-// shape. Entity fields are picked directly rather than
-// delegated to validateProjectEntity — that function REQUIRES
+// stamp always overrides whatever key it finds. Entity fields
+// are picked directly rather than delegated to
+// validateProjectEntity — that function REQUIRES
 // organization_id, which this body never carries pre-stamp.
 export function validateProjectDocumentBody(
     body: Record<string, unknown>,
@@ -1604,17 +1577,6 @@ export function validateProjectDocumentBody(
         body, PROJECT_DOCUMENT_BODY_KEYS,
         'ProjectDocumentBody', ['organization_id'],
     );
-    const state = assertProjectState(
-        pickString(body, 'state'),
-        'ProjectDocumentBody.state',
-    );
-    const stateEventId = pickString(body, 'state_event_id');
-    if (stateEventId === '') {
-        throw new ValidationError(
-            'ProjectDocumentBody.state_event_id must be'
-            + ' non-empty',
-        );
-    }
     return {
         entity: {
             title: pickString(body, 'title'),
@@ -1632,11 +1594,10 @@ export function validateProjectDocumentBody(
             actual_cost: pickNumber(body, 'actual_cost'),
             position: pickNumber(body, 'position'),
         },
-        state,
-        state_at: validateTimestampField(
-            body, 'state_at', 'ProjectDocumentBody.state_at',
+        state: assertProjectState(
+            pickString(body, 'state'),
+            'ProjectDocumentBody.state',
         ),
-        state_event_id: stateEventId,
     };
 }
 
@@ -2200,6 +2161,65 @@ export function validateInvitationEntity(
     };
 }
 
+export interface InvitationTransitionBody {
+    readonly state: 'accepted' | 'declined'
+        | 'revoked';
+    readonly membershipId?: string;
+    readonly eventId: string;
+    readonly at: string;
+}
+
+const INVITATION_TRANSITION_KEYS:
+    readonly string[] = [
+    'state', 'eventId', 'at',
+];
+
+export function validateInvitationTransitionBody(
+    body: Record<string, unknown>,
+): InvitationTransitionBody {
+    assertOnlyKeys(
+        body,
+        INVITATION_TRANSITION_KEYS,
+        'InvitationTransitionBody',
+        ['membershipId'],
+    );
+    const state = pickString(body, 'state');
+    if (
+        state !== 'accepted'
+        && state !== 'declined'
+        && state !== 'revoked'
+    ) {
+        throw new ValidationError(
+            'InvitationTransitionBody.state must'
+            + ' be accepted, declined, or revoked',
+        );
+    }
+    const membershipId = 'membershipId' in body
+        ? pickString(body, 'membershipId')
+        : undefined;
+    if (state === 'accepted') {
+        if (
+            membershipId === undefined
+            || membershipId === ''
+        ) {
+            throw new ValidationError(
+                'membershipId must be non-empty',
+            );
+        }
+    }
+    return {
+        state,
+        ...(membershipId !== undefined
+            ? { membershipId }
+            : {}),
+        eventId: pickString(body, 'eventId'),
+        at: validateTimestampField(
+            body, 'at',
+            'InvitationTransitionBody.at',
+        ),
+    };
+}
+
 const IDEA_SUBMISSION_BODY_KEYS:
     readonly string[] = [
     'idea_id', 'member_id', 'at',
@@ -2260,8 +2280,7 @@ const OBJECTIVE_BODY_KEYS: readonly string[] = [
 // document-body, never part of this validator's key set.
 export type ObjectiveEntityFields = Omit<
     ObjectiveEntity,
-    'id' | 'organization_id' | 'state' | 'state_at'
-        | 'state_event_id'
+    'id' | 'organization_id' | 'state'
 >;
 
 export function validateObjectiveEntity(
@@ -2305,14 +2324,12 @@ export function validateObjectiveEntity(
 // message stays byte-identical on both paths.
 const OBJECTIVE_DOCUMENT_BODY_KEYS: readonly string[] = [
     'position',
-    'state', 'state_at', 'state_event_id',
+    'state',
 ];
 
 export interface ObjectiveDocumentBody {
     readonly entity: ObjectiveEntityFields;
     readonly state: ObjectiveState;
-    readonly state_at: string;
-    readonly state_event_id: string;
 }
 
 export function validateObjectiveDocumentBody(
@@ -2322,26 +2339,14 @@ export function validateObjectiveDocumentBody(
         body, OBJECTIVE_DOCUMENT_BODY_KEYS, 'Objective',
         ['organization_id'],
     );
-    const state = assertObjectiveState(
-        pickString(body, 'state'),
-        'ObjectiveDocumentBody.state',
-    );
-    const stateEventId = pickString(body, 'state_event_id');
-    if (stateEventId === '') {
-        throw new ValidationError(
-            'ObjectiveDocumentBody.state_event_id must be'
-            + ' non-empty',
-        );
-    }
     return {
         entity: {
             position: pickNumber(body, 'position'),
         },
-        state,
-        state_at: validateTimestampField(
-            body, 'state_at', 'ObjectiveDocumentBody.state_at',
+        state: assertObjectiveState(
+            pickString(body, 'state'),
+            'ObjectiveDocumentBody.state',
         ),
-        state_event_id: stateEventId,
     };
 }
 
@@ -2597,8 +2602,7 @@ const RECORD_BODY_KEYS: readonly string[] = [
 // document-body, never part of this validator's key set.
 export type RecordEntityFields = Omit<
     RecordEntity,
-    'id' | 'organization_id' | 'state' | 'state_at'
-        | 'state_event_id'
+    'id' | 'organization_id' | 'state'
 >;
 
 export function validateRecordEntity(
@@ -2632,14 +2636,12 @@ const RECORD_DOCUMENT_ENTITY_KEYS: readonly string[] = [
 
 const RECORD_DOCUMENT_BODY_KEYS: readonly string[] = [
     ...RECORD_DOCUMENT_ENTITY_KEYS,
-    'state', 'state_at', 'state_event_id',
+    'state',
 ];
 
 export interface RecordDocumentBody {
     readonly entity: RecordEntityFields;
     readonly state: RecordState;
-    readonly state_at: string;
-    readonly state_event_id: string;
 }
 
 // The HTTP-body gate for PUT /records/:id (Decision 7): the
@@ -2872,28 +2874,16 @@ export function validateRecordDocumentBody(
             'RecordDocumentBody.name must be non-empty',
         );
     }
-    const state = assertRecordState(
-        pickString(body, 'state'),
-        'RecordDocumentBody.state',
-    );
-    const stateEventId = pickString(body, 'state_event_id');
-    if (stateEventId === '') {
-        throw new ValidationError(
-            'RecordDocumentBody.state_event_id must be'
-            + ' non-empty',
-        );
-    }
     return {
         entity: {
             name,
             description: pickString(body, 'description'),
             position: pickNumber(body, 'position'),
         },
-        state,
-        state_at: validateTimestampField(
-            body, 'state_at', 'RecordDocumentBody.state_at',
+        state: assertRecordState(
+            pickString(body, 'state'),
+            'RecordDocumentBody.state',
         ),
-        state_event_id: stateEventId,
     };
 }
 
@@ -3320,18 +3310,9 @@ export interface RecordWriteEditBody {
     readonly record:
         RecordEntityFields & { organization_id: string };
     readonly attributes: readonly RecordAttributeEntity[];
-    // The echoed lifecycle trio (Phase 6 Task 4, the SECOND
-    // named wire delta): an edit now carries the SAME
-    // state/state_at/state_event_id keys — and the SAME
-    // validation rules — as validateRecordDocumentBody's own
-    // trio, since the synthesized document pair forms purely
-    // from this body. A byte-identical echo of the stored head
-    // converges to a no-op event write at the op (the sameEvent
-    // decompose); a fresh mint would silently author a genuine
-    // transition instead.
+    // Domain `state` only — same as the document PUT body
+    // the synthesized pair must match.
     readonly state: RecordState;
-    readonly state_at: string;
-    readonly state_event_id: string;
     readonly removedAttributeIds: readonly string[];
 }
 
@@ -3352,7 +3333,7 @@ const RECORD_WRITE_CREATE_KEYS:
 const RECORD_WRITE_EDIT_KEYS:
     readonly string[] = [
     'kind', 'id', 'record', 'attributes',
-    'state', 'state_at', 'state_event_id',
+    'state',
     'removedAttributeIds',
 ];
 
@@ -3447,25 +3428,9 @@ export function validateRecordWriteBody(
                 + '.attributes[' + i + ']',
             ),
         );
-        // The document trio's OWN validation rules
-        // (validateRecordDocumentBody), reused verbatim: an
-        // edit's echoed trio is byte-identical wire shape to
-        // what a live PUT records/:id would carry.
         const state = assertRecordState(
             pickString(body, 'state'),
             'RecordWriteEditBody.state',
-        );
-        const stateEventId = pickString(
-            body, 'state_event_id',
-        );
-        if (stateEventId === '') {
-            throw new ValidationError(
-                'RecordWriteEditBody.state_event_id must be'
-                + ' non-empty',
-            );
-        }
-        const stateAt = validateTimestampField(
-            body, 'state_at', 'RecordWriteEditBody.state_at',
         );
         const removedRaw = asArray(
             body['removedAttributeIds'],
@@ -3483,8 +3448,6 @@ export function validateRecordWriteBody(
             kind: 'edit',
             id, record, attributes,
             state,
-            state_at: stateAt,
-            state_event_id: stateEventId,
             removedAttributeIds,
         };
     }

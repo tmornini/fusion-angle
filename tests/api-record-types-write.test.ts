@@ -52,14 +52,10 @@ interface RecordTypePutEcho {
     description: string;
     position: number;
     state: string;
-    state_at: string;
-    state_event_id: string;
 }
 
 interface RecordTypeGetRow extends RecordTypePutEcho {
     state: string;
-    state_at: string;
-    state_event_id: string;
 }
 
 function req(
@@ -81,8 +77,8 @@ function typeBody(
     name: string,
     position: number,
     state: string,
-    stateAt: string,
-    stateEventId: string,
+    _stateAt?: string,
+    _stateEventId?: string,
     description?: string,
 ): Record<string, unknown> {
     return {
@@ -90,8 +86,6 @@ function typeBody(
         description: description ?? (name + ' desc'),
         position,
         state,
-        state_at: stateAt,
-        state_event_id: stateEventId,
     };
 }
 
@@ -140,8 +134,6 @@ async function seedRecordTypeBelowGate(
             description: body['description'],
             position: body['position'],
             state: body['state'],
-            state_at: body['state_at'],
-            state_event_id: body['state_event_id'],
         },
         operationId: TEST_OPERATION_ID,
     });
@@ -177,7 +169,7 @@ async function adminDb(): Promise<{
 const DETAIL =
     '/organizations/' + ORGANIZATION + '/record-types/';
 const COLLECTION =
-    '/organizations/' + ORGANIZATION + '/record-types';
+    '/organizations/' + ORGANIZATION + '/record-types/';
 
 test('PUT .../record-types/:id admin → 200, body echoes '
 + 'entity; GET sees trio',
@@ -198,8 +190,6 @@ async () => {
         description: 'Rental desc',
         position: 1,
         state: 'active',
-        state_at: AT,
-        state_event_id: 'rt-1-genesis',
     });
     const get = await handleRequest(db, req(
         'GET', DETAIL + 'rt-1', adminToken,
@@ -300,7 +290,7 @@ async () => {
         ),
     ));
     const flowCreate = await handleRequest(db, req(
-        'POST', '/flows', adminToken, {
+        'POST', '/organizations/1/flows/', adminToken, {
             id: 'flow-restrict-1',
             flow: {
                 name: 'Intake',
@@ -330,7 +320,7 @@ async () => {
     assert.equal(flowCreate.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
-        '/flows/flow-restrict-1/records/fr-1',
+        '/organizations/1/flows/flow-restrict-1/records/fr-1',
         adminToken,
         {
             id: 'fr-1',
@@ -436,13 +426,7 @@ test('stored PUT body equals recordTypeEntityOf of the'
             body,
         },
         ORGANIZATION,
-        {
-            id: 'ev-g1',
-            entity_id: id,
-            state: 'active',
-            member_id: 'current',
-            at: AT,
-        },
+        { state: 'active' },
     );
     assert.deepEqual(stored, expected);
     assert.deepEqual(
@@ -454,7 +438,7 @@ test('stored PUT body equals recordTypeEntityOf of the'
     const skewed = await handleRequest(db, req(
         'PUT', DETAIL + id, adminToken,
         typeBody(
-            'Skewed', 1, 'deleted',
+            'Skewed', 1, 'archived',
             '2020-01-01T00:00:00.000000Z', 'ev-g1-skew',
         ),
     ));
@@ -468,7 +452,7 @@ test('stored PUT body equals recordTypeEntityOf of the'
             db, ORGANIZATION, id,
         ),
     );
-    assert.equal(afterSkew.state, 'active');
-    assert.equal(afterSkew.state_event_id, 'ev-g1');
+    assert.equal(afterSkew.state, 'archived');
     assert.equal(afterSkew.name, 'Skewed');
+    assert.equal('state_at' in afterSkew, false);
 });

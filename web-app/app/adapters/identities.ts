@@ -111,7 +111,7 @@ export async function getIdentityRoster(
     ctx: RequestContext,
 ): Promise<IdentityRosterRow[]> {
     const identities = await ctx.GET<IdentityEntity[]>(
-        'identities',
+        'identities/',
     );
     return Promise.all(identities.map(async identity =>
         identity.kind === 'service'
@@ -299,7 +299,7 @@ export async function postIdentityCreation(
     spec: IdentityCreationSpec,
 ): Promise<void> {
     if (spec.kind === 'person') {
-        await ctx.POST('identities', {
+        await ctx.POST('identities/', {
             id,
             kind: 'person',
         });
@@ -315,7 +315,7 @@ export async function postIdentityCreation(
         // so a retry overwrites the same row — no INSERT on
         // re-put (Commandment VII), matching the person
         // branch and the contract above.
-        await ctx.POST('identities', {
+        await ctx.POST('identities/', {
             id,
             kind: 'service',
             credential: {

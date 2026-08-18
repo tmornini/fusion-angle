@@ -87,7 +87,7 @@ function seatsCollection(ctx: RequestContext): string {
             'no organization on the session for seats',
         );
     }
-    return 'organizations/' + organization + '/members';
+    return 'organizations/' + organization + '/members/';
 }
 
 function profileOf(
@@ -178,7 +178,7 @@ export async function getHumanMember(
     const [seat, identity, pii] =
         await Promise.all([
             ctx.GET<MembershipEntity>(
-                seatsCollection(ctx) + '/' + id,
+                seatsCollection(ctx) + id,
             ),
             ctx.GET<IdentityEntity>(
                 `identities/${id}`,
@@ -263,7 +263,7 @@ export async function postHumanMemberCreation(
         throw new HumanMemberPiiIntakeFailedError(id, err);
     }
     await ctx.PUT(
-        seatsCollection(ctx) + '/' + id,
+        seatsCollection(ctx) + id,
         { type: 'member', at: nowUtc() },
     );
     humanMemberChanges.notify();

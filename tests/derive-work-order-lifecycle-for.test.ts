@@ -165,7 +165,7 @@ test('workOrderLifecycleStatesFor: birth-claimed create alone'
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token,
+        'POST', '/organizations/1/work-orders/', token,
         createWorkOrderBody(
             workOrderId, workOrderId + '-fwo', graph,
             {
@@ -204,7 +204,7 @@ async () => {
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token,
+        'POST', '/organizations/1/work-orders/', token,
         createWorkOrderBody(
             workOrderId, workOrderId + '-fwo', graph,
             {
@@ -245,7 +245,7 @@ async () => {
     const transition2At = nowUtc();
     const transition2ReleaseAt = nowUtc();
     const transition2 = await handleRequest(db, req(
-        'POST', '/work-orders/' + workOrderId + '/transition',
+        'POST', '/organizations/1/work-orders/' + workOrderId + '/transition',
         token, {
             transitionEventId: workOrderId + '-te2',
             targetState: 'n-finish',
@@ -260,7 +260,7 @@ async () => {
     assert.equal(transition2.status, 201);
 
     const entityPut = await handleRequest(db, req(
-        'PUT', '/work-orders/' + workOrderId, token, {
+        'PUT', '/organizations/1/work-orders/' + workOrderId, token, {
             display_id: 'task1-' + workOrderId,
             flow_graph: graph,
             position: 2,
@@ -270,7 +270,7 @@ async () => {
 
     const claimFreshAt = nowUtc();
     const claimFresh = await handleRequest(db, req(
-        'PUT', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/organizations/1/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: workOrderId + '-ce1',
             claimAt: claimFreshAt,
@@ -282,7 +282,7 @@ async () => {
 
     const claimRepeatAt = nowUtc();
     const claimRepeat = await handleRequest(db, req(
-        'PUT', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/organizations/1/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: workOrderId + '-ce2',
             claimAt: claimRepeatAt,
@@ -305,7 +305,8 @@ async () => {
     // row-plane oracle.
 });
 
-// Named unclaim via POST work-orders/:id/release — an op-pair
+// Named unclaim via POST organizations/:id/work-orders/:id/release — an
+// op-pair
 // leg of deriveWorkOrderLifecycle's own replay (applyReleasePair),
 // so workOrderLifecycleStatesFor INCLUDES the claim_released
 // event and matches the bulk subset. Claim history sees the
@@ -321,7 +322,7 @@ test('workOrderLifecycleStatesFor: a release op\'s'
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token,
+        'POST', '/organizations/1/work-orders/', token,
         createWorkOrderBody(
             workOrderId, workOrderId + '-fwo', graph,
             {
@@ -340,7 +341,7 @@ test('workOrderLifecycleStatesFor: a release op\'s'
 
     const release = await handleRequest(db, req(
         'DELETE',
-        '/work-orders/' + workOrderId + '/claim',
+        '/organizations/1/work-orders/' + workOrderId + '/claim',
         token,
     ));
     assert.equal(release.status, 204);
@@ -383,7 +384,7 @@ async () => {
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token,
+        'POST', '/organizations/1/work-orders/', token,
         createWorkOrderBody(
             workOrderId, workOrderId + '-fwo', graph,
             {
@@ -402,7 +403,7 @@ async () => {
 
     const release = await handleRequest(db, req(
         'DELETE',
-        '/work-orders/' + workOrderId + '/claim',
+        '/organizations/1/work-orders/' + workOrderId + '/claim',
         token,
     ));
     assert.equal(release.status, 204);
@@ -426,7 +427,7 @@ async () => {
 
     const claimAt = nowUtc();
     const reclaim = await handleRequest(db, req(
-        'PUT', '/work-orders/' + workOrderId + '/claim',
+        'PUT', '/organizations/1/work-orders/' + workOrderId + '/claim',
         token, {
             claimEventId: workOrderId + '-ce1',
             claimAt,
@@ -479,7 +480,7 @@ async () => {
     const graph = workOrderFlowGraph(8 * 60 * 60);
 
     const created = await handleRequest(db, req(
-        'POST', '/work-orders', token,
+        'POST', '/organizations/1/work-orders/', token,
         createWorkOrderBody(
             workOrderId, workOrderId + '-fwo', graph,
             {
@@ -527,7 +528,7 @@ async () => {
 
     const release = await handleRequest(db, req(
         'DELETE',
-        '/work-orders/' + workOrderId + '/claim',
+        '/organizations/1/work-orders/' + workOrderId + '/claim',
         token,
     ));
     assert.equal(release.status, 204);

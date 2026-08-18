@@ -475,8 +475,6 @@ test(
             },
             attributes: [],
             state: 'active',
-            state_at: '2025-01-01T00:00:00.000000Z',
-            state_event_id: 'ev-1',
             removedAttributeIds: ['old-1'],
         });
         assert.equal(out.kind, 'edit');
@@ -486,11 +484,6 @@ test(
                 ['old-1'],
             );
             assert.equal(out.state, 'active');
-            assert.equal(
-                out.state_at,
-                '2025-01-01T00:00:00.000000Z',
-            );
-            assert.equal(out.state_event_id, 'ev-1');
         }
     },
 );

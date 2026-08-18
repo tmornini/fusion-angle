@@ -22,7 +22,8 @@ import {
 // class (Decision 7) — a SECOND PUT to an existing flow is
 // non-genesis and must thread If-Match via a header-
 // capable req helper (echo the first PUT's 64-hex ETag),
-// unlike the bare-req idiom the ideas/projects skew tests use.
+// unlike the bare-req idiom the organizations/1/ideas/projects skew tests
+// use.
 
 const BASE = 'http://localhost';
 const STARK_ORGANIZATION = '1';
@@ -111,7 +112,7 @@ function putFlow(
     headers?: Record<string, string>,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', '/flows/' + id, token,
+        'PUT', '/organizations/1/flows/' + id, token,
         flowDocument(name, state, stateAt, stateEventId, graph),
         headers,
     ));
@@ -138,14 +139,15 @@ test(
         );
         assert.equal(genesis.status, 201);
         const head = await handleRequest(db, req(
-            'GET', '/flows/' + id, token,
+            'GET', '/organizations/1/flows/' + id, token,
         ));
         const etag = head.headers.get('ETag');
-        assert.ok(etag, 'no ETag on GET /flows/' + id);
+        assert.ok(etag, 'no ETag on GET /organizations/1/flows/' + id);
 
         // The locked class: this second PUT is non-genesis, so
         // it must echo the current head's ETag rather
-        // than the bare-req idiom the ideas/projects skew tests
+        // than the bare-req idiom the organizations/1/ideas/projects skew
+        // tests
         // use — a save with no echo 412s outright.
         const skewedGraph = graphWithNode(
             'n-skewed', 'Skewed Node',

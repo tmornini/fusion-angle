@@ -117,6 +117,6 @@ async () => {
         at: '2026-06-04T00:00:00.000000Z',
     });
     const res = await handleRequest(db, req(
-        'GET', '/organizations/1/members', await devToken('current')));
+        'GET', '/organizations/1/members/', await devToken('current')));
     assert.equal(res.status, 200);
 });

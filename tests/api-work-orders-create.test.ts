@@ -110,14 +110,15 @@ test(
     + 'plane document + join in one operation',
     async () => {
         const db = await freshDb();
-        await POST(db, 'work-orders', createBody(), DEV_TOKEN);
+        await POST(db, 'organizations/1/work-orders/', createBody(),
+            DEV_TOKEN);
 
         const wo = await GET<{
             id: string;
             display_id: string;
             position: number;
             organization_id: string;
-        }>(db, 'work-orders/wo-1', DEV_TOKEN);
+        }>(db, 'organizations/1/work-orders/wo-1', DEV_TOKEN);
         assert.equal(wo.display_id, 'abcd');
         assert.equal(wo.position, 1);
         // The fence stamped the bound org — never the body.
@@ -130,7 +131,7 @@ test(
             id: string;
             flow_id: string;
             work_order_id: string;
-        }[]>(db, 'flows/f1/work-orders', DEV_TOKEN);
+        }[]>(db, 'organizations/1/flows/f1/work-orders/', DEV_TOKEN);
         assert.equal(links.length, 1);
         assert.equal(links[0]!.id, 'fwo-1');
         assert.equal(links[0]!.flow_id, 'f1');
@@ -158,7 +159,8 @@ test(
     + ' each state event',
     async () => {
         const db = await freshDb();
-        await POST(db, 'work-orders', createBody(), DEV_TOKEN);
+        await POST(db, 'organizations/1/work-orders/', createBody(),
+            DEV_TOKEN);
 
         const events = await workOrderLifecycleStatesFor(db, '1', 'wo-1');
         // Phase Final Stage B: states table retired.
@@ -193,10 +195,10 @@ test(
         // pair-plane create.
     // Phase Final Stage B: states table retired.
         await POST(
-            db, 'work-orders', createBody(), DEV_TOKEN,
+            db, 'organizations/1/work-orders/', createBody(), DEV_TOKEN,
         );
         const wo = await GET<{ id: string }>(
-            db, 'work-orders/wo-1', DEV_TOKEN,
+            db, 'organizations/1/work-orders/wo-1', DEV_TOKEN,
         );
         assert.equal(wo.id, 'wo-1');
         const woEvents = await workOrderLifecycleStatesFor(

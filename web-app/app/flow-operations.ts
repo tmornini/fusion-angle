@@ -27,7 +27,10 @@ import {
 import type {
     FlowSaveShape,
 } from './adapters/flow-mutations.ts';
-import { jitteredBackoff } from './adapters/shared.ts';
+import {
+    jitteredBackoff,
+    organizationItem,
+} from './adapters/shared.ts';
 import {
     NODE_WIDTH,
     NODE_HEIGHT,
@@ -694,7 +697,10 @@ async function postFlowUndo(
         attempt++
     ) {
         try {
-            await ctx.POST(`flows/${flowId}/undo`, {
+            await ctx.POST(
+                organizationItem(ctx, 'flows', flowId)
+                    + '/undo',
+                {
                 eventId: generateCryptoSafeBase62(),
                 at: nowUtc(),
             });

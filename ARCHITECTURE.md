@@ -71,10 +71,12 @@ plus `name` / `lockTimeout` inside the work-order
 document pair at creation — a frozen value, not a live
 relationship.
 
-The **route is the single divorce point**. `GET flows/:id`
-AND `GET flows` (list) reassemble `FlowWithGraph` from the
-pair plane (`= FlowEntity & { graph; hasUndoHistory }`
-— the read DTO).
+The **route is the single divorce point**.
+`GET /organizations/:id/flows/:id` AND
+`GET /organizations/:id/flows/` (list) reassemble
+`FlowWithGraph` from the pair plane
+(`= FlowEntity & { graph; hasUndoHistory }` — the
+read DTO).
 Freeze, work-order creation, stats, the member-hazard
 reader, and export all derive for free because they read
 through `ctx.GET`; the client `getFlowGraph` adapter is
@@ -120,7 +122,9 @@ instance PUT/PATCH shares the constraint engine
 (`api/` — not `shared/`).
 
 Wire = storage at
-`organizations/:org/record-types/:type/{attributes,instances}/...`.
+`/organizations/:organization-id/record-types/`
+plus nested
+`/:record-type-id/{attributes,instances}/...`.
 Flat `/records` and `/record-attributes` are RETIRED.
 Schema: member READ / admin MUTATION (SIMPLE PUT class).
 Instances: member path-tier + per-attribute ACL; public
@@ -173,8 +177,7 @@ Every authenticated request runs org-scoped, riding one
 request vessel — the server half of the Office of the
 Context (`api/request-context.ts`). `handleRequest` mints
 `IncomingContext` (requestId, method, pathname, **base**
-adapter; the facade re-entry keeps the outer request's id
-via the `x-request-id` header). The authentication step
+adapter). The authentication step
 enriches it to `AuthenticatedContext` (principal), and
 `fenceRequest` (`api/request-auth.ts`) completes the
 `RequestContext` — organization, live
@@ -282,51 +285,42 @@ acts on an org it does not yet belong to), so it cannot
 ride the org-stamped write path. Decline (invitee)
 appends `declined`; Revoke (admin) appends `revoked`.
 
-The surface is dedicated facade request handlers on the BASE
-(un-org-scoped) adapter — like
-`identityDefaultOrganizationRequest` — bypassing the
-admin-only `ROUTE_POLICY` with explicit guards:
-grant/revoke and the sent-list require an admin role in the
-relevant org; accept/decline and the invitee read require the
-caller to BE the invitee (identity match). That identity
-guard is what lets a non-admin invitee accept. The
-identity-scoped read (`GET /invitations`) returns the
-caller's own invitations plus latest state; the admin read
-(`GET /invitations/sent`) returns the active org's pending
-invitations. `invitations` joins the lifecycle owner-
-resolver probe, so an invitation's lifecycle events
-resolve to the invitation's org and stay out of every
-other tenant's history reads.
+The surface is two HTTP nests over one storage prefix
+(`/invitations/`): receive at
+`/identities/:id/invitations/` and send at
+`/organizations/:id/invitations/`. Grant is
+`POST /organizations/:id/invitations/` (admin). Accept
+and decline are
+`PUT /identities/:id/invitations/:id` (invitee; body
+`state` accepted or declined). Revoke is
+`PUT /organizations/:id/invitations/:id` (admin; body
+`state` revoked). Each nest has `GET …/versions/` plus
+`GET …/versions/:etag`. `invitations` joins the
+lifecycle owner-resolver probe, so an invitation's
+lifecycle events resolve to the invitation's org and
+stay out of every other tenant's history reads.
 
 Seat semantics are UNCHANGED: a live seat still means an
 accepted member, and the roster, reachable-orgs
 enumeration, and token exchange all read seats.
 
-### Facade + enumeration
+### Route table is the surface
 
-`/organizations/:org/:entity[/:id]` is a facade:
-`facadeRequest` exchanges the caller's bearer for a token
-scoped to `:org` (RFC 8693 self-delegation, membership-
-fenced — a non-member exchange is a 403 minting nothing),
-then re-enters the flat gate with the scoped token so the
-existing handler is org-fenced automatically. `GET
-/organizations` (`enumerateMyOrganizations`) returns the
-caller's reachable orgs, derived fresh from the membership
-ledger (never the possibly-stale token claim).
+`routes[]` (`api/routes.ts`) is the HTTP surface. If a
+URI is not on the table, it does not exist.
+`handleRequest` calls `matchRoute` first — a linear
+scan. A trailing slash is a collection segment
+(`identities/` ≠ `identities`); `:id` never captures
+the empty string. There is no `facadeRequest` rematch
+and no `GET /organizations` collection. Reachable orgs
+are `GET /identities/:id/organizations/`. Product
+families nest under `/organizations/:id/`. Browse the
+live table at `/api-documentation/`.
 
-**Dispatch inversion (org-nested record-types wave).**
-In-table `organizations/...` route patterns match
-**before** the blind facade rewrite (`matchRoute` first;
-`facadeRequest` only when unmatched). Nested record-
-types / attributes / instances therefore never
-auto-exchange against the path org. Path
-`:organization-id` must equal the VERIFIED token claim
-org else **403** (no auto-exchange; nonexistent path
-org is also 403 — no route-topology oracle). Every
-other org-nested family that still rides the facade
-keeps facade behavior; regression surface is
-`tests/api-facade-*.test.ts` +
-`tests/api-dispatch-inversion.test.ts`.
+Path `:organization-id` on an org-nested route must
+equal the VERIFIED token claim org else **403** (no
+auto-exchange; nonexistent path org is also 403 — no
+route-topology oracle).
 
 ### Boot + org-switcher
 
@@ -352,7 +346,7 @@ identity-pii; a service has no name facet on this
 roster), `postIdentityCreation` (person → identity +
 PII; service → identity + hashed `client_secret`).
 The identity stores are the GLOBAL spine — creation is a
-client-minted id + idempotent PUT, OFF the org facade.
+client-minted id + idempotent PUT, not org-nested.
 Presenters mirror the member ones (PII via the `MemberPii`
 tagged union, erased fallback at the call site). Erasure
 splices `identity_pii` only; the identity, the member, and
@@ -558,54 +552,35 @@ required; `sessionContext()` is the no-arg convenience
 that reads the installed client facade and session
 token. Tests wrap a `MemoryDbAdapter`.
 
-`api/routes.ts` covers the surviving history surface —
-**eight lifecycle GET registrations + one value-history
-(instances)**, wire `(at, id)` **DESC** (index 0 =
-current):
-
-1. `GET ideas/:id/versions`
-2. `GET projects/:id/versions`
-3. `GET organizations/:org/record-types/:id/versions`
-4. `GET flows/:id/versions`
-5. `GET objectives/:id/versions`
-6. `GET work-orders/:id/history` (inline `field_values`)
-7. `GET work-orders/history` (bulk; always 200)
-8. `GET objectives/versions` (bulk; always 200)
-9. (value-history)
-    `GET .../record-types/:type/instances/:id/versions`
-    → `{ at, etag, values }[]` by current read ACL
-
-All reads derive from the message ledger. Trio-family
-per-id handlers wrap family `derive*StateHistory` and
-reverse to DESC; org-nested empty → `missedReadError`
-(foreign **403** / absent **404** via
-`resolveOwningOrganization`). Work-order per-id and
-bulk emit `WorkOrderHistoryEventEntity` with transition
-`field_values` folded inline (`{id, attribute_id,
-value}`; claim/birth/release carry `[]`) — there is no
-successor field-values GET. Bulk legs always return an
-array. Ideas / projects / record-types / objectives
-GET entity rows also embed the lifecycle trio
-(`state`, `state_at`, `state_event_id`) from the
-lifecycle-current event. Instances carry full-state
-`values`, not the trio. `stateEventVisibilityFor`
-remains the RESTRICT / ownership 3-tier probe. Every
-verb on the retired shared event-append address is
-router 404. Flat `/records` and `/record-attributes`
-are also router 404. Phase 15 Task 7 retired the
-table-backed `flows/:id/versions[...]` writes and the
-zero-caller shared event-append / current-state-alias
-/ nested field-values families. Pair-chain
-`GET flows/:id/versions` is live (old `:vid` is a
-miss). Lifecycle writes ride document-trio PUTs and
-named ops (work-order create/claim/transition/release,
-invitations), not a shared event-append address.
-Instance public PUT is **405**; PATCH creates and
-updates (If-Match). GET streams the stored PUT for
-stream families; flows GET still `deriveFlow`;
-assemble surfaces still assemble. G1–G6: stored PUT
-= today's `*EntityOf`. The process refuses to listen
-without `schema_marker` (or a successful seed).
+`api/routes.ts` covers the surviving history surface.
+Per-entity `GET …/versions/` (list) plus
+`GET …/versions/:etag` is live for identities,
+ai-agents, organizations, seats, invitations (both
+nests), ideas, projects, flows, record-types, and
+objectives. Work-orders stay
+`GET /organizations/:id/work-orders/:id/history`
+(inline `field_values`). Instance value-revision
+history is
+`GET …/record-types/:record-type-id/instances/:instance-id/versions/`
+plus `…/versions/:version`. There is **no** bulk
+`GET work-orders/history` and **no** bulk
+`GET objectives/versions`. Ideas / projects /
+record-types / objectives GET rows do **not** embed
+the lifecycle trio (`state`, `state_at`,
+`state_event_id`). Instances carry full-state
+`values`. `stateEventVisibilityFor` remains the
+RESTRICT / ownership 3-tier probe. Every verb on the
+retired shared event-append address is router 404.
+Flat `/records` and `/record-attributes` are also
+router 404. Lifecycle writes ride document-trio PUTs
+and named ops (work-order create/claim/transition/
+bind, invitations), not a shared event-append
+address. Instance public PUT is **405**; PATCH
+creates and updates (If-Match). GET streams the
+stored PUT for stream families; flows GET still
+`deriveFlow`; assemble surfaces still assemble.
+The process refuses to listen without
+`schema_marker` (or a successful seed).
 
 ## Write-path derives (Phase 14)
 
@@ -654,9 +629,9 @@ address); and `stateFieldValuesFrom` /
 transition-pair-folded field values only, head-reduced by
 the shared `(at, id)` order — backing the
 `record-attributes` RESTRICT gate). Product field-value
-reads fold inline on `GET work-orders/:id/history` and
-`GET work-orders/history` (`workOrderHistoryFor` /
-`deriveWorkOrderHistories`); the standalone field-values
+reads fold inline on
+`GET /organizations/:id/work-orders/:id/history`
+(`workOrderHistoryFor`); the standalone field-values
 GET and `stateFieldValuesForStateEvent` are GONE.
 
 ### Nested-transaction re-entry

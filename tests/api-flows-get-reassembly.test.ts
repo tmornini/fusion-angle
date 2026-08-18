@@ -8,7 +8,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
     putFlow,
@@ -54,7 +54,7 @@ async function setupMemDb(): Promise<{
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
     await seedHumanMember(db, 'm1', 'Member One');
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -158,7 +158,7 @@ async function seedFlowWithGraph(
 // ── 1. ROUND-TRIP: GET returns the pair-plane graph ──
 
 test(
-    'GET /flows/:id returns the graph from the'
+    'GET /organizations/:id/flows/:id returns the graph from the'
     + ' document pair plane',
     async () => {
         const { ctx } = await setupMemDb();
@@ -169,7 +169,7 @@ test(
         // GET must return the intended graph from the
         // document pair's graph field (pair-plane truth).
         const fetched =
-            await ctx.GET<FlowWithGraph>('flows/' + flowId);
+            await ctx.GET<FlowWithGraph>('organizations/1/flows/' + flowId);
         const got = asStoredGraph(
             fetched.graph, 'flow.graph',
         );
@@ -185,7 +185,7 @@ test(
 // order freeze below still proves GET graph is frozen.
 
 // WORK ORDER auto-derives: creation captures the pair-plane
-// graph via GET /flows/:id.
+// graph via GET /organizations/:id/flows/:id.
 
 test(
     'postWorkOrderCreation freezes flow_graph'
@@ -199,7 +199,7 @@ test(
         await seedFlowWithGraph(ctx, flowId, graph);
 
         // Work-order creation reads the pair-plane graph
-        // via GET /flows/:id.
+        // via GET /organizations/:id/flows/:id.
         const woId = generateCryptoSafeBase62();
         await postWorkOrderCreation(ctx, {
             workOrderId: woId,
@@ -227,12 +227,12 @@ test(
 // ── 4. UNDO round-trip: GET returns the target graph ──────
 
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): undo
-// resolves its own restore target from the flows/:id
+// resolves its own restore target from the organizations/:id/flows/:id
 // document-pair history, and computes graphDelta/revivals
 // SERVER-SIDE (SIDECAR-KEEP). Phase Final Task 2: no row-
 // plane graph writer remains.
 test(
-    'after undo GET /flows/:id returns the'
+    'after undo GET /organizations/:id/flows/:id returns the'
     + ' target (undone) graph from the pair plane',
     async () => {
         const { ctx } = await setupMemDb();
@@ -282,14 +282,14 @@ test(
         // graphDelta/revivals from CURRENT (advancedGraph) vs
         // TARGET, re-introducing what the advance dropped and
         // deleting what it added.
-        await ctx.POST('flows/' + flowId + '/undo', {
+        await ctx.POST('organizations/1/flows/' + flowId + '/undo', {
             eventId: 'undo-ev-1',
             at: nowUtc(),
         });
 
         // Step 5: GET must return the target (undone) graph.
         const fetched =
-            await ctx.GET<FlowWithGraph>('flows/' + flowId);
+            await ctx.GET<FlowWithGraph>('organizations/1/flows/' + flowId);
         const got = asStoredGraph(
             fetched.graph, 'flow.graph',
         );

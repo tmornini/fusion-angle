@@ -22,7 +22,7 @@ import {
 } from './http-fixtures.ts';
 import { seedSeat } from './root-admin-fixture.ts';
 
-// PUT work-orders/:id/binding — bind WO ↔ instance.
+// PUT organizations/:id/work-orders/:id/binding — bind WO ↔ instance.
 // Ladder order is the covenant's (fence → body → instance →
 // join → in-tx 409), NOT claim's internal body-first order —
 // deliberate divergence so a foreign-WO bind with a
@@ -47,11 +47,11 @@ const FWO_ID = 'fwo-bind-1';
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
-const ATTRS = TYPE_DETAIL + '/attributes';
-const INSTANCES = TYPE_DETAIL + '/instances';
-const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
+const ATTRS = TYPE_DETAIL + '/attributes/';
+const INSTANCES = TYPE_DETAIL + '/instances/';
+const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 const BINDING =
-    '/work-orders/' + WO_ID + '/binding';
+    '/organizations/1/work-orders/' + WO_ID + '/binding';
 
 function req(
     method: string,
@@ -122,7 +122,7 @@ async function seedFlow(
     token: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: FLOW_ID,
             flow: {
                 name: 'Bind Flow',
@@ -159,7 +159,7 @@ async function seedWorkOrder(
     fwoId: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', '/work-orders/' + woId, token, {
+        'PUT', '/organizations/1/work-orders/' + woId, token, {
             display_id: 'abcd',
             flow_graph: graphJson(),
             position: 1,
@@ -168,7 +168,7 @@ async function seedWorkOrder(
     assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/work-orders/' + fwoId,
+        '/organizations/1/flows/' + FLOW_ID + '/work-orders/' + fwoId,
         token,
         {
             flow_id: FLOW_ID,
@@ -193,8 +193,6 @@ async function seedLiveType(
             description: '',
             position: 1,
             state: 'active',
-            state_at: AT,
-            state_event_id: typeId + '-genesis',
         },
     ));
     assert.equal(put.status, 201);
@@ -205,7 +203,7 @@ async function seedAttribute(
     token: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', ATTRS + '/' + ATTR_ID, token, {
+        'PUT', ATTRS + ATTR_ID, token, {
             name: 'Title',
             attribute_type: 'text',
             sort_order: 0,
@@ -223,7 +221,7 @@ async function seedInstance(
     token: string,
     instanceId: string,
 ): Promise<void> {
-    const path = INSTANCES + '/' + instanceId;
+    const path = INSTANCES + instanceId;
     const put = await handleRequest(db, req(
         'PATCH', path, token, {
             set: [
@@ -245,7 +243,7 @@ async function seedFlowTypeJoin(
 ): Promise<void> {
     const put = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/records/' + frId,
+        '/organizations/1/flows/' + FLOW_ID + '/records/' + frId,
         token,
         {
             id: frId,
@@ -290,7 +288,10 @@ test('foreign-WO bind with malformed body → 404'
 async () => {
     const { db, tokenB } = await seededDb();
     const res = await handleRequest(db, req(
-        'PUT', BINDING, tokenB,
+        'PUT',
+        '/organizations/' + ORGANIZATION_B
+            + '/work-orders/' + WO_ID + '/binding',
+        tokenB,
         { not_a_key: true },
     ));
     assert.equal(res.status, 404);
@@ -305,7 +306,7 @@ test('absent WO bind → 404',
 async () => {
     const { db, token } = await seededDb();
     const res = await handleRequest(db, req(
-        'PUT', '/work-orders/wo-absent/binding',
+        'PUT', '/organizations/1/work-orders/wo-absent/binding',
         token, bindBody(),
     ));
     assert.equal(res.status, 404);
@@ -359,7 +360,7 @@ async () => {
     await seedInstance(db, token, INSTANCE_TOMB);
     const del = await handleRequest(db, req(
         'DELETE',
-        INSTANCES + '/' + INSTANCE_TOMB,
+        INSTANCES + INSTANCE_TOMB,
         token,
     ));
     assert.equal(del.status, 204);
@@ -385,8 +386,6 @@ async () => {
             description: '',
             position: 1,
             state: 'active',
-            state_at: AT,
-            state_event_id: typeIdB + '-genesis',
         },
     ));
     assert.equal(putTypeB.status, 201);
@@ -507,7 +506,7 @@ async () => {
     assert.equal(res.status, 201);
 
     const detail = await handleRequest(db, req(
-        'GET', '/work-orders/' + WO_ID, token,
+        'GET', '/organizations/1/work-orders/' + WO_ID, token,
     ));
     assert.equal(detail.status, 200);
     const d = await detail.json() as Record<
@@ -517,7 +516,7 @@ async () => {
     assert.equal(d['record_type_id'], TYPE_ID);
 
     const list = await handleRequest(db, req(
-        'GET', '/work-orders', token,
+        'GET', '/organizations/1/work-orders/', token,
     ));
     assert.equal(list.status, 200);
     const rows = await list.json() as Record<

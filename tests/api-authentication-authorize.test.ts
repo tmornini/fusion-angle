@@ -121,7 +121,7 @@ async () => {
     assert.equal(tok.status, 201);
     const body = await tok.json() as { access_token: string };
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members', body.access_token)));
+        await GET(db, 'organizations/1/members/', body.access_token)));
 });
 
 // authorization_code TTL: a code older than

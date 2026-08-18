@@ -32,8 +32,6 @@ export interface RecordTypeWireRow {
     readonly description: string;
     readonly position: number;
     readonly state: string;
-    readonly state_at: string;
-    readonly state_event_id: string;
 }
 
 export function recordTypesUriPrefix(
@@ -46,7 +44,7 @@ export function recordTypesUriPrefix(
 export function recordTypeEntityOf(
     document: DerivedDocument,
     organization: Id,
-    current: StateEntity,
+    current: { readonly state: string },
 ): RecordTypeWireRow {
     const body = document.body;
     return {
@@ -56,8 +54,6 @@ export function recordTypeEntityOf(
         description: pickString(body, 'description'),
         position: pickNumber(body, 'position'),
         state: current.state,
-        state_at: current.at,
-        state_event_id: current.id,
     };
 }
 

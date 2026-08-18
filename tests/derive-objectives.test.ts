@@ -18,7 +18,7 @@ import { STARK_ORGANIZATION } from
 
 // Objectives' own state-history reduction (states-address
 // retirement): unit-level trio walk + echo dedup, and the
-// family history route GET objectives/:id/versions. Uses
+// family history route GET organizations/:id/objectives/:id/versions. Uses
 // seedAdminSchema (not postMockDataLoad) so the suite stays
 // self-contained; seeded genesis lives in mock-data/drift
 // pins. Writes go through the live gate.
@@ -53,65 +53,60 @@ test('deriveObjectiveStateHistory returns the trio walk in'
     const id = 'obj-derive-1';
     const genesisAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/objectives/' + id, token, {
+        'PUT', '/organizations/1/objectives/' + id, token, {
             position: 1, state: 'active',
-            state_at: genesisAt, state_event_id: id + '-ev1',
         },
     ));
     const archiveAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/objectives/' + id, token, {
+        'PUT', '/organizations/1/objectives/' + id, token, {
             position: 1, state: 'archived',
-            state_at: archiveAt, state_event_id: id + '-ev2',
         },
     ));
     // a byte-identical echo of ev2 (drag-reorder style
     // re-put) must NOT mint a third event
     await handleRequest(db, req(
-        'PUT', '/objectives/' + id, token, {
+        'PUT', '/organizations/1/objectives/' + id, token, {
             position: 2, state: 'archived',
-            state_at: archiveAt, state_event_id: id + '-ev2',
         },
     ));
     const history = await deriveObjectiveStateHistory(
         db, STARK_ORGANIZATION, id,
     );
     assert.deepEqual(
-        history.map((r) => [r.id, r.state]),
-        [[id + '-ev1', 'active'], [id + '-ev2', 'archived']],
+        history.map((r) => r.state),
+        ['active', 'archived'],
     );
 });
 
-test('GET objectives/:id/versions carries the objective'
+test('GET organizations/:id/objectives/:id/versions carries the objective'
 + ' trio rows (DESC current-first)', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const id = 'obj-derive-history-1';
     const genesisAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/objectives/' + id, token, {
+        'PUT', '/organizations/1/objectives/' + id, token, {
             position: 1, state: 'active',
-            state_at: genesisAt, state_event_id: id + '-ev1',
         },
     ));
     const archiveAt = nowUtc();
     await handleRequest(db, req(
-        'PUT', '/objectives/' + id, token, {
+        'PUT', '/organizations/1/objectives/' + id, token, {
             position: 1, state: 'archived',
-            state_at: archiveAt, state_event_id: id + '-ev2',
         },
     ));
     const res = await handleRequest(db, req(
-        'GET', '/objectives/' + id + '/versions', token,
+        'GET', '/organizations/1/objectives/' + id + '/versions/', token,
     ));
     assert.equal(res.status, 200);
     const rows = JSON.parse(await res.text()) as {
         id: string; state: string;
     }[];
     assert.equal(rows.length, 2);
-    // Family history is DESC — index 0 is current.
-    assert.equal(rows[0]!.id, id + '-ev2');
+    assert.equal(rows[0]!.id, id);
     assert.equal(rows[0]!.state, 'archived');
-    assert.equal(rows[1]!.id, id + '-ev1');
+    assert.equal(rows[1]!.id, id);
     assert.equal(rows[1]!.state, 'active');
+    assert.equal('state_at' in rows[0]!, false);
 });

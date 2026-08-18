@@ -645,7 +645,9 @@ test('a repeated accept posts no notification', async () => {
     const sarah = await ctxOn(db, 'sarah', '1');
     await postInvitationAcceptance(sarah, inv.id);
     assert.equal(posted.length, 2);   // grant, accept
-    await postInvitationAcceptance(sarah, inv.id);
+    await assert.rejects(
+        () => postInvitationAcceptance(sarah, inv.id),
+    );
     assert.equal(posted.length, 2);
 });
 
@@ -658,7 +660,9 @@ test('a repeated decline posts no notification', async () => {
     const dave = await ctxOn(db, 'dave', '1');
     await postInvitationDecline(dave, inv.id);
     assert.equal(posted.length, 2);   // grant, decline
-    await postInvitationDecline(dave, inv.id);
+    await assert.rejects(
+        () => postInvitationDecline(dave, inv.id),
+    );
     assert.equal(posted.length, 2);
 });
 
@@ -670,7 +674,9 @@ test('a repeated revoke posts no notification', async () => {
     const inv = (await deriveInvitations(db))[0]!;
     await postInvitationRevocation(tony, inv.id);
     assert.equal(posted.length, 2);   // grant, revoke
-    await postInvitationRevocation(tony, inv.id);
+    await assert.rejects(
+        () => postInvitationRevocation(tony, inv.id),
+    );
     assert.equal(posted.length, 2);
 });
 

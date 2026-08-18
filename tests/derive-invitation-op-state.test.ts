@@ -81,14 +81,15 @@ async function grant(
         'current', ORGANIZATION_TWO,
     );
     const res = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email,
             invitationId,
             grantEventId: invitationId + '-grant',
             grantAt: '2026-06-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(res.status, 201);
+    assert.equal(res.status, 200);
 }
 
 test('invitationOpStateFor: pending (granted, unanswered)'
@@ -115,15 +116,17 @@ test('invitationOpStateFor: accepted derives \'accepted\','
     await grant(db, id, 'sarah.chen@company.com');
 
     const accept = await handleRequest(db, req(
-        'POST', '/invitations/' + id + '/acceptance',
+        'PUT',
+        '/identities/' + inviteeId + '/invitations/' + id,
         await organizationToken(inviteeId, ORGANIZATION_TWO),
         {
+            state: 'accepted',
             membershipId: id + '-ms',
-            acceptEventId: id + '-accept',
-            acceptAt: '2026-06-01T00:00:01.000000Z',
+            eventId: id + '-accept',
+            at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(accept.status, 201);
+    assert.equal(accept.status, 204);
 
     assert.equal(await invitationOpStateFor(db, id), 'accepted');
     assert.equal(
@@ -140,14 +143,16 @@ test('invitationOpStateFor: declined derives \'declined\','
     await grant(db, id, 'jessica.park@company.com');
 
     const decline = await handleRequest(db, req(
-        'POST', '/invitations/' + id + '/decline',
+        'PUT',
+        '/identities/' + inviteeId + '/invitations/' + id,
         await organizationToken(inviteeId, ORGANIZATION_TWO),
         {
-            declineEventId: id + '-decline',
-            declineAt: '2026-06-01T00:00:01.000000Z',
+            state: 'declined',
+            eventId: id + '-decline',
+            at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 201);
+    assert.equal(decline.status, 204);
 
     assert.equal(await invitationOpStateFor(db, id), 'declined');
     assert.equal(
@@ -163,14 +168,17 @@ test('invitationOpStateFor: revoked derives \'revoked\','
     await grant(db, id, 'emily.rodriguez@company.com');
 
     const revoke = await handleRequest(db, req(
-        'POST', '/invitations/' + id + '/revocation',
+        'PUT',
+        '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/' + id,
         await organizationToken('current', ORGANIZATION_TWO),
         {
-            revokeEventId: id + '-revoke',
-            revokeAt: '2026-06-01T00:00:01.000000Z',
+            state: 'revoked',
+            eventId: id + '-revoke',
+            at: '2026-06-01T00:00:01.000000Z',
         },
     ));
-    assert.equal(revoke.status, 201);
+    assert.equal(revoke.status, 204);
 
     assert.equal(await invitationOpStateFor(db, id), 'revoked');
     assert.equal(

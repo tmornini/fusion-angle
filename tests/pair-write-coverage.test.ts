@@ -28,7 +28,8 @@ function sourceText(relativePath: string): string {
 // patch, or delete. `route()` builds every entry (the
 // `makeIdRoute()` factory that used to build some of them was
 // retired once its last two live callers — members/:id,
-// objectives/:id — were replaced with pair-appending bespoke
+// organizations/:id/objectives/:id — were replaced with pair-appending
+// bespoke
 // routes), so this walks the table generically rather than
 // caring how an entry was built. Task 10: patch joins the
 // alphabet — intentional widen, not weakening.
@@ -51,6 +52,13 @@ function writtenPattern(entry: Route): string | undefined {
 const NAMED_EXEMPT_ROUTE_PATTERNS:
     ReadonlySet<string> = new Set([
         ...AUTHENTICATION_ROUTES,
+        // Invitation writes form their own pairs at
+        // /invitations/ (storage prefix). PAIR_WIRE
+        // would store a second nest document and turn
+        // grant 200 into 201 via sendWriteResponse.
+        'organizations/:id/invitations/',
+        'organizations/:id/invitations/:id',
+        'identities/:id/invitations/:id',
     ]);
 
 test('every write-verb route is pair-wired or named exempt',
@@ -110,50 +118,21 @@ test('AUTHENTICATION_ROUTES ride the dedicated pair arm, so'
     }
 });
 
-// The invitations and default-organization side channels never
-// appear in the route table above (api/api.ts dispatches them
-// by literal path segments before matchRoute ever runs), so
-// they cannot be caught by the enumeration test. Pin them by
-// static source check instead. The e2e proof that pairs
-// actually land for these routes already lives in
-// tests/api-shadow-ledger-default-organization.test.ts and
-// tests/api-shadow-ledger-memberships-invitations.test.ts —
-// this test only pins that the wiring is present, not
-// duplicating that behavioral coverage.
-//
-// STRUCTURAL LIMIT — for the next author who adds a third side
-// channel: this test can only assert what it already knows to
-// list. A future write path dispatched the same way (matched by
-// literal path segments in api.ts BEFORE matchRoute/routes[]
-// ever runs — the identities/:id/default-organization and
-// /invitations/
-// shape) is invisible to test 1's enumeration BY CONSTRUCTION,
-// and invisible here too unless someone hand-adds its module to
-// the array below. Even for the two files already listed, this
-// only checks that the SUBSTRING 'appendMessagePair' /
-// 'formWritePair' appears somewhere in the file's text — not
-// that EVERY write path inside that file reaches one; a second,
-// unwired write function added later to an already-listed file
-// would still pass. Closing this for good needs a per-write-path
-// registry (the plan's named Phase 2 "5-slot registry"), not a
-// per-file grep — until then, a new side channel is a REVIEW
-// obligation, not a mechanical one.
-test('the invitations and default-organization side channels'
-+ ' import the pair-formation primitives', () => {
-    for (const path of [
-        'api/invitations-domain.ts',
-        'api/organization-requests.ts',
-    ]) {
-        const text = sourceText(path);
-        assert.ok(
-            text.includes('appendMessagePair'),
-            path + ' does not import appendMessagePair',
-        );
-        assert.ok(
-            text.includes('formWritePair'),
-            path + ' does not import formWritePair',
-        );
-    }
+// Invitation nest writes are named-exempt (test 1). Pair
+// formation still lives in invitations-domain.ts at the
+// /invitations/ storage prefix. Pin the primitives.
+test('invitation writes import pair-formation primitives',
+() => {
+    const path = 'api/invitations-domain.ts';
+    const text = sourceText(path);
+    assert.ok(
+        text.includes('appendMessagePair'),
+        path + ' does not import appendMessagePair',
+    );
+    assert.ok(
+        text.includes('formWritePair'),
+        path + ' does not import formWritePair',
+    );
 });
 
 test('api/api.ts awaits simulateLatency exactly 4 times', () => {

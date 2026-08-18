@@ -16,9 +16,9 @@ import {
 // Mirror of tests/api-records-verb-gaps.test.ts phrasing.
 
 const BASE = 'http://localhost';
-const COLLECTION = '/organizations/1/record-types';
-const DETAIL = COLLECTION + '/rt-1';
-const HISTORY = DETAIL + '/versions';
+const COLLECTION = '/organizations/1/record-types/';
+const DETAIL = COLLECTION + 'rt-1';
+const HISTORY = DETAIL + '/versions/';
 
 function req(
     method: string,
@@ -115,8 +115,8 @@ test('PATCH .../record-types/:id 405s (no patch'
 // Nested attributes verb gaps (Task 7): no collection POST;
 // PUT/DELETE detail are live (create is PUT).
 
-const ATTRS = DETAIL + '/attributes';
-const ATTR_DETAIL = ATTRS + '/attr-1';
+const ATTRS = DETAIL + '/attributes/';
+const ATTR_DETAIL = ATTRS + 'attr-1';
 
 test('POST .../attributes 405s (no create verb — '
 + 'parity with flat family)', async () => {

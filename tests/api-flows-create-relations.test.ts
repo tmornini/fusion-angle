@@ -8,7 +8,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     postFlowCreation,
 } from
@@ -34,7 +34,7 @@ import {
 
 // Phase Final Task 2: graph relation ROW halves stripped.
 // Create still seeds graph on the document pair; oracles
-// re-home to GET /flows/:id (pair-plane graph).
+// re-home to GET /organizations/:id/flows/:id (pair-plane graph).
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -43,7 +43,7 @@ async function setupMemDb(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo User');
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     return { db, ctx };
 }
 
@@ -52,7 +52,7 @@ async function getFlowGraph(
     flowId: string,
 ): Promise<StoredGraph> {
     const flow = await ctx.GET<FlowWithGraph>(
-        'flows/' + flowId,
+        'organizations/1/flows/' + flowId,
     );
     return asStoredGraph(
         flow.graph, 'flow.graph',
@@ -155,7 +155,7 @@ test(
             name: 'State Event Test Flow',
         });
         const events = await ctx.GET<StateEntity[]>(
-            'flows/' + flowId + '/versions',
+            'organizations/1/flows/' + flowId + '/versions/',
         );
         assert.equal(events.length, 1);
         const ev = events[0]!;

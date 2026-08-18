@@ -41,10 +41,10 @@ const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
 const ORGANIZATION = '1';
 const COLLECTION =
-    '/organizations/' + ORGANIZATION + '/record-types';
+    '/organizations/' + ORGANIZATION + '/record-types/';
 const TYPE_ID = 'rt-composed-1';
 const ATTR_ID = 'attr-composed-1';
-const DETAIL = COLLECTION + '/' + TYPE_ID;
+const DETAIL = COLLECTION + TYPE_ID;
 const ATTR_DETAIL =
     DETAIL + '/attributes/' + ATTR_ID;
 
@@ -149,8 +149,6 @@ function editBody(
         },
         attributes: [],
         state: 'active',
-        state_at: AT,
-        state_event_id: typeId + '-genesis',
         removedAttributeIds: [...removedAttributeIds],
     };
 }
@@ -161,7 +159,7 @@ async function seedFieldValueReferrer(
     attributeId: string,
 ): Promise<void> {
     await PUT(
-        db, 'work-orders/wo-restrict-fv', {
+        db, 'organizations/1/work-orders/wo-restrict-fv', {
             display_id: 'rfv1',
             flow_graph: {
                 name: 'Restrict FV',
@@ -190,9 +188,10 @@ async function seedFieldValueReferrer(
         transitionAt: AT,
     };
     const pathSegments = [
+        'organizations', STARK_ORGANIZATION,
         'work-orders', 'wo-restrict-fv', 'transition',
     ];
-    const pattern = 'work-orders/:id/transition';
+    const pattern = 'organizations/:id/work-orders/:id/transition';
     const pair = await formWritePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
@@ -234,15 +233,12 @@ async () => {
         organization_id: string;
         name: string;
         state: string;
-        state_event_id: string;
     };
     assert.equal(typeRow.id, TYPE_ID);
     assert.equal(typeRow.organization_id, ORGANIZATION);
     assert.equal(typeRow.name, 'Composed');
     assert.equal(typeRow.state, 'active');
-    assert.equal(
-        typeRow.state_event_id, TYPE_ID + '-genesis',
-    );
+    assert.equal('state_event_id' in typeRow, false);
 
     const attrGet = await handleRequest(db, req(
         'GET', ATTR_DETAIL, adminToken,

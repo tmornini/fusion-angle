@@ -131,9 +131,6 @@ function onIdeasLoaded(
                     ...tuple.entity,
                     position: newPosition,
                     state: tuple.idea.stateValue(),
-                    stateAt: tuple.idea.stateAtValue(),
-                    stateEventId:
-                        tuple.idea.stateEventIdValue(),
                 },
             );
         },

@@ -29,7 +29,7 @@ test('pristine bootstrap seeds no Records', async () => {
     // Pair plane: no records-family document pairs. Sample
     // Records are demo content from postMockDataLoad, not
     // bootstrap. Covers records, record-attributes, and
-    // flow_records joins (…/flows/:id/records/).
+    // flow_records joins (…/organizations/:id/flows/:id/records/).
     const requests = await db.requests.getAll();
     const recordFamily = requests.filter((r) =>
         r.uri_collection.includes('/records/')

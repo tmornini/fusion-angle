@@ -3,8 +3,10 @@ import {
     writeFileSync,
     existsSync,
     mkdirSync,
+    readdirSync,
+    cpSync,
 } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, resolve } from 'path';
 import { PAGE_REGISTRY } from './page-registry.ts';
 import { buildSidebarNavItemsHtml } from './nav-items.ts';
 
@@ -137,6 +139,30 @@ function compose(): void {
     }
 
     console.log(`Composed ${standalonePages.length} standalone pages.`);
+
+    copyApiDocumentationRooms();
+}
+
+function copyApiDocumentationRooms(): void {
+    const src = join(ROOT, 'api-documentation');
+    const dest = join(OUT, 'api-documentation');
+    if (resolve(src) === resolve(dest)) return;
+    if (!existsSync(dest)) {
+        mkdirSync(dest, { recursive: true });
+    }
+    for (const name of readdirSync(src)) {
+        if (
+            name === 'index.html'
+            || name === 'index.ts'
+        ) {
+            continue;
+        }
+        cpSync(
+            join(src, name),
+            join(dest, name),
+            { recursive: true },
+        );
+    }
 }
 
 compose();

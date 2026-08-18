@@ -52,8 +52,6 @@ function ideaDocument(
         expected_outcome: 'o',
         success_metrics: 'm',
         state: 'active',
-        state_at: '2026-01-01T00:00:00.000000Z',
-        state_event_id: stateEventId,
     };
 }
 
@@ -82,24 +80,28 @@ async function twoOrganizationDb(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('foreign-id PUT ideas/:id geneses at this address',
+test('foreign-id PUT organizations/:id/ideas/:id geneses at this address',
 async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
     const tokenB = await organizationToken('current', ORGANIZATION_B);
     const created = await handleRequest(db, req(
-        'PUT', '/ideas/idea-a', tokenA,
+        'PUT', '/organizations/1/ideas/idea-a', tokenA,
         ideaDocument('A-owned', 'ev-idea-a'),
     ));
     assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
-        'PUT', '/ideas/idea-a', tokenB,
+        'PUT',
+        '/organizations/' + ORGANIZATION_B + '/ideas/idea-a',
+        tokenB,
         ideaDocument('stolen', 'ev-steal'),
     ));
     assert.equal(foreign.status, 201);
     const gotB = await handleRequest(db, req(
-        'GET', '/ideas/idea-a', tokenB,
+        'GET',
+        '/organizations/' + ORGANIZATION_B + '/ideas/idea-a',
+        tokenB,
     ));
     assert.equal(gotB.status, 200);
     const wireB = await gotB.json() as {
@@ -109,7 +111,7 @@ async () => {
     assert.equal(wireB.title, 'stolen');
     assert.equal(wireB.organization_id, ORGANIZATION_B);
     const gotA = await handleRequest(db, req(
-        'GET', '/ideas/idea-a', tokenA,
+        'GET', '/organizations/1/ideas/idea-a', tokenA,
     ));
     assert.equal(gotA.status, 200);
     const wireA = await gotA.json() as {
@@ -120,19 +122,26 @@ async () => {
     assert.equal(wireA.organization_id, ORGANIZATION_A);
 });
 
-test('genesis PUT ideas/:id in the caller org is unaffected',
+test('genesis PUT organizations/:id/ideas/:id in the'
+    + ' caller org is unaffected',
 async () => {
     const db = await twoOrganizationDb();
     const tokenB = await organizationToken('current', ORGANIZATION_B);
     const res = await handleRequest(db, req(
-        'PUT', '/ideas/idea-b-genesis', tokenB,
+        'PUT',
+        '/organizations/' + ORGANIZATION_B
+            + '/ideas/idea-b-genesis',
+        tokenB,
         ideaDocument('B-new', 'ev-idea-b'),
     ));
     assert.equal(res.status, 201);
     // Phase Final Task 2: ideas row half stripped — org stamp
     // rides WRITE_RESPONSE_SPECS / derive GET, not the row.
     const getRes = await handleRequest(db, req(
-        'GET', '/ideas/idea-b-genesis', tokenB,
+        'GET',
+        '/organizations/' + ORGANIZATION_B
+            + '/ideas/idea-b-genesis',
+        tokenB,
     ));
     assert.equal(getRes.status, 200);
     const wire = await getRes.json() as {
@@ -149,7 +158,7 @@ async () => {
     const created = await handleRequest(db, req(
         'POST',
         '/organizations/' + ORGANIZATION_A
-            + '/record-types',
+            + '/record-types/',
         tokenA, {
             id: 'rec-a',
             kind: 'create',
@@ -224,7 +233,7 @@ async () => {
     assert.equal(row.organization_id, ORGANIZATION_A);
 });
 
-test('foreign-id PUT projects/:id geneses at this address',
+test('foreign-id PUT organizations/:id/projects/:id geneses at this address',
 async () => {
     const db = await twoOrganizationDb();
     const tokenA = await organizationToken('current', ORGANIZATION_A);
@@ -239,24 +248,25 @@ async () => {
         actual_cost: 0,
         position: 1,
         state: 'submitted',
-        state_at: '2026-01-01T00:00:00.000000Z',
-        state_event_id: 'ev-proj-a',
     };
     const created = await handleRequest(db, req(
-        'PUT', '/projects/proj-a', tokenA, projectBody,
+        'PUT', '/organizations/1/projects/proj-a', tokenA, projectBody,
     ));
     assert.equal(created.status, 201);
 
     const foreign = await handleRequest(db, req(
-        'PUT', '/projects/proj-a', tokenB, {
+        'PUT',
+        '/organizations/' + ORGANIZATION_B + '/projects/proj-a',
+        tokenB, {
             ...projectBody,
             title: 'stolen',
-            state_event_id: 'ev-steal-proj',
         },
     ));
     assert.equal(foreign.status, 201);
     const gotB = await handleRequest(db, req(
-        'GET', '/projects/proj-a', tokenB,
+        'GET',
+        '/organizations/' + ORGANIZATION_B + '/projects/proj-a',
+        tokenB,
     ));
     assert.equal(gotB.status, 200);
     const wireB = await gotB.json() as {
@@ -266,7 +276,7 @@ async () => {
     assert.equal(wireB.title, 'stolen');
     assert.equal(wireB.organization_id, ORGANIZATION_B);
     const gotA = await handleRequest(db, req(
-        'GET', '/projects/proj-a', tokenA,
+        'GET', '/organizations/1/projects/proj-a', tokenA,
     ));
     assert.equal(gotA.status, 200);
     const wireA = await gotA.json() as {

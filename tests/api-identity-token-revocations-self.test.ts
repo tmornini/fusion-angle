@@ -205,7 +205,7 @@ async () => {
     ));
     assert.equal(res.status, 201);
     const still = await handleRequest(
-        db, req('GET', '/organizations/1/members', memberToken),
+        db, req('GET', '/organizations/1/members/', memberToken),
     );
     assert.equal(still.status, 200);
     const refresh = await handleRequest(

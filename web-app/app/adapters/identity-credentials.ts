@@ -66,7 +66,7 @@ export async function getIdentityCredentialState(
     // needed.
     const forIdentity = await ctx.GET<
         IdentityCredentialEntity[]
-    >('identities/' + identityId + '/credentials');
+    >('identities/' + identityId + '/credentials/');
     // Latest by `at`, not array order — a snapshot reimport
     // or concurrent write can reorder rows. latestByKey's
     // default >= tiebreak is the secure direction.

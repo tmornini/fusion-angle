@@ -5,7 +5,10 @@ import {
 import {
     generateCryptoSafeBase62,
 } from '../../../shared/crypto-safe-base62.ts';
-import type { RequestContext } from './shared.ts';
+import {
+    activeOrganization,
+    type RequestContext,
+} from './shared.ts';
 import {
     RequestError,
     HTTP_NOT_FOUND,
@@ -87,7 +90,10 @@ interface SentRow {
 export async function getInvitations(
     ctx: RequestContext,
 ): Promise<InvitationView[]> {
-    const rows = await ctx.GET<InviteeRow[]>('invitations');
+    const rows = await ctx.GET<InviteeRow[]>(
+        'identities/' + ctx.identity.id
+            + '/invitations/',
+    );
     return rows.map(row => ({
         id: row.id,
         organizationId: row.organization_id,
@@ -107,7 +113,11 @@ export async function getInvitations(
 export async function getSentInvitations(
     ctx: RequestContext,
 ): Promise<SentInvitation[]> {
-    const rows = await ctx.GET<SentRow[]>('invitations/sent');
+    const rows = await ctx.GET<SentRow[]>(
+        'organizations/'
+            + activeOrganization(ctx)
+            + '/invitations/',
+    );
     return rows.map(row => ({
         id: row.id,
         organizationId: row.organization_id,
@@ -141,9 +151,14 @@ export async function postInvitationGrant(
     const grantEventId = generateCryptoSafeBase62();
     const grantAt = nowUtc();
     try {
-        await ctx.POST('invitations', {
-            email, invitationId, grantEventId, grantAt,
-        });
+        await ctx.POST(
+            'organizations/'
+                + activeOrganization(ctx)
+                + '/invitations/',
+            {
+                email, invitationId, grantEventId, grantAt,
+            },
+        );
     } catch (err) {
         if (
             err instanceof RequestError
@@ -171,12 +186,16 @@ export async function postInvitationAcceptance(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    const membershipId = generateCryptoSafeBase62();
-    const acceptEventId = generateCryptoSafeBase62();
-    const acceptAt = nowUtc();
-    await ctx.POST('invitations/' + id + '/acceptance', {
-        membershipId, acceptEventId, acceptAt,
-    });
+    await ctx.PUT(
+        'identities/' + ctx.identity.id
+            + '/invitations/' + id,
+        {
+            state: 'accepted',
+            membershipId: generateCryptoSafeBase62(),
+            eventId: generateCryptoSafeBase62(),
+            at: nowUtc(),
+        },
+    );
     await remintSessionClaims(ctx);
     invitationChanges.notify();
 }
@@ -221,11 +240,15 @@ export async function postInvitationDecline(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    const declineEventId = generateCryptoSafeBase62();
-    const declineAt = nowUtc();
-    await ctx.POST('invitations/' + id + '/decline', {
-        declineEventId, declineAt,
-    });
+    await ctx.PUT(
+        'identities/' + ctx.identity.id
+            + '/invitations/' + id,
+        {
+            state: 'declined',
+            eventId: generateCryptoSafeBase62(),
+            at: nowUtc(),
+        },
+    );
     invitationChanges.notify();
 }
 
@@ -235,10 +258,15 @@ export async function postInvitationRevocation(
     ctx: RequestContext,
     id: Id,
 ): Promise<void> {
-    const revokeEventId = generateCryptoSafeBase62();
-    const revokeAt = nowUtc();
-    await ctx.POST('invitations/' + id + '/revocation', {
-        revokeEventId, revokeAt,
-    });
+    await ctx.PUT(
+        'organizations/'
+            + activeOrganization(ctx)
+            + '/invitations/' + id,
+        {
+            state: 'revoked',
+            eventId: generateCryptoSafeBase62(),
+            at: nowUtc(),
+        },
+    );
     invitationChanges.notify();
 }

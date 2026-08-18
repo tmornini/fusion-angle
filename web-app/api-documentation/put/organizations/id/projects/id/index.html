@@ -1,0 +1,31 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PUT /organizations/:id/projects/:id</title>
+<h1>PUT /organizations/:id/projects/:id</h1>
+<h2>Request body</h2>
+<pre>
+{
+  "title": "title",
+  "description": "description",
+  "progress": 0,
+  "start_date": "2020-01-01",
+  "target_end_date": "2020-01-01",
+  "estimated_cost": 0,
+  "actual_cost": 0,
+  "position": 0,
+  "state": "active"
+}
+</pre>
+<h2>Headers</h2>
+<ul>
+  <li>Authorization: Bearer …</li>
+  <li>Operation-ID: on writes</li>
+</ul>
+<h2>Status</h2>
+<ul>
+  <li><a href="../../../../../statuses/200/">200</a></li>
+  <li><a href="../../../../../statuses/400/">400</a></li>
+  <li><a href="../../../../../statuses/401/">401</a></li>
+  <li><a href="../../../../../statuses/403/">403</a></li>
+  <li><a href="../../../../../statuses/404/">404</a></li>
+</ul>

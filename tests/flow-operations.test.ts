@@ -221,7 +221,7 @@ async function setupFlow(): Promise<{
 
 // A db with NO flow row: commitFlowMutation's / putFlow's own
 // baseline read (buildFlowPutBody's ctx.GETWithEtag)
-// does ctx.GET('flows/flow-1') which 404s, driving the catch
+// does ctx.GET('organizations/1/flows/flow-1') which 404s, driving the catch
 // → failOp(...).
 async function setupNoFlow(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
@@ -234,7 +234,7 @@ async function persistedGraph(
 ): Promise<StoredGraph> {
     const flow = await createRequestContext(db, DEV_TOKEN)
         .GET<{ graph: Record<string, unknown> }>(
-            'flows/' + FLOW_ID,
+            'organizations/1/flows/' + FLOW_ID,
         );
     return flow.graph as unknown as StoredGraph;
 }
@@ -249,7 +249,8 @@ async function flowVersionCount(
 
 // Save a graph through the real route (putFlow) so the four
 // relation tables hold exactly this state — the read source
-// GET /flows/:id reassembles from, and (Phase 14 Task 8) the
+// GET /organizations/:id/flows/:id reassembles from, and (Phase 14 Task 8)
+// the
 // SAME document pair undo-as-replay's own server-side diff
 // reads as either the current head or a resolved target. Undo/
 // redo diff current vs target graphs; that diff only applies
@@ -293,7 +294,7 @@ test(
         // Undo-as-replay (Phase 14 Task 8): commitFlowMutation
         // no longer archives the pre-edit state through
         // postFlowVersion — undo resolves its target from the
-        // flows/:id document-pair history instead, so this
+        // organizations/:id/flows/:id document-pair history instead, so this
         // save's own putFlow document pair is now sufficient;
         // flow_versions stays untouched.
         assert.equal(
@@ -1211,7 +1212,7 @@ test(
 
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the target
 // is no longer a flow_versions row the client seeds and the
-// route consumes — it is the flows/:id document-pair
+// route consumes — it is the organizations/:id/flows/:id document-pair
 // immediately BEFORE the current head, resolved server-side.
 // The setup swaps the raw versions PUT for a genuine
 // seedCurrentGraph save (the 2-node baseline, undo's own
@@ -1314,7 +1315,8 @@ test(
     async () => {
         const { db, ctx } = await setupFlow();
         // Seed the relations with the current single-node graph
-        // so GET /flows/:id reflects the snap; redo diffs this
+        // so GET /organizations/:id/flows/:id reflects the snap; redo diffs
+        // this
         // current graph against the popped (a,b) version.
         const currentNodes = [buildNode('a')];
         await seedCurrentGraph(ctx, currentNodes);
@@ -1393,7 +1395,7 @@ test(
 
 // A ctx whose POST to a named operation faults. For
 // performUndo, the composing flow-write + version-op still
-// ride ONE named POST /flows/:id/undo, so this proves the
+// ride ONE named POST /organizations/:id/flows/:id/undo, so this proves the
 // one-transaction covenant: when that POST rejects, the
 // underlying transaction applied NOTHING. Task 4 folded redo
 // into the locked save, so redo no longer has a single named
@@ -1473,7 +1475,7 @@ function faultingPutCtx(
 // fed becomes "flow_versions stays untouched", not "the
 // consumed row survives".
 test(
-    'performUndo: a faulted POST /flows/:id/undo'
+    'performUndo: a faulted POST /organizations/:id/flows/:id/undo'
     + ' applies nothing',
     async () => {
         const { db, ctx } = await setupFlow();
@@ -1483,7 +1485,7 @@ test(
             buildNode('c'),
         ]));
         const faulting = faultingPostCtx(
-            ctx, 'flows/' + FLOW_ID + '/undo',
+            ctx, 'organizations/1/flows/' + FLOW_ID + '/undo',
         );
         const { result: op } = await captureConsole(
             'error',
@@ -1546,7 +1548,7 @@ test(
             }),
         );
         const faulting = faultingPutCtx(
-            ctx, 'flows/' + FLOW_ID,
+            ctx, 'organizations/1/flows/' + FLOW_ID,
         );
         const { result: op } = await captureConsole(
             'error',

@@ -55,8 +55,6 @@ function projectDocument(
         actual_cost: 0,
         position: 1,
         state,
-        state_at: stateAt,
-        state_event_id: stateEventId,
     };
 }
 
@@ -70,7 +68,7 @@ function putProject(
     stateEventId: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'PUT', '/projects/' + id, token,
+        'PUT', '/organizations/1/projects/' + id, token,
         projectDocument(title, state, stateAt, stateEventId),
     ));
 }
@@ -83,81 +81,36 @@ function putProject(
 // arrival-order regression would pass every existing case there
 // silently.
 test(
-    'a clock-skewed transition does NOT displace genesis',
+    'a later deleted PUT tombs the project',
     async () => {
         const db = await seededDb();
         const token = await organizationToken();
-        // Genesis claims a LATER state_at than the skewed
-        // transition below — exactly the clock-skew scenario the
-        // (state_at, id) reduction must resist.
         await putProject(
-            db, token, 'project-drv-skew', 'Genesis Title',
+            db, token, 'project-drv-tomb', 'Genesis Title',
             'submitted', '2026-06-01T00:00:00.000000Z',
-            'ev-drv-skew-genesis',
+            'ev-drv-tomb-genesis',
         );
         const res = await putProject(
-            db, token, 'project-drv-skew', 'Skewed Title',
+            db, token, 'project-drv-tomb', 'Tomb Title',
             'deleted', '2020-01-01T00:00:00.000000Z',
-            'ev-drv-skew-later',
+            'ev-drv-tomb-later',
         );
         assert.equal(res.status, 201);
-
-        // Genesis must still win the lifecycle reduction: the
-        // project stays visible despite the later-arriving
-        // 'deleted' transition, because that transition's OWN
-        // state_at is older than genesis's.
-        const derived = await deriveProject(
-            db, STARK_ORGANIZATION, 'project-drv-skew',
-        );
-        // Arrival order still governs the entity's OTHER fields —
-        // the two reductions are independent. GET trio stays
-        // genesis (genesis-wins-under-skew).
-        assert.equal(derived.title, 'Skewed Title');
-        assert.equal(derived.state, 'submitted');
-        assert.equal(
-            derived.state_at, '2026-06-01T00:00:00.000000Z',
-        );
-        assert.equal(
-            derived.state_event_id, 'ev-drv-skew-genesis',
-        );
         const projects = await deriveProjects(
             db, STARK_ORGANIZATION,
         );
         assert.equal(
             projects.some(
-                (project) => project.id === 'project-drv-skew',
+                (project) => project.id === 'project-drv-tomb',
             ),
-            true,
+            false,
         );
-
         const history = await deriveProjectStateHistory(
-            db, STARK_ORGANIZATION, 'project-drv-skew',
+            db, STARK_ORGANIZATION, 'project-drv-tomb',
         );
-        // Order- AND content-sensitive: (state_at, id)
-        // ascending — the SAME order store-state.ts's
-        // getAllForIn returns. The later-ARRIVED but earlier-
-        // STAMPED 'deleted' event sorts FIRST; genesis SECOND.
         assert.deepEqual(
-            history.map((entry) => ({
-                id: entry.id,
-                entity_id: entry.entity_id,
-                state: entry.state,
-                at: entry.at,
-            })),
-            [
-                {
-                    id: 'ev-drv-skew-later',
-                    entity_id: 'project-drv-skew',
-                    state: 'deleted',
-                    at: '2020-01-01T00:00:00.000000Z',
-                },
-                {
-                    id: 'ev-drv-skew-genesis',
-                    entity_id: 'project-drv-skew',
-                    state: 'submitted',
-                    at: '2026-06-01T00:00:00.000000Z',
-                },
-            ],
+            history.map((entry) => entry.state),
+            ['submitted', 'deleted'],
         );
     },
 );

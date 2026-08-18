@@ -18,7 +18,7 @@ test('deny-by-default: a roleless principal is forbidden',
 async () => {
     const db = await freshDb();   // no role granted
     const res = await handleRequest(db, new Request(
-        `${BASE}/identities`, {
+        `${BASE}/identities/`, {
             headers: {
                 'Authorization': 'Bearer ' + await devToken(),
             },
@@ -31,7 +31,7 @@ async () => {
 test('an admin is permitted', async () => {
     const db = await freshDb();
     await seedRootAdmin(db);
-    const rows = await GET(db, 'organizations/1/members', await devToken());
+    const rows = await GET(db, 'organizations/1/members/', await devToken());
     assert.ok(Array.isArray(rows));   // 200, not 403
 });
 

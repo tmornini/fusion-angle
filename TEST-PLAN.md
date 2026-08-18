@@ -231,19 +231,25 @@ Post-Phase-Final + states-address retirement: every
 lifecycle-backed surface (workbox inbox, flow-stats,
 dashboard, members roster, idea/project/record-type/
 objective state badges + history views) reads family-
-scoped and collection history from the message ledger.
-Nine lifecycle GET registrations + one value-history,
-wire `(at, id)` DESC (index 0 = current): per-entity
-`GET ideas|projects|record-types|flows|objectives|
-members|work-orders/:id/history`, plus bulk
-`GET work-orders/history` and `GET objectives/history`
-(bulk always 200 arrays), plus instance value-history at
-`GET .../record-types/:type/instances/:id/history`.
-Work-order history folds `field_values` inline on each
-transition event; claim/birth/release rows carry `[]`.
-Ideas / projects / record-types / objectives / members
-GET rows embed the lifecycle trio (`state`, `state_at`,
-`state_event_id`) — no separate state-detail fetch.
+scoped history from the message ledger. Per-entity
+GET + one value-history, wire `(at, id)` DESC
+(index 0 = current):
+`GET organizations/:id/<family>/:id/versions/` for
+ideas / projects / record-types / flows /
+objectives; work-orders stay
+`GET organizations/:id/work-orders/:id/history`;
+members stay `GET members/:id/versions`; plus
+instance value-history at
+`GET .../record-types/:type/instances/:id/versions`.
+There is no bulk `GET work-orders/history` and no
+bulk `GET objectives/versions`. Work-order history
+folds `field_values` inline on each transition
+event; claim/birth/release rows carry `[]`.
+Ideas / projects / record-types / objectives GET
+rows keep domain `state` and do not embed
+`state_at` / `state_event_id`. Members GET rows
+still embed the lifecycle trio — no separate
+state-detail fetch.
 There is no `states` table and no shared event-append
 write address. Lifecycle writes are document-trio PUTs
 (ideas/projects/record-types/flows/objectives/members)
@@ -269,9 +275,9 @@ unauthenticated 401):
 - per-entity current-state alias → router 404
 - nested field-values write address → router 404
   (and the retired field-values GET; product reads fold
-  values on `GET work-orders/:id/history` /
-  `GET work-orders/history`; live writes ride the
-  transition fold only)
+  values on
+  `GET organizations/:id/work-orders/:id/history`;
+  live writes ride the transition fold only)
 - `GET|POST|PUT|DELETE /flows/:id/versions[...]` → router 404
   (table DELETED at Phase Final; F66 is MOOT — see F66)
 
@@ -576,14 +582,14 @@ run before A1's build. The single canonical invocation is
 
 - [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
 - [ ] **AT2** Run `./test` (delegates to `TZ=UTC node --test --strip-types tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts` for the timezone suite). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0` for both suites.
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files except `TEST-PLAN.md` and `API-TREE.md`, and the root scripts `build`, `serve`, `test`, `validate`, and `generate-schema-svg`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files except `TEST-PLAN.md`, and the root scripts `build`, `serve`, `test`, `validate`, `generate-schema-svg`, and `generate-api-documentation`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
 
 ---
 
 ## A. Build & Setup
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-server-${SHA}.zip`.
-- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 17 page directories (`auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 28 HTML page files (including `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`.
+- [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
 - [ ] **A3** From the A2 directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an **empty** Postgres, run `node server.mjs --seed-mock-data` (or `./serve` after commit). PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP. This pin **is** SV1.
 - [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser. PASS: root hops to `auth/index.html` always. Landing is a separate public marketing page, not the root target.
 - [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /authentication/token` refresh 401 are acceptable.

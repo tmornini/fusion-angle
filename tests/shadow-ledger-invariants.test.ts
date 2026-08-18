@@ -79,15 +79,14 @@ function ideaFields(title: string) {
     };
 }
 
-// PUT /ideas/:id now takes the FULL document (Decision 7): the
+// PUT /organizations/:id/ideas/:id now takes the FULL document (Decision 7):
+// the
 // entity fields plus the state trio. One fixed trio per idea
 // id keeps both PUTs below a same-state edit.
 function ideaPutBody(ideaId: string, title: string) {
     return {
         ...ideaFields(title),
         state: 'active',
-        state_at: AT,
-        state_event_id: 'ev-' + ideaId,
     };
 }
 
@@ -109,8 +108,6 @@ function recordPutBody(
     return {
         ...recordFields(name, organization),
         state: 'active',
-        state_at: AT,
-        state_event_id: 'ev-' + recordId,
     };
 }
 
@@ -235,13 +232,13 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // Document PUT, twice — the second mints Supersedes
     // (ideas, org 1).
     const firstIdea = await handleRequest(db, req(
-        'PUT', '/ideas/inv-idea-1', org1Token,
+        'PUT', '/organizations/1/ideas/inv-idea-1', org1Token,
         ideaPutBody('inv-idea-1', 'Invariant Idea'),
     ));
     assert.equal(firstIdea.status, 201);
     const firstIdeaId = firstIdea.headers.get('Response-ID');
     const secondIdea = await handleRequest(db, req(
-        'PUT', '/ideas/inv-idea-1', org1Token,
+        'PUT', '/organizations/1/ideas/inv-idea-1', org1Token,
         ideaPutBody('inv-idea-1', 'Invariant Idea Revised'),
     ));
     assert.equal(secondIdea.status, 201);
@@ -252,11 +249,9 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // Idea state-change trio PUT (states/:id retired) — a
     // second lifecycle stamp on the same document address.
     const stateAppend = await handleRequest(db, req(
-        'PUT', '/ideas/inv-idea-1', org1Token, {
+        'PUT', '/organizations/1/ideas/inv-idea-1', org1Token, {
             ...ideaFields('Invariant Idea Reviewed'),
             state: 'in_review',
-            state_at: AT,
-            state_event_id: 'inv-ev-review',
         },
     ));
     assert.equal(stateAppend.status, 201);
@@ -267,7 +262,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // 2+N, not 1).
     const created = await handleRequest(db, req(
         'POST', '/organizations/' + ORGANIZATION_TWO
-            + '/record-types', org2Token,
+            + '/record-types/', org2Token,
         createRecordBody(
             'inv-rec-1', 'inv-rec-1-ev', ORGANIZATION_TWO,
             [{
@@ -303,7 +298,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // shared code but never route-exercised in this mixed batch
     // before now.
     const workOrderPut = await handleRequest(db, req(
-        'PUT', '/work-orders/inv-wo-1', org1Token,
+        'PUT', '/organizations/1/work-orders/inv-wo-1', org1Token,
         workOrderFields('INV-WO-1', STARK_ORGANIZATION),
     ));
     assert.equal(workOrderPut.status, 201);
@@ -333,7 +328,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // Genesis document PUT (flows, org 1) — a fresh id needs no
     // If-Match under the locked class.
     const flowGenesis = await handleRequest(db, req(
-        'PUT', '/flows/inv-flow-1', org1Token,
+        'PUT', '/organizations/1/flows/inv-flow-1', org1Token,
         flowDocumentBody('Invariant Flow', 'inv-flow-1-ev'),
     ));
     assert.equal(flowGenesis.status, 201);
@@ -344,7 +339,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     // pair), none of them route-exercised in this mixed batch
     // before now.
     const workOrderCreated = await handleRequest(db, req(
-        'POST', '/work-orders', org1Token,
+        'POST', '/organizations/1/work-orders/', org1Token,
         workOrderCreateBody(
             'inv-wo-create-1', 'inv-wo-create-1-fwo',
             'inv-flow-1', STARK_ORGANIZATION,
@@ -480,18 +475,13 @@ test('a seeded idea\'s create-pair request reproduces its'
     const parsed = pairJsonOf(createRow!.message) as {
         body: {
             state: string;
-            state_event_id: string;
-            state_at: string;
         };
     };
     const history = await deriveIdeaStateHistory(
         db, STARK_ORGANIZATION, idea.id,
     );
-    const genesis = history.find(
-        s => s.id === parsed.body.state_event_id,
-    )!;
+    const genesis = history[0];
     assert.ok(genesis, 'derived state missing');
     assert.equal(genesis.entity_id, idea.id);
     assert.equal(genesis.state, parsed.body.state);
-    assert.equal(genesis.at, parsed.body.state_at);
 });

@@ -12,6 +12,7 @@ import {
 } from '../../../api/types.ts';
 import {
     filterByField,
+    organizationItem,
     type RequestContext,
 } from './shared.ts';
 import {
@@ -84,7 +85,10 @@ export async function getBaselineScoresForProject(
 ): Promise<ObjectiveScore[]> {
     const rows = await ctx.GET<
         ProjectObjectiveBaselineScoreEntity[]
-    >('projects/' + projectId + '/objective-baseline-scores');
+    >(
+        organizationItem(ctx, 'projects', projectId)
+            + '/objective-baseline-scores/',
+    );
     return rows.map(toObjectiveScore);
 }
 
@@ -95,7 +99,10 @@ export async function getActualScoresForProject(
 ): Promise<ObjectiveScore[]> {
     const rows = await ctx.GET<
         ProjectObjectiveActualScoreEntity[]
-    >('projects/' + projectId + '/objective-actual-scores');
+    >(
+        organizationItem(ctx, 'projects', projectId)
+            + '/objective-actual-scores/',
+    );
     return rows.map(toObjectiveScore);
 }
 
@@ -430,7 +437,7 @@ export async function postProjectBaselineScoring(
     // before the member await (position unchanged).
     await Promise.all(scores.map(s =>
         ctx.PUT(
-            'projects/' + projectId
+            organizationItem(ctx, 'projects', projectId)
             + '/objective-baseline-scores/'
             + generateCryptoSafeBase62(),
             {
@@ -457,7 +464,7 @@ export async function postProjectActualMeasurement(
     const member = await getCurrentHumanMember(ctx);
     await Promise.all(scores.map(s =>
         ctx.PUT(
-            'projects/' + projectId
+            organizationItem(ctx, 'projects', projectId)
             + '/objective-actual-scores/'
             + generateCryptoSafeBase62(),
             {

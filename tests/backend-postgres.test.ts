@@ -80,12 +80,12 @@ function fakeClient(): {
 
 const REQUEST_ROW = {
     id: 'aaaaaaaaaaaaaaaaaaaaaa',
-    uri_collection: '/ideas/',
+    uri_collection: '/organizations/1/ideas/',
     uri_id: '42',
     at: '2026-01-01T00:00:00.000000Z',
     requester_identity_id: 'bbbbbbbbbbbbbbbbbbbbbb',
     message_hash: 'a'.repeat(64),
-    message: 'PUT /ideas/42 HTTP/1.1\r\n\r\n'
+    message: 'PUT /organizations/1/ideas/42 HTTP/1.1\r\n\r\n'
         + String.fromCharCode(0x80, 0x9c, 0xe9),
     method: 'PUT',
     operation_id: 'cccccccccccccccccccccc',
@@ -176,7 +176,7 @@ async () => {
         ['requests'],
         'readonly',
         (tx) => tx.getWhere(
-            'requests', 'uri_collection', '/ideas/',
+            'requests', 'uri_collection', '/organizations/1/ideas/',
         ),
     );
     const text = fake.calls[0]!.text;
@@ -189,7 +189,7 @@ async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.getAddress(
-        'requests', '/ideas/', '42',
+        'requests', '/organizations/1/ideas/', '42',
     );
     const text = fake.calls[0]!.text;
     assert.match(text, /WHERE uri_collection = \$1/);
@@ -197,7 +197,7 @@ async () => {
     assert.match(text, /ORDER BY at, id/);
     assert.deepEqual(
         fake.calls[0]!.values,
-        ['/ideas/', '42'],
+        ['/organizations/1/ideas/', '42'],
     );
 });
 
@@ -209,7 +209,7 @@ async () => {
         ['responses'],
         'readonly',
         (tx) => tx.getAddressVersion(
-            'responses', '/ideas/', '42', 'ab',
+            'responses', '/organizations/1/ideas/', '42', 'ab',
         ),
     );
     const text = fake.calls[0]!.text;
@@ -220,7 +220,7 @@ async () => {
     assert.match(text, /ORDER BY at, id/);
     assert.deepEqual(
         fake.calls[0]!.values,
-        ['/ideas/', '42', 'ab'],
+        ['/organizations/1/ideas/', '42', 'ab'],
     );
 });
 

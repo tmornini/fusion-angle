@@ -358,8 +358,6 @@ async function handleSave(): Promise<void> {
             ...entity,
             ...trimStrings(patch),
             state: idea.stateValue(),
-            stateAt: idea.stateAtValue(),
-            stateEventId: idea.stateEventIdValue(),
         });
     } catch (err) {
         log.error(

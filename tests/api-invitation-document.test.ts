@@ -103,7 +103,8 @@ async function grant(
     email = 'sarah@x.com',
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/invitations', await organizationToken(),
+        'POST', '/organizations/1/invitations/',
+        await organizationToken(),
         {
             email,
             invitationId,
@@ -120,7 +121,7 @@ test('a fresh grant appends 2 pairs — the operation and the'
 async () => {
     const db = await freshDb();
     const res = await grant(db, 'inv-doc-1');
-    assert.equal(res.status, 201);
+    assert.equal(res.status, 200);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     // 6: the fixture's own membership pair (Phase 13 Task 1;
@@ -157,9 +158,9 @@ test('a duplicate grant appends ONLY its operation pair — no'
 async () => {
     const db = await freshDb();
     const first = await grant(db, 'inv-doc-2a');
-    assert.equal(first.status, 201);
+    assert.equal(first.status, 200);
     const second = await grant(db, 'inv-doc-2b');
-    assert.equal(second.status, 201);
+    assert.equal(second.status, 200);
     const requests = await db.requests.getAll();
     const atDuplicateId = requests.filter(
         r => r.uri_collection === '/invitations/'
@@ -205,9 +206,15 @@ async function accept(
     acceptAt: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/invitations/' + invitationId + '/acceptance',
+        'PUT',
+        '/identities/sarah/invitations/' + invitationId,
         await organizationToken('sarah', '1'),
-        { membershipId, acceptEventId: eventId, acceptAt },
+        {
+            state: 'accepted',
+            membershipId,
+            eventId,
+            at: acceptAt,
+        },
     ));
 }
 
@@ -219,7 +226,7 @@ test('a fresh accept appends its seat document at the'
         db, 'inv-doc-3', 'ms-doc-3', 'ev-acc-3',
         '2026-01-01T00:00:01.000000Z',
     );
-    assert.equal(res.status, 201);
+    assert.equal(res.status, 204);
     const requests = await db.requests.getAll();
     const responses = await db.responses.getAll();
     const documents = documentPairsAt(
@@ -259,12 +266,12 @@ async () => {
         db, 'inv-doc-4', 'ms-doc-4', 'ev-acc-4',
         '2026-01-01T00:00:01.000000Z',
     );
-    assert.equal(first.status, 201);
+    assert.equal(first.status, 204);
     const second = await accept(
         db, 'inv-doc-4', 'ms-doc-4b', 'ev-acc-4b',
         '2026-01-01T00:00:02.000000Z',
     );
-    assert.equal(second.status, 201);
+    assert.equal(second.status, 409);
     const documents = (await db.requests.getAll()).filter(
         r => r.uri_collection === '/organizations/1/members/'
             && r.uri_id === 'sarah',
@@ -282,9 +289,15 @@ async function declineFor(
     declineAt: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/invitations/' + invitationId + '/decline',
+        'PUT',
+        '/identities/' + invitee
+            + '/invitations/' + invitationId,
         await organizationToken(invitee, '1'),
-        { declineEventId: eventId, declineAt },
+        {
+            state: 'declined',
+            eventId,
+            at: declineAt,
+        },
     ));
 }
 
@@ -295,9 +308,14 @@ async function revokeFor(
     revokeAt: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/invitations/' + invitationId + '/revocation',
+        'PUT',
+        '/organizations/1/invitations/' + invitationId,
         await organizationToken(),
-        { revokeEventId: eventId, revokeAt },
+        {
+            state: 'revoked',
+            eventId,
+            at: revokeAt,
+        },
     ));
 }
 
@@ -313,12 +331,14 @@ test('deriveInvitations round-trips every terminal state:'
 
     await grant(db, 'inv-derive-accept', 'bruce@x.com');
     await handleRequest(db, req(
-        'POST', '/invitations/inv-derive-accept/acceptance',
+        'PUT',
+        '/identities/bruce/invitations/inv-derive-accept',
         await organizationToken('bruce', '1'),
         {
+            state: 'accepted',
             membershipId: 'ms-derive-bruce',
-            acceptEventId: 'ev-derive-acc',
-            acceptAt: '2026-01-01T00:00:01.000000Z',
+            eventId: 'ev-derive-acc',
+            at: '2026-01-01T00:00:01.000000Z',
         },
     ));
 
@@ -368,12 +388,14 @@ test('every stored invitation-family message verifies against'
     await grant(db, 'inv-balance-1', 'sarah@x.com');
     await grant(db, 'inv-balance-2', 'bruce@x.com');
     await handleRequest(db, req(
-        'POST', '/invitations/inv-balance-2/acceptance',
+        'PUT',
+        '/identities/bruce/invitations/inv-balance-2',
         await organizationToken('bruce', '1'),
         {
+            state: 'accepted',
             membershipId: 'ms-balance-2',
-            acceptEventId: 'ev-balance-acc',
-            acceptAt: '2026-01-01T00:00:01.000000Z',
+            eventId: 'ev-balance-acc',
+            at: '2026-01-01T00:00:01.000000Z',
         },
     ));
     await grant(db, 'inv-balance-3', 'clark@x.com');

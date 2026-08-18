@@ -149,7 +149,7 @@ async function createFlow(
     flowId: string,
 ): Promise<void> {
     const created = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: flowId,
             flow: flowFields('genesis'),
             projectFlowId: flowId + '-pf',
@@ -170,10 +170,10 @@ async function headResponseId(
     db: MemoryDbAdapter, token: string, flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
+        'GET', '/organizations/1/flows/' + flowId, token,
     ));
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /flows/' + flowId);
+    assert.ok(id, 'no Response-ID on GET /organizations/1/flows/' + flowId);
     return id!;
 }
 
@@ -187,12 +187,12 @@ async function save(
     name: string, eventId: string,
 ): Promise<void> {
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
+        'GET', '/organizations/1/flows/' + flowId, token,
     ));
     const etag = got.headers.get('ETag');
-    assert.ok(etag, 'no ETag on GET /flows/' + flowId);
+    assert.ok(etag, 'no ETag on GET /organizations/1/flows/' + flowId);
     const res = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/1/flows/' + flowId, token,
         documentBody(name, eventId),
         { 'if-match': etag },
     ));
@@ -204,7 +204,7 @@ async function undo(
     eventId: string, at: string,
 ): Promise<Response> {
     return handleRequest(db, req(
-        'POST', '/flows/' + flowId + '/undo', token,
+        'POST', '/organizations/1/flows/' + flowId + '/undo', token,
         { eventId, at },
     ));
 }
@@ -213,7 +213,7 @@ async function currentGraphName(
     db: MemoryDbAdapter, token: string, flowId: string,
 ): Promise<string> {
     const got = await handleRequest(db, req(
-        'GET', '/flows/' + flowId, token,
+        'GET', '/organizations/1/flows/' + flowId, token,
     ));
     const body = await got.json() as { name: string };
     return body.name;
@@ -419,7 +419,8 @@ test(
                 resource: string,
                 body: Record<string, unknown>,
             ): Promise<T> => {
-                if (resource === 'flows/' + flowId + '/undo') {
+                if (resource === 'organizations/1/flows/' + flowId +
+                    '/undo') {
                     posts += 1;
                     if (posts === 1) {
                         return Promise.reject(
@@ -508,7 +509,7 @@ test(
         // the live route, at the instant a concurrent write
         // could still race it.
         const undoUriPrefix = canonicalUriCollection(
-            organization, '/flows/' + flowId + '/undo/',
+            organization, '/organizations/1/flows/' + flowId + '/undo/',
         );
         const staleResolution = await resolveFlowUndoTarget(
             db, organization, flowId, undoUriPrefix,
@@ -525,8 +526,8 @@ test(
         // and 412s — it must never silently discard B.
         const pair = await formWritePair({
             method: 'POST',
-            pathname: '/flows/' + flowId + '/undo',
-            routePattern: 'flows/:id/undo',
+            pathname: '/organizations/1/flows/' + flowId + '/undo',
+            routePattern: 'organizations/:id/flows/:id/undo',
             routeSegments: ['flows', ':id', 'undo'],
             pathSegments: ['flows', flowId, 'undo'],
             headerFields: [],
@@ -574,7 +575,7 @@ test(
         const nodeId = 'sidecar-node';
 
         const created = await handleRequest(db, req(
-            'POST', '/flows', token, {
+            'POST', '/organizations/1/flows/', token, {
                 id: flowId,
                 flow: flowFields('Sidecar Flow'),
                 projectFlowId: flowId + '-pf',
@@ -601,13 +602,13 @@ test(
         assert.equal(created.status, 201);
 
         const got = await handleRequest(db, req(
-            'GET', '/flows/' + flowId, token,
+            'GET', '/organizations/1/flows/' + flowId, token,
         ));
         const etag = got.headers.get('ETag');
-        assert.ok(etag, 'no ETag on GET /flows/' + flowId);
+        assert.ok(etag, 'no ETag on GET /organizations/1/flows/' + flowId);
         const deleteAt = '2026-01-01T00:00:01.000000Z';
         const deleted = await handleRequest(db, req(
-            'PUT', '/flows/' + flowId, token,
+            'PUT', '/organizations/1/flows/' + flowId, token,
             documentBody(
                 'Sidecar Trimmed', flowId + '-del', {
                     state_at: deleteAt,
@@ -692,7 +693,8 @@ test(
 
 // ROOT CAUSE, wire evidence, and the two fixes are narrated in
 // full in .superpowers/sdd/phase14-task-8-report.md's
-// "Fix wave 2" section. Short version: web-app/flows/detail.ts's
+// "Fix wave 2" section. Short version:
+// web-app/organizations/1/flows/detail.ts's
 // handleUndo/handleRedo used to follow their OWN commit with
 // commitAndFit(pageState.presenter().withLayoutReconciled()) —
 // a SAVE-TRIGGERING call, even though op.freshSnap already
@@ -702,12 +704,14 @@ test(
 // client-side). That redundant save landed its own document
 // pair immediately after every undo/redo click — and the cursor
 // (resolveFlowUndoTarget) correctly, BY DESIGN, treats every
-// flows/:id document pair as a full history step (that's the
+// organizations/:id/flows/:id document pair as a full history step (that's
+// the
 // whole point of undo-as-replay) — so it "ate" the NEXT undo
 // click, which reverted the reconcile noise instead of reaching
 // the user's actual prior edit. The fix (removing the two
 // commitAndFit(...withLayoutReconciled()) calls,
-// web-app/flows/detail.ts) is NOT reachable from this test file:
+// web-app/organizations/1/flows/detail.ts) is NOT reachable from this test
+// file:
 // it is a page-level DOM change with no automated seam
 // (FlowDesignerPresenter#queueSave calls sessionContext()
 // internally, which requires a real browser IndexedDB

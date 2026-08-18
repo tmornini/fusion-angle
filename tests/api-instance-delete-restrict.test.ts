@@ -42,9 +42,9 @@ const FR_ID = 'fr-del-restrict-1';
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
-const ATTRS = TYPE_DETAIL + '/attributes';
-const INSTANCES = TYPE_DETAIL + '/instances';
-const INSTANCE_DETAIL = INSTANCES + '/' + INSTANCE_ID;
+const ATTRS = TYPE_DETAIL + '/attributes/';
+const INSTANCES = TYPE_DETAIL + '/instances/';
+const INSTANCE_DETAIL = INSTANCES + INSTANCE_ID;
 
 const N_CREATE = 'n-create';
 const N_MID = 'n-mid';
@@ -112,7 +112,7 @@ async function seedFlow(
     token: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/flows', token, {
+        'POST', '/organizations/1/flows/', token, {
             id: FLOW_ID,
             flow: {
                 name: 'Delete Restrict Flow',
@@ -149,7 +149,7 @@ async function seedWorkOrder(
     fwoId: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', '/work-orders/' + woId, token, {
+        'PUT', '/organizations/1/work-orders/' + woId, token, {
             display_id: 'abcd',
             flow_graph: flowGraph(),
             position: 1,
@@ -158,7 +158,7 @@ async function seedWorkOrder(
     assert.equal(put.status, 201);
     const join = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/work-orders/' + fwoId,
+        '/organizations/1/flows/' + FLOW_ID + '/work-orders/' + fwoId,
         token,
         {
             flow_id: FLOW_ID,
@@ -179,8 +179,6 @@ async function seedLiveType(
             description: '',
             position: 1,
             state: 'active',
-            state_at: AT,
-            state_event_id: TYPE_ID + '-genesis',
         },
     ));
     assert.equal(put.status, 201);
@@ -191,7 +189,7 @@ async function seedAttribute(
     token: string,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', ATTRS + '/' + ATTR_ID, token, {
+        'PUT', ATTRS + ATTR_ID, token, {
             name: 'Title',
             attribute_type: 'text',
             sort_order: 0,
@@ -209,7 +207,7 @@ async function seedInstance(
     token: string,
     instanceId: string,
 ): Promise<void> {
-    const path = INSTANCES + '/' + instanceId;
+    const path = INSTANCES + instanceId;
     const put = await handleRequest(db, req(
         'PATCH', path, token, {
             set: [
@@ -229,7 +227,7 @@ async function seedFlowTypeJoin(
 ): Promise<void> {
     const put = await handleRequest(db, req(
         'PUT',
-        '/flows/' + FLOW_ID + '/records/' + FR_ID,
+        '/organizations/1/flows/' + FLOW_ID + '/records/' + FR_ID,
         token,
         {
             id: FR_ID,
@@ -249,7 +247,7 @@ async function bindInstance(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'PUT',
-        '/work-orders/' + woId + '/binding',
+        '/organizations/1/work-orders/' + woId + '/binding',
         token,
         {
             instance_id: instanceId,
@@ -268,7 +266,7 @@ async function transitionTo(
 ): Promise<void> {
     const res = await handleRequest(db, req(
         'POST',
-        '/work-orders/' + woId + '/transition',
+        '/organizations/1/work-orders/' + woId + '/transition',
         token,
         {
             transitionEventId: eventId,
@@ -351,7 +349,7 @@ async () => {
     await seedInstance(db, token, INSTANCE_FRESH);
     const res = await handleRequest(db, req(
         'DELETE',
-        INSTANCES + '/' + INSTANCE_FRESH,
+        INSTANCES + INSTANCE_FRESH,
         token,
     ));
     assert.equal(res.status, 204);
@@ -388,7 +386,7 @@ async () => {
     assert.equal(del.status, 204);
     const bind = await handleRequest(db, req(
         'PUT',
-        '/work-orders/' + WO_UNBOUND + '/binding',
+        '/organizations/1/work-orders/' + WO_UNBOUND + '/binding',
         token,
         {
             instance_id: INSTANCE_ID,

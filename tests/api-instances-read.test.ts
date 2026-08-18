@@ -54,11 +54,11 @@ const INSTANCE_C = 'inst-c';
 const TYPE_DETAIL =
     '/organizations/' + ORGANIZATION
     + '/record-types/' + TYPE_ID;
-const ATTRS = TYPE_DETAIL + '/attributes';
-const INSTANCES = TYPE_DETAIL + '/instances';
+const ATTRS = TYPE_DETAIL + '/attributes/';
+const INSTANCES = TYPE_DETAIL + '/instances/';
 
 function detailPath(instanceId: string): string {
-    return INSTANCES + '/' + instanceId;
+    return INSTANCES + instanceId;
 }
 
 function req(
@@ -120,8 +120,6 @@ function typeBody(): Record<string, unknown> {
         description: 'Rental desc',
         position: 1,
         state: 'active',
-        state_at: AT,
-        state_event_id: TYPE_ID + '-genesis',
     };
 }
 
@@ -142,7 +140,7 @@ async function putAttribute(
     body: Record<string, unknown>,
 ): Promise<void> {
     const put = await handleRequest(db, req(
-        'PUT', ATTRS + '/' + attrId, adminToken, body,
+        'PUT', ATTRS + attrId, adminToken, body,
     ));
     assert.equal(put.status, 201);
 }

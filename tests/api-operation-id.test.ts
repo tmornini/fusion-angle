@@ -17,8 +17,6 @@ const validIdea = {
     expected_outcome: 'o',
     success_metrics: 'm',
     state: 'active',
-    state_at: '2026-01-01T00:00:00.000000Z',
-    state_event_id: 'ev-opid',
 };
 
 test('public PUT without Operation-ID is 400',
@@ -27,7 +25,7 @@ async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request('http://localhost/ideas/i1', {
+        new Request('http://localhost/organizations/1/ideas/i1', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -47,7 +45,7 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/ideas/i2',
+            path: '/organizations/1/ideas/i2',
             token: DEV_TOKEN,
             body: validIdea,
             operationId: 'too-short',
@@ -62,7 +60,7 @@ async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request('http://localhost/ideas', {
+        new Request('http://localhost/organizations/1/ideas/', {
             headers: {
                 Authorization: 'Bearer ' + DEV_TOKEN,
             },
@@ -79,7 +77,7 @@ async () => {
         db,
         apiRequest({
             method: 'PUT',
-            path: '/ideas/i3',
+            path: '/organizations/1/ideas/i3',
             token: DEV_TOKEN,
             body: validIdea,
             operationId: TEST_OPERATION_ID,
@@ -159,13 +157,16 @@ async () => {
     await seedAdminSchema(db);
     const res = await handleRequest(
         db,
-        new Request('http://localhost/invitations', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+        new Request(
+            'http://localhost/organizations/1/invitations/',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({}),
             },
-            body: JSON.stringify({}),
-        }),
+        ),
     );
     assert.equal(res.status, 401);
 });

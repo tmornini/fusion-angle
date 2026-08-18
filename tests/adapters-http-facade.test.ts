@@ -44,11 +44,11 @@ test(
                 'http://example.test',
             );
             await facade.PUT(
-                'ideas/1', { name: 'x' }, 'tok',
+                'organizations/1/ideas/1', { name: 'x' }, 'tok',
             );
         });
         assert.equal(
-            url, 'http://example.test/ideas/1',
+            url, 'http://example.test/organizations/1/ideas/1',
         );
         assert.equal(credentials, 'same-origin');
         assert.ok(operationId !== null);
@@ -69,7 +69,7 @@ test(
                 createHttpFacade('http://example.test'),
                 DEV_TOKEN,
             );
-            await ctx.PUT('ideas/1', { name: 'x' });
+            await ctx.PUT('organizations/1/ideas/1', { name: 'x' });
         });
         assert.ok(operationId !== null);
         assert.match(operationId, OPERATION_ID);
@@ -95,7 +95,7 @@ test(
                 'http://example.test',
             );
             await assert.rejects(
-                () => facade.GET('organizations/1/members', 'tok'),
+                () => facade.GET('organizations/1/members/', 'tok'),
                 (err: unknown) => {
                     assert.ok(
                         err instanceof UnauthorizedError,

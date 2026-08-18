@@ -727,8 +727,6 @@ export function ideaSeedBody(
         ...ideaFields,
         organization_id: assignOrganization(index),
         state: event.state,
-        state_at: event.at,
-        state_event_id: event.id,
     };
 }
 
@@ -769,8 +767,6 @@ export function projectSeedBody(
         ...projectFields,
         organization_id: organization,
         state: event.state,
-        state_at: event.at,
-        state_event_id: event.id,
     };
 }
 
@@ -1542,8 +1538,8 @@ export function buildMockDataInvocations():
         const event = ideaStateEventById.get(idea.id)!;
         invocations.push({
             key: seedPairKey('ideas', idea.id),
-            routePattern: 'ideas/:id',
-            idParams: [idea.id],
+            routePattern: 'organizations/:id/ideas/:id',
+            idParams: [assignOrganization(i), idea.id],
             organization: assignOrganization(i),
             requesterIdentityId: event.member_id,
             body: ideaSeedBody(idea, event, i),
@@ -1578,8 +1574,12 @@ export function buildMockDataInvocations():
         const ideaIndex = ideaIndexById.get(submission.idea_id)!;
         invocations.push({
             key: seedPairKey('idea-submissions', submission.id),
-            routePattern: 'ideas/:id/submissions/:sid',
-            idParams: [submission.idea_id, submission.id],
+            routePattern:
+                'organizations/:id/ideas/:id/submissions/:sid',
+            idParams: [
+                assignOrganization(ideaIndex),
+                submission.idea_id, submission.id,
+            ],
             organization: assignOrganization(ideaIndex),
             requesterIdentityId: submission.member_id,
             body: ideaSubmissionSeedBody(submission),
@@ -1590,8 +1590,8 @@ export function buildMockDataInvocations():
         const organization = projectOrganizationFor(project);
         invocations.push({
             key: seedPairKey('projects', project.id),
-            routePattern: 'projects/:id',
-            idParams: [project.id],
+            routePattern: 'organizations/:id/projects/:id',
+            idParams: [organization, project.id],
             organization,
             requesterIdentityId: event.member_id,
             body: projectSeedBody(project, event, organization),
@@ -1607,7 +1607,9 @@ export function buildMockDataInvocations():
         );
         invocations.push({
             key: seedPairKey('flows', flow.id),
-            routePattern: 'flows',
+            routePattern: 'organizations/:id/flows/',
+            idParams: [STARK_ORGANIZATION],
+            op: true,
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
             body: createBody,
@@ -1624,8 +1626,8 @@ export function buildMockDataInvocations():
         const b = validateFlowCreateBody(createBody);
         invocations.push({
             key: seedPairKey('flows/:id', flow.id),
-            routePattern: 'flows/:id',
-            idParams: [flow.id],
+            routePattern: 'organizations/:id/flows/:id',
+            idParams: [STARK_ORGANIZATION, flow.id],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
             body: seedFlowDocumentBody(b, flow.graph),
@@ -1634,8 +1636,12 @@ export function buildMockDataInvocations():
             key: seedPairKey(
                 'projects/:id/flows/:pfid', projectFlow.id,
             ),
-            routePattern: 'projects/:id/flows/:pfid',
-            idParams: [projectFlow.project_id, projectFlow.id],
+            routePattern:
+                'organizations/:id/projects/:id/flows/:pfid',
+            idParams: [
+                STARK_ORGANIZATION,
+                projectFlow.project_id, projectFlow.id,
+            ],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
             body: b.projectFlow,
@@ -1647,8 +1653,8 @@ export function buildMockDataInvocations():
     // four-above's postFlowCreationOp.
     invocations.push({
         key: seedPairKey('flows/:id', 'seed-flow-org2'),
-        routePattern: 'flows/:id',
-        idParams: ['seed-flow-org2'],
+        routePattern: 'organizations/:id/flows/:id',
+        idParams: [ORGANIZATION_TWO, 'seed-flow-org2'],
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: flowOrg2SeedBody(),
@@ -1670,8 +1676,9 @@ export function buildMockDataInvocations():
     ) {
         invocations.push({
             key: seedPairKey('work-orders/:id', wo.id),
-            routePattern: 'work-orders/:id',
-            idParams: [wo.id],
+            routePattern:
+                'organizations/:id/work-orders/:id',
+            idParams: [STARK_ORGANIZATION, wo.id],
             organization: STARK_ORGANIZATION,
             requesterIdentityId:
                 workOrderFirstEventMemberId.get(wo.id)!,
@@ -1688,8 +1695,11 @@ export function buildMockDataInvocations():
             key: seedPairKey(
                 'flows/:id/work-orders/:woid', join.id,
             ),
-            routePattern: 'flows/:id/work-orders/:woid',
-            idParams: [join.flow_id, join.id],
+            routePattern:
+                'organizations/:id/flows/:id/work-orders/:woid',
+            idParams: [
+                STARK_ORGANIZATION, join.flow_id, join.id,
+            ],
             organization: STARK_ORGANIZATION,
             // The SAME member as the join's own work order's
             // document pair — the requesting identity is who
@@ -1731,8 +1741,9 @@ export function buildMockDataInvocations():
             key: seedPairKey(
                 'work-orders/:id/transition', event.id,
             ),
-            routePattern: 'work-orders/:id/transition',
-            idParams: [event.entity_id],
+            routePattern:
+                'organizations/:id/work-orders/:id/transition',
+            idParams: [STARK_ORGANIZATION, event.entity_id],
             op: true,
             organization: STARK_ORGANIZATION,
             requesterIdentityId: event.member_id,
@@ -1824,8 +1835,12 @@ export function buildMockDataInvocations():
             key: seedPairKey(
                 'flows/:id/records/:frid', join.id,
             ),
-            routePattern: 'flows/:id/records/:frid',
-            idParams: [join.flow_id, join.id],
+            routePattern:
+                'organizations/:id/flows/:id/records/:frid',
+            idParams: [
+                flowRecordOrganizationFor(join),
+                join.flow_id, join.id,
+            ],
             organization: flowRecordOrganizationFor(join),
             requesterIdentityId: recordStateEventByRecordId
                 .get(join.record_id)!.member_id,
@@ -1842,7 +1857,9 @@ export function buildMockDataInvocations():
         );
         invocations.push({
             key: seedPairKey('objectives', seed.id),
-            routePattern: 'objectives',
+            routePattern: 'organizations/:id/objectives/',
+            idParams: [STARK_ORGANIZATION],
+            op: true,
             organization: STARK_ORGANIZATION,
             requesterIdentityId: memberId,
             body: createBody,
@@ -1859,8 +1876,8 @@ export function buildMockDataInvocations():
         const b = validateObjectiveCreateBody(createBody);
         invocations.push({
             key: seedPairKey('objectives/:id', seed.id),
-            routePattern: 'objectives/:id',
-            idParams: [seed.id],
+            routePattern: 'organizations/:id/objectives/:id',
+            idParams: [STARK_ORGANIZATION, seed.id],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: memberId,
             body: objectiveDocumentBodyOf(b),
@@ -1869,8 +1886,12 @@ export function buildMockDataInvocations():
             key: seedPairKey(
                 'objectives/:id/revisions/:rid', b.revisionId,
             ),
-            routePattern: 'objectives/:id/revisions/:rid',
-            idParams: [seed.id, b.revisionId],
+            routePattern:
+                'organizations/:id/objectives/:id'
+                + '/revisions/:rid',
+            idParams: [
+                STARK_ORGANIZATION, seed.id, b.revisionId,
+            ],
             organization: STARK_ORGANIZATION,
             requesterIdentityId: memberId,
             body: objectiveRevisionBodyOf(b),
@@ -1884,7 +1905,9 @@ export function buildMockDataInvocations():
         key: seedPairKey(
             'objectives', ORGANIZATION_TWO_OBJECTIVE.id,
         ),
-        routePattern: 'objectives',
+        routePattern: 'organizations/:id/objectives/',
+        idParams: [ORGANIZATION_TWO],
+        op: true,
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: org2CreateBody,
@@ -1894,8 +1917,11 @@ export function buildMockDataInvocations():
         key: seedPairKey(
             'objectives/:id', ORGANIZATION_TWO_OBJECTIVE.id,
         ),
-        routePattern: 'objectives/:id',
-        idParams: [ORGANIZATION_TWO_OBJECTIVE.id],
+        routePattern: 'organizations/:id/objectives/:id',
+        idParams: [
+            ORGANIZATION_TWO,
+            ORGANIZATION_TWO_OBJECTIVE.id,
+        ],
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: objectiveDocumentBodyOf(org2),
@@ -1904,8 +1930,13 @@ export function buildMockDataInvocations():
         key: seedPairKey(
             'objectives/:id/revisions/:rid', org2.revisionId,
         ),
-        routePattern: 'objectives/:id/revisions/:rid',
-        idParams: [ORGANIZATION_TWO_OBJECTIVE.id, org2.revisionId],
+        routePattern:
+            'organizations/:id/objectives/:id'
+            + '/revisions/:rid',
+        idParams: [
+            ORGANIZATION_TWO,
+            ORGANIZATION_TWO_OBJECTIVE.id, org2.revisionId,
+        ],
         organization: ORGANIZATION_TWO,
         requesterIdentityId: SYSTEM_MEMBER_ID,
         body: objectiveRevisionBodyOf(org2),
@@ -1933,8 +1964,14 @@ export function buildMockDataInvocations():
                 row.id,
             ),
             routePattern:
-                'projects/:id/objective-baseline-scores/:sid',
-            idParams: [row.fields.project_id, row.id],
+                'organizations/:id/projects/:id'
+                + '/objective-baseline-scores/:sid',
+            idParams: [
+                scoreProjectOrganizationById.get(
+                    row.fields.project_id,
+                )!,
+                row.fields.project_id, row.id,
+            ],
             organization: scoreProjectOrganizationById.get(
                 row.fields.project_id,
             )!,
@@ -1949,8 +1986,14 @@ export function buildMockDataInvocations():
                 row.id,
             ),
             routePattern:
-                'projects/:id/objective-actual-scores/:sid',
-            idParams: [row.fields.project_id, row.id],
+                'organizations/:id/projects/:id'
+                + '/objective-actual-scores/:sid',
+            idParams: [
+                scoreProjectOrganizationById.get(
+                    row.fields.project_id,
+                )!,
+                row.fields.project_id, row.id,
+            ],
             organization: scoreProjectOrganizationById.get(
                 row.fields.project_id,
             )!,
@@ -2175,12 +2218,16 @@ export async function formInstanceChainPairs():
     const binding = await formWritePair({
         method: 'PUT',
         pathname:
-            '/work-orders/' + woId + '/binding',
-        routePattern: 'work-orders/:id/binding',
+            '/organizations/' + org
+            + '/work-orders/' + woId + '/binding',
+        routePattern:
+            'organizations/:id/work-orders/:id/binding',
         routeSegments: [
+            'organizations', ':id',
             'work-orders', ':id', 'binding',
         ],
         pathSegments: [
+            'organizations', org,
             'work-orders', woId, 'binding',
         ],
         headerFields: [],
@@ -2200,12 +2247,16 @@ export async function formInstanceChainPairs():
     const reviewOp = await formWritePair({
         method: 'POST',
         pathname:
-            '/work-orders/' + woId + '/transition',
-        routePattern: 'work-orders/:id/transition',
+            '/organizations/' + org
+            + '/work-orders/' + woId + '/transition',
+        routePattern:
+            'organizations/:id/work-orders/:id/transition',
         routeSegments: [
+            'organizations', ':id',
             'work-orders', ':id', 'transition',
         ],
         pathSegments: [
+            'organizations', org,
             'work-orders', woId, 'transition',
         ],
         headerFields: [],
@@ -2242,12 +2293,16 @@ export async function formInstanceChainPairs():
     const completeOp = await formWritePair({
         method: 'POST',
         pathname:
-            '/work-orders/' + woId + '/transition',
-        routePattern: 'work-orders/:id/transition',
+            '/organizations/' + org
+            + '/work-orders/' + woId + '/transition',
+        routePattern:
+            'organizations/:id/work-orders/:id/transition',
         routeSegments: [
+            'organizations', ':id',
             'work-orders', ':id', 'transition',
         ],
         pathSegments: [
+            'organizations', org,
             'work-orders', woId, 'transition',
         ],
         headerFields: [],

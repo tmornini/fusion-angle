@@ -12,7 +12,7 @@ import {
 } from './http-fixtures.ts';
 
 // Task 23: flat records + record-attributes routes are gone
-// (404, not 405). flows/:id/records join family verb gaps
+// (404, not 405). organizations/:id/flows/:id/records join family verb gaps
 // stay. Nested type verb gaps live in
 // api-record-types-verb-gaps.test.ts.
 
@@ -109,42 +109,42 @@ async () => {
     assert.equal(res.status, 404);
 });
 
-test('POST flows/:id/records 405s (no post handler wired)',
+test('POST organizations/:id/flows/:id/records 405s (no post handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/flows/f1/records', token, {},
+        'POST', '/organizations/1/flows/f1/records/', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('PUT flows/:id/records 405s (no put handler wired)',
+test('PUT organizations/:id/flows/:id/records 405s (no put handler wired)',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'PUT', '/flows/f1/records', token, {},
+        'PUT', '/organizations/1/flows/f1/records/', token, {},
     ));
     assert.equal(res.status, 405);
 });
 
-test('DELETE flows/:id/records 405s (no delete handler'
+test('DELETE organizations/:id/flows/:id/records 405s (no delete handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(
-        db, req('DELETE', '/flows/f1/records', token),
+        db, req('DELETE', '/organizations/1/flows/f1/records/', token),
     );
     assert.equal(res.status, 405);
 });
 
-test('POST flows/:id/records/:frid 405s (no post handler'
+test('POST organizations/:id/flows/:id/records/:frid 405s (no post handler'
 + ' wired)', async () => {
     const db = await freshDb();
     const token = await organizationToken();
     const res = await handleRequest(db, req(
-        'POST', '/flows/f1/records/frid1', token, {},
+        'POST', '/organizations/1/flows/f1/records/frid1', token, {},
     ));
     assert.equal(res.status, 405);
 });

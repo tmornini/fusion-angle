@@ -67,7 +67,7 @@ test('a live member passes the membership fence',
 async () => {
     const db = await adminDb();
     const res = await handleRequest(
-        db, req('/organizations/1/members', await organizationToken()));
+        db, req('/organizations/1/members/', await organizationToken()));
     assert.equal(res.status, 200);
 });
 
@@ -76,14 +76,14 @@ async () => {
     const db = await adminDb();
     const token = await organizationToken();   // org '1' claim
     const before = await handleRequest(
-        db, req('/organizations/1/members', token));
+        db, req('/organizations/1/members/', token));
     assert.equal(before.status, 200);
     // Claim-based fence: de-membership lands on the pair plane
     // but the existing token's organizations claim still holds
     // until mint/refresh/exchange or exp.
     await deleteMembership(db, 'current');
     const after = await handleRequest(
-        db, req('/organizations/1/members', token));
+        db, req('/organizations/1/members/', token));
     assert.equal(after.status, 200);
 });
 
@@ -100,6 +100,6 @@ async () => {
     assert.equal(pin.status, 201);
     await deleteMembership(db, 'current');
     const res = await handleRequest(
-        db, req('/organizations/1/members', await devToken()));
+        db, req('/organizations/1/members/', await devToken()));
     assert.equal(res.status, 403);
 });

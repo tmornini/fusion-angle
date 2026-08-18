@@ -192,17 +192,42 @@ export function documentLifecycleEvents(
 ): DocumentLifecycleEvent[] {
     const seen = new Set<Id>();
     const events: DocumentLifecycleEvent[] = [];
+    let afterDelete = false;
     for (const pair of pairs) {
-        if (pair.method === DELETE_METHOD) continue;
-        const stateEventId = pickString(
-            pair.body, 'state_event_id',
-        );
-        if (seen.has(stateEventId)) continue;
-        seen.add(stateEventId);
+        if (pair.method === DELETE_METHOD) {
+            afterDelete = true;
+            continue;
+        }
+        if ('state_event_id' in pair.body) {
+            const stateEventId = pickString(
+                pair.body, 'state_event_id',
+            );
+            if (seen.has(stateEventId)) continue;
+            seen.add(stateEventId);
+            events.push({
+                stateEventId,
+                state: pickString(pair.body, 'state'),
+                stateAt: pickString(pair.body, 'state_at'),
+                memberId: pair.requesterIdentityId,
+                version: pair.version,
+            });
+            afterDelete = false;
+            continue;
+        }
+        const state = pickString(pair.body, 'state');
+        const last = events[events.length - 1];
+        if (
+            !afterDelete
+            && last !== undefined
+            && last.state === state
+        ) {
+            continue;
+        }
+        afterDelete = false;
         events.push({
-            stateEventId,
-            state: pickString(pair.body, 'state'),
-            stateAt: pickString(pair.body, 'state_at'),
+            stateEventId: pair.id,
+            state,
+            stateAt: pair.at,
             memberId: pair.requesterIdentityId,
             version: pair.version,
         });

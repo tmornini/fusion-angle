@@ -88,7 +88,7 @@ function attributesPath(
         + activeOrganization(ctx)
         + '/record-types/'
         + recordTypeId
-        + '/attributes';
+        + '/attributes/';
 }
 
 // Per-type nested collection — the server filters; the

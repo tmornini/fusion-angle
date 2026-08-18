@@ -72,8 +72,6 @@ function recordDocument(
     return {
         ...recordFields(name),
         state,
-        state_at: stateAt,
-        state_event_id: stateEventId,
     };
 }
 
@@ -94,8 +92,8 @@ test('validateRecordDocumentBody accepts entity fields plus'
         name: 'Fresh', description: 'd', position: 1,
     });
     assert.equal(doc.state, 'active');
-    assert.equal(doc.state_at, AT);
-    assert.equal(doc.state_event_id, 'ev-1');
+    assert.equal(doc.state, 'active');
+    assert.equal('state_at' in doc, false);
 });
 
 test('validateRecordDocumentBody tolerates a caller-forged'
@@ -400,7 +398,7 @@ test('documentLifecycleEvents skips a DELETE-method pair,'
     assert.equal(pairs.length, 3);
     const events = documentLifecycleEvents(pairs);
     assert.deepEqual(
-        events.map(e => e.stateEventId),
-        ['ev-x1', 'ev-x2'],
+        events.map(e => e.state),
+        ['active', 'active'],
     );
 });

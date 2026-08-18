@@ -29,7 +29,7 @@ test(
 
         const labels = [
             'fusion.dedup.' + 'a'.repeat(64),
-            'fusion.address./ideas/42',
+            'fusion.address./organizations/1/ideas/42',
         ];
         for (const label of labels) {
             const key = await advisoryKey(label);

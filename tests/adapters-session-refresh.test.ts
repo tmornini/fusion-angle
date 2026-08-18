@@ -93,7 +93,7 @@ async () => {
         await postSessionRefresh(ctx, pair.refresh_token);
     assert.notEqual(creds.refreshToken, pair.refresh_token);
     assert.ok(Array.isArray(
-        await GET(db, 'organizations/1/members', creds.accessToken)));
+        await GET(db, 'organizations/1/members/', creds.accessToken)));
 });
 
 test('a garbage refresh token throws UnauthorizedError',

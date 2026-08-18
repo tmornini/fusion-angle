@@ -69,7 +69,7 @@ async () => {
         );
         const [a, b] = await Promise.all([
             facade.GET('members', 'dead-access'),
-            facade.GET('ideas', 'dead-access'),
+            facade.GET('organizations/1/ideas/', 'dead-access'),
         ]);
         assert.ok(Array.isArray(a));
         assert.ok(Array.isArray(b));

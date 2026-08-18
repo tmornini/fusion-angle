@@ -43,6 +43,7 @@ async function seeded(): Promise<MemoryDbAdapter> {
 
 const RECORDS_WIRING: DocumentFamilyWiring = {
     family: 'record-types',
+    httpNest: 'organization',
     lifecycle: 'trio',
     notFoundTable: 'records',
     validateDocument: validateRecordDocumentBody,
@@ -94,7 +95,7 @@ async function allAttributes(
             db,
             new Request(
                 'http://localhost/organizations/'
-                + organization + '/record-types',
+                + organization + '/record-types/',
                 {
                     headers: {
                         Authorization: 'Bearer ' + token,
@@ -110,7 +111,7 @@ async function allAttributes(
                 new Request(
                     'http://localhost/organizations/'
                     + organization + '/record-types/'
-                    + type.id + '/attributes',
+                    + type.id + '/attributes/',
                     {
                         headers: {
                             Authorization: 'Bearer ' + token,
@@ -252,7 +253,7 @@ test(
         const woRes = await handleRequest(
             db,
             new Request(
-                'http://localhost/work-orders/' + woId,
+                'http://localhost/organizations/1/work-orders/' + woId,
                 {
                     headers: {
                         Authorization: 'Bearer ' + token,
@@ -349,14 +350,19 @@ test(
         // JSON on each FlowWithGraph row (pair-plane head).
         async function assertGraphShape(
             token: string,
+            organization: string,
         ): Promise<void> {
             const res = await handleRequest(
                 db,
-                new Request('http://localhost/flows', {
-                    headers: {
-                        Authorization: 'Bearer ' + token,
+                new Request(
+                    'http://localhost/organizations/'
+                    + organization + '/flows/',
+                    {
+                        headers: {
+                            Authorization: 'Bearer ' + token,
+                        },
                     },
-                }),
+                ),
             );
             assert.equal(res.status, 200);
             const flows = await res.json() as {
@@ -366,7 +372,8 @@ test(
                 const detail = await handleRequest(
                     db,
                     new Request(
-                        'http://localhost/flows/'
+                        'http://localhost/organizations/'
+                        + organization + '/flows/'
                         + flow.id,
                         {
                             headers: {
@@ -402,11 +409,15 @@ test(
                 }
             }
         }
-        await assertGraphShape(await organizationToken());
+        await assertGraphShape(
+            await organizationToken(),
+            STARK_ORGANIZATION,
+        );
         await assertGraphShape(
             await organizationToken(
                 'current', ORGANIZATION_TWO,
             ),
+            ORGANIZATION_TWO,
         );
     },
 );

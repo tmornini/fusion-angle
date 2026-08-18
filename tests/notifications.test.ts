@@ -17,7 +17,7 @@ test('an identities route targets the path identity', () => {
 test('a body identity_id is a target', () => {
     assert.deepEqual(
         identityTargetsFor(
-            'ideas/:id', ['42'],
+            'organizations/:id/ideas/:id', ['42'],
             { identity_id: 'ada' },
         ),
         ['ada'],
@@ -38,7 +38,7 @@ test('a nested token-revocation targets the path identity',
 
 test('no identity facet yields no targets', () => {
     assert.deepEqual(
-        identityTargetsFor('ideas/:id', ['42'], {}),
+        identityTargetsFor('organizations/:id/ideas/:id', ['42'], {}),
         [],
     );
 });

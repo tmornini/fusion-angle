@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PUT /identities/:id/token-revocations/:rid</title>
+<h1>PUT /identities/:id/token-revocations/:rid</h1>
+<h2>Request body</h2>
+<pre>
+{
+  "identity_id": "id",
+  "at": "2020-01-01T00:00:00.000Z"
+}
+</pre>
+<h2>Headers</h2>
+<ul>
+  <li>Authorization: Bearer …</li>
+  <li>Operation-ID: on writes</li>
+</ul>
+<h2>Status</h2>
+<ul>
+  <li><a href="../../../../../statuses/200/">200</a></li>
+  <li><a href="../../../../../statuses/400/">400</a></li>
+  <li><a href="../../../../../statuses/401/">401</a></li>
+  <li><a href="../../../../../statuses/404/">404</a></li>
+</ul>

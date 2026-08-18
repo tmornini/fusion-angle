@@ -40,10 +40,10 @@ import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
 // (drift-identity-tokens craftsmanship).
 //
 // organizations is GLOBAL plane: it IS the tenant root, never
-// itself organization-nested. The only fence is the caller's
-// own membership set, applied either by GET /organizations'
-// filter (the collection) or by the pre-dispatch 404 guard in
-// handleRequest (the :id read).
+// itself organization-nested. The only fence is the path
+// identity's live seats on GET
+// /identities/:id/organizations/, or the pre-dispatch
+// membership guard in handleRequest (the :id read).
 
 const BASE = 'http://localhost';
 
@@ -87,9 +87,9 @@ const MULTI_ORGANIZATION_IDENTITY_ID: Id = 'current';
 const SINGLE_ORGANIZATION_IDENTITY_ID: Id =
     buildMembers()[0]!.id;
 
-// The derived-source twin of enumerateMyOrganizations: the
-// SAME membership-filter step (callerOrganizationIds), sourcing
-// the row list from deriveOrganizations.
+// The derived-source twin of getIdentityOrganizations:
+// live seats of the path identity, then
+// deriveOrganizations filtered to those ids.
 // Token for drift: claim organizations/roles match live
 // memberships for the subject (gate reads claims only).
 async function membershipClaimToken(
@@ -133,7 +133,8 @@ async function wireReachableOrganizations(
     db: MemoryDbAdapter, identityId: Id,
 ): Promise<OrganizationEntity[]> {
     const res = await handleRequest(db, req(
-        'GET', '/organizations',
+        'GET',
+        '/identities/' + identityId + '/organizations/',
         await membershipClaimToken(db, identityId),
     ));
     assert.equal(res.status, 200);
@@ -142,10 +143,11 @@ async function wireReachableOrganizations(
 
 // ---- leg 1: collection wire equals derive PER CALLER ---------
 
-test('leg 1: GET /organizations wire equals derive for a'
-+ ' MULTI-organization caller (current: STARK +'
-+ ' ORGANIZATION_TWO) and a SINGLE-organization caller'
-+ ' (buildMembers()[0]) — different non-vacuous counts',
+test('leg 1: GET /identities/:id/organizations/ wire'
++ ' equals derive for a MULTI-organization caller'
++ ' (current: STARK + ORGANIZATION_TWO) and a'
++ ' SINGLE-organization caller (buildMembers()[0])'
++ ' — different non-vacuous counts',
 async () => {
     const db = await seededDb();
     for (const identityId of [

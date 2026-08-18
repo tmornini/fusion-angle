@@ -14,7 +14,7 @@ import { TEST_OPERATION_ID } from './http-fixtures.ts';
 // that need a STORED legacy fold seed via the below-facade
 // dual-tolerant path (organization === undefined).
 
-const PATTERN = 'work-orders/:id/transition';
+const PATTERN = 'organizations/:id/work-orders/:id/transition';
 
 export async function appendLegacyTransition(
     db: DbAdapter,
@@ -27,6 +27,7 @@ export async function appendLegacyTransition(
     } = {},
 ): Promise<void> {
     const pathSegments = [
+        'organizations', organization,
         'work-orders', workOrderId, 'transition',
     ];
     const requestAt = opts.requestAt

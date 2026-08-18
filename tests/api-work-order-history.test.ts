@@ -31,7 +31,7 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 
-// GET work-orders/:id/history — Phase A1 of states-URI
+// GET organizations/:id/work-orders/:id/history — Phase A1 of states-URI
 // elimination. Lifecycle events DESC (index 0 = current),
 // with transition field_values folded inline; claim/birth/
 // release rows carry []. Miss posture: empty lifecycle →
@@ -148,7 +148,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
 
     const created = await handleRequest(
         db,
-        req('POST', '/work-orders', DEV_TOKEN, createBody()),
+        req('POST', '/organizations/1/work-orders/', DEV_TOKEN, createBody()),
     );
     assert.equal(created.status, 201);
 
@@ -172,9 +172,10 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         transitionAt: nowUtc(),
     };
     const pathSegments = [
+        'organizations', STARK_ORGANIZATION,
         'work-orders', WORK_ORDER_ID, 'transition',
     ];
-    const pattern = 'work-orders/:id/transition';
+    const pattern = 'organizations/:id/work-orders/:id/transition';
     const pair = await formWritePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
@@ -199,7 +200,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         db,
         req(
             'DELETE',
-            '/work-orders/' + WORK_ORDER_ID + '/claim',
+            '/organizations/1/work-orders/' + WORK_ORDER_ID + '/claim',
             DEV_TOKEN,
         ),
     );
@@ -209,7 +210,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
 }
 
 test(
-    'GET work-orders/:id/history returns 200 DESC rows;'
+    'GET organizations/:id/work-orders/:id/history returns 200 DESC rows;'
     + ' row[0] is current; transition carries field_values;'
     + ' claim rows carry []',
     async () => {
@@ -218,7 +219,7 @@ test(
             db,
             req(
                 'GET',
-                '/work-orders/' + WORK_ORDER_ID + '/history',
+                '/organizations/1/work-orders/' + WORK_ORDER_ID + '/history',
                 DEV_TOKEN,
             ),
         );
@@ -292,7 +293,8 @@ test(
             db,
             req(
                 'GET',
-                '/work-orders/' + foreignId + '/history',
+                '/organizations/' + ORGANIZATION_TWO
+                    + '/work-orders/' + foreignId + '/history',
                 tokenTwo,
             ),
         );
@@ -320,7 +322,7 @@ test(
             db,
             req(
                 'GET',
-                '/work-orders/' + missingId + '/history',
+                '/organizations/1/work-orders/' + missingId + '/history',
                 DEV_TOKEN,
             ),
         );
@@ -342,7 +344,7 @@ test(
             db,
             req(
                 'GET',
-                '/work-orders/' + WORK_ORDER_ID + '/history',
+                '/organizations/1/work-orders/' + WORK_ORDER_ID + '/history',
             ),
         );
         assert.equal(res.status, 401);
@@ -351,180 +353,33 @@ test(
     },
 );
 
-// GET work-orders/history — Phase A2 collection history.
-// Org-prefix scoped bulk of the same WorkOrderHistoryEventEntity
-// shape as per-id (field_values folded, (at, id) DESC overall).
-// Always 200 array. Route order is load-bearing: literal
-// `history` must win over work-orders/:id.
+// Bulk GET work-orders/history is deleted. Callers fan-in
+// per-item GET work-orders/:id/history.
 
 test(
-    'GET work-orders/history: literal history wins over :id;'
-    + ' real id still resolves entity; empty org → 200 []',
+    'GET organizations/1/work-orders/history is 404',
     async () => {
         const db = await seededChainDb();
-
         const collection = await handleRequest(
-            db,
-            req('GET', '/work-orders/history', DEV_TOKEN),
-        );
-        assert.equal(collection.status, 200);
-        const rows = await collection.json() as HistoryEvent[];
-        assert.ok(Array.isArray(rows));
-        // Seeded chain contributes events; not a document miss.
-        assert.ok(rows.length > 0);
-        for (const row of rows) {
-            assert.ok(Array.isArray(row.field_values));
-            assert.equal(typeof row.entity_id, 'string');
-            assert.equal(typeof row.state, 'string');
-        }
-        // Strict DESC on (at, id) overall.
-        for (let i = 1; i < rows.length; i++) {
-            const prev = rows[i - 1]!;
-            const cur = rows[i]!;
-            const ordered =
-                prev.at > cur.at
-                || (prev.at === cur.at && prev.id > cur.id);
-            assert.ok(
-                ordered,
-                'collection history must be (at, id) DESC',
-            );
-        }
-
-        // work-orders/:id still resolves a real document.
-        const entity = await handleRequest(
             db,
             req(
                 'GET',
-                '/work-orders/' + WORK_ORDER_ID,
+                '/organizations/1/work-orders/history',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(entity.status, 200);
-        const body = await entity.json() as { id: string };
-        assert.equal(body.id, WORK_ORDER_ID);
+        assert.equal(collection.status, 404);
 
-        // Empty org (no live op pairs) always 200 [].
         const emptyDb = memoryDbAdapter();
         await seedAdminSchema(emptyDb);
         const empty = await handleRequest(
             emptyDb,
-            req('GET', '/work-orders/history', DEV_TOKEN),
-        );
-        assert.equal(empty.status, 200);
-        assert.deepEqual(await empty.json(), []);
-    },
-);
-
-test(
-    'GET work-orders/history org isolation: org B rows absent',
-    async () => {
-        const db = await seededMockDb();
-
-        const starkId = 'wo-coll-hist-stark';
-        const twoId = 'wo-coll-hist-two';
-        const tokenTwo = await organizationToken(
-            'current', ORGANIZATION_TWO,
-        );
-
-        function minimalCreate(id: string) {
-            const t0 = nowUtc();
-            const t1 = nowUtc();
-            const t2 = nowUtc();
-            return {
-                id,
-                workOrder: {
-                    display_id: id,
-                    flow_graph: flowGraph(),
-                    position: 1,
-                },
-                flowWorkOrderId: id + '-fwo',
-                flowWorkOrder: {
-                    flow_id: 'f-coll-hist',
-                    work_order_id: id,
-                    at: nowUtc(),
-                },
-                stateEventIds: [
-                    id + '-ev1', id + '-ev2', id + '-ev3',
-                ],
-                states: ['n-start', 'n-middle', 'claimed'],
-                stateEventAts: [t0, t1, t2],
-            };
-        }
-
-        const starkCreated = await handleRequest(
-            db,
-            req(
-                'POST', '/work-orders', DEV_TOKEN,
-                minimalCreate(starkId),
-            ),
-        );
-        assert.equal(starkCreated.status, 201);
-
-        const twoCreated = await handleRequest(
-            db,
-            req(
-                'POST', '/work-orders', tokenTwo,
-                minimalCreate(twoId),
-            ),
-        );
-        assert.equal(twoCreated.status, 201);
-
-        const starkRes = await handleRequest(
-            db,
-            req('GET', '/work-orders/history', DEV_TOKEN),
-        );
-        assert.equal(starkRes.status, 200);
-        const starkRows =
-            await starkRes.json() as HistoryEvent[];
-        const starkEntityIds = new Set(
-            starkRows.map((row) => row.entity_id),
-        );
-        assert.ok(starkEntityIds.has(starkId));
-        assert.equal(starkEntityIds.has(twoId), false);
-
-        const twoRes = await handleRequest(
-            db,
-            req('GET', '/work-orders/history', tokenTwo),
-        );
-        assert.equal(twoRes.status, 200);
-        const twoRows =
-            await twoRes.json() as HistoryEvent[];
-        const twoEntityIds = new Set(
-            twoRows.map((row) => row.entity_id),
-        );
-        assert.ok(twoEntityIds.has(twoId));
-        assert.equal(twoEntityIds.has(starkId), false);
-    },
-);
-
-test(
-    'GET work-orders/history parity vs per-id for each entity',
-    async () => {
-        const db = await seededChainDb();
-
-        const collection = await handleRequest(
-            db,
-            req('GET', '/work-orders/history', DEV_TOKEN),
-        );
-        assert.equal(collection.status, 200);
-        const all = await collection.json() as HistoryEvent[];
-
-        const perId = await handleRequest(
-            db,
             req(
                 'GET',
-                '/work-orders/' + WORK_ORDER_ID + '/history',
+                '/organizations/1/work-orders/history',
                 DEV_TOKEN,
             ),
         );
-        assert.equal(perId.status, 200);
-        const single =
-            await perId.json() as HistoryEvent[];
-
-        const filtered = all.filter(
-            (row) => row.entity_id === WORK_ORDER_ID,
-        );
-        assert.deepEqual(filtered, single);
-        assert.ok(filtered.length > 0);
+        assert.equal(empty.status, 404);
     },
 );

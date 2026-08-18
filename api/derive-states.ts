@@ -36,17 +36,16 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 // (Phase 11
 // onward; bulk lifecycle collection retired — states-URI
 // elimination C3). Per-entity history rides GET
-// <family>/:id/history; work-order and objective bulk history
-// ride GET work-orders/history and GET objectives/history.
-// Surviving derives in this module:
+// <family>/:id/history (work-orders) or /versions/
+// (trio families). Surviving derives in this module:
 //   (a) trio families — per-id derive*StateHistory readers live
 //       in their own family modules (ideas/projects/records/
 //       flows/objectives); write paths use family
 //       currentDocumentState / row-stamped trios.
 //   (b) deriveMemberStates — members/:id document trio history.
 //   (c) deriveWorkOrderLifecycle / workOrderLifecycleStatesFor /
-//       workOrderHistoryFor / deriveWorkOrderHistories — the
-//       work-order op-pair replay (gate 5d).
+//       workOrderHistoryFor — the work-order op-pair replay
+//       (gate 5d).
 //   (d) flow-graph node/edge sidecars — live on the flow
 //       document-pair body (graphDelta.deletions / revivals);
 //       resolveFlowGraphOwner below resolves their owners.
@@ -93,8 +92,8 @@ const ORGANIZATIONS_ADDRESS_PREFIX =
     canonicalUriCollection(undefined, '/organizations/');
 
 // ALL-orgs, server-side ownership resolution — distinct from
-// api/organization-requests.ts's enumerateMyOrganizations, which
-// filters to the caller's own memberships. This walk NEVER
+// getIdentityOrganizations, which filters to the path
+// identity's live seats. This walk NEVER
 // filters by caller: it resolves which org OWNS an entity,
 // independent of who is asking (Phase 12 Task 5: the row source
 // flips to the pair-plane derivation; the ALL-orgs, uncaller-
@@ -1467,33 +1466,6 @@ export async function deriveWorkOrderLifecycle(
     );
 }
 
-// GET work-orders/history (states-URI elimination A2): the
-// org-prefix scoped bulk of workOrderHistoryFor — same
-// WorkOrderHistoryEventEntity shape (field_values folded),
-// (at, id) DESC overall so rows group by entity_id under a
-// shared total order. Always returns an array (empty when the
-// org has no live op-pair lifecycle).
-export async function deriveWorkOrderHistories(
-    db: DbAdapter,
-    organization: Id,
-): Promise<WorkOrderHistoryEventEntity[]> {
-    return db.readTransaction(
-        ['requests', 'responses'],
-        async (view) => {
-            const [requests, responses] = await Promise.all([
-                view.requests.getAll(),
-                view.responses.getAll(),
-            ]);
-            const plane = workOrderLifecycleFromPlane(
-                requests, responses, organization,
-            );
-            return historyEventsWithFieldValues(
-                plane.events, plane.transitionPairs,
-            );
-        },
-    );
-}
-
 // ENTITY-SCOPED sibling of deriveWorkOrderLifecycle above (Phase
 // 14 Task 1): reuses the SAME pure replay core
 // (replayWorkOrderOperations) over INDEXED reads scoped to ONE
@@ -1629,8 +1601,7 @@ export async function workOrderLifecycleStatesFor(
 // fv row id, latestByKey head reduction, DELETE heads dropped.
 // New-shape pairs (no fieldValues key) render per-event from
 // set/clear — shape-disjoint; they never enter latestByKey.
-// Shared by workOrderHistoryFor (A1) and
-// deriveWorkOrderHistories (A2).
+// Shared by workOrderHistoryFor (per-item /history).
 function fieldValuesByTransitionEvent(
     transitionPairs: readonly OperationPair[],
 ): Map<Id, TransitionFieldValueEntity[]> {
@@ -2250,5 +2221,4 @@ export async function invitationLifecycleStatesFor(
 // Per-entity history lives on GET <family>/:id/history and
 // family-scoped derives (derive*StateHistory,
 // workOrderLifecycleStatesFor, deriveMemberStates filter,
-// invitation sources). Bulk work-order and objective history:
-// GET work-orders/history and GET objectives/history.
+// invitation sources).

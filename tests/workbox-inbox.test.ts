@@ -8,7 +8,7 @@ import {
     createRequestContext,
     type RequestContext,
 } from '../web-app/app/adapters/shared.ts';
-import { devToken } from './token-fixtures.ts';
+import { devToken, organizationToken } from './token-fixtures.ts';
 import {
     postWorkOrderCreation,
 } from
@@ -115,7 +115,7 @@ function buildLinearGraph(): StoredGraph {
 // Seed a flow through the SAME gate-driven create/document-PUT
 // idiom the live route uses (postFlowCreation + putFlow), so a
 // message pair exists at this flow's address — required for the
-// flipped GET flows/:id route (Phase 4 Task 8), which
+// flipped GET organizations/:id/flows/:id route (Phase 4 Task 8), which
 // postWorkOrderCreation reads before creating (this file's own
 // comment names that freeze dependency), to derive it.
 // postFlowCreation seeds a default start/complete graph; the
@@ -125,7 +125,7 @@ async function seedFlow(
     flowId: string,
     graph: StoredGraph,
 ): Promise<void> {
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     await postFlowCreation(ctx, {
         flowId,
         linkId: flowId + '-link',
@@ -154,7 +154,7 @@ interface WoTables {
 async function collectTables(
     db: MemoryDbAdapter,
 ): Promise<WoTables> {
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     const workOrders = await getWorkOrders(ctx);
     const transitionsByWo =
         await getTransitionEventsByWorkOrder(ctx);
@@ -185,7 +185,7 @@ async function setupOneWorkOrder(): Promise<{
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
     await seedHumanMember(db, 'current', 'Demo Test');
-    const ctx = createRequestContext(db, await devToken());
+    const ctx = createRequestContext(db, await organizationToken());
     await seedFlow(db, 'f1', buildLinearGraph());
     const woId = generateCryptoSafeBase62();
     await postWorkOrderCreation(ctx, {
@@ -304,7 +304,7 @@ test(
         // via the named op (states/:id retired). Dated after
         // the create events so the inbox sees a finished WO.
         await ctx.POST(
-            'work-orders/' + woId + '/transition', {
+            'organizations/1/work-orders/' + woId + '/transition', {
                 transitionEventId: 'extra',
                 targetState: 'n-finish',
                 release: null,
@@ -340,7 +340,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await seedFlow(db, 'f1', buildLinearGraph());
         for (let i = 0; i < 3; i++) {
             await postWorkOrderCreation(ctx, {
@@ -413,7 +413,7 @@ test(
         await seedHumanMember(
             db, 'current', 'Demo Test',
         );
-        const ctx = createRequestContext(db, await devToken());
+        const ctx = createRequestContext(db, await organizationToken());
         await seedFlow(db, 'f1', {
             nodes: [
                 buildNode('n-start', 'Start', {

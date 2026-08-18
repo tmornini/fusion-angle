@@ -29,8 +29,6 @@ function buildIdea(
         success_metrics: '',
     }, {
         state,
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'ev-' + id,
     });
 }
 
@@ -50,8 +48,6 @@ function buildProject(
         position: 1,
     }, {
         state: 'approved',
-        stateAt: '2026-01-01T00:00:00.000000Z',
-        stateEventId: 'ev-' + id,
     });
 }
 
@@ -86,8 +82,6 @@ function buildHumanMember(
         },
         {
             state: 'active',
-            stateAt: '2026-01-01T00:00:00.000000Z',
-            stateEventId: 'st-' + id,
         },
     );
 }

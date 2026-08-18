@@ -28,6 +28,7 @@ test('public pages are auth-exempt only', () => {
         .map(([k]) => k)
         .sort();
     assert.deepEqual(publicPages, [
+        'api-documentation',
         'auth',
         'design-system',
         'landing',

@@ -321,7 +321,7 @@ conceptual alphabets remain in `api/types.ts`
 (`MEMBER_STATES`, `IDEA_STATES`, `PROJECT_STATES`, …) and
 are asserted by validators and derive cores.
 
-### History read map (nine lifecycle + one value-history)
+### History read map (seven lifecycle + one value-history)
 
 Wire order is `(at, id)` **DESC** (index 0 = current) on
 every history route. Trio-family and instance paths
@@ -329,30 +329,24 @@ are `/versions`; work-orders stay `/history`. See
 API.md §2.10 for full fence and wire detail.
 
 1. `GET ideas/:id/versions` —
-   `deriveIdeaStateHistory` → `StateEntity[]`; empty →
+   `entityOf` snapshots (domain `state`); empty →
    403 foreign / 404 absent
 2. `GET projects/:id/versions` —
-   `deriveProjectStateHistory` → same
+   same
 3. `GET organizations/:org/record-types/:id/versions` —
-   `deriveRecordStateHistory` → same (flat
-   `records/:id/history` RETIRED)
+   same (flat `records/:id/history` RETIRED)
 4. `GET flows/:id/versions` —
-   `deriveFlowStateHistory` → same
-5. `GET objectives/:id/versions` —
-   `deriveObjectiveStateHistory` → same
+   `deriveFlowStateHistory` → `StateEntity[]`
+5. `GET organizations/:id/objectives/:id/versions/` —
+   `entityOf` snapshots (domain `state`); empty →
+   403 foreign / 404 absent
 6. `GET members/:id/versions` —
    `deriveMemberStates` filter → `StateEntity[]`;
    global miss → 404
-7. `GET work-orders/:id/history` —
+7. `GET organizations/:id/work-orders/:id/history` —
    `workOrderHistoryFor` → WO history + inline
    `field_values`; empty → 403 / 404
-8. `GET work-orders/history` —
-   `deriveWorkOrderHistories` → same WO shape;
-   always 200
-9. `GET objectives/versions` —
-   `deriveObjectiveHistories` → `StateEntity[]`;
-   always 200
-10. (value-history, not lifecycle)
+8. (value-history, not lifecycle)
     `GET .../record-types/:type/instances/:id/versions`
     → `{ at, etag, values }[]` by current read ACL
 
@@ -368,10 +362,12 @@ uses `stateFieldValuesFrom` /
 `stateEventVisibilityFor`.
 
 **Head-state trio.** Ideas / projects / record-types /
-objectives / members GET rows embed `state`,
-`state_at`, `state_event_id` from the lifecycle-current
-event. Flows skip the embed; work-orders stay
-`'stateless'`; instances carry full-state `values`.
+objectives GET rows keep domain `state` and do not
+embed `state_at` / `state_event_id`. Members GET
+rows still embed the lifecycle trio. Flows keep
+`StateEntity[]` on the versions list; work-orders
+stay `'stateless'`; instances carry full-state
+`values`.
 
 The bulk lifecycle collection, bare event-append
 address, per-entity current-state alias, nested

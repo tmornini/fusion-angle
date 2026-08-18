@@ -20,7 +20,7 @@ test('a 401 through a verb is an UnauthorizedError', async () => {
     const db = await freshDb();
     const tok = await expiredToken();
     await assert.rejects(
-        () => GET(db, 'organizations/1/members', tok),
+        () => GET(db, 'organizations/1/members/', tok),
         (err: unknown) => {
             assert.ok(err instanceof UnauthorizedError);
             assert.ok(err instanceof Error);
@@ -41,7 +41,7 @@ async () => {
     const db = await freshDb();   // no role granted
     const tok = await devToken();
     await assert.rejects(
-        () => GET(db, 'organizations/1/members', tok),
+        () => GET(db, 'organizations/1/members/', tok),
         (err: unknown) => {
             assert.ok(err instanceof RequestError);
             assert.ok(err instanceof Error);

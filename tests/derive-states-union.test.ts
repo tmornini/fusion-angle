@@ -207,8 +207,7 @@ function ideaDocument(
         problem_statement: '', target_users: '',
         proposed_solution: '', expected_outcome: '',
         success_metrics: '',
-        state: 'active', state_at: at,
-        state_event_id: stateEventId,
+        state: 'active',
     };
 }
 
@@ -256,7 +255,7 @@ async function createFlowWithNodes(
     flowId: string, nodeIds: readonly string[],
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/flows', token,
+        'POST', '/organizations/A/flows/', token,
         {
             id: flowId,
             flow: flowFields('Flow ' + flowId),
@@ -283,10 +282,10 @@ async function headResponseId(
     db: MemoryDbAdapter, token: string, flowId: string,
 ): Promise<string> {
     const got = await handleRequest(
-        db, req('GET', '/flows/' + flowId, token),
+        db, req('GET', '/organizations/A/flows/' + flowId, token),
     );
     const id = got.headers.get('Response-ID');
-    assert.ok(id, 'no Response-ID on GET /flows/' + flowId);
+    assert.ok(id, 'no Response-ID on GET /organizations/A/flows/' + flowId);
     return id!;
 }
 
@@ -303,12 +302,12 @@ async function saveFlowWithSidecars(
     stateEventId: string, stateAt: string,
 ): Promise<void> {
     const got = await handleRequest(
-        db, req('GET', '/flows/' + flowId, token),
+        db, req('GET', '/organizations/A/flows/' + flowId, token),
     );
     const etag = got.headers.get('ETag');
-    assert.ok(etag, 'no ETag on GET /flows/' + flowId);
+    assert.ok(etag, 'no ETag on GET /organizations/A/flows/' + flowId);
     const res = await handleRequest(db, req(
-        'PUT', '/flows/' + flowId, token,
+        'PUT', '/organizations/A/flows/' + flowId, token,
         {
             ...flowFields('Flow ' + flowId + ' saved'),
             state: 'active', state_at: stateAt,
@@ -354,7 +353,7 @@ async function createWorkOrder(
     db: MemoryDbAdapter, token: string, id: string,
 ): Promise<void> {
     const res = await handleRequest(db, req(
-        'POST', '/work-orders', token,
+        'POST', '/organizations/A/work-orders/', token,
         workOrderBody(
             id, id + '-fwo', 'flow-union-wo-placeholder',
             [
@@ -369,22 +368,33 @@ async function createWorkOrder(
 
 async function grantAndAccept(
     db: MemoryDbAdapter, adminToken: string,
-    inviteeToken: string, inviteeEmail: string,
+    inviteeToken: string, inviteeId: string,
+    inviteeEmail: string,
     invitationId: string, grantEventId: string, grantAt: string,
     membershipId: string, acceptEventId: string, acceptAt: string,
+    organization: string,
 ): Promise<void> {
     const grantRes = await handleRequest(db, req(
-        'POST', '/invitations', adminToken,
+        'POST',
+        '/organizations/' + organization + '/invitations/',
+        adminToken,
         { email: inviteeEmail, invitationId, grantEventId, grantAt },
     ));
-    assert.equal(grantRes.status, 201, 'grant failed');
+    assert.equal(grantRes.status, 200, 'grant failed');
 
     const acceptRes = await handleRequest(db, req(
-        'POST', '/invitations/' + invitationId + '/acceptance',
+        'PUT',
+        '/identities/' + inviteeId
+            + '/invitations/' + invitationId,
         inviteeToken,
-        { membershipId, acceptEventId, acceptAt },
+        {
+            state: 'accepted',
+            membershipId,
+            eventId: acceptEventId,
+            at: acceptAt,
+        },
     ));
-    assert.equal(acceptRes.status, 201, 'accept failed');
+    assert.equal(acceptRes.status, 204, 'accept failed');
 }
 
 interface UnionFixture {
@@ -412,7 +422,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     // union).
     const ideaId = 'idea-union';
     const ideaRes = await handleRequest(db, req(
-        'PUT', '/ideas/' + ideaId, tokenA,
+        'PUT', '/organizations/A/ideas/' + ideaId, tokenA,
         ideaDocument(
             'Union Idea', ideaId + '-genesis',
             '2026-01-02T00:00:00.000000Z',
@@ -422,7 +432,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
 
     const foreignIdeaId = 'idea-union-foreign';
     const foreignIdeaRes = await handleRequest(db, req(
-        'PUT', '/ideas/' + foreignIdeaId, tokenB,
+        'PUT', '/organizations/B/ideas/' + foreignIdeaId, tokenB,
         ideaDocument(
             'Foreign Idea', foreignIdeaId + '-genesis',
             '2026-01-02T00:00:00.000001Z',
@@ -432,15 +442,13 @@ async function buildUnionFixture(): Promise<UnionFixture> {
 
     // (a-objective) an objectives document trio — the
     // states/:id orphan leg's replacement in the five-source
-    // union proof (objectives join ideas/projects/records/
-    // flows on the document-trio source).
+    // union proof (objectives join ideas, projects,
+    // records, flows on the document-trio source).
     const objectiveId = 'obj-union';
     const objectiveRes = await handleRequest(db, req(
-        'PUT', '/objectives/' + objectiveId, tokenA, {
+        'PUT', '/organizations/A/objectives/' + objectiveId, tokenA, {
             position: 1,
             state: 'active',
-            state_at: '2026-01-02T00:00:00.000002Z',
-            state_event_id: objectiveId + '-genesis',
         },
     ));
     assert.equal(objectiveRes.status, 201);
@@ -493,11 +501,13 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     );
     const invitationId = 'inv-union';
     await grantAndAccept(
-        db, tokenA, inviteeToken, 'invitee-union@x.com',
+        db, tokenA, inviteeToken, 'invitee-union',
+        'invitee-union@x.com',
         invitationId, 'ev-union-grant',
         '2026-01-05T00:00:00.000000Z',
         'ms-union-accept', 'ev-union-accept',
         '2026-01-05T00:00:00.000001Z',
+        'A',
     );
 
     return {
@@ -597,14 +607,14 @@ async () => {
 
     assert.deepEqual(
         (await deriveIdeaStateHistory(fx.db, 'A', fx.ideaId))
-            .map((row) => row.id),
-        [fx.ideaId + '-genesis'],
+            .map((row) => row.state),
+        ['active'],
     );
     assert.deepEqual(
         (await deriveObjectiveStateHistory(
             fx.db, 'A', fx.objectiveId,
-        )).map((row) => row.id),
-        [fx.objectiveId + '-genesis'],
+        )).map((row) => row.state),
+        ['active'],
     );
     const agent = await handleRequest(
         fx.db,
@@ -715,7 +725,7 @@ test('deriveInvitationStates: a duplicate grant on the same'
     );
 
     const first = await handleRequest(db, req(
-        'POST', '/invitations', tokenA,
+        'POST', '/organizations/A/invitations/', tokenA,
         {
             email: 'invitee-dup@x.com',
             invitationId: 'inv-dup-a',
@@ -723,10 +733,10 @@ test('deriveInvitationStates: a duplicate grant on the same'
             grantAt: '2026-04-01T00:00:00.000000Z',
         },
     ));
-    assert.equal(first.status, 201, 'first grant failed');
+    assert.equal(first.status, 200, 'first grant failed');
 
     const second = await handleRequest(db, req(
-        'POST', '/invitations', tokenA,
+        'POST', '/organizations/A/invitations/', tokenA,
         {
             email: 'invitee-dup@x.com',
             invitationId: 'inv-dup-b',
@@ -734,7 +744,7 @@ test('deriveInvitationStates: a duplicate grant on the same'
             grantAt: '2026-04-01T00:00:00.000001Z',
         },
     ));
-    assert.equal(second.status, 201, 'duplicate grant failed');
+    assert.equal(second.status, 200, 'duplicate grant failed');
     const secondBody = await second.json() as { id: string };
     // The duplicate echoes the ORIGINAL invitation id, never its
     // own submitted one.
@@ -775,7 +785,7 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
     );
 
     const grantRes = await handleRequest(db, req(
-        'POST', '/invitations', tokenA,
+        'POST', '/organizations/A/invitations/', tokenA,
         {
             email: 'invitee-reaccept@x.com',
             invitationId: 'inv-reaccept',
@@ -783,30 +793,34 @@ test('deriveInvitationStates: a re-accept (idempotent resend)'
             grantAt: '2026-04-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grantRes.status, 201, 'grant failed');
+    assert.equal(grantRes.status, 200, 'grant failed');
 
     const firstAccept = await handleRequest(db, req(
-        'POST', '/invitations/inv-reaccept/acceptance',
+        'PUT',
+        '/identities/invitee-reaccept/invitations/inv-reaccept',
         inviteeToken,
         {
+            state: 'accepted',
             membershipId: 'ms-reaccept-1',
-            acceptEventId: 'ev-reaccept-accept-1',
-            acceptAt: '2026-04-02T00:00:00.000001Z',
+            eventId: 'ev-reaccept-accept-1',
+            at: '2026-04-02T00:00:00.000001Z',
         },
     ));
-    assert.equal(firstAccept.status, 201, 'first accept failed');
+    assert.equal(firstAccept.status, 204, 'first accept failed');
 
     const secondAccept = await handleRequest(db, req(
-        'POST', '/invitations/inv-reaccept/acceptance',
+        'PUT',
+        '/identities/invitee-reaccept/invitations/inv-reaccept',
         inviteeToken,
         {
+            state: 'accepted',
             membershipId: 'ms-reaccept-2',
-            acceptEventId: 'ev-reaccept-accept-2',
-            acceptAt: '2026-04-02T00:00:00.000002Z',
+            eventId: 'ev-reaccept-accept-2',
+            at: '2026-04-02T00:00:00.000002Z',
         },
     ));
     assert.equal(
-        secondAccept.status, 201, 're-accept must stay a no-op',
+        secondAccept.status, 409, 're-accept is not pending',
     );
 
     const rows = await deriveInvitationStates(db);
@@ -836,7 +850,7 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
     );
 
     const grantRes = await handleRequest(db, req(
-        'POST', '/invitations', tokenA,
+        'POST', '/organizations/A/invitations/', tokenA,
         {
             email: 'invitee-redecline@x.com',
             invitationId: 'inv-redecline',
@@ -844,29 +858,35 @@ test('deriveInvitationStates: a re-decline (idempotent resend)'
             grantAt: '2026-04-03T00:00:00.000000Z',
         },
     ));
-    assert.equal(grantRes.status, 201, 'grant failed');
+    assert.equal(grantRes.status, 200, 'grant failed');
 
     const firstDecline = await handleRequest(db, req(
-        'POST', '/invitations/inv-redecline/decline',
+        'PUT',
+        '/identities/invitee-redecline/invitations/'
+            + 'inv-redecline',
         inviteeToken,
         {
-            declineEventId: 'ev-redecline-decline-1',
-            declineAt: '2026-04-03T00:00:00.000001Z',
+            state: 'declined',
+            eventId: 'ev-redecline-decline-1',
+            at: '2026-04-03T00:00:00.000001Z',
         },
     ));
-    assert.equal(firstDecline.status, 201, 'first decline failed');
+    assert.equal(firstDecline.status, 204, 'first decline failed');
 
     const secondDecline = await handleRequest(db, req(
-        'POST', '/invitations/inv-redecline/decline',
+        'PUT',
+        '/identities/invitee-redecline/invitations/'
+            + 'inv-redecline',
         inviteeToken,
         {
-            declineEventId: 'ev-redecline-decline-2',
-            declineAt: '2026-04-03T00:00:00.000002Z',
+            state: 'declined',
+            eventId: 'ev-redecline-decline-2',
+            at: '2026-04-03T00:00:00.000002Z',
         },
     ));
     assert.equal(
-        secondDecline.status, 201,
-        're-decline must stay a no-op',
+        secondDecline.status, 409,
+        're-decline is not pending',
     );
 
     const rows = await deriveInvitationStates(db);

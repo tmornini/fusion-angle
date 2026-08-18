@@ -105,41 +105,45 @@ test('pendingInvitationFor lifecycle on the pair plane'
     assert.equal(await assertPending(), null);
 
     const grant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-rehome-parity-1',
             grantEventId: 'inv-rehome-parity-1-grant',
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 201);
+    assert.equal(grant.status, 200);
     assert.equal(
         (await assertPending())?.id,
         'inv-rehome-parity-1',
     );
 
     const decline = await handleRequest(db, req(
-        'POST',
-        '/invitations/inv-rehome-parity-1/decline',
+        'PUT',
+        '/identities/' + inviteeId
+            + '/invitations/inv-rehome-parity-1',
         inviteeToken, {
-            declineEventId: 'inv-rehome-parity-1-decline',
-            declineAt: '2026-06-02T00:00:01.000000Z',
+            state: 'declined',
+            eventId: 'inv-rehome-parity-1-decline',
+            at: '2026-06-02T00:00:01.000000Z',
         },
     ));
-    assert.equal(decline.status, 201);
+    assert.equal(decline.status, 204);
     assert.equal(await assertPending(), null);
 
     // Declined-reinvite: multi-candidate on the same
     // (organization, identity) pair.
     const regrant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-rehome-parity-2',
             grantEventId: 'inv-rehome-parity-2-grant',
             grantAt: '2026-06-02T00:00:02.000000Z',
         },
     ));
-    assert.equal(regrant.status, 201);
+    assert.equal(regrant.status, 200);
     assert.equal(
         (await assertPending())?.id,
         'inv-rehome-parity-2',
@@ -153,14 +157,15 @@ test('loadInvitation shape: deriveInvitations find-by-id'
     const admin = await organizationToken(
         'current', ORGANIZATION_TWO);
     const grant = await handleRequest(db, req(
-        'POST', '/invitations', admin, {
+        'POST', '/organizations/' + ORGANIZATION_TWO
+            + '/invitations/', admin, {
             email: 'sarah.chen@company.com',
             invitationId: 'inv-rehome-load-1',
             grantEventId: 'inv-rehome-load-1-grant',
             grantAt: '2026-06-02T00:00:00.000000Z',
         },
     ));
-    assert.equal(grant.status, 201);
+    assert.equal(grant.status, 200);
 
     // Phase Final Task 2: invitations ROW half stripped.
     const derived = (await deriveInvitations(db))

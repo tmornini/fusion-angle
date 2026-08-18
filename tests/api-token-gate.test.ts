@@ -30,7 +30,7 @@ async () => {
     const db = await freshDb();
     const res = await handleRequest(
         db, new Request(
-            `${BASE}/organizations/1/members`));
+            `${BASE}/organizations/1/members/`));
     assert.equal(res.status, 401);
     const body = await res.json() as { error: string };
     assert.equal(body.error, 'invalid_token');
@@ -38,14 +38,14 @@ async () => {
 
 test('protected route accepts a valid token', async () => {
     const db = await freshDb();
-    const rows = await GET(db, 'organizations/1/members', await devToken());
+    const rows = await GET(db, 'organizations/1/members/', await devToken());
     assert.ok(Array.isArray(rows));
 });
 
 test('rejects an expired token', async () => {
     const db = await freshDb();
     await assert.rejects(
-        async () => GET(db, 'organizations/1/members', await expiredToken()),
+        async () => GET(db, 'organizations/1/members/', await expiredToken()),
         /invalid_token/);
 });
 
@@ -53,7 +53,7 @@ test('rejects a not-yet-valid token', async () => {
     const db = await freshDb();
     await assert.rejects(
         async () => GET(
-            db, 'organizations/1/members',
+            db, 'organizations/1/members/',
             await notYetValidToken(),
         ),
         /invalid_token/);
@@ -69,7 +69,7 @@ async () => {
         jti: 'anon',
     });
     await assert.rejects(
-        () => GET(db, 'organizations/1/members', anon), /invalid_token/);
+        () => GET(db, 'organizations/1/members/', anon), /invalid_token/);
 });
 
 // Per-request access-token revocation is RETIRED. Mint /
@@ -102,8 +102,8 @@ async () => {
     );
     // Still admitted — revocation bites at next mint/exchange.
     assert.deepEqual(
-        await GET(db, 'organizations/1/members', live),
-        await GET(db, 'organizations/1/members', await devToken()),
+        await GET(db, 'organizations/1/members/', live),
+        await GET(db, 'organizations/1/members/', await devToken()),
     );
 });
 
@@ -127,7 +127,7 @@ test('a token minted within a revocation second still'
         await devToken(),
     );
     const rows = await GET<unknown[]>(
-        db, 'organizations/1/members', sameSecond,
+        db, 'organizations/1/members/', sameSecond,
     );
     assert.ok(Array.isArray(rows));
 });
@@ -154,7 +154,7 @@ test('a jti revoked in the ledger still admits the access'
         await devToken(),
     );
     const rows = await GET<unknown[]>(
-        db, 'organizations/1/members', await devToken(),
+        db, 'organizations/1/members/', await devToken(),
     );
     assert.ok(Array.isArray(rows));
 });

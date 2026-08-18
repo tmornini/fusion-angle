@@ -13,8 +13,8 @@ import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const INPUT = {
     method: 'PUT',
-    pathname: '/ideas/42',
-    routePattern: 'ideas/:id',
+    pathname: '/organizations/1/ideas/42',
+    routePattern: 'organizations/:id/ideas/:id',
     routeSegments: ['ideas', ':id'],
     pathSegments: ['ideas', '42'],
     headerFields: [],

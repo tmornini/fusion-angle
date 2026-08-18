@@ -44,7 +44,7 @@ async function join(
 
 function getSeats(token: string, organization: string) {
     return new Request(
-        `${BASE}/organizations/${organization}/members`,
+        `${BASE}/organizations/${organization}/members/`,
         {
             headers: {
                 'Authorization': 'Bearer ' + token,
