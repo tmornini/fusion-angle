@@ -559,9 +559,4 @@ export async function init(): Promise<void> {
                 },
             );
         });
-
-    const AUTO_REDIRECT_MS = 2000;
-    setTimeout(() => {
-        putLocation('../dashboard/index.html');
-    }, AUTO_REDIRECT_MS);
 }
