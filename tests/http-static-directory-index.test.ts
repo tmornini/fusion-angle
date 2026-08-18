@@ -122,18 +122,6 @@ async () => {
     });
 });
 
-test('/ideas/ does not become a static hit',
-async () => {
-    await withServer({}, undefined, async (base) => {
-        const res = await fetch(base + '/ideas/');
-        assert.equal(res.status, HTTP_UNAUTHORIZED);
-        assert.match(
-            res.headers.get('content-type') ?? '',
-            /application\/json/,
-        );
-    });
-});
-
 test('missing room under /api-documentation/ is'
     + ' 404 JSON, not an API hop',
 async () => {
@@ -156,14 +144,109 @@ async () => {
     });
 });
 
-test('a document navigation to a retired path'
+test('/ideas/ serves ideas/index.html',
+async () => {
+    await withServer({
+        'ideas/index.html': '<p>ideas page</p>',
+    }, undefined, async (base) => {
+        const res = await fetch(base + '/ideas/');
+        assert.equal(res.status, 200);
+        assert.equal(
+            res.headers.get('content-type'),
+            'text/html; charset=utf-8',
+        );
+        assert.equal(
+            await res.text(),
+            '<p>ideas page</p>',
+        );
+    });
+});
+
+test('/ideas without a slash is a miss',
+async () => {
+    let handled = 0;
+    const handle: RequestHandler = async () => {
+        handled += 1;
+        return new Response('api', { status: 200 });
+    };
+    await withServer({
+        'ideas/index.html': '<p>ideas page</p>',
+    }, handle, async (base) => {
+        const res = await fetch(base + '/ideas');
+        assert.equal(res.status, HTTP_NOT_FOUND);
+        const body = await res.json() as {
+            error: string;
+        };
+        assert.equal(body.error, 'Not found');
+        assert.equal(handled, 0);
+    });
+});
+
+test('/assets/ is a miss when no index.html',
+async () => {
+    let handled = 0;
+    const handle: RequestHandler = async () => {
+        handled += 1;
+        return new Response('api', { status: 200 });
+    };
+    await withServer({
+        'assets/inter-400.woff2': 'woff',
+    }, handle, async (base) => {
+        const res = await fetch(base + '/assets/');
+        assert.equal(res.status, HTTP_NOT_FOUND);
+        const body = await res.json() as {
+            error: string;
+        };
+        assert.equal(body.error, 'Not found');
+        assert.equal(handled, 0);
+    });
+});
+
+test('/api-documentation/post/ is a miss when'
+    + ' no index.html',
+async () => {
+    let handled = 0;
+    const handle: RequestHandler = async () => {
+        handled += 1;
+        return new Response('api', { status: 200 });
+    };
+    await withServer({
+        'api-documentation/index.html':
+            '<p>docs home</p>',
+    }, handle, async (base) => {
+        const res = await fetch(
+            base + '/api-documentation/post/',
+        );
+        assert.equal(res.status, HTTP_NOT_FOUND);
+        assert.equal(handled, 0);
+    });
+});
+
+test('/api-documentation/ serves index.html',
+async () => {
+    await withServer({
+        'api-documentation/index.html':
+            '<p>docs home</p>',
+    }, undefined, async (base) => {
+        const res = await fetch(
+            base + '/api-documentation/',
+        );
+        assert.equal(res.status, 200);
+        assert.equal(
+            await res.text(),
+            '<p>docs home</p>',
+        );
+    });
+});
+
+test('a document navigation to a leftover path'
     + ' serves not-found HTML',
 async () => {
     await withServer({
         'not-found/index.html': '<p>gone</p>',
     }, undefined, async (base) => {
         const res = await getDocument(
-            base + '/snapshots',
+            base + '/no-such-page',
         );
         assert.equal(res.status, 200);
         assert.match(
@@ -174,12 +257,91 @@ async () => {
     });
 });
 
-test('a fetch to a retired path stays 401 JSON',
+test('a fetch to a leftover path is 404 JSON',
 async () => {
+    let handled = 0;
+    const handle: RequestHandler = async () => {
+        handled += 1;
+        return new Response('api', { status: 200 });
+    };
     await withServer({
         'not-found/index.html': '<p>gone</p>',
-    }, undefined, async (base) => {
-        const res = await fetch(base + '/snapshots');
+    }, handle, async (base) => {
+        const res = await fetch(
+            base + '/no-such-page',
+        );
+        assert.equal(res.status, HTTP_NOT_FOUND);
+        assert.match(
+            res.headers.get('content-type') ?? '',
+            /application\/json/,
+        );
+        const body = await res.json() as {
+            error: string;
+        };
+        assert.equal(body.error, 'Not found');
+        assert.equal(handled, 0);
+    });
+});
+
+test('the door strips /api/ and hands the remainder',
+async () => {
+    let seen = '';
+    const handle: RequestHandler = async (
+        _adapter, request,
+    ) => {
+        seen = new URL(request.url).pathname;
+        return new Response('ok', { status: 200 });
+    };
+    await withServer({}, handle, async (base) => {
+        const res = await fetch(
+            base + '/api/organizations/1/ideas/',
+        );
+        assert.equal(res.status, 200);
+        assert.equal(
+            seen, '/organizations/1/ideas/',
+        );
+    });
+});
+
+test('bare /api is a miss, not a strip',
+async () => {
+    let handled = 0;
+    const handle: RequestHandler = async () => {
+        handled += 1;
+        return new Response('api', { status: 200 });
+    };
+    await withServer({}, handle, async (base) => {
+        const res = await fetch(base + '/api');
+        assert.equal(res.status, HTTP_NOT_FOUND);
+        const body = await res.json() as {
+            error: string;
+        };
+        assert.equal(body.error, 'Not found');
+        assert.equal(handled, 0);
+    });
+});
+
+test('GET /api/ hops to handleRequest as /',
+async () => {
+    let seen = '';
+    const handle: RequestHandler = async (
+        _adapter, request,
+    ) => {
+        seen = new URL(request.url).pathname;
+        return new Response('ok', { status: 200 });
+    };
+    await withServer({}, handle, async (base) => {
+        await fetch(base + '/api/');
+        assert.equal(seen, '/');
+    });
+});
+
+test('unsigned fetch under /api/ is 401 JSON',
+async () => {
+    await withServer({}, undefined, async (base) => {
+        const res = await fetch(
+            base + '/api/organizations/1/ideas/',
+        );
         assert.equal(res.status, HTTP_UNAUTHORIZED);
         assert.match(
             res.headers.get('content-type') ?? '',

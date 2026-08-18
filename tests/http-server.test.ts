@@ -135,12 +135,16 @@ test('API path without a token is 401 before 404',
 async () => {
     await withServer({}, undefined, async (base, logs) => {
         const res = await fetch(
-            base + '/ideas?secret=1',
+            base
+            + '/api/organizations/1/ideas?secret=1',
         );
         assert.equal(res.status, HTTP_UNAUTHORIZED);
         const last = logs[logs.length - 1];
         assert.ok(last !== undefined);
-        assert.equal(last['path'], '/ideas');
+        assert.equal(
+            last['path'],
+            '/api/organizations/1/ideas',
+        );
         assert.equal(last['method'], 'GET');
         assert.equal(last['status'], HTTP_UNAUTHORIZED);
         assert.equal(typeof last['at'], 'string');

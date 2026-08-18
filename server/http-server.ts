@@ -43,15 +43,6 @@ export const HASHED_CACHE_CONTROL =
     'public, max-age=31536000, immutable';
 export const NO_STORE = 'no-store';
 
-const STATIC_EXTENSIONS: ReadonlySet<string> = new Set([
-    '.html',
-    '.js',
-    '.css',
-    '.woff2',
-    '.ico',
-    '.svg',
-]);
-
 const MIME_BY_EXT: Readonly<Record<string, string>> = {
     '.html': 'text/html; charset=utf-8',
     '.js': 'text/javascript; charset=utf-8',
@@ -106,21 +97,23 @@ export function staticCacheControl(name: string): string {
     return NO_STORE;
 }
 
-function lastSegment(pathname: string): string {
-    const parts = pathname.split('/');
-    return parts[parts.length - 1] ?? '';
-}
-
-function staticExtensionOf(pathname: string): string {
-    const base = lastSegment(pathname);
-    const dot = base.lastIndexOf('.');
-    if (dot <= 0) return '';
-    return base.slice(dot).toLowerCase();
-}
-
 function pathWithoutQuery(raw: string): string {
     const q = raw.indexOf('?');
     return q === -1 ? raw : raw.slice(0, q);
+}
+
+function stripApiMount(
+    pathname: string,
+): string | undefined {
+    if (!pathname.startsWith('/api/')) {
+        return undefined;
+    }
+    return pathname.slice('/api'.length);
+}
+
+function queryOf(raw: string): string {
+    const q = raw.indexOf('?');
+    return q === -1 ? '' : raw.slice(q);
 }
 
 function headerLine(
@@ -164,13 +157,6 @@ function isDocumentNavigation(
         && headerLine(
             req.headers['sec-fetch-mode'],
         ) === 'navigate';
-}
-
-function isAuthenticationPath(
-    pathname: string,
-): boolean {
-    return pathname === '/authentication'
-        || pathname.startsWith('/authentication/');
 }
 
 async function existingStaticFile(
@@ -260,8 +246,9 @@ function requestHost(req: IncomingMessage): string {
 function incomingToRequest(
     req: IncomingMessage,
     body: Buffer | undefined,
+    pathOverride?: string,
 ): Request {
-    const path = req.url ?? '/';
+    const path = pathOverride ?? (req.url ?? '/');
     const url = 'http://' + requestHost(req) + path;
     const headers = new Headers();
     for (const [name, value] of Object.entries(
@@ -380,6 +367,25 @@ async function serveStatic(
     return 200;
 }
 
+async function serveMiss(
+    req: IncomingMessage,
+    res: ServerResponse,
+    root: string,
+): Promise<number> {
+    if (isDocumentNavigation(req)) {
+        const notFound = await existingStaticFile(
+            root, '/not-found/index.html',
+        );
+        if (notFound !== undefined) {
+            return serveStatic(req, res, notFound);
+        }
+    }
+    writeJson(
+        res, HTTP_NOT_FOUND, { error: 'Not found' },
+    );
+    return HTTP_NOT_FOUND;
+}
+
 function grantTypeOf(bytes: Buffer): string | undefined {
     let parsed: unknown;
     try {
@@ -471,103 +477,96 @@ async function dispatch(
             status = HTTP_PAYLOAD_TOO_LARGE;
             return;
         }
-        let pathname = pathWithoutQuery(req.url ?? '/');
-        if (pathname === '' || pathname === '/') {
-            pathname = '/index.html';
-        }
-        const ext = staticExtensionOf(pathname);
-        if (STATIC_EXTENSIONS.has(ext)) {
-            const filePath = safeStaticPath(
-                options.staticRoot, pathname,
+        const rawPath = req.url ?? '/';
+        const pathname = pathWithoutQuery(rawPath);
+
+        if (pathname === '/' || pathname === '') {
+            const filePath = await existingStaticFile(
+                options.staticRoot, '/index.html',
             );
-            if (filePath === undefined) {
-                writeJson(
-                    res,
-                    HTTP_NOT_FOUND,
-                    { error: 'Not found' },
+            if (filePath !== undefined) {
+                status = await serveStatic(
+                    req, res, filePath,
                 );
-                status = HTTP_NOT_FOUND;
                 return;
             }
+            status = await serveMiss(
+                req, res, options.staticRoot,
+            );
+            return;
+        }
+
+        const resourcePath = stripApiMount(pathname);
+        if (resourcePath !== undefined) {
+            const requestPathname = new URL(
+                'http://'
+                    + requestHost(req)
+                    + resourcePath
+                    + queryOf(rawPath),
+            ).pathname;
+            let grantType: string | undefined;
+            if (isAuthTokenPath(requestPathname)
+                && body.kind === 'bytes') {
+                grantType = grantTypeOf(body.bytes);
+            }
+            if (isAuthThrottlePath(requestPathname)
+                && grantType !== 'refresh'
+                && grantType !== 'token-exchange'
+                && throttle.limited(
+                    req.socket.remoteAddress,
+                    headerLine(req.headers['forwarded']),
+                    headerLine(
+                        req.headers['x-forwarded-for'],
+                    ),
+                )) {
+                writeJson(
+                    res,
+                    HTTP_TOO_MANY_REQUESTS,
+                    { error: 'too many requests' },
+                );
+                status = HTTP_TOO_MANY_REQUESTS;
+                return;
+            }
+            const bytes = body.kind === 'bytes'
+                ? body.bytes
+                : undefined;
+            const request = incomingToRequest(
+                req, bytes, resourcePath + queryOf(rawPath),
+            );
+            const response = await handle(
+                options.adapter, request,
+            );
+            await writeFetchResponse(res, response);
+            status = response.status;
+            return;
+        }
+
+        if (pathname.endsWith('/')) {
+            const filePath = await existingStaticFile(
+                options.staticRoot, pathname + 'index.html',
+            );
+            if (filePath !== undefined) {
+                status = await serveStatic(
+                    req, res, filePath,
+                );
+                return;
+            }
+            status = await serveMiss(
+                req, res, options.staticRoot,
+            );
+            return;
+        }
+
+        const filePath = await existingStaticFile(
+            options.staticRoot, pathname,
+        );
+        if (filePath !== undefined) {
             status = await serveStatic(req, res, filePath);
             return;
         }
-        if (
-            pathname === '/api-documentation'
-            || pathname.startsWith(
-                '/api-documentation/',
-            )
-        ) {
-            const indexed = pathname.endsWith('/')
-                ? pathname + 'index.html'
-                : pathname + '/index.html';
-            const filePath = safeStaticPath(
-                options.staticRoot, indexed,
-            );
-            if (filePath === undefined) {
-                writeJson(
-                    res,
-                    HTTP_NOT_FOUND,
-                    { error: 'Not found' },
-                );
-                status = HTTP_NOT_FOUND;
-                return;
-            }
-            status = await serveStatic(
-                req, res, filePath,
-            );
-            return;
-        }
-        if (
-            isDocumentNavigation(req)
-            && !isAuthenticationPath(pathname)
-        ) {
-            const notFound = await existingStaticFile(
-                options.staticRoot,
-                '/not-found/index.html',
-            );
-            if (notFound !== undefined) {
-                status = await serveStatic(
-                    req, res, notFound,
-                );
-                return;
-            }
-        }
-        const requestPathname = new URL(
-            'http://'
-                + requestHost(req)
-                + (req.url ?? '/'),
-        ).pathname;
-        let grantType: string | undefined;
-        if (isAuthTokenPath(requestPathname)
-            && body.kind === 'bytes') {
-            grantType = grantTypeOf(body.bytes);
-        }
-        if (isAuthThrottlePath(requestPathname)
-            && grantType !== 'refresh'
-            && grantType !== 'token-exchange'
-            && throttle.limited(
-                req.socket.remoteAddress,
-                headerLine(req.headers['forwarded']),
-                headerLine(req.headers['x-forwarded-for']),
-            )) {
-            writeJson(
-                res,
-                HTTP_TOO_MANY_REQUESTS,
-                { error: 'too many requests' },
-            );
-            status = HTTP_TOO_MANY_REQUESTS;
-            return;
-        }
-        const bytes = body.kind === 'bytes'
-            ? body.bytes
-            : undefined;
-        const request = incomingToRequest(req, bytes);
-        const response = await handle(
-            options.adapter, request,
+        status = await serveMiss(
+            req, res, options.staticRoot,
         );
-        await writeFetchResponse(res, response);
-        status = response.status;
     } catch {
         if (!res.headersSent) {
             writeJson(

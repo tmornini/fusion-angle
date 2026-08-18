@@ -218,9 +218,10 @@ Every page is a standalone HTML file served by
   `navigateTo()` resolve output as
   `{sourceDir}/{sourceFile}.html` — the file you edit is the
   file the browser loads.
-- **Auth.** Real OAuth 2.1 spine. `/authentication/token`
-  (grant dispatch) + `/authentication/authorize` (password
-  loop) mint/verify HMAC-SHA256 JWTs (`api/access-token.ts`);
+- **Auth.** Real OAuth 2.1 spine.
+  `/api/authentication/token` (grant dispatch) +
+  `/api/authentication/authorize` (password loop)
+  mint/verify HMAC-SHA256 JWTs (`api/access-token.ts`);
   a Bearer gate in `handleRequest` enforces them. The
   `authorization_code` grant is TTL-bound, client-bound, and
   PKCE S256-verified. Authorize without S256 is rejected.
@@ -236,8 +237,9 @@ Every page is a standalone HTML file served by
   New passwords hash with scrypt; PBKDF2 still verifies,
   then rehashes. There is no `SIGNING_KEY_MATERIAL`.
   `JWT_HMAC_SIGNING_KEY` is required. Refresh is an
-  HttpOnly cookie; token JSON has no `refresh_token`;
-  cookie-session access is memory-only. 401 classes:
+  HttpOnly cookie (`Path=/api/authentication`); token
+  JSON has no `refresh_token`; cookie-session access
+  is memory-only. 401 classes:
   `invalid_token` / `invalid_client` / `invalid_grant`.
   Membership, roles, and revocation ride claim snapshots
   (NAMED COVENANT: bite at next mint/refresh/exchange or
@@ -591,9 +593,11 @@ apply to it (RED is the audit's first finding).
   `schema_marker` last so a failed seed
   reads as empty. There is no HTTP
   dump/restore.
-- **HTTP only.** Page URLs use relative paths. The
-  product is `node server.mjs` on one origin. Testing
-  is HTTP-only.
+- **HTTP only.** Page URLs use relative paths.
+  Pages are `/ideas/` or `/ideas/index.html`.
+  The API is `/api/…`. The product is
+  `node server.mjs` on one origin. Testing is
+  HTTP-only.
 - **View Transition aborts.** rapid programmatic navigation
   surfaces both `AbortError: Transition was skipped` and
   `InvalidStateError: Transition was aborted...` lines in

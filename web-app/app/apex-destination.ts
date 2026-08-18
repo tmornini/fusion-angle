@@ -1,7 +1,7 @@
 // Apex `/` destination. The refresh cookie is
-// Path=/authentication, so GET `/` cannot see it.
-// The existing refresh grant is the probe — not a
-// new door.
+// Path=/api/authentication, so GET `/` cannot
+// see it. The existing refresh grant is the
+// probe — not a new door.
 
 import { runSingleFlightRefresh } from
     './adapters/session-refresh-mutex.ts';
@@ -26,7 +26,7 @@ export async function probeRefreshSession(
 ): Promise<boolean> {
     const access = await runSingleFlightRefresh(async () => {
         const response = await fetch(
-            '/authentication/token',
+            '/api/authentication/token',
             {
                 method: 'POST',
                 credentials: 'same-origin',

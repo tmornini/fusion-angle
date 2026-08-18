@@ -158,7 +158,7 @@ export function createHttpFacade(
             | undefined,
         write: boolean,
     ): Promise<Response> {
-        return fetch(origin + '/' + resource, {
+        return fetch(origin + '/api/' + resource, {
             method,
             credentials: 'same-origin',
             headers: requestHeaders(
@@ -177,7 +177,7 @@ export function createHttpFacade(
     async function postCookieRefresh(
     ): Promise<string | null> {
         const response = await fetch(
-            origin + '/authentication/token', {
+            origin + '/api/authentication/token', {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: {

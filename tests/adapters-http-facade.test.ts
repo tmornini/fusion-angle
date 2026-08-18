@@ -48,11 +48,56 @@ test(
             );
         });
         assert.equal(
-            url, 'http://example.test/organizations/1/ideas/1',
+            url,
+            'http://example.test/api/organizations/1/ideas/1',
         );
         assert.equal(credentials, 'same-origin');
         assert.ok(operationId !== null);
         assert.match(operationId, OPERATION_ID);
+    },
+);
+
+test(
+    'cookie refresh posts under the /api/ mount',
+    async () => {
+        const urls: string[] = [];
+        await withMockFetch(async (input) => {
+            urls.push(String(input));
+            if (String(input).endsWith(
+                '/authentication/token',
+            )) {
+                return new Response(
+                    JSON.stringify({
+                        access_token: 'fresh',
+                    }),
+                    { status: 200 },
+                );
+            }
+            return new Response(
+                JSON.stringify({
+                    error: 'invalid_token',
+                }),
+                { status: 401 },
+            );
+        }, async () => {
+            const facade = createHttpFacade(
+                'http://example.test',
+            );
+            await assert.rejects(
+                () => facade.GET(
+                    'organizations/1/ideas/', 'dead',
+                ),
+                UnauthorizedError,
+            );
+        });
+        assert.equal(
+            urls[0],
+            'http://example.test/api/organizations/1/ideas/',
+        );
+        assert.equal(
+            urls[1],
+            'http://example.test/api/authentication/token',
+        );
     },
 );
 

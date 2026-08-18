@@ -295,7 +295,7 @@ it. A Phase-2 run that ignores this collapses:
 
 - **Cookie session.** Product access is memory-only;
   refresh is the HttpOnly `refresh_token` cookie
-  (`Path=/authentication`, `SameSite=Strict`).
+  (`Path=/api/authentication`, `SameSite=Strict`).
   `fusion-ai:authorization` is not the product path
   (`server-core.ts` calls `setCookieSession(true)`).
   Two pages in the same Chrome context share that
@@ -592,7 +592,7 @@ run before A1's build. The single canonical invocation is
 - [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
 - [ ] **A3** From the A2 directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an **empty** Postgres, run `node server.mjs --seed-mock-data` (or `./serve` after commit). PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP. This pin **is** SV1.
 - [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
-- [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /authentication/token` refresh 401 are acceptable.
+- [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /api/authentication/token` refresh 401 are acceptable.
 
 ---
 
@@ -905,7 +905,7 @@ depend on. Run AA3+ in order.
 - [ ] **B15** With no session (Sign out, or a profile with no `refresh_token` cookie), open `dashboard/index.html` directly. PASS: bounced to `auth/index.html?return=dashboard` (the Sign In page), not the dashboard.
 - [ ] **B16** From the B15 bounce, sign in with the seeded admin credentials. PASS: lands on `dashboard/index.html` — the `?return=` target, not a generic default.
 - [ ] **B17** With no session, open `flows/detail.html?flowId=<id>` directly. PASS: bounced to `auth` with the flow preserved in `?return=`; after signing in, lands back on that exact flow with `flowId` intact.
-- [ ] **B18** After signing in on the dashboard, reload (Cmd-R). PASS: stays authenticated on the dashboard — no bounce to `auth` (boot cookie-refreshes via `POST /authentication/token` with `grant_type=refresh` and `credentials: 'same-origin'`).
+- [ ] **B18** After signing in on the dashboard, reload (Cmd-R). PASS: stays authenticated on the dashboard — no bounce to `auth` (boot cookie-refreshes via `POST /api/authentication/token` with `grant_type=refresh` and `credentials: 'same-origin'`).
 - [ ] **B19** With no session, open each public page in turn — `landing/`, `auth/`, `not-found/`, `design-system/`. PASS: each renders normally with NO redirect to `auth`.
 - [ ] **B20** After signing in, close the tab, then reopen `dashboard/index.html` in a new tab in the **same** cookie jar. PASS: still authenticated — no bounce (the HttpOnly `refresh_token` cookie is shared by the jar; boot cookie-refreshes).
 - [ ] **B21** Silent refresh: after signing in, replace the in-memory access token with an expired JWT (keep the live `refresh_token` cookie), then navigate to `members/`. PASS: the page loads with no bounce and no error card — the dead access token was cookie-refreshed transparently.
@@ -2794,8 +2794,8 @@ regression.
 
 - [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stderr seed reveal).
 - [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
-- [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-ai:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
-- [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
+- [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/api/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-ai:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
+- [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /api/authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
 
 ### Two browsers / two identities / one database
 

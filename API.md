@@ -177,143 +177,157 @@ Flat `/members`, `/current-member`, `/ai-members`,
 `/human-members`, and `/memberships` are RETIRED
 (router 404). Seats live on the organization nest.
 
-- `GET /organizations/:organization-id/members/` —
+- `GET /api/organizations/:organization-id/members/` —
   seat roster. primitive (derived).
-- `GET|PUT|DELETE /organizations/:organization-id/members/:identity-id`
+- `GET|PUT|DELETE /api/organizations/:organization-id/members/:identity-id`
   — seat document. `PUT` is a document write (§5.10).
   `GET …/versions/` plus `GET …/versions/:etag` —
   version list and leaf (§2.10).
-- `GET /ai-agents/` · `GET|PUT /ai-agents/:id` —
+- `GET /api/ai-agents/` · `GET|PUT /api/ai-agents/:id` —
   primitive. Global-plane, not a member and not an
   identity. Body is `name`, `description`,
-  `skill_focus`, `model`. `GET /ai-agents/:id/versions/`
-  plus `GET /ai-agents/:id/versions/:etag` — version
+  `skill_focus`, `model`. `GET /api/ai-agents/:id/versions/`
+  plus `GET /api/ai-agents/:id/versions/:etag` — version
   list and leaf (§2.10).
 
 ### 2.2 Identities & subtree
 
-- `GET|POST /identities/` · `GET|PUT /identities/:id`
+- `GET|POST /api/identities/` · `GET|PUT /api/identities/:id`
   — primitive. `POST` is operation (§3.5), admin-only.
   `PUT` is a document write (§5.13).
-- `GET /identities/:id/versions/` plus
-  `GET /identities/:id/versions/:etag` — version list
+- `GET /api/identities/:id/versions/` plus
+  `GET /api/identities/:id/versions/:etag` — version list
   and leaf (§2.10).
-- `GET|PUT /identities/:id/default-organization` —
+- `GET|PUT /api/identities/:id/default-organization` —
   singleton SET document. Self-only. See §2.11.
-- `GET /identities/:id/organizations/` — the identity's
-  reachable organizations. Identity-scoped. There is
-  no `GET /organizations` list.
-- `GET /identities/:id/invitations/` ·
-  `GET|PUT /identities/:id/invitations/:id` — receive
+- `GET /api/identities/:id/organizations/` — the
+  identity's reachable organizations. Identity-scoped.
+  There is no `GET /api/organizations` list.
+- `GET /api/identities/:id/invitations/` ·
+  `GET|PUT /api/identities/:id/invitations/:id` — receive
   nest. See §2.12.
-- `GET|PUT|DELETE /identities/:id/pii` — facet. GET is
-  self-or-admin; PUT/DELETE are self-or-admin. The only
-  PII HTTP (flat `/identity-pii` is RETIRED, router 404).
-  PUT/DELETE ride the message plane's sanctioned
-  hard-delete zone (§5.12).
-- `GET /identities/:id/credentials/` ·
-  `GET|PUT /identities/:id/credentials/:cid` — nested; the opaque
-  `secret` is projected out on every read. Admin-only. `PUT`'s
-  closure is extracted to `postIdentityCredentialDocumentOp`
-  (§5.13) but stays hand-dispatched, never family-registered
+- `GET|PUT|DELETE /api/identities/:id/pii` — facet. GET
+  is self-or-admin; PUT/DELETE are self-or-admin. The
+  only PII HTTP (flat `/identity-pii` is RETIRED,
+  router 404). PUT/DELETE ride the message plane's
+  sanctioned hard-delete zone (§5.12).
+- `GET /api/identities/:id/credentials/` ·
+  `GET|PUT /api/identities/:id/credentials/:cid` —
+  nested; the opaque `secret` is projected out on
+  every read. Admin-only. `PUT`'s closure is extracted
+  to `postIdentityCredentialDocumentOp` (§5.13) but
+  stays hand-dispatched, never family-registered
   (§5.13's nested-plane rationale).
-- `GET|PUT|DELETE /identities/:id/registration` — client
-  registration facet (admin-realm, kind-`'service'` gate);
-  `grantClientCredentials` derives it pre-token.
+- `GET|PUT|DELETE /api/identities/:id/registration` —
+  client registration facet (admin-realm,
+  kind-`'service'` gate); `grantClientCredentials`
+  derives it pre-token.
 
 ### 2.3 Auth spine — tokens, providers, grants
 
-- `GET /identities/:id/tokens/` (derived) ·
-  `GET|PUT /identities/:id/tokens/:tid` — nested under the
-  identity. Admin-only GET. `PUT` is pair-only and stamps
-  `identity_id` from the path. Flat `GET /identity-tokens` ·
-  `GET|PUT /identity-tokens/:id` are RETIRED (router 404).
-- `POST /identities/:id/tokens/:jti/rotation` — operation
-  (§3.6). Path identity must match the jti's identity.
-  Flat `POST /identity-tokens/:jti/rotation` is RETIRED.
-- `POST /identities/:id/tokens/:jti/revocation` — operation
-  (§3.7). Path identity must match the jti's identity.
-  Flat `POST /identity-tokens/:jti/revocation` is RETIRED.
-- `GET|PUT /identities/:id/token-revocations/:rid` —
-  nested under the identity. `GET` admin-only; `PUT` is
-  self-or-admin (path identity vs actor) — a member may
-  revoke its OWN token chain, naming another identity
-  still requires admin. Path stamps `identity_id`.
-  Flat `GET|PUT /identity-token-revocations/:id` is
+- `GET /api/identities/:id/tokens/` (derived) ·
+  `GET|PUT /api/identities/:id/tokens/:tid` — nested
+  under the identity. Admin-only GET. `PUT` is
+  pair-only and stamps `identity_id` from the path.
+  Flat `GET /api/identity-tokens` ·
+  `GET|PUT /api/identity-tokens/:id` are RETIRED
+  (router 404).
+- `POST /api/identities/:id/tokens/:jti/rotation` —
+  operation (§3.6). Path identity must match the
+  jti's identity. Flat
+  `POST /api/identity-tokens/:jti/rotation` is
+  RETIRED.
+- `POST /api/identities/:id/tokens/:jti/revocation` —
+  operation (§3.7). Path identity must match the
+  jti's identity. Flat
+  `POST /api/identity-tokens/:jti/revocation` is
+  RETIRED.
+- `GET|PUT /api/identities/:id/token-revocations/:rid`
+  — nested under the identity. `GET` admin-only;
+  `PUT` is self-or-admin (path identity vs actor) —
+  a member may revoke its OWN token chain, naming
+  another identity still requires admin. Path stamps
+  `identity_id`. Flat
+  `GET|PUT /api/identity-token-revocations/:id` is
   RETIRED (router 404). No collection route.
-- `GET /identities/:id/providers/` ·
-  `GET|PUT /identities/:id/providers/:eid` — nested under the
-  identity. Admin-only. Flat `GET /identity-providers` ·
-  `GET|PUT /identity-providers/:id` are RETIRED (router 404).
-- `GET /role-grants` · `GET|PUT /role-grants/:id` — RETIRED
-  (router 404). Roles derive from membership `type` / claims;
-  `postRoleGrantDocumentOp` and the role-grants seed pairs are
-  gone (§5.13 / §5.15).
-- `POST /authentication/token` — grant dispatch (§3.8). Bearer-exempt.
-- `POST /authentication/authorize` — interactive front door (§3.9).
-  Bearer-exempt.
+- `GET /api/identities/:id/providers/` ·
+  `GET|PUT /api/identities/:id/providers/:eid` —
+  nested under the identity. Admin-only. Flat
+  `GET /api/identity-providers` ·
+  `GET|PUT /api/identity-providers/:id` are RETIRED
+  (router 404).
+- `GET /api/role-grants` ·
+  `GET|PUT /api/role-grants/:id` — RETIRED
+  (router 404). Roles derive from membership `type`
+  / claims; `postRoleGrantDocumentOp` and the
+  role-grants seed pairs are gone (§5.13 / §5.15).
+- `POST /api/authentication/token` — grant dispatch
+  (§3.8). Bearer-exempt.
+- `POST /api/authentication/authorize` — interactive
+  front door (§3.9). Bearer-exempt.
 
 ### 2.4 Ideas
 
 Org-nested. No flat `/ideas` collection.
 
-- `GET /organizations/:id/ideas/` ·
-  `GET|PUT /organizations/:id/ideas/:id` — primitive
-  (§3.10). Member-tier. `GET …/versions/` plus
-  `GET …/versions/:etag` — version list and leaf
-  (§2.10). GET rows do not embed the lifecycle trio.
-- `POST /organizations/:id/ideas/:id/conversion` —
-  operation, idea→project (§3.11). Member-tier.
-- `GET /organizations/:id/ideas/:id/submissions/` ·
-  `PUT /organizations/:id/ideas/:id/submissions/:sid`
+- `GET /api/organizations/:id/ideas/` ·
+  `GET|PUT /api/organizations/:id/ideas/:id` —
+  primitive (§3.10). Member-tier. `GET …/versions/`
+  plus `GET …/versions/:etag` — version list and
+  leaf (§2.10). GET rows do not embed the lifecycle
+  trio.
+- `POST /api/organizations/:id/ideas/:id/conversion`
+  — operation, idea→project (§3.11). Member-tier.
+- `GET /api/organizations/:id/ideas/:id/submissions/`
+  · `PUT /api/organizations/:id/ideas/:id/submissions/:sid`
   — nested.
 
 ### 2.5 Projects
 
 Org-nested. No flat `/projects` collection.
 
-- `GET /organizations/:id/projects/` ·
-  `GET|PUT /organizations/:id/projects/:id` —
+- `GET /api/organizations/:id/projects/` ·
+  `GET|PUT /api/organizations/:id/projects/:id` —
   primitive (§3.32). Member-tier. `GET …/versions/`
   plus `GET …/versions/:etag` — version list and
   leaf (§2.10). GET rows do not embed the lifecycle
   trio.
-- `GET /organizations/:id/projects/:id/flows/` ·
-  `PUT|DELETE /organizations/:id/projects/:id/flows/:pfid`
+- `GET /api/organizations/:id/projects/:id/flows/` ·
+  `PUT|DELETE /api/organizations/:id/projects/:id/flows/:pfid`
   — nested (project↔flow join).
-- `GET /organizations/:id/projects/:id/objective-baseline-scores/` ·
-  `PUT .../objective-baseline-scores/:sid` — nested.
-- `GET /organizations/:id/projects/:id/objective-actual-scores/` ·
-  `PUT .../objective-actual-scores/:sid` — nested.
+- `GET /api/organizations/:id/projects/:id/objective-baseline-scores/`
+  · `PUT .../objective-baseline-scores/:sid` — nested.
+- `GET /api/organizations/:id/projects/:id/objective-actual-scores/`
+  · `PUT .../objective-actual-scores/:sid` — nested.
 
 ### 2.6 Flows
 
 Org-nested. No flat `/flows` collection.
 
-- `GET|POST /organizations/:id/flows/` ·
-  `GET|PUT /organizations/:id/flows/:id` —
+- `GET|POST /api/organizations/:id/flows/` ·
+  `GET|PUT /api/organizations/:id/flows/:id` —
   primitive. `PUT` is a document write (§3.13) and
   the FIRST locked-class route (§5.4) — a save on
   an existing flow must echo the current `ETag` via
   `If-Match` or 428/412s. `POST` is operation
   (§3.12). Member-tier.
-- `POST /organizations/:id/flows/:id/undo` —
+- `POST /api/organizations/:id/flows/:id/undo` —
   operation (§3.14).
 - `POST …/redo` — retired: no pattern match, so a
   request 404s. Live redo is a locked
-  `PUT /organizations/:id/flows/:id` (§3.13).
-- `GET /organizations/:id/flows/:id/versions/` —
-  pair-chain index (live). Flows keep
+  `PUT /api/organizations/:id/flows/:id` (§3.13).
+- `GET /api/organizations/:id/flows/:id/versions/`
+  — pair-chain index (live). Flows keep
   `StateEntity[]` on the list (deferred).
-- `GET /organizations/:id/flows/:id/versions/:etag`
+- `GET /api/organizations/:id/flows/:id/versions/:etag`
   — document version leaf (`documentVersionRoute`).
-- `GET /organizations/:id/flows/:id/work-orders/` ·
-  `PUT /organizations/:id/flows/:id/work-orders/:woid`
+- `GET /api/organizations/:id/flows/:id/work-orders/`
+  · `PUT /api/organizations/:id/flows/:id/work-orders/:woid`
   — nested.
-- `GET /organizations/:id/flows/:id/records/` ·
-  `GET|PUT|DELETE /organizations/:id/flows/:id/records/:frid`
+- `GET /api/organizations/:id/flows/:id/records/` ·
+  `GET|PUT|DELETE /api/organizations/:id/flows/:id/records/:frid`
   — nested.
-- `GET|PUT|DELETE /organizations/:id/flows/:id/tags/:name`
+- `GET|PUT|DELETE /api/organizations/:id/flows/:id/tags/:name`
   — nested, PAIR-PLANE ONLY: first document family
   with no backing table — `flow_response_id` is the
   tag's only body field. SIMPLE class, not locked.
@@ -323,21 +337,21 @@ Org-nested. No flat `/flows` collection.
 Org-nested. No flat `/work-orders` collection. No
 bulk history.
 
-- `GET|POST /organizations/:id/work-orders/` ·
-  `GET|PUT /organizations/:id/work-orders/:id` —
+- `GET|POST /api/organizations/:id/work-orders/` ·
+  `GET|PUT /api/organizations/:id/work-orders/:id` —
   primitive. `PUT` is a document write (§5.6) —
   `'stateless'`: the body carries no lifecycle trio.
   `POST` is operation (§3.17). Member-tier.
-- `PUT|GET|DELETE /organizations/:id/work-orders/:id/claim`
+- `PUT|GET|DELETE /api/organizations/:id/work-orders/:id/claim`
   — claim document (§3.18). First PUT **201**. GET
   `{member_id, expires_at}`; 404 only when unclaimed.
   DELETE releases (**204**). POST 405.
-- `POST /organizations/:id/work-orders/:id/transition`
+- `POST /api/organizations/:id/work-orders/:id/transition`
   — operation (§3.19).
-- `PUT /organizations/:id/work-orders/:id/binding` —
+- `PUT /api/organizations/:id/work-orders/:id/binding` —
   create-only bind (§3.34). First **201**; rebind
   409; POST 405.
-- `GET /organizations/:id/work-orders/:id/history` —
+- `GET /api/organizations/:id/work-orders/:id/history` —
   per-id history (§2.10). There is no
   `GET …/work-orders/history` bulk.
 - `POST …/release` — RETIRED (router 404). Unclaim
@@ -421,8 +435,8 @@ accepted debt, not this family's wire.
 Org-nested. No flat `/objectives` collection. No bulk
 `GET /objectives/versions`.
 
-- `GET|POST /organizations/:id/objectives/` ·
-  `GET|PUT /organizations/:id/objectives/:id` —
+- `GET|POST /api/organizations/:id/objectives/` ·
+  `GET|PUT /api/organizations/:id/objectives/:id` —
   primitive (§3.29). `PUT` is a document write
   (§5.8) — lifecycle **`'trio'`** (genesis at
   create; archive/reactivate via the document PUT).
@@ -430,8 +444,8 @@ Org-nested. No flat `/objectives` collection. No bulk
   plus `GET …/versions/:etag` — version list and
   leaf (§2.10). GET rows do not embed the
   lifecycle trio.
-- `GET /organizations/:id/objectives/:id/revisions/` ·
-  `PUT /organizations/:id/objectives/:id/revisions/:rid`
+- `GET /api/organizations/:id/objectives/:id/revisions/`
+  · `PUT /api/organizations/:id/objectives/:id/revisions/:rid`
   — nested.
 
 ### 2.10 Lifecycle history — the per-URI event log
@@ -466,7 +480,7 @@ GET `:id`. They do **not** embed trio metadata
 GET rows. Flows keep `StateEntity[]` on the list
 (deferred).
 
-`GET /organizations/:id/work-orders/:id/history` —
+`GET /api/organizations/:id/work-orders/:id/history` —
 `workOrderHistoryFor` (entity-scoped op-pair replay
 + transition fold). Wire:
 `WorkOrderHistoryEventEntity` with inline
@@ -524,21 +538,22 @@ RETIRED with the address itself (see
 
 ### 2.11 Organizations & memberships
 
-There is no `GET /organizations` list.
+There is no `GET /api/organizations` list.
 
-- `GET /identities/:id/organizations/` — the identity's
-  reachable organizations (`getIdentityOrganizations`).
-  Identity-scoped; org-less tokens may read this nest.
-- `GET|PUT /organizations/:id` — primitive (global
-  passthrough; reads fence to the caller's memberships).
-  `GET /organizations/:id/versions/` plus
-  `GET /organizations/:id/versions/:etag` — version
-  list and leaf (§2.10).
+- `GET /api/identities/:id/organizations/` — the
+  identity's reachable organizations
+  (`getIdentityOrganizations`). Identity-scoped;
+  org-less tokens may read this nest.
+- `GET|PUT /api/organizations/:id` — primitive
+  (global passthrough; reads fence to the caller's
+  memberships). `GET /api/organizations/:id/versions/`
+  plus `GET /api/organizations/:id/versions/:etag` —
+  version list and leaf (§2.10).
 - Flat `/memberships` is RETIRED (router 404). Seats
   live at
   `/organizations/:organization-id/members/` (§2.1).
-- `GET|PUT /identities/:id/default-organization` — a
-  simple document. Self-only. `GET` returns the SET
+- `GET|PUT /api/identities/:id/default-organization` —
+  a simple document. Self-only. `GET` returns the SET
   document or 404 if never SET. `PUT { organization_id }`
   must be a live seat, else 400. No public DELETE.
   Revoke does not rewrite this document. Token
@@ -556,18 +571,18 @@ documents.
 
 Receive nest (invitee):
 
-- `GET /identities/:id/invitations/`
-- `GET|PUT /identities/:id/invitations/:id` — PUT
+- `GET /api/identities/:id/invitations/`
+- `GET|PUT /api/identities/:id/invitations/:id` — PUT
   sets `accepted` or `declined` from pending
   (§3.23 / §3.24). Invitee-only.
 - `GET …/versions/` plus `GET …/versions/:etag`
 
 Send nest (admin):
 
-- `GET|POST /organizations/:id/invitations/` — POST
-  grants pending (§3.22). Admin-only.
-- `GET|PUT /organizations/:id/invitations/:id` — PUT
-  sets `revoked` from pending (§3.25). Admin-only.
+- `GET|POST /api/organizations/:id/invitations/` —
+  POST grants pending (§3.22). Admin-only.
+- `GET|PUT /api/organizations/:id/invitations/:id` —
+  PUT sets `revoked` from pending (§3.25). Admin-only.
 - `GET …/versions/` plus `GET …/versions/:etag`
 
 ---
@@ -928,7 +943,7 @@ Delegates to `revokeTokenChain` (`api/authentication.ts`).
   `TokenWriteRetriesExhaustedError` rather than a silent, incomplete
   revoke.
 
-### 3.8 `POST /authentication/token` — grant dispatch
+### 3.8 `POST /api/authentication/token` — grant dispatch
 
 `postToken` (`api/authentication.ts`) dispatches on
 `grant_type`. Every grant is **grant-first**: it authenticates
@@ -936,9 +951,9 @@ the presented grant before any side effect, so a failed grant
 appends nothing and mints nothing. `mintPair` is pure crypto (no
 DB). Success JSON is `{ access_token, token_type, expires_in }`
 — **no `refresh_token`**. Refresh is an HttpOnly cookie
-(`Path=/authentication`, `SameSite=Strict`; `Secure` off
-only on `http://localhost`). Cookie-session access is
-memory-only. Wire 401 classes: `invalid_token` (bearer
+(`Path=/api/authentication`, `SameSite=Strict`; `Secure`
+off only on `http://localhost`). Cookie-session access
+is memory-only. Wire 401 classes: `invalid_token` (bearer
 gate), `invalid_client` (bad `client_assertion`),
 `invalid_grant` (credentials, spent code, spent jti).
 Every SUCCESSFUL grant also forms its own message pair
@@ -1014,7 +1029,7 @@ logins each land) — see §5.1 for the headers this produces and
     401 `invalid_grant`, nothing minted. `jti` is
     required; it is not put on the token JSON.
 
-### 3.9 `POST /authentication/authorize` — interactive front door
+### 3.9 `POST /api/authentication/authorize` — interactive front door
 
 `postAuthorize` (`api/authentication.ts`) dispatches on
 `method`.
@@ -2381,7 +2396,7 @@ now declares:
   `'stateless'` wiring (its only tombstone signal is a
   DELETE-method head, already absent via `deriveDocumentsAt`
   — the SAME reduction every family shares). History reads
-  live on `GET /organizations/:id/work-orders/:id/history`
+  live on `GET /api/organizations/:id/work-orders/:id/history`
   (§2.10) with inline `field_values`. There is no bulk
   `GET work-orders/history`.
 - **`notFoundTable`: the identifier the wire 404 body speaks**
@@ -3322,7 +3337,7 @@ with the system-member genesis path accounted in the member
 document plane); field values fold into those transition
 bodies as `fieldValues: [{id, fields}]`. Product reads expose
 them inline on
-`GET /organizations/:id/work-orders/:id/history` as
+`GET /api/organizations/:id/work-orders/:id/history` as
 `field_values: [{id, attribute_id, value}]` (§2.10).
 There is no bulk `GET work-orders/history`. No
 `WRITE_RESPONSE_SPECS` leaf entry remains for a field-values

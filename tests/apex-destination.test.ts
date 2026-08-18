@@ -49,7 +49,10 @@ async () => {
     let posts = 0;
     globalThis.fetch = async (input, init) => {
         posts += 1;
-        assert.equal(String(input), '/authentication/token');
+        assert.equal(
+            String(input),
+            '/api/authentication/token',
+        );
         assert.equal(init?.method, 'POST');
         assert.equal(init?.credentials, 'same-origin');
         const body = JSON.parse(String(init?.body)) as {

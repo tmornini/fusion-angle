@@ -72,8 +72,8 @@ document pair at creation — a frozen value, not a live
 relationship.
 
 The **route is the single divorce point**.
-`GET /organizations/:id/flows/:id` AND
-`GET /organizations/:id/flows/` (list) reassemble
+`GET /api/organizations/:id/flows/:id` AND
+`GET /api/organizations/:id/flows/` (list) reassemble
 `FlowWithGraph` from the pair plane
 (`= FlowEntity & { graph; hasUndoHistory }` — the
 read DTO).
@@ -354,6 +354,9 @@ every `member_id` reference survive.
 
 ## Demo server tier
 
+One origin, two collections — pages at `/ideas/`, API
+at `/api/`.
+
 `./build` emits one artifact from one source tree (clean
 tree required): **`fusion-ai-server-${SHA}.zip`**. Node
 serves composed pages and the API on one origin.
@@ -389,9 +392,9 @@ no LISTEN and no SSE client (stale-until-navigation).
 
 scrypt hashes new passwords; PBKDF2 still verifies,
 then rehashes. Refresh is an HttpOnly cookie
-(`Path=/authentication`, `SameSite=Strict`; `Secure`
-off only on `http://localhost`). Token JSON has
-`access_token` and no `refresh_token`. Cookie-session
+(`Path=/api/authentication`, `SameSite=Strict`;
+`Secure` off only on `http://localhost`). Token JSON
+has `access_token` and no `refresh_token`. Cookie-session
 access is memory-only. 401 classes: `invalid_token`
 (bearer), `invalid_client`, `invalid_grant`. Throttle:
 5 authorize + password-class token grants per address
@@ -558,7 +561,7 @@ Per-entity `GET …/versions/` (list) plus
 ai-agents, organizations, seats, invitations (both
 nests), ideas, projects, flows, record-types, and
 objectives. Work-orders stay
-`GET /organizations/:id/work-orders/:id/history`
+`GET /api/organizations/:id/work-orders/:id/history`
 (inline `field_values`). Instance value-revision
 history is
 `GET …/record-types/:record-type-id/instances/:instance-id/versions/`
@@ -630,7 +633,7 @@ transition-pair-folded field values only, head-reduced by
 the shared `(at, id)` order — backing the
 `record-attributes` RESTRICT gate). Product field-value
 reads fold inline on
-`GET /organizations/:id/work-orders/:id/history`
+`GET /api/organizations/:id/work-orders/:id/history`
 (`workOrderHistoryFor`); the standalone field-values
 GET and `stateFieldValuesForStateEvent` are GONE.
 

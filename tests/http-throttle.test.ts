@@ -73,7 +73,7 @@ test('sixth authorize in a minute is 429', async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const url = base + '/authentication/authorize';
+        const url = base + '/api/authentication/authorize';
         for (let i = 0; i < 5; i++) {
             const res = await fetch(url, { method: 'POST' });
             assert.equal(res.status, 200);
@@ -92,7 +92,7 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const url = base + '/authentication/token';
+        const url = base + '/api/authentication/token';
         const body = JSON.stringify({
             grant_type: 'refresh',
         });
@@ -118,7 +118,7 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const url = base + '/authentication/token';
+        const url = base + '/api/authentication/token';
         const body = JSON.stringify({
             grant_type: 'token-exchange',
         });
@@ -144,7 +144,7 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const url = base + '/authentication/token';
+        const url = base + '/api/authentication/token';
         const body = JSON.stringify({
             grant_type: 'client_credentials',
         });
@@ -178,7 +178,7 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const url = base + '/authentication/authorize/';
+        const url = base + '/api/authentication/authorize/';
         for (let i = 0; i < 5; i++) {
             const res = await fetch(url, { method: 'POST' });
             assert.equal(res.status, 200);
@@ -197,7 +197,7 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const url = base + '/authentication/authorize';
+        const url = base + '/api/authentication/authorize';
         for (let i = 0; i < 5; i++) {
             const res = await fetch(url, {
                 method: 'POST',
@@ -226,7 +226,7 @@ async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const url = base + '/authentication/authorize';
+        const url = base + '/api/authentication/authorize';
         for (let i = 0; i < 5; i++) {
             const res = await fetch(url, {
                 method: 'POST',
@@ -261,7 +261,7 @@ test('sixth dot-segment authorize is 429', async () => {
         return new Response('ok', { status: 200 });
     };
     await withServer(handle, async (base) => {
-        const path = '/authentication/./authorize';
+        const path = '/api/authentication/./authorize';
         for (let i = 0; i < 5; i++) {
             const status = await postRaw(base, path);
             assert.equal(status, 200);

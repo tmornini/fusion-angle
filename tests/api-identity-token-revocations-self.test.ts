@@ -177,7 +177,7 @@ async () => {
     assert.match(cookie, /refresh_token=/);
     assert.match(cookie, /Max-Age=0/);
     assert.match(cookie, /HttpOnly/i);
-    assert.match(cookie, /Path=\/authentication/);
+    assert.match(cookie, /Path=\/api\/authentication/);
     assert.match(cookie, /SameSite=Strict/i);
 });
 

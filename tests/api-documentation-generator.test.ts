@@ -23,7 +23,7 @@ test('validate runs generate-api-documentation'
 test('a known collection is drawn with /',
 () => {
     const svg = svgOf(routes);
-    assert.match(svg, /\/identities\//);
+    assert.match(svg, /\/api\/identities\//);
     assert.doesNotMatch(
         svg, /\/invitations\/sent/,
     );
@@ -47,6 +47,38 @@ test('two 401 links share statuses/401/',
         'get', '/identities/', ['401', '404'],
         'none',
     );
+    assert.match(
+        html, /href="..\/..\/statuses\/401\/"/,
+    );
+});
+
+test('svg draws the /api/ wire prefix',
+() => {
+    const svg = svgOf(routes);
+    assert.match(svg, /\/api\/identities\//);
+    assert.match(
+        svg, /\/api\/authentication\/token/,
+    );
+});
+
+test('rooms stay a page tree, not an /api/ folder',
+() => {
+    const row = routes.find((r) =>
+        uriOf(r) === '/identities/');
+    assert.ok(row);
+    assert.equal(
+        roomPathOf('get', row.segments),
+        'get/identities/index.html',
+    );
+});
+
+test('verb room title is the wire URI',
+() => {
+    const html = verbRoomHtml(
+        'get', '/identities/', ['401', '404'],
+        'none',
+    );
+    assert.match(html, /GET \/api\/identities\//);
     assert.match(
         html, /href="..\/..\/statuses\/401\/"/,
     );

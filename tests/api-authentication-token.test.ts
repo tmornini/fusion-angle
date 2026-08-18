@@ -319,7 +319,7 @@ async () => {
     const cookie = setCookieHeader(res);
     assert.match(cookie, /refresh_token=/);
     assert.match(cookie, /HttpOnly/i);
-    assert.match(cookie, /Path=\/authentication/);
+    assert.match(cookie, /Path=\/api\/authentication/);
     assert.match(cookie, /SameSite=Strict/i);
 });
 

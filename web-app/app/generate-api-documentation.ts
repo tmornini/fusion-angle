@@ -102,6 +102,10 @@ function heading(tag: string, text: string): string {
         + close;
 }
 
+function wireUriOf(resourceUri: string): string {
+    return '/api' + resourceUri;
+}
+
 export function roomPathOf(
     verb: string,
     segments: readonly string[],
@@ -676,7 +680,8 @@ export function verbRoomHtml(
     body: string,
 ): string {
     const lower = verb.toLowerCase();
-    const title = lower.toUpperCase() + ' ' + uri;
+    const title = lower.toUpperCase()
+        + ' ' + wireUriOf(uri);
     const depth = roomDepth(lower, uri);
     const write = lower === 'put'
         || lower === 'post'
@@ -801,7 +806,10 @@ export function svgOf(rows: readonly Route[]): string {
     }
     let longest = 0;
     for (const row of rows) {
-        longest = Math.max(longest, uriOf(row).length);
+        longest = Math.max(
+            longest,
+            wireUriOf(uriOf(row)).length,
+        );
     }
     const width = Math.ceil(
         uriX() + longest * CHAR_W + PAD,
@@ -835,7 +843,7 @@ export function svgOf(rows: readonly Route[]): string {
         y += WING_H - 8;
         for (const row of wings.get(name)!) {
             const verbs = new Set(offeredVerbs(row));
-            const uri = uriOf(row);
+            const uri = wireUriOf(uriOf(row));
             const cy = y;
             HTTP_VERBS.forEach((verb, i) => {
                 const cx = verbColumnX(i) + VERB_W / 2;

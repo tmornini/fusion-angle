@@ -152,7 +152,7 @@ const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
 
 const REFRESH_COOKIE_NAME = 'refresh_token';
-const REFRESH_COOKIE_PATH = '/authentication';
+const REFRESH_COOKIE_PATH = '/api/authentication';
 
 // Secure follows the public URL. Off only when that origin
 // is http://localhost (local HTTP exception).
