@@ -19,15 +19,11 @@ and execution.
 - **Account** — organization settings, members, and billing;
   members join by email invitation (accept writes the
   seat; an admin may revoke a pending invite)
-- **Snapshots** — database management
-  (wipe, reload, upload/download snapshots)
 
 The demo is multi-organization: loading mock data seeds two
 orgs (Stark Industries and Wayne Enterprises) with a sidebar
 org-switcher for the multi-org user. Operator seed prints
 sign-in credentials once on stderr (`--seed-mock-data`).
-The Snapshots page (admin+bearer) may still surface those
-credentials after an in-app wipe-and-load.
 
 **Demo-grade security.** `./build` emits one artifact:
 `fusion-ai-server-${SHA}.zip` (Node + Postgres, pages and

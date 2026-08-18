@@ -147,17 +147,6 @@ only; `.icon-box` / `.icon-box-lg` take the full set.
 **`[data-level]` values**: `normal`, `warning`, `danger`.
 Applied to: `.progress-bar` fill regions.
 
-**Exception — the credential-reveal panel.** The snapshots-
-page demo-credentials panel (`.credential-reveal`,
-`presenters/credential-reveal.ts` + `pages-snapshots.css`) carries a
-`data-tone="warning"` attribute for semantics, but its
-warning border color is applied by the `.credential-reveal`
-class itself (`border: 1px solid hsl(var(--warning))`), NOT
-by a `[data-tone]` selector binding — `.credential-reveal`
-is not in the applied-to list above. The monospace
-`.credential-reveal-box` (one credential per line) and the
-copy-all button complete the one-time, post-wipe reveal.
-
 Helper naming: `toneFor*(status)` returns a `[data-tone]`
 value, `levelFor*(value)` returns a `[data-level]` value.
 Replaces the older `styleFor*` pattern that returned

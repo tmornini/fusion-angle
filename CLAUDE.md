@@ -240,10 +240,8 @@ Every page is a standalone HTML file served by
   (NAMED COVENANT: bite at next mint/refresh/exchange or
   access TTL ≤ 15 min), not live pair-plane re-reads.
   Ownership and default-organization fences stay
-  pair-plane. Snapshot plane (`BOOTSTRAP_ROUTES`) is
-  never bearer-exempt (admin+bearer). See
-  [ARCHITECTURE.md](ARCHITECTURE.md) § Demo server
-  tier.
+  pair-plane. See [ARCHITECTURE.md](ARCHITECTURE.md)
+  § Demo server tier.
 - **Tenancy.** Every authenticated request runs org-scoped
   on the **pair plane**. `fenceRequest` completes the vessel
   with organization, live memberships, and roles from the
@@ -496,8 +494,7 @@ Tests cover pure modules, flow-edit business logic
 (`tests/flow-operations.test.ts`), every data adapter
 (including `adapters-members-union.test.ts` and
 `adapters-flow-publish.test.ts`), workbox inbox, mermaid
-round-trip, in-browser ZIP (flow export, `zip.ts`),
-snapshot import-validation / quota / atomic-import, the
+round-trip, in-browser ZIP (flow export, `zip.ts`), the
 memory transaction backend, the tx runners and view, the
 commit batch route, api routing, navigation, mock-data
 validity (pair count 1448 / bootstrap 8 absolute; the
@@ -584,34 +581,14 @@ apply to it (RED is the audit's first finding).
   for theme and sidebar state are wrapped in try/catch that
   log at `warn` level — quota errors don't break the app but
   are observable via the logger.
-- **Snapshots replace, not merge.** Import clears every table
-  and writes the snapshot rows in ONE transaction (`tx.clear`
-  + `tx.put` over `TABLE_NAMES`); pristine/mock-data seeding
-  wipes via `deleteSchema` first. Snapshots are admin+bearer
-  (`BOOTSTRAP_ROUTES` are never bearer-exempt). Operator
-  seed is `--seed-*` on an empty database (stderr
-  credentials). Postgres import takes the exclusive import
-  lock and stamps `schema_marker` in that same transaction.
-- **Snapshot quota pre-flight.** `putSnapshotFromFile`
-  consults `navigator.storage.estimate()` and rejects with
-  `SnapshotTooLargeError` if `file.size` exceeds half of
-  `quota - usage` (the import doubles peak memory while
-  parsing). Falls back to treating 5 MB as the available
-  quota when `navigator.storage.estimate()` is unavailable,
-  so the effective file-size cap is half of that (2.5 MB)
-  after the same 0.5 headroom ratio is applied.
-- **Snapshot import is atomic (wipe-on-fail retired).**
-  Validators run at the gate (`parseAndValidateSnapshot`,
-  `scanForRetiredKeys`, quota pre-flight) BEFORE the
-  transaction. `scanForRetiredKeys` (client) and the
-  server snapshot validator also reject retired
-  message-plane `uri_prefix` patterns — currently flat
-  `/organizations/:org/records/` and
-  `/organizations/:org/record-attributes/` (anchored so
-  `flows/:id/records` join pairs pass). Postgres commits
-  the clear+put whole or not at all. The memory backend
-  rolls back logic errors the same way (discard the
-  buffer).
+- **Operator seed is below HTTP.**
+  `--seed-bootstrap` and `--seed-mock-data`
+  call `postBootstrap` / `postMockDataLoad`
+  in-process on an empty database and print
+  credentials once on stderr. They stamp
+  `schema_marker` last so a failed seed
+  reads as empty. There is no HTTP
+  dump/restore.
 - **HTTP only.** Page URLs use relative paths. The
   product is `node server.mjs` on one origin. Testing
   is HTTP-only.

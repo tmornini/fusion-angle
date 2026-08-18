@@ -390,9 +390,8 @@ One mint process — do not run two replicas. Boot
 postgres.js 3.4.9 lives behind `api/postgres-client.ts`
 only. DDL is `api/schema-postgres.ts`. Message columns
 are BYTEA Latin-1. Writes `pg_notify('fusion_events',
-…)`; payload over 8000 → `{"kind":"full"}`. Snapshot
-export is REPEATABLE READ. There is no LISTEN and no SSE
-client (stale-until-navigation).
+…)`; payload over 8000 → `{"kind":"full"}`. There is
+no LISTEN and no SSE client (stale-until-navigation).
 
 scrypt hashes new passwords; PBKDF2 still verifies,
 then rehashes. Refresh is an HttpOnly cookie
@@ -421,19 +420,16 @@ They are disposed as follows.
   `JWT_HMAC_SIGNING_KEY`. There is no
   `SIGNING_KEY_MATERIAL`.
 - **A2 credential reveal.** Operator seed prints
-  credentials once on stderr. The Snapshots page
-  (admin+bearer) may still surface
-  `SeededCredentials` after an in-app wipe-and-load.
-- **A3 plaintext ledger.** Re-gated: snapshots are
-  admin+bearer; messages stay verbatim. Residual at
-  full strength (this is a demo server). Token-at-rest
-  hashing is later.
+  credentials once on stderr.
+- **A3 plaintext ledger.** Messages stay verbatim.
+  Residual at full strength (this is a demo server).
+  Token-at-rest hashing is later.
 - **A4 jti replay.** Spent. The grant requires `jti`.
   A second grant with the same assertion is 401
   `invalid_grant`. Do not put `jti` on the token JSON.
-- **A5 BOOTSTRAP_ROUTES.** Never bearer-exempt.
-  Seed below HTTP, or admin+bearer on the snapshot
-  plane.
+- **A5 bootstrap HTTP plane.** There is no
+  bootstrap HTTP plane. Seed is below HTTP
+  (`--seed-bootstrap` / `--seed-mock-data`).
 - **A6 PKCE.** Authorize without S256 is rejected.
   The client sends S256.
 
@@ -452,8 +448,6 @@ They are disposed as follows.
   appends 201
 - `withLifecycleTrio` still exists
 - Roster seat that names an AI agent is later
-- Snapshots admin surface may still reveal
-  `SeededCredentials` after an in-app load
 
 An audit re-confirms each residual is still KNOWN
 (seam flag present, unwidened) and separates any NEW
@@ -489,18 +483,16 @@ re-verified by the automated suite:
   propagated unredacted. Phase 12 Task 1 closed that gap: the
   fence regions now share one redaction catch with the same
   fixed body, so the claim holds everywhere a request can
-  fault. `MissingTableError` still re-raises past all three
-  catches. Product boot sets `recoverMissingTable: false`
-  (`web-app/app/server-core.ts`); a missing table is a
-  loud 500. `redirectIfMissingTable` remains on
-  `app-boot.ts` for the recover option.
+  fault. `MissingTableError` still re-raises past all
+  three catches as a failed request. Product
+  `server-core` just calls `bootApp()`.
 - **Route policy tiers** (`ROUTE_POLICY`,
   `api/authorization.ts`): `admin` everywhere plus a real
   `member` tier on the content surfaces; identities,
   credentials, providers, organization and member
-  writes, and snapshots stay admin-only
-  (deny-by-default). Seat and ai-agent GET are
-  member-readable. Member-tier carve-outs:
+  writes stay admin-only (deny-by-default). Seat and
+  ai-agent GET are member-readable. Member-tier
+  carve-outs:
   `identities/:id/tokens` POST (rotation/revocation) and
   `identities/:id/token-revocations` PUT (self
   logout-everywhere; write authorizer keeps the write
@@ -555,8 +547,8 @@ implemented by `HistoryEntityStore`. The IndexedDB
 orphan-store residual retired with the yank.
 
 `web-app/app/server-core.ts` is the product composition
-root: it installs the fetch facade and boots with
-`hasSchema: true` and `recoverMissingTable: false`.
+root: it installs the fetch facade and calls
+`bootApp()`.
 `web-app/app/adapters/init.ts` is the test composition
 root (`initAdapter()` / `getDbAdapter()` over memory).
 `web-app/app/adapters/shared.ts` defines the
@@ -614,8 +606,6 @@ stream families; flows GET still `deriveFlow`;
 assemble surfaces still assemble. G1–G6: stored PUT
 = today's `*EntityOf`. The process refuses to listen
 without `schema_marker` (or a successful seed).
-Snapshots is an admin import/wipe surface, not
-empty-DB first-boot recovery.
 
 ## Write-path derives (Phase 14)
 
@@ -798,22 +788,15 @@ entity table, and retires rawReadRow; seed absolute at
 EXPECTED_PAIR_COUNT 1448 / bootstrap 8;
 `simulateLatency` 4.
 
-### Two claims (never collapse)
+### The wire-silent claim (never collapse)
 
 1. **HTTP-wire-silent on the entity surface** — route
    surface and every response byte of every derive-based
    GET and every `WRITE_RESPONSE_SPECS`-gated write are
-   unchanged by the deletion. PRECISION: snapshot-payload
-   routes (`GET /snapshots/schema`; `PUT /snapshots/import`
-   inputs) change exactly as claim 2 describes — the same
-   fact over HTTP, not an additional violation. The two
-   seed routes' `SeededCredentials` bodies stay shape- and
-   count-stable.
-2. **Snapshot file-format contract** — the table-key set
-   shrinks to `requests` + `responses`. A snapshot is the
-   table-keyed row export with no version marker; an
-   incompatible body shape fails at use (derive/read),
-   never at an import-time version check.
+   unchanged by the deletion. Operator seed prints
+   `SeededCredentials` once on stderr (in-process
+   `--seed-bootstrap` / `--seed-mock-data`); that body
+   is not an HTTP response.
 
 ### Wire covenant (Phase 15 deltas still hold)
 
@@ -916,8 +899,7 @@ Two backends implement the seam:
 
 The memory backend shares the buffer-then-flush helper so
 the test backend cannot lie about what the production
-gate enforces. Postgres import is one transaction
-(exclusive lock + `schema_marker` in the same commit).
+gate enforces.
 
 ## Page Module Pattern
 

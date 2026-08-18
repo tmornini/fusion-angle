@@ -132,24 +132,18 @@ stamped by the gate and passed to every handler — authorship is never
 client-supplied. A bearer-exempt route carries the anonymous id and
 authors no member-state event.
 
-### 1.2 Bearer-exempt sets (`api/request-auth.ts`)
+### 1.2 Bearer-exempt set (`api/request-auth.ts`)
 
-Two route sets bypass the Bearer gate. Exempt is not the same as
+One route set bypasses the Bearer gate. Exempt is not the same as
 unauthenticated — it is a single audited surface.
 
 - **`AUTHENTICATION_ROUTES`** — the grant surface (a caller cannot hold
   a token before minting one):
   - `authentication/token`
   - `authentication/authorize`
-- **`BOOTSTRAP_ROUTES`** — the snapshot plane
-  (`snapshots/schema|mock-data|bootstrap|import`).
-  Bearer-exempt on the **browser ZIP** (dev-tier
-  install). Not bearer-exempt on the **server ZIP**
-  (`setServerTier(true)` from `server/boot.ts`) —
-  snapshots there are admin+bearer. Seed on the
-  server is `--seed-bootstrap` / `--seed-mock-data`
-  below HTTP. AUTHENTICATION_ROUTES stay exempt on
-  both tiers.
+
+Seed is `--seed-bootstrap` / `--seed-mock-data` below HTTP. There is no
+bootstrap HTTP plane. `AUTHENTICATION_ROUTES` stay exempt.
 
 ### 1.3 The client facade
 
@@ -363,9 +357,7 @@ inversion — ARCHITECTURE.md § Facade). Path
 403 — no route-topology oracle). Flat
 `/records[/:id[/history]]` and
 `/record-attributes[/:id]` are RETIRED (router 404;
-unauth → 401 first). Snapshot import rejects legacy
-`uri_prefix` under those retired patterns (API.md
-§2.13; `scanForRetiredKeys` + server validator).
+unauth → 401 first).
 
 **Record types** (schema; member READ / admin MUTATION;
 `'trio'` SIMPLE PUT class — last-writer-wins, no
@@ -624,38 +616,6 @@ runs on the base adapter with explicit guards:
 - `POST /invitations/:id/acceptance` — accept (§3.23). Invitee-only.
 - `POST /invitations/:id/decline` — decline (§3.24). Invitee-only.
 - `POST /invitations/:id/revocation` — revoke (§3.25). Admin-only.
-
-### 2.13 Snapshots (bootstrap plane)
-
-Bearer-exempt on the **browser ZIP**. Admin+bearer on
-the **server ZIP** (`setServerTier`). Server seed is
-`--seed-bootstrap` / `--seed-mock-data` on an empty
-database only (stderr credentials, never HTTP).
-
-- `GET /snapshots/schema` — schema existence + full export, else null.
-  The export (`getSnapshot`, `api/db-backed.ts`) is the pure
-  message-plane `TABLE_NAMES` arrays (`requests`, `responses`)
-  with no version marker.
-- `DELETE /snapshots/schema` — drop the schema and reopen clean.
-- `POST /snapshots/mock-data` — seed the full demo dataset (§3.26).
-- `POST /snapshots/bootstrap` — seed the pristine minimal state
-  (§3.27).
-- `PUT /snapshots/import` — validate then atomically restore a snapshot
-  (§3.28). A snapshot is the table-keyed row export with no schema
-  version: `parseAndValidateSnapshot` (`api/snapshot-validator.ts`)
-  validates object shape and per-row bodies, ignores unknown
-  top-level keys (including a legacy `__schema_version__`), and
-  does not version-check. An incompatible body shape fails at use
-  (derive/read), never at an import-time version check. The
-  client-side `scanForRetiredKeys` pre-flight
-  (`web-app/app/adapters/snapshots.ts`) fails fast on known dead
-  keys before upload, as a convenience only.
-
-`getHasAnyHumanMembers` (`web-app/app/adapters/snapshots.ts`) — the
-first-run check gating the pristine-vs-seeded boot choice —
-re-anchored (Task 6) from a raw `members` table slice onto a scan
-of the SAME export's `requests` rows at the `/members/` address,
-matching what the now-derived `GET /members` (§2.1) actually sees.
 
 ---
 
@@ -1878,17 +1838,14 @@ a seat, not a leftover `/memberships/:id` row.
 - props: atomic; admin-only; idempotent, its own genesis pair; the
   invitation row persists as audit.
 
-### 3.26 `POST /snapshots/mock-data` — seed the demo dataset
+### 3.26 Operator seed — mock data (in-process)
 
-`postMockDataLoad` (`api/mock-data.ts`). Bearer-exempt on the
-browser ZIP; admin+bearer on the server ZIP. Below the
-shadow ledger for its OWN request: this call forms and
-appends no pair for ITSELF (none of §5.1's headers appear
-on its own response). Server process seed is
-`--seed-mock-data` on an empty database (stderr
-credentials; A2). What it seeds, though,
-includes **1498** of its OWN pre-formed message pairs
-(EXPECTED_PAIR_COUNT) — see §5.3.
+`postMockDataLoad` (`api/mock-data.ts`). Operator flag
+`--seed-mock-data` calls it in-process on an empty database
+and prints credentials once on stderr (A2).
+There is no HTTP path. The seed forms and appends no pair for itself (none of
+§5.1's headers appear). What it seeds includes **1498** of its own pre-formed
+message pairs (`EXPECTED_PAIR_COUNT`) — see §5.3.
 
 - **Four sequential steps, not one atomic op:**
   1. `ensureTables(TABLE_NAMES)`
@@ -1898,48 +1855,28 @@ includes **1498** of its OWN pre-formed message pairs
   3. `seedHumanCredentials(adapter)` — its **own** tx over
      `['requests','responses']` appends the 12 identity-credential
      pairs (part of the 1498 total); the PBKDF2 hashing runs outside
-     the tx (async crypto cannot run inside an IDB transaction).
+     the tx (async crypto cannot run inside a transaction).
      Final absolute remains `EXPECTED_PAIR_COUNT = 1498` after both
      txs.
   4. `postSchemaCreation()` — the schema marker stamps **last**, so a
      failed seed reads as empty and retries cleanly.
-- returns `SeededCredentials` — plaintext sign-ins surfaced
-  in-band on the browser ZIP, once. Deleted on the server
-  ZIP (stderr seed).
+- returns `SeededCredentials` — plaintext sign-ins printed once on
+  stderr. Never on the HTTP wire.
 
-### 3.27 `POST /snapshots/bootstrap` — seed the pristine minimal state
+### 3.27 Operator seed — bootstrap (in-process)
 
-`postBootstrap` (`api/mock-data.ts`). Same four-step shape as
-§3.26 — no pair for itself, below the ledger — with `postBootstrapIn`
-planting only the shell essentials (system actor, current user, the
-singleton org — no Records) and its multi-pair bootstrap set: the
-current-user human-member create bundle (operation + member + detail
-+ identity documents), membership, system member, PII, system
-identity, default-org, and organization, plus credentials via
-`seedHumanCredentials` — bootstrap absolute **12** (§5.3;
-`tests/mock-data-pairs.test.ts`). Returns `SeededCredentials`.
-
-### 3.28 `PUT /snapshots/import` — restore a snapshot (not a POST)
-
-Included for completeness: it is the textbook gate-then-atomic write.
-`putSnapshot` (`api/db-backed.ts`). Also a `BOOTSTRAP_ROUTES`
-member (browser ZIP bearer-exempt; server ZIP admin+bearer)
-— no pair for this call itself; a restored snapshot's own
-`requests`/`responses` rows, if it had any, ride in with the rest of
-the imported data.
-
-- `parseAndValidateSnapshot(json)` at the **gate**, before any storage
-  touch (a bad snapshot throws here, leaving prior data intact).
-- `ensureTables(TABLE_NAMES)`.
-- `transaction(TABLE_NAMES, 'readwrite')`: for each table, `tx.clear`
-  then `tx.put` each row — clear+put as one atomic commit on
-  IndexedDB.
-- `postSchemaCreation()` after the commit (imported data is a schema).
-
-A client-side quota pre-flight (`putSnapshotFromFile`,
-`SnapshotTooLargeError` in `web-app/app/adapters/snapshots.ts`) gates
-the file size before this route is called; that lives in the web-app
-adapter, not the api layer.
+`postBootstrap` (`api/mock-data.ts`). Operator flag
+`--seed-bootstrap` calls it in-process on an empty
+database and prints credentials once on stderr. Same
+four-step shape as §3.26 — no pair for itself, below
+the ledger — with
+`postBootstrapIn` planting only the shell essentials (system actor, current
+user, the singleton org — no Records) and its multi-pair bootstrap set: the
+current-user human-member create bundle (operation + member + detail +
+identity documents), membership, system member, PII, system identity,
+default-org, and organization, plus credentials via `seedHumanCredentials` —
+bootstrap absolute **12** (§5.3; `tests/mock-data-pairs.test.ts`). Returns
+`SeededCredentials` on stderr.
 
 ### 3.29 `PUT /objectives/:id` — objective document write (not a POST)
 
@@ -2226,8 +2163,7 @@ authorization codes, access tokens, `client_assertion`
 values, and bearer `Authorization` headers as they arrived /
 were issued. Refresh is cookie-only (not in the token
 JSON) but a raw dump still has verbatim auth messages.
-This is accepted on the **demo server**: snapshots are
-admin+bearer on the server ZIP (A3); messages stay
+This is accepted on the **demo server**: messages stay
 verbatim. Token-at-rest hashing is later. See
 [ARCHITECTURE.md](ARCHITECTURE.md) § Demo server tier.
 
@@ -2248,11 +2184,9 @@ untouched.
 
 ### 5.3 Seed pair formation (below the gate)
 
-`POST /snapshots/mock-data` and `POST /snapshots/bootstrap` are
-`BOOTSTRAP_ROUTES` — bearer-exempt on the browser ZIP;
-admin+bearer on the server ZIP. Server seed is the
-`--seed-*` flags below HTTP (§2.13). What they seed
-is itself the output of
+`--seed-mock-data` and `--seed-bootstrap` call `postMockDataLoad` /
+`postBootstrap` in-process on an empty database (§3.26 / §3.27). There
+is no HTTP seed path. What they seed is itself the output of
 FIFTEEN pair-capable write families, in dependency order:
 `human-members`, `ideas`, `idea-submissions`, `projects`, `flows`,
 `work-orders`, `flow-work-orders`, `ai-members`,
@@ -2556,8 +2490,7 @@ record-types wave re-homes that family:
   `organizations/:org/record-types[/:id]`.
 - Flat `/records[/:id[/history]]` and
   `/record-attributes[/:id]` are RETIRED (router 404;
-  unauth → 401 first). Snapshot retired-prefix scan
-  rejects legacy `uri_prefix` under those patterns.
+  unauth → 401 first).
 - Family registration name is `record-types` /
   storage name `record_types`; lifecycle alphabet and
   DELETE-pair filter posture are unchanged.
@@ -3032,9 +2965,8 @@ hidden:
    nobody ever revisits again keeps its full historical chain
    forever.
 2. **Exported snapshots.** A snapshot taken before an erasure
-   carries the pre-erasure PII rows verbatim (§ Snapshots,
-   §3.26-§3.28); the theorem covers live storage, not files
-   already written to disk.
+   carries the pre-erasure PII rows verbatim; the theorem covers
+   live storage, not files already written to disk.
 3. **The browser's own session credential.** The
    `fusion-ai:authorization` localStorage entry carries the
    caller's own JWT, whose `name` claim is base64-decodable

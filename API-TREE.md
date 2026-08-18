@@ -73,7 +73,7 @@ organization/default-organization sub-routers).
   |    |              └── :sid                • RECONCILED: projects/:id/objective-baseline-scores — GET collection under project; PUT leaf (bespoke deriveBaselineScores)
   |    |          └── /objective-actual-scores/
   |    |              └── :sid                • RECONCILED: projects/:id/objective-actual-scores — GET collection under project; PUT leaf (bespoke deriveActualScores)
-  |    |  └── /record-types/                  • RECONCILED (org-nested record-types wave): nested-primary wire = storage; NO dual-wire /records facade; in-table match BEFORE facade (dispatch inversion); path org must match fenced claim else 403 (no auto-exchange); member READ / admin MUTATION on schema; flat /records and /record-attributes RETIRED (router 404; snapshot retired-prefix scan rejects legacy uri_prefix) — see API.md §2.8 / §5.7 / §5.20
+  |    |  └── /record-types/                  • RECONCILED (org-nested record-types wave): nested-primary wire = storage; NO dual-wire /records facade; in-table match BEFORE facade (dispatch inversion); path org must match fenced claim else 403 (no auto-exchange); member READ / admin MUTATION on schema; flat /records and /record-attributes RETIRED (router 404) — see API.md §2.8 / §5.7 / §5.20
   |    |      └── :record-type-id
   |    |          └── /history                • lifecycle-trio history (member GET; one of the nine lifecycle registrations)
   |    |          └── /attributes/
@@ -92,12 +92,5 @@ organization/default-organization sub-routers).
 └─|─ /authentication/
   |  ├── token
   |  └── authorize
-└─|─ /snapshots/
-  |  └── export                               • TARGET-STATE: not shipped as a dedicated route today — export is client-side over GET /snapshots/schema (full snapshot body); a first-class /snapshots/export remains a known future addition
-  |  └── import                               • RECONCILED: shipped as PUT /snapshots/import (atomic clear+put; pure message-plane keys requests+responses; no schema version marker)
-  |  └── mock-data                            • RECONCILED: POST /snapshots/mock-data (demo seed; 1498 pairs / bootstrap 12 absolute after role-grant retirement; SeededCredentials re-pointed off identity rows at Final Task 1(d))
-  |  └── schema                               • RECONCILED: GET|DELETE /snapshots/schema (existence + full export, or drop)
-  |  └── bootstrap                            • RECONCILED: POST /snapshots/bootstrap (pristine minimal seed)
-  |  └── pristine                             • TARGET-STATE: deferred — bootstrap covers the minimal seed today; a dedicated /snapshots/pristine remains a known future addition if the two seed paths must diverge on the wire
   \
    \- public realm

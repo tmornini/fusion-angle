@@ -77,9 +77,6 @@
     "records": {
         "readyMs": 252
     },
-    "snapshots": {
-        "readyMs": 327
-    },
     "workbox": {
         "readyMs": 503
     },

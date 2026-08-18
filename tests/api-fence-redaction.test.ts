@@ -14,8 +14,8 @@ import { captureConsole } from './console-capture.ts';
 // fence read's own detail used to reach the wire unredacted.
 // MissingTableError stays the one designed exception: it must
 // still propagate past the fence catch, exactly as it already
-// propagates past the domain-boundary catch, so web-app/core.ts's
-// redirectIfMissingTable recovery still fires.
+// propagates past the domain-boundary catch. A missing table
+// is a failed request; product boot does not recover it.
 
 async function freshDb() {
     const db = memoryDbAdapter();
