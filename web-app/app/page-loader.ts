@@ -1,3 +1,5 @@
+import { UnauthorizedError } from
+    '../../api/http-errors.ts';
 import { log } from './logger.ts';
 import { $ } from './dom.ts';
 import { setHtml } from './safe-html.ts';
@@ -7,6 +9,7 @@ import {
 import {
     extractErrorMessage,
 } from './error-helpers.ts';
+import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
 import {
     getUrlParams,
@@ -39,6 +42,10 @@ export function handlePageLoadError(
     pageName: string,
     err: unknown,
 ): void {
+    if (err instanceof UnauthorizedError) {
+        redirectToLogin();
+        return;
+    }
     log.error(
         'page failed to init',
         'core',

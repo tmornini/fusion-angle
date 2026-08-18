@@ -65,7 +65,10 @@ import {
 import { initErrorSurfacing } from './error-helpers.ts';
 import { redirectToLogin } from './auth-redirect.ts';
 import { navigateTo } from './navigation.ts';
-import { PAGE_REGISTRY } from './page-registry.ts';
+import {
+    PAGE_REGISTRY,
+    pageAuthMode,
+} from './page-registry.ts';
 import {
     markStart,
     markEnd,
@@ -342,6 +345,11 @@ export async function bootApp(): Promise<void> {
     initListeners();
 
     const pageName = getPageName();
+
+    if (pageAuthMode(pageName) === 'missing') {
+        bounceTo('not-found');
+        return;
+    }
 
     let bootOrganizations:
         readonly OrganizationEntity[] = [];

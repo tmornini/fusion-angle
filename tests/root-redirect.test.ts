@@ -13,8 +13,13 @@ const src = readFileSync(
     'utf8',
 );
 
-test('apex hops only to auth', () => {
-    assert.match(src, /auth\/index\.html/);
+test('apex hops via the destination helper', () => {
+    assert.match(src, /resolveApexLocation/);
+    assert.match(src, /probeRefreshSession/);
+    assert.equal(
+        src.includes('auth/index.html'),
+        false,
+    );
     assert.equal(
         src.includes('snapshots/index.html'),
         false,

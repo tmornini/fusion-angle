@@ -371,3 +371,17 @@ export const PAGE_REGISTRY: Record<
         loader: () => import('../not-found/index'),
     },
 };
+
+export type PageAuthMode =
+    | 'missing'
+    | 'gated'
+    | 'public';
+
+export function pageAuthMode(
+    pageName: string,
+): PageAuthMode {
+    const entry = PAGE_REGISTRY[pageName];
+    if (entry === undefined) return 'missing';
+    if (entry.requiresAuth === false) return 'public';
+    return 'gated';
+}

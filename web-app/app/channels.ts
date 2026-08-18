@@ -1,4 +1,5 @@
 import {
+    postNotificationEvent,
     subscribeNotificationEvents,
 } from './adapters/broadcast-channel.ts';
 import {
@@ -9,6 +10,9 @@ import {
 import {
     principalFromToken,
 } from '../../shared/access-token-decode.ts';
+import type {
+    NotificationEvent,
+} from '../../api/notifications.ts';
 
 type Listener<T> = (value: T) => void;
 
@@ -46,6 +50,30 @@ export interface SubscriptionChannel {
     ): () => void;
 }
 
+function eventForThisTab(): NotificationEvent {
+    if (!sessionTokenIsSeeded()) {
+        return { kind: 'full' };
+    }
+    try {
+        const principal =
+            principalFromToken(getSessionToken());
+        const organizationIds =
+            principal.organization !== undefined
+                ? [principal.organization]
+                : [...(principal.organizations ?? [])];
+        const identityIds = sessionIsAuthenticated()
+            ? [principal.id]
+            : [];
+        return {
+            kind: 'scoped',
+            organizationIds,
+            identityIds,
+        };
+    } catch {
+        return { kind: 'full' };
+    }
+}
+
 export function createSubscriptionChannel(
 ): SubscriptionChannel {
     const channel = createChannel<void>();
@@ -67,31 +95,41 @@ export function createSubscriptionChannel(
         if (!sessionTokenIsSeeded()) {
             return;
         }
-        const principal =
-            principalFromToken(getSessionToken());
-        // Active org claim wins when present (post-exchange).
-        // A flat login token has only `organizations`; the
-        // pair-plane fence still serves the default org, so
-        // match any reachable org the event names.
-        const organizationHit =
-            principal.organization !== undefined
-                ? event.organizationIds.includes(
-                    principal.organization,
-                )
-                : sessionIsAuthenticated()
-                    && (principal.organizations ?? [])
-                        .some(id =>
-                            event.organizationIds
-                                .includes(id));
-        const identityHit =
-            sessionIsAuthenticated()
-            && event.identityIds.includes(principal.id);
-        if (organizationHit || identityHit) {
-            channel.send();
+        try {
+            const principal =
+                principalFromToken(getSessionToken());
+            // Active org claim wins when present
+            // (post-exchange). A flat login token has only
+            // `organizations`; the pair-plane fence still
+            // serves the default org, so match any
+            // reachable org the event names.
+            const organizationHit =
+                principal.organization !== undefined
+                    ? event.organizationIds.includes(
+                        principal.organization,
+                    )
+                    : sessionIsAuthenticated()
+                        && (principal.organizations ?? [])
+                            .some(id =>
+                                event.organizationIds
+                                    .includes(id));
+            const identityHit =
+                sessionIsAuthenticated()
+                && event.identityIds.includes(
+                    principal.id,
+                );
+            if (organizationHit || identityHit) {
+                channel.send();
+            }
+        } catch {
+            return;
         }
     });
     return {
-        notify: () => channel.send(),
+        notify: () => {
+            channel.send();
+            postNotificationEvent(eventForThisTab());
+        },
         subscribe: (fn) =>
             channel.subscribe(fn),
     };

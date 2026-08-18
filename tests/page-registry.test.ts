@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { PAGE_REGISTRY } from
+import { PAGE_REGISTRY, pageAuthMode } from
     '../web-app/app/page-registry.ts';
 
 test('PageEntry has no requiresSchema flag',
@@ -43,4 +43,16 @@ test('sidebar has no Snapshots item', () => {
     assert.equal(
         titles.includes('Snapshots'), false,
     );
+});
+
+test('retired snapshots is a missing page', () => {
+    assert.equal(
+        pageAuthMode('snapshots'), 'missing',
+    );
+});
+
+test('dashboard is gated and landing is public',
+() => {
+    assert.equal(pageAuthMode('dashboard'), 'gated');
+    assert.equal(pageAuthMode('landing'), 'public');
 });

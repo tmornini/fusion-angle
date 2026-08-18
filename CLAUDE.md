@@ -632,13 +632,18 @@ apply to it (RED is the audit's first finding).
   by `HistoryEntityStore` on the message plane. Document
   DELETE is a marked tombstone pair; the sole physical
   hard-delete is PII erasure on the message plane.
-- **Same-tab refresh; other tabs stale until navigation.**
-  A successful write in this tab notifies via module
-  pub-sub (`ideaChanges.notify()` and siblings). Writes
-  `pg_notify('fusion_events', …)` on the server; there
-  is no LISTEN and no SSE client. Other tabs stay stale
-  until navigation. Theme/sidebar still sync over
-  `StorageEvent` (they stay in localStorage).
+- **Same-tab refresh; other browsers stale until
+  navigation.** A successful write in this tab
+  notifies via module pub-sub
+  (`ideaChanges.notify()` and siblings) and posts
+  a scoped BroadcastChannel event
+  (`fusion-ai:data`) so other same-origin windows
+  of this browser refresh. Writes
+  `pg_notify('fusion_events', …)` on the server;
+  there is no LISTEN and no SSE client. A second
+  browser stays stale until navigation.
+  Theme/sidebar still sync over `StorageEvent`
+  (they stay in localStorage).
 - **Transaction bodies await only row ops.** Every
   `transaction(…)` body awaits ONLY row ops —
   validators, crypto, hash, `serializeWire`, and scrypt

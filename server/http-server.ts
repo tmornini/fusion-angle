@@ -157,6 +157,37 @@ export function safeStaticPath(
     return full;
 }
 
+function isDocumentNavigation(
+    req: IncomingMessage,
+): boolean {
+    return (req.method ?? 'GET') === 'GET'
+        && headerLine(
+            req.headers['sec-fetch-mode'],
+        ) === 'navigate';
+}
+
+function isAuthenticationPath(
+    pathname: string,
+): boolean {
+    return pathname === '/authentication'
+        || pathname.startsWith('/authentication/');
+}
+
+async function existingStaticFile(
+    root: string,
+    urlPath: string,
+): Promise<string | undefined> {
+    const filePath = safeStaticPath(root, urlPath);
+    if (filePath === undefined) return undefined;
+    try {
+        const info = await stat(filePath);
+        if (info.isFile()) return filePath;
+    } catch {
+        return undefined;
+    }
+    return undefined;
+}
+
 function contentLengthOf(
     req: IncomingMessage,
 ): number | undefined {
@@ -486,6 +517,21 @@ async function dispatch(
                 req, res, filePath,
             );
             return;
+        }
+        if (
+            isDocumentNavigation(req)
+            && !isAuthenticationPath(pathname)
+        ) {
+            const notFound = await existingStaticFile(
+                options.staticRoot,
+                '/not-found/index.html',
+            );
+            if (notFound !== undefined) {
+                status = await serveStatic(
+                    req, res, notFound,
+                );
+                return;
+            }
         }
         const requestPathname = new URL(
             'http://'

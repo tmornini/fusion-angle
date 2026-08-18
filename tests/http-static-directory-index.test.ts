@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { request } from 'node:http';
 import { mkdtemp, mkdir, writeFile, rm } from
     'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -57,6 +58,48 @@ async function withServer(
     }
 }
 
+// Node fetch overwrites Sec-Fetch-Mode to the request
+// mode (`cors`). A document navigation can only be
+// sent on the raw socket.
+function getDocument(
+    url: string,
+): Promise<Response> {
+    const parsed = new URL(url);
+    return new Promise((resolve, reject) => {
+        const req = request({
+            hostname: parsed.hostname,
+            port: parsed.port,
+            path: parsed.pathname,
+            agent: false,
+            headers: {
+                'sec-fetch-mode': 'navigate',
+            },
+        }, (incoming) => {
+            const chunks: Buffer[] = [];
+            incoming.on('data', (chunk: Buffer) => {
+                chunks.push(chunk);
+            });
+            incoming.on('end', () => {
+                resolve(new Response(
+                    Buffer.concat(chunks),
+                    {
+                        status:
+                            incoming.statusCode ?? 0,
+                        headers: {
+                            'content-type':
+                                incoming.headers
+                                    ['content-type']
+                                ?? '',
+                        },
+                    },
+                ));
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
+
 test('/api-documentation/get/identities/ serves'
     + ' index.html',
 async () => {
@@ -110,5 +153,41 @@ async () => {
         };
         assert.equal(body.error, 'Not found');
         assert.equal(handled, 0);
+    });
+});
+
+test('a document navigation to a retired path'
+    + ' serves not-found HTML',
+async () => {
+    await withServer({
+        'not-found/index.html': '<p>gone</p>',
+    }, undefined, async (base) => {
+        const res = await getDocument(
+            base + '/snapshots',
+        );
+        assert.equal(res.status, 200);
+        assert.match(
+            res.headers.get('content-type') ?? '',
+            /text\/html/,
+        );
+        assert.equal(await res.text(), '<p>gone</p>');
+    });
+});
+
+test('a fetch to a retired path stays 401 JSON',
+async () => {
+    await withServer({
+        'not-found/index.html': '<p>gone</p>',
+    }, undefined, async (base) => {
+        const res = await fetch(base + '/snapshots');
+        assert.equal(res.status, HTTP_UNAUTHORIZED);
+        assert.match(
+            res.headers.get('content-type') ?? '',
+            /application\/json/,
+        );
+        const body = await res.json() as {
+            error: string;
+        };
+        assert.equal(body.error, 'invalid_token');
     });
 });

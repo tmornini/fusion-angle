@@ -1,4 +1,7 @@
-import { PAGE_REGISTRY } from './page-registry.ts';
+import {
+    PAGE_REGISTRY,
+    pageAuthMode,
+} from './page-registry.ts';
 import { getPageName, navigateTo } from './navigation.ts';
 import {
     getUrlParams,
@@ -56,7 +59,12 @@ export function decodeReturnTarget(
 // page must never redirect to itself.
 export function redirectToLogin(): void {
     const page = getPageName();
-    if (PAGE_REGISTRY[page]?.requiresAuth === false) {
+    const mode = pageAuthMode(page);
+    if (mode === 'public') {
+        return;
+    }
+    if (mode !== 'gated') {
+        navigateTo('auth');
         return;
     }
     navigateTo('auth', {

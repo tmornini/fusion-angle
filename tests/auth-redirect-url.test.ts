@@ -57,3 +57,14 @@ test('an exempt page return is rejected to the default', () => {
         decodeReturnTarget('auth'),
         { page: DEFAULT_POST_LOGIN_PAGE, params: {} });
 });
+
+test('a retired snapshots return falls to default',
+() => {
+    assert.deepEqual(
+        decodeReturnTarget('snapshots'),
+        {
+            page: DEFAULT_POST_LOGIN_PAGE,
+            params: {},
+        },
+    );
+});

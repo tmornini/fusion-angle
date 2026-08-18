@@ -227,3 +227,89 @@ test(
         assert.equal(fired, 0);
     },
 );
+
+test('notify posts a scoped event other tabs hear',
+async () => {
+    putSessionToken(
+        await organizationToken('current', '1'),
+    );
+    const seen: unknown[] = [];
+    const listener = new BroadcastChannel(
+        CHANNEL_NAME,
+    );
+    listener.addEventListener('message', (event) => {
+        seen.push(event.data);
+    });
+    const ch = createSubscriptionChannel();
+    let local = 0;
+    ch.subscribe(() => {
+        local += 1;
+    });
+    ch.notify();
+    await deliver();
+    listener.close();
+    assert.equal(local, 1);
+    assert.deepEqual(seen, [{
+        kind: 'scoped',
+        organizationIds: ['1'],
+        identityIds: ['current'],
+    }]);
+});
+
+test('notify on a flat session names reachable orgs',
+async () => {
+    putSessionToken(
+        await reachableToken('current', ['1', '2']),
+    );
+    const seen: unknown[] = [];
+    const listener = new BroadcastChannel(
+        CHANNEL_NAME,
+    );
+    listener.addEventListener('message', (event) => {
+        seen.push(event.data);
+    });
+    createSubscriptionChannel().notify();
+    await deliver();
+    listener.close();
+    assert.deepEqual(seen, [{
+        kind: 'scoped',
+        organizationIds: ['1', '2'],
+        identityIds: ['current'],
+    }]);
+});
+
+test('notify with a non-jwt seed posts full',
+async () => {
+    putSessionToken('reminted-access');
+    const seen: unknown[] = [];
+    const listener = new BroadcastChannel(
+        CHANNEL_NAME,
+    );
+    listener.addEventListener('message', (event) => {
+        seen.push(event.data);
+    });
+    createSubscriptionChannel().notify();
+    await deliver();
+    listener.close();
+    assert.deepEqual(seen, [{ kind: 'full' }]);
+});
+
+test('a scoped event with a non-jwt seed does not throw'
+    + ' and does not fire',
+async () => {
+    putSessionToken('reminted-access');
+    const ch = createSubscriptionChannel();
+    let fired = 0;
+    ch.subscribe(() => { fired += 1; });
+    const poster = new BroadcastChannel(
+        CHANNEL_NAME,
+    );
+    poster.postMessage({
+        kind: 'scoped',
+        organizationIds: ['1'],
+        identityIds: ['current'],
+    });
+    await deliver();
+    poster.close();
+    assert.equal(fired, 0);
+});

@@ -591,7 +591,7 @@ run before A1's build. The single canonical invocation is
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-server-${SHA}.zip`.
 - [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
 - [ ] **A3** From the A2 directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an **empty** Postgres, run `node server.mjs --seed-mock-data` (or `./serve` after commit). PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP. This pin **is** SV1.
-- [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser. PASS: root hops to `auth/index.html` always. Landing is a separate public marketing page, not the root target.
+- [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
 - [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /authentication/token` refresh 401 are acceptable.
 
 ---
@@ -862,6 +862,18 @@ depend on. Run AA3+ in order.
 ---
 
 ## B. Entry Pages
+
+### Apex (`/`)
+
+- [ ] **B0** With site data deleted and no
+  `refresh_token` cookie, open `/`. PASS: lands on
+  `landing/index.html` (one hop from the blank root
+  document). Does not open `auth/` and does not open
+  `snapshots/`.
+- [ ] **B0b** After signing in, open `/` in the same
+  cookie jar. PASS: lands on `dashboard/index.html`.
+  Landing (`/landing/index.html`) still stays until
+  a click (B1).
 
 ### Landing Page (`landing/`)
 
@@ -2781,7 +2793,7 @@ regression.
 ### Browser against the real server
 
 - [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stderr seed reveal).
-- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the root hop to auth). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
+- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
 - [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-ai:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
 - [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
 
@@ -2793,6 +2805,10 @@ regression.
 ### Two tabs share the refresh cookie
 
 - [ ] **SV8** Same browser profile as the admin session (SV2). In tab A, stay signed in. Open `dashboard/index.html` in a new tab B. PASS: tab B stays authenticated with no second sign-in — both tabs share the `refresh_token` cookie; boot cookie-refreshes.
+- [ ] **SV8b** Two windows of the same profile, both
+  on `ideas/`. Create an idea in window A. PASS:
+  window B's list gains the card without a reload
+  (BroadcastChannel `fusion-ai:data`).
 - [ ] **SV9** In tab A, click Sign out. In tab B, navigate (sidebar click or reload). PASS: tab B lands on `auth` — logout cleared the shared cookie (`Set-Cookie` `Max-Age=0`); boot refresh cannot mint. (An already-painted tab B may still hold a live access token in memory until that navigation — that is the access-TTL covenant, not a failed cookie clear.)
 
 ### Named residual — stale-until-navigation
