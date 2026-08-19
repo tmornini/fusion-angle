@@ -1,0 +1,539 @@
+#!/bin/bash
+set -euo pipefail
+
+API='https://api.render.com/v1'
+WIPE_TIMEOUT_SEC=120
+REVEAL_TIMEOUT_SEC=180
+POLL_SEC=5
+REVEAL_HEADER='Save your demo sign-ins — shown once; copy them now.'
+DASHBOARD_KEYS='https://dashboard.render.com/u/settings?add-api-key'
+
+usage() {
+    cat <<'USAGE'
+Usage: ./wipe-render-postgres TOKEN --pristine|--mockdata
+
+Wipe the single Render Postgres instance visible to
+TOKEN, then seed it again. TOKEN is the confirmation.
+No prompt.
+
+Options:
+  --pristine   Seed --seed-bootstrap, then listen
+  --mockdata   Restart so --seed-mock-data runs
+  --help       Show this help message
+
+TOKEN must see exactly one Postgres and one web
+service. HTTP only (curl). Development gun.
+USAGE
+}
+
+TOKEN=''
+PRISTINE=false
+MOCKDATA=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --pristine)
+            PRISTINE=true
+            ;;
+        --mockdata)
+            MOCKDATA=true
+            ;;
+        -*)
+            echo "Error: unknown argument: $arg" >&2
+            usage >&2
+            exit 1
+            ;;
+        *)
+            if [ -n "$TOKEN" ]; then
+                echo "Error: unexpected argument:" \
+                    "$arg" >&2
+                usage >&2
+                exit 1
+            fi
+            TOKEN="$arg"
+            ;;
+    esac
+done
+
+if [ "$PRISTINE" = true ] \
+    && [ "$MOCKDATA" = true ]; then
+    echo "Error: --pristine and --mockdata" \
+        "are exclusive" >&2
+    usage >&2
+    exit 1
+fi
+
+if [ "$PRISTINE" = false ] \
+    && [ "$MOCKDATA" = false ]; then
+    echo "Error: exactly one of --pristine or" \
+        "--mockdata is required" >&2
+    usage >&2
+    exit 1
+fi
+
+if [ -z "$TOKEN" ]; then
+    echo "Error: TOKEN is required" >&2
+    usage >&2
+    exit 1
+fi
+
+if ! command -v curl >/dev/null; then
+    echo "Error: curl is required" >&2
+    exit 1
+fi
+if ! command -v node >/dev/null; then
+    echo "Error: node is required" >&2
+    exit 1
+fi
+
+export RENDER_API_KEY="$TOKEN"
+unset TOKEN
+
+TMP=$(mktemp -d \
+    "${TMPDIR:-/tmp}/fusion-wipe.XXXXXX")
+trap 'rm -rf "$TMP"' EXIT
+
+fail_http() {
+    local code="$1"
+    local file="$2"
+    local msg
+    msg=$(node --input-type=module -e '
+        import { readFileSync } from "node:fs";
+        const path = process.argv[1];
+        let msg = "";
+        try {
+            const raw = readFileSync(path, "utf8");
+            const json = JSON.parse(raw);
+            if (
+                json
+                && typeof json.message === "string"
+            ) {
+                msg = json.message;
+            }
+        } catch {
+            msg = "";
+        }
+        process.stdout.write(msg);
+    ' "$file")
+    if [ -n "$msg" ]; then
+        echo "Error: Render HTTP ${code}: ${msg}" >&2
+    else
+        echo "Error: Render HTTP ${code}" >&2
+    fi
+    exit 1
+}
+
+# $1 method  $2 path  $3 outfile  $4 optional JSON body
+http_json() {
+    local method="$1"
+    local path="$2"
+    local out="$3"
+    local body="${4:-}"
+    local code
+    local -a curl_args=(
+        -sS
+        -o "$out"
+        -w '%{http_code}'
+        -X "$method"
+        -H "Authorization: Bearer ${RENDER_API_KEY}"
+        -H "Accept: application/json"
+    )
+    if [ -n "$body" ]; then
+        curl_args+=(
+            -H "Content-Type: application/json"
+            --data-binary @"$body"
+        )
+    fi
+    code=$(curl "${curl_args[@]}" "${API}${path}")
+    case "$code" in
+        2??) return 0 ;;
+        *) fail_http "$code" "$out" ;;
+    esac
+}
+
+write_job_body() {
+    local dest="$1"
+    local cmd="$2"
+    node --input-type=module -e '
+        import { writeFileSync } from "node:fs";
+        writeFileSync(
+            process.argv[1],
+            JSON.stringify({
+                startCommand: process.argv[2],
+            }),
+        );
+    ' "$dest" "$cmd"
+}
+
+start_rfc3339() {
+    if date -u -v-5S +'%Y-%m-%dT%H:%M:%SZ' \
+        >/dev/null 2>&1; then
+        date -u -v-5S +'%Y-%m-%dT%H:%M:%SZ'
+        return
+    fi
+    date -u -d '5 seconds ago' \
+        +'%Y-%m-%dT%H:%M:%SZ'
+}
+
+fetch_logs() {
+    local owner="$1"
+    local resource="$2"
+    local start="$3"
+    local out="$4"
+    local code
+    code=$(curl -sS -o "$out" -w '%{http_code}' \
+        --get \
+        --data-urlencode "ownerId=${owner}" \
+        --data-urlencode "resource=${resource}" \
+        --data-urlencode "startTime=${start}" \
+        --data-urlencode "limit=100" \
+        --data-urlencode "direction=forward" \
+        -H "Authorization: Bearer ${RENDER_API_KEY}" \
+        -H "Accept: application/json" \
+        "${API}/logs")
+    case "$code" in
+        2??) return 0 ;;
+        *) fail_http "$code" "$out" ;;
+    esac
+}
+
+# Prints the markdown table to stdout.
+# Exit 10 if the header is absent.
+# Exit 11 if the header is present but no pairs.
+print_credential_table() {
+    local file="$1"
+    node --input-type=module -e '
+        import { readFileSync } from "node:fs";
+        import { argv, stdout, exit } from
+            "node:process";
+        const header = argv[2];
+        const data = JSON.parse(
+            readFileSync(argv[1], "utf8"),
+        );
+        const lines = [];
+        const logs = Array.isArray(data.logs)
+            ? data.logs
+            : [];
+        for (const entry of logs) {
+            const message = entry && entry.message;
+            const text = typeof message === "string"
+                ? message
+                : "";
+            for (const line of text.split("\n")) {
+                lines.push(line);
+            }
+        }
+        const idx = lines.findIndex(
+            (line) => line.includes(header),
+        );
+        if (idx < 0) exit(10);
+        const rows = [];
+        for (const line of lines.slice(idx + 1)) {
+            const tab = line.indexOf("\t");
+            if (tab <= 0) continue;
+            const user = line.slice(0, tab);
+            const pass = line.slice(tab + 1);
+            if (user === "" || pass === "") continue;
+            if (pass.includes("\t")) continue;
+            rows.push([user, pass]);
+        }
+        if (rows.length === 0) exit(11);
+        const cell = (value) =>
+            value.split("|").join("\\|");
+        stdout.write("| username | password |\n");
+        stdout.write("| --- | --- |\n");
+        for (const [user, pass] of rows) {
+            stdout.write(
+                "| "
+                + cell(user)
+                + " | "
+                + cell(pass)
+                + " |\n",
+            );
+        }
+    ' "$file" "$REVEAL_HEADER"
+}
+
+wait_for_reveal() {
+    local resource="$1"
+    local seed_job="${2:-}"
+    local started=$SECONDS
+    local status
+    while [ $((SECONDS - started)) -lt \
+        "$REVEAL_TIMEOUT_SEC" ]; do
+        if [ -n "$seed_job" ]; then
+            http_json GET \
+                "/services/${SERVICE_ID}/jobs/${seed_job}" \
+                "$TMP/seed-status.json"
+            status=$(node --input-type=module -e '
+                import { readFileSync } from
+                    "node:fs";
+                const job = JSON.parse(
+                    readFileSync(
+                        process.argv[1], "utf8",
+                    ),
+                );
+                process.stdout.write(
+                    typeof job.status === "string"
+                        ? job.status
+                        : "",
+                );
+            ' "$TMP/seed-status.json")
+            case "$status" in
+                failed|canceled)
+                    echo "Error: seed job" \
+                        "${seed_job} ${status}" >&2
+                    exit 1
+                    ;;
+            esac
+        fi
+        fetch_logs "$OWNER_ID" "$resource" \
+            "$SEED_START" "$TMP/logs.json"
+        if print_credential_table \
+            "$TMP/logs.json" \
+            > "$TMP/table.md"; then
+            return 0
+        fi
+        sleep "$POLL_SEC"
+    done
+    echo "Error: seed reveal header missing after" \
+        "${REVEAL_TIMEOUT_SEC}s" >&2
+    exit 1
+}
+
+http_json GET '/postgres?limit=100' \
+    "$TMP/postgres.json"
+http_json GET \
+    '/services?type=web_service&limit=100' \
+    "$TMP/services.json"
+
+node --input-type=module -e '
+    import { readFileSync } from "node:fs";
+    import { argv, stdout, stderr, exit } from
+        "node:process";
+
+    function load(path) {
+        const json = JSON.parse(
+            readFileSync(path, "utf8"),
+        );
+        if (!Array.isArray(json)) {
+            stderr.write(
+                "Error: Render list is not an array\n",
+            );
+            exit(1);
+        }
+        return json;
+    }
+
+    function refuse(kind, lines) {
+        stderr.write(
+            "Error: expected exactly one "
+            + kind
+            + ", found "
+            + String(lines.length)
+            + "\n",
+        );
+        for (const line of lines) {
+            stderr.write("  " + line + "\n");
+        }
+        exit(1);
+    }
+
+    const postgres = load(argv[1]);
+    const services = load(argv[2]);
+    const pgLines = postgres.map((row) => {
+        const item = row && row.postgres;
+        const name = item && item.name;
+        const id = item && item.id;
+        return String(name ?? "?")
+            + " ("
+            + String(id ?? "?")
+            + ")";
+    });
+    const svcLines = services.map((row) => {
+        const item = row && row.service;
+        const name = item && item.name;
+        const id = item && item.id;
+        return String(name ?? "?")
+            + " ("
+            + String(id ?? "?")
+            + ")";
+    });
+    if (postgres.length !== 1) {
+        refuse("Postgres instance", pgLines);
+    }
+    if (services.length !== 1) {
+        refuse("web service", svcLines);
+    }
+    const owner = postgres[0].postgres
+        && postgres[0].postgres.owner
+        && postgres[0].postgres.owner.id;
+    const serviceId = services[0].service
+        && services[0].service.id;
+    if (typeof owner !== "string" || owner === "") {
+        stderr.write(
+            "Error: Postgres owner id missing\n",
+        );
+        exit(1);
+    }
+    if (typeof serviceId !== "string"
+        || serviceId === "") {
+        stderr.write(
+            "Error: web service id missing\n",
+        );
+        exit(1);
+    }
+    stdout.write(owner + "\n" + serviceId + "\n");
+' "$TMP/postgres.json" "$TMP/services.json" \
+    > "$TMP/ids.txt"
+
+OWNER_ID=$(sed -n '1p' "$TMP/ids.txt")
+SERVICE_ID=$(sed -n '2p' "$TMP/ids.txt")
+
+WIPE_START="node --input-type=module -e \"
+import postgres from 'postgres';
+const url = process.env.POSTGRES_URL;
+if (!url) throw new Error('missing POSTGRES_URL');
+const sql = postgres(url, { max: 1 });
+await sql.unsafe('DROP TABLE IF EXISTS responses');
+await sql.unsafe('DROP TABLE IF EXISTS requests');
+await sql.unsafe('DROP TABLE IF EXISTS schema_marker');
+await sql.unsafe(
+    'DROP FUNCTION IF EXISTS message_body(bytea)',
+);
+await sql.end();
+\""
+
+# Collapse the source to one startCommand line.
+WIPE_START=$(printf '%s' "$WIPE_START" | tr '\n' ' ')
+
+write_job_body "$TMP/wipe-job.json" "$WIPE_START"
+http_json POST \
+    "/services/${SERVICE_ID}/jobs" \
+    "$TMP/wipe-created.json" \
+    "$TMP/wipe-job.json"
+
+WIPE_JOB_ID=$(node --input-type=module -e '
+    import { readFileSync } from "node:fs";
+    const job = JSON.parse(
+        readFileSync(process.argv[1], "utf8"),
+    );
+    if (typeof job.id !== "string" || job.id === "") {
+        process.stderr.write(
+            "Error: wipe job id missing\n",
+        );
+        process.exit(1);
+    }
+    process.stdout.write(job.id);
+' "$TMP/wipe-created.json")
+
+wipe_started=$SECONDS
+WIPE_STATUS=''
+while [ $((SECONDS - wipe_started)) -lt \
+    "$WIPE_TIMEOUT_SEC" ]; do
+    http_json GET \
+        "/services/${SERVICE_ID}/jobs/${WIPE_JOB_ID}" \
+        "$TMP/wipe-status.json"
+    WIPE_STATUS=$(node --input-type=module -e '
+        import { readFileSync } from "node:fs";
+        const job = JSON.parse(
+            readFileSync(process.argv[1], "utf8"),
+        );
+        process.stdout.write(
+            typeof job.status === "string"
+                ? job.status
+                : "",
+        );
+    ' "$TMP/wipe-status.json")
+    case "$WIPE_STATUS" in
+        succeeded)
+            break
+            ;;
+        failed|canceled)
+            echo "Error: wipe job ${WIPE_JOB_ID}" \
+                "${WIPE_STATUS}" >&2
+            exit 1
+            ;;
+    esac
+    sleep "$POLL_SEC"
+done
+
+if [ "$WIPE_STATUS" != "succeeded" ]; then
+    echo "Error: wipe job ${WIPE_JOB_ID} timed out" \
+        "(${WIPE_STATUS:-pending})" >&2
+    exit 1
+fi
+
+SEED_START=$(start_rfc3339)
+PRISTINE_START='cd render-out && HTTP_SERVER_PORT=8080'
+PRISTINE_START="${PRISTINE_START} node server.mjs"
+PRISTINE_START="${PRISTINE_START} --seed-bootstrap"
+
+if [ "$MOCKDATA" = true ]; then
+    http_json POST \
+        "/services/${SERVICE_ID}/restart" \
+        "$TMP/restart.json"
+    wait_for_reveal "$SERVICE_ID"
+else
+    write_job_body "$TMP/seed-job.json" \
+        "$PRISTINE_START"
+    http_json POST \
+        "/services/${SERVICE_ID}/jobs" \
+        "$TMP/seed-created.json" \
+        "$TMP/seed-job.json"
+    SEED_JOB_ID=$(node --input-type=module -e '
+        import { readFileSync } from "node:fs";
+        const job = JSON.parse(
+            readFileSync(process.argv[1], "utf8"),
+        );
+        if (typeof job.id !== "string"
+            || job.id === "") {
+            process.stderr.write(
+                "Error: seed job id missing\n",
+            );
+            process.exit(1);
+        }
+        process.stdout.write(job.id);
+    ' "$TMP/seed-created.json")
+    wait_for_reveal "$SEED_JOB_ID" "$SEED_JOB_ID"
+    http_json POST \
+        "/services/${SERVICE_ID}/jobs/${SEED_JOB_ID}/cancel" \
+        "$TMP/seed-cancel.json"
+    http_json POST \
+        "/services/${SERVICE_ID}/restart" \
+        "$TMP/restart.json"
+fi
+
+cat "$TMP/table.md"
+
+try_revoke() {
+    local method path code
+    local -a attempts=(
+        'DELETE /api-keys/current'
+        'DELETE /owners/current/api-keys/current'
+        'POST /api-keys/current/revoke'
+        'POST /api-keys/revoke'
+    )
+    for spec in "${attempts[@]}"; do
+        method=${spec%% *}
+        path=${spec#* }
+        code=$(curl -sS -o "$TMP/revoke.json" \
+            -w '%{http_code}' \
+            -X "$method" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Accept: application/json" \
+            "${API}${path}") || code='000'
+        case "$code" in
+            2??) return 0 ;;
+        esac
+    done
+    echo "Warning: could not revoke the API key." \
+        "Revoke it at ${DASHBOARD_KEYS}" >&2
+}
+
+try_revoke
+exit 0

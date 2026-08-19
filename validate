@@ -19,7 +19,8 @@ LONG_LINES=$( {
         -exec awk "$AWK_LINT" {} +
     awk "$AWK_LINT" build serve test test-postgres \
         validate generate-schema-svg \
-        generate-api-documentation
+        generate-api-documentation measure \
+        wipe-render-postgres
 } )
 
 if [ -n "$LONG_LINES" ]; then
