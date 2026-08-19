@@ -12,7 +12,7 @@ import {
 
 const NOW = 1_700_000_000;
 const CLIENT_ID = 'svc-client';
-const AUDIENCE = 'fusion-ai-web';
+const AUDIENCE = 'fusion-angle';
 
 function clientWith(
     jwks: string,

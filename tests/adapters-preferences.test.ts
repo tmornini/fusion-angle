@@ -41,9 +41,9 @@ test(
     'putPreference then getPreference round-trips'
     + ' the value',
     () => {
-        putPreference('fusion-ai:demo', 'hello');
+        putPreference('fusion-angle:demo', 'hello');
         assert.equal(
-            getPreference('fusion-ai:demo'),
+            getPreference('fusion-angle:demo'),
             'hello',
         );
     },
@@ -53,10 +53,10 @@ test(
     'putPreference overwrites a prior value for'
     + ' the same key',
     () => {
-        putPreference('fusion-ai:color', 'blue');
-        putPreference('fusion-ai:color', 'green');
+        putPreference('fusion-angle:color', 'blue');
+        putPreference('fusion-angle:color', 'green');
         assert.equal(
-            getPreference('fusion-ai:color'),
+            getPreference('fusion-angle:color'),
             'green',
         );
     },
@@ -65,19 +65,19 @@ test(
 test(
     'distinct keys hold independent values',
     () => {
-        putPreference('fusion-ai:a', 'one');
-        putPreference('fusion-ai:b', 'two');
-        assert.equal(getPreference('fusion-ai:a'), 'one');
-        assert.equal(getPreference('fusion-ai:b'), 'two');
+        putPreference('fusion-angle:a', 'one');
+        putPreference('fusion-angle:b', 'two');
+        assert.equal(getPreference('fusion-angle:a'), 'one');
+        assert.equal(getPreference('fusion-angle:b'), 'two');
     },
 );
 
 test(
     'putPreference accepts an empty string value',
     () => {
-        putPreference('fusion-ai:empty', '');
+        putPreference('fusion-angle:empty', '');
         assert.equal(
-            getPreference('fusion-ai:empty'),
+            getPreference('fusion-angle:empty'),
             '',
         );
     },

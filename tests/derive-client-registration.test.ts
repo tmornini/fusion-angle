@@ -17,7 +17,7 @@ const REGISTRATION = {
     grant_types: 'client_credentials',
     redirect_uris: '',
     jwks: '{"keys":[]}',
-    aud: 'fusion-ai-web',
+    aud: 'fusion-angle',
     status: 'active',
 };
 

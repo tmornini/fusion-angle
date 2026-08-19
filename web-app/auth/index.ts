@@ -103,7 +103,7 @@ export async function init(): Promise<void> {
                             + 'font-display '
                             + 'font-bold '
                             + 'auth-brand-name'
-                        }">Fusion AI</span>
+                        }">Fusion Angle</span>
                     </div>
                 </div>
                 <h1 class="${
@@ -120,7 +120,7 @@ export async function init(): Promise<void> {
                     ${
                         'Join thousands of'
                         + ' companies using'
-                        + ' Fusion AI to'
+                        + ' Fusion Angle to'
                         + ' streamline operations,'
                         + ' boost productivity,'
                         + ' and unlock new'
@@ -188,7 +188,7 @@ export async function init(): Promise<void> {
                         'text-2xl font-display '
                         + 'font-bold '
                         + 'text-foreground'
-                    }">Fusion AI</span>
+                    }">Fusion Angle</span>
                 </div>
 
                 <div class="card p-8">

@@ -21,7 +21,7 @@ export type {
     Principal,
 } from '../shared/access-token-decode.ts';
 
-export const TOKEN_AUDIENCE = 'fusion-ai-web';
+export const TOKEN_AUDIENCE = 'fusion-angle';
 const SIGNING_KEY_ID = 'dev-co-located';
 
 // The HMAC secret. Mint/verify require

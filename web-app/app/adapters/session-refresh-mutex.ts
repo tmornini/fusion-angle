@@ -6,7 +6,7 @@
 // BroadcastChannel carries the winner's access token.
 
 const REFRESH_LOCK = 'fusion-refresh';
-const REFRESH_CHANNEL = 'fusion-ai:refresh';
+const REFRESH_CHANNEL = 'fusion-angle:refresh';
 
 let inFlight: Promise<string | null> | null = null;
 let peerAccess: string | null | undefined;

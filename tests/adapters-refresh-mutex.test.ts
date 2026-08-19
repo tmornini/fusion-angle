@@ -126,7 +126,7 @@ async () => {
         posts += 1;
         return 'first';
     });
-    const peer = new BroadcastChannel('fusion-ai:refresh');
+    const peer = new BroadcastChannel('fusion-angle:refresh');
     peer.postMessage({ accessToken: null });
     for (let i = 0; i < 5; i++) {
         await new Promise(r => setImmediate(r));

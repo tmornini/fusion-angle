@@ -50,6 +50,7 @@ const MIME_BY_EXT: Readonly<Record<string, string>> = {
     '.woff2': 'font/woff2',
     '.ico': 'image/x-icon',
     '.svg': 'image/svg+xml',
+    '.png': 'image/png',
 };
 
 export type RequestHandler = (

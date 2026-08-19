@@ -1,6 +1,6 @@
 # Architecture
 
-Vanilla TypeScript. One ZIP: `fusion-ai-server-${SHA}.zip`.
+Vanilla TypeScript. One ZIP: `fusion-angle-server-${SHA}.zip`.
 postgres.js 3.4.9 is bundled behind
 `api/postgres-client.ts` only (named exception). The
 client is a fetch facade (`web-app/app/server-core.ts`).
@@ -327,7 +327,7 @@ route-topology oracle).
 `app-boot.ts::scopeBootToActiveOrganization` always scopes
 the session before first render: enumerate reachable orgs →
 `resolveActiveOrganization` (the persisted
-`fusion-ai:active-organization-id`, else the identity's
+`fusion-angle:active-organization-id`, else the identity's
 default org if reachable, else the first reachable) →
 `postOrganizationSessionExchange` → install the scoped
 token. The sidebar org-switcher
@@ -358,7 +358,7 @@ One origin, two collections — pages at `/ideas/`, API
 at `/api/`.
 
 `./build` emits one artifact from one source tree (clean
-tree required): **`fusion-ai-server-${SHA}.zip`**. Node
+tree required): **`fusion-angle-server-${SHA}.zip`**. Node
 serves composed pages and the API on one origin.
 Postgres is the store. The page talks `fetch`. The
 client bundle is the fetch facade (no in-page API, no

@@ -35,7 +35,7 @@ export function buildRecords():
             name: 'Project Brief',
             description:
                 'Lightweight scoping shape used by'
-                + ' the Fusion Flow.',
+                + ' the Fusion Angle Flow.',
             position: 2,
         },
     ];

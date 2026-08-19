@@ -532,7 +532,7 @@ async function postMockDataLoadIn(
     // Customer Onboarding Data Capture and Review
     // nodes, and is multi-bound to Lead-to-Close.
     // Project Brief carries the idea-shape
-    // attributes referenced by Fusion Flow's
+    // attributes referenced by Fusion Angle Flow's
     // Describe-problem and Solution nodes.
     const mockRecords = buildRecords();
 

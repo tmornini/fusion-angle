@@ -59,3 +59,14 @@ async () => {
         );
     }
 });
+
+test('Fusion Angle Flow keeps its seed id', () => {
+    const flow = buildFlows().find(
+        (row) => row.name === 'Fusion Angle Flow',
+    );
+    assert.ok(flow, 'Fusion Angle Flow must exist');
+    assert.equal(
+        flow!.id,
+        'E2BnBlZyrriqsQYkmS4usb',
+    );
+});

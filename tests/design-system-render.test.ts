@@ -12,10 +12,10 @@ test('design-system render is byte-stable', () => {
     const rendered = buildDesignSystemPage().toString();
     const digest = createHash('sha256')
         .update(rendered).digest('hex');
-    assert.equal(rendered.length, 56262);
+    assert.equal(rendered.length, 56274);
     assert.equal(
         digest,
-        '5027c911bae24f4c6f78c7f517aa1383b55184d5'
-        + '06c4524f15ac1f96ea27dc0f',
+        'a87b1d5782e4d3bb39a632134d0df72fe93d6498'
+        + '8b1ca0a32ba6ad4250206259',
     );
 });

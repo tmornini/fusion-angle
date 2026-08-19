@@ -1,4 +1,4 @@
-# Fusion AI Design System
+# Fusion Angle Design System
 
 A production-ready design system for enterprise applications
 prioritizing clarity, trust, focus, and calm decision-making.

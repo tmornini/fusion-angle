@@ -530,14 +530,14 @@ test('a client_credentials grant appends its root\'s own'
     const now = Math.floor(Date.now() / 1000);
     const assertion = await signer.sign({
         iss: 'svc-shadow', sub: 'svc-shadow',
-        aud: 'fusion-ai-web',
+        aud: 'fusion-angle',
         exp: now + 300, iat: now,
         jti: 'assert-shadow-tokens-1',
     });
     await seedClientRegistration(db, 'svc-shadow', {
         grant_types: 'client_credentials',
         redirect_uris: '', jwks: signer.jwks,
-        aud: 'fusion-ai-web', status: 'active',
+        aud: 'fusion-angle', status: 'active',
     });
     const res = await postToken(db, {
         grant_type: 'client_credentials',

@@ -2923,7 +2923,7 @@ hidden:
    carries the pre-erasure PII rows verbatim; the theorem covers
    live storage, not files already written to disk.
 3. **The browser's own session credential.** The
-   `fusion-ai:authorization` localStorage entry carries the
+   `fusion-angle:authorization` localStorage entry carries the
    caller's own JWT, whose `name` claim is base64-decodable
    client-side for the token's lifetime (up to the 30-day
    refresh TTL). The pin does not scan localStorage — an

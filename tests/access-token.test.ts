@@ -88,7 +88,7 @@ async () => {
     // signature (a placeholder ignoring the body would pass).
     const forgedBody = base64UrlEncode(JSON.stringify({
         sub: 'attacker', roles: ['admin'], name: 'X',
-        aud: 'fusion-ai-web', iat: 1_700_000_000,
+        aud: 'fusion-angle', iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));
     const forged = head + '.' + forgedBody + '.' + sig;
@@ -158,7 +158,7 @@ async () => {
 test('decodeAccessToken rejects a non-string org claim', () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'current', roles: [], name: 'Demo',
-        aud: 'fusion-ai-web', organization: 7, iat: 1_700_000_000,
+        aud: 'fusion-angle', organization: 7, iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));
     assert.throws(
@@ -207,7 +207,7 @@ test('decodeAccessToken rejects a non-array orgs claim',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'current', roles: [], name: 'Demo',
-        aud: 'fusion-ai-web', organizations: 'nope',
+        aud: 'fusion-angle', organizations: 'nope',
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
     }));
@@ -221,7 +221,7 @@ test('decodeAccessToken rejects non-string orgs elements',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'current', roles: [], name: 'Demo',
-        aud: 'fusion-ai-web', organizations: ['1', 7],
+        aud: 'fusion-angle', organizations: ['1', 7],
         iat: 1_700_000_000, nbf: 1_700_000_000,
         exp: 9_999_999_999, jti: 'x',
     }));
@@ -235,7 +235,7 @@ test('decodeAccessToken rejects non-string roles elements',
 () => {
     const body = base64UrlEncode(JSON.stringify({
         sub: 'current', roles: ['admin', 7], name: 'Demo',
-        aud: 'fusion-ai-web', iat: 1_700_000_000,
+        aud: 'fusion-angle', iat: 1_700_000_000,
         nbf: 1_700_000_000, exp: 9_999_999_999, jti: 'x',
     }));
     assert.throws(

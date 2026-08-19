@@ -766,7 +766,7 @@ async () => {
 const activeClient = {
     grant_types: 'client_credentials',
     redirect_uris: '', jwks: '{"keys":[]}',
-    aud: 'fusion-ai-web', status: 'active',
+    aud: 'fusion-angle', status: 'active',
 };
 
 // A really-signed assertion: fresh in-test key pair, public
@@ -776,7 +776,7 @@ async function signedClientSetup() {
     const now = Math.floor(Date.now() / 1000);
     const assertion = await signer.sign({
         iss: 'svc-client', sub: 'svc-client',
-        aud: 'fusion-ai-web',
+        aud: 'fusion-angle',
         exp: now + 300, iat: now, jti: 'assert-1',
     });
     return {
@@ -899,7 +899,7 @@ async () => {
     await putMessagePair(db, ticket);
     const assertion = await signer.sign({
         iss: 'svc-client', sub: 'svc-client',
-        aud: 'fusion-ai-web',
+        aud: 'fusion-angle',
         exp: now + 300, iat: now, jti,
     });
     const res = await handleRequest(db, tokenRequest({
@@ -927,7 +927,7 @@ async () => {
     const now = Math.floor(Date.now() / 1000);
     const forged = await impostor.sign({
         iss: 'svc-client', sub: 'svc-client',
-        aud: 'fusion-ai-web',
+        aud: 'fusion-angle',
         exp: now + 300, iat: now, jti: 'assert-2',
     });
     const res = await handleRequest(db, tokenRequest({

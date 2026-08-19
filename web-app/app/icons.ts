@@ -57,18 +57,14 @@ export function iconSparkles(size: IconSize, cssClass: string) {
 }
 
 export function iconLogo(size: IconSize, cssClass: string) {
+    const extra = cssClass === ''
+        ? ''
+        : ' ' + cssClass;
     return new SafeHtml(
-        '<svg xmlns="http://www.w3.org/2000/svg"'
+        '<img src="../assets/mark.png"'
         + ` width="${size}" height="${size}"`
-        + ' viewBox="-12 -12 24 24" fill="none"'
-        + ` class="${cssClass}" aria-hidden="true">`
-        + '<g class="logo-orbital">'
-        + '<ellipse rx="11" ry="4.2"/>'
-        + '<ellipse rx="11" ry="4.2" transform="rotate(60)"/>'
-        + '<ellipse rx="11" ry="4.2" transform="rotate(120)"/>'
-        + '</g>'
-        + '<circle class="logo-nucleus" r="2.05"/>'
-        + '</svg>',
+        + ` class="brand-mark${extra}"`
+        + ' alt="" />',
     );
 }
 

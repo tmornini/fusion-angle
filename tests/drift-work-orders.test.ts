@@ -250,7 +250,7 @@ const SEEDED_WORK_ORDER_IDS = [
 
 // The three flows carrying seeded joins, paired with their own
 // join count (the 39/6/100 split) — 'E2BnBlZyrriqsQYkmS4usb'
-// (Fusion Flow) carries none, the empty case below.
+// (Fusion Angle Flow) carries none, the empty case
 const SEEDED_JOIN_FLOWS = [
     { flowId: 'h5mErVBQhwdMKwi1co30jB', count: 39 },
     { flowId: '7COt7Kf4OaOBg6AjaNO04s', count: 6 },

@@ -19,7 +19,7 @@ const FIELDS = {
     grantTypes: 'client_credentials',
     redirectUris: '',
     jwks: '{"keys":[]}',
-    aud: 'fusion-ai-web',
+    aud: 'fusion-angle',
     status: 'active' as const,
 };
 

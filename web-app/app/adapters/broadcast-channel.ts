@@ -15,7 +15,7 @@ import {
     notificationEventFromWire,
 } from '../../../api/notifications.ts';
 
-const CHANNEL_NAME = 'fusion-ai:data';
+const CHANNEL_NAME = 'fusion-angle:data';
 
 let channel: BroadcastChannel | undefined;
 

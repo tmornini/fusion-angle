@@ -1,26 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg"
-     viewBox="-12 -12 24 24" width="32" height="32">
+     viewBox="0 0 32 32" width="32" height="32">
   <!--
-    Standalone favicon: a boundary asset outside the app's CSS
-    cascade, so colors are hsl literals mirroring the primary and
-    accent design tokens rather than var() references. Theme tracks
-    prefers-color-scheme to match the browser's light/dark chrome.
+    Standalone favicon: sibling mark.png, outside the
+    app CSS cascade. Light OS chrome inverts the
+    white-on-transparent mark to dark ink.
   -->
   <style>
-    .orbital {
-      fill: none;
-      stroke: hsl(217 36% 46%);
-      stroke-width: 1.6;
-    }
-    .nucleus { fill: hsl(48 98% 55%); }
-    @media (prefers-color-scheme: dark) {
-      .orbital { stroke: hsl(217 45% 60%); }
+    @media (prefers-color-scheme: light) {
+      image { filter: invert(1); }
     }
   </style>
-  <g class="orbital">
-    <ellipse rx="11" ry="4.2"/>
-    <ellipse rx="11" ry="4.2" transform="rotate(60)"/>
-    <ellipse rx="11" ry="4.2" transform="rotate(120)"/>
-  </g>
-  <circle class="nucleus" r="2.05"/>
+  <image href="mark.png" width="32" height="32"
+         preserveAspectRatio="xMidYMid meet"/>
 </svg>

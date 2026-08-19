@@ -236,7 +236,7 @@ export function buildFlows(): FlowSeed[] {
         },
         {
             id: 'E2BnBlZyrriqsQYkmS4usb',
-            name: 'Fusion Flow',
+            name: 'Fusion Angle Flow',
             is_locked: false,
             is_auto_layout: true,
             is_auto_fit: true,

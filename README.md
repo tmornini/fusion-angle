@@ -1,4 +1,4 @@
-# Fusion AI
+# Fusion Angle
 
 Enterprise innovation management platform for capturing ideas,
 defining business cases, and tracking projects through approval
@@ -26,7 +26,7 @@ org-switcher for the multi-org user. Operator seed prints
 sign-in credentials once on stderr (`--seed-mock-data`).
 
 **Demo-grade security.** `./build` emits one artifact:
-`fusion-ai-server-${SHA}.zip` (Node + Postgres, pages and
+`fusion-angle-server-${SHA}.zip` (Node + Postgres, pages and
 API on one origin, `JWT_HMAC_SIGNING_KEY` from the
 environment). The in-browser data tier is gone. A1–A6 are
 disposed as named in [ARCHITECTURE.md](ARCHITECTURE.md)
@@ -36,7 +36,7 @@ disposed as named in [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ```sh
 git clone <repo-url>
-cd fusion-ai
+cd fusion-angle
 npm ci
 ```
 

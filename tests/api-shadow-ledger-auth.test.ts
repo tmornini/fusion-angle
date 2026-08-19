@@ -482,13 +482,13 @@ test('a client_credentials grant stores its own pair with live'
     const now = Math.floor(Date.now() / 1000);
     const assertion = await signer.sign({
         iss: 'svc-client', sub: 'svc-client',
-        aud: 'fusion-ai-web',
+        aud: 'fusion-angle',
         exp: now + 300, iat: now, jti: 'assert-shadow-1',
     });
     await seedClientRegistration(db, 'svc-client', {
         grant_types: 'client_credentials',
         redirect_uris: '', jwks: signer.jwks,
-        aud: 'fusion-ai-web', status: 'active',
+        aud: 'fusion-angle', status: 'active',
     });
     const res = await handleRequest(db, jsonPost(
         'authentication/token', {

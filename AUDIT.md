@@ -102,7 +102,7 @@ repository's absolute path and HEAD SHA, then add:
 ```
 Go to Medium Church!
 
-You audit the fusion-ai repository at <ABS_PATH>,
+You audit the fusion-angle repository at <ABS_PATH>,
 HEAD <SHA>, against ONE scripture section:
 <section name>. After the skill loads, read YOUR
 section from the Medium scroll

@@ -8,7 +8,7 @@ import { strict as assert } from 'node:assert';
 // @ts-expect-error — Node global stub
 globalThis.localStorage = {
     getItem: (key: string) => (
-        key === 'fusion-ai:log-level'
+        key === 'fusion-angle:log-level'
             ? 'info'
             : null
     ),

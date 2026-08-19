@@ -149,7 +149,7 @@ function buildNavbar(): SafeHtml {
                     }">${iconLogo(ICON_SIZE['3xl'], '')}</div>
                     <span class="${
                         'navbar-logo-text'
-                    }">Fusion AI</span>
+                    }">Fusion Angle</span>
                 </a>
                 <div class="navbar-links">
                     <a href="#features"
@@ -274,7 +274,7 @@ function buildHero(): SafeHtml {
                     + 'animate-fade-in-up'
                 }">
                     ${
-                        'Fusion AI puts humans'
+                        'Fusion Angle puts humans'
                         + ' at the center. Our'
                         + ' platform augments'
                         + ' your expertise with'
@@ -454,7 +454,7 @@ function buildCTA(): SafeHtml {
                 }</h2>
                 <p>${
                     'Join thousands of teams'
-                    + ' who use Fusion AI to'
+                    + ' who use Fusion Angle to'
                     + ' amplify their human'
                     + ' intelligence. Start'
                     + ' your free trial'
@@ -490,7 +490,7 @@ function buildFooter(): SafeHtml {
                         }">${iconLogo(ICON_SIZE['3xl'], '')}</div>
                         <span class="${
                             'navbar-logo-text'
-                        }">Fusion AI</span>
+                        }">Fusion Angle</span>
                     </div>
                     <p>${
                         'Human-Intelligence'
@@ -502,7 +502,7 @@ function buildFooter(): SafeHtml {
             </div>
             <div class="footer-bottom">
                 <p>&copy; ${year} ${
-                    'Fusion AI.'
+                    'Fusion Angle.'
                     + ' All rights reserved.'
                 }</p>
             </div>

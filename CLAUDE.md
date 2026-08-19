@@ -191,7 +191,7 @@ type checking (they run in Node).
 ## Architecture
 
 **Vanilla TypeScript.** One ZIP:
-`fusion-ai-server-${SHA}.zip`. postgres.js 3.4.9 is
+`fusion-angle-server-${SHA}.zip`. postgres.js 3.4.9 is
 bundled behind `api/postgres-client.ts` only (named
 exception). The client entry is
 `web-app/app/server-core.ts` (fetch facade). The
@@ -475,7 +475,7 @@ document will ever be.
 ## Build
 
 `./build` requires a clean working directory. Output is
-one ZIP at `~/Desktop/`: `fusion-ai-server-${SHA}.zip`.
+one ZIP at `~/Desktop/`: `fusion-angle-server-${SHA}.zip`.
 `--no-zip` writes the server-core bundle and `server.mjs`
 to a directory (what `./serve` uses). Use `./build --help`
 for options. The build script itself is the source of
@@ -643,7 +643,7 @@ apply to it (RED is the audit's first finding).
   notifies via module pub-sub
   (`ideaChanges.notify()` and siblings) and posts
   a scoped BroadcastChannel event
-  (`fusion-ai:data`) so other same-origin windows
+  (`fusion-angle:data`) so other same-origin windows
   of this browser refresh. Writes
   `pg_notify('fusion_events', …)` on the server;
   there is no LISTEN and no SSE client. A second

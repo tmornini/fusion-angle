@@ -1,4 +1,4 @@
-# Fusion AI — Test Plan
+# Fusion Angle — Test Plan
 
 > **Encoding:** `- [ ]` = pending (not yet executed). Run outcomes are recorded as words in the Summary (PASS / FAIL / BLOCKED / DEFERRED / DRIFT), not by flipping the checkbox. Optional inline annotation: `- [FAIL]` with a note for a failed case.
 
@@ -47,7 +47,7 @@ dispatch prompt MUST embed this requirement as the first
 line of every sub-agent prompt.
 
 After the scripture, each sub-agent reads
-`/Users/tmornini/code/fusion-ai/CLAUDE.md` in full, then
+`/Users/tmornini/code/fusion-angle/CLAUDE.md` in full, then
 begins its assigned case list. The discipline costs
 context; the discipline IS the point.
 
@@ -101,7 +101,7 @@ validate-broken tree. On green, the browser regression
 runs against **one Node origin** in one of two modes:
 
 - **Serial (single human tester)**: A1 `./build` →
-  `~/Desktop/fusion-ai-server-${SHA}.zip`; A2 unzip
+  `~/Desktop/fusion-angle-server-${SHA}.zip`; A2 unzip
   (or `./build --no-zip`) to a temp dir that contains
   `server.mjs`; A3 set `POSTGRES_URL`,
   `JWT_HMAC_SIGNING_KEY`, `HTTP_SERVER_PORT` against
@@ -130,7 +130,7 @@ context and time budgets while keeping per-entity
 mutation domains disjoint:
 
 1. **Phase 0 — Preflight** (main): `./validate`,
-   `./build` to produce `fusion-ai-server-${SHA}.zip`,
+   `./build` to produce `fusion-angle-server-${SHA}.zip`,
    unzip or `--no-zip` so `server.mjs` is on disk,
    start `node server.mjs --seed-mock-data` (A3 /
    SV1). Covers A1–A5.
@@ -296,11 +296,11 @@ it. A Phase-2 run that ignores this collapses:
 - **Cookie session.** Product access is memory-only;
   refresh is the HttpOnly `refresh_token` cookie
   (`Path=/api/authentication`, `SameSite=Strict`).
-  `fusion-ai:authorization` is not the product path
+  `fusion-angle:authorization` is not the product path
   (`server-core.ts` calls `setCookieSession(true)`).
   Two pages in the same Chrome context share that
   cookie.
-- **`fusion-ai:active-organization-id`** is still one
+- **`fusion-angle:active-organization-id`** is still one
   localStorage key per context, so concurrent org
   switches in the same jar race the same slot.
 - **Sign-out is identity-wide on the server.**
@@ -313,7 +313,7 @@ it. A Phase-2 run that ignores this collapses:
   `isolatedContext`.
 - **IndexedDB connection concurrency is gone.** The
   retired browser-ZIP origin wedged on ~9 concurrent
-  `fusion-ai` IDB connections. One Postgres, one
+  `fusion-angle` IDB connections. One Postgres, one
   `server.mjs` — that recipe does not apply.
 
 **Primary strategy — one origin, isolated contexts.**
@@ -357,7 +357,7 @@ Postgres, many isolated Chrome contexts.
 
 1. **AT first.** `./validate`. Abort on red.
 2. **A1.** `./build` from a clean tree →
-   `~/Desktop/fusion-ai-server-${SHA}.zip`.
+   `~/Desktop/fusion-angle-server-${SHA}.zip`.
 3. **A2.** Unzip that ZIP (or
    `./build --no-zip /tmp/fusion-test/`) to a temp
    dir that contains `server.mjs`.
@@ -588,7 +588,7 @@ run before A1's build. The single canonical invocation is
 
 ## A. Build & Setup
 
-- [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-ai-server-${SHA}.zip`.
+- [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-server-${SHA}.zip`.
 - [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
 - [ ] **A3** From the A2 directory, with `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`, and `HTTP_SERVER_PORT` set against an **empty** Postgres, run `node server.mjs --seed-mock-data` (or `./serve` after commit). PASS: the process listens; stderr prints `Save your demo sign-ins — shown once; copy them now.` plus one `username<TAB>password` line per seeded human (including `demo@example.com` and `sarah.chen@company.com`); the stdout listen line has no passwords; seed does not travel over HTTP. This pin **is** SV1.
 - [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
@@ -2282,7 +2282,7 @@ the claude-in-chrome MCP.
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
 - [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `requests`/`responses` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the localStorage session-credentials JWT's name claim, and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
-- [ ] **G47** On a kind-'service' identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-ai-web`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
+- [ ] **G47** On a kind-'service' identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
 
@@ -2291,7 +2291,7 @@ the claude-in-chrome MCP.
 
 ### Sidebar org-switcher
 
-- [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 `--seed-mock-data` seeds two orgs and Tony Stark (`current`) is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-ai:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
+- [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 `--seed-mock-data` seeds two orgs and Tony Stark (`current`) is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-angle:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
 - [ ] **G41** Person and agent writes land on the pair
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`
@@ -2360,7 +2360,7 @@ feature is implemented.
 - [ ] **I2** Navigate to another page. PASS: dark theme persists across navigation.
 - [ ] **I3** Select "Light" theme. PASS: page returns to light theme.
 - [ ] **I4** Select "System" theme. PASS: theme follows OS preference (matches `prefers-color-scheme`).
-- [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-ai:theme`).
+- [ ] **I5** Reload the page. PASS: theme choice persists (stored in `localStorage` key `fusion-angle:theme`).
 - [ ] **I6** Open the app in a second browser tab. Change theme in the first tab. PASS: second tab updates to the new theme without manual reload (cross-tab sync via StorageEvent).
 
 ### Sidebar
@@ -2369,7 +2369,7 @@ feature is implemented.
 - [ ] **I8** Navigate to another page. PASS:
   collapsed state persists (stored in
   `localStorage` key
-  `fusion-ai:sidebar-collapsed`).
+  `fusion-angle:sidebar-collapsed`).
 - [ ] **I9** Click the expand button. PASS: sidebar returns to full width with labels.
 
 ### Mobile Responsive
@@ -2409,7 +2409,7 @@ feature is implemented.
 - [ ] **I28** Open the app in two tabs. In tab 1 collapse the
   sidebar. PASS: tab 2 reflects the collapsed state without manual
   reload (cross-tab sync via StorageEvent on
-  `fusion-ai:sidebar-collapsed`).
+  `fusion-angle:sidebar-collapsed`).
 
 ### Accessibility
 
@@ -2612,7 +2612,7 @@ arc-gauges; Impact is a bipolar arc) and an Objectives box
 
 **K29.** From another tab, log a measurement on an approved
 project. PASS if the Objectives box updates within
-~1 second (BroadcastChannel `fusion-ai:data` + `subscribeProjectScoreChanges`); the
+~1 second (BroadcastChannel `fusion-angle:data` + `subscribeProjectScoreChanges`); the
 three arc-gauge cards refresh only on full page load.
 
 ### K30 + K7 — Project history modal & temporal name resolution (Agent-E)
@@ -2763,7 +2763,7 @@ every other agent, so no write-domain collision.
 
 - [ ] **J1** Stop the `server.mjs` process started in A3. PASS: process terminates.
 - [ ] **J2** Remove the build directory (`rm -rf /tmp/fusion-test` or equivalent). PASS: directory removed.
-- [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-ai-server-${SHA}.zip` exists.
+- [ ] **J3** Verify the ZIP file remains on `~/Desktop` for archival. PASS: `fusion-angle-server-${SHA}.zip` exists.
 
 ## SV. Server (Node + Postgres)
 
@@ -2794,7 +2794,7 @@ regression.
 
 - [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stderr seed reveal).
 - [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
-- [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/api/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-ai:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
+- [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/api/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-angle:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
 - [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /api/authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
 
 ### Two browsers / two identities / one database
@@ -2808,7 +2808,7 @@ regression.
 - [ ] **SV8b** Two windows of the same profile, both
   on `ideas/`. Create an idea in window A. PASS:
   window B's list gains the card without a reload
-  (BroadcastChannel `fusion-ai:data`).
+  (BroadcastChannel `fusion-angle:data`).
 - [ ] **SV9** In tab A, click Sign out. In tab B, navigate (sidebar click or reload). PASS: tab B lands on `auth` — logout cleared the shared cookie (`Set-Cookie` `Max-Age=0`); boot refresh cannot mint. (An already-painted tab B may still hold a live access token in memory until that navigation — that is the access-TTL covenant, not a failed cookie clear.)
 
 ### Named residual — stale-until-navigation

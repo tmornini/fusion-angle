@@ -39,11 +39,15 @@ function clientGraphHits(
 test('build emits one ZIP from the server-core entry', () => {
     assert.match(
         BUILD_SCRIPT,
-        /fusion-ai-server-\$\{SHA\}\.zip/,
+        /fusion-angle-server-\$\{SHA\}\.zip/,
     );
     assert.doesNotMatch(
         BUILD_SCRIPT,
         /fusion-ai-browser/,
+    );
+    assert.doesNotMatch(
+        BUILD_SCRIPT,
+        /fusion-angle-browser/,
     );
     assert.match(
         BUILD_SCRIPT,

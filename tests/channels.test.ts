@@ -86,7 +86,7 @@ test('send with no subscribers is a no-op', () => {
 // own poster) means the module's own postNotificationEvent
 // cannot reach a subscriber created in the same process, so a
 // second handle mirrors another tab posting the event.
-const CHANNEL_NAME = 'fusion-ai:data';
+const CHANNEL_NAME = 'fusion-angle:data';
 
 async function deliver(): Promise<void> {
     // BroadcastChannel delivery is asynchronous; a handful of

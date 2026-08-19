@@ -44,7 +44,7 @@ fi
 
 ./validate
 
-echo "Building Fusion AI..."
+echo "Building Fusion Angle..."
 
 if [ "$NO_ZIP" = true ] && [ -n "$DEST" ]; then
     BUILD_DIR="$DEST"
@@ -132,6 +132,7 @@ cp web-app/assets/*.woff2 "$BUILD_DIR/assets/"
 cp web-app/index.html "$BUILD_DIR/"
 cp web-app/assets/favicon.ico "$BUILD_DIR/assets/"
 cp web-app/assets/favicon.svg "$BUILD_DIR/assets/"
+cp web-app/assets/mark.png "$BUILD_DIR/assets/"
 
 npx --no-install esbuild \
     server/boot.ts \
@@ -150,7 +151,7 @@ if [ "$NO_ZIP" = true ]; then
 else
     SHA=$(git rev-parse --short=7 HEAD)
     DEST_DIR="${DEST:-$HOME/Desktop/}"
-    SERVER_ZIP="${DEST_DIR}fusion-ai-server-${SHA}.zip"
+    SERVER_ZIP="${DEST_DIR}fusion-angle-server-${SHA}.zip"
     (cd "$BUILD_DIR" && zip -r "$SERVER_ZIP" .)
     echo "Distribution: $SERVER_ZIP" \
         "($(wc -c < "$SERVER_ZIP" | xargs) bytes)"

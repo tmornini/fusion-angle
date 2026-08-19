@@ -290,7 +290,7 @@ export function buildDesignSystemPage(): SafeHtml {
         <div>
             <h1 class="${
                 'text-3xl font-bold font-display'
-                }">Fusion AI Design System</h1>
+                }">Fusion Angle Design System</h1>
             <p class="text-muted mt-2">${
                 'A production-ready design system '
                 + 'for enterprise applications '
@@ -307,7 +307,7 @@ export function buildDesignSystemPage(): SafeHtml {
                     'text-2xl font-semibold font-display'
                     }">Brand Colors</h2>
                 <p class="text-muted mt-1">${
-                    'Primary brand colors for Fusion AI'
+                    'Primary brand colors for Fusion Angle'
                     }</p>
             </div>
             <div class="ds-grid-4 stats-grid">
@@ -759,7 +759,7 @@ export function buildDesignSystemPage(): SafeHtml {
             </div>
             <div class="ds-grid-3 score-grid">
                 <div class="card card-hover p-6">
-                    <h3 class="font-semibold mb-1">Fusion Card</h3>
+                    <h3 class="font-semibold mb-1">Fusion Angle Card</h3>
                     <p class="text-xs text-muted mb-2">With hover effect</p>
                     <p class="text-sm text-muted">${
                         'Hover over this card to see the '
