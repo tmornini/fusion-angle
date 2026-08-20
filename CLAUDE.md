@@ -86,7 +86,7 @@ URLs, and CSS class names may keep the short form. Finally
 it runs the
 `generate-schema-svg --check` gate, which fails on
 `SCHEMA.svg` drift from the schema of record (`api/db.ts` +
-`api/types.ts`), then the
+`api/types.ts` + `api/schema-postgres.ts`), then the
 `generate-api-documentation --check` gate, which fails on
 `API.svg` / room drift from `routes[]`.
 

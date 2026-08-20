@@ -379,9 +379,9 @@ export function uniqueColumns(
         .map((spec) => indexColumn(spec));
 }
 
-// The secondary indexes each store carries: ONLY the columns
-// some keyed read (`Tx.getWhere`) actually names, measured
-// against the call sites — never one-per-FK on speculation.
+// The secondary indexes each store carries — equality
+// indexes on a single column, measured against keyed-read
+// call sites, never one-per-FK on speculation.
 // Declared beside TABLE_NAMES as the schema of record both
 // backends read. Index ONLY NOT-NULL columns — IndexedDB
 // omits a row missing the keyPath from `index.getAll`, and

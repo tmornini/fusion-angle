@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Regenerate SCHEMA.svg (the ERD) from the schema of record.
-# Pass --check to fail instead of write when the SVG is stale;
-# ./validate uses that to gate drift.
+# Regenerate SCHEMA.svg from the schema of record
+# (api/db.ts, api/types.ts, api/schema-postgres.ts).
+# Pass --check to fail instead of write when the SVG
+# is stale; ./validate uses that to gate drift.
 node --strip-types web-app/app/generate-schema-svg.ts "$@"

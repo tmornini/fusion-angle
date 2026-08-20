@@ -1,5 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 450" width="288" height="450">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 610" width="800" height="610">
   <defs>
+    <marker id="fk-arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M 0 0 L 8 4 L 0 8 z" fill="hsl(217 34% 60%)" />
+    </marker>
     <style>
       text { font-family: ui-sans-serif, system-ui,
         'Segoe UI', Helvetica, Arial, sans-serif; }
@@ -8,7 +11,8 @@
       .head { fill: hsl(217 36% 46%); }
       .thead { fill: hsl(0 0% 100%); font-size: 12px;
         font-weight: 700; }
-      .col, .pk, .fk, .type { font-size: 11px; }
+      .col, .pk, .fk, .type { font-size: 11px;
+        dominant-baseline: middle; }
       .col { fill: hsl(217 45% 15%); }
       .pk { fill: hsl(217 45% 15%); font-weight: 700; }
       .fk { fill: hsl(217 38% 38%);
@@ -17,49 +21,130 @@
         text-anchor: end; }
       .edge { fill: none; stroke: hsl(217 34% 60%);
         stroke-width: 1.5; }
+      .secondary-index { font-size: 24px; font-weight: 700;
+        fill: hsl(217 36% 46%);
+        dominant-baseline: middle; }
+      .diamond, .sname, .skeys {
+        dominant-baseline: middle; }
+      .diamond { font-size: 11px; text-anchor: middle; }
+      .diamond-pk { font-weight: 700; }
+      .sbox { fill: hsl(0 0% 100%);
+        stroke: hsl(217 30% 88%); stroke-width: 1; }
+      .shead { fill: hsl(217 28% 62%); }
+      .sthead { fill: hsl(0 0% 100%); font-size: 12px;
+        font-weight: 700; }
+      .sname { fill: hsl(217 45% 15%); font-size: 11px; }
+      .skeys { fill: hsl(217 12% 55%); font-size: 11px;
+        text-anchor: end; }
+      .slink { fill: none; stroke: hsl(217 34% 60%);
+        stroke-width: 1.5; }
     </style>
   </defs>
-  <rect x="0" y="0" width="288" height="450" fill="hsl(217 30% 97%)" />
+  <rect x="0" y="0" width="800" height="610" fill="hsl(217 30% 97%)" />
+  <path class="slink" d="M 335 179 H 363" />
   <g class="table">
-    <rect class="box" x="40" y="40" width="208" height="188" rx="6" />
-    <rect class="head" x="40" y="40" width="208" height="26" rx="6" />
-    <text class="thead" x="50" y="58">requests</text>
-    <text class="pk" x="50" y="79">id</text>
-    <text class="type" x="238" y="79">id</text>
-    <text class="col" x="50" y="97">uri_collection</text>
-    <text class="type" x="238" y="97">text</text>
-    <text class="col" x="50" y="115">uri_id</text>
-    <text class="type" x="238" y="115">text</text>
-    <text class="col" x="50" y="133">at</text>
-    <text class="type" x="238" y="133">text</text>
-    <text class="col" x="50" y="151">requester_identity_id</text>
-    <text class="type" x="238" y="151">id</text>
-    <text class="col" x="50" y="169">message_hash</text>
-    <text class="type" x="238" y="169">text</text>
-    <text class="col" x="50" y="187">message</text>
-    <text class="type" x="238" y="187">text</text>
-    <text class="col" x="50" y="205">method</text>
-    <text class="type" x="238" y="205">text</text>
-    <text class="col" x="50" y="223">operation_id</text>
-    <text class="type" x="238" y="223">text</text>
+    <rect class="box" x="56" y="40" width="279" height="278" rx="6" />
+    <rect class="head" x="56" y="40" width="279" height="26" rx="6" />
+    <text class="thead" x="66" y="58">requests</text>
+    <text class="pk" x="88" y="80">id</text>
+    <text class="type" x="271" y="80">id</text>
+    <text class="diamond diamond-pk" x="283" y="80" fill="hsl(217 45% 15%)">◆</text>
+    <text class="diamond" x="295" y="80" fill="hsl(217 36% 46%)">◆</text>
+    <text class="diamond" x="307" y="80" fill="hsl(173 42% 32%)">◆</text>
+    <text class="secondary-index" x="66" y="108">▸</text>
+    <text class="col" x="88" y="108">uri_collection</text>
+    <text class="type" x="271" y="108">text</text>
+    <text class="diamond" x="295" y="108" fill="hsl(217 36% 46%)">◆</text>
+    <text class="diamond" x="307" y="108" fill="hsl(173 42% 32%)">◆</text>
+    <text class="col" x="88" y="136">uri_id</text>
+    <text class="type" x="271" y="136">text</text>
+    <text class="diamond" x="295" y="136" fill="hsl(217 36% 46%)">◆</text>
+    <text class="col" x="88" y="164">at</text>
+    <text class="type" x="271" y="164">text</text>
+    <text class="diamond" x="295" y="164" fill="hsl(217 36% 46%)">◆</text>
+    <text class="diamond" x="307" y="164" fill="hsl(173 42% 32%)">◆</text>
+    <text class="col" x="88" y="192">requester_identity_id</text>
+    <text class="type" x="271" y="192">id</text>
+    <text class="secondary-index" x="66" y="220">▸</text>
+    <text class="col" x="88" y="220">message_hash</text>
+    <text class="type" x="271" y="220">text</text>
+    <text class="diamond" x="319" y="220" fill="hsl(32 70% 42%)">◆</text>
+    <text class="col" x="88" y="248">message</text>
+    <text class="type" x="271" y="248">text</text>
+    <text class="col" x="88" y="276">method</text>
+    <text class="type" x="271" y="276">text</text>
+    <text class="col" x="88" y="304">operation_id</text>
+    <text class="type" x="271" y="304">text</text>
   </g>
+  <g class="sidecar">
+    <rect class="sbox" x="363" y="130" width="378" height="98" rx="6" />
+    <rect class="shead" x="363" y="130" width="378" height="26" rx="6" />
+    <text class="sthead" x="373" y="148">indexes</text>
+    <text class="diamond diamond-pk" x="379" y="165" fill="hsl(217 45% 15%)">◆</text>
+    <text class="sname" x="393" y="165">pk btree</text>
+    <text class="skeys" x="731" y="165">id</text>
+    <text class="diamond" x="379" y="183" fill="hsl(217 36% 46%)">◆</text>
+    <text class="sname" x="393" y="183">address btree</text>
+    <text class="skeys" x="731" y="183">uri_collection, uri_id, at, id</text>
+    <text class="diamond" x="379" y="201" fill="hsl(173 42% 32%)">◆</text>
+    <text class="sname" x="393" y="201">collection btree</text>
+    <text class="skeys" x="731" y="201">uri_collection, at, id</text>
+    <text class="diamond" x="379" y="219" fill="hsl(32 70% 42%)">◆</text>
+    <text class="sname" x="393" y="219">replay btree</text>
+    <text class="skeys" x="731" y="219">message_hash</text>
+  </g>
+  <path class="slink" d="M 298 459 H 326" />
   <g class="table">
-    <rect class="box" x="40" y="258" width="208" height="152" rx="6" />
-    <rect class="head" x="40" y="258" width="208" height="26" rx="6" />
-    <text class="thead" x="50" y="276">responses</text>
-    <text class="pk" x="50" y="297">id</text>
-    <text class="type" x="238" y="297">id</text>
-    <text class="col" x="50" y="315">uri_collection</text>
-    <text class="type" x="238" y="315">text</text>
-    <text class="col" x="50" y="333">uri_id</text>
-    <text class="type" x="238" y="333">text</text>
-    <text class="col" x="50" y="351">at</text>
-    <text class="type" x="238" y="351">text</text>
-    <text class="col" x="50" y="369">version</text>
-    <text class="type" x="238" y="369">text</text>
-    <text class="col" x="50" y="387">message</text>
-    <text class="type" x="238" y="387">text</text>
-    <text class="col" x="50" y="405">operation_id</text>
-    <text class="type" x="238" y="405">text</text>
+    <rect class="box" x="56" y="348" width="242" height="222" rx="6" />
+    <rect class="head" x="56" y="348" width="242" height="26" rx="6" />
+    <text class="thead" x="66" y="366">responses</text>
+    <text class="pk" x="88" y="388">id</text>
+    <text class="type" x="222" y="388">id</text>
+    <text class="diamond diamond-pk" x="234" y="388" fill="hsl(217 45% 15%)">◆</text>
+    <text class="diamond" x="246" y="388" fill="hsl(217 36% 46%)">◆</text>
+    <text class="diamond" x="258" y="388" fill="hsl(173 42% 32%)">◆</text>
+    <text class="secondary-index" x="66" y="416">▸</text>
+    <text class="col" x="88" y="416">uri_collection</text>
+    <text class="type" x="222" y="416">text</text>
+    <text class="diamond" x="246" y="416" fill="hsl(217 36% 46%)">◆</text>
+    <text class="diamond" x="258" y="416" fill="hsl(173 42% 32%)">◆</text>
+    <text class="diamond" x="270" y="416" fill="hsl(270 35% 42%)">◆</text>
+    <text class="col" x="88" y="444">uri_id</text>
+    <text class="type" x="222" y="444">text</text>
+    <text class="diamond" x="246" y="444" fill="hsl(217 36% 46%)">◆</text>
+    <text class="diamond" x="270" y="444" fill="hsl(270 35% 42%)">◆</text>
+    <text class="col" x="88" y="472">at</text>
+    <text class="type" x="222" y="472">text</text>
+    <text class="diamond" x="246" y="472" fill="hsl(217 36% 46%)">◆</text>
+    <text class="diamond" x="258" y="472" fill="hsl(173 42% 32%)">◆</text>
+    <text class="col" x="88" y="500">version</text>
+    <text class="type" x="222" y="500">text</text>
+    <text class="diamond" x="270" y="500" fill="hsl(270 35% 42%)">◆</text>
+    <text class="col" x="88" y="528">message</text>
+    <text class="type" x="222" y="528">text</text>
+    <text class="diamond" x="282" y="528" fill="hsl(350 48% 44%)">◆</text>
+    <text class="col" x="88" y="556">operation_id</text>
+    <text class="type" x="222" y="556">text</text>
   </g>
+  <g class="sidecar">
+    <rect class="sbox" x="326" y="401" width="434" height="116" rx="6" />
+    <rect class="shead" x="326" y="401" width="434" height="26" rx="6" />
+    <text class="sthead" x="336" y="419">indexes</text>
+    <text class="diamond diamond-pk" x="342" y="436" fill="hsl(217 45% 15%)">◆</text>
+    <text class="sname" x="356" y="436">pk btree</text>
+    <text class="skeys" x="750" y="436">id</text>
+    <text class="diamond" x="342" y="454" fill="hsl(217 36% 46%)">◆</text>
+    <text class="sname" x="356" y="454">address btree</text>
+    <text class="skeys" x="750" y="454">uri_collection, uri_id, at, id</text>
+    <text class="diamond" x="342" y="472" fill="hsl(173 42% 32%)">◆</text>
+    <text class="sname" x="356" y="472">collection btree</text>
+    <text class="skeys" x="750" y="472">uri_collection, at, id</text>
+    <text class="diamond" x="342" y="490" fill="hsl(270 35% 42%)">◆</text>
+    <text class="sname" x="356" y="490">version btree</text>
+    <text class="skeys" x="750" y="490">uri_collection, uri_id, version</text>
+    <text class="diamond" x="342" y="508" fill="hsl(350 48% 44%)">◆</text>
+    <text class="sname" x="356" y="508">body gin jsonb_path_ops</text>
+    <text class="skeys" x="750" y="508">message_body(message)</text>
+  </g>
+  <path class="edge" marker-end="url(#fk-arrow)" d="M 56 388 H 28 V 80 H 56" />
 </svg>

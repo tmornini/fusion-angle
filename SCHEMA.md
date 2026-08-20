@@ -1,8 +1,9 @@
 # Database Schema
 
-> **Note on `SCHEMA.svg`:** the ERD is generated from the
-> schema of record (`api/db.ts` + `api/types.ts`) by
-> `./generate-schema-svg`; `./validate` runs it with
+> **Note on `SCHEMA.svg`:** the picture of columns, keys,
+> and indexes is generated from the schema of record
+> (`api/db.ts` + `api/types.ts` + `api/schema-postgres.ts`)
+> by `./generate-schema-svg`; `./validate` runs it with
 > `--check` and fails on drift, so it never goes stale.
 > Regenerate with `./generate-schema-svg` after a schema
 > change.
@@ -128,25 +129,19 @@ and the write authorizer
 ### requests
 
 One row per stored canonical HTTP request message. The
-message text IS the row; `uri_collection` (retains its trailing
-`/`) and `uri_id` (empty string for a collection request) are
-addressing metadata, and `message_hash` is an index over the
-sha256 digest (`shared/digest.ts` `sha256HexOfBytes`) of
-the Latin-1 wire octets of `message` — never a second copy
-of its truth. `at` is pair ENVELOPE metadata only, not a
-domain timestamp inside the message.
+message text IS the row; `uri_collection` (retains its
+trailing `/`) and `uri_id` (empty string for a collection
+request) are addressing metadata, and `message_hash` is an
+index over the sha256 digest (`shared/digest.ts`
+`sha256HexOfBytes`) of the Latin-1 wire octets of
+`message` — never a second copy of its truth. `at` is pair
+ENVELOPE metadata only, not a domain timestamp inside the
+message. `requester_identity_id` is the identity id of the
+requester. `method` is the HTTP method (`^[A-Z]+$`); the
+ledger stores no GET rows. `operation_id` is a 22-char id,
+the same value as on the paired response.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT | PRIMARY KEY — 22-char pair id |
-| uri_collection | TEXT | Collection URI, trailing `/` kept |
-| uri_id | TEXT | Resource id, or `''` for a collection |
-| at | TEXT | RFC-3339 Zulu — envelope metadata |
-| requester_identity_id | TEXT | identity id of the requester |
-| message_hash | TEXT | `sha256HexOfBytes` of Latin-1 wire |
-| message | TEXT | `serializeWire` Latin-1 (BYTEA in PG) |
-| method | TEXT | HTTP method, `^[A-Z]+$`. No GET rows |
-| operation_id | TEXT | 22-char id. Same on the paired response |
+Columns, keys, and indexes live in `SCHEMA.svg`.
 
 Public PUT/PATCH/POST/DELETE send header `Operation-ID`
 (22-char id). Missing or malformed → 400. The server
@@ -155,30 +150,16 @@ send it; it is ignored. Seed `formSeedPair` mints one
 id per envelope and copies it onto inner PUTs.
 
 Validator: `validateRequestEntity` (`api/validators.ts`).
-getWhere allow-list (`api/db.ts` `TABLE_INDEXES`):
-`uri_collection`, `message_hash`.
-
-Postgres indexes: `requests_address`
-`(uri_collection, uri_id, at, id)`;
-`requests_collection` `(uri_collection, at, id)`;
-`requests_replay` `(message_hash)`.
 
 ### responses
 
 The paired response: `id` equals the request's `id`
 (pair locator; wire `Response-ID`). No `etag`,
 `status`, `message_hash`, `follows`, or `supersedes`
-column.
+column. Addressing columns (`uri_collection`, `uri_id`,
+`at`) match the request.
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | TEXT | PRIMARY KEY — equals the request's id |
-| uri_collection | TEXT | Collection URI, trailing `/` kept |
-| uri_id | TEXT | Resource id, or `''` for a collection |
-| at | TEXT | RFC-3339 Zulu — envelope metadata |
-| version | TEXT | 64-hex `documentVersion` of body octets |
-| message | TEXT | `serializeWire` Latin-1 (BYTEA in PG) |
-| operation_id | TEXT | 22-char id. Same value as the request |
+Columns, keys, and indexes live in `SCHEMA.svg`.
 
 `responses.version` is the document revision token
 (unconditional / genesis: sha256 of response body octets;
@@ -195,15 +176,6 @@ from this column. It is not stored on the GET-shaped
 response blob.
 
 Validator: `validateResponseEntity` (`api/validators.ts`).
-getWhere allow-list: `uri_collection`.
-
-Postgres indexes: `responses_address`
-`(uri_collection, uri_id, at, id)`;
-`responses_collection` `(uri_collection, at, id)`;
-`responses_version`
-`(uri_collection, uri_id, version)`;
-`responses_body` GIN `message_body(message)
-jsonb_path_ops`.
 
 ## Derived document families (no table)
 
