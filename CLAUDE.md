@@ -15,7 +15,8 @@ when working with code in this repository.
 ./build dir/           # Server ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
 ./serve [port]         # Build + node server.mjs (default 8080)
-./wipe-render-postgres TOKEN --pristine|--mockdata  # Wipe Render PG; reseed
+./wipe-postgres --postgres render TOKEN --pristine|--mockdata
+./wipe-postgres --postgres local --pristine|--mockdata
 ./measure              # Full ceremony (record+budgets+25+viz)
 ./measure --help       # Show usage
 ./measure --check      # Fail if medians exceed budgets
@@ -76,7 +77,7 @@ at the repo root except [TEST-PLAN.md](TEST-PLAN.md)
 self-contained line), and on the root scripts `build`,
 `serve`, `test`, `validate`, `generate-schema-svg`,
 `generate-api-documentation`, `measure`, and
-`wipe-render-postgres`. It then rejects the `org`
+`wipe-postgres`. It then rejects the `org`
 abbreviation in identifiers under `api/`, `web-app/`,
 `tests/`, and `shared/` (`.ts`/`.html`/`.css`; `compose.ts`
 exempt) — forms matching `org[A-Z]`, camel/Pascal

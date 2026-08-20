@@ -10,51 +10,72 @@ DASHBOARD_KEYS='https://dashboard.render.com/u/settings?add-api-key'
 
 usage() {
     cat <<'USAGE'
-Usage: ./wipe-render-postgres TOKEN --pristine|--mockdata
+Usage: ./wipe-postgres --postgres render TOKEN --pristine|--mockdata
+       ./wipe-postgres --postgres local --pristine|--mockdata
 
-Wipe the single Render Postgres instance visible to
-TOKEN, then seed it again. TOKEN is the confirmation.
-No prompt.
+Wipe Postgres and seed it again. --postgres is
+required and has no default. --postgres render
+needs TOKEN (the confirmation). --postgres local
+uses POSTGRES_URL (loopback only) and
+JWT_HMAC_SIGNING_KEY; it takes no TOKEN.
 
 Options:
-  --pristine   Seed --seed-bootstrap, then listen
-  --mockdata   Restart so --seed-mock-data runs
+  --postgres render|local   Target (required)
+  --pristine   Seed --seed-bootstrap
+  --mockdata   Seed --seed-mock-data
   --help       Show this help message
 
-TOKEN must see exactly one Postgres and one web
-service. HTTP only (curl). Development gun.
+render: TOKEN must see exactly one Postgres and
+one web service. HTTP only (curl).
+local: drop, build, seed node server.mjs.
+Development gun.
 USAGE
 }
 
+POSTGRES_TARGET=''
 TOKEN=''
 PRISTINE=false
 MOCKDATA=false
+SEED_PID=''
 
-for arg in "$@"; do
-    case "$arg" in
+while [ $# -gt 0 ]; do
+    case "$1" in
         --help|-h)
             usage
             exit 0
             ;;
+        --postgres)
+            if [ $# -lt 2 ]; then
+                echo "Error: --postgres requires" \
+                    "a value" >&2
+                usage >&2
+                exit 1
+            fi
+            POSTGRES_TARGET="$2"
+            shift 2
+            ;;
         --pristine)
             PRISTINE=true
+            shift
             ;;
         --mockdata)
             MOCKDATA=true
+            shift
             ;;
         -*)
-            echo "Error: unknown argument: $arg" >&2
+            echo "Error: unknown argument: $1" >&2
             usage >&2
             exit 1
             ;;
         *)
             if [ -n "$TOKEN" ]; then
                 echo "Error: unexpected argument:" \
-                    "$arg" >&2
+                    "$1" >&2
                 usage >&2
                 exit 1
             fi
-            TOKEN="$arg"
+            TOKEN="$1"
+            shift
             ;;
     esac
 done
@@ -75,27 +96,72 @@ if [ "$PRISTINE" = false ] \
     exit 1
 fi
 
-if [ -z "$TOKEN" ]; then
+case "$POSTGRES_TARGET" in
+    '')
+        echo "Error: --postgres is required" >&2
+        usage >&2
+        exit 1
+        ;;
+    render|local)
+        ;;
+    *)
+        echo "Error: --postgres must be render" \
+            "or local" >&2
+        usage >&2
+        exit 1
+        ;;
+esac
+
+if [ "$POSTGRES_TARGET" = "render" ] \
+    && [ -z "$TOKEN" ]; then
     echo "Error: TOKEN is required" >&2
     usage >&2
     exit 1
 fi
 
-if ! command -v curl >/dev/null; then
-    echo "Error: curl is required" >&2
+if [ "$POSTGRES_TARGET" = "local" ] \
+    && [ -n "$TOKEN" ]; then
+    echo "Error: unexpected argument:" \
+        "$TOKEN" >&2
+    usage >&2
     exit 1
 fi
+
 if ! command -v node >/dev/null; then
     echo "Error: node is required" >&2
     exit 1
 fi
 
-export RENDER_API_KEY="$TOKEN"
-unset TOKEN
+if [ "$POSTGRES_TARGET" = "render" ]; then
+    if ! command -v curl >/dev/null; then
+        echo "Error: curl is required" >&2
+        exit 1
+    fi
+    export RENDER_API_KEY="$TOKEN"
+    unset TOKEN
+fi
+
+stop_seed_child() {
+    if [ -z "${SEED_PID:-}" ]; then
+        return 0
+    fi
+    kill -TERM "$SEED_PID" 2>/dev/null || true
+    if kill -0 "$SEED_PID" 2>/dev/null; then
+        sleep "$POLL_SEC"
+        kill -KILL "$SEED_PID" 2>/dev/null || true
+    fi
+    wait "$SEED_PID" 2>/dev/null || true
+    SEED_PID=''
+}
+
+cleanup() {
+    stop_seed_child
+    rm -rf "$TMP"
+}
 
 TMP=$(mktemp -d \
     "${TMPDIR:-/tmp}/fusion-wipe.XXXXXX")
-trap 'rm -rf "$TMP"' EXIT
+trap cleanup EXIT
 
 fail_http() {
     local code="$1"
@@ -201,6 +267,35 @@ fetch_logs() {
     esac
 }
 
+# Flatten Render logs JSON to one text line per
+# logs[].message, splitting each message on \n.
+flatten_render_logs() {
+    local src="$1"
+    local dest="$2"
+    node --input-type=module -e '
+        import { readFileSync, writeFileSync } from
+            "node:fs";
+        import { argv } from "node:process";
+        const data = JSON.parse(
+            readFileSync(argv[1], "utf8"),
+        );
+        const logs = Array.isArray(data.logs)
+            ? data.logs
+            : [];
+        const lines = [];
+        for (const entry of logs) {
+            const message = entry && entry.message;
+            const text = typeof message === "string"
+                ? message
+                : "";
+            for (const line of text.split("\n")) {
+                lines.push(line);
+            }
+        }
+        writeFileSync(argv[2], lines.join("\n"));
+    ' "$src" "$dest"
+}
+
 # Prints the markdown table to stdout.
 # Exit 10 if the header is absent.
 # Exit 11 if the header is present but no pairs.
@@ -211,22 +306,8 @@ print_credential_table() {
         import { argv, stdout, exit } from
             "node:process";
         const header = argv[2];
-        const data = JSON.parse(
-            readFileSync(argv[1], "utf8"),
-        );
-        const lines = [];
-        const logs = Array.isArray(data.logs)
-            ? data.logs
-            : [];
-        for (const entry of logs) {
-            const message = entry && entry.message;
-            const text = typeof message === "string"
-                ? message
-                : "";
-            for (const line of text.split("\n")) {
-                lines.push(line);
-            }
-        }
+        const text = readFileSync(argv[1], "utf8");
+        const lines = text.split("\n");
         const idx = lines.findIndex(
             (line) => line.includes(header),
         );
@@ -256,6 +337,152 @@ print_credential_table() {
             );
         }
     ' "$file" "$REVEAL_HEADER"
+}
+
+assert_local_env() {
+    if [ -z "${POSTGRES_URL:-}" ]; then
+        echo "Error: missing required env" \
+            "POSTGRES_URL" >&2
+        exit 1
+    fi
+    if [ -z "${JWT_HMAC_SIGNING_KEY:-}" ]; then
+        echo "Error: missing required env" \
+            "JWT_HMAC_SIGNING_KEY" >&2
+        exit 1
+    fi
+    local host
+    host=$(node --input-type=module -e '
+        const url = process.env.POSTGRES_URL
+            ?? "";
+        if (url === "") process.exit(2);
+        try {
+            process.stdout.write(
+                new URL(url).hostname,
+            );
+        } catch {
+            process.exit(3);
+        }
+    ') || {
+        echo "Error: POSTGRES_URL host is not" \
+            "loopback" >&2
+        exit 1
+    }
+    case "$host" in
+        localhost|127.0.0.1|'[::1]')
+            ;;
+        *)
+            echo "Error: POSTGRES_URL host is" \
+            "not loopback" >&2
+            exit 1
+            ;;
+    esac
+}
+
+free_loopback_port() {
+    node --input-type=module -e '
+        import { createServer } from "node:net";
+        const s = createServer();
+        s.listen(0, "127.0.0.1", () => {
+            const addr = s.address();
+            if (
+                addr === null
+                || typeof addr === "string"
+            ) {
+                s.close();
+                process.exit(1);
+            }
+            const port = addr.port;
+            s.close(() => {
+                process.stdout.write(String(port));
+            });
+        });
+        s.on("error", () => process.exit(1));
+    '
+}
+
+last_json_message() {
+    local file="$1"
+    node --input-type=module -e '
+        import { readFileSync } from "node:fs";
+        import { argv, stdout } from
+            "node:process";
+        let text = "";
+        try {
+            text = readFileSync(argv[1], "utf8");
+        } catch {
+            text = "";
+        }
+        let last = "";
+        for (const line of text.split("\n")) {
+            if (line === "") continue;
+            try {
+                const json = JSON.parse(line);
+                if (
+                    json
+                    && typeof json.message
+                        === "string"
+                ) {
+                    last = json.message;
+                }
+            } catch {
+                // seed reveal is not JSON
+            }
+        }
+        stdout.write(last);
+    ' "$file"
+}
+
+wait_local_reveal() {
+    local started=$SECONDS
+    while [ $((SECONDS - started)) -lt \
+        "$REVEAL_TIMEOUT_SEC" ]; do
+        if print_credential_table \
+            "$TMP/seed.err" \
+            > "$TMP/table.md"; then
+            return 0
+        fi
+        if ! kill -0 "$SEED_PID" 2>/dev/null; then
+            wait "$SEED_PID" 2>/dev/null || true
+            local msg
+            msg=$(last_json_message \
+                "$TMP/seed.err")
+            if [ -n "$msg" ]; then
+                echo "Error: ${msg}" >&2
+            else
+                echo "Error: seed child exited" \
+                    "before reveal" >&2
+            fi
+            exit 1
+        fi
+        sleep "$POLL_SEC"
+    done
+    echo "Error: seed reveal header missing after" \
+        "${REVEAL_TIMEOUT_SEC}s" >&2
+    stop_seed_child
+    exit 1
+}
+
+wipe_local() {
+    assert_local_env
+    bash -c "$WIPE_START"
+    ./build --no-zip "$TMP/build/"
+    local port
+    port=$(free_loopback_port)
+    local seed_flag
+    if [ "$PRISTINE" = true ]; then
+        seed_flag='--seed-bootstrap'
+    else
+        seed_flag='--seed-mock-data'
+    fi
+    (
+        cd "$TMP/build" || exit 1
+        HTTP_SERVER_PORT="$port" exec \
+            node server.mjs "$seed_flag"
+    ) </dev/null >/dev/null 2>"$TMP/seed.err" &
+    SEED_PID=$!
+    wait_local_reveal
+    stop_seed_child
+    cat "$TMP/table.md"
 }
 
 wait_for_reveal() {
@@ -293,8 +520,10 @@ wait_for_reveal() {
         fi
         fetch_logs "$OWNER_ID" "$resource" \
             "$SEED_START" "$TMP/logs.json"
+        flatten_render_logs \
+            "$TMP/logs.json" "$TMP/logs.txt"
         if print_credential_table \
-            "$TMP/logs.json" \
+            "$TMP/logs.txt" \
             > "$TMP/table.md"; then
             return 0
         fi
@@ -304,6 +533,28 @@ wait_for_reveal() {
         "${REVEAL_TIMEOUT_SEC}s" >&2
     exit 1
 }
+
+WIPE_START="node --input-type=module -e \"
+import postgres from 'postgres';
+const url = process.env.POSTGRES_URL;
+if (!url) throw new Error('missing POSTGRES_URL');
+const sql = postgres(url, { max: 1 });
+await sql.unsafe('DROP TABLE IF EXISTS responses');
+await sql.unsafe('DROP TABLE IF EXISTS requests');
+await sql.unsafe('DROP TABLE IF EXISTS schema_marker');
+await sql.unsafe(
+    'DROP FUNCTION IF EXISTS message_body(bytea)',
+);
+await sql.end();
+\""
+
+# Collapse the source to one startCommand line.
+WIPE_START=$(printf '%s' "$WIPE_START" | tr '\n' ' ')
+
+if [ "$POSTGRES_TARGET" = "local" ]; then
+    wipe_local
+    exit 0
+fi
 
 http_json GET '/postgres?limit=100' \
     "$TMP/postgres.json"
@@ -393,23 +644,6 @@ node --input-type=module -e '
 
 OWNER_ID=$(sed -n '1p' "$TMP/ids.txt")
 SERVICE_ID=$(sed -n '2p' "$TMP/ids.txt")
-
-WIPE_START="node --input-type=module -e \"
-import postgres from 'postgres';
-const url = process.env.POSTGRES_URL;
-if (!url) throw new Error('missing POSTGRES_URL');
-const sql = postgres(url, { max: 1 });
-await sql.unsafe('DROP TABLE IF EXISTS responses');
-await sql.unsafe('DROP TABLE IF EXISTS requests');
-await sql.unsafe('DROP TABLE IF EXISTS schema_marker');
-await sql.unsafe(
-    'DROP FUNCTION IF EXISTS message_body(bytea)',
-);
-await sql.end();
-\""
-
-# Collapse the source to one startCommand line.
-WIPE_START=$(printf '%s' "$WIPE_START" | tr '\n' ' ')
 
 write_job_body "$TMP/wipe-job.json" "$WIPE_START"
 http_json POST \
