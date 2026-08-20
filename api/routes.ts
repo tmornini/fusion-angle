@@ -1575,6 +1575,8 @@ export async function postFlowUndoOp(
         requestAt: pair.requestAt,
         operationId: pair.operationId,
         organization,
+        matchedEtag: current.version,
+        latchedHeadPairId: current.id,
     });
     return db.transaction(
         // Phase Final Task 2: flows + graph ROW halves stripped.
@@ -3684,6 +3686,11 @@ export interface DocumentPairFormInput {
         readonly body: unknown;
     };
     readonly matchedEtag?: string;
+    // Locked-class synthesized PUTs (flow undo) must
+    // carry the document head they restored from, or
+    // coordinateWrite 412s an unlatched PUT at a live
+    // locked address.
+    readonly latchedHeadPairId?: string;
     readonly headerFields?: readonly FieldLine[];
     readonly operationId: string;
 }
@@ -3749,6 +3756,9 @@ export async function formDocumentPairFor(
         operationId: input.operationId,
         ...(input.matchedEtag !== undefined
             ? { matchedEtag: input.matchedEtag }
+            : {}),
+        ...(input.latchedHeadPairId !== undefined
+            ? { latchedHeadPairId: input.latchedHeadPairId }
             : {}),
     });
 }

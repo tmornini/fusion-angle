@@ -60,6 +60,10 @@ import {
 // Flow's record type for the unbound bind picker
 // (also equals the binding's type when bound).
 let heldRecordTypeId: string | null = null;
+// Instance etag from the GET that filled the form.
+// Transition If-Match uses this snapshot, never a
+// submit-time GET (WB19a / WB19b).
+let heldInstanceEtag: string | null = null;
 let conflictNotice: string | null = null;
 
 /* ── Helpers ─────────────── */
@@ -163,6 +167,13 @@ function initTransitionButtons(
                                 detail.idValue(),
                             edgeId,
                             values,
+                            ...(heldInstanceEtag
+                                === null
+                                ? {}
+                                : {
+                                    instanceEtag:
+                                        heldInstanceEtag,
+                                }),
                         },
                     );
                 } catch (err) {
@@ -387,6 +398,7 @@ async function loadPresenter(
     type InstanceWave = {
         instanceValues:
             ReadonlyMap<string, string> | null;
+        instanceEtag: string | null;
         pickerItems: readonly {
             readonly id: string;
             readonly fields: readonly {
@@ -409,6 +421,7 @@ async function loadPresenter(
                     );
                 return {
                     instanceValues: instance.values,
+                    instanceEtag: instance.etag,
                     pickerItems: [],
                     heldTypeId: bound.recordTypeId,
                 };
@@ -422,6 +435,7 @@ async function loadPresenter(
                     );
                 return {
                     instanceValues: null,
+                    instanceEtag: null,
                     pickerItems: instanceListItems(
                         instances, attributes,
                     ),
@@ -430,6 +444,7 @@ async function loadPresenter(
             }
             return {
                 instanceValues: null,
+                instanceEtag: null,
                 pickerItems: [],
                 heldTypeId: recordId,
             };
@@ -446,6 +461,7 @@ async function loadPresenter(
         ),
     );
     heldRecordTypeId = instanceWave.heldTypeId;
+    heldInstanceEtag = instanceWave.instanceEtag;
 
     return new WorkboxDetailPresenter(
         workOrder,

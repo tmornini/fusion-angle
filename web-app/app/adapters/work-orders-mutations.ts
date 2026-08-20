@@ -210,6 +210,11 @@ export interface WorkOrderTransitionInput {
     workOrderId: string;
     edgeId: string;
     values: Record<string, string>;
+    // Snapshot etag of the instance the operator
+    // is looking at. Value-bearing If-Match uses
+    // this, never a submit-time GET, so a
+    // concurrent PATCH 412s (WB19a / WB19b).
+    instanceEtag?: string;
 }
 
 // Diff form pending vs instance head into set/clear.
@@ -255,7 +260,9 @@ export async function postWorkOrderTransition(
     ctx: RequestContext,
     input: WorkOrderTransitionInput,
 ): Promise<void> {
-    const { workOrderId, edgeId, values } = input;
+    const {
+        workOrderId, edgeId, values, instanceEtag,
+    } = input;
     // Wave 1: wo + history + record binding (all keyed
     // by workOrderId). Pass history down so claim-release
     // never re-fetches.
@@ -309,9 +316,10 @@ export async function postWorkOrderTransition(
     const storedValues = instance === null
         ? null
         : instance.values;
-    const etag = instance === null
-        ? undefined
-        : instance.etag;
+    const etag = instanceEtag
+        ?? (instance === null
+            ? undefined
+            : instance.etag);
 
     const pendingValues = new Map(
         Object.entries(values),

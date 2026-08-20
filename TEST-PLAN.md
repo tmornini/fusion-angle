@@ -935,9 +935,9 @@ depend on. Run AA3+ in order.
   links in this order: Dashboard,
   Organization, Ideas, Projects, Records,
   Flows, Workbox, Members, Identities, Billing,
-  Design System. PASS: all 11 links present,
-  in order, and styled. Source of truth:
-  `PAGE_REGISTRY` (entries with
+  API, Design System. PASS: all 12 links
+  present, in order, and styled. Source of
+  truth: `PAGE_REGISTRY` (entries with
   `inSidebarNav: true`) in
   `web-app/app/page-registry.ts`.
   (Teams, People, Roles, Crews, Company,
@@ -2794,7 +2794,7 @@ regression.
 
 - [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stderr seed reveal).
 - [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
-- [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/api/authentication`, `SameSite=Strict` (`Secure` is off on `http://localhost` only); `localStorage` has no `fusion-angle:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
+- [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/api/authentication`, `SameSite=Strict`, `Secure` (always, including `http://localhost` and `http://127.0.0.1`); `localStorage` has no `fusion-angle:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
 - [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /api/authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
 
 ### Two browsers / two identities / one database

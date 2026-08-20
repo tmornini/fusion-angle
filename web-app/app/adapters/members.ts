@@ -145,7 +145,29 @@ export async function getHumanMemberMap(
     const seats = await ctx.GET<MembershipEntity[]>(
         seatsCollection(ctx),
     );
-    return buildHumanMemberMap(seats);
+    const map = buildHumanMemberMap(seats);
+    const filled = await Promise.all(
+        [...map.entries()].map(async ([id, human]) => {
+            const pii = await getMemberPii(ctx, id);
+            return [
+                id,
+                new HumanMember(
+                    seatedHumanParent(
+                        id, human.stateAtValue(),
+                    ),
+                    emptyPersonProfile(id),
+                    pii,
+                    {
+                        state: 'active',
+                        stateAt: human.stateAtValue(),
+                        stateEventId:
+                            human.stateEventIdValue(),
+                    },
+                ),
+            ] as const;
+        }),
+    );
+    return new Map(filled);
 }
 
 export async function getCurrentHumanMember(

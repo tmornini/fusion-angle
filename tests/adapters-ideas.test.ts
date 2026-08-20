@@ -29,9 +29,6 @@ import {
     seedHumanMember,
 } from './member-fixtures.ts';
 import { seededMockDb } from './mock-seed.ts';
-import {
-    MEMBER_WITHOUT_PII_NAME,
-} from '../web-app/app/adapters/members-union.ts';
 
 // PUT/create body: no lifecycle trio — postIdeaCreation mints
 // state/stateAt/stateEventId. GET IdeaEntity carries the
@@ -130,7 +127,7 @@ test('getIdeas returns ideas with submitter', async () => {
     );
     assert.equal(
         result[0]?.submitterName,
-        MEMBER_WITHOUT_PII_NAME,
+        'Alice Test',
     );
     assert.equal(
         result[0]?.idea.stateValue(),
@@ -160,7 +157,7 @@ test('getIdea finds submission for one idea', async () => {
     const result = await getIdea(ctx, 'i1');
     assert.equal(result.idea.titleText(), 'A');
     assert.equal(
-        result.submitterName, MEMBER_WITHOUT_PII_NAME,
+        result.submitterName, 'Alice Test',
     );
 });
 

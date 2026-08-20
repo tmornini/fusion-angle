@@ -36,6 +36,8 @@ export interface InstanceFieldView {
     readonly name: string;
     readonly value: string;
     readonly access: InstanceFieldAccess;
+    readonly attributeType: AttributeType;
+    readonly options: readonly string[];
 }
 
 export interface InstanceListItemView {
@@ -66,6 +68,8 @@ export interface InstanceAttributeAcl {
     readonly name: string;
     readonly readRoles: readonly string[];
     readonly writeRoles: readonly string[];
+    readonly attributeType: AttributeType;
+    readonly options: readonly string[];
 }
 
 export const INSTANCE_CONFLICT_NOTICE =
@@ -105,6 +109,8 @@ export function projectInstanceFields(
             access: canWrite
                 ? 'writable'
                 : 'readonly',
+            attributeType: attr.attributeType,
+            options: attr.options,
         });
     }
     return out;
@@ -311,6 +317,80 @@ export class RecordInstancesPresenter {
         f: InstanceFieldView,
     ): SafeHtml {
         if (f.access === 'writable') {
+            const fieldId =
+                'instance-field-' + f.attributeId;
+            if (f.attributeType === 'select') {
+                return html`<div
+                    class="record-instance-field"
+                    data-attribute-id="${
+                        f.attributeId
+                    }"
+                    data-access="writable">
+                    <label class="label"
+                        for="${fieldId}"
+                        >${f.name}</label>
+                    <select
+                        class="input input-sm"
+                        id="${fieldId}"
+                        data-action="${
+                            'instance-field-value'
+                        }"
+                        data-attribute-id="${
+                            f.attributeId
+                        }">
+                        <option value="">
+                            Select...
+                        </option>
+                        ${f.options.map(
+                            o => html`<option
+                                value="${o}"
+                                ${o === f.value
+                                    ? trusted(
+                                        'selected',
+                                    )
+                                    : html``}
+                                >${o}</option>`,
+                        )}
+                    </select>
+                </div>`;
+            }
+            if (f.attributeType === 'radio') {
+                return html`<div
+                    class="record-instance-field"
+                    data-attribute-id="${
+                        f.attributeId
+                    }"
+                    data-access="writable">
+                    <span class="label"
+                        >${f.name}</span>
+                    <div class="radio-group">
+                        ${f.options.map(
+                            o => html`<label
+                                class="radio-option">
+                                <input
+                                    type="radio"
+                                    name="${
+                                        fieldId
+                                    }"
+                                    value="${o}"
+                                    data-action="${
+                                        'instance-field-value'
+                                    }"
+                                    data-attribute-id="${
+                                        f.attributeId
+                                    }"
+                                    ${o === f.value
+                                        ? trusted(
+                                            'checked',
+                                        )
+                                        : html``}
+                                    />
+                                <span>${o}</span>
+                            </label>`,
+                        )}
+                    </div>
+                </div>`;
+            }
             return html`<div
                 class="record-instance-field"
                 data-attribute-id="${
@@ -318,15 +398,10 @@ export class RecordInstancesPresenter {
                 }"
                 data-access="writable">
                 <label class="label"
-                    for="${
-                        'instance-field-'
-                        + f.attributeId
-                    }">${f.name}</label>
+                    for="${fieldId}"
+                    >${f.name}</label>
                 <input type="text"
-                    id="${
-                        'instance-field-'
-                        + f.attributeId
-                    }"
+                    id="${fieldId}"
                     class="input input-sm"
                     data-action="${
                         'instance-field-value'

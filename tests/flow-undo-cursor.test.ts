@@ -15,8 +15,10 @@ import {
 import {
     resolveFlowUndoTarget,
 } from '../api/derive-flows.ts';
+import type { GuardedDbAdapter } from '../api/db.ts';
 import {
     formWritePair, canonicalUriCollection,
+    documentHeadAt,
 } from '../api/message-pair.ts';
 import {
     organizationToken, DEV_TOKEN,
@@ -85,6 +87,49 @@ function req(
 async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
+    return db;
+}
+
+// Postgres coordinateWrite 412s an unlatched PUT at a
+// locked address. Memory omits writeLocks, so the undo
+// route's synthesized document pair never hit that gate
+// in ./test — garden did. This wrapper installs the same
+// latestPutDelete check so the pin fails here too.
+function withWriteGate(
+    db: MemoryDbAdapter,
+): MemoryDbAdapter {
+    const origTx = db.transaction.bind(db);
+    const origRead = db.readTransaction.bind(db);
+    const wrapView = (
+        view: GuardedDbAdapter,
+    ): GuardedDbAdapter => ({
+        ...view,
+        writeLocks: {
+            lockDedup: async () => {},
+            lockAddress: async () => {},
+            lockHead: async () => {},
+            latestPutDelete: async (collection, uriId) => {
+                const head = await documentHeadAt(
+                    view, collection, uriId,
+                );
+                return head ?? null;
+            },
+            notify: async () => {},
+        },
+        transaction: (tables, fn) => view.transaction(
+            tables, (inner) => fn(wrapView(inner)),
+        ),
+        readTransaction: (tables, fn) =>
+            view.readTransaction(
+                tables, (inner) => fn(wrapView(inner)),
+            ),
+    });
+    db.transaction = (tables, fn) => origTx(
+        tables, (view) => fn(wrapView(view)),
+    );
+    db.readTransaction = (tables, fn) => origRead(
+        tables, (view) => fn(wrapView(view)),
+    );
     return db;
 }
 
@@ -228,6 +273,27 @@ test(
         const db = await freshDb();
         const token = await organizationToken();
         const flowId = 'cursor-single';
+        await createFlow(db, token, flowId);
+        await save(db, token, flowId, 'A', flowId + '-a');
+        await save(db, token, flowId, 'B', flowId + '-b');
+
+        const res = await undo(
+            db, token, flowId, flowId + '-u1', AT,
+        );
+        assert.equal(res.status, 201);
+        assert.equal(
+            await currentGraphName(db, token, flowId), 'A',
+        );
+    },
+);
+
+test(
+    'undo cursor: after a save, undo succeeds under the'
+    + ' postgres write-lock gate',
+    async () => {
+        const db = withWriteGate(await freshDb());
+        const token = await organizationToken();
+        const flowId = 'cursor-write-gate';
         await createFlow(db, token, flowId);
         await save(db, token, flowId, 'A', flowId + '-a');
         await save(db, token, flowId, 'B', flowId + '-b');

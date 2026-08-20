@@ -11,7 +11,6 @@ import {
 } from '../web-app/app/adapters/members.ts';
 import {
     memberName,
-    MEMBER_WITHOUT_PII_NAME,
 } from '../web-app/app/adapters/members-union.ts';
 import {
     type Member,
@@ -59,10 +58,13 @@ test(
         const map = await getHumanMemberMap(ctx);
         assert.ok(map.has('u1'));
         const pii = map.get('u1')?.pii();
-        assert.ok(pii?.erased);
+        assert.ok(pii !== undefined && !pii.erased);
+        if (pii !== undefined && !pii.erased) {
+            assert.equal(pii.name, 'Alice Adams');
+        }
         assert.equal(
             memberName(map, 'u1'),
-            MEMBER_WITHOUT_PII_NAME,
+            'Alice Adams',
         );
     },
 );

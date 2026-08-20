@@ -25,8 +25,13 @@ import {
 import {
     putRecordInstance,
     getRecordInstance,
+    patchRecordInstance,
 } from
 '../web-app/app/adapters/record-instances.ts';
+import {
+    RequestError,
+    HTTP_PRECONDITION_FAILED,
+} from '../api/http-errors.ts';
 import {
     postRecordChange,
 } from
@@ -661,6 +666,59 @@ test(
                 ctx, woId,
             ),
             'n-finish',
+        );
+    },
+);
+
+test(
+    'postWorkOrderTransition 412s when the snapshot'
+    + ' etag is stale against a concurrent PATCH',
+    async () => {
+        const { db, ctx } = await setupScopedDb();
+        await seedFlow(db, 'f1', buildLinearGraph());
+        await seedTypeInstanceAndJoin(ctx, 'f1', 'v0');
+        const woId = await createWorkOrder(ctx, 'f1');
+        await putWorkOrderBinding(
+            ctx, woId, INST_ID, RT_ID,
+        );
+        const loaded = await getRecordInstance(
+            ctx, RT_ID, INST_ID,
+        );
+        const beforeNode =
+            await getWorkOrderCurrentNodeId(
+                ctx, woId,
+            );
+        await patchRecordInstance(
+            ctx, RT_ID, INST_ID, loaded.etag, {
+                set: [{
+                    attributeId: ATTR_ID,
+                    value: 'vB',
+                }],
+            },
+        );
+        await assert.rejects(
+            () => postWorkOrderTransition(ctx, {
+                workOrderId: woId,
+                edgeId: 'e2',
+                values: { [ATTR_ID]: 'vStale' },
+                instanceEtag: loaded.etag,
+            }),
+            (err: unknown) =>
+                err instanceof RequestError
+                && err.status
+                    === HTTP_PRECONDITION_FAILED,
+        );
+        const head = await getRecordInstance(
+            ctx, RT_ID, INST_ID,
+        );
+        assert.equal(
+            head.values.get(ATTR_ID), 'vB',
+        );
+        assert.equal(
+            await getWorkOrderCurrentNodeId(
+                ctx, woId,
+            ),
+            beforeNode,
         );
     },
 );

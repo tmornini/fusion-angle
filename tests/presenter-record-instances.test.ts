@@ -87,12 +87,16 @@ test(
                         name: 'Writable',
                         value: 'w1',
                         access: 'writable',
+                        attributeType: 'text',
+                        options: [],
                     }),
                     field({
                         attributeId: 'a-read',
                         name: 'ReadOnly',
                         value: 'r1',
                         access: 'readonly',
+                        attributeType: 'text',
+                        options: [],
                     }),
                 ],
                 conflictNotice: null,
@@ -147,6 +151,8 @@ test(
                         name: 'Title',
                         value: 'fresh',
                         access: 'writable',
+                        attributeType: 'text',
+                        options: [],
                     }),
                 ],
                 conflictNotice: notice,
@@ -172,18 +178,24 @@ test(
                     name: 'Write',
                     readRoles: ['member'],
                     writeRoles: ['member'],
+                    attributeType: 'text',
+                    options: [],
                 },
                 {
                     id: 'r',
                     name: 'Read',
                     readRoles: ['member'],
                     writeRoles: ['admin'],
+                    attributeType: 'text',
+                    options: [],
                 },
                 {
                     id: 'x',
                     name: 'Hidden',
                     readRoles: ['admin'],
                     writeRoles: ['admin'],
+                    attributeType: 'text',
+                    options: [],
                 },
             ],
             new Map([
@@ -225,6 +237,8 @@ test(
                     name: 'Hidden',
                     readRoles: ['admin'],
                     writeRoles: ['admin'],
+                    attributeType: 'text',
+                    options: [],
                 },
             ],
             new Map([['x', 'secret']]),
@@ -233,6 +247,68 @@ test(
         assert.equal(projected.length, 1);
         assert.equal(
             projected[0]!.access, 'writable',
+        );
+    },
+);
+
+test(
+    'edit form: select attribute renders a select',
+    () => {
+        const html = new RecordInstancesPresenter({
+            instances: [],
+            editing: {
+                instanceId: 'inst-s',
+                fields: [
+                    field({
+                        attributeId: 'a-choice',
+                        name: 'choice',
+                        value: 'b',
+                        access: 'writable',
+                        attributeType: 'select',
+                        options: ['a', 'b', 'c'],
+                    }),
+                ],
+                conflictNotice: null,
+            },
+        }).buildCard().toString();
+        assert.match(html, /<select/);
+        assert.match(
+            html, /data-attribute-id="a-choice"/,
+        );
+        assert.match(html, /value="b"/);
+        assert.match(html, /selected/);
+        assert.doesNotMatch(
+            html, /<input type="text"/,
+        );
+    },
+);
+
+test(
+    'edit form: radio attribute renders radios',
+    () => {
+        const html = new RecordInstancesPresenter({
+            instances: [],
+            editing: {
+                instanceId: 'inst-r',
+                fields: [
+                    field({
+                        attributeId: 'a-radio',
+                        name: 'pick',
+                        value: 'yes',
+                        access: 'writable',
+                        attributeType: 'radio',
+                        options: ['yes', 'no'],
+                    }),
+                ],
+                conflictNotice: null,
+            },
+        }).buildCard().toString();
+        assert.match(html, /type="radio"/);
+        assert.match(
+            html, /data-attribute-id="a-radio"/,
+        );
+        assert.doesNotMatch(
+            html, /<input type="text"/,
         );
     },
 );

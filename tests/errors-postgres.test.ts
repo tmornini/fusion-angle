@@ -7,7 +7,11 @@ import {
     HTTP_GATEWAY_TIMEOUT,
     HTTP_INTERNAL_ERROR,
 } from '../api/http-errors.ts';
-import { MissingTableError } from '../api/db.ts';
+import {
+    MissingTableError,
+    EntityNotFoundError,
+    ForeignOrganizationError,
+} from '../api/db.ts';
 
 function assertWire(
     error: unknown,
@@ -149,5 +153,19 @@ test('plain errors pass through', () => {
 
 test('ApiError passes through', () => {
     const err = new ApiError('already', 409);
+    assert.equal(mapPostgresError(err), err);
+});
+
+test('EntityNotFoundError passes through', () => {
+    const err = new EntityNotFoundError(
+        'identity_pii', 'x',
+    );
+    assert.equal(mapPostgresError(err), err);
+});
+
+test('ForeignOrganizationError passes through', () => {
+    const err = new ForeignOrganizationError(
+        'identity_pii', 'x',
+    );
     assert.equal(mapPostgresError(err), err);
 });

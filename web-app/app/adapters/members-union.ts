@@ -59,15 +59,15 @@ export async function getMembers(
     ]);
     const humans = buildHumanMemberMap(seats);
     const ais = buildAIAgentMap(agents);
-    return [
+    return fillHumanMemberPii(ctx, [
         ...humans.values(),
         ...ais.values(),
-    ];
+    ]);
 }
 
-// Admin Members page fill. Member-tier getMembers stays
-// seats + agents with erased PII; this pass reads each
-// human's nested identities/:id/pii in parallel.
+// Live PII fill. getMembers runs this so every roster
+// (designer, workbox, ideas) shows the name unless
+// /pii is actually erased.
 export async function fillHumanMemberPii(
     ctx: RequestContext,
     members: readonly Member[],

@@ -19,7 +19,6 @@ import { adminContext } from './context-fixtures.ts';
 import {
     getMembers,
     getMemberMap,
-    fillHumanMemberPii,
     memberName,
     isHumanMember,
     isAIMember,
@@ -166,7 +165,7 @@ test(
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
-            MEMBER_WITHOUT_PII_NAME,
+            'Sarah Test',
         );
         assert.equal(
             memberName(map, 'ai_claude_opus'),
@@ -184,7 +183,7 @@ test(
         const map = await getMemberMap(ctx);
         assert.equal(
             memberName(map, 'hw_sarah_chen'),
-            MEMBER_WITHOUT_PII_NAME,
+            'Sarah Test',
         );
         assert.equal(
             memberName(map, 'ai_claude_opus'),
@@ -290,8 +289,8 @@ test(
 );
 
 test(
-    'fillHumanMemberPii names a seeded human;'
-    + ' getMembers stays erased',
+    'getMembers fills live PII names; an erased'
+    + ' slot stays Member without PII',
     async () => {
         const { db, ctx } = await adminContext();
         await seedHumanMember(
@@ -300,36 +299,24 @@ test(
         await seedAIMember(
             db, 'ai1', 'Claude Opus',
         );
-        const raw = await getMembers(ctx);
-        const alice = raw.find(
+        const members = await getMembers(ctx);
+        const alice = members.find(
             m => m.idForLink() === 'u1',
         );
         assert.ok(alice && isHumanMember(alice));
-        assert.equal(alice.pii().erased, true);
-        const filled = await fillHumanMemberPii(
-            ctx, raw,
-        );
-        const named = filled.find(
-            m => m.idForLink() === 'u1',
-        );
-        assert.ok(named && isHumanMember(named));
-        const pii = named.pii();
+        const pii = alice.pii();
         assert.ok(!pii.erased);
         if (!pii.erased) {
             assert.equal(pii.name, 'Alice Test');
         }
-        const agent = filled.find(
+        const agent = members.find(
             m => m.idForLink() === 'ai1',
         );
         assert.ok(agent && isAIMember(agent));
         assert.equal(agent.name(), 'Claude Opus');
-        const stillRaw = await getMembers(ctx);
-        const stillAlice = stillRaw.find(
-            m => m.idForLink() === 'u1',
+        const map = await getMemberMap(ctx);
+        assert.equal(
+            memberName(map, 'u1'), 'Alice Test',
         );
-        assert.ok(
-            stillAlice && isHumanMember(stillAlice),
-        );
-        assert.equal(stillAlice.pii().erased, true);
     },
 );

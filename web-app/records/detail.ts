@@ -488,6 +488,8 @@ function fieldsFromAttributes(
             name: a.name,
             readRoles: a.readRoles,
             writeRoles: a.writeRoles,
+            attributeType: a.attributeType,
+            options: a.options,
         })),
         values,
         heldRoles(),
@@ -703,9 +705,49 @@ async function handleDeleteInstance(
     }
 }
 
+function applyInstanceFieldDraft(
+    target:
+        | HTMLInputElement
+        | HTMLTextAreaElement
+        | HTMLSelectElement,
+): void {
+    if (pageState.kind !== 'instances-editing') {
+        return;
+    }
+    const action = target.getAttribute(
+        'data-action',
+    );
+    if (action !== 'instance-field-value') {
+        return;
+    }
+    const attrId = target.getAttribute(
+        'data-attribute-id',
+    );
+    if (!attrId) return;
+    if (
+        target instanceof HTMLInputElement
+        && target.type === 'radio'
+        && !target.checked
+    ) {
+        return;
+    }
+    pageState.draft[attrId] = target.value;
+}
+
 function onChange(
     root: HTMLElement, e: Event,
 ): void {
+    const changed = e.target;
+    if (
+        pageState.kind === 'instances-editing'
+        && (
+            changed instanceof HTMLSelectElement
+            || changed instanceof HTMLInputElement
+        )
+    ) {
+        applyInstanceFieldDraft(changed);
+        return;
+    }
     if (pageState.kind !== 'editing') return;
     const target = e.target;
     if (
@@ -759,21 +801,13 @@ function onInput(e: Event): void {
         !(target instanceof HTMLInputElement)
         && !(target instanceof
             HTMLTextAreaElement)
+        && !(target instanceof
+            HTMLSelectElement)
     ) return;
     if (
         pageState.kind === 'instances-editing'
     ) {
-        const action = target.getAttribute(
-            'data-action',
-        );
-        if (action === 'instance-field-value') {
-            const attrId = target.getAttribute(
-                'data-attribute-id',
-            );
-            if (!attrId) return;
-            pageState.draft[attrId] =
-                target.value;
-        }
+        applyInstanceFieldDraft(target);
         return;
     }
     if (pageState.kind !== 'editing') return;

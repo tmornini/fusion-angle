@@ -7,18 +7,17 @@ import type {
     NotificationPost,
 } from './notifications.ts';
 
-export class EntityNotFoundError {
-    readonly message: string;
+export class EntityNotFoundError extends Error {
     readonly table: string;
     readonly id: string;
     constructor(
         table: string,
         id: string,
     ) {
+        super(`Not found: ${table}/${id}`);
+        this.name = 'EntityNotFoundError';
         this.table = table;
         this.id = id;
-        this.message =
-            `Not found: ${table}/${id}`;
     }
 }
 
@@ -33,18 +32,17 @@ export function foreignOrganizationMessage(
         + ' belongs to a different organization';
 }
 
-export class ForeignOrganizationError {
-    readonly message: string;
+export class ForeignOrganizationError extends Error {
     readonly table: string;
     readonly id: string;
     constructor(
         table: string,
         id: string,
     ) {
+        super(foreignOrganizationMessage(table, id));
+        this.name = 'ForeignOrganizationError';
         this.table = table;
         this.id = id;
-        this.message =
-            foreignOrganizationMessage(table, id);
     }
 }
 
