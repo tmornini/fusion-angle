@@ -10,12 +10,14 @@ import {
     applySeedFlag,
     assertEmptyDatabase,
     formatSeededCredentials,
+    formatTestPlanSliceCredentials,
     isDatabaseEmpty,
     readSeedMode,
-    SEED_BOTH_FLAGS,
     SEED_BOOTSTRAP_FLAG,
+    SEED_EXCLUSIVE_FLAGS,
     SEED_MOCK_DATA_FLAG,
     SEED_NONEMPTY,
+    SEED_TEST_PLAN_SLICES_FLAG,
     SEED_REVEAL_HEADER,
     serialPasswordHasher,
 } from '../server/seed.ts';
@@ -27,6 +29,10 @@ import { PostgresBackend } from
     '../api/backend-postgres.ts';
 import { BackedDbAdapter } from '../api/db-backed.ts';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import {
+    PARALLEL_SECTIONS,
+    postTestPlanSlices,
+} from '../api/test-plan-slices.ts';
 import { testHashPassword } from './mock-seed.ts';
 
 function fakeClient(
@@ -105,8 +111,41 @@ test('readSeedMode refuses both flags', () => {
         ]),
         (error: unknown) =>
             error instanceof Error
-            && error.message === SEED_BOTH_FLAGS,
+            && error.message === SEED_EXCLUSIVE_FLAGS,
     );
+});
+
+test('readSeedMode accepts slices flag', () => {
+    assert.equal(
+        readSeedMode([
+            'node', SEED_TEST_PLAN_SLICES_FLAG,
+        ]),
+        'test-plan-slices',
+    );
+});
+
+test('readSeedMode refuses any two flags',
+() => {
+    const pairs: Array<readonly string[]> = [
+        [SEED_BOOTSTRAP_FLAG, SEED_MOCK_DATA_FLAG],
+        [
+            SEED_BOOTSTRAP_FLAG,
+            SEED_TEST_PLAN_SLICES_FLAG,
+        ],
+        [
+            SEED_MOCK_DATA_FLAG,
+            SEED_TEST_PLAN_SLICES_FLAG,
+        ],
+    ];
+    for (const flags of pairs) {
+        assert.throws(
+            () => readSeedMode([...flags]),
+            (error: unknown) =>
+                error instanceof Error
+                && error.message
+                    === SEED_EXCLUSIVE_FLAGS,
+        );
+    }
 });
 
 test('boot refuses both seed flags before connect',
@@ -118,11 +157,13 @@ async () => {
         ]),
         (error: unknown) =>
             error instanceof Error
-            && error.message === SEED_BOTH_FLAGS,
+            && error.message === SEED_EXCLUSIVE_FLAGS,
     );
     assert.equal(
-        bootErrorMessage(new Error(SEED_BOTH_FLAGS)),
-        SEED_BOTH_FLAGS,
+        bootErrorMessage(
+            new Error(SEED_EXCLUSIVE_FLAGS),
+        ),
+        SEED_EXCLUSIVE_FLAGS,
     );
 });
 
@@ -198,6 +239,153 @@ test('formatSeededCredentials is terminal text', () => {
     assert.ok(text.includes(SEED_REVEAL_HEADER));
     assert.match(text, /demo@example.com\tsecret-once/);
     assert.doesNotMatch(text, /"level":/);
+});
+
+test('formatTestPlanSliceCredentials is TSV',
+() => {
+    const text = formatTestPlanSliceCredentials([
+        {
+            section: 'AA',
+            organizationId: '1',
+            organizationName: 'Stark Industries',
+            adminUsername: 'demo@example.com',
+            adminPassword: 'secret-aa',
+        },
+        {
+            section: 'B',
+            organizationId: 'b-org',
+            organizationName: 'Stark Industries',
+            adminUsername:
+                'b-admin@test-plan.example',
+            adminPassword: 'secret-b',
+            seatUsername:
+                'b-member@test-plan.example',
+            seatPassword: 'secret-b-seat',
+            flowId: 'b-flow',
+        },
+        {
+            section: 'G',
+            organizationId: 'g-org',
+            organizationName: 'Stark Industries',
+            secondOrganizationId: 'g-org-2',
+            secondOrganizationName: 'Wayne Enterprises',
+            adminUsername:
+                'g-admin@test-plan.example',
+            adminPassword: 'secret-g',
+            unseatedUsername:
+                'g-unseated@test-plan.example',
+            unseatedPassword: 'secret-g-u',
+            memberUsername:
+                'g-member@test-plan.example',
+            memberPassword: 'secret-g-m',
+        },
+    ]);
+    assert.ok(text.includes(SEED_REVEAL_HEADER));
+    assert.match(
+        text,
+        /^AA\torg_id\t1$/m,
+    );
+    assert.match(
+        text,
+        /^AA\tadmin_username\tdemo@example.com$/m,
+    );
+    assert.match(
+        text,
+        /^AA\tadmin_password\tsecret-aa$/m,
+    );
+    assert.match(
+        text,
+        /^B\tseat_username\tb-member@test-plan.example$/m,
+    );
+    assert.match(
+        text,
+        /^B\tflow_id\tb-flow$/m,
+    );
+    assert.match(
+        text,
+        /^G\torg2_id\tg-org-2$/m,
+    );
+    assert.match(
+        text,
+        /^G\torg2_name\tWayne Enterprises$/m,
+    );
+    assert.doesNotMatch(text, /"level":/);
+});
+
+test('slice credential map omits absent extras',
+async () => {
+    const db = memoryDbAdapter();
+    const reveal = await postTestPlanSlices(
+        db, { hashPassword: testHashPassword },
+    );
+    const text = formatTestPlanSliceCredentials(
+        reveal,
+    );
+    assert.ok(text.includes(SEED_REVEAL_HEADER));
+    assert.doesNotMatch(text, /"level":/);
+    for (const section of PARALLEL_SECTIONS) {
+        assert.match(
+            text,
+            new RegExp(
+                '^' + section + '\\t',
+                'm',
+            ),
+            section,
+        );
+    }
+    const extraPasswords = [
+        'seat_password',
+        'unseated_password',
+        'member_password',
+    ] as const;
+    const omitExtras = [
+        'AA', 'C', 'D', 'E', 'F', 'F2',
+        'FS', 'H', 'I', 'K', 'R',
+    ] as const;
+    for (const section of omitExtras) {
+        for (const field of extraPasswords) {
+            assert.doesNotMatch(
+                text,
+                new RegExp(
+                    '^'
+                    + section
+                    + '\\t'
+                    + field
+                    + '\\t',
+                    'm',
+                ),
+                section + ' ' + field,
+            );
+        }
+    }
+    const bSeat = text.match(
+        /^B\tseat_password\t(.+)$/m,
+    );
+    assert.ok(bSeat);
+    assert.ok(
+        (bSeat[1] ?? '').length >= 16,
+    );
+    const gUnseated = text.match(
+        /^G\tunseated_password\t(.+)$/m,
+    );
+    assert.ok(gUnseated);
+    assert.ok(
+        (gUnseated[1] ?? '').length >= 16,
+    );
+    const gMember = text.match(
+        /^G\tmember_password\t(.+)$/m,
+    );
+    assert.ok(gMember);
+    assert.ok(
+        (gMember[1] ?? '').length >= 16,
+    );
+    const svSeat = text.match(
+        /^SV\tseat_password\t(.+)$/m,
+    );
+    assert.ok(svSeat);
+    assert.ok(
+        (svSeat[1] ?? '').length >= 16,
+    );
 });
 
 test('no seed flag writes nothing and seeds nothing',
@@ -298,6 +486,36 @@ async () => {
     );
     assert.ok(printed.includes(SEED_REVEAL_HEADER));
     assert.equal(await db.hasSchema(), true);
+});
+
+test('slices seed prints the section map',
+async () => {
+    const db = memoryDbAdapter();
+    const empty = fakeClient([{
+        requests: false,
+        responses: false,
+        marker: false,
+    }]);
+    const chunks: string[] = [];
+    await applySeedFlag(
+        empty.sql, db, 'test-plan-slices', {
+            hashPassword: testHashPassword,
+            write: (chunk) => {
+                chunks.push(chunk);
+            },
+        },
+    );
+    const printed = chunks.join('');
+    assert.ok(
+        printed.includes(SEED_REVEAL_HEADER),
+    );
+    assert.match(printed, /^AA\torg_id\t1$/m);
+    assert.match(
+        printed,
+        /^SV\tadmin_username\tsv-admin@test-plan.example$/m,
+    );
+    assert.equal(await db.hasSchema(), true);
+    assert.equal(chunks.length, 1);
 });
 
 if (POSTGRES_URL === undefined || POSTGRES_URL === '') {

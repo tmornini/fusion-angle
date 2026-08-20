@@ -193,7 +193,7 @@ type PasswordHasher = (
     plaintext: string,
 ) => Promise<string>;
 
-async function seedHumanCredentials(
+export async function seedHumanCredentials(
     adapter: DbAdapter,
     recipients: readonly CredentialRecipient[],
     hashPasswordFn: PasswordHasher = hashPassword,
@@ -1060,7 +1060,7 @@ export async function postBootstrap(
     return creds;
 }
 
-async function postBootstrapIn(
+export async function postBootstrapIn(
     adapter: DbAdapter,
     identityPair: MessagePair,
     seatPair: MessagePair,

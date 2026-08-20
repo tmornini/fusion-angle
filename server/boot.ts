@@ -18,7 +18,7 @@ import { listenHttp } from './http-server.ts';
 import {
     applySeedFlag,
     readSeedMode,
-    SEED_BOTH_FLAGS,
+    SEED_EXCLUSIVE_FLAGS,
     SEED_NONEMPTY,
 } from './seed.ts';
 import {
@@ -139,7 +139,7 @@ const SAFE_BOOT_MESSAGES: ReadonlySet<string> = new Set([
     UTF8_REQUIRED,
     MISSING_MARKER,
     SEED_NONEMPTY,
-    SEED_BOTH_FLAGS,
+    SEED_EXCLUSIVE_FLAGS,
 ]);
 
 export function bootErrorMessage(

@@ -60,11 +60,13 @@ const repoRoot = fileURLToPath(
 // Plan lists the dual-accept / stored-data tier; routes is
 // the gate-path retirement reject (this task); web-app
 // history entry shape is fold presentation, not the wire.
+// test-plan-slices is the parallel-slice seed writer.
 const NAMED_EXCEPTIONS: ReadonlySet<string> = new Set([
     'api/validators.ts',
     'api/derive-states.ts',
     'api/derive-state-field-values.ts',
     'api/mock-data/seed-message-pairs.ts',
+    'api/test-plan-slices.ts',
     'api/routes.ts',
     'web-app/app/adapters/work-orders-queries.ts',
     'web-app/app/presenters/workbox-detail.ts',

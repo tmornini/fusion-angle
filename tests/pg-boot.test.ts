@@ -11,7 +11,7 @@ import {
     UTF8_REQUIRED,
 } from '../server/boot.ts';
 import {
-    SEED_BOTH_FLAGS,
+    SEED_EXCLUSIVE_FLAGS,
     SEED_NONEMPTY,
 } from '../server/seed.ts';
 import { connectPostgres } from
@@ -176,8 +176,10 @@ test('bootErrorMessage never echoes a URL', () => {
         SEED_NONEMPTY,
     );
     assert.equal(
-        bootErrorMessage(new Error(SEED_BOTH_FLAGS)),
-        SEED_BOTH_FLAGS,
+        bootErrorMessage(
+            new Error(SEED_EXCLUSIVE_FLAGS),
+        ),
+        SEED_EXCLUSIVE_FLAGS,
     );
 });
 

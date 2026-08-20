@@ -2016,7 +2016,7 @@ export function buildMockDataInvocations():
 // idParams for the ADDRESS, but form as POST with {status:
 // 204} — uriId stays '' because messageAddress keys on the
 // LAST segment.
-async function formSeedPair(
+export async function formSeedPair(
     inv: MockDataInvocation, requestAt: string,
     operationId?: string,
 ): Promise<MessagePair> {
@@ -2120,7 +2120,7 @@ function documentSeedResponse(
 // mirrors identityDefaultOrganizationRequest's formWritePair
 // (api/organization-requests.ts) — a singleton document at
 // /identities/:id/default-organization/ (uriId '').
-async function formDefaultOrganizationSeedPair(
+export async function formDefaultOrganizationSeedPair(
     identityId: Id,
     organizationId: Id,
     requestAt: string,

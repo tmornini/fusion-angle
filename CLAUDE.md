@@ -551,12 +551,13 @@ visual rendering) lives here; where a manual case is the
 browser counterpart of an automated area it carries an inline
 pointer at the test file. Pure transitions, flow-edit logic,
 adapters, presenter output, and API routing live in the
-automated suite. The six-phase agent protocol, the per-entity
-mutation-domain table, the `StorageEvent` tolerance patterns,
-and the known MCP limitations (flow-designer gesture
-pointer-capture, `resize_window`, file I/O, kill EPERM) live
-in [TEST-PLAN.md](TEST-PLAN.md) § Protocol — CLAUDE.md does
-not duplicate them.
+automated suite. The section DAG (headers + Protocol),
+the hunter contract, the Historical
+note (six-phase / mutation-domain /
+`≥ N`), and the known MCP limitations
+live in [TEST-PLAN.md](TEST-PLAN.md)
+§ Protocol — CLAUDE.md does not
+duplicate them.
 
 ### Orchestration
 
@@ -588,10 +589,12 @@ apply to it (RED is the audit's first finding).
   log at `warn` level — quota errors don't break the app but
   are observable via the logger.
 - **Operator seed is below HTTP.**
-  `--seed-bootstrap` and `--seed-mock-data`
-  call `postBootstrap` / `postMockDataLoad`
-  in-process on an empty database and print
-  credentials once on stderr. They stamp
+  `--seed-bootstrap`, `--seed-mock-data`,
+  and `--seed-test-plan-slices` call
+  `postBootstrap` / `postMockDataLoad` /
+  `postTestPlanSlices` in-process on an
+  empty database and print credentials
+  once on stderr. They stamp
   `schema_marker` last so a failed seed
   reads as empty. There is no HTTP
   dump/restore.
