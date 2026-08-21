@@ -151,15 +151,10 @@ export function reduceCreateGraphDelta(
 // graph value is the client-authored working snapshot,
 // carried verbatim by postFlowDocumentOp — its nodes[]/edges[]
 // arrive in whatever order the client happened to serialize.
-// The OLD plane's own GET reassembles nodes[]/edges[] from
-// flow_nodes/flow_edges via getAllWhere, which returns rows in
-// PRIMARY-KEY (id) order on IndexedDB — so the two orders
-// already coincide there (H7: invisible on IndexedDB) — but in
-// ARRIVAL order on the memory/localStorage tiers, where they
-// can diverge (load-bearing there). Re-sorting nodes[]/edges[]
-// ascending-id here makes the derived side match the OLD
-// plane's IndexedDB behavior byte-exactly regardless of which
-// backend actually ran the comparison. Within-node
+// Re-sorting nodes[]/edges[] ascending-id here makes the
+// derived GET a stable id-lex snapshot of whatever order
+// the client serialized. The seam promises rows, never an
+// order. Within-node
 // memberIds[]/attributes[] pass through UNSORTED — a cosmetic
 // order change design decision 1 accepts: currentNodeMemberIds/
 // currentNodeAttributes above already return them in THEIR OWN

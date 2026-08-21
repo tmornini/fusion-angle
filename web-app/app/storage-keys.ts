@@ -1,7 +1,6 @@
-// Client-side localStorage keys. All share the
-// fusion-angle: prefix. deleteSchema only removes
-// TABLE_NAMES keys, so these UI/session keys
-// survive a schema wipe.
+// Client-side localStorage keys — UI preferences and the
+// test session mode's credential slot. All share the
+// `fusion-angle:` prefix. No data lives in localStorage.
 
 // OAuth access + refresh token pair. The access token is
 // sent as Authorization: Bearer on authenticated requests.

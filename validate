@@ -50,6 +50,35 @@ if [ -n "$ORG_ABBREV" ]; then
     exit 1
 fi
 
+# Reject the vocabulary of the retired browser-resident
+# storage tiers. `localStorage` alone is legal (UI
+# preferences); its backend/tier compounds are not.
+# `in-browser ZIP` is the live flow export (zip.ts).
+PATTERN='indexeddb|IDBTransaction|non-IDB|\bIDB\b'
+PATTERN="$PATTERN|LocalStorageBackend"
+PATTERN="$PATTERN|localStorage (backend|tier|simulated|demo)"
+PATTERN="$PATTERN|simulated (backend|tier)s?"
+PATTERN="$PATTERN|object stores?|\bPhase B\b|auto-?commit"
+PATTERN="$PATTERN|in-browser data|browser[ -]ZIP"
+RETIRED_VOCAB=$(
+    {
+        find api shared server tests web-app/app -type f \
+            \( -name '*.ts' -o -name '*.html' \
+               -o -name '*.css' \) -print0 \
+        | xargs -0 grep -nEi "$PATTERN" \
+            || true
+        find . -maxdepth 1 -type f -name '*.md' \
+            -exec grep -nEi "$PATTERN" {} + \
+            || true
+    } | grep -v 'in-browser ZIP' || true
+)
+
+if [ -n "$RETIRED_VOCAB" ]; then
+    echo "Error: retired storage-tier vocabulary:" >&2
+    echo "$RETIRED_VOCAB" >&2
+    exit 1
+fi
+
 # SCHEMA.svg is derived from the schema; fail if it has drifted.
 ./generate-schema-svg --check
 

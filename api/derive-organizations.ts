@@ -80,8 +80,8 @@ export function organizationEntityOf(
     };
 }
 
-// Every LIVE organization head, id-lex ordered (byIdAscending,
-// the IndexedDB reference).
+// Every LIVE organization head, id-lex ordered (byIdAscending —
+// the derivation's own order, never the backend's).
 export async function deriveOrganizations(
     db: DbAdapter,
 ): Promise<OrganizationEntity[]> {

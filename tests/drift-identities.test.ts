@@ -70,13 +70,15 @@ import {
 // LIVE write below rides handleRequest, exactly like drift-
 // roster.test.ts.
 //
-// H7 (case 9): id-lex explicit sorts (sortById) bind EVERY
-// collection assertion below — the memory tier's own getAll/
-// getAllWhere is insertion-ordered, while every derived collection
-// (api/derive-identity-spine.ts, api/document-family.ts's generic
-// handlers alike) sorts byIdAscending by construction. A case that
-// skipped the old-plane sort would pass or fail by ACCIDENT of
-// insertion order, never by the property it claims to prove.
+// H7 (case 9): explicit id-lex sort — load-bearing, because
+// the backend's row order is not a contract and no caller
+// may inherit it. sortById binds EVERY collection
+// assertion below; every derived collection
+// (api/derive-identity-spine.ts, api/document-family.ts's
+// generic handlers alike) sorts byIdAscending by
+// construction. A case that skipped the sort would pass
+// or fail by ACCIDENT of insertion order, never by the
+// property it claims to prove.
 //
 // THE DELETED-FILTER DIVERGENCE (case 8, NOT drift-tested):
 // identities and identity_pii were EntityStore-backed; the

@@ -970,10 +970,9 @@ logins each land) — see §5.1 for the headers this produces and
     TTL check → redeeming `client_id` must
     equal authorize's issuer (shared 401 on miss/wrong) →
     PKCE S256 when issuer stored `code_challenge`
-    (`code_verifier` → base64url(sha256) must match; the
-    server ZIP rejects authorize without S256, so redeem
-    always verifies there; the browser ZIP still accepts
-    authorize without a challenge) →
+    (`code_verifier` → base64url(sha256) must match;
+    authorize rejects a request without S256, so redeem
+    always verifies) →
     `authorizationCodeSpent` fast-fail
     (`pairs.getAllAtAddress` on
     `/identities/<id>/tokens/` + the code digest —
@@ -1035,10 +1034,9 @@ logins each land) — see §5.1 for the headers this produces and
 `method`.
 
 - **`password`** → `authorizePassword`:
-  - Server ZIP rejects a request that lacks S256
-    (400, no pair) before the credential check. The
-    browser ZIP keeps the soft path. The client sends
-    S256.
+  - Authorize rejects a request without S256
+    (400, no pair) before the credential check, so
+    redeem always verifies. The client sends S256.
   - `deriveIdentityPiiRows` (full-ledger scan) →
     `identityByEmail` → `deriveCredentialsFor` (identity-keyed)
     → `currentPasswordSecret` → `verifyPassword` (PBKDF2;
@@ -1264,9 +1262,10 @@ versions snapshot before a save.
 
 Undo no longer requires a `flow_versions` row to consume —
 `flow_versions` is not in this route's transaction at all any
-more. The restore target is resolved SERVER-SIDE, pre-tx (the
-IndexedDB auto-commit constraint bars anything but row ops
-inside a transaction), by walking this flow's OWN `flows/:id`
+more. The restore target is resolved SERVER-SIDE, formed
+pre-tx — crypto, hashing, and timers never run inside an
+open transaction (CLAUDE.md § Transaction bodies await
+only row ops), by walking this flow's OWN `flows/:id`
 document-pair history and this flow's OWN `flows/:id/undo`
 operation-pair history together
 (`resolveFlowUndoTarget`, `api/derive-flows.ts`): a stack+pointer
@@ -2027,14 +2026,12 @@ Every multi-noun POST above composes **store primitives** inside a
 single `db.transaction([...tables])` — not by re-issuing HTTP routes.
 This is forced, not stylistic:
 
-- **The IndexedDB auto-commit constraint.** An `IDBTransaction` lives
-  only while it has pending requests; awaiting any non-IDB work inside
-  the transaction body (a timer, fetch, HMAC, gzip) yields to a
-  macrotask and the transaction commits early. Re-entering
-  `handleRequest` mid-transaction would do exactly that. So a handler
-  holding a transaction can only `await` row ops — it physically
-  cannot recurse through the router. The single transaction is what
-  buys atomicity for the multi-table write.
+- **Atomicity.** A composed POST's appends commit or roll
+  back as one. Re-entering `handleRequest` mid-transaction
+  would open a second transaction and split the unit
+  (Commandment X), so a handler holding a transaction
+  composes store primitives and awaits row ops only
+  (CLAUDE.md § Transaction bodies await only row ops).
 - **The client makes one call.** The web-app adapters call the §1.3
   facade once per method; the fan-out is entirely server-side, within
   the handler's transaction.
@@ -2218,10 +2215,11 @@ table; no dual-write beside a seeded row):
   default-org event forms its OWN identity-keyed
   `identities/:id/default-org/` pair (11 more) —
   in a first pass, BEFORE the seed's own big transaction opens
-  (`formWritePair`'s hashing is async crypto, which would
-  auto-commit an IndexedDB transaction early if awaited inside
-  one); a second pass then appends each pre-formed pair in one
-  `MESSAGE_TABLES` transaction (pair-plane only —
+  (formed pre-tx — crypto, hashing, and timers never run
+  inside an open transaction (CLAUDE.md § Transaction
+  bodies await only row ops)); a second pass then appends
+  each pre-formed pair in one `MESSAGE_TABLES` transaction
+  (pair-plane only —
   Phase Final deleted every entity table). The bootstrap seed
   forms exactly **twelve** such pairs (absolute; see
   `tests/mock-data-pairs.test.ts`). Total mock seed:
@@ -2919,14 +2917,9 @@ hidden:
 2. **Exported snapshots.** A snapshot taken before an erasure
    carries the pre-erasure PII rows verbatim; the theorem covers
    live storage, not files already written to disk.
-3. **The browser's own session credential.** The
-   `fusion-angle:authorization` localStorage entry carries the
-   caller's own JWT, whose `name` claim is base64-decodable
-   client-side for the token's lifetime (up to the 30-day
-   refresh TTL). The pin does not scan localStorage — an
-   erased member's OWN prior session token, if retained,
-   still decodes to the pre-erasure name until it expires or
-   is revoked.
+3. **The caller's own access token.** Held in memory for
+   its lifetime (≤ 15 min), it decodes to the pre-erasure
+   name until it expires or is refreshed.
 4. **Replay resurrection.** A client that retained a pre-erasure
    PUT request (the exact bytes, not merely the values) can
    resend it: hash-keyed idempotency composed with hard-delete
@@ -3254,7 +3247,7 @@ BEFORE the transaction opens
 (`formSeedCredentialPairs`,
 `api/mock-data/seed-message-pairs.ts`) — a credential's body is
 unknown until PBKDF2 resolves, and crypto never runs in-tx
-(CLAUDE.md § the IndexedDB auto-commit constraint), so this
+(CLAUDE.md § Transaction bodies await only row ops), so this
 credential batch runs its OWN local pass-1/pass-2 split rather
 than joining `formMockDataMessagePairs` /
 `formBootstrapMessagePair` (both already ran, before
@@ -3456,9 +3449,10 @@ is conditional on `changes`) — but it always carries the SAME
 `organization_id` the identity already held, so including it
 changes nothing the reducer would resolve.
 
-**Why the fence fallback is safe to flip categorically.** It runs
-PRE-DISPATCH in `fenceRequest` — never inside a transaction, so no
-IndexedDB auto-commit hazard — and is LATENT-hot: ordinary traffic
+**Why the fence fallback is safe to flip categorically.** It
+runs PRE-DISPATCH in `fenceRequest` — never inside a
+transaction (CLAUDE.md § Transaction bodies await only row
+ops) — and is LATENT-hot: ordinary traffic
 carries an org-scoped token (`ctx.principal.organization` already
 set), so the fallback read fires only for a flat, un-exchanged
 token, once per boot.

@@ -4731,9 +4731,10 @@ export const routes: Route[] = [
     // baseline-scores/:sid) — every baseline id is client-
     // minted FRESH per conversion, so these are genesis like
     // the project pair above, never Supersedes. All 3+N formed
-    // PRE-TX — crypto and the head-reads stay outside
-    // db.transaction, the IndexedDB auto-commit constraint —
-    // then appended as the tx's LAST acts, beside the operation
+    // PRE-TX — formed pre-tx — crypto, hashing, and timers
+    // never run inside an open transaction (CLAUDE.md §
+    // Transaction bodies await only row ops) — then
+    // appended as the tx's LAST acts, beside the operation
     // pair. Formed ONLY when the gate supplied both a pair and
     // a fence organization; a below-facade caller with neither
     // (none exists for conversion today) skips all 3+N
@@ -5406,8 +5407,9 @@ export const routes: Route[] = [
             ),
         // Admin DELETE with NET-NEW type RESTRICT. RESTRICT
         // check and tombstone append share one tx; referrer
-        // scan awaits only row ops on the view (auto-commit
-        // discipline). Path org is already gate-matched to
+        // scan awaits only row ops on the view (CLAUDE.md §
+        // Transaction bodies await only row ops). Path org
+        // is already gate-matched to
         // the token org; DeleteHandler has no fence arg.
         delete: async (db, params, _actor, pair) => {
             const organization = requireOrganization(

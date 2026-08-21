@@ -365,9 +365,10 @@ test(
 // and silently queued a save whenever the snapshot's node
 // centroid drifted off origin — corrupting undo-as-replay's
 // document-pair history on every such render, not just page
-// load. This test cannot reach #queueSave at all (Node has no
-// IndexedDB — see this file's other tests' centered-input
-// convention) so it asserts the STRUCTURAL guarantee that
+// load. This test cannot reach #queueSave at all (this
+// file installs no client facade — see this file's other
+// tests' centered-input convention) so it asserts the
+// STRUCTURAL guarantee that
 // implies no save was queued: an off-center snapshot survives
 // the plain constructor byte-for-byte. Only the 5-arg,
 // migrateToCenter=true form (onFlowLoaded's own one call

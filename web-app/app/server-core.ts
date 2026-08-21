@@ -6,9 +6,9 @@ import { setCookieSession } from
 import { bootApp } from './app-boot.ts';
 
 // Server-ZIP esbuild entry. Imports pages (via
-// PAGE_REGISTRY loaders) and the fetch facade. The
-// in-page API and IndexedDB backend stay off this
-// graph. Cookie-session: access token is memory only;
+// PAGE_REGISTRY loaders) and the fetch facade.
+// The in-page test facade stays off this graph.
+// Cookie-session: access token is memory only;
 // refresh lives in the HttpOnly cookie. No anonymous JWT.
 
 function serverOrigin(): string {

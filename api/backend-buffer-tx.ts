@@ -17,17 +17,16 @@ import { parseWire } from
 // of the touched tables. The buffer IS the unit of
 // atomicity: every op mutates only the buffer, so a backend
 // commits by flushing the dirty set and rolls back by
-// discarding it. Backend-agnostic by construction — the two
-// simulated backends (memory, localStorage) differ only in
-// how they fill the buffer (preload) and drain it (flush),
-// never in how the buffer is read or written here. The
+// discarding it. The memory backend fills and drains this
+// buffer; Postgres does not use it. The
 // NOT-NULL gate runs at `put` time, so a bad row throws
 // inside `fn` and the whole transaction rolls back.
 //
-// Reads hand out shallow copies (rows are flat), matching
-// IndexedDB's structured-clone-per-read value semantics —
-// a caller mutating a fetched row can never reach the
-// buffer or the committed store.
+// Reads hand out copies, never the buffered or committed
+// row objects — the seam's value semantics: Postgres
+// materializes a fresh row per read, and the test backend
+// must not be weaker. A caller mutating a fetched row can
+// never rewrite committed state.
 export function bufferTx(
     buffer: Map<string, { id: string }[]>,
     mode: TxMode,

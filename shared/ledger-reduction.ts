@@ -4,9 +4,9 @@
 // default is the (at, id) TOTAL order: a later RFC-3339 zulu `at`
 // (which sorts lexically = chronologically) wins, and an equal-
 // `at` tie falls to the larger row id — arbitrary but identical
-// on every backend and every row permutation, where iteration
-// order (append order on the simulated tiers, primary-key order
-// on IndexedDB) is not. Security reducers that must rank equal-
+// on every row permutation, where iteration order is not.
+// The seam promises rows, never an order. Security
+// reducers that must rank equal-
 // `at` events by ACTION (a revoke beats a co-timestamped grant)
 // pass their own fail-closed comparator. Single-key callers read
 // `.get(key)`; callers needing the latest per key over every key

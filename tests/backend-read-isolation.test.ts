@@ -4,11 +4,11 @@ import { MemoryStorageBackend }
     from '../api/backend-memory.ts';
 import type { StorageBackend } from '../api/db.ts';
 
-// Reads must hand out copies, never the buffered or
-// committed row objects — IndexedDB structured-clones every
-// read, and the simulated tiers must share its value
-// semantics. A caller mutating a fetched row must never
-// rewrite committed state.
+// Reads hand out copies, never the buffered or committed
+// row objects — the seam's value semantics: Postgres
+// materializes a fresh row per read, and the test backend
+// must not be weaker. A caller mutating a fetched row can
+// never rewrite committed state.
 
 interface Row { id: string; n: number; k: string }
 

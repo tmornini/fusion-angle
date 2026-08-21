@@ -14,19 +14,15 @@ Phase Final deleted the entity row plane. The schema of
 record is the **message plane** — the append-only
 `pairs` table. The table is listed in `api/db.ts` as
 `TABLE_NAMES` (the authoritative count: one). The table
-is an IndexedDB object store
-(`keyPath: 'id'`) in the `fusion-angle` database; the
-localStorage simulated backend keys the same table as
-`fusion-angle:tableName`; memory uses an in-process Map of
-bare table names; the server ZIP stores the same
-columns in Postgres (`api/schema-postgres.ts`). All
-rows have a text `id` primary key. Column types match
-`PairEntity`: TEXT (string) in the TypeScript /
-IndexedDB view. Postgres stores `request` and
-`response` as BYTEA Latin-1. `method` and
-`operation_id` are TEXT. No `uri_id`-only index. Document-body
-composites (arrays and
-objects — `strengths`, `team_dimensions`, `options`,
+is `pairs` in Postgres
+(`api/schema-postgres.ts`); the memory backend holds the
+same rows in an in-process Map keyed by table name.
+Column types match `PairEntity`: TEXT in the TypeScript
+view; Postgres stores `request` and `response` as BYTEA
+Latin-1. All rows have a text `id` primary key. `method`
+and `operation_id` are TEXT. No `uri_id`-only index.
+Document-body composites (arrays and objects —
+`strengths`, `team_dimensions`, `options`,
 `constraints`, `graph`, `graphDelta`, `revivals`,
 `flow_graph`) store as native nested JSON on the wire and
 in the pair body, never as JSON-encoded strings. Required
@@ -44,22 +40,6 @@ half. Reads reassemble documents and lifecycle state from
 the pair plane (`api/derive-*.ts`); writes append pairs
 only (`tx` lists `MESSAGE_TABLES` on every
 pair-wired path).
-
-**Orphan stores (gate 6) — CANONICAL residual statement.**
-Author gate 6 elected leave-inert (no sweep). IndexedDB opens
-unversioned: a pre-Final origin keeps dropped object stores
-as inert unread orphans until `deleteSchema` (full database
-delete) or a fresh reseed. On localStorage, `deleteSchema`
-iterates only the CURRENT `TABLE_NAMES`, so demo-tier orphan
-keys are never reclaimed by reseed. Named residual: pre-Final
-`identity_pii` rows may remain unspliceable after first-time
-erasure of a pre-Final identity until a full reseed
-(IndexedDB) — live writes no longer dual-write rows, so
-erasure completeness is pair-plane only; the orphan store is
-unread by post-Final code. Named beside the
-erasure-completeness theorem's exported-snapshots disclaimer
-(API.md § THE ERASURE-COMPLETENESS PIN). All other docs
-cross-reference this paragraph; do not restate it.
 
 **Timestamp width:** every persisted timestamp is RFC-3339
 zulu at EXACTLY six fraction digits (`…T12:00:00.000000Z`)

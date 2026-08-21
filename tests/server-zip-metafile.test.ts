@@ -9,7 +9,6 @@ const BUILD_SCRIPT = readFileSync('build', 'utf8');
 // the live mint symbols too, or a server-core import of
 // access-token would pass this pin.
 const FORBIDDEN_INPUTS = [
-    'backend-indexeddb',
     'api/access-token.ts',
 ] as const;
 const FORBIDDEN_SOURCES = [
@@ -73,18 +72,17 @@ test('client-graph pin matches mint and deleted names',
     );
     assert.deepEqual(
         clientGraphHits(
-            'api/backend-indexeddb.ts',
+            'sample/path.ts',
             'SIGNING_KEY_MATERIAL',
         ),
         [
-            'api/backend-indexeddb.ts:backend-indexeddb',
-            'api/backend-indexeddb.ts:SIGNING_KEY_MATERIAL',
+            'sample/path.ts:SIGNING_KEY_MATERIAL',
         ],
     );
 });
 
 test(
-    'client graph omits token mint, signing key, IndexedDB',
+    'client graph omits token mint and signing key',
     async () => {
         const result = await esbuild.build({
             entryPoints: [

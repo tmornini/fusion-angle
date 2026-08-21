@@ -106,8 +106,9 @@ export function piiEntityOf(
     };
 }
 
-// Every LIVE /pii slot, id-lex ordered (byIdAscending, the
-// IndexedDB reference). A DELETE-head slot (an erasure tombstone)
+// Every LIVE /pii slot, id-lex ordered (byIdAscending —
+// the derivation's own order, never the backend's). A
+// DELETE-head slot (an erasure tombstone)
 // is silently absent — deriveDocumentsAt's own head-absence rule,
 // unchanged here.
 export async function deriveIdentityPiiRows(
@@ -487,8 +488,8 @@ export async function deriveClientRegistration(
 // One identity's document kind, or undefined when no identity
 // document exists — the registration route's kind gate reads
 // this (absent -> 404, person -> 400) before every verb. The
-// whole-family prefix read matches the demo tier's E13
-// posture (deriveIdentityPiiRows reads more).
+// whole-family prefix read is the one
+// `deriveIdentityPiiRows` already makes.
 export async function deriveIdentityKind(
     db: DbAdapter,
     identityId: Id,

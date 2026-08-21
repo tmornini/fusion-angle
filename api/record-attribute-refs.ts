@@ -56,13 +56,11 @@ export interface AttributeReferrers {
 // work-order document heads via the organization-scoped
 // work-orders collection prefix, and live node-attribute
 // bindings via flowGraphBindingsFromPairs (graphDelta
-// attributeEvents + nodeFlowIds). Phase Final Task 2:
-// RESTRICT is pair-plane only (pairs via
-// derive helpers). The broader table list stays for tx-list
-// compatibility with residual dual-write callers until
-// Stage B drops the doomed stores. An in-tx caller must
-// declare the whole ring — IndexedDB throws on any store a
-// transaction did not name.
+// attributeEvents + nodeFlowIds). RESTRICT is pair-plane
+// only (`pairs` via derive helpers). An in-tx caller must
+// declare every table it touches — the transaction scope
+// is the declared set, and the memory backend rejects an
+// undeclared table on every test path.
 export const ATTRIBUTE_RESTRICT_TABLES =
     MESSAGE_TABLES;
 

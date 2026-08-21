@@ -1,9 +1,10 @@
 // Pre-tx pair formation for both seed paths (postMockDataLoad,
 // postBootstrap in ../mock-data.ts). formWritePair's hashing is
 // async crypto and cannot run inside the seed's one big
-// TABLE_NAMES transaction — an awaited non-IDB promise
-// auto-commits an IndexedDB transaction early (CLAUDE.md § the
-// IndexedDB auto-commit constraint). So the seed becomes two
+// TABLE_NAMES transaction. Formed pre-tx — crypto, hashing,
+// and timers never run inside an open transaction
+// (CLAUDE.md § Transaction bodies await only row ops). So
+// the seed becomes two
 // passes: every op-invocation's pair is formed HERE, before any
 // transaction opens (pass 1); the seed's existing single
 // transaction then executes row ops only, passing each op its

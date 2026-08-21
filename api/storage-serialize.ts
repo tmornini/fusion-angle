@@ -1,8 +1,8 @@
 // Storage-edge serialization shared by both backends.
-// The NOT NULL gate lives here so both LocalStorageBackend
-// and MemoryStorageBackend reject null/undefined fields
-// identically — the test backend cannot lie about what the
-// production gate enforces.
+// The NOT NULL gate lives here so both Postgres and the
+// memory backend reject null/undefined fields
+// identically — so the test backend cannot lie about
+// what the production gate enforces.
 
 export function isRowShaped(
     row: unknown,

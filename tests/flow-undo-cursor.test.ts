@@ -778,9 +778,7 @@ test(
 // file:
 // it is a page-level DOM change with no automated seam
 // (FlowDesignerPresenter#queueSave calls sessionContext()
-// internally, which requires a real browser IndexedDB
-// connection — "IndexedDB has no Node stub, and we add no fake"
-// per web-app/app/adapters/init.ts's own comment;
+// internally; this file installs no client facade;
 // tests/flow-designer-presenter.test.ts's own header comment
 // independently documents the SAME wall for every
 // #queueSave-triggering presenter method). This test instead

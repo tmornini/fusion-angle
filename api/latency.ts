@@ -1,7 +1,8 @@
-// The demo network-emulation seam, segregated from the
-// storage contract (Interface Segregation): only the client
-// verb facade awaits it before each simulated network hop —
-// no store, decorator, or route handler ever does.
+// The latency shim — both presets pass a no-op today —
+// segregated from the storage contract (Interface
+// Segregation): only the client verb facade awaits it
+// before each simulated network hop — no store,
+// decorator, or route handler ever does.
 interface LatencySimulation {
     simulateLatency(): Promise<void>;
 }

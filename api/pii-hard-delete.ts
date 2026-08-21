@@ -24,19 +24,11 @@ import { appendMessagePair } from './message-pair.ts';
 // (`postIdentityPiiDocumentOp`'s PUT, the `identities/:id/pii`
 // DELETE closure, api/routes.ts) open
 // `MESSAGE_TABLES` (Phase Final Task 2 stripped the
-// identity_pii ROW half); row ops only, per the IndexedDB
-// auto-commit constraint (a transaction body may await only
-// row ops, never crypto or a timer) — `pair` arrives fully
-// formed, all crypto done pre-tx (message-pair.ts).
-//
-// Cross-tab note: the localStorage demo tier flushes a
-// transaction's touched keys as a multi-key buffer, not a single
-// atomic write — the accepted B4 last-writer-wins class this
-// codebase already carries for that tier. Real IndexedDB
-// serializes overlapping-scope readwrite transactions, so two
-// tabs racing the SAME /pii address there still resolve to
-// exactly one genuine winner — the single-slot invariant holds
-// for real, not merely by convention.
+// identity_pii ROW half). Formed pre-tx — crypto, hashing,
+// and timers never run inside an open transaction
+// (CLAUDE.md § Transaction bodies await only row ops) —
+// `pair` arrives fully formed, all crypto done pre-tx
+// (message-pair.ts).
 //
 // Concurrency note: under a genuinely concurrent byte-identical
 // PUT/PUT (or DELETE/DELETE) race at one /pii address, the

@@ -78,12 +78,10 @@ import {
 // test.ts leg 9 pins this against a LIVE echoed-id PUT.
 //
 // THE OUTPUT ORDER IS DEFINED, NOT ACCIDENTAL (Author gate 1):
-// `at` ASCENDING with an id tiebreak — join chronology, backend-
-// independent. Neither backend's own row order is a fact to copy:
-// the memory tier's getAllWhere is insertion-ordered, IndexedDB's
-// is primary-key-ordered, and this derivation's own per-
-// organization reads run over DIFFERENT prefixes combined into
-// one array — there is no single "the" order to inherit.
+// `at` ASCENDING with an id tiebreak — join chronology. This
+// derivation's own per-organization reads run over DIFFERENT
+// prefixes combined into one array — there is no single "the"
+// order to inherit. The seam promises rows, never an order.
 // subjectOrganizations (api/authentication.ts) feeds the JWT
 // `orgs` claim from this derivation's future replacement (Task
 // 3), so a byte-stable order matters to the token's own bytes;

@@ -3,9 +3,9 @@ import {
     principalFromToken,
 } from '../../../shared/access-token-decode.ts';
 
-// Per-tab bearer holder. No mint, no IndexedDB — the
-// browser seed still mints in init.ts; the server entry
-// installs a decode-only anonymous stub or a login token.
+// Per-tab bearer holder. No mint — the test composition
+// root (`adapters/init.ts`) seeds an anonymous token; the
+// server entry installs a login token.
 
 let sessionToken: string | undefined;
 

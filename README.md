@@ -29,7 +29,7 @@ sign-in credentials once on stdout from
 **Demo-grade security.** `./build` emits one artifact:
 `fusion-angle-server-${SHA}.zip` (Node + Postgres, pages and
 API on one origin, `JWT_HMAC_SIGNING_KEY` from the
-environment). The in-browser data tier is gone. A1–A6 are
+environment). A1–A6 are
 disposed as named in [ARCHITECTURE.md](ARCHITECTURE.md)
 § Demo server tier.
 

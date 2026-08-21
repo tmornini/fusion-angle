@@ -34,10 +34,12 @@ import {
 // module exports the two collection derivations alone, no by-id
 // sibling.
 //
-// H7: id-lex explicit sort (IndexedDB-invisible, memory-tier
-// load-bearing — the archived-list raw-order surface and the
-// org-page next-position computation are the named pre-existing
-// H7-class surfaces; these two derivations join them).
+// H7: explicit id-lex sort — load-bearing, because the
+// backend's row order is not a contract and no caller may
+// inherit it. The archived-list raw-order surface and the
+// org-page next-position computation are the named
+// pre-existing H7-class surfaces; these two derivations
+// join them.
 
 function scoresUriPrefix(
     organization: Id,
@@ -83,7 +85,8 @@ async function fetchScoreDocuments(
     return deriveDocumentsAt(pairs, prefix);
 }
 
-// id-lex ordered (the IndexedDB reference). Serves a future live
+// id-lex ordered (byIdAscending — the derivation's own
+// order, never the backend's). Serves a future live
 // GET projects/:id/objective-baseline-scores route: the SERVER
 // already filters by the parent project through this
 // derivation's own nested prefix, so the org fence and the

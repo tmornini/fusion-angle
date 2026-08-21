@@ -161,9 +161,9 @@ export interface SeededCredentials {
 // identity signs with a client_secret — generated, hashed, and
 // discarded, never revealed. Both seed paths call this AFTER
 // the entity seed commits, NEVER inside it: PBKDF2 hashing is
-// async crypto, and awaiting a non-IDB promise inside a
-// transaction body auto-commits the IndexedDB transaction
-// early (CLAUDE.md § IndexedDB auto-commit). So every hash is
+// async crypto. Formed pre-tx — crypto, hashing, and timers
+// never run inside an open transaction (CLAUDE.md §
+// Transaction bodies await only row ops). So every hash is
 // computed up front, then the credential rows land together in
 // one transaction of pure row ops. Phase 10 Task 6: each
 // credential row ALSO forms its OWN message pair, re-pointed
@@ -292,10 +292,11 @@ export async function postMockDataLoad(
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): every pair-wired op-invocation's message
     // pair, formed up front — formWritePair's hashing is async
-    // crypto, which would auto-commit an IndexedDB transaction
-    // early if awaited inside one (CLAUDE.md § the IndexedDB
-    // auto-commit constraint). requestAt is minted once, the
-    // seed's own arrival moment, and shared by every pair.
+    // crypto. Formed pre-tx — crypto, hashing, and timers
+    // never run inside an open transaction (CLAUDE.md §
+    // Transaction bodies await only row ops). requestAt is
+    // minted once, the seed's own arrival moment, and shared
+    // by every pair.
     const pairs = await formMockDataMessagePairs(nowUtc());
     // Pass 2: seed the whole demo dataset in one transaction —
     // row ops only — so a mid-seed failure leaves no
@@ -986,10 +987,11 @@ export async function postBootstrap(
     options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): the lone 'current' human-member create's
-    // bundle, formed up front — see postMockDataLoad's pass 1 for
-    // why (formWritePair's hashing is async crypto, which would
-    // auto-commit an IndexedDB transaction early if awaited
-    // inside one). Bootstrap's body embeds nowUtc() (there is
+    // bundle, formed up front — see postMockDataLoad's pass 1
+    // for why. Formed pre-tx — crypto, hashing, and timers
+    // never run inside an open transaction (CLAUDE.md §
+    // Transaction bodies await only row ops). Bootstrap's
+    // body embeds nowUtc() (there is
     // no fixed seed timestamp here), so it is minted ONCE inside
     // formBootstrapMessagePair and reused verbatim by pass 2
     // below — never a second, independently timestamped body.

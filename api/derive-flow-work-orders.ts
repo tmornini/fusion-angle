@@ -51,7 +51,8 @@ export function flowWorkOrderEntityOf(
     };
 }
 
-// id-lex ordered (the IndexedDB reference); a DELETE head
+// id-lex ordered (byIdAscending — the derivation's own
+// order, never the backend's); a DELETE head
 // excludes the row exactly as the old plane's physical splice
 // does (parity, not a new mechanism). Serves the live GET
 // flows/:id/work-orders route (Phase 5 Task 7).

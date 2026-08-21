@@ -333,8 +333,9 @@ test(
 // concurrent DISPATCH (two requests in flight at once, racing to
 // enqueue), and pins the SAME atomicity: were the gate ever
 // changed to read its prior-claim decision outside the
-// transaction (or to await a non-row-op mid-transaction — the
-// CLAUDE.md auto-commit gotcha), this test would catch the
+// transaction (or to await a non-row-op mid-transaction —
+// CLAUDE.md § Transaction bodies await only row ops), this
+// test would catch the
 // regression even though it cannot force a live interleaving
 // today. Pass-first on the OLD (row-plane) path; held unchanged
 // through the pair-plane flip.

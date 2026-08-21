@@ -165,8 +165,8 @@ const routeTable: readonly Route[] = routes;
 const BASE_URL = 'http://localhost';
 
 // The gate-side Decision 5 post: fired once per successful
-// write, AFTER the route handler's promise resolves (so on
-// IndexedDB the commit has already reached `oncomplete`).
+// write, AFTER the route handler's promise resolves — the
+// transaction has committed.
 // Every write posts the fenced organization, identity
 // targets the route/body name, and the actor so the
 // writer's other tabs refresh even when the session is a
@@ -2060,8 +2060,8 @@ export async function handleRequest(
 
 // What the client verb facade requires of its adapter: the
 // unfenced tier's full contract (handleRequest's gate fences
-// it per request) plus the segregated demo latency shim the
-// facade awaits before each simulated network hop.
+// it per request) plus the latency shim — both presets pass
+// a no-op today.
 export type ClientFacadeAdapter =
     GuardedDbAdapter & LatencySimulation;
 

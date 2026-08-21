@@ -532,9 +532,10 @@ async function readTokenChainFromLedger(
 
 // Each append's event, paired with its OWN formed event pair —
 // formTokenEventPair mints a fresh id per event and addresses the
-// pair by it (Phase 13 Task 5), so pair formation runs PRE-TX
-// only (async crypto — the IndexedDB auto-commit constraint bars
-// awaiting anything but row ops inside an open transaction).
+// pair by it (Phase 13 Task 5). Formed pre-tx — crypto,
+// hashing, and timers never run inside an open
+// transaction (CLAUDE.md § Transaction bodies await only
+// row ops).
 interface TokenEventWrite {
     readonly event: Omit<IdentityTokenEntity, 'id'>;
     readonly pair: MessagePair;
@@ -1118,9 +1119,10 @@ async function grantClientCredentials(
 }
 
 // GATE 3 — KEY-BY-ANCHOR (Phase 13 Task 7): the presented code's
-// sha256 digest, pre-tx always — crypto never runs inside an open
-// transaction (the IndexedDB auto-commit constraint every other
-// pair-forming call site in this file already honors). It keys
+// sha256 digest, pre-tx always — formed pre-tx — crypto,
+// hashing, and timers never run inside an open transaction
+// (CLAUDE.md § Transaction bodies await only row ops). It
+// keys
 // the issued root's row id (and, by construction, that row's own
 // event pair's uri_id — formTokenEventPair derives uriId from the
 // id it is given). authorizeCodeIssuer matches the LIVE code

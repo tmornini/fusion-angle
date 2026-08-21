@@ -268,8 +268,8 @@ async () => {
     }, DEV_TOKEN);
 
     // The literal id-LAST reconstruction of each PUT body,
-    // id-lex sorted (byIdAscending, == IndexedDB's own
-    // production getAll order) — the expected wire text,
+    // id-lex ordered (byIdAscending — the derivation's own
+    // order, never the backend's) — the expected wire text,
     // independent of any stored row.
     const expected = [
         {

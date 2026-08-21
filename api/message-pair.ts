@@ -38,11 +38,10 @@ import type { NotificationEvent } from
     './notifications.ts';
 
 // The shadow-ledger message pair: one `pairs` put. Formed
-// pre-tx (all crypto and address resolution happen before a
-// transaction opens — the IndexedDB auto-commit constraint
-// bars awaiting anything but row ops inside
-// `db.transaction`), then appended as the LAST act of the
-// domain write's own transaction.
+// pre-tx — crypto, hashing, and timers never run
+// inside an open transaction (CLAUDE.md § Transaction
+// bodies await only row ops). Then appended as the LAST
+// act of the domain write's own transaction.
 export interface MessagePair {
     readonly id: Id;
     // The ARRIVAL stamp: minted at gate entry (the first act
@@ -316,8 +315,9 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
 // identities/:id/tokens/:tid would store for that exact row
 // (identityTokenEntityOf: jti, identity_id, action, chain_id,
 // at, id — GET wins). Formed PRE-TX like every other pair
-// (formWritePair's own crypto never runs inside an open
-// transaction — the auto-commit constraint). EVENT-APPEND, like
+// (formed pre-tx — crypto, hashing, and timers never run
+// inside an open transaction (CLAUDE.md § Transaction
+// bodies await only row ops)). EVENT-APPEND, like
 // every identity_tokens row: identities/:id/tokens/:tid
 // carries no DOCUMENT_CLASS_ROUTE_PATTERNS entry — no
 // head-read. requesterIdentityId is the event's OWN

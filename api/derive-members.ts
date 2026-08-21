@@ -85,11 +85,9 @@ function memberRowsFrom(
     return rows;
 }
 
-// Every member-parent head, id-lex ordered (byIdAscending, the
-// IndexedDB reference — H7: the memory tier's own getAll is
-// insertion-ordered, never id-lex, so this sort is load-bearing
-// for every caller that compares against it). Trio stamped from
-// lifecycle-current (genesis-wins-under-skew).
+// Every member-parent head, id-lex ordered (byIdAscending —
+// the derivation's own order, never the backend's). Trio
+// stamped from lifecycle-current (genesis-wins-under-skew).
 export async function deriveMemberParents(
     db: DbAdapter,
 ): Promise<MemberEntity[]> {

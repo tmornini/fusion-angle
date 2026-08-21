@@ -57,10 +57,9 @@ export class MissingTableError extends Error {
     }
 }
 
-// A unique-column collision. IndexedDB raises its native
-// ConstraintError from the {unique:true} index; the
-// simulated tiers scan the declared unique columns before
-// buffering. One typed error covers all three backends;
+// A unique-column collision on a declared unique column;
+// the memory backend scans the declared unique columns
+// before buffering. No table declares one today.
 // handleRequest maps it to 412.
 export class UniqueConstraintError extends Error {
     readonly table: string;
@@ -134,13 +133,12 @@ export type EntityValidator<
 
 export type TxMode = 'readonly' | 'readwrite';
 
-// A row-granular handle over one transaction. `get`
-// returns null for an absent row — absence is modeled at
-// the call site, never via a sentinel. The handle is the
-// real primitive Phase B fulfills with a native
-// IndexedDB transaction; memory + localStorage simulate
-// it transitionally (buffer touched tables, flush on
-// success, discard on throw).
+// The row-granular handle over one transaction. Postgres
+// fulfills it with a native transaction; the memory backend
+// simulates it (buffer touched tables, flush on success,
+// discard on throw).
+// `get` returns null for an absent row — absence is
+// modeled at the call site, never via a sentinel.
 export interface Tx {
     get<T extends { id: string }>(
         table: string,
@@ -230,10 +228,9 @@ export interface StorageBackend {
     ensureTables(
         tables: readonly string[],
     ): Promise<void>;
-    // Schema lifecycle — storage-level because each tier
-    // signals "schema exists" differently: the simulated
-    // backends by table existence, IndexedDB by a marker
-    // store (its object stores always exist post-upgrade).
+    // Schema lifecycle — each backend signals
+    // 'schema exists' its own way: memory by table
+    // existence, Postgres by the `schema_marker` row.
     hasSchema(): Promise<boolean>;
     postSchemaCreation(): Promise<void>;
     deleteSchema(): Promise<void>;
@@ -304,11 +301,10 @@ export interface DbAdapter extends DbLifecycle, DbStores {
         tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
     ): Promise<R>;
-    // Pure-read sibling of `transaction`. IndexedDB can run
-    // concurrent readonly scopes; the memory tier still
-    // serializes for Node determinism. Nested
-    // `readTransaction` joins whatever mode is open so
-    // read-your-writes stays intact.
+    // Pure-read sibling of `transaction`; both backends
+    // reject a write under it. Nested `readTransaction`
+    // joins whatever mode is open so read-your-writes
+    // stays intact.
     readTransaction<R>(
         tables: readonly string[],
         fn: (view: DbAdapter) => Promise<R>,
@@ -333,16 +329,7 @@ export interface GuardedDbAdapter
     ): Promise<R>;
 }
 
-// Phase Final Stage B shrank this list (ideas +
-// idea_submissions first; remaining doomed families follow
-// in later Task 4 commits). IndexedDB's own open is
-// UNVERSIONED (backend-indexeddb.ts's #openConnection calls
-// indexedDB.open(DB_NAME) with no version argument), so
-// onupgradeneeded — the only place object stores are created —
-// never re-fires for an origin that already has a database: an
-// EXISTING origin keeps dropped stores as harmless, unread
-// orphans. deleteSchema (a full database delete) is the only
-// cleanup; nothing else needs to reconcile them.
+// The tables of the message plane — one, `pairs`.
 export const TABLE_NAMES = [
     'pairs',
 ];
@@ -353,11 +340,9 @@ export const TABLE_NAMES = [
 // literal list. Equals TABLE_NAMES.
 export const MESSAGE_TABLES = TABLE_NAMES;
 
-// A secondary index is either a plain column name (the
-// existing shape) or an object form declaring `unique: true`
-// — a UNIQUE index. Absent keys are unindexed in IndexedDB,
-// so a row lacking the column never collides: that IS the
-// partial-unique-index semantics genesis rows rely on.
+// A secondary index is a plain column name, or the object
+// form declaring `unique: true`. No table declares the
+// object form today.
 export type TableIndexSpec =
     | string
     | { readonly column: string; readonly unique: true };
@@ -369,8 +354,8 @@ export function indexColumn(
 }
 
 // The columns a table declares unique, in TABLE_INDEXES
-// order — consumed by both the IndexedDB ConstraintError
-// translation and the simulated tiers' pre-buffer scan.
+// order — consumed by the memory backend's pre-buffer
+// scan.
 export function uniqueColumns(
     table: string,
 ): readonly string[] {
@@ -379,13 +364,10 @@ export function uniqueColumns(
         .map((spec) => indexColumn(spec));
 }
 
-// The secondary indexes each store carries — equality
-// indexes on a single column, measured against keyed-read
-// call sites, never one-per-FK on speculation.
-// Declared beside TABLE_NAMES as the schema of record both
-// backends read. Index ONLY NOT-NULL columns — IndexedDB
-// omits a row missing the keyPath from `index.getAll`, and
-// the NOT-NULL covenant guarantees declared FKs are present.
+// The columns `getWhere` accepts per table — the
+// keyed-read allow-list both backends enforce
+// (`assertGetWhereColumn`). Postgres indexes are
+// declared in `schema-postgres.ts`.
 // Tables absent here are read in full or by primary key: the
 // collection IS its rows.
 export const TABLE_INDEXES:

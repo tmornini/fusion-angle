@@ -276,10 +276,11 @@ export function currentDocumentState(
     return currentLifecycleEvent(history)?.state;
 }
 
-// The shared id-lex ordering (the IndexedDB reference) every
-// document family's own list-derivation sorts its final rows
-// by — byte-identical across families, so it belongs here
-// rather than duplicated per family.
+// The shared id-lex ordering every document family's list
+// derivation sorts its final rows by — byte-identical
+// across families, so it lives here. The order is the
+// derivation's own: the seam promises rows, never an
+// order, so no backend's row order is a fact to inherit.
 export function byIdAscending<T extends { id: Id }>(
     a: T, b: T,
 ): number {

@@ -369,8 +369,9 @@ Every page is a standalone HTML file served by
   `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
   `HTTP_SERVER_PORT`. Tests:
   memory (`api/backend-memory.ts` / `api/db-memory.ts`).
-  There is no IndexedDB or localStorage **data**
-  backend. Theme and sidebar still use localStorage.
+  localStorage holds UI preferences only — theme,
+  sidebar, log level, active organization id — never
+  data.
   `TABLE_NAMES` is one: `pairs` — the
   pure message plane, on `HistoryEntityStore`.
   Every store op crosses the `StorageBackend`
@@ -521,9 +522,8 @@ to a directory (what `./serve` uses). Use `./build --help`
 for options. The build script itself is the source of
 truth for what gets composed, bundled, and copied — read
 it, don't read this section. The client-graph metafile
-must not contain `SIGNING_KEY_MATERIAL`,
-`backend-indexeddb`, or token mint
-(`api/access-token.ts`).
+must not contain `SIGNING_KEY_MATERIAL` or
+token mint (`api/access-token.ts`).
 
 ## Testing
 
@@ -697,6 +697,10 @@ apply to it (RED is the audit's first finding).
   run OUTSIDE the tx. Sync compute between row ops is
   fine. Nested `view.transaction` re-enters the same
   tx; its tables must be a subset of the outer set.
+  A transaction holds its pooled connection and its
+  advisory locks for its whole body; the memory backend
+  serializes whole transactions, so a long body stalls
+  every other op.
 - **Field values reference record attributes by id** in the
   pair-plane body (`attribute_id` → a record-attribute
   document id), never a table named `attributes`. See

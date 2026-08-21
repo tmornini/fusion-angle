@@ -11,8 +11,9 @@ interface TokenGrantResponse {
 
 // Trade a live refresh token for a rotated credential pair via
 // the OAuth refresh grant. Cookie-session omits the body token
-// and reads the HttpOnly cookie. Browser ZIP still sends the
-// stored refresh (body fallback). A terminal 401 surfaces as
+// and reads the HttpOnly cookie. The non-cookie session
+// mode of the test composition root sends the stored
+// refresh in the body. A terminal 401 surfaces as
 // UnauthorizedError; non-401 faults propagate as-is.
 export async function postSessionRefresh(
     ctx: RequestContext,

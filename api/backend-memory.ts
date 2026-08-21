@@ -15,8 +15,9 @@ export class MemoryStorageBackend
         Map<string, { id: string }[]>;
     // Orders whole transactions within this backend
     // instance — global ordering, stronger than the
-    // per-store mutex it replaces (A2). Cross-tab ordering
-    // is out of reach until the IndexedDB tier (Phase B).
+    // per-store mutex it replaces (A2). Cross-process
+    // ordering is Postgres's (advisory locks); this
+    // serializer orders one memory instance.
     readonly #serialize:
         <R>(fn: () => Promise<R>) => Promise<R>;
 

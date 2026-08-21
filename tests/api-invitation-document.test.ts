@@ -364,7 +364,8 @@ test('deriveInvitations round-trips every terminal state:'
         byId.get('inv-derive-decline')?.state, 'declined');
     assert.equal(
         byId.get('inv-derive-revoke')?.state, 'revoked');
-    // id-lex ordered (byIdAscending, the IndexedDB reference).
+    // id-lex ordered (byIdAscending — the derivation's own
+    // order, never the backend's).
     const ids = derived.map(row => row.id);
     assert.deepEqual(ids, [...ids].sort());
 });

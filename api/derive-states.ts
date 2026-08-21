@@ -809,11 +809,10 @@ export async function stateEventVisibilityFor(
 // boundary (isExpiredAsOf below) — a PURE, Date.now-free
 // comparator, deliberately never isClaimEventExpired (api/
 // work-order-claims.ts), which IS Date.now-coupled. Byte-exact
-// replay holds ONLY under this demo's zero-latency, single-process
-// architecture, where the claim body's claimAt and the route's
-// real decision instant are, for all practical purposes, the same
-// moment; the eventual server tier must record the ACTUAL expiry
-// decision as its own event rather than lean on this replay trick.
+// replay holds ONLY where `claimAt` and the decision
+// instant coincide in one process; a multi-process
+// deployment must record the actual expiry decision as
+// its own event rather than lean on this replay trick.
 
 // The work-orders COLLECTION address: POST 'work-orders' (create)
 // and PUT/DELETE 'work-orders/:id' (document) share this ONE

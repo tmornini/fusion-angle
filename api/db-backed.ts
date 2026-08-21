@@ -26,14 +26,11 @@ import {
     validatePairEntity,
 } from './validators.ts';
 
-// One adapter over any StorageBackend. The store wiring
-// and the transaction view live here once (Commandment IX
-// — the third backend, IndexedDB, triggers the
-// abstraction). The per-tier variation rides in the
-// constructor: the backend itself, a latency shim, and
-// an open hook the async tiers (IndexedDB) use to connect
-// before any store op. Schema lifecycle delegates to the
-// backend, which signals "schema exists" its own way.
+// One adapter over any StorageBackend. The per-backend
+// variation rides in the constructor: the backend, a
+// latency shim, an open hook, a post-commit hook — both
+// presets pass no-ops for the last three today. Schema
+// lifecycle delegates to the backend.
 //
 // The surviving store rides HistoryEntityStore (message
 // plane only — clients table eliminated).

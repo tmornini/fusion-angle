@@ -35,10 +35,12 @@ import {
 // Record), which exists only because flows/:id/records/:frid
 // carries a live GET the revisions address never gained.
 //
-// H7: id-lex explicit sort (IndexedDB-invisible, memory-tier
-// load-bearing — the archived-list raw-order surface and the
-// org-page next-position computation are the named pre-existing
-// H7-class surfaces; this derivation joins them). The states/:id
+// H7: explicit id-lex sort — load-bearing, because the
+// backend's row order is not a contract and no caller may
+// inherit it. The archived-list raw-order surface and the
+// org-page next-position computation are the named
+// pre-existing H7-class surfaces; this derivation joins
+// them. The states/:id
 // escape hatch (objectives edition, Author gate 3's watch-point)
 // is UNRELATED to this module — it concerns the PARENT
 // objective's own lifecycle, never its revisions, which carry no
@@ -67,7 +69,8 @@ export function objectiveRevisionEntityOf(
     };
 }
 
-// id-lex ordered (the IndexedDB reference). Serves the live GET
+// id-lex ordered (byIdAscending — the derivation's own
+// order, never the backend's). Serves the live GET
 // objectives/:id/revisions route (a future task's flip): the
 // SERVER already filters by the parent objective through this
 // derivation's own nested prefix, so the org fence and the

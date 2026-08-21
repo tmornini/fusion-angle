@@ -11,7 +11,8 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 // here. This test stubs the minimum DOM/storage
 // surface initCommandPalette touches, points the
 // global adapter at a pristine in-memory tier
-// (IndexedDB has no Node stub), and asserts the
+// (this file installs no client facade), and asserts
+// the
 // call completes without throwing — guarding
 // against a regression to eager loading.
 test(
