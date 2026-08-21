@@ -8,15 +8,19 @@ export const DEFAULT_RUNS = 25;
 export const DEFAULT_BUDGET_SIGMAS = 1.5;
 export const MEASURE_DEMO_EMAIL = 'demo@example.com';
 export const MEASURE_SERVER_ENTRY = 'server.mjs';
-export const MEASURE_SEED_FLAG = '--seed-mock-data';
+export const MEASURE_SEED_COMMAND = './postgres-seed';
 
 export type MeasureServeEnv = {
     postgresUrl: string;
     jwtHmacSigningKey: string;
 };
 
+export function measureSeedArgs(): string[] {
+    return ['--postgres', 'local', '--mock-data'];
+}
+
 export function measureServerArgs(): string[] {
-    return [MEASURE_SERVER_ENTRY, MEASURE_SEED_FLAG];
+    return [MEASURE_SERVER_ENTRY];
 }
 
 export function isVisualizeOnly(

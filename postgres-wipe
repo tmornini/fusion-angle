@@ -1,0 +1,136 @@
+#!/bin/bash
+set -euo pipefail
+
+# shellcheck disable=SC1091
+. "$(dirname "$0")/postgres-lib"
+
+usage() {
+    cat <<'USAGE'
+Usage: ./postgres-wipe --postgres render TOKEN
+       ./postgres-wipe --postgres local
+
+Drop Postgres schema objects. --postgres is
+required and has no default. --postgres render
+needs TOKEN (the confirmation). --postgres local
+uses POSTGRES_URL (loopback only); it takes no
+TOKEN.
+
+Options:
+  --postgres render|local   Target (required)
+  --help       Show this help message
+
+render: TOKEN must see exactly one Postgres and
+one web service. HTTP only (curl).
+local: drop. No seed. Development gun.
+USAGE
+}
+
+POSTGRES_TARGET=''
+TOKEN=''
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --postgres)
+            if [ $# -lt 2 ]; then
+                echo "Error: --postgres requires" \
+                    "a value" >&2
+                usage >&2
+                exit 1
+            fi
+            POSTGRES_TARGET="$2"
+            shift 2
+            ;;
+        -*)
+            echo "Error: unknown argument: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+        *)
+            if [ -n "$TOKEN" ]; then
+                echo "Error: unexpected argument:" \
+                    "$1" >&2
+                usage >&2
+                exit 1
+            fi
+            TOKEN="$1"
+            shift
+            ;;
+    esac
+done
+
+case "$POSTGRES_TARGET" in
+    '')
+        echo "Error: --postgres is required" >&2
+        usage >&2
+        exit 1
+        ;;
+    render|local)
+        ;;
+    *)
+        echo "Error: --postgres must be render" \
+            "or local" >&2
+        usage >&2
+        exit 1
+        ;;
+esac
+
+if [ "$POSTGRES_TARGET" = "render" ] \
+    && [ -z "$TOKEN" ]; then
+    echo "Error: TOKEN is required" >&2
+    usage >&2
+    exit 1
+fi
+
+if [ "$POSTGRES_TARGET" = "local" ] \
+    && [ -n "$TOKEN" ]; then
+    echo "Error: unexpected argument" >&2
+    usage >&2
+    exit 1
+fi
+
+if ! command -v node >/dev/null; then
+    echo "Error: node is required" >&2
+    exit 1
+fi
+
+if [ "$POSTGRES_TARGET" = "local" ]; then
+    assert_loopback_postgres_url
+    bash -c "$WIPE_START"
+    exit 0
+fi
+
+if ! command -v curl >/dev/null; then
+    echo "Error: curl is required" >&2
+    exit 1
+fi
+export RENDER_API_KEY="$TOKEN"
+unset TOKEN
+
+cleanup() {
+    rm -rf "$TMP"
+}
+
+TMP=$(mktemp -d \
+    "${TMPDIR:-/tmp}/fusion-wipe.XXXXXX")
+trap cleanup EXIT
+
+discover_render_ids
+
+write_job_body "$TMP/wipe-job.json" "$WIPE_START"
+http_json POST \
+    "/services/${SERVICE_ID}/jobs" \
+    "$TMP/wipe-created.json" \
+    "$TMP/wipe-job.json"
+
+WIPE_JOB_ID=$(job_id_from \
+    "$TMP/wipe-created.json" wipe)
+wait_for_job "$WIPE_JOB_ID" "$WIPE_TIMEOUT_SEC" wipe
+
+echo "seed with ./postgres-seed --postgres" \
+    "render TOKEN --<mode>" >&2
+echo "Revoke the API key at ${DASHBOARD_KEYS}" >&2
+exit 0

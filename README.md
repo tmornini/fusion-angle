@@ -23,7 +23,8 @@ and execution.
 The demo is multi-organization: loading mock data seeds two
 orgs (Stark Industries and Wayne Enterprises) with a sidebar
 org-switcher for the multi-org user. Operator seed prints
-sign-in credentials once on stderr (`--seed-mock-data`).
+sign-in credentials once on stdout from
+`./postgres-seed --mock-data`.
 
 **Demo-grade security.** `./build` emits one artifact:
 `fusion-angle-server-${SHA}.zip` (Node + Postgres, pages and

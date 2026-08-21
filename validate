@@ -20,7 +20,7 @@ LONG_LINES=$( {
     awk "$AWK_LINT" build serve test test-postgres \
         validate generate-schema-svg \
         generate-api-documentation measure \
-        wipe-postgres
+        postgres-wipe postgres-lib postgres-seed
 } )
 
 if [ -n "$LONG_LINES" ]; then

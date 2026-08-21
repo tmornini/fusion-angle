@@ -13,10 +13,12 @@ session:
 2. Executes **AT** as a fail-fast gate. Any AT
    failure aborts before A1.
 3. Executes A1–A5. Parallel A3 is
-   `node server.mjs --seed-test-plan-slices` (14
-   disjoint slices, stderr credential map). Serial
-   (`--serial`) A3 is `node server.mjs --seed-mock-data`
-   (SV1).
+   `./postgres-seed --postgres local
+   --test-plan-slices` then `node server.mjs`
+   (14 disjoint slices, stdout credential
+   map). Serial (`--serial`) A3 is
+   `./postgres-seed --postgres local
+   --mock-data` then `node server.mjs` (SV1).
 4. Grants Chrome origin `http://localhost` **before**
    dispatch.
 5. Parallel: one hunter per `parallel: yes` section
@@ -161,18 +163,22 @@ ride the parent hunter. K8 is a process-lock case, not
 a K-hunter case on the parallel path.
 
 - **Serial (`--serial`)**: A1 `./build` → ZIP; A2 unzip
-  or `./build --no-zip`; A3 `node server.mjs --seed-mock-data`
-  on an empty database (this pin **is** SV1). One
-  process, one mock tenant, one cookie jar. Walk
-  document order including K8 inside K, then J. Headers
-  are not consulted. Case text is unchanged.
+  or `./build --no-zip`; A3 `./postgres-seed
+  --postgres local --mock-data` then
+  `node server.mjs` on an empty database (this
+  pin **is** SV1). One process, one mock tenant,
+  one cookie jar. Walk document order including
+  K8 inside K, then J. Headers are not
+  consulted. Case text is unchanged.
 - **Parallel (default)**: the same A1–A2. Grant Chrome
   origin `http://localhost` before anything else. A3
-  `node server.mjs --seed-test-plan-slices`. Capture
-  the stderr credential map. Spawn one hunter per
-  `parallel: yes` section. Join. Then K8 (wipe/reseed
-  of the shared DB; no hunter still running). Then J.
-  Then summary + mitigation paths.
+  `./postgres-seed --postgres local
+  --test-plan-slices` then `node server.mjs`.
+  Capture the stdout credential map. Spawn one
+  hunter per `parallel: yes` section. Join.
+  Then K8 (wipe/reseed of the shared DB; no
+  hunter still running). Then J. Then summary
+  + mitigation paths.
 
 DAG edges only:
 
@@ -410,14 +416,16 @@ agent mutates:
 before A1.
 
 **Parallel (default):** A1–A2 → grant
-`http://localhost` → A3 `--seed-test-plan-slices` →
-14 hunters → join in document order → K8 → J →
-summary.
+`http://localhost` → A3 `./postgres-seed
+--postgres local --test-plan-slices` then
+`node server.mjs` → 14 hunters → join in
+document order → K8 → J → summary.
 
-**Serial (`--serial`):** A1–A3 `--seed-mock-data` →
-A → AA → B → C → D → E → F → F2 → FS → G → H → I →
-K (including K8 in document order) → R → SV6–SV10 →
-J.
+**Serial (`--serial`):** A1–A2 → A3
+`./postgres-seed --postgres local --mock-data`
+then `node server.mjs` → A → AA → B → C → D →
+E → F → F2 → FS → G → H → I → K (including K8
+in document order) → R → SV6–SV10 → J.
 
 K's product cases on the parallel path run K1–K6,
 K9–K30, K7 last. K8 is skipped by the K hunter and
@@ -497,7 +505,7 @@ run before A1's build. The single canonical invocation is
 
 - [ ] **AT1** Run `npx tsc --noEmit -p web-app/app/tsconfig.json`. PASS: exits 0; no diagnostics emitted.
 - [ ] **AT2** Run `./test` (delegates to `TZ=UTC node --test --strip-types tests/*.test.ts` for the main suite, then `TZ=Pacific/Honolulu node --test --strip-types tests/tz/*.test.ts` for the timezone suite). PASS: exits 0; the runner's final summary reports `pass N` with `fail 0` for both suites.
-- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files except `TEST-PLAN.md`, and the root scripts `build`, `serve`, `test`, `validate`, `generate-schema-svg`, and `generate-api-documentation`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
+- [ ] **AT3** Run `./validate`. PASS: exits 0 (composes AT1+AT2 plus the 78-char awk lint over `api/`, `web-app/`, `tests/`, `shared/`, the root `.md` files except `TEST-PLAN.md`, and the root scripts `build`, `serve`, `test`, `test-postgres`, `validate`, `generate-schema-svg`, `generate-api-documentation`, `measure`, `postgres-wipe`, `postgres-lib`, and `postgres-seed`; the org-abbreviation identifier lint over `api/`, `web-app/`, `tests/`, `shared/` `*.ts|html|css` with `compose.ts` exempt — reject `org` camel/Pascal/ORG_ identifier forms in favor of `organization`; then the `generate-schema-svg --check` SCHEMA.svg-drift gate; then the `generate-api-documentation --check` API.svg/room-drift gate). Any long-line violation prints `FILE:LINE: N chars` to stderr and fails the script; any org-abbreviation hit prints `FILE:LINE:` and fails.
 
 ---
 
@@ -510,40 +518,47 @@ depends: AT
 
 - [ ] **A1** Run `./build` from a clean working directory. PASS: exits 0, prints no errors, creates `~/Desktop/fusion-angle-server-${SHA}.zip`.
 - [ ] **A2** Unzip the A1 ZIP (or run `./build --no-zip /tmp/fusion-test/`). PASS: the temp dir contains `server.mjs`, `assets/app.js`, `assets/styles.css`, `assets/` (*.woff2 fonts), 18 page directories (`api-documentation`, `auth`, `billing`, `dashboard`, `design-system`, `flows`, `ideas`, `identities`, `identity-providers`, `identity-tokens`, `invitations`, `landing`, `members`, `not-found`, `organization`, `projects`, `records`, `workbox`) with 29 HTML page files (including `api-documentation/index.html`, `flows/stats.html`, `records/detail.html`, `identities/index.html`, `identities/detail.html`, `identity-providers/index.html`, `identity-tokens/index.html`, and `invitations/index.html`), plus root `index.html`. Verb/status rooms under `api-documentation/` are generated, not PAGE_REGISTRY pages — do not count them as the 29.
-- [ ] **A3** From the A2 directory, with
-  `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
-  and `HTTP_SERVER_PORT` set against an
-  **empty** Postgres:
+- [ ] **A3** With `POSTGRES_URL`,
+  `JWT_HMAC_SIGNING_KEY`, and
+  `HTTP_SERVER_PORT` set against an
+  **empty** Postgres. Seed from the
+  checkout, then start `node server.mjs`
+  from the A2 directory:
 
   - **Serial (`--serial`):**
-    `node server.mjs --seed-mock-data`.
-    PASS: process listens; stderr prints
-    `Save your demo sign-ins — shown
-    once; copy them now.` plus one
-    `username<TAB>password` line per
-    seeded human (including
+    `./postgres-seed --postgres local
+    --mock-data` then `node server.mjs`.
+    PASS: process listens; seed stdout
+    prints `Save your demo sign-ins —
+    shown once; copy them now.` plus
+    one `username<TAB>password` line
+    per seeded human (including
     `demo@example.com` and
-    `sarah.chen@company.com`); stdout
-    listen line has no passwords; seed
-    does not travel over HTTP. This pin
+    `sarah.chen@company.com`); listen
+    stdout has no passwords; seed does
+    not travel over HTTP. This pin
     **is** SV1.
   - **Parallel (default):**
-    `node server.mjs --seed-test-plan-slices`.
-    PASS: process listens; stderr prints
-    the same reveal header plus TSV
-    `section<TAB>field<TAB>value` rows
-    covering all 14 parallel sections
-    (AA's admin is `demo@example.com`;
-    B names `seat_*` and `flow_id`; G
-    names `org2_*`, `unseated_*`,
+    `./postgres-seed --postgres local
+    --test-plan-slices` then
+    `node server.mjs`.
+    PASS: process listens; seed stdout
+    prints the same reveal header plus
+    TSV `section<TAB>field<TAB>value`
+    rows covering all 14 parallel
+    sections (AA's admin is
+    `demo@example.com`; B names
+    `seat_*` and `flow_id`; G names
+    `org2_*`, `unseated_*`,
     `member_*`; SV names `seat_*`);
-    stdout has no passwords; seed does
-    not travel over HTTP. If a section
-    cannot run from its minimum
-    fixtures, A3 FAIL — do not dispatch
-    hunters. This pin **is** SV1 on
-    the parallel path (listen + stderr
-    reveal); the SV hunter skips SV1.
+    listen stdout has no passwords;
+    seed does not travel over HTTP. If
+    a section cannot run from its
+    minimum fixtures, A3 FAIL — do not
+    dispatch hunters. This pin **is**
+    SV1 on the parallel path (listen +
+    stdout reveal); the SV hunter
+    skips SV1.
 - [ ] **A4** Open `http://localhost:$HTTP_SERVER_PORT/` in the test browser with site data deleted and no `refresh_token` cookie. PASS: unsigned root hops to `landing/index.html` (one hop from the blank root document). Does not open `auth/` and does not open `snapshots/`. Landing remains the public marketing page; it is now also the unsigned root target.
 - [ ] **A5** Open DevTools Console on that load. PASS: no 501; no JSON parse crash. CSP `frame-ancestors` delivered via meta and an anonymous `POST /api/authentication/token` refresh 401 are acceptable.
 
@@ -558,10 +573,13 @@ depends: A
 
 On the parallel path AA's slice is already
 bootstrap-only — do not restart the process. Sign
-in as the AA admin and run AA3+. Serial may restart
-`--seed-bootstrap` if the operator started from
-mock-data. Each later step creates data that
-subsequent steps depend on. Run AA3+ in order.
+in as the AA admin and run AA3+. Serial may stop,
+`./postgres-wipe --postgres local`, then
+`./postgres-seed --postgres local --bootstrap`,
+then start `node server.mjs` if the operator
+started from mock-data. Each later step creates
+data that subsequent steps depend on. Run AA3+
+in order.
 
 - [ ] **AA3** Verify bootstrap data exists: user "Tony Stark" (id: `current`), organization "Stark Industries" (domain `acmecorp.com`). `OrganizationEntity` has no plan field — its quota fields are `seats`, `projects_limit`, `ideas_limit`.
 
@@ -847,7 +865,7 @@ depends: A
 
 ### Auth Page (`auth/`)
 
-> Note: the demo auto-login is RETIRED. Gated pages now require a signed-in session — after seeding (`--seed-bootstrap` / `--seed-mock-data`), sign in with the stderr admin credentials before exercising gated pages. Cases below that "navigate to `dashboard`" assume a valid sign-in.
+> Note: the demo auto-login is RETIRED. Gated pages now require a signed-in session — after seeding (`./postgres-seed --postgres local --bootstrap` / `--mock-data`), sign in with the stdout admin credentials before exercising gated pages. Cases below that "navigate to `dashboard`" assume a valid sign-in.
 
 - [ ] **B4** Page loads in **Sign In** mode by default. PASS: title is "Welcome back", submit button reads "Sign in" with an SVG arrow icon (matching the Sign Up button's "Create account" affordance per B10).
 - [ ] **B5** On desktop (≥1024px), left panel shows branded marketing stats (10K+ Active Users, 98% Satisfaction, 50+ Integrations). PASS: two-column layout visible.
@@ -2126,7 +2144,7 @@ depends: A
 
 - [ ] **V1 — Invite by email grants a pending invitation** On
   `members/index.html` as an org admin (Tony Stark on Stark
-  Industries after A3 `--seed-mock-data`), click `+ Invite member` (`#invite-
+  Industries after A3 mock-data), click `+ Invite member` (`#invite-
   member-btn`, mail icon). PASS: the `invite-member` dialog
   opens with a single Email input (`#invite-email`), helper
   text "Invite an existing person to this organization", a
@@ -2290,7 +2308,7 @@ depends: A
 
 ### Sidebar org-switcher
 
-- [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 `--seed-mock-data` seeds two orgs and Tony Stark (`current`) is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-angle:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
+- [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 mock-data seeds two orgs and Tony Stark (`current`) is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-angle:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
 - [ ] **G41** Person and agent writes land on the pair
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`
@@ -2485,13 +2503,17 @@ and Phase 3. Catastrophic if run in Phase 2 because it
 replaces the database, which is shared across all seven
 Phase 2 agents.
 
-Empty state: stop the A3 process. Restart with
-`node server.mjs --seed-bootstrap`. Sign in with the
-stderr admin credential. Open Organization. PASS: the
-empty-state copy "No objectives yet. Add one to get
-started." renders (bootstrap seeds org 1 with no
-objectives). Restore the shared garden by stopping
-again and restarting with `--seed-mock-data`.
+Empty state: stop the A3 process.
+`./postgres-wipe --postgres local` then
+`./postgres-seed --postgres local --bootstrap`
+then start `node server.mjs`. Sign in with the
+stdout admin credential. Open Organization. PASS:
+the empty-state copy "No objectives yet. Add one
+to get started." renders (bootstrap seeds org 1
+with no objectives). Restore the shared garden
+by stopping again, `./postgres-wipe --postgres
+local`, then `./postgres-seed --postgres local
+--mock-data`, then start.
 
 ### K9–K18 — Project detail: inline scoring + Approve (Agent-E)
 
@@ -2807,10 +2829,13 @@ Operator prerequisites:
   `HTTP_SERVER_PORT` set (required; no defaults; never
   logged)
 - Empty database; seed serial A3 with
-  `--seed-mock-data` and parallel A3 with
-  `--seed-test-plan-slices`. The SV hunter
-  still skips SV1 and does not re-seed.
-- Credentials print once on **stderr**, never HTTP
+  `./postgres-seed --postgres local --mock-data`
+  then `node server.mjs`, and parallel A3 with
+  `./postgres-seed --postgres local
+  --test-plan-slices` then `node server.mjs`.
+  The SV hunter still skips SV1 and does
+  not re-seed.
+- Credentials print once on **stdout**, never HTTP
 - One mint process — do not run two `server.mjs`
   replicas
 
@@ -2824,14 +2849,14 @@ regression.
 
 ### Browser against the real server
 
-- [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stderr seed reveal).
-- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stderr password. PASS: the dashboard loads from this Node origin — pages and API are one process.
+- [ ] **SV1** Satisfied by A3 — do not re-run. PASS if A3 passed (listen + stdout seed reveal).
+- [ ] **SV2** Open `http://localhost:$HTTP_SERVER_PORT/auth/index.html` (or follow the unsigned root hop to landing, then Sign In). Sign in as `demo@example.com` with the stdout password. PASS: the dashboard loads from this Node origin — pages and API are one process.
 - [ ] **SV3** After SV2, inspect DevTools. PASS: Application → Cookies shows `refresh_token` as HttpOnly, `Path=/api/authentication`, `SameSite=Strict`, `Secure` (always, including `http://localhost` and `http://127.0.0.1`); `localStorage` has no `fusion-angle:authorization` key and no `refresh_token`; the sign-in token response JSON has `access_token` and no `refresh_token`. Access is memory-only; refresh is the cookie.
 - [ ] **SV4** On the signed-in dashboard, reload (Cmd-R). PASS: stays authenticated — no bounce to `auth`. Boot cookie-refreshes via `POST /api/authentication/token` (`grant_type=refresh`, `credentials: 'same-origin'`).
 
 ### Two browsers / two identities / one database
 
-- [ ] **SV6** Two cookie jars against the same origin (Chrome + Firefox, or Chrome + a Guest profile). In browser A, sign in as `demo@example.com`. In browser B, sign in as `sarah.chen@company.com` (stderr password; Sarah is Stark, same organization as the admin). PASS: both dashboards load; the sidebar member chips name different people; one Postgres, two sessions.
+- [ ] **SV6** Two cookie jars against the same origin (Chrome + Firefox, or Chrome + a Guest profile). In browser A, sign in as `demo@example.com`. In browser B, sign in as `sarah.chen@company.com` (stdout password; Sarah is Stark, same organization as the admin). PASS: both dashboards load; the sidebar member chips name different people; one Postgres, two sessions.
 - [ ] **SV7** In browser A, create an idea with a unique title (Ideas → Create Idea → required fields → Submit Idea). In browser B, navigate to `ideas/` (or reload if already there). PASS: Sarah's list includes A's new idea — two identities, one database.
 
 ### Two tabs share the refresh cookie

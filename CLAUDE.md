@@ -15,8 +15,11 @@ when working with code in this repository.
 ./build dir/           # Server ZIP to dir/ instead of ~/Desktop/
 ./build --help         # Show usage
 ./serve [port]         # Build + node server.mjs (default 8080)
-./wipe-postgres --postgres render TOKEN --pristine|--mockdata
-./wipe-postgres --postgres local --pristine|--mockdata
+./postgres-seed --postgres local --bootstrap|--mock-data|--test-plan-slices
+./postgres-seed --postgres render TOKEN \
+    --bootstrap|--mock-data|--test-plan-slices
+./postgres-wipe --postgres render TOKEN
+./postgres-wipe --postgres local
 ./measure              # Full ceremony (record+budgets+25+viz)
 ./measure --help       # Show usage
 ./measure --check      # Fail if medians exceed budgets
@@ -42,6 +45,7 @@ commit; then build or serve.
 ```bash
 export POSTGRES_URL=...
 export JWT_HMAC_SIGNING_KEY=...
+./postgres-seed --postgres local --mock-data
 ./serve 8080
 # open http://localhost:8080/landing/index.html
 ```
@@ -62,6 +66,37 @@ into the sandbox-allowed path.
 `localhost` is reachable from the sandbox, so the Chrome MCP
 tools can drive the page normally.
 
+### Cold start
+
+From an empty Postgres to a listening app. The tools
+begin at `POSTGRES_URL`; the platform provisions the
+role and database.
+
+*Local, Docker `postgres:17`:*
+
+```bash
+docker run -d --name fusion-postgres \
+    -e POSTGRES_USER=fusion \
+    -e POSTGRES_PASSWORD=<secret> \
+    -e POSTGRES_DB=fusion \
+    -p 5432:5432 postgres:17
+export POSTGRES_URL=postgres://fusion:<secret>@localhost:5432/fusion
+export JWT_HMAC_SIGNING_KEY=<random>
+./postgres-seed --postgres local --mock-data
+./serve 8080
+```
+
+*Render.* Create Postgres in the dashboard. Set
+`POSTGRES_URL` (INTERNAL string) and
+`JWT_HMAC_SIGNING_KEY`. Start command:
+`cd render-out && HTTP_SERVER_PORT=$PORT node server.mjs`.
+Then `./postgres-seed --postgres render TOKEN --mock-data`.
+
+*Anywhere else.* A DBA runs `createuser fusion` (with
+a password) and `createdb -O fusion -E UTF8 fusion`
+once, then `./postgres-seed --postgres local …` on
+that host or through `ssh -L 5432:localhost:5432`.
+
 ### Validate semantics
 
 `./validate` runs `tsc --noEmit` (type checking), then
@@ -76,8 +111,9 @@ at the repo root except [TEST-PLAN.md](TEST-PLAN.md)
 (exempted because its entries are meant to scan as one
 self-contained line), and on the root scripts `build`,
 `serve`, `test`, `validate`, `generate-schema-svg`,
-`generate-api-documentation`, `measure`, and
-`wipe-postgres`. It then rejects the `org`
+`generate-api-documentation`, `measure`,
+`postgres-lib`, `postgres-seed`, and
+`postgres-wipe`. It then rejects the `org`
 abbreviation in identifiers under `api/`, `web-app/`,
 `tests/`, and `shared/` (`.ts`/`.html`/`.css`; `compose.ts`
 exempt) — forms matching `org[A-Z]`, camel/Pascal
@@ -163,11 +199,12 @@ consoles quiet).
 
 Clean tree required for measure sweeps (same as `./build`
 — measures committed bytes); bare `--visualize` alone is
-exempt. Bare `./measure` builds `--no-zip` and spawns
-`node server.mjs --seed-mock-data` (needs `POSTGRES_URL`
-and `JWT_HMAC_SIGNING_KEY`). `--base-url URL` hits a
+exempt. Bare `./measure` builds `--no-zip`, runs
+`./postgres-seed --postgres local --mock-data`, then
+spawns `node server.mjs` (needs `POSTGRES_URL` and
+`JWT_HMAC_SIGNING_KEY`). `--base-url URL` hits a
 running origin instead (requires `--password` or
-`MEASURE_PASSWORD`; skips seed). Sandbox:
+`MEASURE_PASSWORD`; skips the seed). Sandbox:
 `TMPDIR=/tmp/claude ./measure ...`. Chrome binary:
 `$CHROME`, or the macOS default Google Chrome path.
 
@@ -327,8 +364,10 @@ Every page is a standalone HTML file served by
   (`api/backend-postgres.ts`, DDL in
   `api/schema-postgres.ts`) — BYTEA Latin-1;
   postgres.js 3.4.9 behind `api/postgres-client.ts`
-  only. Required env (never logged): `POSTGRES_URL`,
-  `JWT_HMAC_SIGNING_KEY`, `HTTP_SERVER_PORT`. Tests:
+  only. The server does not apply DDL;
+  `./postgres-seed` does. Required env (never logged):
+  `POSTGRES_URL`, `JWT_HMAC_SIGNING_KEY`,
+  `HTTP_SERVER_PORT`. Tests:
   memory (`api/backend-memory.ts` / `api/db-memory.ts`).
   There is no IndexedDB or localStorage **data**
   backend. Theme and sidebar still use localStorage.
@@ -590,15 +629,12 @@ apply to it (RED is the audit's first finding).
   log at `warn` level — quota errors don't break the app but
   are observable via the logger.
 - **Operator seed is below HTTP.**
-  `--seed-bootstrap`, `--seed-mock-data`,
-  and `--seed-test-plan-slices` call
-  `postBootstrap` / `postMockDataLoad` /
-  `postTestPlanSlices` in-process on an
-  empty database and print credentials
-  once on stderr. They stamp
-  `schema_marker` last so a failed seed
-  reads as empty. There is no HTTP
-  dump/restore.
+  `./postgres-seed` (`--bootstrap`, `--mock-data`,
+  `--test-plan-slices`) calls `postBootstrap` /
+  `postMockDataLoad` / `postTestPlanSlices` in-process
+  on an empty database and prints credentials once on
+  stdout. It stamps `schema_marker` last so a failed
+  seed reads as empty. There is no HTTP dump/restore.
 - **HTTP only.** Page URLs use relative paths.
   Pages are `/ideas/` or `/ideas/index.html`.
   The API is `/api/…`. The product is

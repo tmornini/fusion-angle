@@ -378,11 +378,13 @@ Theme and sidebar still use localStorage.
 logged and never defaulted: `POSTGRES_URL`,
 `JWT_HMAC_SIGNING_KEY`, `HTTP_SERVER_PORT`. Optional
 `TRUSTED_PROXY_HOPS` (comma list). Body over 1 MiB →
-**413**. Seed `--seed-bootstrap` or `--seed-mock-data` on
-an empty database only; credentials print once on stderr.
-One mint process — do not run two replicas. Boot
-`assertUtf8`; no `schema_marker` and no successful seed
-→ refuse to listen. A missing table is a loud 500.
+**413**. The server neither seeds nor applies DDL
+and takes no argv (`server.mjs takes no arguments;
+seed with ./postgres-seed`). One mint process — do
+not run two replicas. Boot `assertUtf8`; missing
+`schema_marker` refuses with `schema_marker absent;
+seed with ./postgres-seed`. A missing table is a
+loud 500.
 
 postgres.js 3.4.9 lives behind `api/postgres-client.ts`
 only. DDL is `api/schema-postgres.ts`. Message columns
@@ -402,11 +404,12 @@ per minute; refresh and token-exchange are not counted
 (cookie boot). Wrong `TRUSTED_PROXY_HOPS` makes the
 throttle a global cap; refresh/exchange stay unlimited.
 
-`./measure` builds `--no-zip` and spawns
-`node server.mjs --seed-mock-data` (needs
-`POSTGRES_URL` and `JWT_HMAC_SIGNING_KEY`).
-`--base-url` hits a running origin instead (needs
-`--password` or `MEASURE_PASSWORD`; skips seed).
+`./measure` builds `--no-zip`, runs
+`./postgres-seed --postgres local --mock-data`, then
+spawns `node server.mjs` (needs `POSTGRES_URL` and
+`JWT_HMAC_SIGNING_KEY`). `--base-url` hits a running
+origin instead (needs `--password` or
+`MEASURE_PASSWORD`; skips the seed).
 
 ### Deploy blockers A1–A6 (disposed)
 
@@ -416,8 +419,8 @@ They are disposed as follows.
 - **A1 HMAC key.** Mint/verify reads
   `JWT_HMAC_SIGNING_KEY`. There is no
   `SIGNING_KEY_MATERIAL`.
-- **A2 credential reveal.** Operator seed prints
-  credentials once on stderr.
+- **A2 credential reveal.** `./postgres-seed` prints
+  credentials once on stdout.
 - **A3 plaintext ledger.** Messages stay verbatim.
   Residual at full strength (this is a demo server).
   Token-at-rest hashing is later.
@@ -425,8 +428,8 @@ They are disposed as follows.
   A second grant with the same assertion is 401
   `invalid_grant`. Do not put `jti` on the token JSON.
 - **A5 bootstrap HTTP plane.** There is no
-  bootstrap HTTP plane. Seed is below HTTP
-  (`--seed-bootstrap` / `--seed-mock-data`).
+  bootstrap HTTP plane. Seed is `./postgres-seed`,
+  not a server flag.
 - **A6 PKCE.** Authorize without S256 is rejected.
   The client sends S256.
 
@@ -583,7 +586,7 @@ creates and updates (If-Match). GET streams the
 stored PUT for stream families; flows GET still
 `deriveFlow`; assemble surfaces still assemble.
 The process refuses to listen without
-`schema_marker` (or a successful seed).
+`schema_marker`.
 
 ## Write-path derives (Phase 14)
 
@@ -772,9 +775,9 @@ EXPECTED_PAIR_COUNT 1448 / bootstrap 8;
    surface and every response byte of every derive-based
    GET and every `WRITE_RESPONSE_SPECS`-gated write are
    unchanged by the deletion. Operator seed prints
-   `SeededCredentials` once on stderr (in-process
-   `--seed-bootstrap` / `--seed-mock-data`); that body
-   is not an HTTP response.
+   `SeededCredentials` once on stdout from
+   `./postgres-seed`; that body is not an HTTP
+   response.
 
 ### Wire covenant (Phase 15 deltas still hold)
 

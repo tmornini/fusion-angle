@@ -51,8 +51,7 @@ export class MissingTableError extends Error {
     constructor(table: string) {
         super(
             `Schema is missing table "${table}".`
-            + ' Reseed with --seed-bootstrap or'
-            + ' --seed-mock-data.',
+            + ' Seed with ./postgres-seed.',
         );
         this.table = table;
         this.name = 'MissingTableError';

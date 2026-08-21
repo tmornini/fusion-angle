@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import {
     DEFAULT_RUNS,
     MEASURE_DEMO_EMAIL,
-    MEASURE_SEED_FLAG,
+    MEASURE_SEED_COMMAND,
     MEASURE_SERVER_ENTRY,
     finalizeMeasureCli,
     isVisualizeOnly,
     lastJsonLogMessage,
+    measureSeedArgs,
     measureServerArgs,
     needsLocalMeasureServer,
     parseMeasureArgv,
@@ -285,14 +286,11 @@ test('lastJsonLogMessage takes the last message', () => {
     assert.equal(lastJsonLogMessage('plain'), null);
 });
 
-test('local Node spawn is server.mjs plus seed', () => {
+test('local Node spawn is seed then server.mjs', () => {
+    assert.equal(MEASURE_SEED_COMMAND, './postgres-seed');
+    assert.deepEqual(measureSeedArgs(), [
+        '--postgres', 'local', '--mock-data',
+    ]);
     assert.equal(MEASURE_SERVER_ENTRY, 'server.mjs');
-    assert.equal(
-        MEASURE_SEED_FLAG,
-        '--seed-mock-data',
-    );
-    assert.deepEqual(
-        measureServerArgs(),
-        ['server.mjs', '--seed-mock-data'],
-    );
+    assert.deepEqual(measureServerArgs(), ['server.mjs']);
 });

@@ -71,6 +71,16 @@ function asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
 }
 
+export function isUndefinedTable(
+    error: unknown,
+): boolean {
+    if (error === null || typeof error !== 'object') {
+        return false;
+    }
+    const code = (error as { code?: unknown }).code;
+    return code === '42P01';
+}
+
 function statusOf(fault: Fault): number {
     if (isTimeout(fault)) {
         return HTTP_GATEWAY_TIMEOUT;
@@ -109,7 +119,7 @@ function messageOf(fault: Fault): string {
     if (fault.code === '40P01') {
         return 'deadlock';
     }
-    if (fault.code === '42P01') {
+    if (isUndefinedTable(fault)) {
         return 'missing table';
     }
     if (fault.code === '22P02') {

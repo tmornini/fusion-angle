@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mapPostgresError } from
-    '../api/errors-postgres.ts';
+import {
+    isUndefinedTable,
+    mapPostgresError,
+} from '../api/errors-postgres.ts';
 import {
     ApiError,
     HTTP_GATEWAY_TIMEOUT,
@@ -131,6 +133,21 @@ test('timeout and connection loss are 504', () => {
             'gateway timeout',
         );
     }
+});
+
+test('isUndefinedTable is SQLSTATE 42P01', () => {
+    assert.equal(
+        isUndefinedTable({ code: '42P01' }),
+        true,
+    );
+    assert.equal(
+        isUndefinedTable({ code: '42P02' }),
+        false,
+    );
+    assert.equal(
+        isUndefinedTable(new Error('nope')),
+        false,
+    );
 });
 
 test('missing table is loud 500, not recovery', () => {

@@ -3,7 +3,7 @@
 // Excluded from browser tsc; uses Node APIs + global WebSocket.
 //
 // Flow: optional bare --visualize (disk only) → clean-tree
-// gate → (build → node server.mjs --seed-mock-data) or
+// gate → (build → ./postgres-seed → node server.mjs) or
 // --base-url origin → Chrome → login → detail-URL
 // discovery → N-run sweep → report → optional
 // --check / --record / --visualize. Cleanup always in
@@ -52,8 +52,10 @@ import {
     DEFAULT_RUNS,
     DEFAULT_BUDGET_SIGMAS,
     MEASURE_DEMO_EMAIL,
+    MEASURE_SEED_COMMAND,
     isVisualizeOnly,
     lastJsonLogMessage,
+    measureSeedArgs,
     measureServerArgs,
     needsLocalMeasureServer,
     parseMeasureArgv,
@@ -133,7 +135,7 @@ function usageText(): string {
         '  --base-url URL       Hit this origin instead',
         '                       of building and spawning',
         '                       node server.mjs.',
-        '                       Skips --seed-mock-data.',
+        '                       Skips the seed.',
         '  --password SECRET    Auth password when',
         '                       --base-url is set.',
         '                       MEASURE_PASSWORD also',
@@ -1041,12 +1043,67 @@ async function main(): Promise<void> {
                 );
             }
 
-            // 2. Serve node server.mjs --seed-mock-data
+            // 2. Seed via ./postgres-seed, then spawn
+            //    node server.mjs
             if (localServe === null) {
                 throw new Error(
                     'missing required env POSTGRES_URL',
                 );
             }
+            process.stderr.write('Seeding Postgres …\n');
+            let seedOut = '';
+            let seedErr = '';
+            try {
+                const seeded = await execFile(
+                    MEASURE_SEED_COMMAND,
+                    measureSeedArgs(),
+                    {
+                        cwd: repoRoot,
+                        timeout: SEED_TIMEOUT_MS,
+                        env: {
+                            ...process.env,
+                            POSTGRES_URL:
+                                localServe.postgresUrl,
+                            JWT_HMAC_SIGNING_KEY:
+                                localServe
+                                    .jwtHmacSigningKey,
+                        },
+                        maxBuffer: 16 * 1024 * 1024,
+                    },
+                );
+                seedOut = String(seeded.stdout);
+                seedErr = String(seeded.stderr);
+            } catch (err: unknown) {
+                const e = err as {
+                    stderr?: string | Buffer;
+                    stdout?: string | Buffer;
+                    message?: string;
+                };
+                seedErr = e.stderr
+                    ? String(e.stderr)
+                    : '';
+                const logged = lastJsonLogMessage(
+                    seedErr,
+                );
+                throw new Error(
+                    logged
+                    ?? (seedErr.trim()
+                        || e.message
+                        || 'seed failed'),
+                );
+            }
+            const parsed = passwordFromSeedReveal(
+                seedOut,
+                MEASURE_DEMO_EMAIL,
+            );
+            if (parsed === null) {
+                throw new Error(
+                    'seed reveal missing password for '
+                    + MEASURE_DEMO_EMAIL,
+                );
+            }
+            password = parsed;
+
             const port = await freePort();
             baseUrl = `http://127.0.0.1:${port}`;
             process.stderr.write(
@@ -1079,7 +1136,7 @@ async function main(): Promise<void> {
                     stderrText += chunk;
                 });
             }
-            const secret = await pollUntil(
+            await pollUntil(
                 `node server.mjs on port ${port}`,
                 SEED_TIMEOUT_MS,
                 async () => {
@@ -1096,26 +1153,19 @@ async function main(): Promise<void> {
                                 : ''),
                         );
                     }
-                    const parsed =
-                        passwordFromSeedReveal(
-                            stderrText,
-                            MEASURE_DEMO_EMAIL,
-                        );
-                    if (parsed === null) return null;
                     try {
                         const res = await fetch(
                             baseUrl + '/',
                         );
                         return res.ok
                             || res.status === 404
-                            ? parsed
+                            ? true
                             : null;
                     } catch {
                         return null;
                     }
                 },
             );
-            password = secret;
         }
 
         // 3. Launch Chrome
@@ -1149,7 +1199,7 @@ async function main(): Promise<void> {
         await cdp.send('Page.enable');
         await cdp.send('Runtime.enable');
 
-        // 4. Login (seed is --seed-mock-data on boot,
+        // 4. Login (seed is ./postgres-seed --mock-data,
         // or --password against --base-url).
         process.stderr.write(
             `Logging in as ${MEASURE_DEMO_EMAIL} …\n`,

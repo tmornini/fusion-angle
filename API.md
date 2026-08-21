@@ -140,7 +140,7 @@ unauthenticated — it is a single audited surface.
   - `authentication/token`
   - `authentication/authorize`
 
-Seed is `--seed-bootstrap` / `--seed-mock-data` below HTTP. There is no
+Seed is `./postgres-seed` below HTTP. There is no
 bootstrap HTTP plane. `AUTHENTICATION_ROUTES` stay exempt.
 
 ### 1.3 The client facade
@@ -1808,9 +1808,10 @@ a seat, not a leftover `/memberships/:id` row.
 
 ### 3.26 Operator seed — mock data (in-process)
 
-`postMockDataLoad` (`api/mock-data.ts`). Operator flag
-`--seed-mock-data` calls it in-process on an empty database
-and prints credentials once on stderr (A2).
+`postMockDataLoad` (`api/mock-data.ts`).
+`./postgres-seed --mock-data` calls it in-process on
+an empty database and prints credentials once on
+stdout (A2).
 There is no HTTP path. The seed forms and appends no pair for itself (none of
 §5.1's headers appear). What it seeds includes **1498** of its own pre-formed
 message pairs (`EXPECTED_PAIR_COUNT`) — see §5.3.
@@ -1829,22 +1830,22 @@ message pairs (`EXPECTED_PAIR_COUNT`) — see §5.3.
   4. `postSchemaCreation()` — the schema marker stamps **last**, so a
      failed seed reads as empty and retries cleanly.
 - returns `SeededCredentials` — plaintext sign-ins printed once on
-  stderr. Never on the HTTP wire.
+  stdout. Never on the HTTP wire.
 
 ### 3.27 Operator seed — bootstrap (in-process)
 
-`postBootstrap` (`api/mock-data.ts`). Operator flag
-`--seed-bootstrap` calls it in-process on an empty
-database and prints credentials once on stderr. Same
-four-step shape as §3.26 — no pair for itself, below
-the ledger — with
+`postBootstrap` (`api/mock-data.ts`).
+`./postgres-seed --bootstrap` calls it in-process on
+an empty database and prints credentials once on
+stdout. Same four-step shape as §3.26 — no pair for
+itself, below the ledger — with
 `postBootstrapIn` planting only the shell essentials (system actor, current
 user, the singleton org — no Records) and its multi-pair bootstrap set: the
 current-user human-member create bundle (operation + member + detail +
 identity documents), membership, system member, PII, system identity,
 default-org, and organization, plus credentials via `seedHumanCredentials` —
 bootstrap absolute **12** (§5.3; `tests/mock-data-pairs.test.ts`). Returns
-`SeededCredentials` on stderr.
+`SeededCredentials` on stdout.
 
 ### 3.29 `PUT /objectives/:id` — objective document write (not a POST)
 
@@ -2138,9 +2139,10 @@ untouched.
 
 ### 5.3 Seed pair formation (below the gate)
 
-`--seed-mock-data` and `--seed-bootstrap` call `postMockDataLoad` /
-`postBootstrap` in-process on an empty database (§3.26 / §3.27). There
-is no HTTP seed path. What they seed is itself the output of
+`./postgres-seed --mock-data` and `--bootstrap` call
+`postMockDataLoad` / `postBootstrap` in-process on an
+empty database (§3.26 / §3.27). There is no HTTP seed
+path. What they seed is itself the output of
 FIFTEEN pair-capable write families, in dependency order:
 `human-members`, `ideas`, `idea-submissions`, `projects`, `flows`,
 `work-orders`, `flow-work-orders`, `ai-members`,
