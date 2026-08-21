@@ -30,6 +30,9 @@ const ROOT_FILES = [
     'postgres-wipe',
     'postgres-lib',
     'postgres-seed',
+    'Dockerfile',
+    'compose.yaml',
+    '.dockerignore',
     'generate-schema-svg',
     'generate-api-documentation',
 ] as const;

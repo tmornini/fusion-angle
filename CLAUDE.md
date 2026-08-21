@@ -20,6 +20,11 @@ when working with code in this repository.
     --bootstrap|--mock-data|--test-plan-slices
 ./postgres-wipe --postgres render TOKEN
 ./postgres-wipe --postgres local
+./postgres-seed --postgres compose \
+    --bootstrap|--mock-data|--test-plan-slices
+docker compose build       # image of the committed tree
+docker compose up --wait   # postgres:18 + server, 127.0.0.1:8080
+docker compose down        # stop; the database dies with it
 ./measure              # Full ceremony (record+budgets+25+viz)
 ./measure --help       # Show usage
 ./measure --check      # Fail if medians exceed budgets
@@ -97,6 +102,58 @@ a password) and `createdb -O fusion -E UTF8 fusion`
 once, then `./postgres-seed --postgres local …` on
 that host or through `ssh -L 5432:localhost:5432`.
 
+### Compose stack
+
+Local, short-lived proof of the deployable:
+the `./build` bundle under Node 24,
+Postgres 18, and Render's environment
+contract. Also an origin for TEST-PLAN
+agents and `./measure --base-url`, and a
+Postgres for `./test-postgres`.
+
+Required in the shell (hex is URL-safe):
+
+```bash
+export POSTGRES_PASSWORD=$(openssl rand -hex 16)
+export JWT_HMAC_SIGNING_KEY=$(openssl rand -hex 32)
+```
+
+```bash
+docker compose build
+./postgres-seed --postgres compose --mock-data
+docker compose up --wait
+# open http://localhost:8080/landing/index.html
+docker compose down
+```
+
+`PORT` is `"8080"` in the server service;
+the start line sets `HTTP_SERVER_PORT=$PORT`
+and `exec`s Node so `SIGTERM` reaches
+`boot.ts`. `TRUSTED_PROXY_HOPS` is unset:
+no proxy sits in front.
+
+Host `POSTGRES_URL` for `./test-postgres`:
+
+`postgres://fusion:$POSTGRES_PASSWORD@localhost:5432/fusion`
+
+Smoke `./measure` against the stack; never
+`--record` (history is the host spawn path):
+
+```bash
+./measure --base-url http://127.0.0.1:8080 \
+    --password "$PW" --runs 1 --pages organization
+```
+
+Restarting `postgres` empties the database
+(tmpfs). Ports 8080 and 5432 conflict with
+`./serve` and the cold-start
+`fusion-postgres` container.
+
+The Docker socket is outside the Claude
+sandbox. Run these commands with the `!`
+prefix, or from a terminal that can reach
+`/var/run/docker.sock`.
+
 ### Validate semantics
 
 `./validate` runs `tsc --noEmit` (type checking), then
@@ -112,8 +169,9 @@ at the repo root except [TEST-PLAN.md](TEST-PLAN.md)
 self-contained line), and on the root scripts `build`,
 `serve`, `test`, `validate`, `generate-schema-svg`,
 `generate-api-documentation`, `measure`,
-`postgres-lib`, `postgres-seed`, and
-`postgres-wipe`. It then rejects the `org`
+`postgres-lib`, `postgres-seed`,
+`postgres-wipe`, `Dockerfile`, `compose.yaml`,
+and `.dockerignore`. It then rejects the `org`
 abbreviation in identifiers under `api/`, `web-app/`,
 `tests/`, and `shared/` (`.ts`/`.html`/`.css`; `compose.ts`
 exempt) — forms matching `org[A-Z]`, camel/Pascal

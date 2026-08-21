@@ -1,0 +1,71 @@
+x-postgres-url: &postgres-url
+    postgres://fusion:${POSTGRES_PASSWORD:?required}@postgres/fusion
+
+services:
+    postgres:
+        image: postgres:18
+        environment:
+            POSTGRES_USER: fusion
+            POSTGRES_DB: fusion
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+        tmpfs:
+            - /var/lib/postgresql
+        ports:
+            - 127.0.0.1:5432:5432
+        healthcheck:
+            test:
+                - CMD
+                - pg_isready
+                - -h
+                - 127.0.0.1
+                - -U
+                - fusion
+                - -d
+                - fusion
+            interval: 2s
+            timeout: 2s
+            retries: 15
+
+    server:
+        build:
+            context: .
+            target: runtime
+        depends_on:
+            postgres:
+                condition: service_healthy
+        environment:
+            PORT: "8080"
+            POSTGRES_URL: *postgres-url
+            JWT_HMAC_SIGNING_KEY: ${JWT_HMAC_SIGNING_KEY:?required}
+        ports:
+            - 127.0.0.1:8080:8080
+        stop_grace_period: 15s
+        healthcheck:
+            test:
+                - CMD
+                - node
+                - -e
+                - >-
+                  fetch('http://127.0.0.1:' + process.env.PORT + '/')
+                  .then((r) => process.exit(r.ok ? 0 : 1),
+                  () => process.exit(1))
+            interval: 2s
+            timeout: 2s
+            retries: 15
+            start_period: 5s
+
+    seed:
+        build:
+            context: .
+            target: builder
+        profiles:
+            - seed
+        depends_on:
+            postgres:
+                condition: service_healthy
+        environment:
+            POSTGRES_URL: *postgres-url
+        entrypoint:
+            - node
+            - --strip-types
+            - server/postgres-seed.ts

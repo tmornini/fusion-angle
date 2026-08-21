@@ -10,15 +10,19 @@ Usage: ./postgres-seed --postgres local
        --bootstrap|--mock-data|--test-plan-slices
        ./postgres-seed --postgres render TOKEN
        --bootstrap|--mock-data|--test-plan-slices
+       ./postgres-seed --postgres compose
+       --bootstrap|--mock-data|--test-plan-slices
 
 Seed an empty Postgres. --postgres is
 required and has no default. --postgres render
 needs TOKEN (the confirmation). --postgres local
 uses POSTGRES_URL (loopback only); it takes no
-TOKEN.
+TOKEN. --postgres compose seeds the compose
+stack; it takes no TOKEN and reads
+POSTGRES_PASSWORD through compose.yaml.
 
 Options:
-  --postgres render|local   Target (required)
+  --postgres render|local|compose   Target (required)
   --bootstrap   Seed bootstrap identities
   --mock-data   Seed mock data
   --test-plan-slices   Seed TEST-PLAN slices
@@ -28,6 +32,8 @@ render: TOKEN must see exactly one Postgres and
 one web service. HTTP only (curl).
 local: assert loopback, then
 node --strip-types server/postgres-seed.ts.
+compose: docker compose run --rm seed MODE — the
+Render job command inside the builder image.
 Development gun.
 USAGE
 }
@@ -116,11 +122,11 @@ case "$POSTGRES_TARGET" in
         usage >&2
         exit 1
         ;;
-    render|local)
+    render|local|compose)
         ;;
     *)
-        echo "Error: --postgres must be render" \
-            "or local" >&2
+        echo "Error: --postgres must be render," \
+            "local, or compose" >&2
         usage >&2
         exit 1
         ;;
@@ -133,7 +139,8 @@ if [ "$POSTGRES_TARGET" = "render" ] \
     exit 1
 fi
 
-if [ "$POSTGRES_TARGET" = "local" ] \
+if [ "$POSTGRES_TARGET" = "local" \
+    -o "$POSTGRES_TARGET" = "compose" ] \
     && [ -n "$TOKEN" ]; then
     echo "Error: unexpected argument" >&2
     usage >&2
@@ -146,6 +153,16 @@ elif [ "$MOCK_DATA" = true ]; then
     MODE='--mock-data'
 else
     MODE='--test-plan-slices'
+fi
+
+if [ "$POSTGRES_TARGET" = "compose" ]; then
+    if ! command -v docker >/dev/null; then
+        echo "Error: docker is required" >&2
+        exit 1
+    fi
+    ROOT="$(cd "$(dirname "$0")" && pwd)"
+    exec docker compose -f "$ROOT/compose.yaml" \
+        run --rm seed "$MODE"
 fi
 
 if ! command -v node >/dev/null; then
