@@ -69,11 +69,12 @@ import {
 // No internal db.transaction wrap here (unlike derive-
 // organizations.ts / deriveIdentityPiiRows): identity_tokens is
 // never a hard-delete zone (api/derive-identity-spine.ts's own
-// header draws this line for its own siblings) — two independent
-// getAllWhere reads, outside any transaction, is the cheaper shape
-// every OTHER derive-identity-spine.ts facet but pii already uses.
+// header draws this line for its own siblings) — one
+// getAllWhere on db.pairs, outside any transaction, is the
+// cheaper shape every OTHER derive-identity-spine.ts facet
+// but pii already uses.
 //
-// Reads db.requests/db.responses (+ pickString/validate-
+// Reads db.pairs (+ pickString/validate-
 // IdentityTokenEntity over their decoded bodies) ONLY — never
 // db.identityTokens, the row-plane table this task's GET flip
 // retired as a production READ; Phase 13 Task 9 retires the
@@ -124,15 +125,10 @@ async function fetchTokenDocumentsAt(
     dbOrView: DbAdapter,
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
-    const [requests, responses] = await Promise.all([
-        dbOrView.requests.getAllWhere(
-            'uri_collection', prefix,
-        ),
-        dbOrView.responses.getAllWhere(
-            'uri_collection', prefix,
-        ),
-    ]);
-    return deriveDocumentsAt(requests, responses, prefix);
+    const pairs = await dbOrView.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
+    return deriveDocumentsAt(pairs, prefix);
 }
 
 // Nested docs plus leftover flat docs whose identity_id
@@ -194,28 +190,25 @@ export async function deriveIdentityToken(
 export async function deriveIdentityTokens(
     db: DbAdapter,
 ): Promise<IdentityTokenEntity[]> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAll(),
-        db.responses.getAll(),
-    ]);
+    const pairs = await db.pairs.getAll();
     const byId = new Map<string, IdentityTokenEntity>();
     const flat = deriveDocumentsAt(
-        requests, responses, IDENTITY_TOKENS_FLAT_PREFIX,
+        pairs, IDENTITY_TOKENS_FLAT_PREFIX,
     );
     for (const document of flat.values()) {
         byId.set(document.uriId, identityTokenEntityOf(document));
     }
     const prefixes = new Set<string>();
-    for (const request of requests) {
-        if (TOKENS_ADDRESS_PATTERN.test(request.uri_collection)) {
-            prefixes.add(request.uri_collection);
+    for (const pair of pairs) {
+        if (TOKENS_ADDRESS_PATTERN.test(pair.uri_collection)) {
+            prefixes.add(pair.uri_collection);
         }
     }
     for (const prefix of prefixes) {
         const match = TOKENS_ADDRESS_PATTERN.exec(prefix)!;
         const identityId = match[1]!;
         const documents = deriveDocumentsAt(
-            requests, responses, prefix,
+            pairs, prefix,
         );
         for (const document of documents.values()) {
             byId.set(

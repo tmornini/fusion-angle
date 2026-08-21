@@ -371,8 +371,8 @@ Every page is a standalone HTML file served by
   memory (`api/backend-memory.ts` / `api/db-memory.ts`).
   There is no IndexedDB or localStorage **data**
   backend. Theme and sidebar still use localStorage.
-  `TABLE_NAMES` is two: `requests`, `responses` — the
-  pure message plane, both on `HistoryEntityStore`.
+  `TABLE_NAMES` is one: `pairs` — the
+  pure message plane, on `HistoryEntityStore`.
   Every store op crosses the `StorageBackend`
   transaction seam (`api/db.ts`). The memory backend
   simulates the same transaction (buffer then flush)
@@ -543,10 +543,11 @@ Tests cover pure modules, flow-edit business logic
 round-trip, in-browser ZIP (flow export, `zip.ts`), the
 memory transaction backend, the tx runners and view, the
 commit batch route, api routing, navigation, mock-data
-validity (pair count 1448 / bootstrap 8 absolute; the
-mock-data fingerprint file retired with the clients
-table), client registration facet + derive, the two-tier
-hazard predicate (`flow-graph-hazard.test.ts`), presenter
+validity (pair count 1448 / bootstrap 8 absolute on
+`pairs`; the mock-data fingerprint file retired with
+the clients table), client registration facet + derive,
+the two-tier hazard predicate (`flow-graph-hazard.test.ts`),
+presenter
 SafeHtml, flow-stats pure math + adapter + presenter,
 `duration-units`, and the invitation lifecycle.
 Phase 14 cores: `drift-phase14-cores-parity.test.ts`,

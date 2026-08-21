@@ -93,15 +93,14 @@ function memberRowsFrom(
 export async function deriveMemberParents(
     db: DbAdapter,
 ): Promise<MemberEntity[]> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', MEMBERS_PREFIX),
-        db.responses.getAllWhere('uri_collection', MEMBERS_PREFIX),
-    ]);
+    const stored = await db.pairs.getAllWhere(
+        'uri_collection', MEMBERS_PREFIX,
+    );
     const documents = deriveDocumentsAt(
-        requests, responses, MEMBERS_PREFIX,
+        stored, MEMBERS_PREFIX,
     );
     const pairs = documentPairsAt(
-        requests, responses, MEMBERS_PREFIX,
+        stored, MEMBERS_PREFIX,
     );
     return memberRowsFrom(documents, pairs)
         .sort(byIdAscending);
@@ -117,18 +116,17 @@ export async function deriveMemberParent(
     db: DbAdapter,
     id: Id,
 ): Promise<MemberEntity> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', MEMBERS_PREFIX),
-        db.responses.getAllWhere('uri_collection', MEMBERS_PREFIX),
-    ]);
+    const stored = await db.pairs.getAllWhere(
+        'uri_collection', MEMBERS_PREFIX,
+    );
     const document = deriveDocumentsAt(
-        requests, responses, MEMBERS_PREFIX,
+        stored, MEMBERS_PREFIX,
     ).get(id);
     if (document === undefined) {
         throw new EntityNotFoundError('members', id);
     }
     const pairs = documentPairsAt(
-        requests, responses, MEMBERS_PREFIX,
+        stored, MEMBERS_PREFIX,
     ).filter((pair) => pair.uriId === id);
     const history = stateHistoryFrom(
         documentLifecycleEvents(pairs), id,
@@ -163,19 +161,14 @@ export async function deriveMembers(
     db: DbAdapter,
     organization: Id,
 ): Promise<MemberEntity[]> {
-    const [seats, identityRequests, identityResponses] =
-        await Promise.all([
-            deriveOrganizationMemberSeats(db, organization),
-            db.requests.getAllWhere(
-                'uri_collection', IDENTITIES_PREFIX,
-            ),
-            db.responses.getAllWhere(
-                'uri_collection', IDENTITIES_PREFIX,
-            ),
-        ]);
+    const [seats, identityPairs] = await Promise.all([
+        deriveOrganizationMemberSeats(db, organization),
+        db.pairs.getAllWhere(
+            'uri_collection', IDENTITIES_PREFIX,
+        ),
+    ]);
     const identities = deriveDocumentsAt(
-        identityRequests, identityResponses,
-        IDENTITIES_PREFIX,
+        identityPairs, IDENTITIES_PREFIX,
     );
     const rows: MemberEntity[] = [];
     for (const seat of seats) {

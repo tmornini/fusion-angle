@@ -83,13 +83,10 @@ export async function deriveObjectiveRevisions(
     const prefix = objectiveRevisionsUriPrefix(
         organization, objectiveId,
     );
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    const documents = deriveDocumentsAt(
-        requests, responses, prefix,
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
     );
+    const documents = deriveDocumentsAt(pairs, prefix);
     const rows: ObjectiveRevisionEntity[] = [];
     for (const document of documents.values()) {
         rows.push(objectiveRevisionEntityOf(document));

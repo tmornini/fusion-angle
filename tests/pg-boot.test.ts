@@ -5,10 +5,12 @@ import {
     readListenEnv,
 } from '../server/boot.ts';
 import {
+    assertNoLegacyMessageTables,
     assertSchemaMarker,
     assertUtf8,
     bootErrorMessage,
     hasSchemaMarker,
+    LEGACY_MESSAGE_TABLES,
     MISSING_MARKER,
     NO_ARGUMENTS,
     UTF8_REQUIRED,
@@ -187,6 +189,35 @@ test('bootErrorMessage never echoes a URL', () => {
     assert.equal(
         bootErrorMessage(new Error(MISSING_MARKER)),
         MISSING_MARKER,
+    );
+    assert.equal(
+        bootErrorMessage(
+            new Error(LEGACY_MESSAGE_TABLES),
+        ),
+        LEGACY_MESSAGE_TABLES,
+    );
+});
+
+test('boot refuses legacy message tables',
+async () => {
+    const present = fakeClient([
+        { rel: 'requests' },
+    ]);
+    await assert.rejects(
+        () => assertNoLegacyMessageTables(
+            present.sql,
+        ),
+        (error: unknown) =>
+            error instanceof Error
+            && error.message
+                === LEGACY_MESSAGE_TABLES,
+    );
+    const absent = fakeClient([
+        { rel: null },
+        { rel: null },
+    ]);
+    await assertNoLegacyMessageTables(
+        absent.sql,
     );
 });
 

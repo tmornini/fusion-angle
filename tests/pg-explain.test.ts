@@ -115,24 +115,18 @@ async function putPair(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('requests', {
+    await tx.put('pairs', {
         id,
         uri_collection: collection,
         uri_id: uriId,
-        at,
         requester_identity_id: REQUESTER,
-        message_hash: hex64(n),
-        message,
         method,
-        operation_id: OPERATION,
-    });
-    await tx.put('responses', {
-        id,
-        uri_collection: collection,
-        uri_id: uriId,
-        at,
+        request_at: at,
+        request_hash: hex64(n),
+        request: message,
+        response_at: at,
         version: hex64(n),
-        message,
+        response: message,
         operation_id: OPERATION,
     });
 }
@@ -144,26 +138,20 @@ async function putAuthorize(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('requests', {
+    await tx.put('pairs', {
         id,
         uri_collection: AUTH_COLLECTION,
         uri_id: '',
-        at,
         requester_identity_id: REQUESTER,
-        message_hash: hex64(n),
-        message:
+        method: 'GET',
+        request_at: at,
+        request_hash: hex64(n),
+        request:
             'GET /authentication/authorize/'
             + ' HTTP/1.1\r\n\r\n',
-        method: 'GET',
-        operation_id: OPERATION,
-    });
-    await tx.put('responses', {
-        id,
-        uri_collection: AUTH_COLLECTION,
-        uri_id: '',
-        at,
+        response_at: at,
         version: hex64(n),
-        message: jsonWire({ code }),
+        response: jsonWire({ code }),
         operation_id: OPERATION,
     });
 }
@@ -288,8 +276,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         await backend.ensureTables(TABLE_NAMES);
         await seedRows(backend);
-        await sql.query`ANALYZE requests`;
-        await sql.query`ANALYZE responses`;
+        await sql.query`ANALYZE pairs`;
     });
 
     after(async () => {
@@ -304,138 +291,99 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    test('pk request uses requests_pkey', async () => {
+    test('pk uses pairs_pkey', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM requests
+            SELECT * FROM pairs
             WHERE id = ${ideaId}
         `;
         assertIndexPlan(
             explainText(plans),
-            ['requests_pkey'],
-        );
-    });
-
-    test('pk response uses responses_pkey', async () => {
-        const plans = await sql.query<
-            Record<string, unknown>
-        >`
-            EXPLAIN
-            SELECT * FROM responses
-            WHERE id = ${ideaId}
-        `;
-        assertIndexPlan(
-            explainText(plans),
-            ['responses_pkey'],
+            ['pairs_pkey'],
         );
     });
 
     test('small collection uses collection index',
     async () => {
-        const requests = await sql.query<
-            Record<string, unknown>
-        >`
-            EXPLAIN
-            SELECT * FROM requests
-            WHERE uri_collection = ${IDEA_COLLECTION}
-            ORDER BY at, id
-        `;
-        const responses = await sql.query<
-            Record<string, unknown>
-        >`
-            EXPLAIN
-            SELECT * FROM responses
-            WHERE uri_collection = ${IDEA_COLLECTION}
-            ORDER BY at, id
-        `;
-        assertIndexPlan(
-            explainText(requests),
-            ['requests_collection'],
-        );
-        assertIndexPlan(
-            explainText(responses),
-            ['responses_collection'],
-        );
-    });
-
-    test('message_hash uses requests_replay', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM requests
-            WHERE message_hash = ${ideaHash}
+            SELECT * FROM pairs
+            WHERE uri_collection = ${IDEA_COLLECTION}
+            ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['requests_replay'],
+            ['pairs_collection'],
+        );
+    });
+
+    test('request_hash uses pairs_replay', async () => {
+        const plans = await sql.query<
+            Record<string, unknown>
+        >`
+            EXPLAIN
+            SELECT * FROM pairs
+            WHERE request_hash = ${ideaHash}
+        `;
+        assertIndexPlan(
+            explainText(plans),
+            ['pairs_replay'],
         );
     });
 
     test('address uses address index', async () => {
-        const requests = await sql.query<
+        const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM requests
-            WHERE uri_collection = ${IDEA_COLLECTION}
-              AND uri_id = ${IDEA_URI_ID}
-            ORDER BY at, id
-        `;
-        const responses = await sql.query<
-            Record<string, unknown>
-        >`
-            EXPLAIN
-            SELECT * FROM responses
+            SELECT * FROM pairs
             WHERE uri_collection = ${VERSION_COLLECTION}
               AND uri_id = ${VERSION_URI_ID}
-            ORDER BY at, id
+            ORDER BY response_at, id
         `;
         assertIndexPlan(
-            explainText(requests),
-            ['requests_address'],
-        );
-        assertIndexPlan(
-            explainText(responses),
-            ['responses_address'],
+            explainText(plans),
+            ['pairs_address'],
         );
     });
 
-    test('version triple uses responses_version',
+    test('version triple uses pairs_version',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM responses
+            SELECT * FROM pairs
             WHERE uri_collection = ${VERSION_COLLECTION}
               AND uri_id = ${VERSION_URI_ID}
               AND version = ${versionHit}
-            ORDER BY at, id
+            ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['responses_version'],
+            ['pairs_version'],
         );
     });
 
-    test('body containment uses responses_body',
+    test('body containment uses pairs_body',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM responses
+            SELECT * FROM pairs
             WHERE uri_collection = ${AUTH_COLLECTION}
-              AND message_body(message) @>
+              AND message_body(response) @>
                   ${AUTH_CONTAINMENT}::jsonb
-            ORDER BY at, id
+            ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['responses_body'],
+            ['pairs_body'],
         );
     });
 
@@ -445,20 +393,17 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT r.id, q.method
-            FROM responses r
-            JOIN requests q ON q.id = r.id
-            WHERE r.uri_collection = ${VERSION_COLLECTION}
-              AND r.uri_id = ${VERSION_URI_ID}
-              AND q.method IN ('PUT', 'DELETE')
-            ORDER BY r.at DESC, r.id DESC
+            SELECT id, method
+            FROM pairs
+            WHERE uri_collection = ${VERSION_COLLECTION}
+              AND uri_id = ${VERSION_URI_ID}
+              AND method IN ('PUT', 'DELETE')
+            ORDER BY response_at DESC, id DESC
             LIMIT 1
         `;
         const text = explainText(plans);
-        assert.ok(
-            text.includes('requests_pkey'),
-            'expected requests_pkey in\n' + text,
-        );
-        assertIndexPlan(text, ['responses_address']);
+        assert.doesNotMatch(text, /requests_pkey/);
+        assert.doesNotMatch(text, /Join/);
+        assertIndexPlan(text, ['pairs_address']);
     });
 }

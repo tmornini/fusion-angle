@@ -278,7 +278,7 @@ Master never re-dispatches a hunter to retry.
   `getBoundingClientRect` (its larger CSS-px values miss).
 - **List pages populate slowly (5–14s)**: org-scoped list
   reads re-derive each entity's lifecycle from the
-  message-plane pair ledger (`requests`/`responses`), so
+  message-plane pair ledger (`pairs`), so
   cards can take 5–14s to paint (Flows is slowest). Wait
   ≥14s and assert the container's `childCount` /
   `data-*-card` count — never an early screenshot, which
@@ -392,9 +392,9 @@ mutation domains disjoint:
 
 #### Entity mutation domain scoping
 
-Phase 2 agents share one Postgres (`requests` /
-`responses`); every product write appends pairs
-only. There is no per-agent private ledger.
+Phase 2 agents share one Postgres (`pairs`);
+every product write appends pairs only. There
+is no per-agent private ledger.
 Agents own **disjoint pair-address families**
 (URI prefixes), not entity tables — the historical
 table names below name the ADDRESS family each
@@ -742,7 +742,7 @@ in order.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
   via pair fixture on the flow document address
-  (`requests`/`responses`) per the protocol workaround.)
+  (`pairs`) per the protocol workaround.)
 - [ ] **AA29** Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
@@ -900,7 +900,7 @@ depends: A
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, so create the zero-membership state via pair fixtures (the B21 precedent): sign in as a single-org seeded member, then append a DELETE-shaped membership document pair (and clear any default-organization pairs) for that identity through the gate or by inserting matching `requests`/`responses` rows — do NOT poke a retired `memberships` table. `getOrganizations` is fenced to the derived membership ledger, so the identity now reaches no org. Their login credential is untouched.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, so create the zero-membership state via pair fixtures (the B21 precedent): sign in as a single-org seeded member, then append a DELETE-shaped membership document pair (and clear any default-organization pairs) for that identity through the gate or by inserting matching `pairs` rows — do NOT poke a retired `memberships` table. `getOrganizations` is fenced to the derived membership ledger, so the identity now reaches no org. Their login credential is untouched.
 
 - [ ] **B25** From the zero-membership state, sign out, then sign in again with that member's credentials. PASS: lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher.
 - [ ] **B26** From the zero-membership state while signed in, open `dashboard/index.html` (or any org-gated page) directly and reload (Cmd-R). PASS: redirected to `invitations/index.html` by the boot org gate — no dashboard error card, no retry loop (the returning-user path, not just fresh login).
@@ -1483,7 +1483,7 @@ canvas re-renders after each step.)
   live path; undo now walks the flow's own full document-pair
   history). The `flow_versions` store is DELETED (Phase
   Final) — there is nothing to inspect; the flow's own
-  document-pair history in `requests`/`responses` is the
+  document-pair history in `pairs` is the
   sole undo source.
 - [ ] **F46** Edit a flow (rename a state), let auto-save complete.
   Navigate away from the designer to `flows/index.html`. Re-open the
@@ -1583,7 +1583,7 @@ designer "tag current" action lands.)
 - [ ] **F66** MOOT (Phase Final). The `flow_versions` table is
   DELETED; there is nothing to inspect.
   Member assignment is captured only in the flow's own
-  document-pair history (`requests`/`responses`). Confirm
+  document-pair history (`pairs`). Confirm
   via pair fixtures or F67: a `memberIds` change is still
   undoable through that history.
 - [ ] **F67** Tick one checkbox in the Members fieldset,
@@ -1814,7 +1814,7 @@ depends: A
 
 - [ ] **WB16** After binding an instance and
   transitioning with value changes, inspect
-  `requests`/`responses` (or derived
+  `pairs` (or derived
   `GET work-orders/:id/history` and the instance
   head). PASS: the work-order document pair head
   carries `display_id` and `flow_graph` JSON; the
@@ -1848,13 +1848,13 @@ depends: A
   most one live `'claimed'` event for this work order's
   `entity_id` under the `(at, id)` reduction (a stale prior claim
   is superseded by a `'claim_expired'` event, never overwritten
-  in place). Inspect via `requests`/`responses` or derived
+  in place). Inspect via `pairs` or derived
   `GET work-orders/:id/history` (DESC; claim rows carry
   `field_values: []`).
 - [ ] **WB19** After transitioning a work order through at
   least two states, read the derived history
   (`GET work-orders/:id/history` or the matching pairs in
-  `requests`/`responses`) for this work order's id. PASS:
+  `pairs`) for this work order's id. PASS:
   rows are `(at, id)` DESC (index 0 = current); each
   non-claim event has the immutable shape `{id, entity_id,
   state, member_id, at, field_values}`, with `state`
@@ -2298,7 +2298,7 @@ depends: A
 - [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. With mock data seeded and the demo admin's active organization (Stark), the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
-- [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `requests`/`responses` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the localStorage session-credentials JWT's name claim, and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
+- [ ] **G46** On a person's detail page, click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `pairs` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the localStorage session-credentials JWT's name claim, and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
 - [ ] **G47** On a kind-'service' identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
@@ -2353,7 +2353,7 @@ feature is implemented.
   persist (round-tripped through
   `PUT /organizations/<id>`). Inspect the
   `organizations/:id` document pairs on the message
-  plane (`requests`/`responses`): the latest head
+  plane (`pairs`): the latest head
   body carries the updated `name` and `domain`
   alongside the unchanged `seats`,
   `projects_limit`, `ideas_limit`, and

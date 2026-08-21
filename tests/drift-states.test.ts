@@ -1026,11 +1026,11 @@ async () => {
         STARK_ORGANIZATION, '/organizations/1/flows/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
     ]);
     const pairs = documentPairsAt(
-        requests, responses, prefix,
+        requests, prefix,
     ).filter((p) => p.uriId === flowId);
     const states: { state: string; at: string }[] = [];
     for (const pair of pairs) {

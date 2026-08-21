@@ -139,14 +139,14 @@ test('a member PUT identities/:id/token-revocations/:rid'
     assert.deepEqual(
         row, { id: 'self-rev-1', identity_id: 'member1', at },
     );
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const own = requests.find(
         r => r.uri_collection
             === '/identities/member1/token-revocations/'
             && r.uri_id === 'self-rev-1',
     );
     assert.ok(own);
-    const responses = await db.responses.getAll();
+    const responses = await db.pairs.getAll();
     const ownResponse = responses.find(
         r => r.uri_collection
             === '/identities/member1/token-revocations/'
@@ -245,7 +245,7 @@ test('a member PUT naming ANOTHER identity 403s, byte-pinned'
         error: 'forbidden: PUT ' + path
             + ' requires a role this principal lacks',
     });
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     assert.equal(
         requests.filter(
             r => r.uri_id === 'foreign-rev-1',

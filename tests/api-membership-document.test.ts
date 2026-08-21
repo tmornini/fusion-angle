@@ -117,8 +117,8 @@ async () => {
         db, 'sarah', body, 'current', pair,
     );
     assert.deepEqual(written, body);
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.pairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
@@ -137,8 +137,8 @@ test('a byte-identical PUT resend to a seat converges'
     assert.deepEqual(first, second);
     // seedAdminSchema: org + current seat; one unique
     // sarah seat PUT. Byte-identical resend dedups.
-    assert.equal((await db.requests.getAll()).length, 4);
-    assert.equal((await db.responses.getAll()).length, 4);
+    assert.equal((await db.pairs.getAll()).length, 4);
+    assert.equal((await db.pairs.getAll()).length, 4);
 });
 
 test('a seat PUT chain derives the latest body',

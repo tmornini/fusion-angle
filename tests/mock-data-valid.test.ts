@@ -577,18 +577,15 @@ test(
         );
         const [agentRequests, agentResponses] =
             await Promise.all([
-                db.requests.getAllWhere(
+                db.pairs.getAllWhere(
                     'uri_collection', '/ai-agents/',
                 ),
-                db.responses.getAllWhere(
+                db.pairs.getAllWhere(
                     'uri_collection', '/ai-agents/',
                 ),
             ]);
         const agentIds = new Set(
-            deriveDocumentsAt(
-                agentRequests, agentResponses,
-                '/ai-agents/',
-            ).keys(),
+            deriveDocumentsAt(agentRequests, '/ai-agents/').keys(),
         );
         const violations = new Set<string>();
         for (const s of states) {

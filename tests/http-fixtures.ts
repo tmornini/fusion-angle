@@ -87,7 +87,7 @@ export async function storedPutBodyText(
             'no live PUT at ' + collection + id,
         );
     }
-    return storedMessageBodyText(stored.message);
+    return storedMessageBodyText(stored.response);
 }
 
 export async function storedCollectionText(

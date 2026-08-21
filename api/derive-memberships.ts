@@ -97,11 +97,11 @@ import {
 // deriveMembershipsForIdentity filtered to one organization —
 // ADAPTER-SHAPED (`dbOrView: DbAdapter`, the SAME type an open
 // db.transaction view carries) so the invitation grant's own open
-// transaction (which already declares 'requests'/'responses'
+// transaction (which already declares MESSAGE_TABLES
 // among its tables) can call it in-tx without opening a nested
 // transaction of its own.
 //
-// Reads db.requests/db.responses (+ pickString/validate-
+// Reads db.pairs (+ pickString/validate-
 // MembershipEntity over their decoded bodies) ONLY — never
 // db.memberships, the row-plane table Task 3 retires this
 // derivation to replace.
@@ -149,16 +149,11 @@ export async function deriveMembershipsForIdentity(
     const rows: MembershipEntity[] = [];
     for (const organization of organizations) {
         const seatPrefix = seatsPrefixFor(organization.id);
-        const [seatRequests, seatResponses] = await Promise.all([
-            db.requests.getAllWhere(
-                'uri_collection', seatPrefix,
-            ),
-            db.responses.getAllWhere(
-                'uri_collection', seatPrefix,
-            ),
-        ]);
+        const seatPairs = await db.pairs.getAllWhere(
+            'uri_collection', seatPrefix,
+        );
         const seat = deriveDocumentsAt(
-            seatRequests, seatResponses, seatPrefix,
+            seatPairs, seatPrefix,
         ).get(identityId);
         if (seat !== undefined) {
             rows.push(seatEntityOf(seat, organization.id));
@@ -180,16 +175,11 @@ export async function membershipExistsFor(
     identityId: Id,
 ): Promise<boolean> {
     const seatPrefix = seatsPrefixFor(organization);
-    const [seatRequests, seatResponses] = await Promise.all([
-        dbOrView.requests.getAllWhere(
-            'uri_collection', seatPrefix,
-        ),
-        dbOrView.responses.getAllWhere(
-            'uri_collection', seatPrefix,
-        ),
-    ]);
+    const seatPairs = await dbOrView.pairs.getAllWhere(
+        'uri_collection', seatPrefix,
+    );
     return deriveDocumentsAt(
-        seatRequests, seatResponses, seatPrefix,
+        seatPairs, seatPrefix,
     ).has(identityId);
 }
 
@@ -198,13 +188,10 @@ export async function deriveOrganizationMemberSeats(
     organization: Id,
 ): Promise<MembershipEntity[]> {
     const prefix = seatsPrefixFor(organization);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    const documents = deriveDocumentsAt(
-        requests, responses, prefix,
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
     );
+    const documents = deriveDocumentsAt(pairs, prefix);
     const rows: MembershipEntity[] = [];
     for (const document of documents.values()) {
         rows.push(seatEntityOf(document, organization));
@@ -218,12 +205,11 @@ export async function deriveOrganizationMemberSeat(
     identityId: Id,
 ): Promise<MembershipEntity> {
     const prefix = seatsPrefixFor(organization);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const document = deriveDocumentsAt(
-        requests, responses, prefix,
+        pairs, prefix,
     ).get(identityId);
     if (document === undefined) {
         throw new EntityNotFoundError(

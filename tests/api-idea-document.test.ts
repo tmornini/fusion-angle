@@ -142,8 +142,8 @@ test('a byte-identical resend converges: one event,'
     );
     const events = await deriveIdeaStateHistory(db, '1', 'doc-3');
     assert.equal(events.length, 1);
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
+    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.pairs.getAll()).length, 3);
 });
 
 test('same-body second PUT on a simple document is 200'
@@ -159,7 +159,7 @@ async () => {
     const firstEtag = first.headers.get('ETag');
     assert.ok(firstEtag !== null && firstEtag !== '');
     const prefix = '/organizations/1/ideas/';
-    const before = (await db.requests.getAllWhere(
+    const before = (await db.pairs.getAllWhere(
         'uri_collection', prefix,
     )).filter((row) => row.uri_id === 'same-1');
     assert.equal(before.length, 1);
@@ -180,7 +180,7 @@ async () => {
     );
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('ETag'), firstEtag);
-    const after = (await db.requests.getAllWhere(
+    const after = (await db.pairs.getAllWhere(
         'uri_collection', prefix,
     )).filter((row) => row.uri_id === 'same-1');
     assert.equal(after.length, 1);
@@ -207,10 +207,10 @@ test('the pair request body carries domain state;'
     assert.equal(wire.state, 'in_review');
     assert.equal('state_at' in wire, false);
     assert.equal('state_event_id' in wire, false);
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     // seedRootAdmin 2 + idea PUT 1
     assert.equal(requests.length, 3);
-    const parsed = pairJsonOf(requests[2]!.message) as {
+    const parsed = pairJsonOf(requests[2]!.request) as {
         body: { state: string };
     };
     assert.equal(parsed.body.state, 'in_review');
@@ -279,7 +279,7 @@ test('GET /organizations/:id/ideas/:id body octets equal the live PUT '
         );
         assert.ok(stored !== undefined);
         const storedBody = HttpMessage.fromWire(
-            stored.message,
+            stored.response,
         ).body();
         assert.ok(storedBody.exists());
         setClockForTest(

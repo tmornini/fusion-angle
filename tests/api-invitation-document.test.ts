@@ -122,8 +122,8 @@ async () => {
     const db = await freshDb();
     const res = await grant(db, 'inv-doc-1');
     assert.equal(res.status, 200);
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
     // 6: the fixture's own membership pair (Phase 13 Task 1;
     // role-grant retired), two identities/:id/pii pairs
     // (Phase 15 gate 6), the organizations/:id document
@@ -139,7 +139,7 @@ async () => {
     // by construction (design decision 6), so a match here IS
     // the document.
     const documents = documentPairsAt(
-        requests, responses, '/invitations/',
+        requests, '/invitations/',
     ).filter(pair => pair.uriId === 'inv-doc-1');
     assert.equal(documents.length, 1);
     const wire = documents[0]!.body;
@@ -161,7 +161,7 @@ async () => {
     assert.equal(first.status, 200);
     const second = await grant(db, 'inv-doc-2b');
     assert.equal(second.status, 200);
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const atDuplicateId = requests.filter(
         r => r.uri_collection === '/invitations/'
             && r.uri_id === 'inv-doc-2b',
@@ -188,8 +188,8 @@ async () => {
     // organizations/:id document (Stage B), plus sarah's own
     // conflicting membership pair (Phase 13 Task 1) — the
     // failed grant appends nothing further. Role-grant retired.
-    assert.equal((await db.requests.getAll()).length, 5);
-    assert.equal((await db.responses.getAll()).length, 5);
+    assert.equal((await db.pairs.getAll()).length, 5);
+    assert.equal((await db.pairs.getAll()).length, 5);
 });
 
 // ── accept: the memberships document pair (the B2 closure) ──
@@ -227,10 +227,10 @@ test('a fresh accept appends its seat document at the'
         '2026-01-01T00:00:01.000000Z',
     );
     assert.equal(res.status, 204);
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
     const documents = documentPairsAt(
-        requests, responses, '/organizations/1/members/',
+        requests, '/organizations/1/members/',
     ).filter(pair => pair.uriId === 'sarah');
     assert.equal(documents.length, 1);
     assert.deepEqual(documents[0]!.body, {
@@ -272,7 +272,7 @@ async () => {
         '2026-01-01T00:00:02.000000Z',
     );
     assert.equal(second.status, 409);
-    const documents = (await db.requests.getAll()).filter(
+    const documents = (await db.pairs.getAll()).filter(
         r => r.uri_collection === '/organizations/1/members/'
             && r.uri_id === 'sarah',
     );
@@ -403,8 +403,7 @@ test('every stored invitation-family message verifies against'
         db, 'inv-balance-3', 'clark', 'ev-balance-dec',
         '2026-01-01T00:00:01.000000Z',
     );
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
+    const pairs = await db.pairs.getAll();
     // 3 grants x 2 (operation + invitation document) + 1 accept
     // x 2 (operation + memberships document) + 1 decline x 1
     // (operation only — decline synthesizes no document) = 9,
@@ -412,12 +411,11 @@ test('every stored invitation-family message verifies against'
     // Task 1; role-grant retired), four identities/:id/pii
     // pairs (current, sarah, bruce, clark — Phase 15 gate 6),
     // and the organizations/:id document (Stage B) = 15.
-    assert.equal(requests.length, 15);
-    assert.equal(responses.length, 15);
-    for (const row of requests) {
+    assert.equal(pairs.length, 15);
+    for (const row of pairs) {
         assert.equal(
-            await requestMessageHash(row.message),
-            row.message_hash,
+            await requestMessageHash(row.request),
+            row.request_hash,
         );
     }
 });

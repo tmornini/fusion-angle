@@ -155,10 +155,10 @@ async function pairGraphDeltaEvents(
         action: string;
     }[];
 }> {
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
     const pairs = documentPairsAt(
-        requests, responses, '/organizations/1/flows/',
+        requests, '/organizations/1/flows/',
     ).filter((p) => p.uriId === flowId);
     const memberEvents: {
         flow_node_id: string;

@@ -31,12 +31,12 @@ test(
         const db = await freshDb();
         // DEV_TOKEN carries no `organization` claim, so
         // fenceRequest falls back to identityDefaultOrganization,
-        // which derives from db.requests/db.responses at the
+        // which derives from db.pairs/db.pairs at the
         // identity's default-organization address. Fault THAT
         // read alone
         // — every other read passes through unaffected.
-        const original = db.requests.getAllWhere.bind(db.requests);
-        (db.requests as unknown as {
+        const original = db.pairs.getAllWhere.bind(db.pairs);
+        (db.pairs as unknown as {
             getAllWhere: (
                 column: string, key: string,
             ) => ReturnType<typeof original>;
@@ -78,15 +78,15 @@ test(
     + ' never redacted to the fixed 500',
     async () => {
         const db = await freshDb();
-        const original = db.requests.getAllWhere.bind(db.requests);
-        (db.requests as unknown as {
+        const original = db.pairs.getAllWhere.bind(db.pairs);
+        (db.pairs as unknown as {
             getAllWhere: (
                 column: string, key: string,
             ) => ReturnType<typeof original>;
         }).getAllWhere = async (column, key) => {
             if (key === '/identities/current/'
                 + 'default-organization/') {
-                throw new MissingTableError('requests');
+                throw new MissingTableError('pairs');
             }
             return original(column, key);
         };

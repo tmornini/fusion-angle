@@ -30,22 +30,28 @@ test(
     async () => {
         const adapter = memoryDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.requests.put('u1', {
+        await adapter.pairs.put('u1', {
             uri_collection:
                 '/organizations/1/ideas/',
             uri_id: '42',
-            at: '2026-01-01T00:00:00.000000Z',
             requester_identity_id: 'current',
-            message_hash: 'a'.repeat(64),
-            message:
+            method: 'PUT',
+            request_at:
+                '2026-01-01T00:00:00.000000Z',
+            request_hash: 'a'.repeat(64),
+            request:
                 'PUT /organizations/1/ideas/42'
                 + ' HTTP/1.1\r\n\r\n',
-            method: 'PUT',
+            response_at:
+                '2026-01-01T00:00:00.000001Z',
+            version: 'e'.repeat(64),
+            response:
+                'HTTP/1.1 200 OK\r\n\r\n',
             operation_id: '0123456789ABCDEFGHIJKL',
         });
         await adapter.postSchemaCreation();
         const requests =
-            await adapter.requests.getAll();
+            await adapter.pairs.getAll();
         assert.equal(
             requests.length, 1,
             'second postSchemaCreation preserves'

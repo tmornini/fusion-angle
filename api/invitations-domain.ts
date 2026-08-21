@@ -1,4 +1,5 @@
 import type { DbAdapter } from './db.ts';
+import { MESSAGE_TABLES } from './db.ts';
 import {
     ValidationError,
     assertInvitationState,
@@ -508,7 +509,7 @@ async function grantInvitation(
         })
         : undefined;
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             const outcome = await grantOutcomeFor(
                 view, organization, identityId);
@@ -674,7 +675,7 @@ async function acceptInvitation(
     );
     let conflict = false;
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             const state = await currentInvitationState(view, id);
             if (state !== 'pending') {
@@ -746,7 +747,7 @@ async function declineInvitation(
     }
     let conflict = false;
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             const state = await currentInvitationState(view, id);
             if (state !== 'pending') {
@@ -811,7 +812,7 @@ async function revokeInvitation(
     }
     let conflict = false;
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             const state = await currentInvitationState(view, id);
             if (state !== 'pending') {

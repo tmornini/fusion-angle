@@ -1,7 +1,6 @@
 import type {
     Id,
-    RequestEntity,
-    ResponseEntity,
+    PairEntity,
     StateEntity,
 } from './types.ts';
 import { pickString } from './validators.ts';
@@ -60,8 +59,7 @@ export interface DocumentPair {
     readonly version: string;
 }
 
-// Every PUT/DELETE pair at `uriCollection`, request matched
-// to its response by their shared id, decoded once —
+// Every PUT/DELETE pair at `uriCollection`, decoded once —
 // ascending by the envelope (at, id), the SAME arrival order
 // headPairIdAt (message-pair.ts) picks a single head from.
 // That shared mechanism is ordering ONLY: headPairIdAt
@@ -71,43 +69,36 @@ export interface DocumentPair {
 // PUT/DELETE (the DOCUMENT head — design decision 6).
 // POST/PATCH rows at the same address are not heads. Only
 // successful writes are stored, so there is no status
-// filter. Method comes from the request row's `method`
-// column. A response with no stored request (should never
-// happen for an appended pair) is skipped rather than
-// thrown — this module trusts validated storage completely
-// but does not assume it can dereference a foreign key that
-// itself would be a storage bug elsewhere.
+// filter. Method comes from the pair's `method` column.
+// DocumentPair.at is the response stamp.
 export function documentPairsAt(
-    requests: readonly RequestEntity[],
-    responses: readonly ResponseEntity[],
+    pairs: readonly PairEntity[],
     uriCollection: string,
 ): readonly DocumentPair[] {
-    const requestById = new Map(
-        requests.map((request) => [request.id, request]),
-    );
-    const pairs: DocumentPair[] = [];
-    for (const response of responses) {
-        if (response.uri_collection !== uriCollection) {
+    const out: DocumentPair[] = [];
+    for (const pair of pairs) {
+        if (pair.uri_collection !== uriCollection) {
             continue;
         }
-        const request = requestById.get(response.id);
-        if (request === undefined) continue;
-        if (!DOCUMENT_METHODS.has(request.method)) continue;
-        pairs.push({
-            id: response.id,
-            at: response.at,
-            uriId: response.uri_id,
-            method: request.method,
-            body: requestBodyOf(request.message),
-            requesterIdentityId: request.requester_identity_id,
-            version: response.version,
+        if (!DOCUMENT_METHODS.has(pair.method)) {
+            continue;
+        }
+        out.push({
+            id: pair.id,
+            at: pair.response_at,
+            uriId: pair.uri_id,
+            method: pair.method,
+            body: requestBodyOf(pair.request),
+            requesterIdentityId:
+                pair.requester_identity_id,
+            version: pair.version,
         });
     }
-    return pairs.sort((a, b) =>
-        a.at < b.at ? -1
-            : a.at > b.at ? 1
-                : a.id < b.id ? -1
-                    : a.id > b.id ? 1
+    return out.sort((left, right) =>
+        left.at < right.at ? -1
+            : left.at > right.at ? 1
+                : left.id < right.id ? -1
+                    : left.id > right.id ? 1
                         : 0);
 }
 
@@ -130,12 +121,15 @@ export interface DerivedDocument {
 // Supersedes is NEVER walked (provenance-only — a DAG
 // under races; only the reduction decides currency).
 export function deriveDocumentsAt(
-    requests: readonly RequestEntity[],
-    responses: readonly ResponseEntity[],
+    pairs: readonly PairEntity[],
     uriCollection: string,
 ): Map<string, DerivedDocument> {
-    const pairs = documentPairsAt(requests, responses, uriCollection);
-    const heads = latestByKey(pairs, (pair) => pair.uriId);
+    const documentPairs = documentPairsAt(
+        pairs, uriCollection,
+    );
+    const heads = latestByKey(
+        documentPairs, (pair) => pair.uriId,
+    );
     const documents = new Map<string, DerivedDocument>();
     for (const [uriId, head] of heads) {
         if (head.method === DELETE_METHOD) continue;

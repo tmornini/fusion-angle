@@ -133,10 +133,10 @@ test(
             'identities/trace-me',
             { kind: 'person' },
         );
-        const rows = await db.requests.getAll();
+        const rows = await db.pairs.getAll();
         assert.ok(
             rows.some(
-                r => r.message.includes(ctx.requestId),
+                r => r.request.includes(ctx.requestId),
             ),
             'stored pair must carry the client requestId',
         );

@@ -214,8 +214,8 @@ test(
         // and TWO synthesized baseline pairs — Phase 7 Task
         // 4's 3+N widening, N=2 here) + three schema/
         // bootstrap pairs = 11.
-        const allRequests = await db.requests.getAll();
-        const allResponses = await db.responses.getAll();
+        const allRequests = await db.pairs.getAll();
+        const allResponses = await db.pairs.getAll();
         assert.equal(allRequests.length, 10);
         assert.equal(allResponses.length, 10);
         assert.equal(allRequests.length, allResponses.length);
@@ -237,7 +237,7 @@ test(
         // The requester is the caller, never the idea's author.
         assert.equal(request.requester_identity_id, 'current');
 
-        const parsed = pairJsonOf(request.message) as {
+        const parsed = pairJsonOf(request.request) as {
             body: Record<string, unknown>;
         };
         assert.deepEqual(parsed.body, {
@@ -263,7 +263,7 @@ test(
         // The conversion's idea pair is the one carrying
         // 'promoted' (the seed carried 'approved').
         const ideaRequest = atIdeaAddress.find((r) => {
-            const body = (pairJsonOf(r.message) as {
+            const body = (pairJsonOf(r.request) as {
                 body: Record<string, unknown>;
             }).body;
             return body['state'] === 'promoted';
@@ -274,7 +274,7 @@ test(
             ideaRequest.requester_identity_id, 'current',
         );
 
-        const ideaParsed = pairJsonOf(ideaRequest.message) as {
+        const ideaParsed = pairJsonOf(ideaRequest.request) as {
             body: Record<string, unknown>;
         };
         assert.deepEqual(ideaParsed.body, {
@@ -314,7 +314,7 @@ test(
                 'current',
             );
             const baselineParsed = pairJsonOf(
-                baselineRequest.message,
+                baselineRequest.request,
             ) as { body: Record<string, unknown> };
             // KEY-SET spot-check: the wire body is the
             // baseline's `fields` VERBATIM — exactly

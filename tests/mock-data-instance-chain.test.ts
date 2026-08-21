@@ -142,11 +142,11 @@ async () => {
     const prefix =
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + WO01_ID + '/binding/';
-    const requests = await db.requests.getAllWhere(
+    const requests = await db.pairs.getAllWhere(
         'uri_collection', prefix,
     );
     assert.equal(requests.length, 1);
-    const model = parseWire(requests[0]!.message);
+    const model = parseWire(requests[0]!.request);
     assert.equal(model.startLine.kind, 'request');
     if (model.startLine.kind !== 'request') {
         return;
@@ -182,12 +182,12 @@ async () => {
     const otherPrefix =
         '/organizations/' + STARK_ORGANIZATION
         + '/work-orders/' + otherWoId + '/transition/';
-    const otherReqs = await db.requests.getAllWhere(
+    const otherReqs = await db.pairs.getAllWhere(
         'uri_collection', otherPrefix,
     );
     assert.ok(otherReqs.length > 0);
     for (const request of otherReqs) {
-        const embedded = pairJsonOf(request.message) as {
+        const embedded = pairJsonOf(request.request) as {
             body: Record<string, unknown>;
         };
         assert.ok(
@@ -213,8 +213,8 @@ async () => {
         STARK_ORGANIZATION, SEED_RECORD_TYPE_ID,
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
     ]);
     const byId = new Map(
         responses

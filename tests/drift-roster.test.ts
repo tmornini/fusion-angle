@@ -656,14 +656,14 @@ async () => {
     const token = await organizationToken();
     const aiId = 'ai-drift-chain-1';
 
-    const beforeCreate = (await db.requests.getAll()).length;
+    const beforeCreate = (await db.pairs.getAll()).length;
     const created = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token,
         aiMemberDocumentBody('Chain AI'),
     ));
     assert.equal(created.status, 201);
     assert.equal(
-        (await db.requests.getAll()).length, beforeCreate + 1,
+        (await db.pairs.getAll()).length, beforeCreate + 1,
     );
     const agent1 = await handleRequest(
         db, req('GET', '/ai-agents/' + aiId, token),
@@ -688,7 +688,7 @@ async () => {
     );
 
     const humanId = 'human-drift-chain-1';
-    const beforeHumanCreate = (await db.requests.getAll()).length;
+    const beforeHumanCreate = (await db.pairs.getAll()).length;
     const humanCreated = await handleRequest(db, req(
         'PUT', '/identities/' + humanId, token, {
             kind: 'person',
@@ -700,7 +700,7 @@ async () => {
     ));
     assert.equal(humanCreated.status, 201);
     assert.equal(
-        (await db.requests.getAll()).length,
+        (await db.pairs.getAll()).length,
         beforeHumanCreate + 1,
     );
     const humanEdited = await handleRequest(db, req(
@@ -968,11 +968,11 @@ async () => {
         undefined, '/ai-agents/',
     );
     const [aiRequests, aiResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', aiPrefix),
-        db.responses.getAllWhere('uri_collection', aiPrefix),
+        db.pairs.getAllWhere('uri_collection', aiPrefix),
+        db.pairs.getAllWhere('uri_collection', aiPrefix),
     ]);
     const aiDocumentPairs = documentPairsAt(
-        aiRequests, aiResponses, aiPrefix,
+        aiRequests, aiPrefix,
     ).filter((pair) => pair.uriId === aiId);
     assert.equal(aiDocumentPairs.length, 1);
     assert.equal(aiDocumentPairs[0]!.method, 'PUT');
@@ -992,11 +992,11 @@ async () => {
         undefined, '/identities/',
     );
     const [humanRequests, humanResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', humanPrefix),
-        db.responses.getAllWhere('uri_collection', humanPrefix),
+        db.pairs.getAllWhere('uri_collection', humanPrefix),
+        db.pairs.getAllWhere('uri_collection', humanPrefix),
     ]);
     const humanDocumentPairs = documentPairsAt(
-        humanRequests, humanResponses, humanPrefix,
+        humanRequests, humanPrefix,
     ).filter((pair) => pair.uriId === humanId);
     assert.equal(humanDocumentPairs.length, 1);
     assert.equal(humanDocumentPairs[0]!.method, 'PUT');
@@ -1011,20 +1011,20 @@ test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const token = await organizationToken();
     const aiId = 'ai-drift-resend-1';
 
-    const beforeCount = (await db.requests.getAll()).length;
+    const beforeCount = (await db.pairs.getAll()).length;
     const body = aiMemberDocumentBody('Resend AI Facet');
     const first = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token, body,
     ));
     assert.equal(first.status, 201);
-    const afterFirst = (await db.requests.getAll()).length;
+    const afterFirst = (await db.pairs.getAll()).length;
     assert.equal(afterFirst, beforeCount + 1);
 
     const second = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token, body,
     ));
     assert.equal(second.status, 201);
-    const afterSecond = (await db.requests.getAll()).length;
+    const afterSecond = (await db.pairs.getAll()).length;
     assert.equal(afterSecond, afterFirst);
     assert.equal(
         first.headers.get('Response-ID'),

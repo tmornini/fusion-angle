@@ -12,34 +12,18 @@ import { appendMessagePair } from './message-pair.ts';
 // bodyless erasure tombstone: evidence of erasure without
 // erased content). Supersession and erasure are the SAME
 // mechanism here. `replacePiiSlot` is THE ONLY code path that
-// deletes rows from `requests` or `responses` — grep-provable;
-// keep it that way. The address is CHAINLESS by construction:
+// deletes a stored pair — grep-provable; keep it that way. The
+// address is CHAINLESS by construction:
 // `identities/:id/pii` is retired from `DOCUMENT_CLASS_ROUTE_
 // PATTERNS` (message-pair.ts), so the gate's own head-read never
 // runs for it and every /pii pair forms with neither Supersedes
 // nor Follows — a stored provenance pointer at a removed pair
 // would be a stored lie.
 //
-// THE SINGLE-AUTHORITATIVE-ID-SET RULE (a binding verification
-// finding): the pairs occupying the slot are enumerated by ONE
-// scan — `requests.getAllWhere('uri_collection', ...)` — and THAT
-// id-set alone is deleted from BOTH tables. `responses` is NEVER
-// re-scanned independently and trusted to agree: two independent
-// scans could disagree (a pre-existing torn pair, a mid-flight
-// anomaly), and reconciling them defensively would be Internal
-// Defense over a covenant this function alone must keep. Deriving
-// both deletions from ONE id-set structurally preserves the
-// orphan-pair balance (`requests.length === responses.length`,
-// asserted throughout the shadow-ledger suite) and guarantees
-// this zone never MANUFACTURES a torn pair — a pre-existing one
-// still surfaces on its own terms, via `storedResponseFor`'s
-// `responses.getById` throwing `EntityNotFoundError` rather than
-// silently reading as a missing replay (message-pair.ts).
-//
 // Runs INSIDE the caller's own transaction — both callers
 // (`postIdentityPiiDocumentOp`'s PUT, the `identities/:id/pii`
 // DELETE closure, api/routes.ts) open
-// `['requests', 'responses']` (Phase Final Task 2 stripped the
+// `MESSAGE_TABLES` (Phase Final Task 2 stripped the
 // identity_pii ROW half); row ops only, per the IndexedDB
 // auto-commit constraint (a transaction body may await only
 // row ops, never crypto or a timer) — `pair` arrives fully
@@ -67,11 +51,11 @@ export async function replacePiiSlot(
     uriCollection: string,
     pair: MessagePair,
 ): Promise<void> {
-    const prior = await view.requests
-        .getAllWhere('uri_collection', uriCollection);
+    const prior = await view.pairs.getAllWhere(
+        'uri_collection', uriCollection,
+    );
     for (const row of prior) {
-        await view.requests.delete(row.id);
-        await view.responses.delete(row.id);
+        await view.pairs.delete(row.id);
     }
     await appendMessagePair(view, pair);
 }

@@ -363,38 +363,15 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     return db;
 }
 
-test('every request has exactly one response and vice'
-+ ' versa — no orphan pair', async () => {
-    const db = await seededWithMixedBatch();
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.ok(requests.length > 0);
-    assert.equal(requests.length, responses.length);
-    const requestIds = new Set(requests.map(r => r.id));
-    const responseIds = new Set(responses.map(r => r.id));
-    for (const id of requestIds) {
-        assert.ok(
-            responseIds.has(id),
-            'request ' + id + ' has no response',
-        );
-    }
-    for (const id of responseIds) {
-        assert.ok(
-            requestIds.has(id),
-            'response ' + id + ' has no request',
-        );
-    }
-});
-
 test('every stored request message re-hashes to its own'
 + ' message_hash', async () => {
     const db = await seededWithMixedBatch();
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     assert.ok(requests.length > 0);
     for (const row of requests) {
         assert.equal(
-            await requestMessageHash(row.message),
-            row.message_hash,
+            await requestMessageHash(row.request),
+            row.request_hash,
             'requests row ' + row.id + ' hash mismatch',
         );
     }
@@ -413,10 +390,10 @@ const BEARER_JWT =
 test('stored request messages carry the live bearer JWT',
 async () => {
     const db = await seededWithMixedBatch();
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     assert.ok(requests.length > 0);
     const withBearer = requests.filter(
-        row => BEARER_JWT.test(row.message),
+        row => BEARER_JWT.test(row.request),
     );
     assert.ok(
         withBearer.length > 0,
@@ -431,24 +408,24 @@ test('every pair\'s envelope timestamps are RFC-3339 zulu'
 + ' with 6-digit sub-second precision, and the request'
 + ' strictly precedes its own response', async () => {
     const db = await seededWithMixedBatch();
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const responsesById = new Map(
-        (await db.responses.getAll()).map(r => [r.id, r]),
+        (await db.pairs.getAll()).map(r => [r.id, r]),
     );
     assert.ok(requests.length > 0);
     for (const request of requests) {
         assert.match(
-            request.at, RFC3339_ZULU_MICROS,
+            request.request_at, RFC3339_ZULU_MICROS,
             'request ' + request.id + ' at is malformed',
         );
         const response = responsesById.get(request.id);
         assert.ok(response, 'no response for ' + request.id);
         assert.match(
-            response!.at, RFC3339_ZULU_MICROS,
+            response!.response_at, RFC3339_ZULU_MICROS,
             'response ' + request.id + ' at is malformed',
         );
         assert.ok(
-            request.at < response!.at,
+            request.request_at < response!.response_at,
             'pair ' + request.id + ' response at does not'
                 + ' strictly follow its request at',
         );
@@ -464,7 +441,7 @@ test('a seeded idea\'s create-pair request reproduces its'
 + ' actual genesis row in states', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const createRow = requests.find(
         r => r.uri_id === idea.id
             && r.uri_collection
@@ -472,7 +449,7 @@ test('a seeded idea\'s create-pair request reproduces its'
                     + '/ideas/',
     );
     assert.ok(createRow, 'no create pair for the seeded idea');
-    const parsed = pairJsonOf(createRow!.message) as {
+    const parsed = pairJsonOf(createRow!.request) as {
         body: {
             state: string;
         };

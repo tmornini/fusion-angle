@@ -58,12 +58,11 @@ export async function deriveFlowTag(
     name: Id,
 ): Promise<FlowTagEntity> {
     const prefix = flowTagsUriPrefix(organization, flowId);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const document = deriveDocumentsAt(
-        requests, responses, prefix,
+        pairs, prefix,
     ).get(name);
     if (document === undefined) {
         // Probe the parent flow: a foreign flow's tag 403s;

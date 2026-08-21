@@ -6,6 +6,7 @@ import {
     EntityNotFoundError,
     type DbAdapter,
     TABLE_NAMES,
+    MESSAGE_TABLES,
 } from '../api/db.ts';
 import { nowUtc } from '../api/types.ts';
 import {
@@ -126,9 +127,7 @@ function workOrderFlowGraph(
 // The claim gate's write-tx table list
 // (postWorkOrderClaimOp, routes.ts). Phase Final Task 2:
 // work_orders dropped (ROW half stripped).
-const CLAIM_TX_TABLES = [
-    'requests', 'responses',
-] as const;
+const CLAIM_TX_TABLES = MESSAGE_TABLES;
 
 const EMPTY_FLOW_ID = 'E2BnBlZyrriqsQYkmS4usb';
 
@@ -395,7 +394,7 @@ test('stateEventVisibilityFor: tier (i) event-append pairs'
     }
     assert.notEqual(foreignEventId, '');
 
-    const txTables = ['requests', 'responses'];
+    const txTables = MESSAGE_TABLES;
 
     // Own → visible (tier i).
     const preOwn = await stateEventVisibilityFor(
@@ -495,7 +494,7 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
 
     // Op-born: no states/:id pair at transitionEventId;
     // lives only inside the transition op body.
-    const byId = (await db.responses.getAll()).filter(
+    const byId = (await db.pairs.getAll()).filter(
         (row) => row.uri_id === transitionEventId,
     );
     const statesTail = '/' + 'states' + '/';
@@ -591,9 +590,7 @@ test('flowGraphBindingsFromPairs: seed attribute + member'
 + ' ledgers non-empty; pre-tx vs in-tx parity; nodeFlowIds'
 + ' cover every bound node', async () => {
     const db = await seededDb();
-    const txTables = [
-        'requests', 'responses',
-    ];
+    const txTables = MESSAGE_TABLES;
     const preTx = await flowGraphBindingsFromPairs(
         db, STARK_ORGANIZATION,
     );
@@ -1598,9 +1595,7 @@ async () => {
     );
     const inTx = await db.transaction(
         // Stage B: roster + organizations/1/objectives/records retired.
-        [
-            'requests', 'responses',
-        ],
+        MESSAGE_TABLES,
         (view) => collectAttributeReferrers(
             view,
             STARK_ORGANIZATION,
@@ -1738,9 +1733,7 @@ async () => {
     // Pre-tx vs in-tx parity (pair plane only).
     const inTx = await db.transaction(
         // Stage B: roster + records/work_orders retired.
-        [
-            'requests', 'responses',
-        ],
+        MESSAGE_TABLES,
         (view) => collectAttributeReferrers(
             view,
             STARK_ORGANIZATION,

@@ -98,13 +98,12 @@ async function fetchIdeaPairs(
     readonly documents: Map<string, DerivedDocument>;
     readonly pairs: readonly DocumentPair[];
 }> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     return {
-        documents: deriveDocumentsAt(requests, responses, prefix),
-        pairs: documentPairsAt(requests, responses, prefix),
+        documents: deriveDocumentsAt(pairs, prefix),
+        pairs: documentPairsAt(pairs, prefix),
     };
 }
 
@@ -204,11 +203,10 @@ export async function deriveIdeaSubmissions(
     ideaId: Id,
 ): Promise<IdeaSubmissionEntity[]> {
     const prefix = submissionsUriPrefix(organization, ideaId);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    const documents = deriveDocumentsAt(requests, responses, prefix);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
+    const documents = deriveDocumentsAt(pairs, prefix);
     const submissions: IdeaSubmissionEntity[] = [];
     for (const document of documents.values()) {
         submissions.push(ideaSubmissionEntityOf(document));

@@ -4,6 +4,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     organizationToken,
@@ -217,7 +218,7 @@ async function appendInstancePair(
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
     return pair.id;
@@ -548,7 +549,7 @@ async () => {
     const header = res.headers.get('ETag');
     assert.ok(header !== null);
     assert.match(header.slice(1, -1), HEX64);
-    const stored = await db.responses.getById(pairId);
+    const stored = await db.pairs.getById(pairId);
     assert.ok(stored !== undefined);
     assert.match(stored.version, HEX64);
     assert.notEqual(

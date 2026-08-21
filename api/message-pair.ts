@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import type {
-    Id, IdentityTokenEntity, ResponseEntity,
+    Id, IdentityTokenEntity, PairEntity,
 } from './types.ts';
 import { nowUtc } from './types.ts';
 import {
@@ -37,12 +37,12 @@ import {
 import type { NotificationEvent } from
     './notifications.ts';
 
-// The shadow-ledger message pair: one row in `requests`, one
-// in `responses`, sharing `id`. Formed pre-tx (all crypto and
-// address resolution happen before a transaction opens — the
-// IndexedDB auto-commit constraint bars awaiting anything but
-// row ops inside `db.transaction`), then appended as the LAST
-// act of the domain write's own transaction.
+// The shadow-ledger message pair: one `pairs` put. Formed
+// pre-tx (all crypto and address resolution happen before a
+// transaction opens — the IndexedDB auto-commit constraint
+// bars awaiting anything but row ops inside
+// `db.transaction`), then appended as the LAST act of the
+// domain write's own transaction.
 export interface MessagePair {
     readonly id: Id;
     // The ARRIVAL stamp: minted at gate entry (the first act
@@ -387,12 +387,12 @@ export async function documentHeadAt(
         method: string;
     } | undefined;
     for (const pair of pairs) {
-        const method = pair.request.method;
+        const method = pair.method;
         if (method !== 'PUT' && method !== 'DELETE') {
             continue;
         }
-        const at = pair.response.at;
-        const id = pair.response.id;
+        const at = pair.response_at;
+        const id = pair.id;
         if (
             head === undefined
             || at > head.at
@@ -412,12 +412,11 @@ export async function documentHeadAt(
 export async function storedResponseFor(
     db: DbAdapter,
     requestHash: string,
-): Promise<ResponseEntity | undefined> {
-    const prior = await db.requests
-        .getAllWhere('message_hash', requestHash);
-    const first = prior[0];
-    if (first === undefined) return undefined;
-    return await db.responses.getById(first.id);
+): Promise<PairEntity | undefined> {
+    const prior = await db.pairs.getAllWhere(
+        'request_hash', requestHash,
+    );
+    return prior[0];
 }
 
 // The wire rendering of a stored envelope stamp: IMF-fixdate
@@ -534,9 +533,9 @@ export function hoistedHeaderFields(request: Request): FieldLine[] {
 // byte-identical replay — both render from the STORED row,
 // never the in-memory pair, so a concurrent-replay's surviving
 // original pair is what the wire advertises either way.
-export function wireHeadersFor(stored: ResponseEntity): HeadersInit {
+export function wireHeadersFor(stored: PairEntity): HeadersInit {
     const headers: Record<string, string> = {
-        'Date': httpDateOf(stored.at),
+        'Date': httpDateOf(stored.response_at),
         'Response-ID': stored.id,
         'Operation-ID': stored.operation_id,
     };
@@ -547,8 +546,8 @@ export function wireHeadersFor(stored: ResponseEntity): HeadersInit {
 // serializeWire message — the one reconstruction path shared
 // by a fresh write's success return and an idempotent replay's
 // early return.
-export function responseFromStored(stored: ResponseEntity): Response {
-    const model = parseWire(stored.message);
+export function responseFromStored(stored: PairEntity): Response {
+    const model = parseWire(stored.response);
     if (model.startLine.kind !== 'response') {
         throw new Error(
             'stored response message has no status line: '
@@ -569,10 +568,10 @@ export function responseFromStored(stored: ResponseEntity): Response {
 // octets, Date replaced with now, no Operation-ID.
 // ETag and Response-ID are projection headers.
 export function streamGetFromStored(
-    stored: ResponseEntity,
+    stored: PairEntity,
     at: string,
 ): Response {
-    const model = parseWire(stored.message);
+    const model = parseWire(stored.response);
     if (model.startLine.kind !== 'response') {
         throw new Error(
             'stored response message has no status line: '
@@ -604,7 +603,7 @@ export function streamGetFromStored(
 // Operation-ID is added here (wireHeadersFor), never stored
 // on the GET-shaped blob.
 export function sendWriteResponse(
-    stored: ResponseEntity,
+    stored: PairEntity,
     method: string,
     appended: boolean,
 ): Response {
@@ -657,11 +656,12 @@ export async function storedPairResponse(
     return sendWriteResponse(stored, method, true);
 }
 
-// In-tx put by pair id (row ops only, no crypto): writes both
-// rows keyed by pair.id. Idempotent by id — a second put of the
-// same pair overwrites the same slots. Auth grant pairs use this
-// path so two byte-identical logins each land (their ids differ);
-// hash-keyed appendMessagePair would drop the second.
+// In-tx put by pair id (row ops only, no crypto): one pairs
+// put keyed by pair.id. Idempotent by id — a second put of
+// the same pair overwrites the same slot. Auth grant pairs
+// use this path so two byte-identical logins each land
+// (their ids differ); hash-keyed appendMessagePair would
+// drop the second.
 // The view parameter is DbAdapter, NOT GuardedDbAdapter: route
 // handlers receive DbAdapter and their transaction callbacks are
 // typed (view: DbAdapter) — the fence spends the guard before
@@ -679,15 +679,17 @@ export async function putMessagePair(
 }
 
 // In-tx append (row ops only, no crypto): skips silently if a
-// request with the same hash is already stored (the concurrent
-// -retry guard); otherwise puts both rows via writePairRows.
+// pair with the same request_hash is already stored (the
+// concurrent-retry guard); otherwise one pairs put via
+// writePairRows.
 export async function appendMessagePair(
     view: DbAdapter,
     pair: MessagePair,
 ): Promise<void> {
     await coordinateWrite(view, pair, true);
-    const replay = await view.requests
-        .getAllWhere('message_hash', pair.requestHash);
+    const replay = await view.pairs.getAllWhere(
+        'request_hash', pair.requestHash,
+    );
     if (replay.length > 0) return;
     await writePairRows(view, pair);
     await notifyWrite(view, pair);
@@ -697,27 +699,18 @@ async function writePairRows(
     view: DbAdapter,
     pair: MessagePair,
 ): Promise<void> {
-    await view.requests.put(pair.id, {
+    await view.pairs.put(pair.id, {
         uri_collection: pair.uriCollection,
         uri_id: pair.uriId,
-        at: pair.requestAt,
-        requester_identity_id: pair.requesterIdentityId,
-        message_hash: pair.requestHash,
-        message: pair.requestMessage,
+        requester_identity_id:
+            pair.requesterIdentityId,
         method: pair.method,
-        operation_id: pair.operationId,
-    });
-    // The response row's `at` — SAME column name as the
-    // requests row, per the author — is minted HERE, as late
-    // as a same-tx write permits. nowUtc() is synchronous: no
-    // await, so the auto-commit constraint (which bars only
-    // awaited promises) is not in play.
-    await view.responses.put(pair.id, {
-        uri_collection: pair.uriCollection,
-        uri_id: pair.uriId,
-        at: nowUtc(),
+        request_at: pair.requestAt,
+        request_hash: pair.requestHash,
+        request: pair.requestMessage,
+        response_at: nowUtc(),
         version: pair.responseEtag,
-        message: pair.responseMessage,
+        response: pair.responseMessage,
         operation_id: pair.operationId,
     });
 }

@@ -9,8 +9,7 @@ import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
     WorkOrderEntity,
-    RequestEntity,
-    ResponseEntity,
+    PairEntity,
     StateEntity,
 } from '../api/types.ts';
 import {
@@ -577,15 +576,15 @@ async () => {
     // workOrder.flow_graph against the entity PUT's STORED,
     // round-tripped response — two independently re-encoded
     // values, not the same in-memory literal.
-    const storedCreatePostRow = (await db.requests.getAllWhere(
+    const storedCreatePostRow = (await db.pairs.getAllWhere(
         'uri_collection',
         canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.uri_id === workOrderId
-            && decodeRequestMessage(r.message).method === 'POST',
+            && decodeRequestMessage(r.request).method === 'POST',
     )!;
     const storedCreateFlowGraph = (
-        decodeRequestMessage(storedCreatePostRow.message)
+        decodeRequestMessage(storedCreatePostRow.request)
             .body['workOrder'] as { flow_graph: Record<string, unknown> }
     ).flow_graph;
     const entityPut = await handleRequest(db, req(
@@ -642,7 +641,7 @@ async () => {
 
     // Claim attempt by actor B — 409, nothing stored.
     const beforeReject =
-        (await db.requests.getAll()).length;
+        (await db.pairs.getAll()).length;
     const claimRejectAt = nowUtc();
     const claimReject = await handleRequest(db, req(
         'PUT', '/organizations/1/work-orders/' + workOrderId + '/claim',
@@ -655,7 +654,7 @@ async () => {
     ));
     assert.equal(claimReject.status, 409);
     assert.equal(
-        (await db.requests.getAll()).length, beforeReject,
+        (await db.pairs.getAll()).length, beforeReject,
     );
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
@@ -867,8 +866,8 @@ async () => {
         STARK_ORGANIZATION, '/organizations/1/work-orders/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
     ]);
     const atAddress = requests.filter(
         (r) => r.uri_collection === prefix
@@ -879,16 +878,16 @@ async () => {
     assert.equal(atAddress.length, 2);
 
     const documentPairs = documentPairsAt(
-        requests, responses, prefix,
+        requests, prefix,
     ).filter((pair) => pair.uriId === workOrderId);
     assert.equal(documentPairs.length, 1);
     assert.equal(documentPairs[0]!.method, 'PUT');
 
     const postRow = atAddress.find(
-        (r) => decodeRequestMessage(r.message).method === 'POST',
+        (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(
-        Object.keys(decodeRequestMessage(postRow.message).body),
+        Object.keys(decodeRequestMessage(postRow.request).body),
     );
     const documentBodyKeys = new Set(
         Object.keys(documentPairs[0]!.body),
@@ -962,28 +961,22 @@ function atIdCompare(
 }
 
 function allPairsAt(
-    requests: readonly RequestEntity[],
-    responses: readonly ResponseEntity[],
+    rows: readonly PairEntity[],
     uriCollection: string,
 ): AnyPair[] {
-    const requestById = new Map(
-        requests.map((request) => [request.id, request]),
-    );
     const pairs: AnyPair[] = [];
-    for (const response of responses) {
-        if (response.uri_collection !== uriCollection) {
+    for (const row of rows) {
+        if (row.uri_collection !== uriCollection) {
             continue;
         }
-        const request = requestById.get(response.id);
-        if (request === undefined) continue;
-        const decoded = decodeRequestMessage(request.message);
+        const decoded = decodeRequestMessage(row.request);
         pairs.push({
-            id: response.id,
-            at: response.at,
-            uriId: response.uri_id,
+            id: row.id,
+            at: row.response_at,
+            uriId: row.uri_id,
             method: decoded.method,
             body: decoded.body,
-            requesterIdentityId: request.requester_identity_id,
+            requesterIdentityId: row.requester_identity_id,
         });
     }
     return pairs.sort(atIdCompare);
@@ -1219,10 +1212,10 @@ async function replayWorkOrderStates(
         organization, '/organizations/1/work-orders/',
     );
     const [woRequests, woResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', woPrefix),
-        db.responses.getAllWhere('uri_collection', woPrefix),
+        db.pairs.getAllWhere('uri_collection', woPrefix),
+        db.pairs.getAllWhere('uri_collection', woPrefix),
     ]);
-    const allWoPairs = allPairsAt(woRequests, woResponses, woPrefix);
+    const allWoPairs = allPairsAt(woRequests, woPrefix);
     const createPair = allWoPairs.find(
         (p) => p.method === 'POST' && p.uriId === workOrderId,
     );
@@ -1232,7 +1225,7 @@ async function replayWorkOrderStates(
         );
     }
     const entityPairs = documentPairsAt(
-        woRequests, woResponses, woPrefix,
+        woRequests, woPrefix,
     ).filter((pair) => pair.uriId === workOrderId);
 
     const claimPrefix = canonicalUriCollection(
@@ -1240,16 +1233,16 @@ async function replayWorkOrderStates(
         '/organizations/1/work-orders/' + workOrderId + '/claim/',
     );
     const [claimRequests, claimResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', claimPrefix),
-        db.responses.getAllWhere('uri_collection', claimPrefix),
+        db.pairs.getAllWhere('uri_collection', claimPrefix),
+        db.pairs.getAllWhere('uri_collection', claimPrefix),
     ]);
     const claimPairs = allPairsAt(
-        claimRequests, claimResponses, claimPrefix,
+        claimRequests, claimPrefix,
     ).filter(
         (p) => p.method === 'POST' || p.method === 'PUT',
     );
     const claimDeletes = allPairsAt(
-        claimRequests, claimResponses, claimPrefix,
+        claimRequests, claimPrefix,
     ).filter((p) => p.method === 'DELETE');
 
     const releasePrefix = canonicalUriCollection(
@@ -1258,17 +1251,16 @@ async function replayWorkOrderStates(
     );
     const [releaseRequests, releaseResponses] =
         await Promise.all([
-            db.requests.getAllWhere(
+            db.pairs.getAllWhere(
                 'uri_collection', releasePrefix,
             ),
-            db.responses.getAllWhere(
+            db.pairs.getAllWhere(
                 'uri_collection', releasePrefix,
             ),
         ]);
     const releasePairs = [
         ...allPairsAt(
-            releaseRequests, releaseResponses,
-            releasePrefix,
+            releaseRequests, releasePrefix,
         ).filter((p) => p.method === 'POST'),
         ...claimDeletes,
     ];
@@ -1280,12 +1272,11 @@ async function replayWorkOrderStates(
     const [
         transitionRequests, transitionResponses,
     ] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', transitionPrefix),
-        db.responses.getAllWhere('uri_collection', transitionPrefix),
+        db.pairs.getAllWhere('uri_collection', transitionPrefix),
+        db.pairs.getAllWhere('uri_collection', transitionPrefix),
     ]);
     const transitionPairs = allPairsAt(
-        transitionRequests, transitionResponses,
-        transitionPrefix,
+        transitionRequests, transitionPrefix,
     ).filter((p) => p.method === 'POST');
 
     // The create pair's 3-slot arrays synthesize the three birth
@@ -1414,15 +1405,15 @@ async () => {
     // independently re-encoded values, not the same in-memory
     // literal — so a canonical-JSON regression that mangled
     // either differently would be caught.
-    const storedCreatePostRow = (await db.requests.getAllWhere(
+    const storedCreatePostRow = (await db.pairs.getAllWhere(
         'uri_collection',
         canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
         (r) => r.uri_id === workOrderId
-            && decodeRequestMessage(r.message).method === 'POST',
+            && decodeRequestMessage(r.request).method === 'POST',
     )!;
     const storedCreateFlowGraph = (
-        decodeRequestMessage(storedCreatePostRow.message)
+        decodeRequestMessage(storedCreatePostRow.request)
             .body['workOrder'] as { flow_graph: Record<string, unknown> }
     ).flow_graph;
     const entityPut = await handleRequest(db, req(
@@ -1658,7 +1649,7 @@ test('same-join-id retry: two different work-order creates '
         STARK_ORGANIZATION,
         '/organizations/1/flows/' + flowId + '/work-orders/',
     );
-    const joinResponses = await db.responses.getAllAtAddress(
+    const joinResponses = await db.pairs.getAllAtAddress(
         joinPrefix, sharedFwoId,
     );
     assert.equal(joinResponses.length, 2);

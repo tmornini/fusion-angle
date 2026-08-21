@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import { nowUtc } from '../api/types.ts';
 import { invitationOpStateFor } from '../api/derive-invitations.ts';
@@ -104,9 +105,7 @@ test('invitationOpStateFor: byte-identical pre-tx (the plain'
 
     // Phase Final Task 2: memberships ROW half stripped from
     // acceptInvitation's tx list.
-    const acceptTxTables = [
-        'requests', 'responses',
-    ];
+    const acceptTxTables = MESSAGE_TABLES;
     const preTx = await invitationOpStateFor(db, id);
     const inTx = await db.transaction(
         acceptTxTables,
@@ -149,7 +148,7 @@ test('invitationLifecycleStatesFor: byte-identical pre-tx (the'
     ));
     assert.equal(revoke.status, 204);
 
-    const revokeTxTables = ['requests', 'responses'];
+    const revokeTxTables = MESSAGE_TABLES;
     const preTx = await invitationLifecycleStatesFor(db, id);
     const inTx = await db.transaction(
         revokeTxTables,
@@ -250,9 +249,7 @@ test('workOrderLifecycleStatesFor: byte-identical pre-tx (the'
     assert.equal(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
-    const claimTxTables = [
-        'requests', 'responses',
-    ];
+    const claimTxTables = MESSAGE_TABLES;
     const preTx = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -316,9 +313,7 @@ test('workOrderClaimHistoryFor: byte-identical pre-tx (the'
     assert.equal(created.status, 201);
 
     // Phase Final Task 2: work_orders dropped from claim tx.
-    const claimTxTables = [
-        'requests', 'responses',
-    ];
+    const claimTxTables = MESSAGE_TABLES;
     const preTx = await workOrderClaimHistoryFor(
         db, STARK_ORGANIZATION, workOrderId,
     );

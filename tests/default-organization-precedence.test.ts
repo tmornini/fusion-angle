@@ -4,6 +4,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
 import { formWritePair, appendMessagePair } from '../api/message-pair.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
@@ -75,7 +76,7 @@ async function seedDefaultOrganizationEvent(
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             await appendMessagePair(view, pair);
         },
@@ -154,7 +155,7 @@ test(
             operationId: TEST_OPERATION_ID,
         });
         await db.transaction(
-            ['requests', 'responses'],
+            MESSAGE_TABLES,
             async (view) => {
                 await appendMessagePair(view, tombstone);
             },

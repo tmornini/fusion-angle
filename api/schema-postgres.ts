@@ -1,57 +1,39 @@
 // Compile-time Postgres DDL. The only input to sql.unsafe.
 // Never concatenate request identifiers into these strings.
 
-export const POSTGRES_REQUESTS_TABLE =
-    String.raw`CREATE TABLE IF NOT EXISTS requests (
+export const POSTGRES_PAIRS_TABLE =
+    String.raw`CREATE TABLE IF NOT EXISTS pairs (
     id text COLLATE "C" PRIMARY KEY
-        CONSTRAINT requests_id_chk
+        CONSTRAINT pairs_id_chk
         CHECK (id ~ '^[0-9A-Za-z]{22}$'),
     uri_collection text COLLATE "C" NOT NULL
-        CONSTRAINT requests_collection_chk
+        CONSTRAINT pairs_collection_chk
         CHECK (left(uri_collection, 1) = '/'
            AND right(uri_collection, 1) = '/'),
     uri_id text COLLATE "C" NOT NULL,
-    at text COLLATE "C" NOT NULL
-        CONSTRAINT requests_at_chk
-        CHECK (at ~
-        '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$'),
     requester_identity_id text COLLATE "C" NOT NULL,
-    message_hash text COLLATE "C" NOT NULL
-        CONSTRAINT requests_hash_chk
-        CHECK (message_hash ~ '^[0-9a-f]{64}$'),
-    message bytea NOT NULL,
     method text COLLATE "C" NOT NULL
-        CONSTRAINT requests_method_chk
+        CONSTRAINT pairs_method_chk
         CHECK (method ~ '^[A-Z]+$'),
-    operation_id text COLLATE "C" NOT NULL
-        CONSTRAINT requests_operation_chk
-        CHECK (operation_id ~ '^[0-9A-Za-z]{22}$')
-);`;
-
-export const POSTGRES_RESPONSES_TABLE =
-    String.raw`CREATE TABLE IF NOT EXISTS responses (
-    id text COLLATE "C" PRIMARY KEY
-        CONSTRAINT responses_id_chk
-        CHECK (id ~ '^[0-9A-Za-z]{22}$'),
-    uri_collection text COLLATE "C" NOT NULL
-        CONSTRAINT responses_collection_chk
-        CHECK (left(uri_collection, 1) = '/'
-           AND right(uri_collection, 1) = '/'),
-    uri_id text COLLATE "C" NOT NULL,
-    at text COLLATE "C" NOT NULL
-        CONSTRAINT responses_at_chk
-        CHECK (at ~
+    request_at text COLLATE "C" NOT NULL
+        CONSTRAINT pairs_request_at_chk
+        CHECK (request_at ~
+        '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$'),
+    request_hash text COLLATE "C" NOT NULL
+        CONSTRAINT pairs_request_hash_chk
+        CHECK (request_hash ~ '^[0-9a-f]{64}$'),
+    request bytea NOT NULL,
+    response_at text COLLATE "C" NOT NULL
+        CONSTRAINT pairs_response_at_chk
+        CHECK (response_at ~
         '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$'),
     version text COLLATE "C" NOT NULL
-        CONSTRAINT responses_version_chk
+        CONSTRAINT pairs_version_chk
         CHECK (version ~ '^[0-9a-f]{64}$'),
-    message bytea NOT NULL,
+    response bytea NOT NULL,
     operation_id text COLLATE "C" NOT NULL
-        CONSTRAINT responses_operation_chk
-        CHECK (operation_id ~ '^[0-9A-Za-z]{22}$'),
-    CONSTRAINT responses_request_fk
-        FOREIGN KEY (id) REFERENCES requests (id)
-        DEFERRABLE INITIALLY DEFERRED
+        CONSTRAINT pairs_operation_chk
+        CHECK (operation_id ~ '^[0-9A-Za-z]{22}$')
 );`;
 
 export const POSTGRES_SCHEMA_MARKER_TABLE =
@@ -77,36 +59,27 @@ RETURN CASE
 END;`;
 
 export const POSTGRES_INDEXES =
-    String.raw`DROP INDEX IF EXISTS requests_operation;
-DROP INDEX IF EXISTS responses_operation;
-CREATE INDEX IF NOT EXISTS requests_address
-    ON requests (uri_collection, uri_id, at, id);
-CREATE INDEX IF NOT EXISTS responses_address
-    ON responses (uri_collection, uri_id, at, id);
-CREATE INDEX IF NOT EXISTS requests_collection
-    ON requests (uri_collection, at, id);
-CREATE INDEX IF NOT EXISTS responses_collection
-    ON responses (uri_collection, at, id);
-CREATE INDEX IF NOT EXISTS requests_replay
-    ON requests (message_hash);
-CREATE INDEX IF NOT EXISTS responses_version
-    ON responses (uri_collection, uri_id, version);
-CREATE INDEX IF NOT EXISTS responses_body
-    ON responses
-    USING gin (message_body(message) jsonb_path_ops);`;
+    String.raw`CREATE INDEX IF NOT EXISTS pairs_address
+    ON pairs (uri_collection, uri_id, response_at, id);
+CREATE INDEX IF NOT EXISTS pairs_collection
+    ON pairs (uri_collection, response_at, id);
+CREATE INDEX IF NOT EXISTS pairs_replay
+    ON pairs (request_hash);
+CREATE INDEX IF NOT EXISTS pairs_version
+    ON pairs (uri_collection, uri_id, version);
+CREATE INDEX IF NOT EXISTS pairs_body
+    ON pairs
+    USING gin (message_body(response) jsonb_path_ops);`;
 
 export const POSTGRES_SCHEMA_STATEMENTS = [
-    POSTGRES_REQUESTS_TABLE,
-    POSTGRES_RESPONSES_TABLE,
+    POSTGRES_PAIRS_TABLE,
     POSTGRES_SCHEMA_MARKER_TABLE,
     POSTGRES_MESSAGE_BODY_FUNCTION,
     POSTGRES_INDEXES,
 ] as const;
 
 export const POSTGRES_SCHEMA =
-    POSTGRES_REQUESTS_TABLE
-    + '\n\n'
-    + POSTGRES_RESPONSES_TABLE
+    POSTGRES_PAIRS_TABLE
     + '\n\n'
     + POSTGRES_SCHEMA_MARKER_TABLE
     + '\n\n'

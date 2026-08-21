@@ -167,7 +167,7 @@ async () => {
 test('system identity exists once',
 async () => {
     const { db } = await seeded();
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const system = requests.filter((r) =>
         r.uri_collection === '/identities/'
         && r.uri_id === SYSTEM_MEMBER_ID,
@@ -241,7 +241,7 @@ async () => {
         memberSeats[0]!.organization_id,
         g.organizationId,
     );
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const agents = requests.filter((r) =>
         r.uri_collection === '/ai-agents/'
         && r.uri_id === 'g-ai',
@@ -353,16 +353,14 @@ async () => {
         assert.ok(row, section);
         const [requests, responses] =
             await Promise.all([
-                db.requests.getAll(),
-                db.responses.getAll(),
+                db.pairs.getAll(),
+                db.pairs.getAll(),
             ]);
         const prefix =
             canonicalUriCollection(
                 row.organizationId, '/objectives/',
             );
-        const documents = deriveDocumentsAt(
-            requests, responses, prefix,
-        );
+        const documents = deriveDocumentsAt(requests, prefix);
         assert.equal(
             documents.size, 4, section,
         );
@@ -485,12 +483,7 @@ test('slice seed pair count is pinned',
 async () => {
     const { db } = await seeded();
     const requests =
-        await db.requests.getAll();
-    const responses =
-        await db.responses.getAll();
-    assert.equal(
-        requests.length, responses.length,
-    );
+        await db.pairs.getAll();
     assert.equal(
         requests.length, EXPECTED_SLICE_PAIRS,
     );
@@ -499,9 +492,9 @@ async () => {
 test('slice seed request hashes are unique',
 async () => {
     const { db } = await seeded();
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const distinctHashes = new Set(
-        requests.map((r) => r.message_hash),
+        requests.map((r) => r.request_hash),
     );
     // A collision would silently drop a pair via
     // appendMessagePair's same-hash dedup skip.

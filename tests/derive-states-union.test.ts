@@ -637,14 +637,11 @@ async () => {
     );
     // Graph sidecars on the flow document pairs (C3).
     const prefix = canonicalUriCollection('A', '/flows/');
-    const [requests, responses] = await Promise.all([
-        fx.db.requests.getAllWhere('uri_collection', prefix),
-        fx.db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const stored = await fx.db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const sidecarIds: string[] = [];
-    for (const pair of documentPairsAt(
-        requests, responses, prefix,
-    )) {
+    for (const pair of documentPairsAt(stored, prefix)) {
         const delta = pair.body['graphDelta'];
         const deletions =
             typeof delta === 'object' && delta !== null

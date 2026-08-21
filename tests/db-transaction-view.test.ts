@@ -2,65 +2,53 @@ import { test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { memoryDbAdapter } from '../api/db-memory.ts';
 
-const aResponse = {
-    uri_collection: '/organizations/1/flows/',
-    uri_id: '7',
-    at: '2026-01-01T00:00:00.000000Z',
-    version: 'e'.repeat(64),
-    message: '{"kind":"response"}',
-    operation_id: '0123456789ABCDEFGHIJKL',
-};
-
-const aRequest = {
+const aPair = {
     uri_collection: '/organizations/1/ideas/',
     uri_id: '42',
-    at: '2026-01-01T00:00:00.000000Z',
     requester_identity_id: 'current',
-    message_hash: 'a'.repeat(64),
-    message: '{"kind":"request"}',
     method: 'PUT',
+    request_at: '2026-01-01T00:00:00.000000Z',
+    request_hash: 'a'.repeat(64),
+    request: '{"kind":"request"}',
+    response_at: '2026-01-01T00:00:00.000000Z',
+    version: 'e'.repeat(64),
+    response: '{"kind":"response"}',
     operation_id: '0123456789ABCDEFGHIJKL',
 };
 
 test(
-    'a view commits writes across stores atomically',
+    'a view commits writes atomically',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
-            ['responses', 'requests'],
+            ['pairs'],
             async (view) => {
-                await view.responses.put('s1', aResponse);
-                await view.requests.put('r1', aRequest);
+                await view.pairs.put('s1', aPair);
             },
         );
-        const response = await db.responses.getById('s1');
-        const request = await db.requests.getById('r1');
-        assert.equal(response.id, 's1');
-        assert.equal(request.id, 'r1');
+        const pair = await db.pairs.getById('s1');
+        assert.equal(pair.id, 's1');
     },
 );
 
 test(
-    'a throw inside the view rolls back every store',
+    'a throw inside the view rolls back',
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['responses', 'requests'],
+                ['pairs'],
                 async (view) => {
-                    await view.responses.put('s1', aResponse);
-                    await view.requests.put('r1', aRequest);
+                    await view.pairs.put('s1', aPair);
                     throw new Error('boom');
                 },
             ),
             /boom/,
         );
-        const responses = await db.responses.getAll();
-        const requests = await db.requests.getAll();
-        assert.deepEqual(responses, []);
-        assert.deepEqual(requests, []);
+        const pairs = await db.pairs.getAll();
+        assert.deepEqual(pairs, []);
     },
 );
 
@@ -70,12 +58,12 @@ test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         const seen = await db.transaction(
-            ['responses', 'requests'],
+            ['pairs'],
             async (view) => {
-                await view.responses.put('s1', aResponse);
+                await view.pairs.put('s1', aPair);
                 // Read back inside the same tx — the put is
                 // visible before commit.
-                return view.responses.getAll();
+                return view.pairs.getAll();
             },
         );
         assert.equal(seen.length, 1);
@@ -89,23 +77,20 @@ test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         await db.transaction(
-            ['responses', 'requests'],
+            ['pairs'],
             async (view) => {
                 await view.transaction(
-                    ['responses'],
+                    ['pairs'],
                     async (inner) => {
-                        await inner.responses.put(
-                            's1', aResponse,
+                        await inner.pairs.put(
+                            's1', aPair,
                         );
                     },
                 );
-                await view.requests.put('r1', aRequest);
             },
         );
-        const response = await db.responses.getById('s1');
-        const request = await db.requests.getById('r1');
-        assert.equal(response.id, 's1');
-        assert.equal(request.id, 'r1');
+        const pair = await db.pairs.getById('s1');
+        assert.equal(pair.id, 's1');
     },
 );
 
@@ -116,13 +101,13 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['responses', 'requests'],
+                ['pairs'],
                 async (view) => {
                     await view.transaction(
-                        ['responses'],
+                        ['pairs'],
                         async (inner) => {
-                            await inner.responses.put(
-                                's1', aResponse,
+                            await inner.pairs.put(
+                                's1', aPair,
                             );
                         },
                     );
@@ -132,7 +117,7 @@ test(
             /boom/,
         );
         assert.deepEqual(
-            await db.responses.getAll(), [],
+            await db.pairs.getAll(), [],
         );
     },
 );
@@ -144,15 +129,15 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.transaction(
-                ['responses'],
+                ['pairs'],
                 async (view) => {
                     await view.transaction(
-                        ['requests'],
+                        ['other'],
                         async () => undefined,
                     );
                 },
             ),
-            /requests/,
+            /other/,
         );
     },
 );
@@ -162,10 +147,10 @@ test(
     async () => {
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
-        await db.responses.put('s1', aResponse);
+        await db.pairs.put('s1', aPair);
         const seen = await db.readTransaction(
-            ['responses'],
-            (view) => view.responses.getAll(),
+            ['pairs'],
+            (view) => view.pairs.getAll(),
         );
         assert.equal(seen.length, 1);
         assert.equal(seen[0]!.id, 's1');
@@ -179,15 +164,15 @@ test(
         await db.postSchemaCreation();
         await assert.rejects(
             () => db.readTransaction(
-                ['responses'],
-                (view) => view.responses.put(
-                    's1', aResponse,
+                ['pairs'],
+                (view) => view.pairs.put(
+                    's1', aPair,
                 ),
             ),
             /readonly transaction/,
         );
         assert.deepEqual(
-            await db.responses.getAll(), [],
+            await db.pairs.getAll(), [],
         );
     },
 );
@@ -198,21 +183,21 @@ test(
         const db = memoryDbAdapter();
         await db.postSchemaCreation();
         const seen = await db.transaction(
-            ['responses', 'requests'],
+            ['pairs'],
             async (view) => {
-                await view.responses.put('s1', aResponse);
+                await view.pairs.put('s1', aPair);
                 // Nested read joins the open write tx so the
                 // uncommitted put is visible (read-your-writes).
                 return view.readTransaction(
-                    ['responses'],
-                    (inner) => inner.responses.getAll(),
+                    ['pairs'],
+                    (inner) => inner.pairs.getAll(),
                 );
             },
         );
         assert.equal(seen.length, 1);
         assert.equal(seen[0]!.id, 's1');
         assert.equal(
-            (await db.responses.getById('s1')).id, 's1',
+            (await db.pairs.getById('s1')).id, 's1',
         );
     },
 );

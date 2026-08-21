@@ -164,8 +164,8 @@ async () => {
     await seedRootAdmin(db);
     const { code, access_token, refresh_token } =
         await fullLoginFlow(db);
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
     const authFlowRows = [...requests, ...responses].filter(
         row => row.uri_collection === '/authentication/authorize/'
             || row.uri_collection === '/authentication/token/',
@@ -175,36 +175,36 @@ async () => {
         r => r.uri_collection === '/authentication/authorize/');
     assert.ok(authorizeRequest);
     assert.ok(
-        authorizeRequest!.message.includes(PASSWORD),
+        authorizeRequest!.request.includes(PASSWORD),
         'authorize request missing live password',
     );
     assert.ok(
-        authorizeRequest!.message.includes('demo@example.com'),
+        authorizeRequest!.request.includes('demo@example.com'),
         'authorize request missing live email',
     );
     const authorizeResponse = responses.find(
         r => r.uri_collection === '/authentication/authorize/');
     assert.ok(authorizeResponse);
     assert.ok(
-        authorizeResponse!.message.includes(code),
+        authorizeResponse!.response.includes(code),
         'authorize response missing live code',
     );
     const tokenRequest = requests.find(
         r => r.uri_collection === '/authentication/token/');
     assert.ok(tokenRequest);
     assert.ok(
-        tokenRequest!.message.includes(code),
+        tokenRequest!.request.includes(code),
         'token request missing live code',
     );
     const tokenResponse = responses.find(
         r => r.uri_collection === '/authentication/token/');
     assert.ok(tokenResponse);
     assert.ok(
-        tokenResponse!.message.includes(access_token),
+        tokenResponse!.response.includes(access_token),
         'token response missing access_token',
     );
     assert.equal(
-        tokenResponse!.message.includes(refresh_token),
+        tokenResponse!.response.includes(refresh_token),
         false,
         'token stored JSON must omit refresh_token',
     );
@@ -216,9 +216,9 @@ test('a full login flow keeps requests/responses balanced,'
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     await fullLoginFlow(db);
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.equal(requests.length, responses.length);
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
+
     // seedRootAdmin: org + membership (2; role-grants retired)
     // + pii + credential (2) + authorize + token + token-event
     // + pbkdf2-to-scrypt rehash (4) = 8.
@@ -272,10 +272,10 @@ test('stored messages verify against their hashes', async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     await fullLoginFlow(db);
-    for (const row of await db.requests.getAll()) {
+    for (const row of await db.pairs.getAll()) {
         assert.equal(
-            await requestMessageHash(row.message),
-            row.message_hash);
+            await requestMessageHash(row.request),
+            row.request_hash);
     }
 });
 
@@ -295,8 +295,8 @@ test('a wrong password stores no NEW pair beyond the'
     // 2: the fixture's own pii + credential pairs (Phase 13 Task
     // 8's seedIdentityPii/seedIdentityCredential re-point) — the
     // failed attempt itself appends no further pair.
-    assert.equal((await db.requests.getAll()).length, 2);
-    assert.equal((await db.responses.getAll()).length, 2);
+    assert.equal((await db.pairs.getAll()).length, 2);
+    assert.equal((await db.pairs.getAll()).length, 2);
 });
 
 test('a double-spent authorization code stores nothing on'
@@ -306,7 +306,7 @@ async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const { code } = await fullLoginFlow(db);
-    const before = (await db.requests.getAll()).length;
+    const before = (await db.pairs.getAll()).length;
     // A distinguishing header keeps this replay from being
     // byte-identical to the original exchange — otherwise
     // appendMessagePair's same-hash dedup (message-pair.ts)
@@ -319,9 +319,9 @@ async () => {
             client_id: 'web',
         }, { [REQUEST_ID_HEADER]: 'replay-attempt' }));
     assert.equal(replay.status, 401);
-    assert.equal((await db.requests.getAll()).length, before);
+    assert.equal((await db.pairs.getAll()).length, before);
     assert.equal(
-        (await db.responses.getAll()).length, before);
+        (await db.pairs.getAll()).length, before);
 });
 
 test('the wire response on a 2xx carries a Response-ID and'
@@ -351,7 +351,7 @@ test('an unsupported grant_type stores no NEW pair beyond the'
     // 2: the fixture's own pii + credential pairs (Phase 13 Task
     // 8's seedIdentityPii/seedIdentityCredential re-point) — the
     // rejected grant itself appends no further pair.
-    assert.equal((await db.requests.getAll()).length, 2);
+    assert.equal((await db.pairs.getAll()).length, 2);
 });
 
 test('a refresh grant stores its own pair with live secrets',
@@ -372,9 +372,9 @@ async () => {
         access_token: rotatedJson.access_token,
         refresh_token: refreshTokenFromSetCookie(res),
     };
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.equal(requests.length, responses.length);
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
+
     // 11: the fixture's own pii + credential pairs (2, Phase 13
     // Task 8) + seedRootAdmin's 2 fixture pairs + authorize +
     // token (the token hop's own event pair, Phase 13 Task 5,
@@ -385,7 +385,7 @@ async () => {
     assert.equal(requests.length, 11);
     const refreshRequest = requests.find(
         r => r.uri_collection === '/authentication/token/'
-            && r.message.includes(first.refresh_token),
+            && r.request.includes(first.refresh_token),
     );
     assert.ok(refreshRequest);
     const refreshResponse = responses.find(
@@ -393,10 +393,10 @@ async () => {
     );
     assert.ok(refreshResponse);
     assert.ok(
-        refreshResponse!.message.includes(rotated.access_token),
+        refreshResponse!.response.includes(rotated.access_token),
     );
     assert.equal(
-        refreshResponse!.message.includes(rotated.refresh_token),
+        refreshResponse!.response.includes(rotated.refresh_token),
         false,
     );
 });
@@ -419,9 +419,9 @@ test('a token-exchange grant stores its own pair with live'
     };
     assert.equal(bodyJson.refresh_token, undefined);
     assert.equal(setCookieHeader(res), '');
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.equal(requests.length, responses.length);
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
+
     // 6: the fixture's own pii + credential pairs (2, Phase 13
     // Task 8) + seedRootAdmin's 2 fixture pairs + the exchange's
     // own event pair (Phase 13 Task 5: issueTokenPair's root
@@ -430,7 +430,7 @@ test('a token-exchange grant stores its own pair with live'
     assert.equal(requests.length, 6);
     const exchangeRequest = requests.find(
         r => r.uri_collection === '/authentication/token/'
-            && r.message.includes(subjectToken),
+            && r.request.includes(subjectToken),
     );
     assert.ok(exchangeRequest);
     const exchangeResponse = responses.find(
@@ -438,12 +438,12 @@ test('a token-exchange grant stores its own pair with live'
     );
     assert.ok(exchangeResponse);
     assert.ok(
-        exchangeResponse!.message.includes(
+        exchangeResponse!.response.includes(
             bodyJson.access_token,
         ),
     );
     assert.equal(
-        exchangeResponse!.message.includes('refresh_token'),
+        exchangeResponse!.response.includes('refresh_token'),
         false,
     );
 });
@@ -504,9 +504,9 @@ test('a client_credentials grant stores its own pair with live'
         access_token: bodyJson.access_token,
         refresh_token: refreshTokenFromSetCookie(res),
     };
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.equal(requests.length, responses.length);
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
+
     // 7: dbWithPasswordUser's own pii + credential pairs (2,
     // Phase 13 Task 8) + the fixture's own membership pair
     // (Phase 13 Task 1) + the registration-facet pair the
@@ -517,7 +517,7 @@ test('a client_credentials grant stores its own pair with live'
     assert.equal(requests.length, 7);
     const credRequest = requests.find(
         r => r.uri_collection === '/authentication/token/'
-            && r.message.includes(assertion),
+            && r.request.includes(assertion),
     );
     assert.ok(credRequest);
     const credResponse = responses.find(
@@ -525,10 +525,10 @@ test('a client_credentials grant stores its own pair with live'
     );
     assert.ok(credResponse);
     assert.ok(
-        credResponse!.message.includes(body.access_token),
+        credResponse!.response.includes(body.access_token),
     );
     assert.equal(
-        credResponse!.message.includes(body.refresh_token),
+        credResponse!.response.includes(body.refresh_token),
         false,
     );
 });
@@ -584,12 +584,12 @@ test('an Authorization header sent alongside the token grant is'
     });
     const res = await handleRequest(db, req);
     assert.equal(res.status, 201);
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const row = requests.find(
         r => r.uri_collection === '/authentication/token/');
     assert.ok(row);
     assert.ok(
-        row!.message.includes('some-stale-caller-token'));
+        row!.request.includes('some-stale-caller-token'));
 });
 
 test('a reused (already-rotated-away) refresh token grant is a'
@@ -604,8 +604,8 @@ test('a reused (already-rotated-away) refresh token grant is a'
         grant_type: 'refresh',
         refresh_token: first.refresh_token,
     }));
-    const before = (await db.requests.getAll()).length;
-    const opPairsBefore = (await db.requests.getAll()).filter(
+    const before = (await db.pairs.getAll()).length;
+    const opPairsBefore = (await db.pairs.getAll()).filter(
         r => r.uri_collection === '/authentication/token/'
             && r.uri_id === '',
     ).length;
@@ -619,9 +619,9 @@ test('a reused (already-rotated-away) refresh token grant is a'
             refresh_token: first.refresh_token,
         }, { [REQUEST_ID_HEADER]: 'replay-attempt' }));
     assert.equal(reused.status, 401);
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    assert.equal(requests.length, responses.length);
+    const requests = await db.pairs.getAll();
+    const responses = await db.pairs.getAll();
+
     const opPairsAfter = requests.filter(
         r => r.uri_collection === '/authentication/token/'
             && r.uri_id === '',

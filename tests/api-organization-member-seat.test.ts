@@ -95,13 +95,13 @@ test('accept writes the seat at the invitation'
 
     const prefix = seatsPrefix(ORGANIZATION_TWO);
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere(
+        db.pairs.getAllWhere(
             'uri_collection', prefix),
-        db.responses.getAllWhere(
+        db.pairs.getAllWhere(
             'uri_collection', prefix),
     ]);
     const seats = documentPairsAt(
-        requests, responses, prefix,
+        requests, prefix,
     ).filter((pair) => pair.uriId === SARAH_ID
         && pair.method === 'PUT');
     assert.equal(seats.length, 1);

@@ -80,18 +80,17 @@ function humanCreateBody(id: string, eventId: string) {
 async function allMessages(
     db: MemoryDbAdapter,
 ): Promise<string[]> {
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
+    const pairs = await db.pairs.getAll();
     return [
-        ...requests.map(r => r.message),
-        ...responses.map(r => r.message),
+        ...pairs.map(r => r.request),
+        ...pairs.map(r => r.response),
     ];
 }
 
-// ── 1. PUT-PUT: exactly ONE pair (the latest); balance holds ──
+// ── 1. PUT-PUT: exactly ONE pair (the latest) ──
 
 test('PUT-PUT at one address leaves exactly ONE pair (the'
-+ ' latest); requests == responses balance holds', async () => {
++ ' latest)', async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
         'PUT', '/identities/slot-1/pii', DEV_TOKEN,
@@ -107,16 +106,14 @@ test('PUT-PUT at one address leaves exactly ONE pair (the'
     // ABSENCE — stated explicitly, not merely the old assertion
     // deleted.
     assert.equal(second.headers.get('Supersedes'), null);
-    const requests = await db.requests.getAll();
-    const responses = await db.responses.getAll();
-    const atAddress = requests.filter(
+    const pairs = await db.pairs.getAll();
+    const atAddress = pairs.filter(
         r => r.uri_collection === '/identities/slot-1/pii/',
     );
     assert.equal(atAddress.length, 1);
     assert.equal(
         atAddress[0]!.id, second.headers.get('Response-ID'),
     );
-    assert.equal(requests.length, responses.length);
     // Phase Final Task 2: identity_pii ROW half stripped —
     // domain oracle is deriveIdentityPii. G5: PUT-PUT still
     // physically deletes the prior pair (one-role DELETE).
@@ -143,8 +140,8 @@ async () => {
     // Case 7 (the DELETE half): the tombstone carries no
     // Supersedes either — chainless applies to BOTH verbs.
     assert.equal(del.headers.get('Supersedes'), null);
-    const requests = await db.requests.getAll();
-    const atAddress = requests.filter(
+    const pairs = await db.pairs.getAll();
+    const atAddress = pairs.filter(
         r => r.uri_collection === '/identities/slot-2/pii/',
     );
     assert.equal(atAddress.length, 1);
@@ -170,8 +167,8 @@ async () => {
     ));
     assert.equal(put.status, 201);
     assert.equal(put.headers.get('Supersedes'), null);
-    const requests = await db.requests.getAll();
-    const atAddress = requests.filter(
+    const pairs = await db.pairs.getAll();
+    const atAddress = pairs.filter(
         r => r.uri_collection === '/identities/slot-3/pii/',
     );
     assert.equal(atAddress.length, 1);
@@ -193,7 +190,7 @@ test('a byte-identical resend against the LIVE slot replays'
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
-    const countAfterFirst = (await db.requests.getAll()).length;
+    const countAfterFirst = (await db.pairs.getAll()).length;
     const resend = await handleRequest(db, req(
         'PUT', '/identities/slot-4a/pii', DEV_TOKEN,
         humanPii('Dana'),
@@ -204,7 +201,7 @@ test('a byte-identical resend against the LIVE slot replays'
     // answers this resend; the live slot's row is untouched.
     assert.equal(resend.headers.get('Response-ID'), firstId);
     assert.equal(
-        (await db.requests.getAll()).length, countAfterFirst,
+        (await db.pairs.getAll()).length, countAfterFirst,
     );
 });
 
@@ -234,8 +231,8 @@ test('a byte-identical resend AFTER supersession finds no'
     assert.equal(resend.status, 201);
     assert.equal(resend.headers.get('Supersedes'), null);
     assert.notEqual(resend.headers.get('Response-ID'), firstId);
-    const requests = await db.requests.getAll();
-    const atAddress = requests.filter(
+    const pairs = await db.pairs.getAll();
+    const atAddress = pairs.filter(
         r => r.uri_collection === '/identities/slot-4b/pii/',
     );
     assert.equal(atAddress.length, 1);
@@ -346,8 +343,8 @@ test("the zone's confinement: a non-/pii DELETE (a memberships"
     // Unlike /pii, a seat DELETE still APPENDS — the
     // hard-delete zone is confined to identities/:id/pii alone.
     assert.equal(del.headers.get('Supersedes'), null);
-    const requests = await db.requests.getAll();
-    const atAddress = requests.filter(
+    const pairs = await db.pairs.getAll();
+    const atAddress = pairs.filter(
         r => r.uri_collection === '/organizations/1/members/'
             && r.uri_id === 'confine-1',
     );

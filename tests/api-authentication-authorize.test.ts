@@ -76,7 +76,7 @@ async function s256Fields(): Promise<{
 async function noStoredAuthorizeResponse(
     db: MemoryDbAdapter,
 ): Promise<boolean> {
-    const responses = await db.responses.getAllWhere(
+    const responses = await db.pairs.getAllWhere(
         'uri_collection',
         canonicalUriCollection(undefined, '/authentication/authorize/'),
     );

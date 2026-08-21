@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { memoryDbAdapter } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import {
     formWritePair,
@@ -163,7 +164,7 @@ test('append then head-read round-trips', async () => {
     await db.postSchemaCreation();
     const pair = await formWritePair({ ...INPUT });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
     assert.equal(
@@ -176,12 +177,11 @@ test('append then head-read round-trips', async () => {
         await storedResponseFor(db, pair.requestHash);
     assert.equal(stored?.id, pair.id);
     // Early request, late response: the request row keeps
-    // the arrival stamp verbatim; the response row's `at`
-    // (same column name) was minted at append time,
-    // strictly after arrival.
-    const request = await db.requests.getById(pair.id);
-    assert.equal(request.at, INPUT.requestAt);
-    assert.ok(request.at < stored!.at);
+    // the arrival stamp verbatim; response_at was minted
+    // at append time, strictly after arrival.
+    const request = await db.pairs.getById(pair.id);
+    assert.equal(request.request_at, INPUT.requestAt);
+    assert.ok(request.request_at < stored!.response_at);
 });
 
 test('a same-hash re-append writes nothing', async () => {
@@ -190,12 +190,11 @@ test('a same-hash re-append writes nothing', async () => {
     const pair = await formWritePair({ ...INPUT });
     const replay = { ...pair, id: 'other-uuid' };
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             await appendMessagePair(view, pair);
             await appendMessagePair(view, replay);
         },
     );
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.pairs.getAll()).length, 1);
 });

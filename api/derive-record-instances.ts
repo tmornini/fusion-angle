@@ -73,9 +73,8 @@ export async function instanceParentEtag(
     db: DbAdapter,
     pairId: string,
 ): Promise<string | undefined> {
-    const request = await db.requests.getById(pairId);
-    if (request === undefined) return undefined;
-    return ifMatchFromMessage(request.message);
+    const pair = await db.pairs.getById(pairId);
+    return ifMatchFromMessage(pair.request);
 }
 
 export function advertisedInstanceEtag(
@@ -175,11 +174,10 @@ async function fetchInstancePairs(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    return documentPairsAt(requests, responses, prefix);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
+    return documentPairsAt(pairs, prefix);
 }
 
 // undefined when absent OR tombstoned (DELETE is the last
@@ -195,12 +193,11 @@ export async function deriveInstanceHead(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const document = deriveDocumentsAt(
-        requests, responses, prefix,
+        pairs, prefix,
     ).get(instanceId);
     if (document === undefined) return undefined;
     return {
@@ -219,13 +216,10 @@ export async function deriveInstanceCollection(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    const documents = deriveDocumentsAt(
-        requests, responses, prefix,
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
     );
+    const documents = deriveDocumentsAt(pairs, prefix);
     const rows: InstanceHead[] = [];
     for (const document of documents.values()) {
         rows.push({

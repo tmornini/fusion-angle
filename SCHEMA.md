@@ -12,21 +12,19 @@
 
 Phase Final deleted the entity row plane. The schema of
 record is the **message plane** — the append-only
-`requests` / `responses` pair tables. The tables are listed
-in `api/db.ts` as `TABLE_NAMES` (the authoritative count:
-two). Each table is an IndexedDB object store
+`pairs` table. The table is listed in `api/db.ts` as
+`TABLE_NAMES` (the authoritative count: one). The table
+is an IndexedDB object store
 (`keyPath: 'id'`) in the `fusion-angle` database; the
-localStorage simulated backend keys the same tables as
+localStorage simulated backend keys the same table as
 `fusion-angle:tableName`; memory uses an in-process Map of
 bare table names; the server ZIP stores the same
 columns in Postgres (`api/schema-postgres.ts`). All
 rows have a text `id` primary key. Column types match
-`RequestEntity` / `ResponseEntity`: TEXT (string) in
-the TypeScript / IndexedDB view. Postgres stores
-`message` as BYTEA Latin-1. `method` and
-`operation_id` are TEXT on the request row;
-`operation_id` is TEXT on the response row (same
-value as the request). No `uri_id`-only index. Document-body
+`PairEntity`: TEXT (string) in the TypeScript /
+IndexedDB view. Postgres stores `request` and
+`response` as BYTEA Latin-1. `method` and
+`operation_id` are TEXT. No `uri_id`-only index. Document-body
 composites (arrays and
 objects — `strengths`, `team_dimensions`, `options`,
 `constraints`, `graph`, `graphDelta`, `revivals`,
@@ -44,7 +42,7 @@ tags, …) is a **derivation** over message pairs at a URI
 address. There is no per-entity table and no dual-write
 half. Reads reassemble documents and lifecycle state from
 the pair plane (`api/derive-*.ts`); writes append pairs
-only (`tx` lists `['requests','responses']` on every
+only (`tx` lists `MESSAGE_TABLES` on every
 pair-wired path).
 
 **Orphan stores (gate 6) — CANONICAL residual statement.**
@@ -115,7 +113,7 @@ view — omits it.
 
 ## Messages (schema of record)
 
-The append-only ledgers every pair-wired HTTP write appends
+The append-only ledger every pair-wired HTTP write appends
 into. Seeded demo data forms pairs pre-tx (`formSeedPair`);
 `EXPECTED_PAIR_COUNT` 1448 / bootstrap 8 is absolute.
 Global-spine (pass-through), NOT org-fenced at the store:
@@ -125,20 +123,25 @@ and the write authorizer
 `resolveGlobalOwner`, which may fall back to
 `resolveOwningOrganization`).
 
-### requests
+### pairs
 
-One row per stored canonical HTTP request message. The
-message text IS the row; `uri_collection` (retains its
-trailing `/`) and `uri_id` (empty string for a collection
-request) are addressing metadata, and `message_hash` is an
-index over the sha256 digest (`shared/digest.ts`
-`sha256HexOfBytes`) of the Latin-1 wire octets of
-`message` — never a second copy of its truth. `at` is pair
-ENVELOPE metadata only, not a domain timestamp inside the
-message. `requester_identity_id` is the identity id of the
+One row per stored canonical HTTP request message and its
+paired response. The request and response texts ARE the
+row; `uri_collection` (retains its trailing `/`) and
+`uri_id` (empty string for a collection request) are
+addressing metadata, and `request_hash` is an index over
+the sha256 digest (`shared/digest.ts` `sha256HexOfBytes`)
+of the Latin-1 wire octets of `request` — never a second
+copy of its truth. `request_at` is pair ENVELOPE metadata
+only, not a domain timestamp inside the message.
+`response_at` is the paired response's envelope time; it
+is not required to equal `request_at`.
+`requester_identity_id` is the identity id of the
 requester. `method` is the HTTP method (`^[A-Z]+$`); the
-ledger stores no GET rows. `operation_id` is a 22-char id,
-the same value as on the paired response.
+ledger stores no GET rows. `operation_id` is a 22-char id
+on the pair. `id` is the pair locator (wire
+`Response-ID`). No `etag`, `status`, `message_hash`,
+`follows`, or `supersedes` column.
 
 Columns, keys, and indexes live in `SCHEMA.svg`.
 
@@ -148,19 +151,7 @@ never mints this header for a public write. GET may
 send it; it is ignored. Seed `formSeedPair` mints one
 id per envelope and copies it onto inner PUTs.
 
-Validator: `validateRequestEntity` (`api/validators.ts`).
-
-### responses
-
-The paired response: `id` equals the request's `id`
-(pair locator; wire `Response-ID`). No `etag`,
-`status`, `message_hash`, `follows`, or `supersedes`
-column. Addressing columns (`uri_collection`, `uri_id`,
-`at`) match the request.
-
-Columns, keys, and indexes live in `SCHEMA.svg`.
-
-`responses.version` is the document revision token
+`pairs.version` is the document revision token
 (unconditional / genesis: sha256 of response body octets;
 later: sha256 of body octets || matched 64-hex). Wire
 `ETag` / `If-Match` are that same token for documents.
@@ -174,7 +165,7 @@ Write HTTP responses add `Operation-ID` at send time
 from this column. It is not stored on the GET-shaped
 response blob.
 
-Validator: `validateResponseEntity` (`api/validators.ts`).
+Validator: `validatePairEntity` (`api/validators.ts`).
 
 ## Derived document families (no table)
 
@@ -186,7 +177,7 @@ table:
 
 `flows/:id/tags/:name` (Phase 14 Task 9) is the FIRST
 document family with no backing table at all: PUT, GET, and
-DELETE all touch only `requests`/`responses`, addressed at
+DELETE all touch only `pairs`, addressed at
 `flows/<flow-id>/tags/<name>/`. A tag body carries exactly
 one field, `flow_response_id` — the pinned `id` of one of the
 flow's own `flows/:id` document-pair responses — so the tag

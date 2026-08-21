@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import type {
-    Id, RequestEntity, ResponseEntity, StateFieldValueEntity,
+    Id, PairEntity, StateFieldValueEntity,
 } from './types.ts';
 import { pickString } from './validators.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
@@ -28,13 +28,13 @@ import {
 // forms transition op pairs that carry the same fold.
 
 function matchingPrefixes(
-    requests: readonly RequestEntity[],
+    pairs: readonly PairEntity[],
     pattern: RegExp,
 ): ReadonlySet<string> {
     const prefixes = new Set<string>();
-    for (const request of requests) {
-        if (pattern.test(request.uri_collection)) {
-            prefixes.add(request.uri_collection);
+    for (const pair of pairs) {
+        if (pattern.test(pair.uri_collection)) {
+            prefixes.add(pair.uri_collection);
         }
     }
     return prefixes;
@@ -54,15 +54,14 @@ interface TransitionFieldValue {
 // ever CREATES a row (validateWorkOrderTransitionBody carries
 // no delete arm), never tombstones one.
 function transitionFieldValueCandidates(
-    requests: readonly RequestEntity[],
-    responses: readonly ResponseEntity[],
+    pairs: readonly PairEntity[],
 ): DocumentPair[] {
     const candidates: DocumentPair[] = [];
     for (const prefix of matchingPrefixes(
-        requests, WORK_ORDER_TRANSITION_PATTERN,
+        pairs, WORK_ORDER_TRANSITION_PATTERN,
     )) {
         for (const transition of operationPairsAt(
-            requests, responses, prefix,
+            pairs, prefix,
         )) {
             // New-shape pairs (no fieldValues bag) contribute
             // nothing to the legacy SFV census (RESTRICT legs
@@ -98,12 +97,9 @@ function transitionFieldValueCandidates(
 // folds via fieldValuesByTransitionEvent on entity-scoped
 // transition pairs), never before this fold runs.
 export function stateFieldValuesFrom(
-    requests: readonly RequestEntity[],
-    responses: readonly ResponseEntity[],
+    pairs: readonly PairEntity[],
 ): StateFieldValueEntity[] {
-    const candidates = transitionFieldValueCandidates(
-        requests, responses,
-    );
+    const candidates = transitionFieldValueCandidates(pairs);
     const heads = latestByKey(candidates, (pair) => pair.uriId);
     const rows: StateFieldValueEntity[] = [];
     for (const [uriId, head] of heads) {
@@ -157,14 +153,14 @@ async function isVisibleStateEvent(
 // (pair plane), not the row-plane rawHasRow fence.
 //
 // NAMED DEVIATION — Author gate 1(d) (fix wave, Critical 2):
-// this SFV RESTRICT leg still reads the WHOLE requests/
-// responses plane inside a write-gate transaction, which gate
+// this SFV RESTRICT leg still reads the WHOLE pairs
+// plane inside a write-gate transaction, which gate
 // 1(d) disfavors in favor of entity-scoped indexed reads (the
 // workOrderClaimSourcesFor precedent this header cites). The
 // deviation PERSISTS BY DESIGN at the browser tier — it is not
 // a Phase Final residual for the SFV count. The transition
 // family (work-orders/:id/transition/) WOULD be servable via N
-// indexed requests/responses.getAllWhere ('uri_collection', ...)
+// indexed pairs.getAllWhere ('uri_collection', ...)
 // reads (api/db.ts's TABLE_INDEXES: both tables index
 // uri_collection — an EXACT-match index, one value per entity, not
 // a family-wide constant), one per known work-order id, EXCEPT
@@ -184,12 +180,9 @@ export async function deriveStateFieldValueReferrers(
     boundOrganization: Id,
     attributeIds: readonly Id[],
 ): Promise<Map<Id, readonly StateFieldValueEntity[]>> {
-    const [requests, responses] = await Promise.all([
-        view.requests.getAll(),
-        view.responses.getAll(),
-    ]);
+    const pairs = await view.pairs.getAll();
     const wanted = new Set(attributeIds);
-    const candidates = stateFieldValuesFrom(requests, responses)
+    const candidates = stateFieldValuesFrom(pairs)
         .filter((row) => wanted.has(row.attribute_id));
 
     // IMPORTANT 3 (fix wave): resolve visibility ONCE per

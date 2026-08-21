@@ -210,7 +210,7 @@ test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     assert.ok(secondId);
     assert.notEqual(secondId, firstId);
 
-    const responses = await db.responses.getAll();
+    const responses = await db.pairs.getAll();
     const secondRow = responses.find(r => r.id === secondId);
     assert.ok(secondRow);
     assert.equal('supersedes' in secondRow!, false);
@@ -239,12 +239,12 @@ test('e2e: DELETE marks the tag — GET 404s after, and the'
     const delId = del.headers.get('Response-ID');
     assert.ok(delId);
 
-    const responses = await db.responses.getAll();
+    const responses = await db.pairs.getAll();
     const delRow = responses.find(r => r.id === delId);
     assert.ok(delRow);
     assert.equal('supersedes' in delRow!, false);
 
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const delRequest = requests.find(r => r.id === delId);
     assert.ok(delRequest);
     // The DELETE row itself is present, unmoved — a marked
@@ -263,14 +263,14 @@ test('e2e: a malformed tag body (extra key) 400s and stores'
     const token = await organizationToken();
     await createFlow(db, token, 'flow-tag-5');
     const r1 = await headResponseId(db, token, 'flow-tag-5');
-    const before = await db.requests.getAll();
+    const before = await db.pairs.getAll();
 
     const res = await handleRequest(db, req(
         'PUT', '/organizations/1/flows/flow-tag-5/tags/v1', token,
         { flow_response_id: r1, extra: 'nope' },
     ));
     assert.equal(res.status, 400);
-    const after = await db.requests.getAll();
+    const after = await db.pairs.getAll();
     assert.equal(after.length, before.length);
 });
 
@@ -280,14 +280,14 @@ test('e2e: a malformed tag name (disallowed characters) 400s'
     const token = await organizationToken();
     await createFlow(db, token, 'flow-tag-6');
     const r1 = await headResponseId(db, token, 'flow-tag-6');
-    const before = await db.requests.getAll();
+    const before = await db.pairs.getAll();
 
     const res = await handleRequest(db, req(
         'PUT', '/organizations/1/flows/flow-tag-6/tags/not%20ok', token,
         { flow_response_id: r1 },
     ));
     assert.equal(res.status, 400);
-    const after = await db.requests.getAll();
+    const after = await db.pairs.getAll();
     assert.equal(after.length, before.length);
 });
 

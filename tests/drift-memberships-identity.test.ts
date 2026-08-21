@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import type { Id, MembershipEntity } from '../api/types.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
@@ -205,9 +206,7 @@ test('leg 5: membershipExistsFor — member + non-member parity'
 
     // Phase Final Task 2: invitations + memberships ROW
     // halves stripped from grantInvitation's tx list.
-    const grantTxTables = [
-        'requests', 'responses',
-    ];
+    const grantTxTables = MESSAGE_TABLES;
     const inTxMemberCheck = await db.transaction(
         grantTxTables,
         (view) => membershipExistsFor(

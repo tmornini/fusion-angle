@@ -64,11 +64,10 @@ async function fetchFlowRecordDocuments(
     flowId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = flowRecordsUriPrefix(organization, flowId);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    return deriveDocumentsAt(requests, responses, prefix);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
+    return deriveDocumentsAt(pairs, prefix);
 }
 
 // id-lex ordered (the IndexedDB reference); a DELETE head

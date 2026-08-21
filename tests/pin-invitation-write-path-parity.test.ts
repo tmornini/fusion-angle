@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { MemoryDbAdapter } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import { handleRequest } from '../api/api.ts';
 import {
     pendingInvitationFor,
@@ -63,15 +64,9 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 // transaction over (api/invitations-domain.ts). Phase Final
 // Task 2: invitations + memberships ROW halves stripped;
 // states stays until states-trace.
-const GRANT_TX_TABLES = [
-    'requests', 'responses',
-];
-const ACCEPT_TX_TABLES = [
-    'requests', 'responses',
-];
-const DECLINE_OR_REVOKE_TX_TABLES = [
-    'requests', 'responses',
-];
+const GRANT_TX_TABLES = MESSAGE_TABLES;
+const ACCEPT_TX_TABLES = MESSAGE_TABLES;
+const DECLINE_OR_REVOKE_TX_TABLES = MESSAGE_TABLES;
 
 async function assertPendingWritePathParity(
     db: MemoryDbAdapter,
@@ -353,7 +348,7 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
 
     const seatPrefix = '/organizations/'
         + ORGANIZATION_TWO + '/members/';
-    const seatRows = await db.requests.getAllWhere(
+    const seatRows = await db.pairs.getAllWhere(
         'uri_collection', seatPrefix,
     );
     assert.equal(

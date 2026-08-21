@@ -111,26 +111,20 @@ export async function isDatabaseEmpty(
     sql: SqlClient,
 ): Promise<boolean> {
     const rows = await sql.query<{
-        requests: boolean;
-        responses: boolean;
+        pairs: boolean;
         marker: boolean;
     }>`
         SELECT
             EXISTS (
-                SELECT 1 FROM requests
-            ) AS requests,
-            EXISTS (
-                SELECT 1 FROM responses
-            ) AS responses,
+                SELECT 1 FROM pairs
+            ) AS pairs,
             EXISTS (
                 SELECT 1 FROM schema_marker
             ) AS marker
     `;
     const row = rows[0];
     if (row === undefined) return true;
-    return !row.requests
-        && !row.responses
-        && !row.marker;
+    return !row.pairs && !row.marker;
 }
 
 export async function assertEmptyDatabase(

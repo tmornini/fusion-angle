@@ -14,7 +14,7 @@ import {
     validateProjectFlowEntity,
     validateRecordAttributeEntity,
     validateFlowDocumentBody,
-    validateResponseEntity,
+    validatePairEntity,
     asStoredGraph,
     asConstraint,
     assertFlowGraphWriteLaw,
@@ -1270,24 +1270,40 @@ test(
     },
 );
 
-// --- ResponseEntity ---
+// --- PairEntity ---
 
-const validResponse = {
+const validPair = {
     uri_collection: '/organizations/1/ideas/',
     uri_id: '42',
-    at: '2026-01-01T00:00:00.000000Z',
+    requester_identity_id: 'current',
+    method: 'PUT',
+    request_at: '2026-01-01T00:00:00.000000Z',
+    request_hash: 'a'.repeat(64),
+    request: '{"kind":"request"}',
+    response_at: '2026-01-01T00:00:00.000001Z',
     version: 'e'.repeat(64),
-    message: '{"kind":"response"}',
+    response: '{"kind":"response"}',
     operation_id: '0123456789ABCDEFGHIJKL',
 };
 
 test(
-    'validateResponseEntity rejects status key',
+    'validatePairEntity accepts a full pair',
+    () => {
+        const got = validatePairEntity(validPair);
+        assert.equal(got.method, 'PUT');
+        assert.equal(got.request_at, validPair.request_at);
+        assert.equal(
+            got.response_at, validPair.response_at,
+        );
+    },
+);
+
+test(
+    'validatePairEntity rejects status key',
     () => {
         assert.throws(
-            () => validateResponseEntity({
-                ...validResponse,
-                status: 200,
+            () => validatePairEntity({
+                ...validPair, status: 200,
             }),
             /unexpected key "status"/,
         );
@@ -1295,14 +1311,39 @@ test(
 );
 
 test(
-    'validateResponseEntity rejects message_hash key',
+    'validatePairEntity rejects message_hash key',
     () => {
         assert.throws(
-            () => validateResponseEntity({
-                ...validResponse,
+            () => validatePairEntity({
+                ...validPair,
                 message_hash: 'a'.repeat(64),
             }),
             /unexpected key "message_hash"/,
+        );
+    },
+);
+
+test(
+    'validatePairEntity rejects a short hash',
+    () => {
+        assert.throws(
+            () => validatePairEntity({
+                ...validPair,
+                request_hash: 'aa',
+            }),
+            /request_hash must be a 64-/,
+        );
+    },
+);
+
+test(
+    'validatePairEntity rejects a lowercase method',
+    () => {
+        assert.throws(
+            () => validatePairEntity({
+                ...validPair, method: 'put',
+            }),
+            /method must match \^\[A-Z\]\+\$/,
         );
     },
 );

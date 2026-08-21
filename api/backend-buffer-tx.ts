@@ -99,8 +99,12 @@ export function bufferTx(
                         Record<string, unknown>;
                     const r = right as
                         Record<string, unknown>;
-                    const atL = String(l['at'] ?? '');
-                    const atR = String(r['at'] ?? '');
+                    const atL = String(
+                        l['response_at'] ?? '',
+                    );
+                    const atR = String(
+                        r['response_at'] ?? '',
+                    );
                     if (atL < atR) return -1;
                     if (atL > atR) return 1;
                     if (left.id < right.id) return -1;
@@ -115,12 +119,6 @@ export function bufferTx(
             uriId: string,
             version: string,
         ): Promise<T[]> {
-            if (table === 'requests') {
-                throw new Error(
-                    'getAddressVersion does not'
-                    + ' accept requests',
-                );
-            }
             return scoped(table)
                 .filter((row) => {
                     const rec = row as
@@ -135,8 +133,12 @@ export function bufferTx(
                         Record<string, unknown>;
                     const r = right as
                         Record<string, unknown>;
-                    const atL = String(l['at'] ?? '');
-                    const atR = String(r['at'] ?? '');
+                    const atL = String(
+                        l['response_at'] ?? '',
+                    );
+                    const atR = String(
+                        r['response_at'] ?? '',
+                    );
                     if (atL < atR) return -1;
                     if (atL > atR) return 1;
                     if (left.id < right.id) return -1;
@@ -150,12 +152,6 @@ export function bufferTx(
             collection: string,
             containment: Record<string, unknown>,
         ): Promise<T[]> {
-            if (table === 'requests') {
-                throw new Error(
-                    'getWhereBody does not accept'
-                    + ' requests',
-                );
-            }
             return scoped(table)
                 .filter((row) => {
                     const rec = row as
@@ -166,7 +162,7 @@ export function bufferTx(
                     ) {
                         return false;
                     }
-                    const message = rec['message'];
+                    const message = rec['response'];
                     if (typeof message !== 'string') {
                         return false;
                     }
@@ -183,8 +179,12 @@ export function bufferTx(
                         Record<string, unknown>;
                     const r = right as
                         Record<string, unknown>;
-                    const atL = String(l['at'] ?? '');
-                    const atR = String(r['at'] ?? '');
+                    const atL = String(
+                        l['response_at'] ?? '',
+                    );
+                    const atR = String(
+                        r['response_at'] ?? '',
+                    );
                     if (atL < atR) return -1;
                     if (atL > atR) return 1;
                     if (left.id < right.id) return -1;

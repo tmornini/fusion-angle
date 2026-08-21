@@ -8,7 +8,10 @@ import {
 import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { ValidationError } from '../api/types.ts';
-import { EntityNotFoundError } from '../api/db.ts';
+import {
+    EntityNotFoundError,
+    MESSAGE_TABLES,
+} from '../api/db.ts';
 import {
     validateIdentityDocumentBody,
     validateIdentityEntity,
@@ -154,8 +157,8 @@ async () => {
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: identity spine tables retired.
-    assert.equal((await db.requests.getAll()).length, 1);
-    assert.equal((await db.responses.getAll()).length, 1);
+    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.pairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
@@ -172,8 +175,8 @@ test('a byte-identical PUT resend to identities/:id converges'
         db, 'identities/id-resend-1', body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
+    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.pairs.getAll()).length, 3);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file
@@ -206,7 +209,7 @@ async function putDocumentPair(
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
     return pair.id;
@@ -231,7 +234,7 @@ async function deleteDocumentPair(
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
 }
@@ -259,7 +262,7 @@ test('a PUT chain Supersedes-chains and the head derives the'
         db, 'identities-chain-1', second,
         '2026-02-02T00:00:00.000000Z', firstId,
     );
-    const secondResponse = await db.responses.getById(secondId);
+    const secondResponse = await db.pairs.getById(secondId);
     assert.equal('supersedes' in secondResponse, false);
 
     const headAfterSecond = await documentGetHandler(wiring)(

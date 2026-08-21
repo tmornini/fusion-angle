@@ -22,9 +22,8 @@ const KEYED_READS: ReadonlyArray<{
     table: string;
     column: string;
 }> = [
-    { table: 'requests', column: 'message_hash' },
-    { table: 'requests', column: 'uri_collection' },
-    { table: 'responses', column: 'uri_collection' },
+    { table: 'pairs', column: 'request_hash' },
+    { table: 'pairs', column: 'uri_collection' },
 ];
 
 test('no caller getAllWhere uri_id', async () => {
@@ -34,8 +33,8 @@ test('no caller getAllWhere uri_id', async () => {
     );
 });
 
-test('responses carry no unique follows index', () => {
-    const cols = TABLE_INDEXES['responses'] ?? [];
+test('pairs carry no unique follows index', () => {
+    const cols = TABLE_INDEXES['pairs'] ?? [];
     assert.equal(
         cols.some(
             (spec) =>

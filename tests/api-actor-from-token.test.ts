@@ -21,7 +21,7 @@ test(
             strengths: [],
             team_dimensions: {},
         }, DEV_TOKEN);
-        const requests = await db.requests.getAll();
+        const requests = await db.pairs.getAll();
         const row = requests.find(r =>
             r.uri_collection === '/identities/'
             && r.uri_id === 'current'

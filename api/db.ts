@@ -1,6 +1,5 @@
 import type {
-    RequestEntity,
-    ResponseEntity,
+    PairEntity,
 } from './types.ts';
 import type {
     NotificationEvent,
@@ -263,16 +262,13 @@ export const backendRunner = (
 export const ambientRunner = (tx: Tx): TxRunner =>
     (_tables, _mode, fn) => fn(tx);
 
-// The 2 stores an adapter exposes, factored out of
+// The store an adapter exposes, factored out of
 // DbAdapter so an adapter can build the whole bundle in one
 // place (`#buildStores`) and a transaction can rebuild it
-// bound to an open tx (A9). Both surviving stores ride
+// bound to an open tx (A9). The surviving store rides
 // HistoryEntityStore (message plane only).
 export interface DbStores {
-    requests:
-        EntityStore<RequestEntity>;
-    responses:
-        EntityStore<ResponseEntity>;
+    pairs: EntityStore<PairEntity>;
 }
 
 // Schema/connection lifecycle — the non-row surface every
@@ -348,9 +344,14 @@ export interface GuardedDbAdapter
 // orphans. deleteSchema (a full database delete) is the only
 // cleanup; nothing else needs to reconcile them.
 export const TABLE_NAMES = [
-    'requests',
-    'responses',
+    'pairs',
 ];
+
+// The pair-plane transaction declaration. Every
+// `transaction` / `readTransaction` that touches
+// the message plane passes this instead of a
+// literal list. Equals TABLE_NAMES.
+export const MESSAGE_TABLES = TABLE_NAMES;
 
 // A secondary index is either a plain column name (the
 // existing shape) or an object form declaring `unique: true`
@@ -389,11 +390,8 @@ export function uniqueColumns(
 // collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
-    requests: [
-        'uri_collection', 'message_hash',
-    ],
-    responses: [
-        'uri_collection',
+    pairs: [
+        'uri_collection', 'request_hash',
     ],
 };
 

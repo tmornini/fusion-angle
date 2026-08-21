@@ -829,7 +829,7 @@ test('a second client_credentials grant with the same jti'
         client_assertion: assertion,
     }));
     assert.equal(first.status, 201);
-    const before = await db.requests.getAll();
+    const before = await db.pairs.getAll();
     const grantCount = before.filter((row) =>
         row.uri_collection === '/authentication/token/',
     ).length;
@@ -845,7 +845,7 @@ test('a second client_credentials grant with the same jti'
     assert.deepEqual(
         await second.json(), { error: 'invalid_grant' },
     );
-    const after = await db.requests.getAll();
+    const after = await db.pairs.getAll();
     assert.equal(
         after.filter((row) =>
             row.uri_collection === '/authentication/token/',
@@ -972,7 +972,7 @@ async () => {
     // 401 mask. The derive's first read is
     // requests.getAllWhere — the fault-injection point that
     // replaced the retired rawReadRow stub.
-    (db.requests as unknown as {
+    (db.pairs as unknown as {
         getAllWhere: () => Promise<never>;
     }).getAllWhere = async () => {
         throw new Error('store exploded');

@@ -125,12 +125,6 @@ function messageOf(fault: Fault): string {
     if (fault.code === '22P02') {
         return 'bad JSON at GIN';
     }
-    if (
-        fault.constraint === 'responses_request_fk'
-        || fault.code === '23503'
-    ) {
-        return 'torn pair: responses_request_fk';
-    }
     if (isPrimaryKey(fault)) {
         return 'duplicate primary key';
     }

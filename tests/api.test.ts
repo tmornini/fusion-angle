@@ -249,13 +249,13 @@ test(
         // be forced from the store the derivation actually reads.
         // Task 8 (Phase 11): the fence's own
         // default-organization fallback
-        // ALSO derives from db.requests now
+        // ALSO derives from db.pairs now
         // (identityDefaultOrganization / deriveDefaultOrganization)
         // — so the fault is targeted at the ideas prefix alone,
         // letting the fence's own read through to the real
         // implementation unaffected.
-        const original = db.requests.getAllWhere.bind(db.requests);
-        (db.requests as unknown as {
+        const original = db.pairs.getAllWhere.bind(db.pairs);
+        (db.pairs as unknown as {
             getAllWhere: (
                 column: string, key: string,
             ) => ReturnType<typeof original>;

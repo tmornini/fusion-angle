@@ -73,7 +73,7 @@ function req(
 async function pairCount(
     db: MemoryDbAdapter,
 ): Promise<number> {
-    return (await db.requests.getAll()).length;
+    return (await db.pairs.getAll()).length;
 }
 
 function graphJson(): Record<string, unknown> {

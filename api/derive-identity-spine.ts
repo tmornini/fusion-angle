@@ -1,5 +1,8 @@
 import type { DbAdapter } from './db.ts';
-import { EntityNotFoundError } from './db.ts';
+import {
+    EntityNotFoundError,
+    MESSAGE_TABLES,
+} from './db.ts';
 import type {
     Id,
     IdentityPiiEntity,
@@ -36,7 +39,7 @@ import {
 // ('/identities/<id>/pii/', uriId '' — a singleton document at a
 // collection-style address, message-address.ts), so no index can
 // serve "every request whose uri_collection has this shape" for an
-// arbitrary id. deriveIdentityPiiRows reads db.requests/responses
+// arbitrary id. deriveIdentityPiiRows reads db.pairs
 // IN FULL (ONE shared tx) and matches PII_ADDRESS_PATTERN — the
 // segment-boundary rule verified against derive-invitations.ts's
 // OP_ADDRESS_PATTERN at Step 0: '[^/]+' between two literal
@@ -49,24 +52,25 @@ import {
 // READ SEMANTICS (concurrency lens): '/pii' is the message
 // plane's ONE sanctioned hard-delete zone (api/pii-hard-delete.ts)
 // — a write physically DELETES the slot's prior pair before
-// appending its own. Two INDEPENDENT getAllWhere reads (one per
-// store) could straddle a concurrent supersession: the first read
+// appending its own. Two INDEPENDENT half-store reads could
+// straddle a concurrent supersession: the first read
 // captures the OLD request row, a concurrent replacePiiSlot then
 // deletes it and appends a NEW pair, and the second read captures
 // the NEW response row alone — the two rows never share an id, so
-// deriveDocumentsAt's request/response match fails and a LIVE
+// deriveDocumentsAt's match fails and a LIVE
 // identity spuriously 404s. Both pii derives below close this by
-// reading requests AND responses inside ONE shared readonly
-// db.readTransaction(['requests', 'responses'], ...) —
+// reading db.pairs inside ONE shared readonly
+// db.readTransaction(MESSAGE_TABLES, ...) —
 // greenfield code, closed at zero cost. No other facet in this
 // module is a delete zone, so none of the other reads need this
-// — Promise.all outside a transaction (the deriveMembers/
-// deriveInvitations precedent) is sufficient for them.
+// — a prefix getAllWhere outside a transaction (the
+// deriveMembers/deriveInvitations precedent) is sufficient
+// for them.
 //
 // Role-grants RETIRED: membership `type` bakes claim roles at
 // mint; Gate-16 response-body deviation deleted with the family.
 //
-// Every function below reads db.requests/db.responses (+
+// Every function below reads db.pairs (+
 // pickString over their decoded bodies) ONLY, mirroring api/
 // derive-members.ts and api/derive-invitations.ts. Production
 // reads this module today: the identity facet routes
@@ -110,18 +114,15 @@ export async function deriveIdentityPiiRows(
     db: DbAdapter,
 ): Promise<IdentityPiiEntity[]> {
     return db.readTransaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
-            const [requests, responses] = await Promise.all([
-                view.requests.getAll(),
-                view.responses.getAll(),
-            ]);
+            const pairs = await view.pairs.getAll();
             const prefixes = new Set<string>();
-            for (const request of requests) {
+            for (const pair of pairs) {
                 if (
-                    PII_ADDRESS_PATTERN.test(request.uri_collection)
+                    PII_ADDRESS_PATTERN.test(pair.uri_collection)
                 ) {
-                    prefixes.add(request.uri_collection);
+                    prefixes.add(pair.uri_collection);
                 }
             }
             const rows: IdentityPiiEntity[] = [];
@@ -129,7 +130,7 @@ export async function deriveIdentityPiiRows(
                 const match = PII_ADDRESS_PATTERN.exec(prefix)!;
                 const identityId = match[1]!;
                 const document = deriveDocumentsAt(
-                    requests, responses, prefix,
+                    pairs, prefix,
                 ).get('');
                 if (document === undefined) continue;
                 rows.push(piiEntityOf(identityId, document));
@@ -140,7 +141,7 @@ export async function deriveIdentityPiiRows(
 }
 
 // The single-slot read at the identity's own exact prefix — ONE
-// getAllWhere per store, both inside the SAME shared tx (the
+// getAllWhere on db.pairs, inside the SAME shared tx (the
 // module header's torn-read closure). Throws
 // EntityNotFoundError('identity_pii', id) on absence OR a
 // DELETE-head slot (an erasure tombstone) — the 404-byte anchor
@@ -151,14 +152,13 @@ export async function deriveIdentityPii(
 ): Promise<IdentityPiiEntity> {
     const prefix = piiPrefixFor(id);
     return db.readTransaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
-            const [requests, responses] = await Promise.all([
-                view.requests.getAllWhere('uri_collection', prefix),
-                view.responses.getAllWhere('uri_collection', prefix),
-            ]);
+            const pairs = await view.pairs.getAllWhere(
+                'uri_collection', prefix,
+            );
             const document = deriveDocumentsAt(
-                requests, responses, prefix,
+                pairs, prefix,
             ).get('');
             if (document === undefined) {
                 throw new EntityNotFoundError(
@@ -204,11 +204,10 @@ async function fetchCredentialDocuments(
     identityId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = credentialsPrefixFor(identityId);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    return deriveDocumentsAt(requests, responses, prefix);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
+    return deriveDocumentsAt(pairs, prefix);
 }
 
 // id-lex ordered. Pairs at the exact credentials prefix;
@@ -286,11 +285,10 @@ async function fetchProviderDocumentsAt(
     db: DbAdapter,
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    return deriveDocumentsAt(requests, responses, prefix);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
+    return deriveDocumentsAt(pairs, prefix);
 }
 
 // Nested docs plus old-flat docs whose identity_id matches.
@@ -394,11 +392,10 @@ async function fetchRevocationDocumentsFor(
     identityId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = tokenRevocationsPrefixFor(identityId);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
-    return deriveDocumentsAt(requests, responses, prefix);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
+    return deriveDocumentsAt(pairs, prefix);
 }
 
 export async function deriveTokenRevocationsFor(
@@ -438,7 +435,7 @@ export async function deriveTokenRevocation(
 // ---- (the /pii single-slot shape: literal last segment, ------
 // ---- uriId ''), Supersedes-chained like /credentials. NOT a ---
 // ---- delete zone — a DELETE head is a deregistration ----------
-// ---- tombstone, not an erasure — so the plain Promise.all ----
+// ---- tombstone, not an erasure — so a prefix getAllWhere -----
 // ---- read shape suffices (the module header's torn-read -------
 // ---- closure stays pii-only) -------------------------------------
 
@@ -473,12 +470,11 @@ export async function deriveClientRegistration(
     identityId: Id,
 ): Promise<ClientRegistrationEntity> {
     const prefix = registrationPrefixFor(identityId);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const document = deriveDocumentsAt(
-        requests, responses, prefix,
+        pairs, prefix,
     ).get('');
     if (document === undefined) {
         throw new EntityNotFoundError(
@@ -500,12 +496,11 @@ export async function deriveIdentityKind(
     const prefix = canonicalUriCollection(
         undefined, '/identities/',
     );
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const document = deriveDocumentsAt(
-        requests, responses, prefix,
+        pairs, prefix,
     ).get(identityId);
     return document === undefined
         ? undefined

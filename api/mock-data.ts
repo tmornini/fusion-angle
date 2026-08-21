@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import { TABLE_NAMES } from './db.ts';
+import { TABLE_NAMES, MESSAGE_TABLES } from './db.ts';
 import {
     postIdeaDocumentOp,
     postIdeaSubmissionOp,
@@ -171,13 +171,13 @@ export interface SeededCredentials {
 // pass-2 split (formSeedCredentialPairs, seed-message-pairs.ts),
 // since a credential's body embeds the post-hash secret computed
 // HERE, after formMockDataMessagePairs / formBootstrapMessagePair
-// already ran. The write transaction widens to
-// ['identity_credentials', 'requests', 'responses'] — the bare
+// already ran. The write transaction opens
+// MESSAGE_TABLES — the bare
 // ['identity_credentials'] set from before this task would trip
 // postIdentityCredentialDocumentOp's OWN nested
-// ['identity_credentials', 'requests', 'responses'] transaction
+// MESSAGE_TABLES transaction
 // on the nested-subset guard (api/db-backed.ts's #assertSubset:
-// 'requests'/'responses' not in the outer declared set).
+// message-plane stores not in the outer declared set).
 //
 // Phase Final Task 1(d): recipients are the in-memory
 // person/PII list (buildMembers / bootstrap PII body) — never
@@ -232,7 +232,7 @@ export async function seedHumanCredentials(
     // DocumentOp is the SAME op every live PUT
     // identities/:id/credentials/:cid rides.
     await adapter.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             await Promise.all([
                 ...planned.map(cred =>

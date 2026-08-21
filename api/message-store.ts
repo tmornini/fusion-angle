@@ -1,8 +1,5 @@
-import type { DbStores } from './db.ts';
-import type {
-    RequestEntity,
-    ResponseEntity,
-} from './types.ts';
+import type { DbAdapter } from './db.ts';
+import type { PairEntity } from './types.ts';
 import { latestByKey } from
     '../shared/ledger-reduction.ts';
 import { HttpMessage } from
@@ -16,33 +13,28 @@ import { parseWire } from
 // Body containment is getAllWhereBody. No
 // uri_id-only scan. Live document = latest PUT or
 // DELETE at (uri_collection, uri_id) by (at, id).
-// Head PUT → that response. Head DELETE → none. POST/PATCH
+// Head PUT → that pair. Head DELETE → none. POST/PATCH
 // are not heads.
 
 const PUT_METHOD = 'PUT';
 const DELETE_METHOD = 'DELETE';
 
-export interface StoredPair {
-    readonly request: RequestEntity;
-    readonly response: ResponseEntity;
-}
-
 export interface MessageStore {
     get(
         collection: string,
         id: string,
-    ): Promise<ResponseEntity | undefined>;
+    ): Promise<PairEntity | undefined>;
     getPairs(
         collection: string,
         id: string,
-    ): Promise<readonly StoredPair[]>;
+    ): Promise<readonly PairEntity[]>;
     getAllAt(
         collection: string,
-    ): Promise<readonly StoredPair[]>;
+    ): Promise<readonly PairEntity[]>;
     getAllWhereBody(
         collection: string,
         containment: Record<string, unknown>,
-    ): Promise<readonly StoredPair[]>;
+    ): Promise<readonly PairEntity[]>;
     getCollection(
         collection: string,
     ): Promise<unknown[]>;
@@ -54,15 +46,15 @@ export interface MessageStore {
         collection: string,
         id: string,
         version: string,
-    ): Promise<ResponseEntity | undefined>;
+    ): Promise<PairEntity | undefined>;
 }
 
-export function messageStore(db: DbStores): MessageStore {
+export function messageStore(db: DbAdapter): MessageStore {
     return {
         async get(collection, id) {
             return livePutOf(
                 await pairsAt(db, collection, id),
-            )?.response;
+            );
         },
         async getPairs(collection, id) {
             return pairsAt(db, collection, id);
@@ -71,17 +63,9 @@ export function messageStore(db: DbStores): MessageStore {
             return pairsInCollection(db, collection);
         },
         async getAllWhereBody(collection, containment) {
-            const responses =
-                await db.responses.getAllWhereBody(
-                    collection, containment,
-                );
-            const pairs: StoredPair[] = [];
-            for (const response of responses) {
-                const request = await db.requests
-                    .getById(response.id);
-                pairs.push({ request, response });
-            }
-            return sortByAtId(pairs);
+            return (await db.pairs.getAllWhereBody(
+                collection, containment,
+            )).slice().sort(comparePair);
         },
         async getCollection(collection) {
             return entitiesOf(
@@ -105,27 +89,11 @@ export function messageStore(db: DbStores): MessageStore {
             ));
         },
         async getByVersion(collection, id, version) {
-            const matches = (
-                await db.responses.getAllAtVersion(
+            return latestOf(
+                await db.pairs.getAllAtVersion(
                     collection, id, version,
-                )
+                ),
             );
-            const requestById = new Map(
-                (
-                    await db.requests.getAllAtAddress(
-                        collection, id,
-                    )
-                ).map((request) => [request.id, request]),
-            );
-            const pairs: StoredPair[] = [];
-            for (const response of matches) {
-                const request = requestById.get(
-                    response.id,
-                );
-                if (request === undefined) continue;
-                pairs.push({ request, response });
-            }
-            return latestOf(pairs)?.response;
         },
     };
 }
@@ -156,33 +124,23 @@ function matchesFilters(
     return true;
 }
 
-function compareAtId(
-    a: { at: string; id: string },
-    b: { at: string; id: string },
+function comparePair(
+    a: PairEntity, b: PairEntity,
 ): number {
-    if (a.at < b.at) return -1;
-    if (a.at > b.at) return 1;
+    if (a.response_at < b.response_at) return -1;
+    if (a.response_at > b.response_at) return 1;
     if (a.id < b.id) return -1;
     if (a.id > b.id) return 1;
     return 0;
 }
 
-function sortByAtId(
-    pairs: StoredPair[],
-): StoredPair[] {
-    return pairs.sort((a, b) => compareAtId(
-        { at: a.response.at, id: a.response.id },
-        { at: b.response.at, id: b.response.id },
-    ));
-}
-
 function latestOf(
-    pairs: readonly StoredPair[],
-): StoredPair | undefined {
+    pairs: readonly PairEntity[],
+): PairEntity | undefined {
     if (pairs.length === 0) return undefined;
     const rows = pairs.map((pair) => ({
-        at: pair.response.at,
-        id: pair.response.id,
+        at: pair.response_at,
+        id: pair.id,
         pair,
     }));
     return latestByKey(rows, () => 'head').get('head')
@@ -190,48 +148,48 @@ function latestOf(
 }
 
 function livePutOf(
-    pairs: readonly StoredPair[],
-): StoredPair | undefined {
+    pairs: readonly PairEntity[],
+): PairEntity | undefined {
     const head = latestOf(
         pairs.filter(
-            (pair) => isDocumentMethod(pair.request.method),
+            (pair) => isDocumentMethod(pair.method),
         ),
     );
-    if (head?.request.method !== PUT_METHOD) {
+    if (head?.method !== PUT_METHOD) {
         return undefined;
     }
     return head;
 }
 
 function livePutsOf(
-    pairs: readonly StoredPair[],
-): StoredPair[] {
+    pairs: readonly PairEntity[],
+): PairEntity[] {
     const documents = pairs.filter(
-        (pair) => isDocumentMethod(pair.request.method),
+        (pair) => isDocumentMethod(pair.method),
     );
     const rows = documents.map((pair) => ({
-        at: pair.response.at,
-        id: pair.response.id,
+        at: pair.response_at,
+        id: pair.id,
         pair,
     }));
     const heads = latestByKey(
-        rows, (row) => row.pair.response.uri_id,
+        rows, (row) => row.pair.uri_id,
     );
-    const live: StoredPair[] = [];
+    const live: PairEntity[] = [];
     for (const row of heads.values()) {
-        if (row.pair.request.method === PUT_METHOD) {
+        if (row.pair.method === PUT_METHOD) {
             live.push(row.pair);
         }
     }
-    return sortByAtId(live);
+    return live.sort(comparePair);
 }
 
 function entitiesOf(
-    pairs: readonly StoredPair[],
+    pairs: readonly PairEntity[],
 ): unknown[] {
     const entities: unknown[] = [];
     for (const pair of pairs) {
-        const entity = jsonBodyOf(pair.response.message);
+        const entity = jsonBodyOf(pair.response);
         if (entity !== undefined) entities.push(entity);
     }
     return entities;
@@ -253,46 +211,26 @@ export function liveHeadId(entity: unknown): string {
 }
 
 async function pairsInCollection(
-    db: DbStores,
+    db: DbAdapter,
     collection: string,
-): Promise<StoredPair[]> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere(
+): Promise<PairEntity[]> {
+    const pairs = [
+        ...await db.pairs.getAllWhere(
             'uri_collection', collection,
         ),
-        db.responses.getAllWhere(
-            'uri_collection', collection,
-        ),
-    ]);
-    const requestById = new Map(
-        requests.map((request) => [request.id, request]),
-    );
-    const pairs: StoredPair[] = [];
-    for (const response of responses) {
-        const request = requestById.get(response.id);
-        if (request === undefined) continue;
-        pairs.push({ request, response });
-    }
-    return sortByAtId(pairs);
+    ];
+    return pairs.sort(comparePair);
 }
 
 async function pairsAt(
-    db: DbStores,
+    db: DbAdapter,
     collection: string,
     id: string,
-): Promise<StoredPair[]> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllAtAddress(collection, id),
-        db.responses.getAllAtAddress(collection, id),
-    ]);
-    const requestById = new Map(
-        requests.map((request) => [request.id, request]),
-    );
-    const pairs: StoredPair[] = [];
-    for (const response of responses) {
-        const request = requestById.get(response.id);
-        if (request === undefined) continue;
-        pairs.push({ request, response });
-    }
-    return sortByAtId(pairs);
+): Promise<PairEntity[]> {
+    const pairs = [
+        ...await db.pairs.getAllAtAddress(
+            collection, id,
+        ),
+    ];
+    return pairs.sort(comparePair);
 }

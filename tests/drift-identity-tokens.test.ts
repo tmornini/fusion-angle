@@ -6,6 +6,7 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest, PUT } from '../api/api.ts';
 import type { DbAdapter } from '../api/db.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import {
     base64UrlDecode,
     bytesToBase64Url,
@@ -342,7 +343,7 @@ test('deriveIdentityTokenEventsForJti: byte-identical pre-tx'
         action: 'rotated', chain_id: 'chain-tx', at: AT2,
     }, DEV_TOKEN);
 
-    const tokenTxTables = ['requests', 'responses'];
+    const tokenTxTables = MESSAGE_TABLES;
 
     const preTx =
         await deriveIdentityTokenEventsForJti(db, 'jti-tx');
@@ -485,7 +486,7 @@ test('authorizationCodeSpent: byte-identical pre-tx (the plain'
     const { code } = await authorizeRes.json() as { code: string };
     const derivedId = await deriveAuthorizationCodeId(code);
 
-    const grantTxTables = ['requests', 'responses'];
+    const grantTxTables = MESSAGE_TABLES;
 
     const preTxBefore = await authorizationCodeSpent(
         db, derivedId, 'current',
@@ -605,7 +606,7 @@ async () => {
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             await appendMessagePair(view, flatPair);
         },

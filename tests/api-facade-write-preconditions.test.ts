@@ -52,11 +52,11 @@ async () => {
         ideaPutBody('idea-hdr-1', 'Headers'), token,
         [['if-match', '"probe-value-123"']],
     );
-    const stored = (await db.requests.getAll())
+    const stored = (await db.pairs.getAll())
         .find(r => r.uri_id === 'idea-hdr-1');
     assert.ok(stored, 'a request row was stored');
     assert.ok(
-        stored!.message.includes('probe-value-123'),
+        stored!.request.includes('probe-value-123'),
         'the header value must reach the stored request'
         + ' message',
     );

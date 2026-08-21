@@ -4,6 +4,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import {
     formWritePair,
     appendMessagePair,
@@ -81,7 +82,7 @@ async function appendInstancePair(
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
     return pair.id;

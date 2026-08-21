@@ -158,21 +158,18 @@ test('seedErrorMessage never echoes a URL', () => {
 test('isDatabaseEmpty is true when no rows exist',
 async () => {
     const empty = fakeClient([{
-        requests: false,
-        responses: false,
+        pairs: false,
         marker: false,
     }]);
     assert.equal(await isDatabaseEmpty(empty.sql), true);
-    assert.match(empty.texts[0] ?? '', /FROM requests/);
-    assert.match(empty.texts[0] ?? '', /FROM responses/);
+    assert.match(empty.texts[0] ?? '', /FROM pairs/);
     assert.match(empty.texts[0] ?? '', /schema_marker/);
 });
 
 test('assertEmptyDatabase refuses any message row',
 async () => {
     const nonempty = fakeClient([{
-        requests: true,
-        responses: false,
+        pairs: true,
         marker: false,
     }]);
     await assert.rejects(
@@ -186,8 +183,7 @@ async () => {
 test('assertEmptyDatabase refuses a marker row',
 async () => {
     const marked = fakeClient([{
-        requests: false,
-        responses: false,
+        pairs: false,
         marker: true,
     }]);
     await assert.rejects(
@@ -380,8 +376,7 @@ test('non-empty refuses without seeding or printing',
 async () => {
     const db = memoryDbAdapter();
     const nonempty = fakeClient([{
-        requests: true,
-        responses: false,
+        pairs: true,
         marker: false,
     }]);
     let wrote = false;
@@ -406,8 +401,7 @@ test('seedPostgres seeds when mode is required',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        requests: false,
-        responses: false,
+        pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];
@@ -430,8 +424,7 @@ test('bootstrap seed prints credentials once',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        requests: false,
-        responses: false,
+        pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];
@@ -454,8 +447,7 @@ test('mock-data seed prints every human sign-in',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        requests: false,
-        responses: false,
+        pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];
@@ -482,8 +474,7 @@ test('slices seed prints the section map',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        requests: false,
-        responses: false,
+        pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];

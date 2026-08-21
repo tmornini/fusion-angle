@@ -26,16 +26,15 @@ export async function deriveDefaultOrganization(
     identityId: Id,
 ): Promise<IdentityDefaultOrganizationEntity[]> {
     const prefix = defaultOrganizationPrefix(identityId);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const document = deriveDocumentsAt(
-        requests, responses, prefix,
+        pairs, prefix,
     ).get('');
     if (document === undefined) return [];
     const head = documentPairsAt(
-        requests, responses, prefix,
+        pairs, prefix,
     ).find((pair) => pair.id === document.pairId);
     return [{
         id: identityId,

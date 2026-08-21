@@ -13,8 +13,7 @@ import type {
     WriteLocks,
 } from './db.ts';
 import type {
-    RequestEntity,
-    ResponseEntity,
+    PairEntity,
 } from './types.ts';
 import type { LatencySimulation } from './latency.ts';
 import type {
@@ -24,8 +23,7 @@ import type {
 import { HistoryEntityStore }
     from './store-history-entity.ts';
 import {
-    validateRequestEntity,
-    validateResponseEntity,
+    validatePairEntity,
 } from './validators.ts';
 
 // One adapter over any StorageBackend. The store wiring
@@ -37,7 +35,7 @@ import {
 // before any store op. Schema lifecycle delegates to the
 // backend, which signals "schema exists" its own way.
 //
-// Both surviving stores ride HistoryEntityStore (message
+// The surviving store rides HistoryEntityStore (message
 // plane only — clients table eliminated).
 export class BackedDbAdapter
     implements GuardedDbAdapter, LatencySimulation
@@ -47,8 +45,7 @@ export class BackedDbAdapter
     readonly #open: () => Promise<void>;
     readonly #notify: NotificationPost;
 
-    readonly requests!: EntityStore<RequestEntity>;
-    readonly responses!: EntityStore<ResponseEntity>;
+    readonly pairs!: EntityStore<PairEntity>;
 
     constructor(
         backend: StorageBackend,
@@ -137,8 +134,11 @@ export class BackedDbAdapter
             return fn(view);
         };
         const locks = writeLocksOf(tx);
+        const stores = this.#buildStores(
+            ambientRunner(tx),
+        );
         const view: GuardedDbAdapter = {
-            ...this.#buildStores(ambientRunner(tx)),
+            ...stores,
             initialize: () => this.initialize(),
             deleteSchema: () => this.deleteSchema(),
             hasSchema: () => this.hasSchema(),
@@ -173,11 +173,8 @@ export class BackedDbAdapter
 
     #buildStores(run: TxRunner): DbStores {
         return {
-            requests: new HistoryEntityStore(
-                'requests', run, validateRequestEntity,
-            ),
-            responses: new HistoryEntityStore(
-                'responses', run, validateResponseEntity,
+            pairs: new HistoryEntityStore(
+                'pairs', run, validatePairEntity,
             ),
         };
     }

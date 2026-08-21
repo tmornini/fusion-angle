@@ -16,6 +16,9 @@ export const MISSING_MARKER =
 export const NO_ARGUMENTS =
     'server.mjs takes no arguments; seed with '
     + './postgres-seed';
+export const LEGACY_MESSAGE_TABLES =
+    'legacy message tables present; wipe with '
+    + './postgres-wipe';
 
 export type EnvBag = Record<string, string | undefined>;
 
@@ -71,10 +74,28 @@ export async function assertSchemaMarker(
     }
 }
 
+export async function assertNoLegacyMessageTables(
+    sql: SqlClient,
+): Promise<void> {
+    const names = ['requests', 'responses'] as const;
+    for (const name of names) {
+        const rows = await sql.query<{
+            rel: string | null;
+        }>`
+            SELECT to_regclass(${name}) AS rel
+        `;
+        if (rows[0]?.rel !== null
+            && rows[0]?.rel !== undefined) {
+            throw new Error(LEGACY_MESSAGE_TABLES);
+        }
+    }
+}
+
 const SAFE_BOOT_MESSAGES: ReadonlySet<string> = new Set([
     UTF8_REQUIRED,
     MISSING_MARKER,
     NO_ARGUMENTS,
+    LEGACY_MESSAGE_TABLES,
 ]);
 
 export function safeErrorMessage(

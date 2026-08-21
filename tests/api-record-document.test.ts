@@ -10,7 +10,7 @@ import { handleRequest } from '../api/api.ts';
 import { postRecordDocumentOp } from '../api/routes.ts';
 import { validateRecordDocumentBody } from '../api/validators.ts';
 import { ValidationError } from '../api/types.ts';
-import type { RequestEntity, ResponseEntity } from '../api/types.ts';
+import type { PairEntity } from '../api/types.ts';
 import {
     documentPairsAt,
     documentLifecycleEvents,
@@ -303,8 +303,8 @@ test('a byte-identical resend replays the stored response:'
     );
     const events = await deriveRecordStateHistory(db, '1', 'rec-resend');
     assert.equal(events.length, 1);
-    assert.equal((await db.requests.getAll()).length, 3);
-    assert.equal((await db.responses.getAll()).length, 3);
+    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.pairs.getAll()).length, 3);
 });
 
 // -- 4. the DELETE-pair walk filter (Author gate 9) ----------
@@ -325,10 +325,7 @@ async function storedPairAt(
     uriId: string,
     at: string,
     body: Record<string, unknown> | undefined,
-): Promise<{
-    readonly request: RequestEntity;
-    readonly response: ResponseEntity;
-}> {
+): Promise<PairEntity> {
     const pair = await formWritePair({
         method,
         pathname: '/organizations/1/record-types/' + uriId,
@@ -345,26 +342,18 @@ async function storedPairAt(
         operationId: TEST_OPERATION_ID,
     });
     return {
-        request: {
-            id: pair.id,
-            uri_collection: pair.uriCollection,
-            uri_id: pair.uriId,
-            at,
-            requester_identity_id: pair.requesterIdentityId,
-            message_hash: pair.requestHash,
-            message: pair.requestMessage,
-            method: pair.method,
-            operation_id: pair.operationId,
-        },
-        response: {
-            id: pair.id,
-            uri_collection: pair.uriCollection,
-            uri_id: pair.uriId,
-            at,
-            version: pair.responseEtag,
-            message: pair.responseMessage,
-            operation_id: pair.operationId,
-        },
+        id: pair.id,
+        uri_collection: pair.uriCollection,
+        uri_id: pair.uriId,
+        requester_identity_id: pair.requesterIdentityId,
+        method: pair.method,
+        request_at: at,
+        request_hash: pair.requestHash,
+        request: pair.requestMessage,
+        response_at: at,
+        version: pair.responseEtag,
+        response: pair.responseMessage,
+        operation_id: pair.operationId,
     };
 }
 
@@ -387,13 +376,9 @@ test('documentLifecycleEvents skips a DELETE-method pair,'
             '2026-01-03T00:00:00.000000Z', 'ev-x2',
         ),
     );
-    const requests = [
-        first.request, deleted.request, second.request,
-    ];
-    const responses = [
-        first.response, deleted.response, second.response,
-    ];
-    const pairs = documentPairsAt(requests, responses, prefix)
+    const pairs = documentPairsAt(
+        [first, deleted, second], prefix,
+    )
         .filter(pair => pair.uriId === 'rec-x');
     assert.equal(pairs.length, 3);
     const events = documentLifecycleEvents(pairs);

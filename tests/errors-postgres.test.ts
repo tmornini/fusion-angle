@@ -29,7 +29,7 @@ test('duplicate PK is loud 500', () => {
     assertWire(
         mapPostgresError({
             code: '23505',
-            constraint: 'requests_pkey',
+            constraint: 'pairs_pkey',
         }),
         HTTP_INTERNAL_ERROR,
         'duplicate primary key',
@@ -37,7 +37,7 @@ test('duplicate PK is loud 500', () => {
     assertWire(
         mapPostgresError({
             code: '23505',
-            constraint: 'responses_pkey',
+            constraint: 'pairs_pkey',
         }),
         HTTP_INTERNAL_ERROR,
         'duplicate primary key',
@@ -48,7 +48,7 @@ test('constraint_name maps like constraint', () => {
     assertWire(
         mapPostgresError({
             code: '23505',
-            constraint_name: 'requests_pkey',
+            constraint_name: 'pairs_pkey',
         }),
         HTTP_INTERNAL_ERROR,
         'duplicate primary key',
@@ -59,7 +59,7 @@ test('other unique is loud 500', () => {
     assertWire(
         mapPostgresError({
             code: '23505',
-            constraint: 'requests_hash_key',
+            constraint: 'pairs_request_hash_key',
         }),
         HTTP_INTERNAL_ERROR,
         'unique constraint',
@@ -74,36 +74,18 @@ test('bad JSON at GIN is loud 500', () => {
     );
 });
 
-test('responses_request_fk is loud 500', () => {
-    assertWire(
-        mapPostgresError({
-            code: '23503',
-            constraint: 'responses_request_fk',
-        }),
-        HTTP_INTERNAL_ERROR,
-        'torn pair: responses_request_fk',
-    );
-    assertWire(
-        mapPostgresError({
-            constraint: 'responses_request_fk',
-        }),
-        HTTP_INTERNAL_ERROR,
-        'torn pair: responses_request_fk',
-    );
-});
-
 test('CHECK failed is loud 500', () => {
     assertWire(
         mapPostgresError({
             code: '23514',
-            constraint: 'requests_id_chk',
+            constraint: 'pairs_id_chk',
         }),
         HTTP_INTERNAL_ERROR,
         'check failed',
     );
     assertWire(
         mapPostgresError({
-            constraint: 'requests_at_chk',
+            constraint: 'pairs_request_at_chk',
         }),
         HTTP_INTERNAL_ERROR,
         'check failed',

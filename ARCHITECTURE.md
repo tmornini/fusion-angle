@@ -81,7 +81,7 @@ Freeze, work-order creation, stats, the member-hazard
 reader, and export all derive for free because they read
 through `ctx.GET`; the client `getFlowGraph` adapter is
 unchanged. Writes append pairs only (`tx`
-`['requests','responses']`); ids and `at` are client-minted
+`MESSAGE_TABLES`); ids and `at` are client-minted
 (Idempotency), the author server-derived from the verified
 token. Undo resolves its restore target SERVER-SIDE
 (stack+pointer over this flow's document-pair history vs
@@ -183,7 +183,7 @@ enriches it to `AuthenticatedContext` (principal), and
 `RequestContext` — organization, live
 `memberOrganizations`, and roles — each field set exactly
 once. There is **no org-scoped adapter wrapper**: the
-message plane (`requests`, `responses`) is global; tenancy
+message plane (`pairs`) is global; tenancy
 rides `uri_collection` on the pair plane. Handlers receive
 `ctx.base`. The org rides the VERIFIED token claim,
 never the path; a flat (un-exchanged) token has none and
@@ -240,7 +240,7 @@ leaf ownership through already-fenced parents. Phase Final
 Stage B deleted those three decorator modules and the
 `StateStore` class; `EntityStore` remains as the store
 interface implemented by `HistoryEntityStore` on the
-message plane (`requests`/`responses` only). The pair
+message plane (`pairs` only). The pair
 plane + write authorizer is the as-built successor.
 
 ### Multitenancy model
@@ -521,11 +521,11 @@ ids; omitted from stored JSON when empty),
 `GraphNode.attributes: NodeAttribute[]`, record/constraint
 shapes, `StateEntity` as the **derived** event DTO, the
 state alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
-(`DbAdapter` + `TABLE_NAMES` = `requests`,
-`responses` only — [SCHEMA.md](SCHEMA.md) is the
+(`DbAdapter` + `TABLE_NAMES` = `pairs` only —
+[SCHEMA.md](SCHEMA.md) is the
 authoritative list and per-column reference),
 `api/store-history-entity.ts` (`HistoryEntityStore` — the
-sole store class; backs both message-plane tables; no
+sole store class; backs the message-plane table; no
 tombstone filter, no lifecycle log), `api/db-postgres.ts`
 (product persistence), `api/db-memory.ts` (test impl),
 `api/api.ts` (the HTTP gate — `handleRequest` plus the
@@ -594,7 +594,7 @@ The process refuses to listen without
 
 Several write-path decision reads — "what is the CURRENT
 state before I write?" — derive from the pair plane
-(`requests`/`responses`) rather than a table read, so a gate
+(`pairs`) rather than a table read, so a gate
 never trusts a stale row-plane snapshot the ledger has
 already superseded. Earlier phases established the shape for
 invitations, memberships, and identity tokens; Phase 14
@@ -614,8 +614,8 @@ call, never widening the caller's table set on its own
 authority; (d) every write-gate read is ENTITY-SCOPED —
 indexed or address reads (`getAllAtAddress`,
 `getAllWhere('uri_collection', ...)`,
-`getAllWhere('message_hash', ...)`), never a
-whole-plane `getAll()` of `requests`/`responses` on a hot path (the one)
+`getAllWhere('request_hash', ...)`), never a
+whole-plane `getAll()` of `pairs` on a hot path (the one)
 named exception is below); (e) a pre-tx call and an in-tx
 call of the same core return byte-identical results, pinned
 by drift/parity tests.
@@ -708,7 +708,7 @@ than silently reaching for a workaround:
 
 1. **SFV RESTRICT whole-plane scan** (Task 6).
    `deriveStateFieldValueReferrers` reads
-   `view.requests.getAll()`/`view.responses.getAll()` inside
+   `view.pairs.getAll()` inside
    the RESTRICT write gate — a whole-plane scan rule (d)
    above otherwise forbids. No `attribute_id` index exists on
    the pair plane; transition-fold field values live on
@@ -740,7 +740,7 @@ than silently reaching for a workaround:
 `flows/:id/tags/:name` (PUT/GET/DELETE, SIMPLE class) is the
 first document family with NO backing table at all —
 `postFlowTagDocumentOp`'s transaction touches only
-`requests`/`responses`. A tag pins one flow document pair's
+`pairs`. A tag pins one flow document pair's
 response id (`flow_response_id`, the tag's only body field);
 GET replays the tag's own stored body, so a tag's pin
 survives every later save of the flow it names. DELETE is a

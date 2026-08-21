@@ -4,6 +4,7 @@ import {
     memoryDbAdapter,
     type MemoryDbAdapter,
 } from '../api/db-memory.ts';
+import { MESSAGE_TABLES } from '../api/db.ts';
 import { generateCryptoSafeBase62 } from
     '../shared/crypto-safe-base62.ts';
 import {
@@ -50,7 +51,7 @@ async function writePair(
         operationId: generateCryptoSafeBase62(),
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
     return {
@@ -179,5 +180,5 @@ async () => {
     const hits = await messageStore(db)
         .getAllWhereBody(COLLECTION, { code: 'abc' });
     assert.equal(hits.length, 1);
-    assert.equal(hits[0]!.response.uri_id, 'doc-1');
+    assert.equal(hits[0]!.uri_id, 'doc-1');
 });

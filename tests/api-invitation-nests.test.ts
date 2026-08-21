@@ -169,15 +169,15 @@ async function membershipsFor(
             + organization.id + '/members/';
         const [seatRequests, seatResponses] =
             await Promise.all([
-                db.requests.getAllWhere(
+                db.pairs.getAllWhere(
                     'uri_collection', seatPrefix,
                 ),
-                db.responses.getAllWhere(
+                db.pairs.getAllWhere(
                     'uri_collection', seatPrefix,
                 ),
             ]);
         for (const document of deriveDocumentsAt(
-            seatRequests, seatResponses, seatPrefix,
+            seatRequests, seatPrefix,
         ).values()) {
             if (document.uriId === identityId) {
                 ids.push(organization.id);

@@ -155,7 +155,7 @@ async function pairsAt(
     collection: string,
     uriId: string,
 ): Promise<number> {
-    const rows = await db.requests.getAllWhere(
+    const rows = await db.pairs.getAllWhere(
         'uri_collection', collection,
     );
     return rows.filter((row) => row.uri_id === uriId)
@@ -167,7 +167,7 @@ async function putHeadsAt(
     collection: string,
     uriId: string,
 ): Promise<number> {
-    const rows = await db.requests.getAllWhere(
+    const rows = await db.pairs.getAllWhere(
         'uri_collection', collection,
     );
     return rows.filter((row) =>
@@ -289,7 +289,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assert.equal(live.status, 200);
         const etag = live.headers.get('ETag');
         assert.ok(etag !== null && etag !== '');
-        const heads = await db.responses.getAllWhere(
+        const heads = await db.pairs.getAllWhere(
             'uri_collection', FLOW_PREFIX,
         );
         const liveHead = heads
@@ -376,7 +376,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const leftHeld = Promise.withResolvers<void>();
         const rightHeld = Promise.withResolvers<void>();
         const left = backend.transaction(
-            ['requests'],
+            ['pairs'],
             'readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
@@ -387,7 +387,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             },
         );
         const right = backend.transaction(
-            ['requests'],
+            ['pairs'],
             'readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
@@ -435,7 +435,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 `;
                 await assert.rejects(
                     () => tight.transaction(
-                        ['requests'],
+                        ['pairs'],
                         'readonly',
                         (txn) => (
                             txn as PostgresTx

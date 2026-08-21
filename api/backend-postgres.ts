@@ -22,7 +22,8 @@ import {
 } from './advisory-lock.ts';
 
 const DROP_SCHEMA =
-    'DROP TABLE IF EXISTS responses;\n'
+    'DROP TABLE IF EXISTS pairs;\n'
+    + 'DROP TABLE IF EXISTS responses;\n'
     + 'DROP TABLE IF EXISTS requests;\n'
     + 'DROP TABLE IF EXISTS schema_marker;\n'
     + 'DROP FUNCTION IF EXISTS message_body(bytea);';
@@ -240,7 +241,7 @@ function postgresTx(
         },
         async lockHead(id: string): Promise<void> {
             await sql.query`
-                SELECT id FROM responses
+                SELECT id FROM pairs
                 WHERE id = ${id}
                 FOR UPDATE
             `;
@@ -256,13 +257,12 @@ function postgresTx(
                 id: string;
                 method: string;
             }>`
-                SELECT r.id, q.method
-                FROM responses r
-                JOIN requests q ON q.id = r.id
-                WHERE r.uri_collection = ${collection}
-                  AND r.uri_id = ${uriId}
-                  AND q.method IN ('PUT', 'DELETE')
-                ORDER BY r.at DESC, r.id DESC
+                SELECT id, method
+                FROM pairs
+                WHERE uri_collection = ${collection}
+                  AND uri_id = ${uriId}
+                  AND method IN ('PUT', 'DELETE')
+                ORDER BY response_at DESC, id DESC
                 LIMIT 1
             `;
             const row = rows[0];
@@ -308,15 +308,15 @@ async function advisoryLock(
 
 function assertMessageTable(
     table: string,
-): 'requests' | 'responses' {
-    if (table === 'requests' || table === 'responses') {
+): 'pairs' {
+    if (table === 'pairs') {
         return table;
     }
     throw new Error('unknown table: ' + table);
 }
 
 function assertIndexedColumn(
-    table: 'requests' | 'responses',
+    table: 'pairs',
     column: string,
 ): void {
     assertGetWhereColumn(table, column);
@@ -327,7 +327,8 @@ function entityOf<T extends { id: string }>(
 ): T {
     return {
         ...row,
-        message: latin1OfBytea(row.message),
+        request: latin1OfBytea(row.request),
+        response: latin1OfBytea(row.response),
     } as unknown as T;
 }
 
@@ -375,66 +376,44 @@ function textField(
 
 async function selectById(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
     id: string,
 ): Promise<Record<string, unknown>[]> {
-    if (table === 'requests') {
-        return sql.query`
-            SELECT * FROM requests
-            WHERE id = ${id}
-        `;
-    }
     return sql.query`
-        SELECT * FROM responses
+        SELECT * FROM pairs
         WHERE id = ${id}
     `;
 }
 
 async function selectAll(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
 ): Promise<Record<string, unknown>[]> {
-    if (table === 'requests') {
-        return sql.query`
-            SELECT * FROM requests
-            ORDER BY at, id
-        `;
-    }
     return sql.query`
-        SELECT * FROM responses
-        ORDER BY at, id
+        SELECT * FROM pairs
+        ORDER BY response_at, id
     `;
 }
 
 async function selectWhere(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
     column: string,
     key: string,
 ): Promise<Record<string, unknown>[]> {
-    if (table === 'requests') {
-        if (column === 'uri_collection') {
-            return sql.query`
-                SELECT * FROM requests
-                WHERE uri_collection = ${key}
-                ORDER BY at, id
-            `;
-        }
-        if (column === 'message_hash') {
-            return sql.query`
-                SELECT * FROM requests
-                WHERE message_hash = ${key}
-                ORDER BY at, id
-            `;
-        }
-    } else {
-        if (column === 'uri_collection') {
-            return sql.query`
-                SELECT * FROM responses
-                WHERE uri_collection = ${key}
-                ORDER BY at, id
-            `;
-        }
+    if (column === 'uri_collection') {
+        return sql.query`
+            SELECT * FROM pairs
+            WHERE uri_collection = ${key}
+            ORDER BY response_at, id
+        `;
+    }
+    if (column === 'request_hash') {
+        return sql.query`
+            SELECT * FROM pairs
+            WHERE request_hash = ${key}
+            ORDER BY response_at, id
+        `;
     }
     throw new Error(
         'getWhere does not accept ' + column,
@@ -443,150 +422,112 @@ async function selectWhere(
 
 async function selectAddress(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
     collection: string,
     uriId: string,
 ): Promise<Record<string, unknown>[]> {
-    if (table === 'requests') {
-        return sql.query`
-            SELECT * FROM requests
-            WHERE uri_collection = ${collection}
-              AND uri_id = ${uriId}
-            ORDER BY at, id
-        `;
-    }
     return sql.query`
-        SELECT * FROM responses
+        SELECT * FROM pairs
         WHERE uri_collection = ${collection}
           AND uri_id = ${uriId}
-        ORDER BY at, id
+        ORDER BY response_at, id
     `;
 }
 
 async function selectAddressVersion(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
     collection: string,
     uriId: string,
     version: string,
 ): Promise<Record<string, unknown>[]> {
-    if (table === 'requests') {
-        throw new Error(
-            'getAddressVersion does not accept requests',
-        );
-    }
     return sql.query`
-        SELECT * FROM responses
+        SELECT * FROM pairs
         WHERE uri_collection = ${collection}
           AND uri_id = ${uriId}
           AND version = ${version}
-        ORDER BY at, id
+        ORDER BY response_at, id
     `;
 }
 
 async function selectWhereBody(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
     collection: string,
     containment: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
-    if (table === 'requests') {
-        throw new Error(
-            'getWhereBody does not accept requests',
-        );
-    }
     return sql.query`
-        SELECT * FROM responses
+        SELECT * FROM pairs
         WHERE uri_collection = ${collection}
-          AND message_body(message) @> ${containment}::jsonb
-        ORDER BY at, id
+          AND message_body(response) @>
+              ${containment}::jsonb
+        ORDER BY response_at, id
     `;
 }
 
 async function deleteById(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
     id: string,
 ): Promise<void> {
-    if (table === 'requests') {
-        await sql.query`
-            DELETE FROM requests
-            WHERE id = ${id}
-        `;
-        return;
-    }
     await sql.query`
-        DELETE FROM responses
+        DELETE FROM pairs
         WHERE id = ${id}
     `;
 }
 
 async function deleteAll(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
 ): Promise<void> {
-    if (table === 'requests') {
-        await sql.query`DELETE FROM requests`;
-        return;
-    }
-    await sql.query`DELETE FROM responses`;
+    await sql.query`DELETE FROM pairs`;
 }
 
 async function upsertRow(
     sql: SqlClient,
-    table: 'requests' | 'responses',
+    _table: 'pairs',
     row: Record<string, unknown>,
 ): Promise<void> {
     const id = textField(row, 'id');
     const collection = textField(row, 'uri_collection');
     const uriId = textField(row, 'uri_id');
-    const at = textField(row, 'at');
-    const operationId = textField(row, 'operation_id');
-    const message = byteaOfWire(row.message);
-    if (table === 'requests') {
-        const requester = textField(
-            row, 'requester_identity_id',
-        );
-        const hash = textField(row, 'message_hash');
-        const method = textField(row, 'method');
-        await sql.query`
-            INSERT INTO requests (
-                id, uri_collection, uri_id, at,
-                requester_identity_id, message_hash,
-                message, method, operation_id
-            ) VALUES (
-                ${id}, ${collection}, ${uriId}, ${at},
-                ${requester}, ${hash}, ${message},
-                ${method}, ${operationId}
-            )
-            ON CONFLICT (id) DO UPDATE SET
-                uri_collection = EXCLUDED.uri_collection,
-                uri_id = EXCLUDED.uri_id,
-                at = EXCLUDED.at,
-                requester_identity_id =
-                    EXCLUDED.requester_identity_id,
-                message_hash = EXCLUDED.message_hash,
-                message = EXCLUDED.message,
-                method = EXCLUDED.method,
-                operation_id = EXCLUDED.operation_id
-        `;
-        return;
-    }
+    const requester = textField(
+        row, 'requester_identity_id',
+    );
+    const method = textField(row, 'method');
+    const requestAt = textField(row, 'request_at');
+    const requestHash = textField(row, 'request_hash');
+    const request = byteaOfWire(row.request);
+    const responseAt = textField(row, 'response_at');
     const version = textField(row, 'version');
+    const response = byteaOfWire(row.response);
+    const operationId = textField(row, 'operation_id');
     await sql.query`
-        INSERT INTO responses (
-            id, uri_collection, uri_id, at,
-            version, message, operation_id
+        INSERT INTO pairs (
+            id, uri_collection, uri_id,
+            requester_identity_id, method,
+            request_at, request_hash, request,
+            response_at, version, response,
+            operation_id
         ) VALUES (
-            ${id}, ${collection}, ${uriId}, ${at},
-            ${version}, ${message}, ${operationId}
+            ${id}, ${collection}, ${uriId},
+            ${requester}, ${method},
+            ${requestAt}, ${requestHash}, ${request},
+            ${responseAt}, ${version}, ${response},
+            ${operationId}
         )
         ON CONFLICT (id) DO UPDATE SET
             uri_collection = EXCLUDED.uri_collection,
             uri_id = EXCLUDED.uri_id,
-            at = EXCLUDED.at,
+            requester_identity_id =
+                EXCLUDED.requester_identity_id,
+            method = EXCLUDED.method,
+            request_at = EXCLUDED.request_at,
+            request_hash = EXCLUDED.request_hash,
+            request = EXCLUDED.request,
+            response_at = EXCLUDED.response_at,
             version = EXCLUDED.version,
-            message = EXCLUDED.message,
+            response = EXCLUDED.response,
             operation_id = EXCLUDED.operation_id
     `;
 }

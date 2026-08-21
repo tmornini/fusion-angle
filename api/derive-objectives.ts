@@ -29,12 +29,11 @@ export async function deriveObjectiveStateHistory(
     objectiveId: Id,
 ): Promise<StateEntity[]> {
     const prefix = objectivesUriPrefix(organization);
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const stored = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const pairs = documentPairsAt(
-        requests, responses, prefix,
+        stored, prefix,
     ).filter((pair) => pair.uriId === objectiveId);
     return stateHistoryFrom(
         documentLifecycleEvents(pairs), objectiveId,

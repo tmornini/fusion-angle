@@ -193,8 +193,8 @@ async function latestSidecarStateFor(
     entityId: string,
 ): Promise<string> {
     const [requests, responses] = await Promise.all([
-        db.requests.getAll(),
-        db.responses.getAll(),
+        db.pairs.getAll(),
+        db.pairs.getAll(),
     ]);
     const prefixes = new Set(
         requests
@@ -208,8 +208,8 @@ async function latestSidecarStateFor(
     }[] = [];
     for (const prefix of prefixes) {
         for (const pair of documentPairsAt(
-            requests, responses, prefix,
-        )) {
+        requests, prefix,
+    )) {
             const delta = pair.body['graphDelta'];
             const deletions =
                 typeof delta === 'object' && delta !== null

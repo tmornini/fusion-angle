@@ -546,7 +546,7 @@ test('live-write chain: create, reposition, revision edit,'
     const token = await organizationToken();
     const objectiveId = 'obj-drift-chain-1';
 
-    const beforeCreate = (await db.requests.getAll()).length;
+    const beforeCreate = (await db.pairs.getAll()).length;
     const created = await handleRequest(db, req(
         'POST', '/organizations/1/objectives/', token,
         objectiveCreateBody(
@@ -556,7 +556,7 @@ test('live-write chain: create, reposition, revision edit,'
     ));
     assert.equal(created.status, 201);
     assert.equal(
-        (await db.requests.getAll()).length, beforeCreate + 3,
+        (await db.pairs.getAll()).length, beforeCreate + 3,
     );
     {
         const getRes = await handleRequest(
@@ -722,7 +722,7 @@ test('live-write chain: create, reposition, revision edit,'
     const baselineIdA = 'bl-drift-chain-1-a';
     const baselineIdB = 'bl-drift-chain-1-b';
     const secondObjectiveId = OBJECTIVE_SEEDS[0]!.id;
-    const beforeConversion = (await db.requests.getAll()).length;
+    const beforeConversion = (await db.pairs.getAll()).length;
     const conversion = await handleRequest(db, req(
         'POST', '/organizations/1/ideas/' + ideaId + '/conversion', token, {
             projectId,
@@ -768,7 +768,7 @@ test('live-write chain: create, reposition, revision edit,'
     ));
     assert.equal(conversion.status, 201);
     assert.equal(
-        (await db.requests.getAll()).length,
+        (await db.pairs.getAll()).length,
         beforeConversion + 5,
     );
     const basePath =
@@ -851,7 +851,7 @@ test('live-write chain: create, reposition, revision edit,'
     );
     const beforeDuplicateIds = new Set(
         (
-            await db.responses.getAllWhere(
+            await db.pairs.getAllWhere(
                 'uri_collection', objectivesPrefix,
             )
         ).filter((r) => r.uri_id === objectiveId)
@@ -875,8 +875,8 @@ test('live-write chain: create, reposition, revision edit,'
     );
 
     const [afterRequests, afterResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', objectivesPrefix),
-        db.responses.getAllWhere('uri_collection', objectivesPrefix),
+        db.pairs.getAllWhere('uri_collection', objectivesPrefix),
+        db.pairs.getAllWhere('uri_collection', objectivesPrefix),
     ]);
     const afterAtAddress = afterResponses.filter(
         (r) => r.uri_id === objectiveId,
@@ -890,7 +890,7 @@ test('live-write chain: create, reposition, revision edit,'
         assert.equal('supersedes' in row, false);
     }
     const documentPairsAfter = documentPairsAt(
-        afterRequests, afterResponses, objectivesPrefix,
+        afterRequests, objectivesPrefix,
     ).filter((pair) => pair.uriId === objectiveId);
     // create doc + reposition + archive + reactivate +
     // duplicate create's document = 5
@@ -945,8 +945,8 @@ test('the create-op POST pair is not read as a document pair —'
         STARK_ORGANIZATION, '/organizations/1/objectives/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
     ]);
     const atAddress = requests.filter(
         (r) => r.uri_collection === prefix
@@ -955,16 +955,16 @@ test('the create-op POST pair is not read as a document pair —'
     assert.equal(atAddress.length, 2);
 
     const documentPairs = documentPairsAt(
-        requests, responses, prefix,
+        requests, prefix,
     ).filter((pair) => pair.uriId === objectiveId);
     assert.equal(documentPairs.length, 1);
     assert.equal(documentPairs[0]!.method, 'PUT');
 
     const postRow = atAddress.find(
-        (r) => decodeRequestMessage(r.message).method === 'POST',
+        (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(
-        Object.keys(decodeRequestMessage(postRow.message).body),
+        Object.keys(decodeRequestMessage(postRow.request).body),
     );
     const documentBodyKeys = new Set(
         Object.keys(documentPairs[0]!.body),
@@ -998,13 +998,13 @@ async () => {
         position: 99,
         state: 'active' as const,
     };
-    const beforeReposition = (await db.requests.getAll()).length;
+    const beforeReposition = (await db.pairs.getAll()).length;
     const first = await handleRequest(db, req(
         'PUT', '/organizations/1/objectives/' + objectiveId, token,
         positionBody,
     ));
     assert.equal(first.status, 201);
-    const afterFirst = (await db.requests.getAll()).length;
+    const afterFirst = (await db.pairs.getAll()).length;
     assert.equal(afterFirst, beforeReposition + 1);
 
     const second = await handleRequest(db, req(
@@ -1012,7 +1012,7 @@ async () => {
         positionBody,
     ));
     assert.equal(second.status, 201);
-    const afterSecond = (await db.requests.getAll()).length;
+    const afterSecond = (await db.pairs.getAll()).length;
     assert.equal(afterSecond, afterFirst);
     assert.equal(
         first.headers.get('Response-ID'),

@@ -190,7 +190,7 @@ async function derivedRecordAttributes(
 async function resolveAttributePath(
     db: DbAdapter, organization: Id, id: Id,
 ): Promise<string | null> {
-    const hits = (await db.responses.getAll()).filter(
+    const hits = (await db.pairs.getAll()).filter(
         (row) => row.uri_id === id,
     );
     const needle = '/organizations/' + organization
@@ -745,7 +745,7 @@ async () => {
 
     // Step 3: referenced-attribute removal 409s; zero new pairs.
     const beforeRequestCount =
-        (await db.requests.getAll()).length;
+        (await db.pairs.getAll()).length;
     const beforeAttrCount = (
         await derivedRecordAttributes(db, STARK_ORGANIZATION)
     ).length;
@@ -760,7 +760,7 @@ async () => {
     ));
     assert.equal(rejected.status, 409);
     assert.equal(
-        (await db.requests.getAll()).length, beforeRequestCount,
+        (await db.pairs.getAll()).length, beforeRequestCount,
     );
     assert.equal(
         (await derivedRecordAttributes(db, STARK_ORGANIZATION))
@@ -905,8 +905,9 @@ async () => {
     assert.equal(first.status, 201);
 
     const firstDocumentPairs = documentPairsAt(
-        await db.requests.getAllWhere('uri_collection', prefix),
-        await db.responses.getAllWhere('uri_collection', prefix),
+        await db.pairs.getAllWhere(
+            'uri_collection', prefix,
+        ),
         prefix,
     ).filter((pair) => pair.uriId === recordId);
     assert.equal(firstDocumentPairs.length, 1);
@@ -929,11 +930,11 @@ async () => {
     assert.equal(second.status, 201);
 
     const allRequests =
-        await db.requests.getAllWhere('uri_collection', prefix);
+        await db.pairs.getAllWhere('uri_collection', prefix);
     const allResponses =
-        await db.responses.getAllWhere('uri_collection', prefix);
+        await db.pairs.getAllWhere('uri_collection', prefix);
     const secondDocumentPairs = documentPairsAt(
-        allRequests, allResponses, prefix,
+        allRequests, prefix,
     ).filter((pair) => pair.uriId === recordId);
     assert.equal(secondDocumentPairs.length, 2);
     const secondDocumentPairId = secondDocumentPairs[1]!.id;
@@ -989,8 +990,8 @@ async () => {
         STARK_ORGANIZATION, '/record-types/',
     );
     const [recordRequests, recordResponses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', recordsPrefix),
-        db.responses.getAllWhere('uri_collection', recordsPrefix),
+        db.pairs.getAllWhere('uri_collection', recordsPrefix),
+        db.pairs.getAllWhere('uri_collection', recordsPrefix),
     ]);
     const atRecordAddress = recordRequests.filter(
         (r) => r.uri_collection === recordsPrefix
@@ -999,16 +1000,16 @@ async () => {
     assert.equal(atRecordAddress.length, 2);
 
     const recordDocumentPairs = documentPairsAt(
-        recordRequests, recordResponses, recordsPrefix,
+        recordRequests, recordsPrefix,
     ).filter((pair) => pair.uriId === recordId);
     assert.equal(recordDocumentPairs.length, 1);
     assert.equal(recordDocumentPairs[0]!.method, 'PUT');
 
     const postRow = atRecordAddress.find(
-        (r) => decodeRequestMessage(r.message).method === 'POST',
+        (r) => decodeRequestMessage(r.request).method === 'POST',
     )!;
     const createBodyKeys = new Set(
-        Object.keys(decodeRequestMessage(postRow.message).body),
+        Object.keys(decodeRequestMessage(postRow.request).body),
     );
     const documentBodyKeys = new Set(
         Object.keys(recordDocumentPairs[0]!.body),
@@ -1025,16 +1026,15 @@ async () => {
         + '/record-types/' + recordId + '/attributes/';
     const [attributeRequests, attributeResponses] =
         await Promise.all([
-            db.requests.getAllWhere(
+            db.pairs.getAllWhere(
                 'uri_collection', attributesPrefix,
             ),
-            db.responses.getAllWhere(
+            db.pairs.getAllWhere(
                 'uri_collection', attributesPrefix,
             ),
         ]);
     const attributeDocumentPairs = documentPairsAt(
-        attributeRequests, attributeResponses,
-        attributesPrefix,
+        attributeRequests, attributesPrefix,
     ).filter((pair) => pair.uriId === attributeId);
     assert.equal(attributeDocumentPairs.length, 1);
     assert.equal(attributeDocumentPairs[0]!.method, 'PUT');
@@ -1236,8 +1236,8 @@ async function transitionFieldValueCounts(
         '/organizations/1/work-orders/' + workOrderId + '/transition/',
     );
     const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere('uri_collection', prefix),
     ]);
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
@@ -1247,7 +1247,7 @@ async function transitionFieldValueCounts(
         if (response.uri_collection !== prefix) continue;
         const request = requestById.get(response.id);
         if (request === undefined) continue;
-        const decoded = decodeRequestMessage(request.message);
+        const decoded = decodeRequestMessage(request.request);
         if (decoded.method !== 'POST') continue;
         // Guard: new-shape transitions omit fieldValues; only
         // legacy bags contribute to this SFV tally.
@@ -1320,11 +1320,8 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     );
     assert.equal(flagshipScan.size, 0);
 
-    const allRequests = await db.requests.getAll();
-    const allResponses = await db.responses.getAll();
-    const sfvRows = stateFieldValuesFrom(
-        allRequests, allResponses,
-    );
+    const allPairs = await db.pairs.getAll();
+    const sfvRows = stateFieldValuesFrom(allPairs);
     const flagshipSfvTally = new Map<string, number>();
     for (const row of sfvRows) {
         if (

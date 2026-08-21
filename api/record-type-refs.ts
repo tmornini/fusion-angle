@@ -42,19 +42,11 @@ export async function collectRecordTypeReferrers(
     const instancesPrefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const [instanceRequests, instanceResponses] =
-        await Promise.all([
-            view.requests.getAllWhere(
-                'uri_collection', instancesPrefix,
-            ),
-            view.responses.getAllWhere(
-                'uri_collection', instancesPrefix,
-            ),
-        ]);
+    const instancePairs = await view.pairs.getAllWhere(
+        'uri_collection', instancesPrefix,
+    );
     const instanceHeads = deriveDocumentsAt(
-        instanceRequests,
-        instanceResponses,
-        instancesPrefix,
+        instancePairs, instancesPrefix,
     );
     const instanceIds = [...instanceHeads.keys()].sort();
 

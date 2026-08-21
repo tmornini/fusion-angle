@@ -410,13 +410,13 @@ test(
         const flowId = 'cursor-exhausted';
         await createFlow(db, token, flowId);
 
-        const before = await db.requests.getAll();
+        const before = await db.pairs.getAll();
         const res = await undo(
             db, token, flowId, flowId + '-u1', AT,
         );
         assert.equal(res.status, 201);
 
-        const after = await db.requests.getAll();
+        const after = await db.pairs.getAll();
         assert.equal(
             after.length, before.length + 1,
             'exhaustion appends exactly the operation pair'
@@ -434,7 +434,7 @@ test(
             '2026-01-01T00:00:01.000000Z',
         );
         assert.equal(again.status, 201);
-        const afterAgain = await db.requests.getAll();
+        const afterAgain = await db.pairs.getAll();
         assert.equal(
             afterAgain.length, after.length + 1,
             'a second exhausted undo ALSO appends only its'
@@ -699,13 +699,11 @@ test(
         assert.equal(undone.status, 201);
 
         const prefix = canonicalUriCollection('1', '/flows/');
-        const [requests, responses] = await Promise.all([
-            db.requests.getAllWhere('uri_collection', prefix),
-            db.responses.getAllWhere('uri_collection', prefix),
-        ]);
-        const pairs = documentPairsAt(
-            requests, responses, prefix,
-        ).filter((p) => p.uriId === flowId);
+        const stored = await db.pairs.getAllWhere(
+            'uri_collection', prefix,
+        );
+        const pairs = documentPairsAt(stored, prefix)
+            .filter((p) => p.uriId === flowId);
         const states: { state: string; at: string }[] = [];
         for (const pair of pairs) {
             const delta = pair.body['graphDelta'];

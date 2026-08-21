@@ -130,13 +130,12 @@ async function fetchFlowPairs(
     readonly documents: Map<string, DerivedDocument>;
     readonly pairs: readonly DocumentPair[];
 }> {
-    const [requests, responses] = await Promise.all([
-        db.requests.getAllWhere('uri_collection', prefix),
-        db.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const pairs = await db.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     return {
-        documents: deriveDocumentsAt(requests, responses, prefix),
-        pairs: documentPairsAt(requests, responses, prefix),
+        documents: deriveDocumentsAt(pairs, prefix),
+        pairs: documentPairsAt(pairs, prefix),
     };
 }
 
@@ -252,32 +251,28 @@ export async function resolveFlowUndoTarget(
     undoUriPrefix: string,
 ): Promise<FlowUndoResolution | undefined> {
     const prefix = flowsUriPrefix(organization);
-    const [requests, responses, undoRequests] =
-        await Promise.all([
-            db.requests.getAllWhere('uri_collection', prefix),
-            db.responses.getAllWhere('uri_collection', prefix),
-            db.requests.getAllWhere(
-                'uri_collection', undoUriPrefix,
-            ),
-        ]);
-    const pairs = documentPairsAt(requests, responses, prefix)
+    const [stored, undoPairs] = await Promise.all([
+        db.pairs.getAllWhere('uri_collection', prefix),
+        db.pairs.getAllWhere(
+            'uri_collection', undoUriPrefix,
+        ),
+    ]);
+    const pairs = documentPairsAt(stored, prefix)
         .filter((pair) => pair.uriId === flowId);
     const current = pairs.at(-1);
     if (current === undefined) return undefined;
-    const requestAtById = new Map(
-        requests.map((request) => [request.id, request.at]),
-    );
     const undoRequestAts = new Set(
-        undoRequests.map((request) => request.at),
+        undoPairs.map((pair) => pair.request_at),
+    );
+    const storedById = new Map(
+        stored.map((row) => [row.id, row]),
     );
     const stack: DocumentPair[] = [];
     let pointer = -1;
     for (const pair of pairs) {
-        const requestAt = requestAtById.get(pair.id);
-        if (
-            requestAt !== undefined
-            && undoRequestAts.has(requestAt)
-        ) {
+        if (undoRequestAts.has(
+            storedById.get(pair.id)!.request_at,
+        )) {
             pointer -= 1;
         } else {
             stack.length = Math.max(pointer + 1, 0);
@@ -335,7 +330,7 @@ export async function deriveFlowStateHistory(
 // (unvalidated against the relation ledgers). dbOrView-shaped
 // and opens no nested transaction — callable from WITHIN an
 // already-open write-gate transaction (ATTRIBUTE_RESTRICT_
-// TABLES already lists requests + responses).
+// TABLES already lists the pair plane).
 export interface FlowGraphBindingLedgers {
     readonly attributeEvents:
         readonly FlowNodeAttributeEntity[];
@@ -368,16 +363,13 @@ export async function flowGraphBindingsFromPairs(
     organization: Id,
 ): Promise<FlowGraphBindingLedgers> {
     const prefix = flowsUriPrefix(organization);
-    const [requests, responses] = await Promise.all([
-        dbOrView.requests.getAllWhere('uri_collection', prefix),
-        dbOrView.responses.getAllWhere('uri_collection', prefix),
-    ]);
+    const stored = await dbOrView.pairs.getAllWhere(
+        'uri_collection', prefix,
+    );
     const attributeEvents: FlowNodeAttributeEntity[] = [];
     const memberEvents: FlowNodeMemberEntity[] = [];
     const nodeFlowIds = new Map<Id, Id>();
-    for (const pair of documentPairsAt(
-        requests, responses, prefix,
-    )) {
+    for (const pair of documentPairsAt(stored, prefix)) {
         const delta = pair.body['graphDelta'];
         if (typeof delta !== 'object' || delta === null) {
             continue;

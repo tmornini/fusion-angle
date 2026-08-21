@@ -6,6 +6,7 @@ import {
 } from '../api/db-memory.ts';
 import {
     EntityNotFoundError,
+    MESSAGE_TABLES,
 } from '../api/db.ts';
 import type { DbAdapter } from '../api/db.ts';
 import type { Id } from '../api/types.ts';
@@ -230,7 +231,7 @@ async function testDocumentOp(
     pair?: MessagePair,
 ): Promise<unknown> {
     return db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         async (view) => {
             if (pair !== undefined) {
                 const latchedId = pair.latchedHeadPairId;
@@ -447,7 +448,7 @@ test('locked arm: a matching echo stores no predecessor'
         assert.equal(second.headers.get('Follows'), null);
         assert.equal(second.headers.get('Supersedes'), null);
         const secondId = second.headers.get('Response-ID')!;
-        const stored = (await db.responses.getAll())
+        const stored = (await db.pairs.getAll())
             .find((row) => row.id === secondId);
         assert.equal(
             stored !== undefined
@@ -488,7 +489,7 @@ async () => {
             resend.headers.get('Response-ID'),
             edit.headers.get('Response-ID'),
         );
-        assert.equal((await db.requests.getAll()).length, 4);
+        assert.equal((await db.pairs.getAll()).length, 4);
     });
 });
 
@@ -535,7 +536,7 @@ test('locked arm: two writers racing the SAME echo — the'
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, genesis),
     );
     // Two writers both observed the SAME head (genesis.id)
@@ -626,8 +627,8 @@ async () => {
             'If-Match does not match the current document at '
             + path,
         );
-        const responses = await db.responses.getAll();
-        const atPath = responses.filter(
+        const pairs = await db.pairs.getAll();
+        const atPath = pairs.filter(
             (row) =>
                 row.uri_collection
                     === '/organizations/1/'
@@ -637,8 +638,7 @@ async () => {
         assert.equal(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
-        assert.equal((await db.requests.getAll()).length, 4);
-        assert.equal(responses.length, 4);
+        assert.equal(pairs.length, 4);
     });
 });
 
@@ -718,7 +718,7 @@ async function putStatelessDocumentPair(
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
 }
@@ -740,7 +740,7 @@ async function deleteStatelessDocumentPair(
         operationId: TEST_OPERATION_ID,
     });
     await db.transaction(
-        ['requests', 'responses'],
+        MESSAGE_TABLES,
         (view) => appendMessagePair(view, pair),
     );
 }

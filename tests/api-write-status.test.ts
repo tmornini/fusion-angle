@@ -72,7 +72,7 @@ async function pairsAt(
     prefix: string,
     uriId: string,
 ): Promise<number> {
-    const rows = await db.requests.getAllWhere(
+    const rows = await db.pairs.getAllWhere(
         'uri_collection', prefix,
     );
     return rows.filter((row) => row.uri_id === uriId)
@@ -89,14 +89,14 @@ async function storedResponseAt(
     readonly status: number;
     readonly hasOperationId: boolean;
 }> {
-    const requests = (await db.requests.getAllWhere(
+    const requests = (await db.pairs.getAllWhere(
         'uri_collection', prefix,
     )).filter((row) => row.uri_id === uriId);
     const last = requests[requests.length - 1];
     assert.ok(last !== undefined, 'no stored request');
-    const stored = await db.responses.getById(last.id);
+    const stored = await db.pairs.getById(last.id);
     assert.ok(stored !== undefined, 'no stored response');
-    const model = parseWire(stored.message);
+    const model = parseWire(stored.response);
     assert.equal(model.startLine.kind, 'response');
     return {
         requestId: last.id,
@@ -272,13 +272,13 @@ test('DELETE never-written is 404 and stores nothing',
 async () => {
     const db = await freshDb();
     const token = await organizationToken();
-    const before = (await db.requests.getAll()).length;
+    const before = (await db.pairs.getAll()).length;
     const res = await handleRequest(db, req(
         'DELETE', '/memberships/ws-never', token,
     ));
     assert.equal(res.status, 404);
     assert.equal(
-        (await db.requests.getAll()).length, before,
+        (await db.pairs.getAll()).length, before,
     );
     assert.equal(
         await pairsAt(

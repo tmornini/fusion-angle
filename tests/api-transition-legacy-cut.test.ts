@@ -222,7 +222,7 @@ async () => {
     );
     // Below-facade appends the pair; lifecycle derives from
     // the stored body (seed tier dual-tolerant).
-    const requests = await db.requests.getAll();
+    const requests = await db.pairs.getAll();
     const hit = requests.some((r) => r.id === pair.id);
     assert.equal(hit, true);
 });

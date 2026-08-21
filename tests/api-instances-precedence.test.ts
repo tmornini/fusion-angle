@@ -558,7 +558,7 @@ async () => {
     const header = res.headers.get('ETag');
     assert.ok(header !== null);
     assert.match(header.slice(1, -1), HEX64);
-    const stored = await db.responses.getById(pairId);
+    const stored = await db.pairs.getById(pairId);
     assert.ok(stored !== undefined);
     assert.match(stored.version, HEX64);
     assert.notEqual(

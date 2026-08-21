@@ -18,6 +18,7 @@ import {
     NO_ARGUMENTS,
     requiredEnv,
     assertUtf8,
+    assertNoLegacyMessageTables,
     assertSchemaMarker,
     bootErrorMessage,
     type EnvBag,
@@ -110,6 +111,7 @@ export async function boot(
         acquireTimeoutMs: POOL_ACQUIRE_TIMEOUT_MS,
     });
     await assertUtf8(sql);
+    await assertNoLegacyMessageTables(sql);
     await assertSchemaMarker(sql);
     const adapter = new BackedDbAdapter(
         new PostgresBackend(sql),

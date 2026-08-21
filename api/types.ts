@@ -1032,31 +1032,22 @@ export interface ProjectObjectiveActualScoreEntity {
     at: string;
 }
 
-// One row per stored HTTP request message. The canonical
-// message IS the row; the columns beside it are addressing
-// and index machinery, never a second truth.
-export interface RequestEntity {
+// One row per stored HTTP pair. The canonical
+// messages ARE the two BYTEA columns; the
+// columns beside them are addressing and index
+// machinery, never a second truth.
+export interface PairEntity {
     id: Id;
     uri_collection: string;
     uri_id: string;
-    at: string;
     requester_identity_id: Id;
-    message_hash: string;
-    message: string;
     method: string;
-    operation_id: string;
-}
-
-// The paired response. id equals the request's id.
-// Only successful writes are stored — no status column.
-// Request `message_hash` remains; the response has none.
-export interface ResponseEntity {
-    id: Id;
-    uri_collection: string;
-    uri_id: string;
-    at: string;
+    request_at: string;
+    request_hash: string;
+    request: string;
+    response_at: string;
     version: string;
-    message: string;
+    response: string;
     operation_id: string;
 }
 
