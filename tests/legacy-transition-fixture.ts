@@ -3,7 +3,7 @@ import {
     postWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import {
     SYSTEM_MEMBER_ID,
@@ -35,7 +35,7 @@ export async function appendLegacyTransition(
             ? body['transitionAt'] as string
             : new Date().toISOString());
     const actor = opts.actor ?? SYSTEM_MEMBER_ID;
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: PATTERN,
@@ -52,6 +52,6 @@ export async function appendLegacyTransition(
     });
     await postWorkOrderTransitionOp(
         db, workOrderId, body, actor,
-        undefined, [], pair,
+        undefined, [], messagePair,
     );
 }

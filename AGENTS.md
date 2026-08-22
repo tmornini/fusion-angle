@@ -342,12 +342,12 @@ Every page is a standalone HTML file served by
   `invalid_token` / `invalid_client` / `invalid_grant`.
   Membership, roles, and revocation ride claim snapshots
   (NAMED COVENANT: bite at next mint/refresh/exchange or
-  access TTL ≤ 15 min), not live pair-plane re-reads.
+  access TTL ≤ 15 min), not live message-plane re-reads.
   Ownership and default-organization fences stay
-  pair-plane. See [ARCHITECTURE.md](ARCHITECTURE.md)
+  message-plane. See [ARCHITECTURE.md](ARCHITECTURE.md)
   § Demo server tier.
 - **Tenancy.** Every authenticated request runs org-scoped
-  on the **pair plane**. `fenceRequest` completes the vessel
+  on the **message plane**. `fenceRequest` completes the vessel
   with organization, live memberships, and roles from the
   VERIFIED token claim (never the path); handlers receive
   `ctx.base` — there is no `organizationScopedAdapter`.
@@ -355,7 +355,7 @@ Every page is a standalone HTML file served by
   `uri_collection`. A flat (un-exchanged) token
   resolves its org via
   `identityDefaultOrganization`: the identity's SET
-  default organization (pair-plane
+  default organization (message-plane
   `/identities/:id/default-organization` document) if
   that organization is a live seat, else PRIMARY
   (earliest remaining join `at`, identifier order on
@@ -365,7 +365,7 @@ Every page is a standalone HTML file served by
   for the fenced org). NAMED
   COVENANT: de-membership / demotion / revocation bite at
   next mint/refresh/exchange or access TTL (≤ 15 min), not
-  the very next request. Ownership fences stay pair-plane.
+  the very next request. Ownership fences stay message-plane.
   Org-scoped PUT/DELETE hit the write authorizer
   (`writeAuthorizerFor` → `resolveGlobalOwner`) so a
   foreign id 403s rather than genesis-ing in the caller's
@@ -386,14 +386,15 @@ Every page is a standalone HTML file served by
 - **Data.** REST-style API (`api/`) over Postgres.
   The page talks `fetch` (`adapters/http-facade.ts`).
   Adapters in `web-app/app/adapters/` shape pages from
-  pair-plane derives. The live flow graph is pair-plane
+  message-plane derives. The live flow graph is message-plane
   only: GET reassembles `FlowWithGraph` from the
   document body's `graph` field; `graphDelta` /
   `revivals` are write-side sidecars. A work order
   freezes its own `flow_graph` inside the work-order
-  document pair. Flow undo resolves its restore target
-  from the flow's own document-pair history (Phase 14
-  Task 8). Lifecycle history is per-entity GET
+  document message pair. Flow undo resolves its restore
+  target from the flow's own document-message-pair
+  history (Phase 14 Task 8). Lifecycle history is
+  per-entity GET
   (`GET organizations/:id/<family>/:id/versions/`
   for ideas / projects / record-types / flows /
   objectives; work-orders stay
@@ -412,7 +413,7 @@ Every page is a standalone HTML file served by
   field-values families — all router 404.
   Phase Final DELETED the graph/version tables with the
   rest of the row plane. Ownership fences resolve on
-  the pair plane (`resolveOwningOrganization`,
+  the message plane (`resolveOwningOrganization`,
   `stateEventVisibilityFor` for RESTRICT). Flow tags
   (`flows/:id/tags/:name`) are the first document family
   that never had a backing table; post-Final every family
@@ -431,7 +432,7 @@ Every page is a standalone HTML file served by
   localStorage holds UI preferences only — theme,
   sidebar, log level, active organization id — never
   data.
-  `TABLE_NAMES` is one: `pairs` — the
+  `TABLE_NAMES` is one: `message_pairs` — the
   pure message plane, on `HistoryEntityStore`.
   Every store op crosses the `StorageBackend`
   transaction seam (`api/db.ts`). The memory backend
@@ -534,9 +535,9 @@ REST routing, DB adapter interface, mock data,
 validators, plus the auth/authz/tenancy spine:
 `authentication.ts` (OAuth grants), `access-token.ts` (JWT
 mint/verify), `authorization.ts` (per-org roles), the
-pair-plane org fence (`fenceRequest` / `ctx.base` —
+message-plane org fence (`fenceRequest` / `ctx.base` —
 `db-organization-scoped` / `store-organization-scoped`
-DELETED with Phase Final), and pair-plane identity
+DELETED with Phase Final), and message-plane identity
 derives (`derive-identity-spine.ts`,
 `derive-organizations.ts`,
 `derive-memberships.ts`).
@@ -603,8 +604,9 @@ round-trip, in-browser ZIP (flow export, `zip.ts`), the
 memory transaction backend, the tx runners and view, the
 commit batch route, api routing, navigation, mock-data
 validity (pair count 1448 / bootstrap 8 absolute on
-`pairs`; the mock-data fingerprint file retired with
-the clients table), client registration facet + derive,
+`message_pairs`; the mock-data fingerprint file retired
+with the clients table), client registration facet +
+derive,
 the two-tier hazard predicate (`flow-graph-hazard.test.ts`),
 presenter
 SafeHtml, flow-stats pure math + adapter + presenter,
@@ -695,11 +697,12 @@ apply to it (RED is the audit's first finding).
   on an empty database and prints credentials once on
   stdout. It stamps `schema_marker` last so a failed
   seed reads as empty. There is no HTTP dump/restore.
-- **Operator wipe drops the pair plane.**
+- **Operator wipe drops the message plane.**
   `./postgres-wipe` (`--postgres local` or
   `--postgres render TOKEN`) runs
-  `POSTGRES_DROP_SCHEMA`: `pairs` first, then
-  retired `responses` / `requests`, then
+  `POSTGRES_DROP_SCHEMA`: `message_pairs` first,
+  then leftover `pairs`, then retired
+  `responses` / `requests`, then
   `schema_marker`, then `message_body(bytea)`.
   It does not seed. Seed still refuses a
   non-empty database.
@@ -714,7 +717,7 @@ apply to it (RED is the audit's first finding).
   console — Chromium throws both classes for the same root
   cause. Browser-internal (no app code calls
   `startViewTransition`); no app impact.
-- **Lifecycle is append-only on the pair plane.** An
+- **Lifecycle is append-only on the message plane.** An
   entity's current state is the latest derived event on its
   `entity_id` under the `(at, id)` total order. Reversal is
   a *new* event with the new state, not an edit of a prior
@@ -769,7 +772,7 @@ apply to it (RED is the audit's first finding).
   serializes whole transactions, so a long body stalls
   every other op.
 - **Field values reference record attributes by id** in the
-  pair-plane body (`attribute_id` → a record-attribute
+  message-plane body (`attribute_id` → a record-attribute)
   document id), never a table named `attributes`. See
   [SCHEMA.md](SCHEMA.md) and
   `api/derive-state-field-values.ts`.

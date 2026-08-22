@@ -1,7 +1,7 @@
 import type { DbAdapter } from './db.ts';
 import { EntityNotFoundError } from './db.ts';
 import type {
-    Id, PairEntity, StateEntity,
+    Id, MessagePairEntity, StateEntity,
 } from './types.ts';
 import {
     pickString,
@@ -16,7 +16,7 @@ import {
 import { missedReadError } from './derive-states.ts';
 import {
     deriveDocumentsAt,
-    documentPairsAt,
+    documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
@@ -24,7 +24,7 @@ import {
     DELETED_STATE,
     requestBodyOf,
     type DerivedDocument,
-    type DocumentPair,
+    type DocumentMessagePair,
 } from './derive-documents.ts';
 import type {
     Route,
@@ -135,7 +135,7 @@ export interface DocumentFamilyWiring {
     readonly documentOp: (
         db: DbAdapter, id: Id,
         body: Record<string, unknown>, actor: Id,
-        pair?: MessagePair,
+        messagePair?: MessagePair,
     ) => Promise<unknown>;
     // Head-pair body -> wire entity (id + organization_id
     // stamped by the caller). Trio families that embed the
@@ -227,7 +227,7 @@ export async function throwDocumentMiss(
     );
 }
 
-// The generic per-id derivation: store.getPairs at this
+// The generic per-id derivation: store.getMessagePairs at this
 // address, reduce to the head document (deriveDocumentsAt),
 // and — for a 'trio' family ONLY — walk the lifecycle
 // history over those same pairs to 404 a lifecycle-deleted
@@ -245,7 +245,7 @@ async function derivedDocumentEntity(
     const prefix = canonicalUriCollection(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getPairs(
+    const stored = await messageStore(db).getMessagePairs(
         prefix, id,
     );
     const document = deriveDocumentsAt(
@@ -257,10 +257,11 @@ async function derivedDocumentEntity(
         );
     }
     if (wiring.lifecycle === 'trio') {
-        const pairs = documentPairsAt(stored, prefix)
-            .filter((pair) => pair.uriId === id);
+        const messagePairs = documentMessagePairsAt(
+            stored, prefix,
+        ).filter((messagePair) => messagePair.uriId === id);
         const history = stateHistoryFrom(
-            documentLifecycleEvents(pairs), id,
+            documentLifecycleEvents(messagePairs), id,
         );
         if (currentDocumentState(history) === DELETED_STATE) {
             throw await throwDocumentMiss(
@@ -321,9 +322,9 @@ export function documentGetHandler(
 }
 
 // Live PUT pair id at this address — store.get, the same
-// live-document reduction headPairIdAt now uses. A DELETE
+// live-document reduction headMessagePairIdAt now uses. A DELETE
 // head or virgin address is undefined.
-export async function documentHeadPairId(
+export async function documentHeadMessagePairId(
     db: DbAdapter,
     uriCollection: string,
     id: Id,
@@ -343,10 +344,10 @@ export async function documentHeadPairId(
 export function documentPutHandler(
     wiring: DocumentFamilyWiring,
 ): PutHandler {
-    return (db, params, body, actor, pair) =>
+    return (db, params, body, actor, messagePair) =>
         wiring.documentOp(
             db, entityIdParam(wiring, params),
-            body, actor, pair,
+            body, actor, messagePair,
         );
 }
 
@@ -400,11 +401,11 @@ export async function lookupStoredRevision(
     prefix: string,
     id: Id,
     version: string,
-): Promise<PairEntity | undefined> {
-    const pair = await messageStore(db).getByVersion(
+): Promise<MessagePairEntity | undefined> {
+    const messagePair = await messageStore(db).getByVersion(
         prefix, id, version,
     );
-    return pair;
+    return messagePair;
 }
 
 export async function storedRevisionDocument(
@@ -424,7 +425,7 @@ export async function storedRevisionDocument(
     }
     return {
         uriId: id,
-        pairId: found.id,
+        messagePairId: found.id,
         method: found.method,
         body: requestBodyOf(found.request),
     };
@@ -436,20 +437,20 @@ export async function versionSnapshotsAt(
     id: Id,
     toEntity: (document: DerivedDocument) => unknown,
 ): Promise<unknown[]> {
-    const stored = await messageStore(db).getPairs(
+    const stored = await messageStore(db).getMessagePairs(
         prefix, id,
     );
-    const pairs = documentPairsAt(
+    const messagePairs = documentMessagePairsAt(
         stored, prefix,
-    ).filter((pair) => pair.uriId === id);
+    ).filter((messagePair) => messagePair.uriId === id);
     const snapshots: unknown[] = [];
-    for (const pair of pairs.toReversed()) {
-        if (pair.method !== PUT_METHOD) continue;
+    for (const messagePair of messagePairs.toReversed()) {
+        if (messagePair.method !== PUT_METHOD) continue;
         snapshots.push(toEntity({
             uriId: id,
-            pairId: pair.id,
-            method: pair.method,
-            body: pair.body,
+            messagePairId: messagePair.id,
+            method: messagePair.method,
+            body: messagePair.body,
         }));
     }
     return snapshots;
@@ -464,14 +465,14 @@ async function documentStateHistoryAt(
     const prefix = canonicalUriCollection(
         organization, '/' + wiring.family + '/',
     );
-    const stored = await messageStore(db).getPairs(
+    const stored = await messageStore(db).getMessagePairs(
         prefix, id,
     );
     return stateHistoryFrom(
         documentLifecycleEvents(
-            documentPairsAt(
+            documentMessagePairsAt(
                 stored, prefix,
-            ).filter((pair) => pair.uriId === id),
+            ).filter((messagePair) => messagePair.uriId === id),
         ),
         id,
     );
@@ -501,7 +502,7 @@ async function serveDocumentRevision(
     const body = requestBodyOf(found.request);
     const document: DerivedDocument = {
         uriId: id,
-        pairId: found.id,
+        messagePairId: found.id,
         method: found.method,
         body,
     };
@@ -628,16 +629,22 @@ export function documentCollectionGetHandler(
         // derivedDocumentEntity above, same reason: a
         // 'stateless' body carries no trio to walk, and a
         // DELETE head is already absent from `documents`.
-        const pairsById = new Map<Id, DocumentPair[]>();
+        const messagePairsById = new Map<
+            Id, DocumentMessagePair[]
+        >();
         if (wiring.lifecycle === 'trio') {
-            for (const pair of documentPairsAt(
+            for (const messagePair of documentMessagePairsAt(
                 stored, prefix,
             )) {
-                const list = pairsById.get(pair.uriId);
+                const list = messagePairsById.get(
+                    messagePair.uriId,
+                );
                 if (list === undefined) {
-                    pairsById.set(pair.uriId, [pair]);
+                    messagePairsById.set(
+                        messagePair.uriId, [messagePair],
+                    );
                 } else {
-                    list.push(pair);
+                    list.push(messagePair);
                 }
             }
         }
@@ -646,7 +653,7 @@ export function documentCollectionGetHandler(
             if (wiring.lifecycle === 'trio') {
                 const history = stateHistoryFrom(
                     documentLifecycleEvents(
-                        pairsById.get(id) ?? [],
+                        messagePairsById.get(id) ?? [],
                     ),
                     id,
                 );
@@ -711,8 +718,9 @@ const ID_PATTERN_SUFFIX = '/:id';
 // Arrival-last sentinel so this write is the newest link
 // in the lifecycle walk (first-occurrence-wins by
 // state_event_id; current is (state_at, id)).
-const INCOMING_PAIR_AT = '9999-12-31T23:59:59.999999Z';
-const INCOMING_PAIR_ID = '\uffff';
+const INCOMING_MESSAGE_PAIR_AT =
+    '9999-12-31T23:59:59.999999Z';
+const INCOMING_MESSAGE_PAIR_ID = '\uffff';
 
 const ORGANIZATION_NEST_PREFIX = 'organizations/:id/';
 
@@ -750,7 +758,7 @@ function trioDocumentFromBody(
 ): DerivedDocument {
     return {
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: PUT_METHOD,
         body,
     };
@@ -766,15 +774,15 @@ export async function streamedTrioEntityOf(
     entityOf: DocumentFamilyWiring['entityOf'],
 ): Promise<unknown> {
     const raw = withoutId(body);
-    const stored = await messageStore(db).getPairs(
+    const stored = await messageStore(db).getMessagePairs(
         prefix, id,
     );
-    const existing = documentPairsAt(
+    const existing = documentMessagePairsAt(
         stored, prefix,
     );
-    const incoming: DocumentPair = {
-        id: INCOMING_PAIR_ID,
-        at: INCOMING_PAIR_AT,
+    const incoming: DocumentMessagePair = {
+        id: INCOMING_MESSAGE_PAIR_ID,
+        at: INCOMING_MESSAGE_PAIR_AT,
         uriId: id,
         method: PUT_METHOD,
         body: raw,

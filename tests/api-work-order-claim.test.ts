@@ -66,7 +66,8 @@ function graphJson(): Record<string, unknown> {
 
 // yNSSnbrpacodQTzUEcdEVA is seeded via a REAL PUT (never a raw
 // db.workOrders.put)
-// so it carries a genuine organizations/:id/work-orders/:id document pair —
+// so it carries a genuine organizations/:id/work-orders/:id
+// document message pair —
 // Phase 14 Task 4's flip needs one: applyClaimPair's
 // lockTimeoutAsOf requires a document head before ANY claim
 // pair (api/derive-states.ts), an invariant every real work
@@ -74,7 +75,7 @@ function graphJson(): Record<string, unknown> {
 // one beside the create; every seeded work order gets its own,
 // api/mock-data/seed-message-pairs.ts's Phase 5 Task 4). A raw
 // row poke has no real-world analog, so it stopped being a
-// faithful fixture once the gate started reading the pair
+// faithful fixture once the gate started reading the message
 // plane.
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
@@ -155,7 +156,7 @@ test(
         const db = await seededDb();
         // A live claim by 'other' — via a REAL claim POST, not
         // a raw row poke: the gate's own decision read now
-        // sources the pair plane (Phase 14 Task 4), which a
+        // sources the message plane (Phase 14 Task 4), which a
         // row-only write leaves no trace in.
         await seedOrganizationMember(db, OTHER);
         await PUT(
@@ -225,7 +226,7 @@ test(
         // deleteWorkOrderClaim adapter uses (workbox's
         // "release claim" action) — never a raw row poke, so
         // the release is visible to the flipped gate's own
-        // pair-plane read (workOrderClaimHistoryFor). This is
+        // message-plane read (workOrderClaimHistoryFor). This is
         // the hazard-closure scenario itself, driven through
         // postWorkOrderClaimOp end to end, not just at the
         // derive layer.
@@ -357,7 +358,7 @@ test(
 // test would catch the
 // regression even though it cannot force a live interleaving
 // today. Pass-first on the OLD (row-plane) path; held unchanged
-// through the pair-plane flip.
+// through the message-plane flip.
 test(
     'two-actor contention: exactly one claimed event lands and'
     + ' exactly one request gets the byte-exact 409 body — never'

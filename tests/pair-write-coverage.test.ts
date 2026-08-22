@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { routes, type Route } from '../api/routes.ts';
 import {
-    PAIR_WIRED_ROUTE_PATTERNS,
+    MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     REPLAY_EXEMPT_ROUTE_PATTERNS,
 } from '../api/message-pair.ts';
 import {
@@ -75,7 +75,7 @@ test('every write-verb route is pair-wired or named exempt',
     assert.ok(writeRoutePatterns.length > 36);
     for (const pattern of writeRoutePatterns) {
         assert.ok(
-            PAIR_WIRED_ROUTE_PATTERNS.has(pattern)
+            MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(pattern)
                 || NAMED_EXEMPT_ROUTE_PATTERNS.has(pattern),
             'unwired, un-exempt write route: ' + pattern,
         );
@@ -83,7 +83,8 @@ test('every write-verb route is pair-wired or named exempt',
 });
 
 // Task 10: a synthetic patch-only route is a write for the
-// walker. Without a PAIR_WIRED / named-exempt entry it would
+// walker. Without a MESSAGE_PAIR_WIRED / named-exempt
+// entry it would
 // fail the completeness gate above — the alphabet grew, so
 // the gate must see patch. Currently no live route carries
 // patch; this pins the walker, not a table row.
@@ -98,7 +99,7 @@ test('patch-only synthetic is a write route the walker'
     const pattern = writtenPattern(synthetic);
     assert.equal(pattern, 'patch-only-synthetic/:id');
     assert.equal(
-        PAIR_WIRED_ROUTE_PATTERNS.has(pattern!),
+        MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(pattern!),
         false,
     );
     assert.equal(
@@ -130,8 +131,8 @@ test('invitation writes import pair-formation primitives',
         path + ' does not import appendMessagePair',
     );
     assert.ok(
-        text.includes('formWritePair'),
-        path + ' does not import formWritePair',
+        text.includes('formWriteMessagePair'),
+        path + ' does not import formWriteMessagePair',
     );
 });
 

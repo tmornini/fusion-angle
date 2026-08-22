@@ -39,7 +39,7 @@ import {
 import { sharedMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: objectives(+objective_revisions) seed
-// row halves stripped — assertions ride the pair plane.
+// row halves stripped — assertions ride the message plane.
 
 async function projectIdsByState(
     ctx: RequestContext,
@@ -132,7 +132,7 @@ test('approved projects have full baseline coverage',
         // Coverage is per-org since SP-6: an approved project
         // is scored against the objectives in ITS org, not the
         // global set. Phase Final Task 2: objectives + scores
-        // from the pair plane.
+        // from the message plane.
         const organizationByProject = new Map<string, string>();
         for (const organization of ['AjdvjuECVZEgZoFajaIEkg'
             , 'BBjWJsjYIDkTRKIIPrzWRw']) {
@@ -253,7 +253,7 @@ test('submitted projects have zero scores', async () => {
 // Phase 7 Task 5's STANDING content pins: the id-only
 // fingerprint (tests/mock-data-fingerprint.test.ts) no longer
 // covers objectives after the strip, so these pin author picks
-// via the pair-plane score adapter.
+// via the message-plane score adapter.
 test('a seeded baseline score\'s author matches the pinned'
 + ' pre-hoist pick', async () => {
     const db = await sharedMockDb();

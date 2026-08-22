@@ -22,7 +22,7 @@ import {
 } from '../api/derive-identity-spine.ts';
 import {
     appendMessagePair,
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import {
@@ -67,7 +67,7 @@ test('rejects an extra key', () => {
 });
 
 // Phase Final Stage B: identity_providers table retired —
-// store append pins live on pair-plane document tests.
+// store append pins live on message-plane document tests.
 
 test('an anonymous principal cannot read providers',
 async () => {
@@ -122,7 +122,7 @@ async () => {
     );
     const expected = identityProviderEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: goodRow,
     });
@@ -205,7 +205,7 @@ async () => {
     await seedAdminSchema(db);
     const id = generateIdentifier();
     const body = { ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw' };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/identity-providers/' + id,
         routePattern: 'identity-providers/:id',
@@ -219,7 +219,7 @@ async () => {
         responseStatus: 200,
         responseBody: identityProviderEntityOf({
             uriId: id,
-            pairId: id,
+            messagePairId: id,
             method: 'PUT',
             body,
         }),
@@ -228,7 +228,7 @@ async () => {
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
         },
     );
     const rows = await deriveIdentityProvidersFor(db
@@ -250,7 +250,7 @@ async () => {
         ...goodRow, identity_id: 'prBESZPjJDiuXCeZLmbiVw',
         provider: 'flat-google',
     };
-    const flatPair = await formWritePair({
+    const flatPair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/identity-providers/' + id,
         routePattern: 'identity-providers/:id',
@@ -264,7 +264,7 @@ async () => {
         responseStatus: 200,
         responseBody: identityProviderEntityOf({
             uriId: id,
-            pairId: id,
+            messagePairId: id,
             method: 'PUT',
             body: flatBody,
         }),

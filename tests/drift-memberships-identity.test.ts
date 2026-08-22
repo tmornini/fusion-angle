@@ -30,7 +30,7 @@ const NO_SUCH_IDENTITY = generateIdentifier();
 // Phase Final Task 2: memberships dual-write stripped. This
 // file no longer compares derive vs row-plane oracles — the
 // memberships table is empty after seed. Coverage re-homes to
-// pair-plane pins (counts, multi-org set, order, presence,
+// message-plane pins (counts, multi-org set, order, presence,
 // accept/remove lifecycle, echoed-id resilience).
 
 const BASE = 'http://localhost';
@@ -122,7 +122,7 @@ async () => {
 // -- leg 2: the multi-org identity --------------------------------
 
 test("leg 2: the multi-org identity ('XXZruirZyAOoRpNxaDnpSA', STARK +"
-+ ' ORGANIZATION_TWO) — two membership documents on pair plane',
++ ' ORGANIZATION_TWO) — two membership documents on message plane',
 async () => {
     const db = await seededDb();
     const derived = sortById(
@@ -165,7 +165,7 @@ test("leg 3: the ORDER pin — deriveMembershipsForIdentity('at'"
     );
 });
 
-// -- leg 4: the earliest-join reduction on the pair plane ------
+// -- leg 4: the earliest-join reduction on the message plane ---
 
 test('leg 4: the earliest-join reduction'
 + ' (primaryMembershipOrganization-shape) on derived rows,'
@@ -208,7 +208,7 @@ test('leg 5: membershipExistsFor — member + non-member parity'
         db, STARK_ORGANIZATION, mikeId,
     );
     // Phase Final Task 2: memberships ROW half stripped —
-    // member presence is pair-plane only.
+    // member presence is message-plane only.
     assert.equal(memberCheck, true);
     assert.equal(nonMemberCheck, false);
 
@@ -273,7 +273,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
     assert.equal(accept.status, 204);
 
     // Phase Final Task 2: memberships ROW half stripped —
-    // accept lands on the pair plane only.
+    // accept lands on the message plane only.
     const after = sortById(
         await deriveMembershipsForIdentity(db, sarahId),
     );
@@ -292,7 +292,7 @@ test('leg 6: LIVE accept — grant + accept an invitation through'
 // -- leg 7: the REMOVAL leg ----------------------------------------
 
 test('leg 7: REMOVAL — DELETE seat derives ABSENT'
-+ ' on the pair plane', async () => {
++ ' on the message plane', async () => {
     const db = await seededDb();
     const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
     const before = await deriveMembershipsForIdentity(
@@ -345,7 +345,7 @@ async () => {
 // -- leg 9: the ECHOED-id regression (Fable review, Critical) -----
 //
 // The fetch-edit-PUT client pattern echoes a GET response's own
-// `id` field back into a later PUT body. formWritePair stores the
+// `id` field back into a later PUT body. formWriteMessagePair stores the
 // RAW wire body verbatim in the ledger (api/api.ts) — it is
 // documentWriteResponseSpec's OWN validateDocument call that
 // tolerates (strips) a stray id, and ONLY for the write's

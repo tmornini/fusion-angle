@@ -23,7 +23,7 @@ import {
     postHumanMemberDocumentOp,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import {
     documentFamilyWiring,
@@ -306,7 +306,7 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = memberFields();
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/members/nVpWUxfKrqvVXWgWENWhbA',
         routePattern: 'members/:id',
@@ -324,12 +324,13 @@ async () => {
     // Mid-stage: body still includes the trio (Task 6 may
     // thin the op return to entity fields alone).
     const written = await postMemberDocumentOp(
-        db, 'nVpWUxfKrqvVXWgWENWhbA', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
+        db, 'nVpWUxfKrqvVXWgWENWhbA', body,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: roster tables retired.
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 test('postAiMemberDocumentOp writes exactly the pair and'
@@ -338,7 +339,7 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = aiMemberFields();
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/ai-members/VLoTvOKjXoNVDjLLBotQXA',
         routePattern: 'ai-members/:id',
@@ -352,12 +353,13 @@ async () => {
         operationId: TEST_OPERATION_ID,
     });
     const written = await postAiMemberDocumentOp(
-        db, 'VLoTvOKjXoNVDjLLBotQXA', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
+        db, 'VLoTvOKjXoNVDjLLBotQXA', body,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: roster tables retired.
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 test('postHumanMemberDocumentOp writes exactly the pair and'
@@ -366,7 +368,7 @@ test('postHumanMemberDocumentOp writes exactly the pair and'
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = humanMemberFields();
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/human-members/fVrMeaOxbnDcSKMPwtIEZg',
         routePattern: 'human-members/:id',
@@ -380,12 +382,13 @@ test('postHumanMemberDocumentOp writes exactly the pair and'
         operationId: TEST_OPERATION_ID,
     });
     const written = await postHumanMemberDocumentOp(
-        db, 'fVrMeaOxbnDcSKMPwtIEZg', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
+        db, 'fVrMeaOxbnDcSKMPwtIEZg', body,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: roster tables retired.
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) —

@@ -35,8 +35,8 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 
 // Phase Final Task 2: graph relation ROW halves stripped.
-// Create still seeds graph on the document pair; oracles
-// re-home to GET /organizations/:id/flows/:id (pair-plane graph).
+// Create still seeds graph on the document message pair; oracles
+// re-home to GET /organizations/:id/flows/:id (message-plane graph).
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -63,7 +63,7 @@ async function getFlowGraph(
 
 test(
     'postFlowCreation seeds default-graph nodes'
-    + ' on the pair plane',
+    + ' on the message plane',
     async () => {
         const { ctx } = await setupMemDb();
         const flowId = generateIdentifier();
@@ -83,7 +83,7 @@ test(
 );
 
 test(
-    'postFlowCreation: pair-plane graph'
+    'postFlowCreation: message-plane graph'
     + ' equals the default graph',
     async () => {
         const { ctx } = await setupMemDb();
@@ -173,7 +173,7 @@ test(
 );
 
 test(
-    'postFlowCreation: pair-plane graph has no'
+    'postFlowCreation: message-plane graph has no'
     + ' edges for the default graph',
     async () => {
         const { ctx } = await setupMemDb();

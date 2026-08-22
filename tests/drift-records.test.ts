@@ -15,7 +15,7 @@ import type {
 import { nowUtc } from
     '../api/types.ts';
 import { canonicalUriCollection } from '../api/message-pair.ts';
-import { documentPairsAt } from '../api/derive-documents.ts';
+import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
     documentCollectionGetHandler,
@@ -230,7 +230,7 @@ async function derivedRecordAttributes(
 async function resolveAttributePath(
     db: DbAdapter, organization: Id, id: Id,
 ): Promise<string | null> {
-    const hits = (await db.pairs.getAll()).filter(
+    const hits = (await db.messagePairs.getAll()).filter(
         (row) => row.uri_id === id,
     );
     const needle = '/organizations/' + organization
@@ -789,7 +789,7 @@ async () => {
 
     // Step 3: referenced-attribute removal 409s; zero new pairs.
     const beforeRequestCount =
-        (await db.pairs.getAll()).length;
+        (await db.messagePairs.getAll()).length;
     const beforeAttrCount = (
         await derivedRecordAttributes(db, STARK_ORGANIZATION)
     ).length;
@@ -804,7 +804,7 @@ async () => {
     ));
     assert.equal(rejected.status, 409);
     assert.equal(
-        (await db.pairs.getAll()).length, beforeRequestCount,
+        (await db.messagePairs.getAll()).length, beforeRequestCount,
     );
     assert.equal(
         (await derivedRecordAttributes(db, STARK_ORGANIZATION))
@@ -884,7 +884,7 @@ async () => {
     );
 
     // Phase Final Task 2: states ROW half stripped — history
-    // is pair-plane only.
+    // is message-plane only.
     const derivedHistory = await deriveRecordStateHistory(
         db, STARK_ORGANIZATION, recordId,
     );
@@ -921,8 +921,8 @@ async () => {
 
 // -- 6. duplicate-create supersession ----------------------------
 
-test('duplicate-create supersession: second document pair'
-+ ' Supersedes the first document pair; wire equals derive',
+test('duplicate-create supersession: second document message pair'
++ ' Supersedes the first document message pair; wire equals derive',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -948,13 +948,13 @@ async () => {
     ));
     assert.equal(first.status, 201);
 
-    const firstDocumentPairs = documentPairsAt(
-        await db.pairs.getAllWhere(
+    const firstDocumentMessagePairs = documentMessagePairsAt(
+        await db.messagePairs.getAllWhere(
             'uri_collection', prefix,
         ),
         prefix,
-    ).filter((pair) => pair.uriId === recordId);
-    assert.equal(firstDocumentPairs.length, 1);
+    ).filter((messagePair) => messagePair.uriId === recordId);
+    assert.equal(firstDocumentMessagePairs.length, 1);
 
     const second = await handleRequest(db, req(
         'POST', '/organizations/' + STARK_ORGANIZATION
@@ -974,16 +974,17 @@ async () => {
     assert.equal(second.status, 201);
 
     const allRequests =
-        await db.pairs.getAllWhere('uri_collection', prefix);
+        await db.messagePairs.getAllWhere('uri_collection', prefix);
     const allResponses =
-        await db.pairs.getAllWhere('uri_collection', prefix);
-    const secondDocumentPairs = documentPairsAt(
+        await db.messagePairs.getAllWhere('uri_collection', prefix);
+    const secondDocumentMessagePairs = documentMessagePairsAt(
         allRequests, prefix,
-    ).filter((pair) => pair.uriId === recordId);
-    assert.equal(secondDocumentPairs.length, 2);
-    const secondDocumentPairId = secondDocumentPairs[1]!.id;
+    ).filter((messagePair) => messagePair.uriId === recordId);
+    assert.equal(secondDocumentMessagePairs.length, 2);
+    const secondDocumentMessagePairId =
+        secondDocumentMessagePairs[1]!.id;
     const secondDocumentResponseRow = allResponses.find(
-        (r) => r.id === secondDocumentPairId,
+        (r) => r.id === secondDocumentMessagePairId,
     )!;
     assert.equal(
         'supersedes' in secondDocumentResponseRow, false,
@@ -1005,7 +1006,7 @@ async () => {
 
 // -- 7. method-filter --------------------------------------------
 
-test('the create-op POST pair is not read as a document pair —'
+test('the create-op POST pair is not read as a document message pair —'
 + ' create and document bodies share zero top-level keys',
 async () => {
     const db = await seededDb();
@@ -1034,8 +1035,8 @@ async () => {
         STARK_ORGANIZATION, '/record-types/',
     );
     const [recordRequests, recordResponses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', recordsPrefix),
-        db.pairs.getAllWhere('uri_collection', recordsPrefix),
+        db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
+        db.messagePairs.getAllWhere('uri_collection', recordsPrefix),
     ]);
     const atRecordAddress = recordRequests.filter(
         (r) => r.uri_collection === recordsPrefix
@@ -1043,11 +1044,11 @@ async () => {
     );
     assert.equal(atRecordAddress.length, 2);
 
-    const recordDocumentPairs = documentPairsAt(
+    const recordDocumentMessagePairs = documentMessagePairsAt(
         recordRequests, recordsPrefix,
-    ).filter((pair) => pair.uriId === recordId);
-    assert.equal(recordDocumentPairs.length, 1);
-    assert.equal(recordDocumentPairs[0]!.method, 'PUT');
+    ).filter((messagePair) => messagePair.uriId === recordId);
+    assert.equal(recordDocumentMessagePairs.length, 1);
+    assert.equal(recordDocumentMessagePairs[0]!.method, 'PUT');
 
     const postRow = atRecordAddress.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
@@ -1056,7 +1057,7 @@ async () => {
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
     const documentBodyKeys = new Set(
-        Object.keys(recordDocumentPairs[0]!.body),
+        Object.keys(recordDocumentMessagePairs[0]!.body),
     );
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
@@ -1070,18 +1071,19 @@ async () => {
         + '/record-types/' + recordId + '/attributes/';
     const [attributeRequests, attributeResponses] =
         await Promise.all([
-            db.pairs.getAllWhere(
+            db.messagePairs.getAllWhere(
                 'uri_collection', attributesPrefix,
             ),
-            db.pairs.getAllWhere(
+            db.messagePairs.getAllWhere(
                 'uri_collection', attributesPrefix,
             ),
         ]);
-    const attributeDocumentPairs = documentPairsAt(
+    const attributeDocumentMessagePairs = documentMessagePairsAt(
         attributeRequests, attributesPrefix,
-    ).filter((pair) => pair.uriId === attributeId);
-    assert.equal(attributeDocumentPairs.length, 1);
-    assert.equal(attributeDocumentPairs[0]!.method, 'PUT');
+    ).filter((messagePair) =>
+        messagePair.uriId === attributeId);
+    assert.equal(attributeDocumentMessagePairs.length, 1);
+    assert.equal(attributeDocumentMessagePairs[0]!.method, 'PUT');
 });
 
 // -- 8. genesis-wins-under-skew ----------------------------------
@@ -1283,8 +1285,8 @@ async function transitionFieldValueCounts(
             + '/transition/',
     );
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
     const requestById = new Map(
         requests.map((request) => [request.id, request]),
@@ -1367,8 +1369,8 @@ test('THE VALUE-COUNT DERIVABILITY PROOF: a per-attribute'
     );
     assert.equal(flagshipScan.size, 0);
 
-    const allPairs = await db.pairs.getAll();
-    const sfvRows = stateFieldValuesFrom(allPairs);
+    const allMessagePairs = await db.messagePairs.getAll();
+    const sfvRows = stateFieldValuesFrom(allMessagePairs);
     const flagshipSfvTally = new Map<string, number>();
     for (const row of sfvRows) {
         if (

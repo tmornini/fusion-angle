@@ -17,10 +17,10 @@ import {
     postMembershipDocumentOp,
     postInstancePatchOp,
     WRITE_RESPONSE_SPECS,
-    formDocumentPairFor,
+    formDocumentMessagePairFor,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
     IF_MATCH_HEADER,
     strongEtagOf,
@@ -96,7 +96,7 @@ function req(
     });
 }
 
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -117,7 +117,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -194,13 +194,13 @@ async function putInstance(
     ));
 }
 
-async function countInstancePairs(
+async function countInstanceMessagePairs(
     db: MemoryDbAdapter,
 ): Promise<number> {
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
-    const responses = await db.pairs.getAllWhere(
+    const responses = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     return responses.filter(
@@ -208,7 +208,7 @@ async function countInstancePairs(
     ).length;
 }
 
-async function appendInstancePair(
+async function appendInstanceMessagePair(
     db: MemoryDbAdapter,
     organization: string,
     typeId: string,
@@ -220,7 +220,7 @@ async function appendInstancePair(
     const pathname = '/organizations/' + organization
         + '/record-types/' + typeId
         + '/instances/' + instanceId;
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method,
         pathname,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -237,9 +237,9 @@ async function appendInstancePair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
-    return pair.id;
+    return messagePair.id;
 }
 
 test('PATCH fresh If-Match → 200 + new ETag; GET full '
@@ -254,7 +254,7 @@ async () => {
     ]);
     assert.equal(put.status, 201);
     const headEtag = put.headers.get('ETag')!;
-    const before = await countInstancePairs(db);
+    const before = await countInstanceMessagePairs(db);
     const patch = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         {
@@ -303,9 +303,9 @@ async () => {
     );
     assert.ok(head !== undefined);
     assert.ok(newEtag !== null && HEX64.test(newEtag.slice(1, -1)));
-    assert.notEqual(newEtag, strongEtagOf(head.pairId));
+    assert.notEqual(newEtag, strongEtagOf(head.messagePairId));
     assert.equal(
-        await countInstancePairs(db),
+        await countInstanceMessagePairs(db),
         before + 2,
         'each PATCH adds TWO pairs (wire + revision)',
     );
@@ -447,7 +447,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    const genesisId = await appendInstancePair(
+    const genesisId = await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
         'PUT', {
             set: [
@@ -459,7 +459,7 @@ async () => {
         },
         AT,
     );
-    await appendInstancePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
         'DELETE', undefined, AT2, genesisId,
     );
@@ -488,7 +488,7 @@ async () => {
         await adminDb();
     await putLiveType(db, adminToken);
     await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
-    await appendInstancePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_ID,
         'PUT', {
             set: [
@@ -702,7 +702,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
-    const before = await countInstancePairs(db);
+    const before = await countInstanceMessagePairs(db);
     const res = await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         { clear: [ATTR_NUM] },
@@ -718,7 +718,7 @@ async () => {
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
     assert.equal(
-        await countInstancePairs(db),
+        await countInstanceMessagePairs(db),
         before + 2,
     );
 });
@@ -904,7 +904,7 @@ async () => {
     // Form the wire pair as the gate would, with If-Match
     // still targeting H0 (gate-equivalent check already
     // "passed" for this pair).
-    const stalePair = await formWritePair({
+    const staleMessagePair = await formWriteMessagePair({
         method: 'PATCH',
         pathname: INSTANCE_DETAIL,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -953,7 +953,7 @@ async () => {
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert.ok(live !== undefined);
-    assert.notEqual(live.pairId, h0);
+    assert.notEqual(live.messagePairId, h0);
     assert.deepEqual(live.values, [
         { attribute_id: ATTR_ID, value: 'advanced' },
     ]);
@@ -965,7 +965,7 @@ async () => {
             [ORGANIZATION, TYPE_ID, INSTANCE_ID],
             staleBody,
             'nkgaOHZISTQrILTfPThWCA',
-            stalePair,
+            staleMessagePair,
             ORGANIZATION,
             ['member'],
         ),
@@ -988,7 +988,7 @@ async () => {
     assert.deepEqual(after?.values, [
         { attribute_id: ATTR_ID, value: 'advanced' },
     ]);
-    assert.equal(after?.pairId, live.pairId);
+    assert.equal(after?.messagePairId, live.messagePairId);
 });
 
 test('formed revision pair carries no predecessor fields',
@@ -1000,7 +1000,7 @@ async () => {
     await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
-    const revision = await formDocumentPairFor(db, {
+    const revision = await formDocumentMessagePairFor(db, {
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [ORGANIZATION, TYPE_ID, INSTANCE_ID],
         method: 'PUT',
@@ -1128,7 +1128,7 @@ async () => {
     const put = await putInstance(db, memberToken, [
         { attribute_id: ATTR_ID, value: 'A' },
     ]);
-    assert.equal(await countInstancePairs(db), 2);
+    assert.equal(await countInstanceMessagePairs(db), 2);
     await handleRequest(db, req(
         'PATCH', INSTANCE_DETAIL, memberToken,
         {
@@ -1143,5 +1143,5 @@ async () => {
             [IF_MATCH_HEADER]: put.headers.get('ETag')!,
         },
     ));
-    assert.equal(await countInstancePairs(db), 4);
+    assert.equal(await countInstanceMessagePairs(db), 4);
 });

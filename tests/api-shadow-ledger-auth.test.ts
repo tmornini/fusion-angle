@@ -165,8 +165,8 @@ async () => {
     await seedRootAdmin(db);
     const { code, access_token, refresh_token } =
         await fullLoginFlow(db);
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
     const authFlowRows = [...requests, ...responses].filter(
         row => row.uri_collection === '/authentication/authorize/'
             || row.uri_collection === '/authentication/token/',
@@ -217,8 +217,8 @@ test('a full login flow keeps requests/responses balanced,'
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     await fullLoginFlow(db);
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
 
     // seedRootAdmin: org + membership (2; role-grants retired)
     // + pii + credential (2) + authorize + token + token-event
@@ -273,7 +273,7 @@ test('stored messages verify against their hashes', async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     await fullLoginFlow(db);
-    for (const row of await db.pairs.getAll()) {
+    for (const row of await db.messagePairs.getAll()) {
         assert.equal(
             await requestMessageHash(row.request),
             row.request_hash);
@@ -296,8 +296,8 @@ test('a wrong password stores no NEW pair beyond the'
     // 2: the fixture's own pii + credential pairs (Phase 13 Task
     // 8's seedIdentityPii/seedIdentityCredential re-point) — the
     // failed attempt itself appends no further pair.
-    assert.equal((await db.pairs.getAll()).length, 2);
-    assert.equal((await db.pairs.getAll()).length, 2);
+    assert.equal((await db.messagePairs.getAll()).length, 2);
+    assert.equal((await db.messagePairs.getAll()).length, 2);
 });
 
 test('a double-spent authorization code stores nothing on'
@@ -307,7 +307,7 @@ async () => {
     const db = await dbWithPasswordUser();
     await seedRootAdmin(db);
     const { code } = await fullLoginFlow(db);
-    const before = (await db.pairs.getAll()).length;
+    const before = (await db.messagePairs.getAll()).length;
     // A distinguishing header keeps this replay from being
     // byte-identical to the original exchange — otherwise
     // appendMessagePair's same-hash dedup (message-pair.ts)
@@ -320,9 +320,9 @@ async () => {
             client_id: 'web',
         }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
     assert.equal(replay.status, 401);
-    assert.equal((await db.pairs.getAll()).length, before);
+    assert.equal((await db.messagePairs.getAll()).length, before);
     assert.equal(
-        (await db.pairs.getAll()).length, before);
+        (await db.messagePairs.getAll()).length, before);
 });
 
 test('the wire response on a 2xx carries a Response-ID and'
@@ -352,7 +352,7 @@ test('an unsupported grant_type stores no NEW pair beyond the'
     // 2: the fixture's own pii + credential pairs (Phase 13 Task
     // 8's seedIdentityPii/seedIdentityCredential re-point) — the
     // rejected grant itself appends no further pair.
-    assert.equal((await db.pairs.getAll()).length, 2);
+    assert.equal((await db.messagePairs.getAll()).length, 2);
 });
 
 test('a refresh grant stores its own pair with live secrets',
@@ -373,16 +373,16 @@ async () => {
         access_token: rotatedJson.access_token,
         refresh_token: refreshTokenFromSetCookie(res),
     };
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
 
     // 11: the fixture's own pii + credential pairs (2, Phase 13
     // Task 8) + seedRootAdmin's 2 fixture pairs + authorize +
     // token (the token hop's own event pair, Phase 13 Task 5,
     // plus pbkdf2 rehash, brings fullLoginFlow's count to 8)
-    // + refresh's own operation pair + refresh's rotate-branch
-    // event pairs (2: the retired root, the issued successor —
-    // Phase 13 Task 5).
+    // + refresh's own operation message pair + refresh's
+    // rotate-branch event pairs (2: the retired root, the
+    // issued successor — Phase 13 Task 5).
     assert.equal(requests.length, 11);
     const refreshRequest = requests.find(
         r => r.uri_collection === '/authentication/token/'
@@ -420,8 +420,8 @@ test('a token-exchange grant stores its own pair with live'
     };
     assert.equal(bodyJson.refresh_token, undefined);
     assert.equal(setCookieHeader(res), '');
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
 
     // 6: the fixture's own pii + credential pairs (2, Phase 13
     // Task 8) + seedRootAdmin's 2 fixture pairs + the exchange's
@@ -451,11 +451,11 @@ test('a token-exchange grant stores its own pair with live'
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
 // the client_credentials grant's own admin role check derives
-// from the pair plane once role_grants/memberships flip, so a
+// from the message plane once role_grants/memberships flip, so a
 // raw row here would go derivation-invisible. Every id/field
 // value stays IDENTICAL to the raw puts these replace — only the
 // write mechanism changes.
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: GuardedDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -473,7 +473,7 @@ async function seedMembershipPair(
 test('a client_credentials grant stores its own pair with live'
 + ' secrets', async () => {
     const db = await dbWithPasswordUser();
-    await seedMembershipPair(db, 'm-svc', {
+    await seedMembershipMessagePair(db, 'm-svc', {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         identity_id: 'uYaHKbNeVUcsFjuooOjMew',
         type: 'member',
@@ -505,8 +505,8 @@ test('a client_credentials grant stores its own pair with live'
         access_token: bodyJson.access_token,
         refresh_token: refreshTokenFromSetCookie(res),
     };
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
 
     // 7: dbWithPasswordUser's own pii + credential pairs (2,
     // Phase 13 Task 8) + the fixture's own membership pair
@@ -514,7 +514,7 @@ test('a client_credentials grant stores its own pair with live'
     // fixture seeds (clients elimination) precede the token
     // grant's spent-jti ticket, its own event pair (Phase 13
     // Task 5: the issued root's pair at the row's address),
-    // and its operation pair.
+    // and its operation message pair.
     assert.equal(requests.length, 7);
     const credRequest = requests.find(
         r => r.uri_collection === '/authentication/token/'
@@ -585,7 +585,7 @@ test('an Authorization header sent alongside the token grant is'
     });
     const res = await handleRequest(db, req);
     assert.equal(res.status, 201);
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const row = requests.find(
         r => r.uri_collection === '/authentication/token/');
     assert.ok(row);
@@ -594,7 +594,7 @@ test('an Authorization header sent alongside the token grant is'
 });
 
 test('a reused (already-rotated-away) refresh token grant is a'
-+ ' 401 that stores NO further operation pair — but its'
++ ' 401 that stores NO further operation message pair — but its'
 + ' replay-branch chain-revocation DOES grow the ledger by its'
 + ' own event pairs (Phase 13 Task 5: revocationAppends is not'
 + ' idempotent, and it now carries a pair per row)', async () => {
@@ -605,8 +605,9 @@ test('a reused (already-rotated-away) refresh token grant is a'
         grant_type: 'refresh',
         refresh_token: first.refresh_token,
     }));
-    const before = (await db.pairs.getAll()).length;
-    const opPairsBefore = (await db.pairs.getAll()).filter(
+    const before = (await db.messagePairs.getAll()).length;
+    const operationMessagePairsBefore =
+        (await db.messagePairs.getAll()).filter(
         r => r.uri_collection === '/authentication/token/'
             && r.uri_id === '',
     ).length;
@@ -620,20 +621,21 @@ test('a reused (already-rotated-away) refresh token grant is a'
             refresh_token: first.refresh_token,
         }, { [REQUEST_ID_HEADER]: 'replay-attemptAAAAAAAAAw' }));
     assert.equal(reused.status, 401);
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
 
-    const opPairsAfter = requests.filter(
+    const operationMessagePairsAfter = requests.filter(
         r => r.uri_collection === '/authentication/token/'
             && r.uri_id === '',
     ).length;
     assert.equal(
-        opPairsAfter, opPairsBefore,
-        'no NEW operation pair for the replay-branch 401',
+        operationMessagePairsAfter,
+        operationMessagePairsBefore,
+        'no NEW operation message pair for the replay-branch 401',
     );
     // +2: the chain's two distinct jtis (the original root, the
     // rotate's successor) each gain a fresh 'revoked' event pair
-    // — the replay branch's own no-operation-pair-but-growing-
-    // event-pairs shape (Phase 13 Task 5).
+    // — the replay branch's own no-operation-message-pair-but-
+    // growing-event-pairs shape (Phase 13 Task 5).
     assert.equal(requests.length, before + 2);
 });

@@ -18,7 +18,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
     strongEtagOf,
     HEX64,
@@ -83,7 +83,7 @@ function req(
     });
 }
 
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -104,7 +104,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -196,7 +196,7 @@ async function putInstance(
 // Below-gate revision / tombstone seeds — PATCH and DELETE
 // handlers land later; GET must still prove one-head-read
 // and tombstone-as-absent via synthetic PUT|DELETE pairs.
-async function appendInstancePair(
+async function appendInstanceMessagePair(
     db: MemoryDbAdapter,
     organization: string,
     typeId: string,
@@ -208,7 +208,7 @@ async function appendInstancePair(
     const pathname = '/organizations/' + organization
         + '/record-types/' + typeId
         + '/instances/' + instanceId;
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method,
         pathname,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -225,9 +225,9 @@ async function appendInstancePair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
-    return pair.id;
+    return messagePair.id;
 }
 
 interface InstanceDetailWire {
@@ -258,15 +258,15 @@ async () => {
         ],
     );
     assert.equal(put.status, 201);
-    const putPairId = put.headers.get('Response-ID');
-    assert.ok(putPairId !== null && putPairId !== '');
+    const putMessagePairId = put.headers.get('Response-ID');
+    assert.ok(putMessagePairId !== null && putMessagePairId !== '');
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
     assert.equal(res.status, 200);
     const etag = res.headers.get('ETag');
     assert.ok(etag !== null && HEX64.test(etag.slice(1, -1)));
-    assert.notEqual(etag, strongEtagOf(putPairId!));
+    assert.notEqual(etag, strongEtagOf(putMessagePairId!));
     const body = await res.json() as InstanceDetailWire;
     assert.deepEqual(body, {
         id: INSTANCE_A,
@@ -374,7 +374,7 @@ async () => {
     const { db, adminToken, memberToken } =
         await adminDb();
     await putLiveType(db, adminToken);
-    const genesisId = await appendInstancePair(
+    const genesisId = await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
         'PUT', {
             set: [
@@ -386,7 +386,7 @@ async () => {
         },
         AT,
     );
-    await appendInstancePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
         'DELETE', undefined, AT2, genesisId,
     );
@@ -410,7 +410,7 @@ async () => {
     // uri_collection org segment. Same instance id must not be
     // live under org 1 (head miss → missedReadError probe).
     await seedOrganizationDocument(db, ORGANIZATION_B, 'Beta');
-    await appendInstancePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION_B, FOREIGN_TYPE_ID, INSTANCE_A,
         'PUT', {
             set: [
@@ -457,7 +457,7 @@ async () => {
         ],
     );
     assert.equal(putB.status, 201);
-    const pairB = putB.headers.get('Response-ID')!;
+    const messagePairB = putB.headers.get('Response-ID')!;
     const putA = await putInstance(
         db, memberToken, INSTANCE_A, [
             {
@@ -467,8 +467,8 @@ async () => {
         ],
     );
     assert.equal(putA.status, 201);
-    const pairA = putA.headers.get('Response-ID')!;
-    const genesisC = await appendInstancePair(
+    const messagePairA = putA.headers.get('Response-ID')!;
+    const genesisC = await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_C,
         'PUT', {
             set: [
@@ -480,7 +480,7 @@ async () => {
         },
         AT,
     );
-    await appendInstancePair(
+    await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_C,
         'DELETE', undefined, AT2, genesisC,
     );
@@ -552,7 +552,7 @@ async () => {
         ],
     );
     assert.equal(put.status, 201);
-    const pairId = put.headers.get('Response-ID')!;
+    const messagePairId = put.headers.get('Response-ID')!;
     const res = await handleRequest(db, req(
         'GET', detailPath(INSTANCE_A), memberToken,
     ));
@@ -560,7 +560,7 @@ async () => {
     const header = res.headers.get('ETag');
     assert.ok(header !== null);
     assert.match(header.slice(1, -1), HEX64);
-    const stored = await db.pairs.getById(pairId);
+    const stored = await db.messagePairs.getById(messagePairId);
     assert.ok(stored !== undefined);
     assert.match(stored.version, HEX64);
     assert.notEqual(
@@ -568,7 +568,7 @@ async () => {
         stored.version,
         'instance projected ETag is not stored version',
     );
-    assert.notEqual(pairId, stored.version);
+    assert.notEqual(messagePairId, stored.version);
 });
 
 test('GET after full-state revision pair → values from '
@@ -579,7 +579,7 @@ async () => {
     await putLiveType(db, adminToken);
     await seedPublicAndSecretAttrs(db, adminToken);
     // Genesis delta (set only) — incomplete vs later head.
-    const genesisId = await appendInstancePair(
+    const genesisId = await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
         'PUT', {
             set: [
@@ -594,7 +594,7 @@ async () => {
     // Synthetic full-state revision (Task 17 will write
     // this shape from PATCH). GET must return THIS head
     // only — not merge with genesis.
-    const revisionId = await appendInstancePair(
+    const revisionId = await appendInstanceMessagePair(
         db, ORGANIZATION, TYPE_ID, INSTANCE_A,
         'PUT', {
             values: [

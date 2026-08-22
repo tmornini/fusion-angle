@@ -133,12 +133,12 @@ function flowDocument(
     };
 }
 
-async function pairsAt(
+async function messagePairsAt(
     db: DbAdapter,
     collection: string,
     uriId: string,
 ): Promise<number> {
-    const rows = await db.pairs.getAllWhere(
+    const rows = await db.messagePairs.getAllWhere(
         'uri_collection', collection,
     );
     return rows.filter((row) => row.uri_id === uriId)
@@ -218,7 +218,7 @@ export function defineStoreAcceptance(
         assert.equal(first.status, 201);
         const firstEtag = first.headers.get('ETag');
         assert.equal(
-            await pairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
+            await messagePairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
             1,
         );
         const second = await handleRequest(db, req(
@@ -229,7 +229,7 @@ export function defineStoreAcceptance(
         assert.equal(second.status, 200);
         assert.equal(second.headers.get('ETag'), firstEtag);
         assert.equal(
-            await pairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
+            await messagePairsAt(db, IDEA_PREFIX, 'tlQsXUYcTRtLtuHsWqBJBQ'),
             1,
         );
     });
@@ -260,7 +260,7 @@ export function defineStoreAcceptance(
         );
         assert.equal(await second.text(), firstBytes);
         assert.equal(
-            await pairsAt(db, IDEA_PREFIX, 'tjrZLujBtBVqFwOsBDWdQQ'),
+            await messagePairsAt(db, IDEA_PREFIX, 'tjrZLujBtBVqFwOsBDWdQQ'),
             1,
         );
     });
@@ -299,7 +299,7 @@ export function defineStoreAcceptance(
             name: string;
         };
         assert.equal(liveBody.name, 'Acceptance');
-        const before = await pairsAt(
+        const before = await messagePairsAt(
             db, FLOW_PREFIX, 'tYhGBKEoBjBYeqTcJWMNVQ',
         );
         const stale = await handleRequest(db, req(
@@ -310,7 +310,7 @@ export function defineStoreAcceptance(
         ));
         assert.equal(stale.status, 412);
         assert.equal(
-            await pairsAt(db, FLOW_PREFIX, 'tYhGBKEoBjBYeqTcJWMNVQ'),
+            await messagePairsAt(db, FLOW_PREFIX, 'tYhGBKEoBjBYeqTcJWMNVQ'),
             before,
         );
         const again = await handleRequest(

@@ -28,8 +28,9 @@ import { compareIdentifiers } from
 // deriveOrganizations(db) (api/derive-organizations.ts) enumerates
 // every LIVE organization, then this walks each organization's
 // own '/organizations/<oid>/members/' prefix in turn —
-// EXHAUSTIVE, never short-circuited, unlike organizationHasMember-
-// Pair's own co-membership fast path (api/derive-states.ts): that
+// EXHAUSTIVE, never short-circuited, unlike
+// organizationHasMemberMessagePair's own co-membership
+// fast path (api/derive-states.ts): that
 // function answers "does this identity belong to ONE named
 // organization," this answers "every organization it belongs to,"
 // so every organization must be probed regardless of an early
@@ -45,8 +46,8 @@ import { compareIdentifiers } from
 // REMOVAL is a genuine hard row-DELETE — no states-log soft-
 // delete event exists for memberships (MEMBERSHIPS_WIRING's own
 // 'stateless' lifecycle) — so a DELETE-head pair excludes the row
-// here exactly as organizationHasMemberPair's own comment
-// establishes for the SAME prefix shape.
+// here exactly as organizationHasMemberMessagePair's own
+// comment establishes for the SAME prefix shape.
 //
 // THE ENTITY SHAPE mirrors membershipDocumentEntityOf's own
 // spread (api/routes.ts) byte-for-byte, but reconstructs it
@@ -67,10 +68,11 @@ import { compareIdentifiers } from
 // documentWriteResponseSpec's own validateDocument call tolerates
 // a stray `id` for the RESPONSE ONLY
 // (`wiring.validateDocument(withoutId(body ?? {}))`, api/document-
-// family.ts) — formWritePair still stores the caller's RAW body
-// verbatim in the ledger (api/api.ts). The fetch-edit-PUT client
-// pattern (a GET response's own `id` echoed back into a later
-// PUT) therefore lands a STORED body carrying `id` even though
+// family.ts) — formWriteMessagePair still stores the caller's
+// RAW body verbatim in the ledger (api/api.ts). The
+// fetch-edit-PUT client pattern (a GET response's own
+// `id` echoed back into a later PUT) therefore lands a
+// STORED body carrying `id` even though
 // the live write itself succeeds. validateMembershipEntity's
 // assertOnlyKeys rejects an unknown key unconditionally, so
 // skipping withoutId here would throw INSIDE the per-organization
@@ -101,7 +103,7 @@ import { compareIdentifiers } from
 // among its tables) can call it in-tx without opening a nested
 // transaction of its own.
 //
-// Reads db.pairs (+ pickString/validate-
+// Reads db.messagePairs (+ pickString/validate-
 // MembershipEntity over their decoded bodies) ONLY — never
 // db.memberships, the row-plane table Task 3 retires this
 // derivation to replace.
@@ -147,11 +149,11 @@ export async function deriveMembershipsForIdentity(
     const rows: MembershipEntity[] = [];
     for (const organization of organizations) {
         const seatPrefix = seatsPrefixFor(organization.id);
-        const seatPairs = await db.pairs.getAllWhere(
+        const seatMessagePairs = await db.messagePairs.getAllWhere(
             'uri_collection', seatPrefix,
         );
         const seat = deriveDocumentsAt(
-            seatPairs, seatPrefix,
+            seatMessagePairs, seatPrefix,
         ).get(identityId);
         if (seat !== undefined) {
             rows.push(seatEntityOf(seat, organization.id));
@@ -160,10 +162,11 @@ export async function deriveMembershipsForIdentity(
     return rows.sort(byAtThenIdAscending);
 }
 
-// ONE organization's membership-presence probe, pair-plane —
-// the organizationHasMemberPair shape (api/derive-states.ts),
-// generalized to accept an already-open transaction view. Returns
-// as soon as a LIVE membership naming `identityId` is found at
+// ONE organization's membership-presence probe, message-plane —
+// the organizationHasMemberMessagePair shape
+// (api/derive-states.ts), generalized to accept an
+// already-open transaction view. Returns as soon as a
+// LIVE membership naming `identityId` is found at
 // `organization`'s own prefix; there is only one organization to
 // probe, so no exhaustive union is needed here (contrast
 // deriveMembershipsForIdentity above).
@@ -173,11 +176,12 @@ export async function membershipExistsFor(
     identityId: Id,
 ): Promise<boolean> {
     const seatPrefix = seatsPrefixFor(organization);
-    const seatPairs = await dbOrView.pairs.getAllWhere(
-        'uri_collection', seatPrefix,
-    );
+    const seatMessagePairs =
+        await dbOrView.messagePairs.getAllWhere(
+            'uri_collection', seatPrefix,
+        );
     return deriveDocumentsAt(
-        seatPairs, seatPrefix,
+        seatMessagePairs, seatPrefix,
     ).has(identityId);
 }
 
@@ -186,10 +190,10 @@ export async function deriveOrganizationMemberSeats(
     organization: Id,
 ): Promise<MembershipEntity[]> {
     const prefix = seatsPrefixFor(organization);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const documents = deriveDocumentsAt(pairs, prefix);
+    const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: MembershipEntity[] = [];
     for (const document of documents.values()) {
         rows.push(seatEntityOf(document, organization));
@@ -203,11 +207,11 @@ export async function deriveOrganizationMemberSeat(
     identityId: Id,
 ): Promise<MembershipEntity> {
     const prefix = seatsPrefixFor(organization);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     const document = deriveDocumentsAt(
-        pairs, prefix,
+        messagePairs, prefix,
     ).get(identityId);
     if (document === undefined) {
         throw new EntityNotFoundError(

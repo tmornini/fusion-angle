@@ -94,11 +94,11 @@ import {
     appendMessagePair,
     canonicalUriCollection,
     documentHeadAt,
-    formWritePair,
-    headPairIdAt,
-    pairResponseBody,
-    ifMatchFromPair,
-    rawIfMatchFromPair,
+    formWriteMessagePair,
+    headMessagePairIdAt,
+    messagePairResponseBody,
+    ifMatchFromMessagePair,
+    rawIfMatchFromMessagePair,
     parseIfMatch,
     IF_MATCH_HEADER,
     strongEtagOf,
@@ -355,7 +355,7 @@ export { param, requireOrganization, withoutId };
 // validated once at the gate (documentWriteResponseSpec, via
 // validateDocument). Phase Final Task 2: the ideas ROW half is
 // stripped; the pair + states.postEvent land in ONE transaction
-// (states ROW half stripped (pair plane only)). Genesis
+// (states ROW half stripped (message plane only)). Genesis
 // is head-presence-defined — a fresh id's PUT simply finds no
 // head, so it authors like any other transition.
 //
@@ -607,7 +607,7 @@ export type GetHandler = (
 // not-yet-wired writes (TypeScript cannot prove bearerExempt
 // was false inside the gate's one shared dispatch switch), and
 // defined for a route named in message-pair.ts's
-// PAIR_WIRED_ROUTE_PATTERNS. A wired handler's LAST in-tx act
+// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS. A wired handler's LAST in-tx act
 // is appending it (absence there is a wiring bug — crash
 // loud); an unwired handler ignores the extra argument
 // (TypeScript permits a closure with fewer declared
@@ -618,7 +618,7 @@ export type PutHandler = (
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
-    pair: MessagePair | undefined,
+    messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
     requestAt: string,
@@ -633,7 +633,7 @@ export type PatchHandler = (
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
-    pair: MessagePair | undefined,
+    messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
 ) => Promise<unknown>;
@@ -642,7 +642,7 @@ type DeleteHandler = (
     adapter: DbAdapter,
     params: string[],
     actor: Id,
-    pair: MessagePair | undefined,
+    messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
 ) => Promise<void>;
@@ -653,15 +653,15 @@ type DeleteHandler = (
 // for a bearer-exempt or global route. Only the conversion
 // handler consults organization today (to form the created
 // project's OWN document-address pair beside the operation
-// pair above); every other POST handler ignores the extra
+// message pair above); every other POST handler ignores the extra
 // trailing args, the same fewer-parameter-closure precedent
-// `pair` already established.
+// `messagePair` already established.
 type PostHandler = (
     adapter: DbAdapter,
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
-    pair: MessagePair | undefined,
+    messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
     requestAt: string,
@@ -696,7 +696,7 @@ export function route(
 // Project the opaque `secret` out of a credential before it
 // crosses the API boundary — reads expose existence and
 // lifecycle, never the hash. Makes true the non-leakage
-// covenant in types.ts and SCHEMA.md SP-1.
+// covenant in types.ts and SCHEMA.md § Secrets.
 function withoutSecret(
     cred: IdentityCredentialEntity,
 ): Omit<IdentityCredentialEntity, 'secret'> {
@@ -722,7 +722,7 @@ function withoutSecret(
 // tests/drift-identities.test.ts's own gate-15 proof
 // (pairPlaneMembershipsAcrossKnownOrganizations), generalized from
 // that test's hardcoded two-org set to deriveOrganizations(db)
-// (Phase 12 Task 5: the pair-plane derivation, api/derive-
+// (Phase 12 Task 5: the message-plane derivation, api/derive-
 // organizations.ts — itself reading only requests/responses, the
 // SAME global passthrough the prior db.organizations.getAll()
 // read rode) so this holds for however many organizations
@@ -767,9 +767,9 @@ function ownerOrganizationViaMembershipPairPlane(
 
 // The bundle a live POST /records forms (Phase 6 Task 4, the
 // migration's first VARIABLE-CARDINALITY synthesis): the gate's
-// own operation pair, the synthesized document pair (at the
+// own operation message pair, the synthesized document message pair (at the
 // record's own records/:id address — the SAME address the
-// operation pair shares, since records' createBodyIdField
+// operation message pair shares, since records' createBodyIdField
 // override collapses the two onto one uri_id, the flows
 // precedent), one synthesized attribute-PUT pair per
 // attributes[] entry, and one synthesized attribute-DELETE pair
@@ -778,12 +778,12 @@ function ownerOrganizationViaMembershipPairPlane(
 // attributeDeletes is always empty). All pairs share ONE
 // requestAt (the write's own origination) yet strictly-later
 // RESPONSE `at` stamps (appendMessagePair's nowUtc() is
-// monotonic), so the document pair — appended after the
-// operation pair — becomes the address's head; a duplicate
+// monotonic), so the document message pair — appended after the
+// operation message pair — becomes the address's head; a duplicate
 // create's Supersedes therefore resolves against the prior
-// DOCUMENT pair, not the prior operation pair (the Phase 5
+// DOCUMENT message pair, not the prior operation message pair (the Phase 5
 // shared-address mechanism, re-pinned here).
-export interface RecordWritePairs {
+export interface RecordWriteMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
     readonly attributePuts: readonly MessagePair[];
@@ -806,7 +806,7 @@ export interface RecordWritePairs {
 // every genuine client PUT — validateRecordDocumentBody's own
 // comment) plus the lifecycle trio. Create maps the trio from
 // initialState*; edit carries the body's own echoed trio
-// verbatim (never re-derived), so a synthesized document pair
+// verbatim (never re-derived), so a synthesized document message pair
 // is byte-indistinguishable from what a live PUT would have
 // stored for the identical write.
 export function recordDocumentBodyOf(
@@ -829,7 +829,7 @@ export function recordDocumentBodyOf(
 // Nested attribute storage body (Task 8): strip id /
 // organization_id / record_id (parentage is the URI under
 // the type) and stamp DEFAULT_ATTRIBUTE_ACL_ROLES so seed
-// and composed-op pairs always carry both ACL arrays.
+// and composed-operation message pairs always carry both ACL arrays.
 export function recordAttributeDocumentBodyOf(
     row: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -859,15 +859,15 @@ export function recordAttributeDocumentBodyOf(
 // .../record-types (Task 9 / Task 23). Document address is
 // RECORD_TYPE_DETAIL_PATTERN; attributes form at
 // ATTRIBUTE_DETAIL_PATTERN.
-async function formRecordWritePairs(
+async function formRecordWriteMessagePairs(
     db: DbAdapter,
     b: RecordWriteBody,
     actor: Id,
-    pair: MessagePair,
+    messagePair: MessagePair,
     organization: Id,
     documentRoutePattern: string,
     documentParams: readonly string[],
-): Promise<RecordWritePairs> {
+): Promise<RecordWriteMessagePairs> {
     const documentBody = recordDocumentBodyOf(b);
     // Belt-and-suspenders (the flows precedent): a create's
     // initialStateEventId carries no non-empty check of its
@@ -876,13 +876,13 @@ async function formRecordWritePairs(
     // rather than silently minting an invalid synthesized
     // pair.
     validateRecordDocumentBody(documentBody);
-    const document = await formDocumentPairFor(db, {
+    const document = await formDocumentMessagePairFor(db, {
         routePattern: documentRoutePattern,
         params: [...documentParams],
         body: documentBody,
         requesterIdentityId: actor,
-        requestAt: pair.requestAt,
-        operationId: pair.operationId,
+        requestAt: messagePair.requestAt,
+        operationId: messagePair.operationId,
         organization,
     });
     // Attribute pairs form at nested ATTRIBUTE_DETAIL_
@@ -895,15 +895,15 @@ async function formRecordWritePairs(
                     attr as unknown as
                         Record<string, unknown>,
                 );
-            return formDocumentPairFor(db, {
+            return formDocumentMessagePairFor(db, {
                 routePattern: ATTRIBUTE_DETAIL_PATTERN,
                 params: [
                     organization, b.id, attr.id,
                 ],
                 body: attributeBody,
                 requesterIdentityId: actor,
-                requestAt: pair.requestAt,
-                operationId: pair.operationId,
+                requestAt: messagePair.requestAt,
+                operationId: messagePair.operationId,
                 organization,
             });
         }),
@@ -917,15 +917,15 @@ async function formRecordWritePairs(
             // here for the synthesized removal pair) —
             // SPEC-LESS, so an explicit response override
             // skips WRITE_RESPONSE_SPECS entirely.
-            return formDocumentPairFor(db, {
+            return formDocumentMessagePairFor(db, {
                 routePattern: ATTRIBUTE_DETAIL_PATTERN,
                 params: [
                     organization, b.id, id,
                 ],
                 body: undefined,
                 requesterIdentityId: actor,
-                requestAt: pair.requestAt,
-                operationId: pair.operationId,
+                requestAt: messagePair.requestAt,
+                operationId: messagePair.operationId,
                 organization,
                 method: 'DELETE',
                 response: {
@@ -936,7 +936,7 @@ async function formRecordWritePairs(
         }),
     );
     return {
-        operation: pair,
+        operation: messagePair,
         document,
         attributePuts,
         attributeDeletes,
@@ -993,10 +993,12 @@ export async function loadAttributeSchemaById(
     const prefix = attributesUriPrefix(
         organization, recordTypeId,
     );
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const documents = deriveDocumentsAt(pairs, prefix);
+    const documents = deriveDocumentsAt(
+        messagePairs, prefix,
+    );
     const map = new Map<string, AttributeSchemaRow>();
     for (const [id, document] of documents) {
         map.set(
@@ -1033,15 +1035,15 @@ export function nestedAttributeWireOf(
 // stripped — attributes/record body ride the operation +
 // document + attribute pairs; states.postEvent on create/edit
 // stays until the states-trace group. Removed attributes are
-// RESTRICTED inside the same tx (pair-plane referrers; 409
-// bytes preserved). `pairs` is optional so the seed's below-
+// RESTRICTED inside the same tx (message-plane referrers; 409
+// bytes preserved). `messagePairs` is optional so the seed's below-
 // facade call keeps compiling; the route always supplies the
 // bundle.
 export async function postRecordWriteOp(
     db: DbAdapter,
     payload: Record<string, unknown>,
     _actor: Id,
-    pairs?: RecordWritePairs,
+    messagePairs?: RecordWriteMessagePairs,
     // Verified token organization for the RESTRICT SFV
     // visibility probe (stateEventVisibilityFor). Optional so
     // the below-facade seed path (creates only; never removes
@@ -1055,8 +1057,8 @@ export async function postRecordWriteOp(
             ? body.removedAttributeIds
             : [];
     // State event + RESTRICT + pairs commit as one
-    // transaction. Attribute bodies live only on the pair
-    // plane (attributePuts/attributeDeletes).
+    // transaction. Attribute bodies live only on the
+    // message plane (attributePuts/attributeDeletes).
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
@@ -1089,19 +1091,19 @@ export async function postRecordWriteOp(
                 }
             }
             // The whole bundle or none (Atomicity): the
-            // operation pair, the document pair, N attribute-
+            // operation message pair, the document message pair, N attribute-
             // PUT pairs, and M attribute-DELETE pairs — appended
             // LAST, in that order, so each pair's response `at`
             // strictly follows the one before it (nowUtc
-            // monotonicity) and the document pair becomes the
+            // monotonicity) and the document message pair becomes the
             // shared address's head.
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(view, pairs.document);
-                for (const p of pairs.attributePuts) {
+            if (messagePairs !== undefined) {
+                await appendMessagePair(view, messagePairs.operation);
+                await appendMessagePair(view, messagePairs.document);
+                for (const p of messagePairs.attributePuts) {
                     await appendMessagePair(view, p);
                 }
-                for (const p of pairs.attributeDeletes) {
+                for (const p of messagePairs.attributeDeletes) {
                     await appendMessagePair(view, p);
                 }
             }
@@ -1143,10 +1145,10 @@ function documentOperationOrganization(
 // falls to `actor`, authoring the birth like any other
 // transition). Phase Final Task 2: the ideas ROW half is
 // stripped — the pair + states.postEvent commit as ONE
-// transaction (states ROW half stripped — pair plane only).
+// transaction (states ROW half stripped — message plane only).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
-// and type parity. `pair` is optional so the seed's
+// and type parity. `messagePair` is optional so the seed's
 // below-facade call keeps compiling unchanged; the route always
 // supplies one, since 'ideas/:id' is pair-wired and never
 // bearer-exempt.
@@ -1155,7 +1157,7 @@ export async function postIdeaDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<IdeaEntity> {
     const doc = validateIdeaDocumentBody(withoutId(body));
     const entity = {
@@ -1165,8 +1167,8 @@ export async function postIdeaDocumentOp(
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1179,10 +1181,10 @@ export async function postIdeaDocumentOp(
 // ternary below falls to `actor`, authoring the birth like any
 // other transition). Phase Final Task 2: the projects ROW half
 // is stripped — the pair + states.postEvent commit as ONE
-// transaction (states ROW half stripped — pair plane only).
+// transaction (states ROW half stripped — message plane only).
 // WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade callers
-// and type parity. `pair` is optional so the seed's
+// and type parity. `messagePair` is optional so the seed's
 // below-facade call keeps compiling unchanged; the route always
 // supplies one, since 'projects/:id' is pair-wired and never
 // bearer-exempt.
@@ -1191,7 +1193,7 @@ export async function postProjectDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<ProjectEntity> {
     const doc = validateProjectDocumentBody(withoutId(body));
     const entity = {
@@ -1200,11 +1202,11 @@ export async function postProjectDocumentOp(
     } as unknown as Omit<ProjectEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: projects ROW half stripped;
-        // states ROW half stripped (pair plane only).
+        // states ROW half stripped (message plane only).
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1224,14 +1226,14 @@ export async function postProjectDocumentOp(
 // row half strips with the states-trace group).
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
 // reconstructed return is for below-facade callers and type
-// parity. `pair` is optional so the seed's below-facade call
+// parity. `messagePair` is optional so the seed's below-facade call
 // keeps compiling; the route always supplies one.
 export async function postRecordDocumentOp(
     db: DbAdapter,
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<RecordEntity> {
     const doc = validateRecordDocumentBody(withoutId(body));
     const entity = {
@@ -1240,11 +1242,11 @@ export async function postRecordDocumentOp(
     } as unknown as Omit<RecordEntity, 'id'>;
     return db.transaction(
         // Phase Final Task 2: records ROW half stripped;
-        // states ROW half stripped (pair plane only).
+        // states ROW half stripped (message plane only).
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1254,18 +1256,18 @@ export async function postRecordDocumentOp(
 // Record attribute document write — the sixth family, and the
 // SECOND 'stateless' one (vacuous BY CONSTRUCTION). Phase Final
 // Task 2: the record_attributes ROW half is stripped — pure
-// pair-plane write (postWorkOrderDocumentOp shape).
+// message-plane write (postWorkOrderDocumentOp shape).
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
 // reconstructed return is for below-facade callers and type
 // parity. validateRecordAttributeDocumentBody rejects a body
-// carrying the trio at the gate. `pair` is optional. The actor
+// carrying the trio at the gate. `messagePair` is optional. The actor
 // parameter is spelled `_actor`: no state event here to author.
 export async function postRecordAttributeDocumentOp(
     db: DbAdapter,
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<RecordAttributeEntity> {
     const doc = validateRecordAttributeDocumentBody(
         withoutId(body),
@@ -1279,8 +1281,8 @@ export async function postRecordAttributeDocumentOp(
         // stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1290,12 +1292,12 @@ export async function postRecordAttributeDocumentOp(
 // Idea submission write: a genesis-only document address (an
 // idea is submitted once per sid; no edit/transition case
 // exists for this family). Phase Final Task 2: the
-// idea_submissions ROW half is stripped — pure pair-plane
+// idea_submissions ROW half is stripped — pure message-plane
 // write (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes via ideaSubmissionEntityOf
 // (GET derive). Exported so the seed can
 // drive submission creation through the same op the route
-// uses (Decision 6's below-facade carve-out). `pair` is
+// uses (Decision 6's below-facade carve-out). `messagePair` is
 // optional so a future below-facade caller with no pair keeps
 // compiling; the live route always supplies one, since
 // 'ideas/:id/submissions/:sid' is pair-wired and never
@@ -1304,19 +1306,19 @@ export async function postIdeaSubmissionOp(
     db: DbAdapter,
     sid: Id,
     body: Record<string, unknown>,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<IdeaSubmissionEntity> {
     const entity = ideaSubmissionEntityOf({
         uriId: sid,
-        pairId: sid,
+        messagePairId: sid,
         method: 'PUT',
         body: withoutId(body),
     });
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -1360,7 +1362,7 @@ export function flowCreateDocumentBody(
 }
 
 // The three pairs a live POST /flows forms (Task 5): the gate's
-// own operation pair (204, at the flows/:id address per Task 1's
+// own operation message pair (204, at the flows/:id address per Task 1's
 // createdEntityUriId override — POST 'flows' and PUT 'flows/:id'
 // collapse onto the SAME (uriCollection, uriId), see derive-
 // documents.ts's DOCUMENT_METHODS filter for why the two never
@@ -1368,43 +1370,44 @@ export function flowCreateDocumentBody(
 // route pre-forms below. All three share ONE requestAt (the
 // create's own origination) yet strictly-later RESPONSE `at`
 // stamps (appendMessagePair's nowUtc() is monotonic), so the
-// document pair — appended after the operation pair — becomes
-// the address's head.
-export interface FlowCreationPairs {
+// document message pair — appended after the
+// operation message pair — becomes the address's head.
+export interface FlowCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
     readonly join: MessagePair;
 }
 
 // Flow creation. Phase Final Task 2: flows + graph relation
-// + project_flows ROW halves stripped — pair plane carries
+// + project_flows ROW halves stripped — message plane carries
 // the document (graphDelta SIDECAR-KEEP) and the join; only
 // the initial 'active' states.postEvent remains until the
 // states-trace group. graphDelta is still validated at the
-// HTTP gate and stored on the document pair. Exported so the
+// HTTP gate and stored on the document message pair. Exported so the
 // seed can drive flow creation through the same gate the
-// route uses (Decision 6's below-facade carve-out). `pairs`
+// route uses (Decision 6's below-facade carve-out). `messagePairs`
 // is optional so the seed's below-facade call keeps
 // compiling; the route always supplies the triple.
 export async function postFlowCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     _actor: Id,
-    pairs?: FlowCreationPairs,
+    messagePairs?: FlowCreationMessagePairs,
 ): Promise<void> {
     validateFlowCreateBody(body);
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
             // Three pairs or none (Atomicity): the operation
-            // pair (the gate's own), the synthesized document
-            // pair, and the synthesized join pair — appended in
-            // that order, LAST, so the document pair's response
-            // `at` strictly follows the operation pair's.
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(view, pairs.document);
-                await appendMessagePair(view, pairs.join);
+            // message pair (the gate's own), the synthesized
+            // document message pair, and the synthesized join
+            // pair — appended in that order, LAST, so the
+            // document message pair's response `at` strictly
+            // follows the operation message pair's.
+            if (messagePairs !== undefined) {
+                await appendMessagePair(view, messagePairs.operation);
+                await appendMessagePair(view, messagePairs.document);
+                await appendMessagePair(view, messagePairs.join);
             }
         },
     );
@@ -1422,7 +1425,7 @@ export async function postFlowCreationOp(
 // (flow_versions) is NOT part of this op — no writers remain.
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes; the
 // reconstructed return is for below-facade callers and type
-// parity. `pair` is optional so a below-facade caller with no
+// parity. `messagePair` is optional so a below-facade caller with no
 // pair keeps compiling; the live route always supplies one.
 async function assertLiveFlowGraphWriteLaw(
     db: DbAdapter,
@@ -1442,7 +1445,7 @@ export async function postFlowDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<FlowEntity> {
     const doc = validateFlowDocumentBody(withoutId(body));
     await assertLiveFlowGraphWriteLaw(db, doc.graph);
@@ -1450,18 +1453,18 @@ export async function postFlowDocumentOp(
         ...doc.entity,
         ...documentOperationOrganization(body),
     } as unknown as Omit<FlowEntity, 'id'>;
-    const latchedId = pair?.latchedHeadPairId;
+    const latchedId = messagePair?.latchedHeadMessagePairId;
     return db.transaction(
         // Phase Final Task 2: flows + graph ROW halves
-        // stripped; states ROW half stripped (pair plane only).
+        // stripped; states ROW half stripped (message plane only).
         MESSAGE_TABLES,
         async (view) => {
             // Revival states events dual-write until the
             // states-trace strip; pair body also carries
             // revivals for deriveFlowGraphStates (SIDECAR-KEEP).
-            if (pair !== undefined) {
-                const latest = await headPairIdAt(
-                    view, pair.uriCollection, pair.uriId,
+            if (messagePair !== undefined) {
+                const latest = await headMessagePairIdAt(
+                    view, messagePair.uriCollection, messagePair.uriId,
                 );
                 if (
                     latchedId !== undefined
@@ -1473,7 +1476,7 @@ export async function postFlowDocumentOp(
                         HTTP_PRECONDITION_FAILED,
                     );
                 }
-                await appendMessagePair(view, pair);
+                await appendMessagePair(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1485,32 +1488,32 @@ export async function postFlowDocumentOp(
 // restore write. Phase Final Task 2: flows + graph ROW
 // halves stripped — the 'updated' state event, revivals
 // states events, and the operation + synthesized document
-// pairs (graphDelta/revivals SIDECAR-KEEP on the document
+// message pairs (graphDelta/revivals SIDECAR-KEEP on the document
 // body) commit as ONE transaction. Exhaustion appends only
-// the operation pair. `current.id` is the in-tx latch so a
+// the operation message pair. `current.id` is the in-tx latch so a
 // racing save 412s when the lock head has moved.
 export async function postFlowUndoOp(
     db: DbAdapter,
     id: Id,
     actor: Id,
     organization: Id,
-    pair: MessagePair,
+    messagePair: MessagePair,
     resolution: FlowUndoResolution,
     b: FlowUndoBody,
 ): Promise<unknown> {
     const { current, target } = resolution;
     if (target === undefined) {
         // Exhaustion: the gate still requires this wired write's
-        // own operation pair to land (api.ts's post-dispatch
+        // own operation message pair to land (api.ts's post-dispatch
         // "wired write stored no pair" guard, true for every
         // pair-wired route), so it is appended ALONE — no
-        // document pair, no domain writes — a genuine no-op a
+        // document message pair, no domain writes — a genuine no-op a
         // LATER resolution walk correctly ignores (it carries no
-        // correlated document pair to displace anything).
+        // correlated document message pair to displace anything).
         return db.transaction(
             MESSAGE_TABLES,
             async (view) => {
-                await appendMessagePair(view, pair);
+                await appendMessagePair(view, messagePair);
             },
         );
     }
@@ -1556,25 +1559,25 @@ export async function postFlowUndoOp(
         revivals,
     };
     validateFlowDocumentBody(documentBody);
-    const documentPair = await formDocumentPairFor(db, {
+    const documentMessagePair = await formDocumentMessagePairFor(db, {
         routePattern: 'organizations/:id/flows/:id',
         params: [organization, id],
         body: documentBody,
         requesterIdentityId: actor,
-        requestAt: pair.requestAt,
-        operationId: pair.operationId,
+        requestAt: messagePair.requestAt,
+        operationId: messagePair.operationId,
         organization,
         matchedEtag: current.version,
-        latchedHeadPairId: current.id,
+        latchedHeadMessagePairId: current.id,
     });
     return db.transaction(
         // Phase Final Task 2: flows + graph ROW halves stripped.
         MESSAGE_TABLES,
         async (view) => {
-            const latest = await headPairIdAt(
+            const latest = await headMessagePairIdAt(
                 view,
-                documentPair.uriCollection,
-                documentPair.uriId,
+                documentMessagePair.uriCollection,
+                documentMessagePair.uriId,
             );
             if (latest !== current.id) {
                 throw new ApiError(
@@ -1583,27 +1586,27 @@ export async function postFlowUndoOp(
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePair(view, pair);
-            await appendMessagePair(view, documentPair);
+            await appendMessagePair(view, messagePair);
+            await appendMessagePair(view, documentMessagePair);
         },
     );
 }
 
 // The three pairs a live POST /objectives forms (Task 3): the
-// gate's own operation pair (204, at the objectives/:id address
+// gate's own operation message pair (204, at the objectives/:id address
 // per the create-body-id-field override — POST 'objectives' and
 // PUT 'objectives/:id' collapse onto the SAME (uriCollection,
 // uriId), the flows/records precedent), the synthesized document
-// pair (objectives/:id), and the synthesized revision pair
+// message pair (objectives/:id), and the synthesized revision pair
 // (objectives/:id/revisions/:rid) the route pre-forms below. All
 // three share ONE requestAt (the create's own origination) yet
 // strictly-later RESPONSE `at` stamps (appendMessagePair's
-// nowUtc() is monotonic), so the document pair — appended after
-// the operation pair — becomes the shared address's head; the
+// nowUtc() is monotonic), so the document message pair — appended after
+// the operation message pair — becomes the shared address's head; the
 // revision pair lives at its OWN distinct address (a fresh
 // revision id per create), so it is always genesis there unless
 // a live PUT had already visited that exact revision id.
-export interface ObjectiveCreationPairs {
+export interface ObjectiveCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
     readonly revision: MessagePair;
@@ -1619,7 +1622,7 @@ export interface ObjectiveCreationPairs {
 // this SAME write: the entity field (organization_id
 // STRIPPED — the org rides the address) plus the lifecycle
 // trio mapped from the create body's initialState* — the
-// recordDocumentBodyOf shape, so a synthesized document pair
+// recordDocumentBodyOf shape, so a synthesized document message pair
 // is byte-indistinguishable from what a live PUT would have
 // stored for the identical write.
 export function objectiveDocumentBodyOf(
@@ -1649,12 +1652,12 @@ export function objectiveRevisionBodyOf(
 // Objective creation: operation + document + first-revision
 // pairs commit as ONE transaction. Phase Final Task 2:
 // objectives + objective_revisions ROW halves stripped —
-// pure pair-plane write. The genesis lifecycle trio folds
-// onto the document pair via objectiveDocumentBodyOf
+// pure message-plane write. The genesis lifecycle trio folds
+// onto the document message pair via objectiveDocumentBodyOf
 // (states-address retirement); no separate states/:id event
 // is written. Exported so the seed can drive objective
 // creation through the same gate the route uses (Decision
-// 6's below-facade carve-out). `pairs` is optional so the
+// 6's below-facade carve-out). `messagePairs` is optional so the
 // seed's below-facade shape keeps compiling; the route
 // always supplies the bundle, since 'objectives' is pair-
 // wired and never bearer-exempt. Create appends THREE pairs
@@ -1662,7 +1665,7 @@ export function objectiveRevisionBodyOf(
 export async function postObjectiveCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
-    pairs?: ObjectiveCreationPairs,
+    messagePairs?: ObjectiveCreationMessagePairs,
 ): Promise<void> {
     validateObjectiveCreateBody(body);
     return db.transaction(
@@ -1670,10 +1673,10 @@ export async function postObjectiveCreationOp(
         // objective_revisions ROW halves stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(view, pairs.document);
-                await appendMessagePair(view, pairs.revision);
+            if (messagePairs !== undefined) {
+                await appendMessagePair(view, messagePairs.operation);
+                await appendMessagePair(view, messagePairs.document);
+                await appendMessagePair(view, messagePairs.revision);
             }
         },
     );
@@ -1681,13 +1684,13 @@ export async function postObjectiveCreationOp(
 
 // Objective document write — the fifth lifecycle-trio family
 // (states-address retirement). Phase Final Task 2: the
-// objectives ROW half is stripped — pure pair-plane write
+// objectives ROW half is stripped — pure message-plane write
 // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity.
 // validateObjectiveDocumentBody admits entity field plus the
 // lifecycle trio; Task 1 widens the gate only — state-event
-// minting lands with later tasks. `pair` is optional so a
+// minting lands with later tasks. `messagePair` is optional so a
 // future below-facade caller keeps compiling; the live route
 // always supplies one, since 'objectives/:id' is pair-wired
 // and never bearer-exempt. The actor parameter is spelled
@@ -1697,7 +1700,7 @@ export async function postObjectiveDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<ObjectiveEntity> {
     const doc = validateObjectiveDocumentBody(withoutId(body));
     const entity = {
@@ -1708,8 +1711,8 @@ export async function postObjectiveDocumentOp(
         // Phase Final Task 2: objectives ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return { id, ...entity };
         },
@@ -1740,14 +1743,14 @@ export function identityDocumentBodyOf(
 
 // Identity creation: Phase Final Task 2 strips the
 // identities + identity_credentials ROW halves — pure
-// pair-plane write. A person's PII enters later via PUT
+// message-plane write. A person's PII enters later via PUT
 // identities/:id/pii. NO state event (an identity carries
 // no lifecycle event at creation). The pairs a live POST
 // /identities forms: operation (204 at identities/:id) +
 // identities/:id document ({kind} alone). A service ALSO
-// forms the credential-document pair at
+// forms the credential-document message pair at
 // identities/:id/credentials/:cid, appended last.
-export type IdentityWritePairs =
+export type IdentityWriteMessagePairs =
     | {
         readonly kind: 'person';
         readonly operation: MessagePair;
@@ -1761,14 +1764,14 @@ export type IdentityWritePairs =
     };
 
 // Exported so the seed can drive identity creation through
-// the same gate the route uses. `pairs` is optional so the
+// the same gate the route uses. `messagePairs` is optional so the
 // seed's below-facade shape keeps compiling; the route always
 // supplies the bundle. Create appends operation + identity
 // document (+ credential document for service), LAST.
 export async function postIdentityCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
-    pairs?: IdentityWritePairs,
+    messagePairs?: IdentityWriteMessagePairs,
 ): Promise<void> {
     validateIdentityCreateBody(body);
     return db.transaction(
@@ -1776,14 +1779,14 @@ export async function postIdentityCreationOp(
         // ROW halves stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
+            if (messagePairs !== undefined) {
+                await appendMessagePair(view, messagePairs.operation);
                 await appendMessagePair(
-                    view, pairs.identityDocument,
+                    view, messagePairs.identityDocument,
                 );
-                if (pairs.kind === 'service') {
+                if (messagePairs.kind === 'service') {
                     await appendMessagePair(
-                        view, pairs.credentialDocument,
+                        view, messagePairs.credentialDocument,
                     );
                 }
             }
@@ -1814,7 +1817,7 @@ function workOrderCreateDocumentBody(
 }
 
 // The three pairs a live POST /work-orders forms (Task 3):
-// the gate's own operation pair (204, at the work-orders/:id
+// the gate's own operation message pair (204, at the work-orders/:id
 // address per the registry's createBodyIdField — POST
 // 'work-orders' and PUT 'work-orders/:id' collapse onto the
 // SAME (uriCollection, uriId), exactly as flows/:id did for its
@@ -1822,9 +1825,9 @@ function workOrderCreateDocumentBody(
 // pre-forms below. All three share ONE requestAt (the
 // create's own origination) yet strictly-later RESPONSE `at`
 // stamps (appendMessagePair's nowUtc() is monotonic), so the
-// document pair — appended after the operation pair — becomes
-// the address's head.
-export interface WorkOrderCreationPairs {
+// document message pair — appended after the
+// operation message pair — becomes the address's head.
+export interface WorkOrderCreationMessagePairs {
     readonly operation: MessagePair;
     readonly document: MessagePair;
     readonly join: MessagePair;
@@ -1845,7 +1848,7 @@ export async function postWorkOrderCreationOp(
     db: DbAdapter,
     body: Record<string, unknown>,
     _actor: Id,
-    pairs?: WorkOrderCreationPairs,
+    messagePairs?: WorkOrderCreationMessagePairs,
 ): Promise<void> {
     validateWorkOrderCreateBody(body);
     return db.transaction(
@@ -1857,11 +1860,11 @@ export async function postWorkOrderCreationOp(
             // document, join, and the genesis claim
             // document so DELETE /claim can release the
             // creation-time claim.
-            if (pairs !== undefined) {
-                await appendMessagePair(view, pairs.operation);
-                await appendMessagePair(view, pairs.document);
-                await appendMessagePair(view, pairs.join);
-                await appendMessagePair(view, pairs.claim);
+            if (messagePairs !== undefined) {
+                await appendMessagePair(view, messagePairs.operation);
+                await appendMessagePair(view, messagePairs.document);
+                await appendMessagePair(view, messagePairs.join);
+                await appendMessagePair(view, messagePairs.claim);
             }
         },
     );
@@ -1877,7 +1880,7 @@ export async function postWorkOrderCreationOp(
 // (naming the prior claimant) and the new 'claimed'
 // land atomically. Exported so the seed can drive a
 // work-order claim through the same gate the route uses
-// — this is also Phase 1's dual-write insertion seam. `pair`
+// — this is also Phase 1's dual-write insertion seam. `messagePair`
 // is optional, mirroring postWorkOrderCreationOp; it is
 // appended on EVERY exit path (the idempotent re-claim
 // no-op included), since a wired route must never resolve a
@@ -1885,7 +1888,7 @@ export async function postWorkOrderCreationOp(
 // on that mismatch).
 //
 // PHASE 14 TASK 4: the prior-claim decision read is re-
-// anchored onto the pair plane (workOrderClaimHistoryFor,
+// anchored onto the message plane (workOrderClaimHistoryFor,
 // api/derive-states.ts) — ENTITY-SCOPED indexed reads inside
 // this SAME transaction, never a nested tx — in place of the
 // row-plane view.states.getAllFor(workOrderId). Author gate 3:
@@ -1893,7 +1896,7 @@ export async function postWorkOrderCreationOp(
 // clock) stay byte-identical — ONLY the event SOURCE flips.
 //
 // PHASE 15 TASK 2: the claim-gate graph read is re-anchored
-// onto workOrderDocumentHeadFor (pair-plane document head)
+// onto workOrderDocumentHeadFor (message-plane document head)
 // in place of view.workOrders.getById. isClaimEventExpired +
 // 409 bytes + EntityNotFoundError mapping stay byte-identical
 // — ONLY the row source flips. Phase Final Task 2: work_orders
@@ -1904,7 +1907,7 @@ export async function postWorkOrderClaimOp(
     body: Record<string, unknown>,
     actor: Id,
     organization: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<void> {
     return db.transaction(
         // Phase Final Task 2: work_orders ROW half stripped.
@@ -1945,9 +1948,9 @@ export async function postWorkOrderClaimOp(
                 && !priorExpired;
             if (priorLive) {
                 if (prior.member_id === actor) {
-                    if (pair !== undefined) {
+                    if (messagePair !== undefined) {
                         await appendMessagePair(
-                            view, pair,
+                            view, messagePair,
                         );
                     }
                     return;
@@ -1959,10 +1962,11 @@ export async function postWorkOrderClaimOp(
                 );
             }
             // Phase Final Task 2: states ROW half stripped —
-            // claim_expired + claimed live on the op pair body
+            // claim_expired + claimed live on the
+            // operation message pair body
             // (workOrderClaimHistoryFor reads them back).
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
         },
     );
@@ -1972,20 +1976,20 @@ export async function postWorkOrderClaimOp(
 // document. The gate's DELETE table already 404s a never-
 // written address and 204s an already-DELETE head without
 // dispatch. A PUT head proceeds here; append the DELETE
-// pair. applyReleasePair synthesizes claim_released from
+// pair. applyReleaseMessagePair synthesizes claim_released from
 // the pair (id/at/actor) — no caller-minted body.
 export async function deleteWorkOrderClaimOp(
     db: DbAdapter,
     _workOrderId: Id,
     _actor: Id,
     _organization: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<void> {
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
         },
     );
@@ -2123,7 +2127,7 @@ async function assertRequiredAttributesAtExit(
 // bearing instance shape adds bind assert + If-Match
 // ladder + ACL/constraints + W10 required-at-exit + one
 // tx of op + revision. Authorship is stamped from the
-// verified caller (actor). `pair` is optional.
+// verified caller (actor). `messagePair` is optional.
 export async function postWorkOrderTransitionOp(
     db: DbAdapter,
     workOrderId: Id,
@@ -2131,7 +2135,7 @@ export async function postWorkOrderTransitionOp(
     actor: Id,
     organization: Id | undefined,
     roles: readonly string[],
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<void> {
     const validated =
         validateWorkOrderTransitionBody(body);
@@ -2142,8 +2146,8 @@ export async function postWorkOrderTransitionOp(
         return db.transaction(
             MESSAGE_TABLES,
             async (view) => {
-                if (pair !== undefined) {
-                    await appendMessagePair(view, pair);
+                if (messagePair !== undefined) {
+                    await appendMessagePair(view, messagePair);
                 }
             },
         );
@@ -2167,8 +2171,8 @@ export async function postWorkOrderTransitionOp(
         }
         if (
             validated.kind === 'instance'
-            && pair !== undefined
-            && rawIfMatchFromPair(pair)
+            && messagePair !== undefined
+            && rawIfMatchFromMessagePair(messagePair)
                 !== undefined
         ) {
             throw new ValidationError(
@@ -2184,8 +2188,8 @@ export async function postWorkOrderTransitionOp(
         return db.transaction(
             MESSAGE_TABLES,
             async (view) => {
-                if (pair !== undefined) {
-                    await appendMessagePair(view, pair);
+                if (messagePair !== undefined) {
+                    await appendMessagePair(view, messagePair);
                 }
             },
         );
@@ -2224,7 +2228,7 @@ export async function postWorkOrderTransitionOp(
             + ' the work order\'s binding',
         );
     }
-    if (pair === undefined) {
+    if (messagePair === undefined) {
         throw new Error(
             'value-bearing transition requires a'
             + ' formed pair',
@@ -2234,7 +2238,7 @@ export async function postWorkOrderTransitionOp(
         '/organizations/' + organization
         + '/work-orders/' + workOrderId
         + '/transition';
-    const rawIfMatch = rawIfMatchFromPair(pair);
+    const rawIfMatch = rawIfMatchFromMessagePair(messagePair);
     if (rawIfMatch === undefined) {
         throw new ApiError(
             'If-Match is required to transition with'
@@ -2276,7 +2280,7 @@ export async function postWorkOrderTransitionOp(
         head.values, attributesById, roles,
     );
     const parent = await instanceParentEtag(
-        db, head.pairId,
+        db, head.messagePairId,
     );
     const advertised = await advertisedInstanceEtag(
         instanceGetBody(
@@ -2324,14 +2328,14 @@ export async function postWorkOrderTransitionOp(
             clear: validated.clear,
         },
     );
-    const revisionPair = await formDocumentPairFor(db, {
+    const revisionMessagePair = await formDocumentMessagePairFor(db, {
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [org, typeId, instanceId],
         method: 'PUT',
         body: { values: mergedValues },
         requesterIdentityId: actor,
-        requestAt: pair.requestAt,
-        operationId: pair.operationId,
+        requestAt: messagePair.requestAt,
+        operationId: messagePair.operationId,
         organization: org,
         response: {
             status: HTTP_OK,
@@ -2343,7 +2347,7 @@ export async function postWorkOrderTransitionOp(
             value: strongEtagOf(ifMatchTarget),
         }],
     });
-    const latchedPairId = head.pairId;
+    const latchedMessagePairId = head.messagePairId;
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
@@ -2359,20 +2363,20 @@ export async function postWorkOrderTransitionOp(
             }
             // R9: lock head must still be the latched pair
             // id, not the 64-hex If-Match.
-            const latest = await headPairIdAt(
+            const latest = await headMessagePairIdAt(
                 view,
-                revisionPair.uriCollection,
-                revisionPair.uriId,
+                revisionMessagePair.uriCollection,
+                revisionMessagePair.uriId,
             );
-            if (latest !== latchedPairId) {
+            if (latest !== latchedMessagePairId) {
                 throw new ApiError(
                     'If-Match does not match the current '
                         + 'instance at ' + pathname,
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePair(view, pair);
-            await appendMessagePair(view, revisionPair);
+            await appendMessagePair(view, messagePair);
+            await appendMessagePair(view, revisionMessagePair);
         },
     );
 }
@@ -2392,7 +2396,7 @@ export async function postWorkOrderBindingOp(
     body: Record<string, unknown>,
     _actor: Id,
     organization: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<void> {
     return db.transaction(
         MESSAGE_TABLES,
@@ -2452,8 +2456,8 @@ export async function postWorkOrderBindingOp(
                     HTTP_CONFLICT,
                 );
             }
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
         },
     );
@@ -2465,21 +2469,21 @@ export async function postWorkOrderBindingOp(
 // create/claim/transition ops above and the states/:id unclaim
 // path, never by a document PUT, so this op posts NO states
 // event of its own. Phase Final Task 2: the work_orders ROW
-// half is stripped — pure pair-plane write
+// half is stripped — pure message-plane write
 // (postFlowTagDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
 // is for below-facade callers and type parity.
 // validateWorkOrderDocumentBody rejects a body carrying the
 // trio at the gate. Exported so the seed can drive a work-
 // order document write through the same op the route uses.
-// `pair` is optional. The actor parameter is spelled `_actor`:
+// `messagePair` is optional. The actor parameter is spelled `_actor`:
 // no state event here to author.
 export async function postWorkOrderDocumentOp(
     db: DbAdapter,
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<WorkOrderEntity, 'id'>> {
     const doc = validateWorkOrderDocumentBody(withoutId(body));
     const entity = {
@@ -2490,8 +2494,8 @@ export async function postWorkOrderDocumentOp(
         // Phase Final Task 2: work_orders ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2499,21 +2503,21 @@ export async function postWorkOrderDocumentOp(
 }
 
 // Flow work-order join document write. Phase Final Task 2:
-// the flow_work_orders ROW half is stripped — pure pair-plane
+// the flow_work_orders ROW half is stripped — pure message-plane
 // write. WRITE_RESPONSE_SPECS successBody forms the wire
 // bytes; the reconstructed return is for below-facade
-// callers and type parity. `pair` is optional. The actor
+// callers and type parity. `messagePair` is optional. The actor
 // parameter is spelled `_actor`: no state event here to author.
 export async function postFlowWorkOrderDocumentOp(
     db: DbAdapter,
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<FlowWorkOrderEntity> {
     const entity = flowWorkOrderEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
     });
@@ -2521,8 +2525,8 @@ export async function postFlowWorkOrderDocumentOp(
         // Phase Final Task 2: flow_work_orders ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2530,10 +2534,10 @@ export async function postFlowWorkOrderDocumentOp(
 }
 
 // Flow record join document write. Phase Final Task 2: the
-// flow_records ROW half is stripped — pure pair-plane write
+// flow_records ROW half is stripped — pure message-plane write
 // (postFlowWorkOrderDocumentOp shape). WRITE_RESPONSE_SPECS
 // successBody forms the wire bytes; the reconstructed return
-// is for below-facade callers and type parity. `pair` is
+// is for below-facade callers and type parity. `messagePair` is
 // optional. The actor parameter is spelled `_actor`: no state
 // event here to author.
 export async function postFlowRecordDocumentOp(
@@ -2541,11 +2545,11 @@ export async function postFlowRecordDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<FlowRecordEntity> {
     const entity = flowRecordEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
     });
@@ -2553,34 +2557,34 @@ export async function postFlowRecordDocumentOp(
         // Phase Final Task 2: flow_records ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
     );
 }
 
-// Flow tag document write — the codebase's FIRST pair-plane-ONLY
+// Flow tag document write — the codebase's FIRST message-plane-ONLY
 // write (Phase 14 Task 9): no table, no row, no dual-write. The
 // pair alone carries everything (uriCollection/uriId encode the
 // address; the stored request's method distinguishes a PUT tag
 // from a DELETE tombstone), so this op needs neither `id`
 // nor `body` — the
 // SAME shape identity-tokens/:id's own pair-only PUT rides (Phase
-// 13 Task 9). `pair` is optional so a below-facade caller with no
+// 13 Task 9). `messagePair` is optional so a below-facade caller with no
 // pair keeps compiling; ZERO seed tags means no such caller
 // exists today (Step 0), but the shape stays uniform with every
 // sibling op above.
 export async function postFlowTagDocumentOp(
     db: DbAdapter,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<void> {
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
         },
     );
@@ -2588,10 +2592,10 @@ export async function postFlowTagDocumentOp(
 
 // Objective baseline-score document write. Phase Final Task 2:
 // the project_objective_baseline_scores ROW half is stripped —
-// pure pair-plane write (postIdeaSubmissionOp shape).
+// pure message-plane write (postIdeaSubmissionOp shape).
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes.
 // Exported so the seed can drive the same write path (Decision
-// 6's below-facade carve-out). `pair` is optional so a
+// 6's below-facade carve-out). `messagePair` is optional so a
 // below-facade caller with no pair keeps compiling; the live
 // route always supplies one. `_actor` is unused: there is no
 // state event here to author.
@@ -2600,21 +2604,21 @@ export async function postBaselineScoreDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<
     ProjectObjectiveBaselineScoreEntity
 > {
     const entity = scoreEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
     });
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2623,7 +2627,7 @@ export async function postBaselineScoreDocumentOp(
 
 // Objective actual-score document write. Phase Final Task 2:
 // the project_objective_actual_scores ROW half is stripped —
-// pure pair-plane write, byte-twin of
+// pure message-plane write, byte-twin of
 // postBaselineScoreDocumentOp. WRITE_RESPONSE_SPECS forms the
 // wire bytes. `_actor` is unused: no state event to author.
 export async function postActualScoreDocumentOp(
@@ -2631,19 +2635,19 @@ export async function postActualScoreDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<ProjectObjectiveActualScoreEntity> {
     const entity = scoreEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
     });
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2651,9 +2655,9 @@ export async function postActualScoreDocumentOp(
 }
 
 // Membership document write — Phase Final Task 2: the
-// memberships ROW half is stripped — pure pair-plane write
+// memberships ROW half is stripped — pure message-plane write
 // (postFlowTagDocumentOp shape). No states interaction
-// (memberships never post events). `pair` is optional so a
+// (memberships never post events). `messagePair` is optional so a
 // below-facade caller keeps compiling; the live route always
 // supplies one. WRITE_RESPONSE_SPECS successBody forms the
 // wire bytes; the reconstructed return is for type parity.
@@ -2662,7 +2666,7 @@ export async function postMembershipDocumentOp(
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<MembershipEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<MembershipEntity, 'id'>;
@@ -2670,8 +2674,8 @@ export async function postMembershipDocumentOp(
         // Phase Final Task 2: memberships ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2679,8 +2683,8 @@ export async function postMembershipDocumentOp(
 }
 
 // Member document write — Phase Final Task 2: the members
-// ROW half is stripped — pure pair-plane write. No states
-// interaction (genesis/archive ride PUT states/:id). `pair`
+// ROW half is stripped — pure message-plane write. No states
+// interaction (genesis/archive ride PUT states/:id). `messagePair`
 // is optional so a below-facade caller keeps compiling; the
 // live route always supplies one.
 export async function postMemberDocumentOp(
@@ -2688,7 +2692,7 @@ export async function postMemberDocumentOp(
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<MemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<MemberEntity, 'id'>;
@@ -2696,8 +2700,8 @@ export async function postMemberDocumentOp(
         // Phase Final Task 2: members ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2705,16 +2709,16 @@ export async function postMemberDocumentOp(
 }
 
 // AI-member document write — Phase Final Task 2: the
-// ai_members ROW half is stripped — pure pair-plane write.
+// ai_members ROW half is stripped — pure message-plane write.
 // No states interaction. The composed POST edit arm at this
-// route sits beside this PUT; verbs stay independent. `pair`
+// route sits beside this PUT; verbs stay independent. `messagePair`
 // is optional so a below-facade caller keeps compiling.
 export async function postAiMemberDocumentOp(
     db: DbAdapter,
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<AIMemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<AIMemberEntity, 'id'>;
@@ -2722,8 +2726,8 @@ export async function postAiMemberDocumentOp(
         // Phase Final Task 2: ai_members ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2731,17 +2735,17 @@ export async function postAiMemberDocumentOp(
 }
 
 // Human-member document write — Phase Final Task 2: the
-// human_members ROW half is stripped — pure pair-plane
+// human_members ROW half is stripped — pure message-plane
 // write. NO live PUT exists on human-members/:id (get/post
 // only); this op serves synthesis/seed callers. No states
-// interaction. `pair` is optional so a below-facade caller
+// interaction. `messagePair` is optional so a below-facade caller
 // keeps compiling.
 export async function postHumanMemberDocumentOp(
     db: DbAdapter,
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<HumanMemberEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<HumanMemberEntity, 'id'>;
@@ -2749,8 +2753,8 @@ export async function postHumanMemberDocumentOp(
         // Phase Final Task 2: human_members ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2758,9 +2762,9 @@ export async function postHumanMemberDocumentOp(
 }
 
 // Identity PII document write — Phase Final Task 2: the
-// identity_pii ROW half is stripped — pure pair-plane write
+// identity_pii ROW half is stripped — pure message-plane write
 // via replacePiiSlot (hard-delete zone). No states
-// interaction. `pair` is optional so a below-facade caller
+// interaction. `messagePair` is optional so a below-facade caller
 // keeps compiling; the live route always supplies one.
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes
 // via piiEntityOf (GET derive). G5: the slot still
@@ -2770,11 +2774,11 @@ export async function postIdentityPiiDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<IdentityPiiEntity> {
     const entity = piiEntityOf(id, {
         uriId: '',
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
     });
@@ -2782,8 +2786,12 @@ export async function postIdentityPiiDocumentOp(
         // Phase Final Task 2: identity_pii ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await replacePiiSlot(view, pair.uriCollection, pair);
+            if (messagePair !== undefined) {
+                await replacePiiSlot(
+                    view,
+                    messagePair.uriCollection,
+                    messagePair,
+                );
             }
             return entity;
         },
@@ -2791,8 +2799,8 @@ export async function postIdentityPiiDocumentOp(
 }
 
 // Identity document write — Phase Final Task 2: the
-// identities ROW half is stripped — pure pair-plane write.
-// No states interaction. `pair` is optional so a below-
+// identities ROW half is stripped — pure message-plane write.
+// No states interaction. `messagePair` is optional so a below-
 // facade caller keeps compiling; the live route always
 // supplies one.
 export async function postIdentityDocumentOp(
@@ -2800,7 +2808,7 @@ export async function postIdentityDocumentOp(
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<IdentityEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<IdentityEntity, 'id'>;
@@ -2808,31 +2816,31 @@ export async function postIdentityDocumentOp(
         // Phase Final Task 2: identities ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
     );
 }
 
-// AI-agent document write — pair-plane only. Not a
-// member and not an identity. `pair` is optional so a
+// AI-agent document write — message-plane only. Not a
+// member and not an identity. `messagePair` is optional so a
 // below-facade caller keeps compiling.
 export async function postAiAgentDocumentOp(
     db: DbAdapter,
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<AIAgentEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<AIAgentEntity, 'id'>;
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2841,14 +2849,14 @@ export async function postAiAgentDocumentOp(
 
 // Identity credential document write — Phase Final Task 2:
 // the identity_credentials ROW half is stripped — pure
-// pair-plane write. No states interaction. `pair` is
+// message-plane write. No states interaction. `messagePair` is
 // optional so a below-facade caller keeps compiling.
 export async function postIdentityCredentialDocumentOp(
     db: DbAdapter,
     _id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<Omit<IdentityCredentialEntity, 'id'>> {
     const entity = withoutId(body) as unknown as
         Omit<IdentityCredentialEntity, 'id'>;
@@ -2857,8 +2865,8 @@ export async function postIdentityCredentialDocumentOp(
         // stripped.
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2866,9 +2874,9 @@ export async function postIdentityCredentialDocumentOp(
 }
 
 // Client-registration document write (clients elimination) —
-// pure pair-plane write, the postIdentityCredentialDocumentOp
+// pure message-plane write, the postIdentityCredentialDocumentOp
 // shape: Supersedes-chained appendMessagePair, never the pii
-// hard-delete zone. `pair` is optional so a below-facade
+// hard-delete zone. `messagePair` is optional so a below-facade
 // caller keeps compiling; the live route always supplies one.
 // WRITE_RESPONSE_SPECS successBody forms the wire bytes
 // via registrationEntityOf (GET derive). DELETE stays a
@@ -2878,19 +2886,19 @@ export async function postClientRegistrationDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<ClientRegistrationEntity> {
     const entity = registrationEntityOf(id, {
         uriId: '',
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: withoutId(body),
     });
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2924,7 +2932,7 @@ async function requireServiceIdentity(
 
 // Identity provider document write — Phase Final Task 2: the
 // identity_providers ROW half is stripped (gate 1 DEFAULT:
-// DELETE at Stage B) — pure pair-plane write. Extracted so
+// DELETE at Stage B) — pure message-plane write. Extracted so
 // below-facade fixtures form pairs derivation can see.
 export async function postIdentityProviderDocumentOp(
     db: DbAdapter,
@@ -2932,7 +2940,7 @@ export async function postIdentityProviderDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<JKeRxRPHBGBkzSLrvNpmlg> {
     const raw = withoutId(body);
     if (
@@ -2947,15 +2955,15 @@ export async function postIdentityProviderDocumentOp(
     const stamped = { ...raw, identity_id: identityId };
     const entity = identityProviderEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: stamped,
     });
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                await appendMessagePair(view, pair);
+            if (messagePair !== undefined) {
+                await appendMessagePair(view, messagePair);
             }
             return entity;
         },
@@ -2965,7 +2973,7 @@ export async function postIdentityProviderDocumentOp(
 // The pre-tx response body for each pair-wired write —
 // computed through the SAME validator/stamp its own handler
 // applies, so the gate's precomputed body is byte-identical to
-// the pair plane's stored response (WRITE_RESPONSE_SPECS +
+// the message plane's stored response (WRITE_RESPONSE_SPECS +
 // responseFromStored). A pattern absent here, or present with
 // no successBody, returns 204 with no body. Keyed by route
 // pattern, not verb — but ONLY for the pattern's PUT or POST
@@ -3019,7 +3027,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             ideaSubmissionEntityOf({
                 uriId: param(params, 2),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
@@ -3034,7 +3042,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             projectFlowEntityOf({
                 uriId: param(params, 2),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
@@ -3074,7 +3082,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             flowWorkOrderEntityOf({
                 uriId: param(params, 2),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
@@ -3098,7 +3106,7 @@ export const WRITE_RESPONSE_SPECS:
                 return recordTypeEntityOf(
                     {
                         uriId: id,
-                        pairId: id,
+                        messagePairId: id,
                         method: 'PUT',
                         body: raw,
                     },
@@ -3160,7 +3168,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             flowRecordEntityOf({
                 uriId: param(params, 2),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
@@ -3178,7 +3186,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             flowTagEntityOf(param(params, 1), {
                 uriId: validateFlowTagName(param(params, 2)),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
@@ -3197,7 +3205,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             objectiveRevisionEntityOf({
                 uriId: param(params, 2),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
@@ -3210,7 +3218,7 @@ export const WRITE_RESPONSE_SPECS:
             validateBaselineScoreEntity(raw);
             return scoreEntityOf({
                 uriId: param(params, 2),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: raw,
             });
@@ -3224,7 +3232,7 @@ export const WRITE_RESPONSE_SPECS:
             validateActualScoreEntity(raw);
             return scoreEntityOf({
                 uriId: param(params, 2),
-                pairId: param(params, 2),
+                messagePairId: param(params, 2),
                 method: 'PUT',
                 body: raw,
             });
@@ -3233,7 +3241,7 @@ export const WRITE_RESPONSE_SPECS:
     'identities/': { status: HTTP_NO_CONTENT },
     // G3: identities/:id emits identityDocumentEntityOf
     // (GET derive). Creation and the human-member half share
-    // this spec via formDocumentPairFor.
+    // this spec via formDocumentMessagePairFor.
     'identities/:id': documentWriteResponseSpec(IDENTITIES_WIRING),
     'ai-agents/:id': documentWriteResponseSpec(AI_AGENTS_WIRING),
     // G5: piiEntityOf (GET derive). replacePiiSlot still
@@ -3244,7 +3252,7 @@ export const WRITE_RESPONSE_SPECS:
             param(params, 0),
             {
                 uriId: '',
-                pairId: param(params, 0),
+                messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             },
@@ -3270,7 +3278,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             registrationEntityOf(param(params, 0), {
                 uriId: '',
-                pairId: param(params, 0),
+                messagePairId: param(params, 0),
                 method: 'PUT',
                 body: withoutId(body ?? {}),
             }),
@@ -3308,7 +3316,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             identityTokenEntityOf({
                 uriId: param(params, 1),
-                pairId: param(params, 1),
+                messagePairId: param(params, 1),
                 method: 'PUT',
                 body: {
                     ...withoutId(body ?? {}),
@@ -3324,7 +3332,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             tokenRevocationEntityOf({
                 uriId: param(params, 1),
-                pairId: param(params, 1),
+                messagePairId: param(params, 1),
                 method: 'PUT',
                 body: {
                     ...withoutId(body ?? {}),
@@ -3337,7 +3345,7 @@ export const WRITE_RESPONSE_SPECS:
     // EXEMPT_ROUTE_PATTERNS-wired, so a resend never bypasses
     // this resolver the way a document/event-append route's
     // idempotent replay would). The route handler reads this
-    // exact value back off the formed pair (pairResponseBody)
+    // exact value back off the formed pair (messagePairResponseBody)
     // rather than minting a second one.
     'identities/:id/tokens/:jti/rotation': {
         status: HTTP_OK,
@@ -3354,7 +3362,7 @@ export const WRITE_RESPONSE_SPECS:
         status: HTTP_OK,
         successBody: (params, body) => organizationEntityOf({
             uriId: param(params, 0),
-            pairId: param(params, 0),
+            messagePairId: param(params, 0),
             method: 'PUT',
             body: withoutId(body ?? {}),
         }),
@@ -3366,7 +3374,7 @@ export const WRITE_RESPONSE_SPECS:
         successBody: (params, body) =>
             identityProviderEntityOf({
                 uriId: param(params, 1),
-                pairId: param(params, 1),
+                messagePairId: param(params, 1),
                 method: 'PUT',
                 body: {
                     ...withoutId(body ?? {}),
@@ -3401,14 +3409,14 @@ function resolveWriteResponseSpec(
     return spec;
 }
 
-export interface DocumentPairFormInput {
+export interface DocumentMessagePairFormInput {
     readonly routePattern: string;
     // Pattern params, in order (e.g. ['members/:id']'s single
     // :id, or ['projects/:id/objective-baseline-scores/:sid']'s
     // [projectId, baselineId]).
     readonly params: readonly Id[];
     // undefined only for the record-attribute DELETE tombstone
-    // sites, which carry no body — mirroring WritePairInput's own
+    // sites, which carry no body — mirroring WriteMessagePairInput's own
     // body: Record<string, unknown> | undefined.
     readonly body: Record<string, unknown> | undefined;
     readonly requesterIdentityId: Id;
@@ -3426,27 +3434,27 @@ export interface DocumentPairFormInput {
     // carry the document head they restored from, or
     // coordinateWrite 412s an unlatched PUT at a live
     // locked address.
-    readonly latchedHeadPairId?: string;
+    readonly latchedHeadMessagePairId?: string;
     readonly headerFields?: readonly FieldLine[];
     readonly operationId: string;
 }
 
 // The shared document-pair former (Phase 9 Task 2, Commandment
-// IX): replaces every route-inline formWritePair block that
+// IX): replaces every route-inline formWriteMessagePair block that
 // shared this ONE core shape — resolve the response, resolve the
 // address, form the pair. Lives beside WRITE_RESPONSE_SPECS
 // (routes.ts, not message-pair.ts): the specs live here, and
 // message-pair.ts must never import routes.ts (Step 0(c) — the
 // import graph stays acyclic; routes.ts already imports
-// formWritePair FROM message-pair.ts, so the dependency runs
+// formWriteMessagePair FROM message-pair.ts, so the dependency runs
 // one way only). Builds the pair PRE-TX only — the in-tx
 // appendMessagePair calls stay at each op's own transaction.
 // db is the chain-walk for G1 trio stored PUT bodies
 // (resolveStreamedTrioWriteBody). Other families still
 // use successBody alone.
-export async function formDocumentPairFor(
+export async function formDocumentMessagePairFor(
     db: DbAdapter,
-    input: DocumentPairFormInput,
+    input: DocumentMessagePairFormInput,
 ): Promise<MessagePair> {
     const routeSegments = input.routePattern.split('/');
     let nextParam = 0;
@@ -3476,7 +3484,7 @@ export async function formDocumentPairFor(
             input.requesterIdentityId, input.organization,
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: input.method ?? 'PUT',
         pathname: '/' + pathSegments.join('/'),
         routePattern: input.routePattern,
@@ -3493,8 +3501,8 @@ export async function formDocumentPairFor(
         ...(input.matchedEtag !== undefined
             ? { matchedEtag: input.matchedEtag }
             : {}),
-        ...(input.latchedHeadPairId !== undefined
-            ? { latchedHeadPairId: input.latchedHeadPairId }
+        ...(input.latchedHeadMessagePairId !== undefined
+            ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
             : {}),
     });
 }
@@ -3518,7 +3526,7 @@ export async function postInstanceDeleteOp(
     db: DbAdapter,
     p: string[],
     _actor: Id,
-    pair: MessagePair | undefined,
+    messagePair: MessagePair | undefined,
     organization: Id | undefined,
     _roles: readonly string[],
 ): Promise<void> {
@@ -3526,7 +3534,7 @@ export async function postInstanceDeleteOp(
     const typeId = param(p, 1);
     const instanceId = param(p, 2);
     await requireRecordTypeExists(db, org, typeId);
-    if (pair === undefined) {
+    if (messagePair === undefined) {
         throw new Error(
             'instance DELETE requires a formed pair',
         );
@@ -3573,7 +3581,7 @@ export async function postInstanceDeleteOp(
                     HTTP_CONFLICT,
                 );
             }
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
         },
     );
 }
@@ -3595,11 +3603,11 @@ async function inFlightPlacementBlockersFor(
     const workOrdersPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
-    const woPairs = await view.pairs.getAllWhere(
+    const woMessagePairs = await view.messagePairs.getAllWhere(
         'uri_collection', workOrdersPrefix,
     );
     const woHeads = deriveDocumentsAt(
-        woPairs, workOrdersPrefix,
+        woMessagePairs, workOrdersPrefix,
     );
     const blockers: string[] = [];
     for (const [woId, doc] of woHeads) {
@@ -3641,11 +3649,11 @@ async function instanceAddressSpent(
     prefix: string,
     instanceId: Id,
 ): Promise<boolean> {
-    const pairs =
-        await db.pairs.getAllAtAddress(
+    const messagePairs =
+        await db.messagePairs.getAllAtAddress(
             prefix, instanceId,
         );
-    return pairs.length > 0;
+    return messagePairs.length > 0;
 }
 
 // Instance PATCH create (Task 20): no live PUT, no
@@ -3658,7 +3666,7 @@ async function postInstanceCreateOp(
     p: string[],
     body: Record<string, unknown>,
     actor: Id,
-    pair: MessagePair,
+    messagePair: MessagePair,
     organization: Id | undefined,
     roles: readonly string[],
 ): Promise<void> {
@@ -3684,14 +3692,14 @@ async function postInstanceCreateOp(
     const mergedValues = mergeInstanceValues(
         [], { set: validated.set },
     );
-    const revisionPair = await formDocumentPairFor(db, {
+    const revisionMessagePair = await formDocumentMessagePairFor(db, {
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [org, typeId, instanceId],
         method: 'PUT',
         body: { values: mergedValues },
         requesterIdentityId: actor,
-        requestAt: pair.requestAt,
-        operationId: pair.operationId,
+        requestAt: messagePair.requestAt,
+        operationId: messagePair.operationId,
         organization: org,
         response: {
             status: HTTP_OK,
@@ -3720,8 +3728,8 @@ async function postInstanceCreateOp(
                     HTTP_PRECONDITION_REQUIRED,
                 );
             }
-            await appendMessagePair(view, pair);
-            await appendMessagePair(view, revisionPair);
+            await appendMessagePair(view, messagePair);
+            await appendMessagePair(view, revisionMessagePair);
         },
     );
 }
@@ -3736,7 +3744,7 @@ export async function postInstancePatchOp(
     p: string[],
     body: Record<string, unknown>,
     actor: Id,
-    pair: MessagePair | undefined,
+    messagePair: MessagePair | undefined,
     organization: Id | undefined,
     roles: readonly string[],
 ): Promise<void> {
@@ -3746,15 +3754,15 @@ export async function postInstancePatchOp(
     const pathname = '/organizations/' + org
         + '/record-types/' + typeId
         + '/instances/' + instanceId;
-    if (pair === undefined) {
+    if (messagePair === undefined) {
         throw new Error(
             'instance PATCH requires a formed pair',
         );
     }
-    const ifMatchTarget = ifMatchFromPair(pair);
+    const ifMatchTarget = ifMatchFromMessagePair(messagePair);
     if (ifMatchTarget === undefined) {
         return postInstanceCreateOp(
-            db, p, body, actor, pair, organization,
+            db, p, body, actor, messagePair, organization,
             roles,
         );
     }
@@ -3775,7 +3783,7 @@ export async function postInstancePatchOp(
         head.values, attributesById, roles,
     );
     const parent = await instanceParentEtag(
-        db, head.pairId,
+        db, head.messagePairId,
     );
     const advertised = await advertisedInstanceEtag(
         instanceGetBody(
@@ -3812,14 +3820,14 @@ export async function postInstancePatchOp(
     // Revision: If-Match target is the in-tx latch.
     // Wire is operation-plane; ghost-replay closed via
     // headerFields: [] on the synthetic revision.
-    const revisionPair = await formDocumentPairFor(db, {
+    const revisionMessagePair = await formDocumentMessagePairFor(db, {
         routePattern: INSTANCE_DETAIL_PATTERN,
         params: [org, typeId, instanceId],
         method: 'PUT',
         body: { values: mergedValues },
         requesterIdentityId: actor,
-        requestAt: pair.requestAt,
-        operationId: pair.operationId,
+        requestAt: messagePair.requestAt,
+        operationId: messagePair.operationId,
         organization: org,
         response: {
             status: HTTP_OK,
@@ -3831,26 +3839,26 @@ export async function postInstancePatchOp(
             value: strongEtagOf(ifMatchTarget),
         }],
     });
-    const latchedPairId = head.pairId;
+    const latchedMessagePairId = head.messagePairId;
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
             // R9: lock head must still be the latched pair
             // id, not the 64-hex If-Match.
-            const latest = await headPairIdAt(
+            const latest = await headMessagePairIdAt(
                 view,
-                revisionPair.uriCollection,
-                revisionPair.uriId,
+                revisionMessagePair.uriCollection,
+                revisionMessagePair.uriId,
             );
-            if (latest !== latchedPairId) {
+            if (latest !== latchedMessagePairId) {
                 throw new ApiError(
                     'If-Match does not match the current '
                         + 'instance at ' + pathname,
                     HTTP_PRECONDITION_FAILED,
                 );
             }
-            await appendMessagePair(view, pair);
-            await appendMessagePair(view, revisionPair);
+            await appendMessagePair(view, messagePair);
+            await appendMessagePair(view, revisionMessagePair);
         },
     );
 }
@@ -3878,26 +3886,26 @@ export const routes: Route[] = [
         // Admin-only — POST /identities has no member-tier
         // entry, so it falls to the root admin tier in
         // ROUTE_POLICY. Task 5: forms the identities/:id
-        // document pair (+ the credential-document pair for a
-        // service) INLINE PRE-TX, beside the gate's own operation
-        // pair. See postIdentityCreationOp for the transaction
-        // shape.
+        // document message pair (+ the credential-document
+        // message pair for a service) INLINE PRE-TX, beside
+        // the gate's own operation message pair. See
+        // postIdentityCreationOp for the transaction shape.
         post: async (
-            db, _p, body, actor, pair, organization,
+            db, _p, body, actor, messagePair, organization,
         ) => {
-            let pairs: IdentityWritePairs | undefined;
+            let messagePairs: IdentityWriteMessagePairs | undefined;
             if (
-                pair !== undefined && organization !== undefined
+                messagePair !== undefined && organization !== undefined
             ) {
                 const b = validateIdentityCreateBody(body);
-                const identityDocument = await formDocumentPairFor(
+                const identityDocument = await formDocumentMessagePairFor(
                     db, {
                         routePattern: 'identities/:id',
                         params: [b.id],
                         body: identityDocumentBodyOf(b.kind),
                         requesterIdentityId: actor,
-                        requestAt: pair.requestAt,
-                        operationId: pair.operationId,
+                        requestAt: messagePair.requestAt,
+                        operationId: messagePair.operationId,
                         organization,
                     },
                 );
@@ -3916,7 +3924,7 @@ export const routes: Route[] = [
                         );
                     }
                     const credentialDocument =
-                        await formDocumentPairFor(db, {
+                        await formDocumentMessagePairFor(db, {
                             routePattern:
                                 'identities/:id/credentials/:cid',
                             params: [b.id, credId],
@@ -3927,25 +3935,25 @@ export const routes: Route[] = [
                                 ),
                             },
                             requesterIdentityId: actor,
-                            requestAt: pair.requestAt,
-                            operationId: pair.operationId,
+                            requestAt: messagePair.requestAt,
+                            operationId: messagePair.operationId,
                             organization,
                         });
-                    pairs = {
+                    messagePairs = {
                         kind: 'service',
-                        operation: pair,
+                        operation: messagePair,
                         identityDocument,
                         credentialDocument,
                     };
                 } else {
-                    pairs = {
+                    messagePairs = {
                         kind: 'person',
-                        operation: pair,
+                        operation: messagePair,
                         identityDocument,
                     };
                 }
             }
-            return postIdentityCreationOp(db, body, pairs);
+            return postIdentityCreationOp(db, body, messagePairs);
         },
     }),
     // GET is FLIPPED (Phase 10 Task 8): absorbed into the generic
@@ -4045,20 +4053,20 @@ export const routes: Route[] = [
             }
             return row;
         },
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postIdentityPiiDocumentOp(
-                db, param(p, 0), body, actor, pair,
+                db, param(p, 0), body, actor, messagePair,
             ),
         // G5: DELETE still replacePiiSlot (physical delete).
-        delete: (db, _p, _actor, pair) => {
+        delete: (db, _p, _actor, messagePair) => {
             // Phase Final Task 2: identity_pii ROW half
-            // stripped — pair-plane replacePiiSlot only.
+            // stripped — message-plane replacePiiSlot only.
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
+                    if (messagePair !== undefined) {
                         await replacePiiSlot(
-                            view, pair.uriCollection, pair,
+                            view, messagePair.uriCollection, messagePair,
                         );
                     }
                 },
@@ -4170,9 +4178,9 @@ export const routes: Route[] = [
             }
             return withoutSecret(credential);
         },
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postIdentityCredentialDocumentOp(
-                db, param(p, 1), body, actor, pair,
+                db, param(p, 1), body, actor, messagePair,
             ),
     }),
     // The client-registration facet (clients elimination):
@@ -4191,20 +4199,20 @@ export const routes: Route[] = [
             await requireServiceIdentity(db, identityId);
             return deriveClientRegistration(db, identityId);
         },
-        put: async (db, p, body, actor, pair) => {
+        put: async (db, p, body, actor, messagePair) => {
             const identityId = param(p, 0);
             await requireServiceIdentity(db, identityId);
             return postClientRegistrationDocumentOp(
-                db, identityId, body, actor, pair,
+                db, identityId, body, actor, messagePair,
             );
         },
-        delete: async (db, p, _actor, pair) => {
+        delete: async (db, p, _actor, messagePair) => {
             await requireServiceIdentity(db, param(p, 0));
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                 },
             );
@@ -4223,7 +4231,7 @@ export const routes: Route[] = [
             deriveTokenRevocation(
                 db, param(p, 0), param(p, 1),
             ),
-        put: (db, p, body, _actor, pair) => {
+        put: (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const id = param(p, 1);
             const raw = withoutId(body);
@@ -4241,15 +4249,15 @@ export const routes: Route[] = [
             };
             const entity = tokenRevocationEntityOf({
                 uriId: id,
-                pairId: id,
+                messagePairId: id,
                 method: 'PUT',
                 body: stamped,
             });
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                     return entity;
                 },
@@ -4276,7 +4284,7 @@ export const routes: Route[] = [
             deriveIdentityToken(
                 db, param(p, 0), param(p, 1),
             ),
-        put: (db, p, body, _actor, pair) => {
+        put: (db, p, body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const id = param(p, 1);
             const raw = withoutId(body);
@@ -4294,15 +4302,15 @@ export const routes: Route[] = [
             };
             const entity = identityTokenEntityOf({
                 uriId: id,
-                pairId: id,
+                messagePairId: id,
                 method: 'PUT',
                 body: stamped,
             });
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                     return entity;
                 },
@@ -4325,7 +4333,7 @@ export const routes: Route[] = [
     // the reuse guard for real. The gate's successBody
     // resolver PRE-MINTS the successor jti so the pair IS the
     // response; this handler reads that SAME value back off
-    // the pair (pairResponseBody) and threads it into
+    // the pair (messagePairResponseBody) and threads it into
     // rotateRefreshJti, which appends the pair as the LAST act
     // of its own transaction — only on the 'rotate' branch, so
     // a 409 (reuse or unknown) stores no pair even though the
@@ -4333,7 +4341,7 @@ export const routes: Route[] = [
     // is undefined (unreachable for this wired, fenced route)
     // a fresh jti is minted here instead — crash-free.
     route('identities/:id/tokens/:jti/rotation', {
-        post: async (db, p, _body, _actor, pair) => {
+        post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
             const owner = identityForJti(
@@ -4348,13 +4356,13 @@ export const routes: Route[] = [
                     HTTP_FORBIDDEN,
                 );
             }
-            const newJti = pair === undefined
+            const newJti = messagePair === undefined
                 ? generateIdentifier()
-                : (pairResponseBody(pair)?.['jti'] as
+                : (messagePairResponseBody(messagePair)?.['jti'] as
                     string | undefined)
                     ?? generateIdentifier();
             const outcome = await rotateRefreshJti(
-                db, presented, newJti, pair,
+                db, presented, newJti, messagePair,
             );
             if (outcome.kind === 'rotate') {
                 return { jti: outcome.newJti };
@@ -4373,7 +4381,7 @@ export const routes: Route[] = [
     // appends its pair (revokeTokenChain guards both exit
     // paths).
     route('identities/:id/tokens/:jti/revocation', {
-        post: async (db, p, _body, _actor, pair) => {
+        post: async (db, p, _body, _actor, messagePair) => {
             const identityId = param(p, 0);
             const presented = param(p, 1);
             const owner = identityForJti(
@@ -4388,7 +4396,7 @@ export const routes: Route[] = [
                     HTTP_FORBIDDEN,
                 );
             }
-            await revokeTokenChain(db, presented, pair);
+            await revokeTokenChain(db, presented, messagePair);
         },
     }),
     // Nested provider events (credentials shape). Dual-read
@@ -4405,10 +4413,10 @@ export const routes: Route[] = [
             deriveIdentityProvider(
                 db, param(p, 0), param(p, 1),
             ),
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postIdentityProviderDocumentOp(
                 db, param(p, 0), param(p, 1),
-                body, actor, pair,
+                body, actor, messagePair,
             ),
     }),
     // The grant closures retire into api.ts's dedicated
@@ -4454,7 +4462,7 @@ export const routes: Route[] = [
     // isPermitted matches /ideas on the segment prefix, so
     // /ideas/:id/conversion is member-permitted.
     //
-    // Phase 3 Task 4: the operation pair above lives at the
+    // Phase 3 Task 4: the operation message pair above lives at the
     // ideas-family OPERATION address (uri_id '') — a projects-
     // prefix scan finds no pair for a conversion-born project
     // without a SECOND pair at the project's OWN document
@@ -4478,13 +4486,13 @@ export const routes: Route[] = [
     // never run inside an open transaction (AGENTS.md §
     // Transaction bodies await only row ops) — then
     // appended as the tx's LAST acts, beside the operation
-    // pair. Formed ONLY when the gate supplied both a pair and
+    // message pair. Formed ONLY when the gate supplied both a pair and
     // a fence organization; a below-facade caller with neither
     // (none exists for conversion today) skips all 3+N
     // appends, preserving dual-write discipline.
     route('organizations/:id/ideas/:id/conversion', {
         post: async (
-            db, p, body, actor, pair, organization,
+            db, p, body, actor, messagePair, organization,
         ) => {
             const ideaId = param(p, 1);
             const b = validateIdeaConversionBody(body);
@@ -4508,44 +4516,44 @@ export const routes: Route[] = [
                 state: b.ideaState,
             };
             validateIdeaDocumentBody(ideaDocument);
-            let projectPair: MessagePair | undefined;
-            let ideaPair: MessagePair | undefined;
-            const baselinePairs: MessagePair[] = [];
+            let projectMessagePair: MessagePair | undefined;
+            let ideaMessagePair: MessagePair | undefined;
+            const baselineMessagePairs: MessagePair[] = [];
             if (
-                pair !== undefined
+                messagePair !== undefined
                 && organization !== undefined
             ) {
-                projectPair = await formDocumentPairFor(db, {
+                projectMessagePair = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/projects/:id',
                     params: [organization, b.projectId],
                     body: projectDocument,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
-                // The idea's OWN document pair, at its EXISTING
+                // The idea's OWN document message pair, at its EXISTING
                 // address (the idea was created earlier, through
                 // a live PUT /ideas/:id) — this head-read finds
                 // that prior pair, so this one records Supersedes,
                 // unlike the project pair above (a fresh address,
                 // genesis).
-                ideaPair = await formDocumentPairFor(db, {
+                ideaMessagePair = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/ideas/:id',
                     params: [organization, ideaId],
                     body: ideaDocument,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
                 // The per-baseline pairs (Task 4): N synthesized
                 // pairs, one per validated baseline, at each
                 // baseline's OWN address — every baseline id is
                 // client-minted FRESH for this conversion, so
-                // each pair is genesis there (headPairIdAt finds
+                // each pair is genesis there (headMessagePairIdAt finds
                 // no prior pair) unless a live PUT had already
                 // visited that exact id. Body is the baseline's
                 // `fields` VERBATIM — the live standalone PUT
@@ -4554,8 +4562,8 @@ export const routes: Route[] = [
                 // parts) — so the response spec's successBody
                 // below is what runs validateBaselineScoreEntity.
                 for (const baseline of b.baselines) {
-                    baselinePairs.push(await formDocumentPairFor(
-                        db, {
+                    baselineMessagePairs.push(
+                        await formDocumentMessagePairFor(db, {
                             routePattern:
                                 'organizations/:id/projects/:id'
                                 + '/objective-baseline-scores'
@@ -4566,8 +4574,8 @@ export const routes: Route[] = [
                             ],
                             body: baseline.fields,
                             requesterIdentityId: actor,
-                            requestAt: pair.requestAt,
-                            operationId: pair.operationId,
+                            requestAt: messagePair.requestAt,
+                            operationId: messagePair.operationId,
                             organization,
                         },
                     ));
@@ -4580,22 +4588,22 @@ export const routes: Route[] = [
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
-                    if (projectPair !== undefined) {
+                    if (projectMessagePair !== undefined) {
                         await appendMessagePair(
-                            view, projectPair,
+                            view, projectMessagePair,
                         );
                     }
-                    if (ideaPair !== undefined) {
+                    if (ideaMessagePair !== undefined) {
                         await appendMessagePair(
-                            view, ideaPair,
+                            view, ideaMessagePair,
                         );
                     }
-                    for (const baselinePair of baselinePairs) {
+                    for (const baselineMessagePair of baselineMessagePairs) {
                         await appendMessagePair(
-                            view, baselinePair,
+                            view, baselineMessagePair,
                         );
                     }
                 },
@@ -4625,8 +4633,8 @@ export const routes: Route[] = [
             ),
     }),
     route('organizations/:id/ideas/:id/submissions/:sid', {
-        put: (db, p, body, _actor, pair) =>
-            postIdeaSubmissionOp(db, param(p, 2), body, pair),
+        put: (db, p, body, _actor, messagePair) =>
+            postIdeaSubmissionOp(db, param(p, 2), body, messagePair),
     }),
     route('organizations/:id/flows/', {
         // GET stays deriveFlows: stamps hasUndoHistory from
@@ -4638,7 +4646,7 @@ export const routes: Route[] = [
             deriveFlows(db, requireOrganization(organization)),
         // Member-tier POST — /flows carries POST in
         // MEMBER_VERBS. Forms the document + join pairs pre-tx
-        // (Task 5) beside the gate's own operation pair — the
+        // (Task 5) beside the gate's own operation message pair — the
         // SAME shape a live genesis PUT /flows/:id and a live
         // PUT /projects/:id/flows/:pfid would each carry — ONLY
         // when the gate supplied both a pair and a fence
@@ -4647,10 +4655,10 @@ export const routes: Route[] = [
         // all three, preserving dual-write discipline. See
         // postFlowCreationOp for the transaction shape.
         post: async (
-            db, _p, body, actor, pair, organization,
+            db, _p, body, actor, messagePair, organization,
         ) => {
-            let pairs: FlowCreationPairs | undefined;
-            if (pair !== undefined && organization !== undefined) {
+            let messagePairs: FlowCreationMessagePairs | undefined;
+            if (messagePair !== undefined && organization !== undefined) {
                 const b = validateFlowCreateBody(body);
                 const documentBody = flowCreateDocumentBody(b);
                 validateFlowDocumentBody(documentBody);
@@ -4658,14 +4666,14 @@ export const routes: Route[] = [
                     db, documentBody.graph as
                         Record<string, unknown>,
                 );
-                const document = await formDocumentPairFor(db, {
+                const document = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/flows/:id',
                     params: [organization, b.id],
                     body: documentBody,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
                 // The live :pfid PUT's request shape, verified by
@@ -4683,7 +4691,7 @@ export const routes: Route[] = [
                 // decision — no duplicate-create carve-out at this
                 // address through this task; pinned by the same-
                 // join-id retry test in tests/drift-flows.test.ts).
-                const join = await formDocumentPairFor(db, {
+                const join = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/projects/:id'
                         + '/flows/:pfid',
@@ -4693,13 +4701,13 @@ export const routes: Route[] = [
                     ],
                     body: b.projectFlow,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
-                pairs = { operation: pair, document, join };
+                messagePairs = { operation: messagePair, document, join };
             }
-            return postFlowCreationOp(db, body, actor, pairs);
+            return postFlowCreationOp(db, body, actor, messagePairs);
         },
     }),
     // flows/:id is the FIRST locked-class route (Task 3).
@@ -4729,19 +4737,19 @@ export const routes: Route[] = [
     // Undo-as-replay (Phase 14 Task 8). Phase Final Task 2:
     // flows + graph ROW halves stripped; restore writes the
     // 'updated' state event, revival states events, and the
-    // operation + document pairs. graphDelta/revivals are
-    // server-computed into the document pair body
+    // operation + document message pairs. graphDelta/revivals are
+    // server-computed into the document message pair body
     // (SIDECAR-KEEP → deriveFlowGraphStates). No flow_versions
     // row is read or written. Exhaustion appends only the
-    // operation pair. A moved lock head → 412 via the
+    // operation message pair. A moved lock head → 412 via the
     // in-tx head re-read.
     route('organizations/:id/flows/:id/undo', {
         post: async (
-            db, p, body, actor, pair, organization,
+            db, p, body, actor, messagePair, organization,
         ) => {
             const id = param(p, 1);
             const b = validateFlowUndoBody(body);
-            if (pair === undefined || organization === undefined) {
+            if (messagePair === undefined || organization === undefined) {
                 // Never live for flows (member-tier POST, always
                 // pair-wired) — kept so this handler's control
                 // flow matches every other wired route's
@@ -4750,7 +4758,7 @@ export const routes: Route[] = [
                 return undefined;
             }
             const resolution = await resolveFlowUndoTarget(
-                db, organization, id, pair.uriCollection,
+                db, organization, id, messagePair.uriCollection,
             );
             if (resolution === undefined) {
                 throw await missedReadError(
@@ -4758,7 +4766,7 @@ export const routes: Route[] = [
                 );
             }
             return postFlowUndoOp(
-                db, id, actor, organization, pair, resolution, b,
+                db, id, actor, organization, messagePair, resolution, b,
             );
         },
     }),
@@ -4785,32 +4793,32 @@ export const routes: Route[] = [
     }),
     route('organizations/:id/projects/:id/flows/:pfid', {
         // Phase Final Task 2: project_flows ROW half stripped —
-        // pure pair-plane write (join derives from the ledger).
+        // pure message-plane write (join derives from the ledger).
         // G6: reconstructed return is projectFlowEntityOf.
-        put: (db, p, body, _actor, pair) => {
+        put: (db, p, body, _actor, messagePair) => {
             const pfid = param(p, 2);
             const entity = projectFlowEntityOf({
                 uriId: pfid,
-                pairId: pfid,
+                messagePairId: pfid,
                 method: 'PUT',
                 body: withoutId(body),
             });
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                     return entity;
                 },
             );
         },
-        delete: (db, _p, _actor, pair) => {
+        delete: (db, _p, _actor, messagePair) => {
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                 },
             );
@@ -4854,7 +4862,7 @@ export const routes: Route[] = [
         // Member-tier POST — /work-orders carries POST in
         // MEMBER_VERBS (the claim sub-route is also a member
         // POST). Forms the document + join pairs pre-tx
-        // (Task 3) beside the gate's own operation pair — the
+        // (Task 3) beside the gate's own operation message pair — the
         // SAME shape a live genesis PUT /work-orders/:id and a
         // live PUT /flows/:id/work-orders/:woid would each
         // carry — ONLY when the gate supplied both a pair and
@@ -4864,22 +4872,22 @@ export const routes: Route[] = [
         // discipline. See postWorkOrderCreationOp for the
         // transaction shape.
         post: async (
-            db, _p, body, actor, pair, organization,
+            db, _p, body, actor, messagePair, organization,
         ) => {
-            let pairs: WorkOrderCreationPairs | undefined;
-            if (pair !== undefined && organization !== undefined) {
+            let messagePairs: WorkOrderCreationMessagePairs | undefined;
+            if (messagePair !== undefined && organization !== undefined) {
                 const b = validateWorkOrderCreateBody(body);
                 const documentBody =
                     workOrderCreateDocumentBody(b);
                 validateWorkOrderDocumentBody(documentBody);
-                const document = await formDocumentPairFor(db, {
+                const document = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/work-orders/:id',
                     params: [organization, b.id],
                     body: documentBody,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
                 // The live :woid PUT's request shape, verified
@@ -4898,7 +4906,7 @@ export const routes: Route[] = [
                 // out at this address through this task; pinned
                 // by the same-join-id retry test in
                 // tests/drift-work-orders.test.ts).
-                const join = await formDocumentPairFor(db, {
+                const join = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/flows/:id'
                         + '/work-orders/:woid',
@@ -4908,8 +4916,8 @@ export const routes: Route[] = [
                     ],
                     body: b.flowWorkOrder,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
                 const graph = asWorkOrderFlowGraph(
@@ -4917,7 +4925,7 @@ export const routes: Route[] = [
                     'workOrder.flow_graph',
                 );
                 const claimAt = b.stateEventAts[2]!;
-                const claim = await formDocumentPairFor(db, {
+                const claim = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/work-orders/:id'
                         + '/claim',
@@ -4933,16 +4941,16 @@ export const routes: Route[] = [
                         ),
                     },
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
-                pairs = {
-                    operation: pair, document, join, claim,
+                messagePairs = {
+                    operation: messagePair, document, join, claim,
                 };
             }
             return postWorkOrderCreationOp(
-                db, body, actor, pairs,
+                db, body, actor, messagePairs,
             );
         },
     }),
@@ -5001,15 +5009,15 @@ export const routes: Route[] = [
                 expires_at: claim.expiresAt,
             };
         },
-        put: (db, p, body, actor, pair, organization) =>
+        put: (db, p, body, actor, messagePair, organization) =>
             postWorkOrderClaimOp(
                 db, param(p, 1), body, actor,
-                requireOrganization(organization), pair,
+                requireOrganization(organization), messagePair,
             ),
-        delete: (db, p, actor, pair, organization) =>
+        delete: (db, p, actor, messagePair, organization) =>
             deleteWorkOrderClaimOp(
                 db, param(p, 1), actor,
-                requireOrganization(organization), pair,
+                requireOrganization(organization), messagePair,
             ),
     }),
     // Member-tier POST — /work-orders carries POST in
@@ -5023,7 +5031,7 @@ export const routes: Route[] = [
     // here only; the op stays dual-tolerant for seed.
     route('organizations/:id/work-orders/:id/transition', {
         post: (
-            db, p, body, actor, pair,
+            db, p, body, actor, messagePair,
             organization, roles,
         ) => {
             if ('fieldValues' in body) {
@@ -5035,7 +5043,7 @@ export const routes: Route[] = [
             }
             return postWorkOrderTransitionOp(
                 db, param(p, 1), body, actor,
-                organization, roles, pair,
+                organization, roles, messagePair,
             );
         },
     }),
@@ -5043,10 +5051,10 @@ export const routes: Route[] = [
     // no DELETE. POST is gone. Member-tier via
     // MEMBER_VERBS PUT on /work-orders.
     route('organizations/:id/work-orders/:id/binding', {
-        put: (db, p, body, actor, pair, organization) =>
+        put: (db, p, body, actor, messagePair, organization) =>
             postWorkOrderBindingOp(
                 db, param(p, 1), body, actor,
-                requireOrganization(organization), pair,
+                requireOrganization(organization), messagePair,
             ),
     }),
     // GET work-orders/:id/history (states-URI elimination A1):
@@ -5084,9 +5092,9 @@ export const routes: Route[] = [
             ),
     }),
     route('organizations/:id/flows/:id/work-orders/:woid', {
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postFlowWorkOrderDocumentOp(
-                db, param(p, 2), body, actor, pair,
+                db, param(p, 2), body, actor, messagePair,
             ),
     }),
     // GET states/:id/field-values RETIRED (states-URI
@@ -5105,7 +5113,7 @@ export const routes: Route[] = [
     // factories — documentPutHandler takes param 1 as id
     // on an org nest (param 0 is the path org). PUT
     // reuses postRecordDocumentOp (same trio body /
-    // pair append). POST reuses formRecordWritePairs +
+    // pair append). POST reuses formRecordWriteMessagePairs +
     // postRecordWriteOp with nested document addresses.
     // DELETE is inline records/:id posture plus type RESTRICT.
     route(RECORD_TYPES_COLLECTION_PATTERN, {
@@ -5115,26 +5123,26 @@ export const routes: Route[] = [
             ),
         // Admin-only composed create/edit (MEMBER_VERBS has
         // GET only). Same transaction / RESTRICT discipline
-        // as flat POST /records; document pair at the nested
+        // as flat POST /records; document message pair at the nested
         // detail address, attributes at ATTRIBUTE_DETAIL_
         // PATTERN.
         post: async (
-            db, _p, body, actor, pair, organization,
+            db, _p, body, actor, messagePair, organization,
         ) => {
-            let pairs: RecordWritePairs | undefined;
+            let messagePairs: RecordWriteMessagePairs | undefined;
             if (
-                pair !== undefined
+                messagePair !== undefined
                 && organization !== undefined
             ) {
                 const b = validateRecordWriteBody(body);
-                pairs = await formRecordWritePairs(
-                    db, b, actor, pair, organization,
+                messagePairs = await formRecordWriteMessagePairs(
+                    db, b, actor, messagePair, organization,
                     RECORD_TYPE_DETAIL_PATTERN,
                     [organization, b.id],
                 );
             }
             return postRecordWriteOp(
-                db, body, actor, pairs, organization,
+                db, body, actor, messagePairs, organization,
             );
         },
     }),
@@ -5144,9 +5152,9 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
                 param(p, 1),
             ),
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postRecordDocumentOp(
-                db, param(p, 1), body, actor, pair,
+                db, param(p, 1), body, actor, messagePair,
             ),
         // Admin DELETE with NET-NEW type RESTRICT. RESTRICT
         // check and tombstone append share one tx; referrer
@@ -5154,7 +5162,7 @@ export const routes: Route[] = [
         // Transaction bodies await only row ops). Path org
         // is already gate-matched to
         // the token org; DeleteHandler has no fence arg.
-        delete: async (db, params, _actor, pair) => {
+        delete: async (db, params, _actor, messagePair) => {
             const organization = requireOrganization(
                 param(params, 0),
             );
@@ -5172,8 +5180,8 @@ export const routes: Route[] = [
                             HTTP_CONFLICT,
                         );
                     }
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                 },
             );
@@ -5224,7 +5232,7 @@ export const routes: Route[] = [
             return recordTypeEntityOf(
                 {
                     uriId: id,
-                    pairId: found.id,
+                    messagePairId: found.id,
                     method: found.method,
                     body,
                 },
@@ -5243,11 +5251,11 @@ export const routes: Route[] = [
             const typeId = param(p, 1);
             await requireRecordTypeExists(db, org, typeId);
             const prefix = attributesUriPrefix(org, typeId);
-            const pairs = await db.pairs.getAllWhere(
+            const messagePairs = await db.messagePairs.getAllWhere(
                 'uri_collection', prefix,
             );
             const documents = deriveDocumentsAt(
-                pairs, prefix,
+                messagePairs, prefix,
             );
             const rows: { id: string }[] = [];
             for (const [id, document] of documents) {
@@ -5270,11 +5278,11 @@ export const routes: Route[] = [
             const attrId = param(p, 2);
             await requireRecordTypeExists(db, org, typeId);
             const prefix = attributesUriPrefix(org, typeId);
-            const pairs = await db.pairs.getAllWhere(
+            const messagePairs = await db.messagePairs.getAllWhere(
                 'uri_collection', prefix,
             );
             const document = deriveDocumentsAt(
-                pairs, prefix,
+                messagePairs, prefix,
             ).get(attrId);
             if (document === undefined) {
                 throw await missedReadError(
@@ -5285,17 +5293,17 @@ export const routes: Route[] = [
                 org, typeId, attrId, document.body,
             );
         },
-        put: async (db, p, body, _actor, pair) => {
+        put: async (db, p, body, _actor, messagePair) => {
             const org = param(p, 0);
             const typeId = param(p, 1);
             const attrId = param(p, 2);
             await requireRecordTypeExists(db, org, typeId);
             const prefix = attributesUriPrefix(org, typeId);
-            const pairs = await db.pairs.getAllWhere(
+            const messagePairs = await db.messagePairs.getAllWhere(
                 'uri_collection', prefix,
             );
             const hasHead = deriveDocumentsAt(
-                pairs, prefix,
+                messagePairs, prefix,
             ).has(attrId);
             const raw = withoutId(body);
             if (hasHead) {
@@ -5306,28 +5314,28 @@ export const routes: Route[] = [
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                 },
             );
         },
-        delete: async (db, p, _actor, pair) => {
+        delete: async (db, p, _actor, messagePair) => {
             const org = param(p, 0);
             const typeId = param(p, 1);
             const attrId = param(p, 2);
             await requireRecordTypeExists(db, org, typeId);
-            if (pair === undefined) {
+            if (messagePair === undefined) {
                 throw new Error(
                     'nested attribute DELETE without pair',
                 );
             }
             const prefix = attributesUriPrefix(org, typeId);
-            const pairs = await db.pairs.getAllWhere(
+            const messagePairs = await db.messagePairs.getAllWhere(
                 'uri_collection', prefix,
             );
             if (!deriveDocumentsAt(
-                pairs, prefix,
+                messagePairs, prefix,
             ).has(attrId)) {
                 throw await missedReadError(
                     db, attrId, org, 'record_attributes',
@@ -5339,7 +5347,7 @@ export const routes: Route[] = [
                     await deleteRecordAttributeSafe(
                         view, org, attrId, typeId,
                     );
-                    await appendMessagePair(view, pair);
+                    await appendMessagePair(view, messagePair);
                 },
             );
         },
@@ -5368,7 +5376,7 @@ export const routes: Route[] = [
                     head.values, attributesById, roles,
                 );
                 const parent = await instanceParentEtag(
-                    db, head.pairId,
+                    db, head.messagePairId,
                 );
                 const etag = await advertisedInstanceEtag(
                     instanceGetBody(
@@ -5423,7 +5431,7 @@ export const routes: Route[] = [
                     rev.values, attributesById, roles,
                 );
                 const parent = await instanceParentEtag(
-                    db, rev.pairId,
+                    db, rev.messagePairId,
                 );
                 const etag = await advertisedInstanceEtag(
                     instanceGetBody(
@@ -5527,14 +5535,14 @@ export const routes: Route[] = [
                 ),
             };
         },
-        patch: (db, p, body, actor, pair, organization,
+        patch: (db, p, body, actor, messagePair, organization,
             roles,
         ) => postInstancePatchOp(
-            db, p, body, actor, pair, organization, roles,
+            db, p, body, actor, messagePair, organization, roles,
         ),
-        delete: (db, p, actor, pair, organization, roles,
+        delete: (db, p, actor, messagePair, organization, roles,
         ) => postInstanceDeleteOp(
-            db, p, actor, pair, organization, roles,
+            db, p, actor, messagePair, organization, roles,
         ),
     }),
     // Flow↔record bindings nest under their parent flow:
@@ -5561,28 +5569,28 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
                 param(p, 1), param(p, 2),
             ),
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postFlowRecordDocumentOp(
-                db, param(p, 2), body, actor, pair,
+                db, param(p, 2), body, actor, messagePair,
             ),
         // Phase Final Task 2: flow_records ROW half stripped —
-        // DELETE is a pure pair-plane tombstone append.
-        delete: (db, _p, _actor, pair) => {
+        // DELETE is a pure message-plane tombstone append.
+        delete: (db, _p, _actor, messagePair) => {
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                 },
             );
         },
     }),
-    // Flow tags: the codebase's FIRST pair-plane-ONLY document
+    // Flow tags: the codebase's FIRST message-plane-ONLY document
     // family (Phase 14 Task 9, election #2's companion) — no
     // backing table, no dual-write, derived entirely from message
     // pairs. Bespoke route() wiring reusing deriveDocumentsAt/
-    // documentPairsAt exactly like the identities/:id/pii analog
+    // documentMessagePairsAt exactly like the identities/:id/pii analog
     // (gate 8), SIMPLE class (a repeat PUT records Supersedes —
     // 'organizations/:id/flows/:id/tags/:name' is registered
     // in message-pair.ts's DOCUMENT_CLASS_ROUTE_PATTERNS):
@@ -5618,10 +5626,10 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
                 param(p, 1), param(p, 2),
             ),
-        put: (db, _p, _body, _actor, pair) =>
-            postFlowTagDocumentOp(db, pair),
-        delete: (db, _p, _actor, pair) =>
-            postFlowTagDocumentOp(db, pair),
+        put: (db, _p, _body, _actor, messagePair) =>
+            postFlowTagDocumentOp(db, messagePair),
+        delete: (db, _p, _actor, messagePair) =>
+            postFlowTagDocumentOp(db, messagePair),
     }),
 
     // Hand-written in place of makeIdRoute<OrganizationEntity>
@@ -5636,16 +5644,16 @@ export const routes: Route[] = [
     // generic documentGetHandler(wiring): that machinery
     // requires a wiring row's documentOp, and organizations has
     // none. Phase Final Task 2: the organizations ROW half is
-    // stripped — pure pair-plane write (postFlowTagDocumentOp
+    // stripped — pure message-plane write (postFlowTagDocumentOp
     // shape). WRITE_RESPONSE_SPECS successBody forms the wire
     // bytes via organizationEntityOf (id-last; GET wins).
     route('organizations/:id', {
         get: (db, p) => deriveOrganization(db, param(p, 0)),
-        put: (db, p, body, _actor, pair) => {
+        put: (db, p, body, _actor, messagePair) => {
             const id = param(p, 0);
             const entity = organizationEntityOf({
                 uriId: id,
-                pairId: id,
+                messagePairId: id,
                 method: 'PUT',
                 body: withoutId(body),
             });
@@ -5654,8 +5662,8 @@ export const routes: Route[] = [
                 // stripped.
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                     return entity;
                 },
@@ -5739,16 +5747,16 @@ export const routes: Route[] = [
                 db, requireOrganization(organization),
                 param(p, 1),
             ),
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postMembershipDocumentOp(
-                db, param(p, 1), body, actor, pair,
+                db, param(p, 1), body, actor, messagePair,
             ),
-        delete: (db, _p, _actor, pair) => {
+        delete: (db, _p, _actor, messagePair) => {
             return db.transaction(
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                 },
             );
@@ -5833,7 +5841,7 @@ export const routes: Route[] = [
     route('organizations/:id/objectives/', {
         get: documentCollectionGetHandler(OBJECTIVES_WIRING),
         // Forms the document + revision pairs pre-tx (Task 3)
-        // beside the gate's own operation pair — the SAME shape
+        // beside the gate's own operation message pair — the SAME shape
         // a live genesis PUT /objectives/:id and a live PUT
         // /objectives/:id/revisions/:rid would each carry — ONLY
         // when the gate supplied both a pair and a fence
@@ -5842,26 +5850,26 @@ export const routes: Route[] = [
         // both, preserving dual-write discipline. See
         // postObjectiveCreationOp for the transaction shape.
         post: async (
-            db, _p, body, actor, pair, organization,
+            db, _p, body, actor, messagePair, organization,
         ) => {
-            let pairs: ObjectiveCreationPairs | undefined;
-            if (pair !== undefined && organization !== undefined) {
+            let messagePairs: ObjectiveCreationMessagePairs | undefined;
+            if (messagePair !== undefined && organization !== undefined) {
                 const b = validateObjectiveCreateBody(body);
                 const documentBody = objectiveDocumentBodyOf(b);
                 validateObjectiveDocumentBody(documentBody);
-                const document = await formDocumentPairFor(db, {
+                const document = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/objectives/:id',
                     params: [organization, b.id],
                     body: documentBody,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
                 const revisionBody = objectiveRevisionBodyOf(b);
                 validateObjectiveRevisionEntity(revisionBody);
-                const revision = await formDocumentPairFor(db, {
+                const revision = await formDocumentMessagePairFor(db, {
                     routePattern:
                         'organizations/:id/objectives/:id'
                         + '/revisions/:rid',
@@ -5870,13 +5878,15 @@ export const routes: Route[] = [
                     ],
                     body: revisionBody,
                     requesterIdentityId: actor,
-                    requestAt: pair.requestAt,
-                    operationId: pair.operationId,
+                    requestAt: messagePair.requestAt,
+                    operationId: messagePair.operationId,
                     organization,
                 });
-                pairs = { operation: pair, document, revision };
+                messagePairs = {
+                    operation: messagePair, document, revision,
+                };
             }
-            return postObjectiveCreationOp(db, body, pairs);
+            return postObjectiveCreationOp(db, body, messagePairs);
         },
     }),
     // objectives/:id is the seventh family. GET is FLIPPED
@@ -5915,15 +5925,15 @@ export const routes: Route[] = [
     // Hand-written so PUT can append its message pair in the
     // same transaction (see message-pair.ts). Phase Final
     // Task 2: objective_revisions ROW half stripped — pure
-    // pair-plane write. WRITE_RESPONSE_SPECS successBody forms
+    // message-plane write. WRITE_RESPONSE_SPECS successBody forms
     // the wire bytes; the reconstructed return is for type
     // parity with the former store put.
     route('organizations/:id/objectives/:id/revisions/:rid', {
-        put: (db, p, body, _actor, pair) => {
+        put: (db, p, body, _actor, messagePair) => {
             const id = param(p, 2);
             const entity = objectiveRevisionEntityOf({
                 uriId: id,
-                pairId: id,
+                messagePairId: id,
                 method: 'PUT',
                 body: withoutId(body),
             });
@@ -5932,8 +5942,8 @@ export const routes: Route[] = [
                 // half stripped.
                 MESSAGE_TABLES,
                 async (view) => {
-                    if (pair !== undefined) {
-                        await appendMessagePair(view, pair);
+                    if (messagePair !== undefined) {
+                        await appendMessagePair(view, messagePair);
                     }
                     return entity;
                 },
@@ -5964,9 +5974,9 @@ export const routes: Route[] = [
         'organizations/:id/projects/:id'
         + '/objective-baseline-scores/:sid',
         {
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postBaselineScoreDocumentOp(
-                db, param(p, 2), body, actor, pair,
+                db, param(p, 2), body, actor, messagePair,
             ),
     }),
     // Objective actual scores nest under their parent project,
@@ -5989,9 +5999,9 @@ export const routes: Route[] = [
         'organizations/:id/projects/:id'
         + '/objective-actual-scores/:sid',
         {
-        put: (db, p, body, actor, pair) =>
+        put: (db, p, body, actor, messagePair) =>
             postActualScoreDocumentOp(
-                db, param(p, 2), body, actor, pair,
+                db, param(p, 2), body, actor, messagePair,
             ),
     }),
     // Bulk lifecycle collection RETIRED (states-URI

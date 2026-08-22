@@ -17,7 +17,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
@@ -88,7 +88,7 @@ export function makeAIMember(
 
 const MEMBER_ORGANIZATION: Id = 'AjdvjuECVZEgZoFajaIEkg';
 
-async function identityDocumentPair(
+async function identityDocumentMessagePair(
     id: Id,
     body: Record<string, unknown>,
     requestAt: string,
@@ -99,7 +99,7 @@ async function identityDocumentPair(
             'no per-write response spec for identities/:id',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: `/identities/${id}`,
         routePattern: 'identities/:id',
@@ -118,7 +118,7 @@ async function identityDocumentPair(
     });
 }
 
-async function identityPiiDocumentPair(
+async function identityPiiDocumentMessagePair(
     id: Id,
     pii: Record<string, unknown>,
     requestAt: string,
@@ -130,7 +130,7 @@ async function identityPiiDocumentPair(
             + ' identities/:id/pii',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: `/identities/${id}/pii`,
         routePattern: 'identities/:id/pii',
@@ -149,7 +149,7 @@ async function identityPiiDocumentPair(
     });
 }
 
-async function aiAgentDocumentPair(
+async function aiAgentDocumentMessagePair(
     id: Id,
     body: Record<string, unknown>,
     requestAt: string,
@@ -160,7 +160,7 @@ async function aiAgentDocumentPair(
             'no per-write response spec for ai-agents/:id',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: `/ai-agents/${id}`,
         routePattern: 'ai-agents/:id',
@@ -197,13 +197,13 @@ export async function seedHumanMember(
     };
     await postIdentityDocumentOp(
         db, id, identityBody, SYSTEM_MEMBER_ID,
-        await identityDocumentPair(
+        await identityDocumentMessagePair(
             id, identityBody, requestAt,
         ),
     );
     await postIdentityPiiDocumentOp(
         db, id, pii, SYSTEM_MEMBER_ID,
-        await identityPiiDocumentPair(id, pii, requestAt),
+        await identityPiiDocumentMessagePair(id, pii, requestAt),
     );
     await seedSeat(db, MEMBER_ORGANIZATION, id, 'member');
 }
@@ -217,7 +217,7 @@ export async function seedAIMember(
     const body = { name, ...aiDetail() };
     await postAiAgentDocumentOp(
         db, id, body, SYSTEM_MEMBER_ID,
-        await aiAgentDocumentPair(id, body, requestAt),
+        await aiAgentDocumentMessagePair(id, body, requestAt),
     );
 }
 

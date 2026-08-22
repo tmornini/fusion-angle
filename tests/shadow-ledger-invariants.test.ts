@@ -36,7 +36,7 @@ const INV_FLOW_1_EV = generateIdentifier();
 const INV_WO_CREATE_1 = generateIdentifier();
 const INV_WO_CREATE_1_FWO = generateIdentifier();
 
-function pairJsonOf(message: string): {
+function messagePairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
 } {
     const body = HttpMessage.fromWire(message).body();
@@ -164,8 +164,8 @@ function workOrderFields(displayId: string, organization: string) {
 
 // The workOrder facet reuses workOrderFields() — the SAME
 // construction the entity-PUT case above already exercises —
-// so the create's synthesized document pair and this literal
-// are ONE source, never two divergent builds.
+// so the create's synthesized document message pair and this
+// literal are ONE source, never two divergent builds.
 function workOrderCreateBody(
     id: string,
     flowWorkOrderId: string,
@@ -220,10 +220,11 @@ function createRecordBody(
     };
 }
 
-// A mock-data seed (EXPECTED_PAIR_COUNT pre-formed pairs, see
-// mock-data-pairs.test.ts) plus one live-write batch layered on
-// top via handleRequest: one document PUT (Supersedes minted,
-// ideas), one idea state-change trio PUT (states/:id retired),
+// A mock-data seed (EXPECTED_MESSAGE_PAIR_COUNT pre-formed
+// pairs, see mock-data-pairs.test.ts) plus one live-write
+// batch layered on top via handleRequest: one document PUT
+// (Supersedes minted, ideas), one idea state-change trio PUT
+// (states/:id retired),
 // one FAILED write (work-order claim conflict 409), one create
 // POST (records — Phase 6 Task 4's own bundle: operation +
 // document + one attribute pair, not a single pair), one entity
@@ -272,9 +273,10 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     assert.equal(stateAppend.status, 201);
 
     // Create POST (records, org 2) — Task 4's bundle: the
-    // operation pair, its synthesized document pair, and one
-    // synthesized attribute-PUT pair (the create balance is now
-    // 2+N, not 1).
+    // operation message pair, its synthesized
+    // document message pair, and one synthesized
+    // attribute-PUT pair (the create balance is now 2+N,
+    // not 1).
     const created = await handleRequest(db, req(
         'POST', '/organizations/' + ORGANIZATION_TWO
             + '/record-types/', org2Token,
@@ -354,9 +356,10 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
     assert.equal(flowGenesis.status, 201);
 
     // Work-order CREATE (org 1) — a genesis POST, joined to the
-    // flow just created above: three pairs land (the operation
-    // pair, its synthesized document pair, its synthesized join
-    // pair), none of them route-exercised in this mixed batch
+    // flow just created above: three pairs land (the
+    // operation message pair, its synthesized
+    // document message pair, its synthesized join pair),
+    // none of them route-exercised in this mixed batch
     // before now.
     const workOrderCreated = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -387,7 +390,7 @@ async function seededWithMixedBatch(): Promise<MemoryDbAdapter> {
 test('every stored request message re-hashes to its own'
 + ' message_hash', async () => {
     const db = await seededWithMixedBatch();
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     assert.ok(requests.length > 0);
     for (const row of requests) {
         assert.equal(
@@ -411,7 +414,7 @@ const BEARER_JWT =
 test('stored request messages carry the live bearer JWT',
 async () => {
     const db = await seededWithMixedBatch();
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     assert.ok(requests.length > 0);
     const withBearer = requests.filter(
         row => BEARER_JWT.test(row.request),
@@ -429,9 +432,9 @@ test('every pair\'s envelope timestamps are RFC-3339 zulu'
 + ' with 6-digit sub-second precision, and the request'
 + ' strictly precedes its own response', async () => {
     const db = await seededWithMixedBatch();
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const responsesById = new Map(
-        (await db.pairs.getAll()).map(r => [r.id, r]),
+        (await db.messagePairs.getAll()).map(r => [r.id, r]),
     );
     assert.ok(requests.length > 0);
     for (const request of requests) {
@@ -462,7 +465,7 @@ test('a seeded idea\'s create-pair request reproduces its'
 + ' actual genesis row in states', async () => {
     const db = await seededMockDb();
     const idea = buildIdeas()[0]!;
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const createRow = requests.find(
         r => r.uri_id === idea.id
             && r.uri_collection
@@ -470,7 +473,7 @@ test('a seeded idea\'s create-pair request reproduces its'
                     + '/ideas/',
     );
     assert.ok(createRow, 'no create pair for the seeded idea');
-    const parsed = pairJsonOf(createRow!.request) as {
+    const parsed = messagePairJsonOf(createRow!.request) as {
         body: {
             state: string;
         };

@@ -2,9 +2,9 @@ import type { DbAdapter } from './db.ts';
 import type { Id } from './types.ts';
 import {
     deriveDocumentsAt,
-    documentPairsAt,
+    documentMessagePairsAt,
     byIdAscending,
-    type DocumentPair,
+    type DocumentMessagePair,
 } from './derive-documents.ts';
 import {
     documentVersion,
@@ -29,14 +29,14 @@ export interface InstanceValue {
 
 export interface InstanceRevision {
     readonly at: string;
-    readonly pairId: string;
+    readonly messagePairId: string;
     readonly values: readonly InstanceValue[];
     readonly version: string;
 }
 
 export interface InstanceHead {
     readonly id: string;
-    readonly pairId: string;      // latch pair id
+    readonly messagePairId: string; // latch pair id
     readonly values: readonly InstanceValue[];
 }
 
@@ -71,10 +71,10 @@ export function projectionOmitsStored(
 
 export async function instanceParentEtag(
     db: DbAdapter,
-    pairId: string,
+    messagePairId: string,
 ): Promise<string | undefined> {
-    const pair = await db.pairs.getById(pairId);
-    return ifMatchFromMessage(pair.request);
+    const messagePair = await db.messagePairs.getById(messagePairId);
+    return ifMatchFromMessage(messagePair.request);
 }
 
 export function advertisedInstanceEtag(
@@ -166,22 +166,22 @@ export function mergeInstanceValues(
         }));
 }
 
-async function fetchInstancePairs(
+async function fetchInstanceMessagePairs(
     db: DbAdapter,
     organization: Id,
     recordTypeId: Id,
-): Promise<readonly DocumentPair[]> {
+): Promise<readonly DocumentMessagePair[]> {
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    return documentPairsAt(pairs, prefix);
+    return documentMessagePairsAt(messagePairs, prefix);
 }
 
 // undefined when absent OR tombstoned (DELETE is the last
-// document pair) — tombstone = absent for every read path.
+// document message pair) — tombstone = absent for every read path.
 // Head body: revisionValuesOf(head body) — ONE head pair via
 // deriveDocumentsAt (PUT|DELETE only; no fold across pairs).
 export async function deriveInstanceHead(
@@ -193,16 +193,16 @@ export async function deriveInstanceHead(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     const document = deriveDocumentsAt(
-        pairs, prefix,
+        messagePairs, prefix,
     ).get(instanceId);
     if (document === undefined) return undefined;
     return {
         id: instanceId,
-        pairId: document.pairId,
+        messagePairId: document.messagePairId,
         values: revisionValuesOf(document.body),
     };
 }
@@ -216,15 +216,17 @@ export async function deriveInstanceCollection(
     const prefix = instancesUriPrefix(
         organization, recordTypeId,
     );
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const documents = deriveDocumentsAt(pairs, prefix);
+    const documents = deriveDocumentsAt(
+        messagePairs, prefix,
+    );
     const rows: InstanceHead[] = [];
     for (const document of documents.values()) {
         rows.push({
             id: document.uriId,
-            pairId: document.pairId,
+            messagePairId: document.messagePairId,
             values: revisionValuesOf(document.body),
         });
     }
@@ -239,20 +241,21 @@ export async function deriveInstanceRevisions(
     recordTypeId: Id,
     instanceId: Id,
 ): Promise<InstanceRevision[]> {
-    const pairs = (await fetchInstancePairs(
+    const messagePairs = (await fetchInstanceMessagePairs(
         db, organization, recordTypeId,
-    )).filter((pair) => pair.uriId === instanceId);
-    if (pairs.length === 0) return [];
-    const last = pairs[pairs.length - 1]!;
+    )).filter((messagePair) =>
+        messagePair.uriId === instanceId);
+    if (messagePairs.length === 0) return [];
+    const last = messagePairs[messagePairs.length - 1]!;
     if (last.method === DELETE_METHOD) return [];
     const revisions: InstanceRevision[] = [];
-    for (const pair of pairs) {
-        if (pair.method !== PUT_METHOD) continue;
+    for (const messagePair of messagePairs) {
+        if (messagePair.method !== PUT_METHOD) continue;
         revisions.push({
-            at: pair.at,
-            pairId: pair.id,
-            values: revisionValuesOf(pair.body),
-            version: pair.version,
+            at: messagePair.at,
+            messagePairId: messagePair.id,
+            values: revisionValuesOf(messagePair.body),
+            version: messagePair.version,
         });
     }
     return revisions;

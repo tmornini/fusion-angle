@@ -1,5 +1,5 @@
 import type {
-    PairEntity,
+    MessagePairEntity,
 } from './types.ts';
 import type {
     NotificationEvent,
@@ -265,7 +265,7 @@ export const ambientRunner = (tx: Tx): TxRunner =>
 // bound to an open tx (A9). The surviving store rides
 // HistoryEntityStore (message plane only).
 export interface DbStores {
-    pairs: EntityStore<PairEntity>;
+    messagePairs: EntityStore<MessagePairEntity>;
 }
 
 // Schema/connection lifecycle — the non-row surface every
@@ -329,12 +329,13 @@ export interface GuardedDbAdapter
     ): Promise<R>;
 }
 
-// The tables of the message plane — one, `pairs`.
+// The tables of the message plane — one,
+// `message_pairs`.
 export const TABLE_NAMES = [
-    'pairs',
+    'message_pairs',
 ];
 
-// The pair-plane transaction declaration. Every
+// The message-plane transaction declaration. Every
 // `transaction` / `readTransaction` that touches
 // the message plane passes this instead of a
 // literal list. Equals TABLE_NAMES.
@@ -372,7 +373,7 @@ export function uniqueColumns(
 // collection IS its rows.
 export const TABLE_INDEXES:
     Record<string, readonly TableIndexSpec[]> = {
-    pairs: [
+    message_pairs: [
         'uri_collection', 'request_hash',
     ],
 };

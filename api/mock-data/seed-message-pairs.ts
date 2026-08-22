@@ -1,5 +1,5 @@
 // Pre-tx pair formation for both seed paths (postMockDataLoad,
-// postBootstrap in ../mock-data.ts). formWritePair's hashing is
+// postBootstrap in ../mock-data.ts). formWriteMessagePair's hashing is
 // async crypto and cannot run inside the seed's one big
 // TABLE_NAMES transaction. Formed pre-tx — crypto, hashing,
 // and timers never run inside an open transaction
@@ -40,8 +40,9 @@
 // and a revision invocation per seeded objective. The scores
 // deferral closes (Task 5 of Phase 7), landing WHOLE: baselines
 // AND actuals (broader than "baselines" alone — the handoff's
-// own phrasing) — one document pair per seeded row, closed
-// through postBaselineScoreDocumentOp / postActualScoreDocumentOp.
+// own phrasing) — one document message pair per seeded row,
+// closed through postBaselineScoreDocumentOp /
+// postActualScoreDocumentOp.
 // The human-members/ai-members create-time bundle grows from one
 // pair to three (Phase 8 Task 4, the objectives-family
 // precedent generalized to the roster): the existing operation
@@ -54,41 +55,45 @@
 // each seeded membership row (16 — 11 human-member-organization
 // rows, `current` counted twice for its two-organization
 // membership, + 4 ai-member rows) now folds in its OWN document
-// pair, closed through postMembershipDocumentOp. Leftover
-// members/:id parent documents are gone from the seed.
+// message pair, closed through postMembershipDocumentOp.
+// Leftover members/:id parent documents are gone from the
+// seed.
 // Bootstrap's membership forms this SAME pair via
 // formBootstrapMessagePair. NO whole-slice seed
 // deferral remains; the work-order historical traces stay the
 // one NAMED direct-write carve-out above. The human-member
 // create-time bundle widens once more, human-only (Phase 10 Task
-// 5): a fourth invocation forms the identities/:id document pair
-// — a human member's own identity row, which an AI member never
-// has (finding 10), so the ai-members loop below stays a triple.
+// 5): a fourth invocation forms the identities/:id document
+// message pair — a human member's own identity row, which an
+// AI member never has (finding 10), so the ai-members loop
+// below stays a triple.
 // Bootstrap's lone 'XXZruirZyAOoRpNxaDnpSA' human-member create forms this
 // SAME
 // quadruple via formBootstrapMessagePair. Phase 10 Task 6 closes
 // the identity spine's remaining raw writes: each seeded AI
 // member and the system member ALSO form their OWN identities/:id
-// document pair (a standalone invocation — neither create-time
-// bundle above ever carried one, so this widens no triple/
-// quadruple), and each seeded role grant forms its OWN
-// role-grants/:id document pair. Every invocation here (as
-// always) forms through the SAME formSeedPair pipeline, UNTOUCHED
-// — formSeedPair is genesis by construction. The
-// 12 identity-credential document pairs (11 human passwords + the
-// system client secret) are the ONE exception: a credential's
+// document message pair (a standalone invocation — neither
+// create-time bundle above ever carried one, so this widens
+// no triple/quadruple), and each seeded role grant forms its
+// OWN role-grants/:id document message pair. Every invocation
+// here (as always) forms through the SAME formSeedMessagePair
+// pipeline, UNTOUCHED — formSeedMessagePair is genesis
+// by construction. The 12 identity-credential document
+// message pairs (11 human passwords + the system client
+// secret) are the ONE exception: a credential's
 // hashed secret is unknown until PBKDF2 resolves inside
 // seedHumanCredentials (api/mock-data.ts), which runs AFTER this
 // file's shared pre-tx pass already completed — so those 12 pairs
 // are formed by seedHumanCredentials' OWN local pass-1/pass-2
-// split, calling formSeedPair directly (formSeedCredentialPairs,
-// below) rather than riding buildMockDataInvocations /
+// split, calling formSeedMessagePair directly
+// (formSeedCredentialMessagePairs, below) rather than
+// riding buildMockDataInvocations /
 // formBootstrapMessagePair.
 //
 // Phase 11 Task 3 closed the historical-trace carve-out
 // itself (the work-order deferral's last piece, named above):
 // every trace event formed its own message pair through the
-// SAME formSeedPair pipeline every family above already rides.
+// SAME formSeedMessagePair pipeline every family above already rides.
 // States-address retirement Task 12 reshapes those 861 traces
 // (212 hand-authored + 649 generated) 1:1 into
 // work-orders/:id/transition op-shaped pairs (op: true),
@@ -102,11 +107,12 @@
 // (api/derive-organizations.ts), registered ahead of this task
 // (family-registry.ts, Task 2). Its two seeded organizations
 // (Stark Industries, Wayne Enterprises) form their OWN
-// organizations/:id document pair, the SAME per-family
-// onboarding playbook every prior family already rode. Phase
-// Final Task 2 strips the organizations ROW half — pairs alone
-// remain. Bootstrap's own lone STARK_ORGANIZATION pair mirrors
-// this via formBootstrapMessagePair below.
+// organizations/:id document message pair, the SAME
+// per-family onboarding playbook every prior family already
+// rode. Phase Final Task 2 strips the organizations ROW half
+// — pairs alone remain. Bootstrap's own lone
+// STARK_ORGANIZATION pair mirrors this via
+// formBootstrapMessagePair below.
 
 import type {
     Id,
@@ -131,7 +137,7 @@ import {
     storedGraph,
 } from '../types.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     OPERATION_ID_HEADER,
 } from '../message-pair.ts';
 import type { MessagePair } from '../message-pair.ts';
@@ -507,7 +513,7 @@ const fEmployees = 'DfkwfBiyfyCyRHvsHnDiqQ';
 const fReviewerNotes = 'ElVKgkCreTEHQXJZPBJDKw';
 
 // WO01 Review / Complete event ids — the only value-bearing
-// seed transitions (formInstanceChainPairs + transitionSeedBody
+// seed transitions (formInstanceChainMessagePairs + transitionSeedBody
 // value-branch). Dropped from the op-driven loop to avoid
 // double-append.
 export const WO01_REVIEW_EVENT_ID =
@@ -642,7 +648,7 @@ export const mockFlowRecords: FlowRecordEntity[] = [
 //
 // Each returns the EXACT object its family's postXxxOp receives
 // as its body/payload argument — the same construction feeds
-// both formWritePair (here) and the actual write (mock-data.ts).
+// both formWriteMessagePair (here) and the actual write (mock-data.ts).
 
 // The wire body a live PUT organizations/:id would carry for a
 // seeded organization row (Phase 12 Task 3): the six
@@ -1160,7 +1166,7 @@ export function roleGrantSeedBody(
 // at} — the ONE shape every seeded credential (11 human
 // passwords + the system client secret, both mock-data and
 // bootstrap) shares. Hoisted (Phase 10 Task 6) so
-// formSeedCredentialPairs (this file) and seedHumanCredentials
+// formSeedCredentialMessagePairs (this file) and seedHumanCredentials
 // (mock-data.ts) share the SAME construction — the
 // membershipSeedBody precedent above, for the credential ledger.
 // `secret` is the POST-HASH value only — the plaintext never
@@ -1235,10 +1241,11 @@ interface ObjectiveSeed {
 
 // The create body for POST /objectives — objective row,
 // first revision, and the genesis lifecycle trio. The trio
-// folds onto the document pair via objectiveDocumentBodyOf
-// (states-address retirement); pair count is unchanged —
-// only body bytes grow. Genesis event id mirrors
-// aiMemberSeedBody's seed-member-${id}-active pattern.
+// folds onto the document message pair via
+// objectiveDocumentBodyOf (states-address retirement); pair
+// count is unchanged — only body bytes grow. Genesis event
+// id mirrors aiMemberSeedBody's seed-member-${id}-active
+// pattern.
 export function objectiveSeedBody(
     seed: ObjectiveSeed,
     organization: Id,
@@ -1354,7 +1361,7 @@ export function bootstrapCurrentMemberPiiBody():
 
 // ---- pass 1: the op-invocation list + pair formation ----
 
-export function seedPairKey(
+export function seedMessagePairKey(
     routePattern: string, id: string,
 ): string {
     return routePattern + ':' + id;
@@ -1448,7 +1455,7 @@ export function buildMockDataInvocations():
         // other human is single-org via assignOrganization — the
         // SAME per-member partition postMockDataLoadIn's own
         // membership loop uses (mock-data.ts). Each row folds in
-        // its OWN document pair, closed through
+        // its OWN document message pair, closed through
         // postMembershipDocumentOp, ordered before the
         // human-member triple below — the SAME write order
         // postMockDataLoadIn uses (memberships land before the
@@ -1461,7 +1468,7 @@ export function buildMockDataInvocations():
                 ? 'admin' as const
                 : 'member' as const;
             invocations.push({
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     ORGANIZATION_MEMBER_DETAIL_PATTERN,
                     member.id + '-' + n,
                 ),
@@ -1474,16 +1481,17 @@ export function buildMockDataInvocations():
             });
         });
         invocations.push({
-            key: seedPairKey('identities/:id', member.id),
+            key: seedMessagePairKey('identities/:id', member.id),
             routePattern: 'identities/:id',
             idParams: [member.id],
             organization: undefined,
             requesterIdentityId: SYSTEM_MEMBER_ID,
             body: identityPersonSeedBody(member),
         });
-        // Phase 10 Task 2: the PII facet's own document pair,
-        // closing the intake decomposition's seed side — its own
-        // address (identities/:id/pii), formed the SAME way
+        // Phase 10 Task 2: the PII facet's own document
+        // message pair, closing the intake decomposition's
+        // seed side — its own address (identities/:id/pii),
+        // formed the SAME way
         // every other per-member invocation above is, over the
         // SAME body humanMemberPiiSeedBody hands the actual write
         // (mock-data.ts) so the two can never drift. ORDERING
@@ -1493,7 +1501,7 @@ export function buildMockDataInvocations():
         // it commits BEFORE seedHumanCredentials' pii-presence
         // filter runs.
         invocations.push({
-            key: seedPairKey('identities/:id/pii', member.id),
+            key: seedMessagePairKey('identities/:id/pii', member.id),
             routePattern: 'identities/:id/pii',
             idParams: [member.id],
             organization: undefined,
@@ -1502,12 +1510,13 @@ export function buildMockDataInvocations():
         });
     });
     // The system identity's OWN identities/:id document
-    // pair — the last raw identities.put site the mock-data seed
-    // still held for the system actor (the human-member loop
-    // above forms this SAME pair per human member already; the
-    // ai-members loop below forms its OWN, per member).
+    // message pair — the last raw identities.put site the
+    // mock-data seed still held for the system actor (the
+    // human-member loop above forms this SAME pair per human
+    // member already; the ai-members loop below forms its
+    // OWN, per member).
     invocations.push({
-        key: seedPairKey('identities/:id', SYSTEM_MEMBER_ID),
+        key: seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
         routePattern: 'identities/:id',
         idParams: [SYSTEM_MEMBER_ID],
         organization: undefined,
@@ -1523,7 +1532,7 @@ export function buildMockDataInvocations():
     ideas.forEach((idea, i) => {
         const event = ideaStateEventById.get(idea.id)!;
         invocations.push({
-            key: seedPairKey('ideas', idea.id),
+            key: seedMessagePairKey('ideas', idea.id),
             routePattern: 'organizations/:id/ideas/:id',
             idParams: [assignOrganization(i), idea.id],
             organization: assignOrganization(i),
@@ -1533,9 +1542,9 @@ export function buildMockDataInvocations():
     });
     // Phase 12 Task 3 / Phase Final Task 2: the two seeded
     // organizations form their OWN organizations/:id document
-    // pairs (ROW half stripped — pair-plane only).
+    // message pairs (ROW half stripped — message-plane only).
     invocations.push({
-        key: seedPairKey('organizations/:id', STARK_ORGANIZATION),
+        key: seedMessagePairKey('organizations/:id', STARK_ORGANIZATION),
         routePattern: 'organizations/:id',
         idParams: [STARK_ORGANIZATION],
         organization: undefined,
@@ -1546,7 +1555,7 @@ export function buildMockDataInvocations():
         ),
     });
     invocations.push({
-        key: seedPairKey('organizations/:id', ORGANIZATION_TWO),
+        key: seedMessagePairKey('organizations/:id', ORGANIZATION_TWO),
         routePattern: 'organizations/:id',
         idParams: [ORGANIZATION_TWO],
         organization: undefined,
@@ -1559,7 +1568,7 @@ export function buildMockDataInvocations():
     for (const submission of buildIdeaSubmissions()) {
         const ideaIndex = ideaIndexById.get(submission.idea_id)!;
         invocations.push({
-            key: seedPairKey('idea-submissions', submission.id),
+            key: seedMessagePairKey('idea-submissions', submission.id),
             routePattern:
                 'organizations/:id/ideas/:id/submissions/:sid',
             idParams: [
@@ -1575,7 +1584,7 @@ export function buildMockDataInvocations():
         const event = projectStateEventById.get(project.id)!;
         const organization = projectOrganizationFor(project);
         invocations.push({
-            key: seedPairKey('projects', project.id),
+            key: seedMessagePairKey('projects', project.id),
             routePattern: 'organizations/:id/projects/:id',
             idParams: [organization, project.id],
             organization,
@@ -1592,7 +1601,7 @@ export function buildMockDataInvocations():
             flow, event, projectFlow, flowRelations,
         );
         invocations.push({
-            key: seedPairKey('flows', flow.id),
+            key: seedMessagePairKey('flows', flow.id),
             routePattern: 'organizations/:id/flows/',
             idParams: [STARK_ORGANIZATION],
             op: true,
@@ -1601,17 +1610,18 @@ export function buildMockDataInvocations():
             body: createBody,
         });
         // Task 5: create appends THREE pairs — the operation
-        // pair above, plus a document pair (at the flow's own
-        // address) and a join pair (at the project_flows
-        // address), each keyed by its OWN deterministic
-        // invocation entry, mirroring the idea-submissions
-        // two-idParams precedent. The document body is built
-        // through flowCreateDocumentBody — the SAME construction
+        // message pair above, plus a document message pair
+        // (at the flow's own address) and a join pair (at the
+        // project_flows address), each keyed by its OWN
+        // deterministic invocation entry, mirroring the
+        // idea-submissions two-idParams precedent. The
+        // document body is built through
+        // flowCreateDocumentBody — the SAME construction
         // api/routes.ts's POST /flows handler uses — never a
         // second, hand-rolled copy.
         const b = validateFlowCreateBody(createBody);
         invocations.push({
-            key: seedPairKey('flows/:id', flow.id),
+            key: seedMessagePairKey('flows/:id', flow.id),
             routePattern: 'organizations/:id/flows/:id',
             idParams: [STARK_ORGANIZATION, flow.id],
             organization: STARK_ORGANIZATION,
@@ -1619,7 +1629,7 @@ export function buildMockDataInvocations():
             body: seedFlowDocumentBody(b, flow.graph),
         });
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'projects/:id/flows/:pfid', projectFlow.id,
             ),
             routePattern:
@@ -1640,7 +1650,7 @@ export function buildMockDataInvocations():
     // postFlowDocumentOp's genesis document PUT instead of the
     // four-above's postFlowCreationOp.
     invocations.push({
-        key: seedPairKey(
+        key: seedMessagePairKey(
             'flows/:id', seedIdentifier('seed-flow-org2'),
         ),
         routePattern: 'organizations/:id/flows/:id',
@@ -1653,9 +1663,10 @@ export function buildMockDataInvocations():
         body: flowOrg2SeedBody(),
     });
     // Phase 5 Task 4: the entity/join gap closed — one document
-    // pair per seeded work order (hand-authored + generated) and
-    // one join pair per seeded flow-work-order join, mirroring
-    // the flows family's document-genesis shape. The work-order
+    // message pair per seeded work order (hand-authored +
+    // generated) and one join pair per seeded
+    // flow-work-order join, mirroring the flows family's
+    // document-genesis shape. The work-order
     // HISTORICAL TRACES (states events + state_field_values) stay
     // a direct WRITE — Path A, the fingerprint-critical invariant
     // (op-replay would rearrange the pinned states fingerprint) —
@@ -1668,7 +1679,7 @@ export function buildMockDataInvocations():
         ]
     ) {
         invocations.push({
-            key: seedPairKey('work-orders/:id', wo.id),
+            key: seedMessagePairKey('work-orders/:id', wo.id),
             routePattern:
                 'organizations/:id/work-orders/:id',
             idParams: [STARK_ORGANIZATION, wo.id],
@@ -1685,7 +1696,7 @@ export function buildMockDataInvocations():
         ]
     ) {
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'flows/:id/work-orders/:woid', join.id,
             ),
             routePattern:
@@ -1695,9 +1706,9 @@ export function buildMockDataInvocations():
             ],
             organization: STARK_ORGANIZATION,
             // The SAME member as the join's own work order's
-            // document pair — the requesting identity is who
-            // brought the work order into being, not a second,
-            // independently-picked author.
+            // document message pair — the requesting identity
+            // is who brought the work order into being, not a
+            // second, independently-picked author.
             requesterIdentityId: workOrderFirstEventMemberId.get(
                 join.work_order_id,
             )!,
@@ -1714,7 +1725,7 @@ export function buildMockDataInvocations():
     // semantics do not match historical traces (zero seeded
     // claim events; the in-flight fixtures are 2- and
     // 3-event). WO-instance SoT Task 6: WO01's two value-
-    // bearing events leave this loop — formInstanceChainPairs
+    // bearing events leave this loop — formInstanceChainMessagePairs
     // forms their NEW-shape ops + revision pairs (and the
     // instance genesis + binding) so they are not double-
     // appended.
@@ -1731,7 +1742,7 @@ export function buildMockDataInvocations():
             continue;
         }
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'work-orders/:id/transition', event.id,
             ),
             routePattern:
@@ -1746,7 +1757,7 @@ export function buildMockDataInvocations():
     for (const m of aiMembers) {
         const { id: _id, ...fields } = m;
         invocations.push({
-            key: seedPairKey('ai-agents/:id', m.id),
+            key: seedMessagePairKey('ai-agents/:id', m.id),
             routePattern: 'ai-agents/:id',
             idParams: [m.id],
             organization: undefined,
@@ -1767,7 +1778,7 @@ export function buildMockDataInvocations():
         // nested record-types patterns (same storage addresses
         // as the retired flat alias window; counts unchanged).
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 RECORD_TYPES_COLLECTION_PATTERN, r.id,
             ),
             routePattern: RECORD_TYPES_COLLECTION_PATTERN,
@@ -1777,19 +1788,20 @@ export function buildMockDataInvocations():
             requesterIdentityId: event.member_id,
             body: createBody,
         });
-        // Phase 6 Task 4: create appends the document pair (at
-        // the type's own nested address) and one attribute-PUT
-        // pair per seeded attribute, each keyed by its OWN
-        // deterministic invocation entry — the flows document +
-        // join precedent above, generalized from fixed
-        // cardinality to 1+1+N. Bodies via the shared BODY
-        // builders (api/routes.ts) — never a second, hand-rolled
-        // copy. Every seeded attribute is genesis, so no
+        // Phase 6 Task 4: create appends the document message
+        // pair (at the type's own nested address) and one
+        // attribute-PUT pair per seeded attribute, each keyed
+        // by its OWN deterministic invocation entry — the
+        // flows document + join precedent above, generalized
+        // from fixed cardinality to 1+1+N. Bodies via the
+        // shared BODY builders (api/routes.ts) — never a
+        // second, hand-rolled copy. Every seeded attribute
+        // is genesis, so no
         // attribute-DELETE invocation exists here (the seed
         // never removes an attribute it just created).
         const b = validateRecordWriteBody(createBody);
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 RECORD_TYPE_DETAIL_PATTERN, r.id,
             ),
             routePattern: RECORD_TYPE_DETAIL_PATTERN,
@@ -1802,7 +1814,7 @@ export function buildMockDataInvocations():
             // Task 8: attributes store under their type
             // prefix; bodies drop record_id and stamp ACL.
             invocations.push({
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     ATTRIBUTE_DETAIL_PATTERN, a.id,
                 ),
                 routePattern: ATTRIBUTE_DETAIL_PATTERN,
@@ -1825,7 +1837,7 @@ export function buildMockDataInvocations():
     // author.
     for (const join of mockFlowRecords) {
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'flows/:id/records/:frid', join.id,
             ),
             routePattern:
@@ -1849,7 +1861,7 @@ export function buildMockDataInvocations():
             seed, STARK_ORGANIZATION, memberId,
         );
         invocations.push({
-            key: seedPairKey('objectives', seed.id),
+            key: seedMessagePairKey('objectives', seed.id),
             routePattern: 'organizations/:id/objectives/',
             idParams: [STARK_ORGANIZATION],
             op: true,
@@ -1857,18 +1869,18 @@ export function buildMockDataInvocations():
             requesterIdentityId: memberId,
             body: createBody,
         });
-        // Task 3: create appends the document pair (at the
-        // objective's own address) and the revision pair (at
-        // its first revision's own address), each keyed by its
-        // OWN deterministic invocation entry — the flows
-        // document + join precedent, objectives' own fixed
-        // 1+1+1. Bodies via the shared BODY builders
+        // Task 3: create appends the document message pair
+        // (at the objective's own address) and the revision
+        // pair (at its first revision's own address), each
+        // keyed by its OWN deterministic invocation entry —
+        // the flows document + join precedent, objectives'
+        // own fixed 1+1+1. Bodies via the shared BODY builders
         // (api/routes.ts) — never a second, hand-rolled copy.
         // The SAME member authors all three invocations (the
         // revision author).
         const b = validateObjectiveCreateBody(createBody);
         invocations.push({
-            key: seedPairKey('objectives/:id', seed.id),
+            key: seedMessagePairKey('objectives/:id', seed.id),
             routePattern: 'organizations/:id/objectives/:id',
             idParams: [STARK_ORGANIZATION, seed.id],
             organization: STARK_ORGANIZATION,
@@ -1876,7 +1888,7 @@ export function buildMockDataInvocations():
             body: objectiveDocumentBodyOf(b),
         });
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'objectives/:id/revisions/:rid', b.revisionId,
             ),
             routePattern:
@@ -1895,7 +1907,7 @@ export function buildMockDataInvocations():
         ORGANIZATION_TWO, SYSTEM_MEMBER_ID,
     );
     invocations.push({
-        key: seedPairKey(
+        key: seedMessagePairKey(
             'objectives', ORGANIZATION_TWO_OBJECTIVE.id,
         ),
         routePattern: 'organizations/:id/objectives/',
@@ -1907,7 +1919,7 @@ export function buildMockDataInvocations():
     });
     const org2 = validateObjectiveCreateBody(org2CreateBody);
     invocations.push({
-        key: seedPairKey(
+        key: seedMessagePairKey(
             'objectives/:id', ORGANIZATION_TWO_OBJECTIVE.id,
         ),
         routePattern: 'organizations/:id/objectives/:id',
@@ -1920,7 +1932,7 @@ export function buildMockDataInvocations():
         body: objectiveDocumentBodyOf(org2),
     });
     invocations.push({
-        key: seedPairKey(
+        key: seedMessagePairKey(
             'objectives/:id/revisions/:rid', org2.revisionId,
         ),
         routePattern:
@@ -1936,9 +1948,10 @@ export function buildMockDataInvocations():
     });
     // Phase 7 Task 5: the scores half of the seed deferral closes
     // LAST, landing WHOLE — baselines AND actuals, one document
-    // pair per seeded row, from the SAME buildSeedScoreRows
-    // output mock-data.ts's pass-2 write drives through
-    // postBaselineScoreDocumentOp / postActualScoreDocumentOp.
+    // message pair per seeded row, from the SAME
+    // buildSeedScoreRows output mock-data.ts's pass-2 write
+    // drives through postBaselineScoreDocumentOp /
+    // postActualScoreDocumentOp.
     // `pools` is the SAME pre-tx pool the objectives loop above
     // draws from — every scored project is STARK by construction
     // (the lone org-2 project is seeded 'submitted', so it never
@@ -1952,7 +1965,7 @@ export function buildMockDataInvocations():
     const scoreRows = buildSeedScoreRows(scoreProjects, pools);
     for (const row of scoreRows.baselines) {
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'projects/:id/objective-baseline-scores/:sid',
                 row.id,
             ),
@@ -1974,7 +1987,7 @@ export function buildMockDataInvocations():
     }
     for (const row of scoreRows.actuals) {
         invocations.push({
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'projects/:id/objective-actual-scores/:sid',
                 row.id,
             ),
@@ -2009,7 +2022,7 @@ export function buildMockDataInvocations():
 // idParams for the ADDRESS, but form as POST with {status:
 // 204} — uriId stays '' because messageAddress keys on the
 // LAST segment.
-export async function formSeedPair(
+export async function formSeedMessagePair(
     inv: MockDataInvocation, requestAt: string,
     operationId?: string,
 ): Promise<MessagePair> {
@@ -2041,7 +2054,7 @@ export async function formSeedPair(
             : documentSeedResponse(
                 inv, routeSegments, pathSegments,
             );
-    return formWritePair({
+    return formWriteMessagePair({
         method,
         pathname: '/' + pathSegments.join('/'),
         routePattern: inv.routePattern,
@@ -2075,7 +2088,7 @@ export async function formSeedPair(
 // for the identical request. `params` mirrors matchRoute's own
 // extraction (routes.ts): the path segment at each `:`-prefixed
 // route segment, in order. Every document-class invocation here
-// forms a PUT (formSeedPair's own method === 'PUT' when idParams
+// forms a PUT (formSeedMessagePair's own method === 'PUT' when idParams
 // is defined and op is not set), so a PerVerbWriteResponseSpec
 // entry (Task 4: ai-members/:id, human-members/:id) resolves
 // through its OWN `put` slot — the writeResponseSpecFor
@@ -2110,10 +2123,10 @@ function documentSeedResponse(
 }
 
 // The default-organization side channel's own pair former:
-// mirrors identityDefaultOrganizationRequest's formWritePair
+// mirrors identityDefaultOrganizationRequest's formWriteMessagePair
 // (api/organization-requests.ts) — a singleton document at
 // /identities/:id/default-organization/ (uriId '').
-export async function formDefaultOrganizationSeedPair(
+export async function formDefaultOrganizationSeedMessagePair(
     identityId: Id,
     organizationId: Id,
     requestAt: string,
@@ -2122,7 +2135,7 @@ export async function formDefaultOrganizationSeedPair(
         'identities', identityId, 'default-organization',
     ];
     const operationId = generateIdentifier();
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
         routePattern: 'identities/:id/default-organization',
@@ -2146,7 +2159,7 @@ export async function formDefaultOrganizationSeedPair(
     });
 }
 
-// The instance chain cannot ride formSeedPair: its
+// The instance chain cannot ride formSeedMessagePair: its
 // revisions share an address and its head depends on
 // (at, id) order — so this pass mints DISTINCT
 // ascending requestAt values (a named deviation from
@@ -2154,10 +2167,10 @@ export async function formDefaultOrganizationSeedPair(
 // sequentially. headerFields stays [] for every link
 // — the seed's no-bearer carve-out extends to If-Match
 // on seed revision pairs (never hoist If-Match onto
-// synthetic revisions; the wire op pair's hoisted
-// If-Match is what makes resends distinct messages on
-// the live path).
-export async function formInstanceChainPairs():
+// synthetic revisions; the wire operation message pair's
+// hoisted If-Match is what makes resends distinct messages
+// on the live path).
+export async function formInstanceChainMessagePairs():
     Promise<ReadonlyMap<string, MessagePair>>
 {
     const events = buildWorkOrderStateEvents();
@@ -2191,7 +2204,7 @@ export async function formInstanceChainPairs():
     // PATCH create would store. Seed writes this one
     // pair only (1498).
     const genesisId = generateIdentifier();
-    const genesis = await formWritePair({
+    const genesis = await formWriteMessagePair({
         method: 'PUT',
         pathname: instancePathname,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -2208,7 +2221,7 @@ export async function formInstanceChainPairs():
     });
 
     const bindingId = generateIdentifier();
-    const binding = await formWritePair({
+    const binding = await formWriteMessagePair({
         method: 'PUT',
         pathname:
             '/organizations/' + org
@@ -2237,7 +2250,7 @@ export async function formInstanceChainPairs():
     });
 
     const reviewOpId = generateIdentifier();
-    const reviewOp = await formWritePair({
+    const reviewOp = await formWriteMessagePair({
         method: 'POST',
         pathname:
             '/organizations/' + org
@@ -2266,7 +2279,7 @@ export async function formInstanceChainPairs():
     const reviewValues = mergeInstanceValues(
         [], { set: reviewSet },
     );
-    const reviewRevision = await formWritePair({
+    const reviewRevision = await formWriteMessagePair({
         method: 'PUT',
         pathname: instancePathname,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -2283,7 +2296,7 @@ export async function formInstanceChainPairs():
     });
 
     const completeOpId = generateIdentifier();
-    const completeOp = await formWritePair({
+    const completeOp = await formWriteMessagePair({
         method: 'POST',
         pathname:
             '/organizations/' + org
@@ -2312,7 +2325,7 @@ export async function formInstanceChainPairs():
     const completeValues = mergeInstanceValues(
         reviewValues, { set: completeSet },
     );
-    const completeRevision = await formWritePair({
+    const completeRevision = await formWriteMessagePair({
         method: 'PUT',
         pathname: instancePathname,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -2328,71 +2341,74 @@ export async function formInstanceChainPairs():
         operationId: completeOpId,
     });
 
-    const pairs = new Map<string, MessagePair>();
-    pairs.set(
-        seedPairKey(
+    const messagePairs = new Map<string, MessagePair>();
+    messagePairs.set(
+        seedMessagePairKey(
             INSTANCE_DETAIL_PATTERN, instanceId,
         ),
         genesis,
     );
-    pairs.set(
-        seedPairKey(
+    messagePairs.set(
+        seedMessagePairKey(
             'work-orders/:id/binding', woId,
         ),
         binding,
     );
-    pairs.set(
-        seedPairKey(
+    messagePairs.set(
+        seedMessagePairKey(
             'work-orders/:id/transition', review.id,
         ),
         reviewOp,
     );
-    pairs.set(
-        seedPairKey(
+    messagePairs.set(
+        seedMessagePairKey(
             INSTANCE_DETAIL_PATTERN,
             instanceId + '-review',
         ),
         reviewRevision,
     );
-    pairs.set(
-        seedPairKey(
+    messagePairs.set(
+        seedMessagePairKey(
             'work-orders/:id/transition',
             complete.id,
         ),
         completeOp,
     );
-    pairs.set(
-        seedPairKey(
+    messagePairs.set(
+        seedMessagePairKey(
             INSTANCE_DETAIL_PATTERN,
             instanceId + '-complete',
         ),
         completeRevision,
     );
-    return pairs;
+    return messagePairs;
 }
 
 // Pass 1 for postMockDataLoad: every op-invocation's pair,
 // formed BEFORE the seed's transaction opens. `requestAt` is
 // minted once by the caller (the seed's arrival moment) and
 // shared by every pair this seed forms — except the instance
-// chain (formInstanceChainPairs), which mints its own
+// chain (formInstanceChainMessagePairs), which mints its own
 // ascending requestAt values so instance-head order is
 // deterministic.
 export async function formMockDataMessagePairs(
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {
-    const pairs = new Map<string, MessagePair>();
+    const messagePairs = new Map<string, MessagePair>();
     for (const inv of buildMockDataInvocations()) {
-        pairs.set(inv.key, await formSeedPair(inv, requestAt));
+        messagePairs.set(
+            inv.key,
+            await formSeedMessagePair(inv, requestAt),
+        );
     }
     // One default-organization document per seeded human.
     for (const [index, member] of buildMembers().entries()) {
-        pairs.set(
-            seedPairKey(
+        messagePairs.set(
+            seedMessagePairKey(
                 'identities/:id/default-organization',
                 member.id,
             ),
-            await formDefaultOrganizationSeedPair(
+            await formDefaultOrganizationSeedMessagePair(
                 member.id,
                 memberPrimaryOrganization(member.id, index),
                 requestAt,
@@ -2401,28 +2417,29 @@ export async function formMockDataMessagePairs(
     }
     // WO-instance SoT Task 6: instance genesis + binding +
     // Review/Complete new-shape ops and revision pairs.
-    for (const [key, pair] of
-        await formInstanceChainPairs()
+    for (const [key, messagePair] of
+        await formInstanceChainMessagePairs()
     ) {
-        pairs.set(key, pair);
+        messagePairs.set(key, messagePair);
     }
-    return pairs;
+    return messagePairs;
 }
 
 // Pass 1 for seedHumanCredentials (mock-data.ts), called for
 // BOTH seed paths: the 12 (mock-data) / 2 (bootstrap) identity-
-// credential document pairs, formed from their OWN post-hash
-// bodies — content unknown until PBKDF2 resolves inside
-// seedHumanCredentials, which runs AFTER formMockDataMessagePairs
-// / formBootstrapMessagePair above already completed, so these
-// pairs can never join either. `requestAt` is minted once by the
-// caller, this credential batch's own arrival moment — the SAME
-// pattern every other pass 1 shares. Calls the SAME formSeedPair
+// credential document message pairs, formed from their OWN
+// post-hash bodies — content unknown until PBKDF2 resolves
+// inside seedHumanCredentials, which runs AFTER
+// formMockDataMessagePairs / formBootstrapMessagePair above
+// already completed, so these pairs can never join either.
+// `requestAt` is minted once by the caller, this credential
+// batch's own arrival moment — the SAME
+// pattern every other pass 1 shares. Calls the SAME formSeedMessagePair
 // every other family here does — untouched — so a seeded
 // credential pair can never drift from the shape the live PUT
 // identities/:id/credentials/:cid would have formed for an
 // identical request.
-export async function formSeedCredentialPairs(
+export async function formSeedCredentialMessagePairs(
     planned: readonly {
         readonly id: Id;
         readonly identityId: Id;
@@ -2434,12 +2451,12 @@ export async function formSeedCredentialPairs(
     },
     requestAt: string,
 ): Promise<ReadonlyMap<string, MessagePair>> {
-    const pairs = new Map<string, MessagePair>();
+    const messagePairs = new Map<string, MessagePair>();
     for (const cred of planned) {
-        const key = seedPairKey(
+        const key = seedMessagePairKey(
             'identities/:id/credentials/:cid', cred.id,
         );
-        pairs.set(key, await formSeedPair(
+        messagePairs.set(key, await formSeedMessagePair(
             {
                 key,
                 routePattern: 'identities/:id/credentials/:cid',
@@ -2453,10 +2470,10 @@ export async function formSeedCredentialPairs(
             requestAt,
         ));
     }
-    const systemKey = seedPairKey(
+    const systemKey = seedMessagePairKey(
         'identities/:id/credentials/:cid', systemCredential.id,
     );
-    pairs.set(systemKey, await formSeedPair(
+    messagePairs.set(systemKey, await formSeedMessagePair(
         {
             key: systemKey,
             routePattern: 'identities/:id/credentials/:cid',
@@ -2470,7 +2487,7 @@ export async function formSeedCredentialPairs(
         },
         requestAt,
     ));
-    return pairs;
+    return messagePairs;
 }
 
 // Pass 1 for postBootstrap: the lone 'XXZruirZyAOoRpNxaDnpSA' human-member
@@ -2481,31 +2498,34 @@ export async function formSeedCredentialPairs(
 // so no stored pair ever drifts from what was actually written.
 // Task 5: ALSO forms bootstrap's own membership pair (its lone
 // 'XXZruirZyAOoRpNxaDnpSA' membership). Phase 10 Task 2: ALSO
-// forms the current member's PII document pair
+// forms the current member's PII document message pair
 // (identities/:id/pii), the SAME facet-split every other
 // seeded human now carries. Phase 10 Task 5: the
 // human-member bundle grows from 1+1+1 to 1+1+1+1 — the
-// current member's own identities/:id document pair, the
-// SAME fourth invocation the mock-data seed's own
+// current member's own identities/:id document message pair,
+// the SAME fourth invocation the mock-data seed's own
 // human-members loop now forms per member. Phase 10 Task 6:
 // ALSO forms the system member's OWN identities/:id
-// document pair. The credential pairs stay OUTSIDE this
-// function — seedHumanCredentials' own local
-// pass-1/pass-2 split (formSeedCredentialPairs) forms
+// document message pair. The credential pairs stay OUTSIDE
+// this function — seedHumanCredentials' own local
+// pass-1/pass-2 split (formSeedCredentialMessagePairs) forms
 // them, for both seed paths.
 export async function formBootstrapMessagePair(
     requestAt: string,
 ): Promise<{
-    readonly identityPair: MessagePair;
-    readonly seatPair: MessagePair;
-    readonly piiPair: MessagePair;
-    readonly systemIdentityPair: MessagePair;
-    readonly defaultOrganizationPair: MessagePair;
-    readonly organizationPair: MessagePair;
+    readonly identityMessagePair: MessagePair;
+    readonly seatMessagePair: MessagePair;
+    readonly piiMessagePair: MessagePair;
+    readonly systemIdentityMessagePair: MessagePair;
+    readonly defaultOrganizationMessagePair: MessagePair;
+    readonly organizationMessagePair: MessagePair;
 }> {
-    const identityPair = await formSeedPair(
+    const identityMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('identities/:id', 'XXZruirZyAOoRpNxaDnpSA'),
+            key: seedMessagePairKey(
+                'identities/:id',
+                'XXZruirZyAOoRpNxaDnpSA',
+            ),
             routePattern: 'identities/:id',
             idParams: ['XXZruirZyAOoRpNxaDnpSA'],
             organization: undefined,
@@ -2514,9 +2534,9 @@ export async function formBootstrapMessagePair(
         },
         requestAt,
     );
-    const seatPair = await formSeedPair(
+    const seatMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 ORGANIZATION_MEMBER_DETAIL_PATTERN,
                 'current-0',
             ),
@@ -2529,9 +2549,12 @@ export async function formBootstrapMessagePair(
         },
         requestAt,
     );
-    const piiPair = await formSeedPair(
+    const piiMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('identities/:id/pii', 'XXZruirZyAOoRpNxaDnpSA'),
+            key: seedMessagePairKey(
+                'identities/:id/pii',
+                'XXZruirZyAOoRpNxaDnpSA',
+            ),
             routePattern: 'identities/:id/pii',
             idParams: ['XXZruirZyAOoRpNxaDnpSA'],
             organization: undefined,
@@ -2540,9 +2563,9 @@ export async function formBootstrapMessagePair(
         },
         requestAt,
     );
-    const systemIdentityPair = await formSeedPair(
+    const systemIdentityMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('identities/:id', SYSTEM_MEMBER_ID),
+            key: seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
             routePattern: 'identities/:id',
             idParams: [SYSTEM_MEMBER_ID],
             organization: undefined,
@@ -2551,13 +2574,13 @@ export async function formBootstrapMessagePair(
         },
         requestAt,
     );
-    const defaultOrganizationPair =
-        await formDefaultOrganizationSeedPair(
+    const defaultOrganizationMessagePair =
+        await formDefaultOrganizationSeedMessagePair(
             'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION, requestAt,
         );
-    const organizationPair = await formSeedPair(
+    const organizationMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('organizations/:id', STARK_ORGANIZATION),
+            key: seedMessagePairKey('organizations/:id', STARK_ORGANIZATION),
             routePattern: 'organizations/:id',
             idParams: [STARK_ORGANIZATION],
             organization: undefined,
@@ -2570,11 +2593,11 @@ export async function formBootstrapMessagePair(
         requestAt,
     );
     return {
-        identityPair,
-        seatPair,
-        piiPair,
-        systemIdentityPair,
-        defaultOrganizationPair,
-        organizationPair,
+        identityMessagePair,
+        seatMessagePair,
+        piiMessagePair,
+        systemIdentityMessagePair,
+        defaultOrganizationMessagePair,
+        organizationMessagePair,
     };
 }

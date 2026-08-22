@@ -29,7 +29,7 @@ import {
     postWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { STARK_ORGANIZATION } from
     '../api/mock-data/seed-constants.ts';
@@ -44,11 +44,11 @@ import { TEST_OPERATION_ID } from './http-fixtures.ts';
 // event payloads.
 //
 // NAMED re-pin (Phase 15 Task 4): RESTRICT's three graph legs
-// are pair-plane derived now — a raw
+// are message-plane derived now — a raw
 // db.flowNodeAttributes.put / db.workOrders.put leaves no
-// graphDelta / work-orders document pair, so live flow and
-// work-order referrers must land through the SAME wire-
-// reachable writers the live routes serve.
+// graphDelta / work-orders document message pair, so live
+// flow and work-order referrers must land through the SAME
+// wire-reachable writers the live routes serve.
 
 const TYPE_PATH =
     'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
@@ -75,7 +75,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     await seedCurrentMember(db);
     // Phase Final Stage B: records family retired — seed
-    // through live document PUTs so the pair plane owns them.
+    // through live document PUTs so the message plane owns them.
     await PUT(db, TYPE_PATH, {
         name: 'Asset', description: 'd', position: 1,
         state: 'active',
@@ -253,14 +253,14 @@ test(
     'an unreferenced attribute deletes cleanly',
     async () => {
         const db = await seededDb();
-        const before = (await db.pairs.getAll()).length;
+        const before = (await db.messagePairs.getAll()).length;
         // Phase Final Stage B: wire-seeded VXTdVVRluJDRBqbXWZBntA; DELETE
         // appends a tombstone pair (table retired).
         await DELETE(
             db, ATTR1_PATH, DEV_TOKEN,
         );
         assert.equal(
-            (await db.pairs.getAll()).length, before + 1,
+            (await db.messagePairs.getAll()).length, before + 1,
         );
         await assert.rejects(
             () => GET(
@@ -270,12 +270,12 @@ test(
     },
 );
 
-// Phase Final Task 1(a): pair-plane organization_id re-anchor
+// Phase Final Task 1(a): message-plane organization_id re-anchor
 // for RESTRICT DELETE. Wire-seeded attribute (pairs exist) so
 // the head response body stamps organization_id; DELETE is
 // 204 and wire GET 404s.
 test(
-    'pair-plane organization_id deletes a wire-seeded'
+    'message-plane organization_id deletes a wire-seeded'
     + ' unreferenced attribute (Task 1(a) parity)',
     async () => {
         const db = await seededDb();
@@ -314,7 +314,7 @@ async function seedFieldValueReferrer(
     value: string,
 ): Promise<void> {
     // Phase Final Stage B: work_orders table retired — seed
-    // through the live document PUT so the pair plane owns it.
+    // through the live document PUT so the message plane owns it.
     await PUT(
         db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + WORK_ORDER_ID, {
@@ -348,7 +348,7 @@ async function seedFieldValueReferrer(
         'work-orders', WORK_ORDER_ID, 'transition',
     ];
     const pattern = 'organizations/:id/work-orders/:id/transition';
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: pattern,
@@ -365,7 +365,7 @@ async function seedFieldValueReferrer(
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, body, SYSTEM_MEMBER_ID,
-        undefined, [], pair,
+        undefined, [], messagePair,
     );
 }
 
@@ -389,7 +389,7 @@ test(
                     err.message,
                 ),
         );
-        // RESTRICT 409: attribute still served on pair plane.
+        // RESTRICT 409: attribute still served on message plane.
         const still = await GET<{ id: string }>(
             db, ATTR1_PATH, DEV_TOKEN,
         );
@@ -442,13 +442,13 @@ test(
             }],
         });
         // deletion must succeed — 'removed' is not a referrer
-        const before = (await db.pairs.getAll()).length;
+        const before = (await db.messagePairs.getAll()).length;
         await DELETE(
             db, ATTR1_PATH, DEV_TOKEN,
         );
         // Phase Final Stage B: tombstone pair lands; GET 404s.
         assert.equal(
-            (await db.pairs.getAll()).length, before + 1,
+            (await db.messagePairs.getAll()).length, before + 1,
         );
         await assert.rejects(
             () => GET(
@@ -598,8 +598,8 @@ test(
             db, 'VXTdVVRluJDRBqbXWZBntA', FIELD_VALUE_ID,
             'High',
         );
-        const requestsBefore = await db.pairs.getAll();
-        const responsesBefore = await db.pairs.getAll();
+        const requestsBefore = await db.messagePairs.getAll();
+        const responsesBefore = await db.messagePairs.getAll();
         await assert.rejects(
             () => POST(db
                 , 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {
@@ -622,7 +622,7 @@ test(
                 err instanceof RequestError
                 && err.status === 409,
         );
-        // the batch applied NOTHING: pair-plane document
+        // the batch applied NOTHING: message-plane document
         // survives and zero pairs append
         const record = await GET<{ name: string }>(
             db, TYPE_PATH, DEV_TOKEN,
@@ -635,11 +635,11 @@ test(
         // pair-balance: the whole bundle is pairs-or-nothing,
         // so a 409 rollback appends NEITHER table any rows.
         assert.equal(
-            (await db.pairs.getAll()).length,
+            (await db.messagePairs.getAll()).length,
             requestsBefore.length,
         );
         assert.equal(
-            (await db.pairs.getAll()).length,
+            (await db.messagePairs.getAll()).length,
             responsesBefore.length,
         );
     },

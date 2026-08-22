@@ -12,7 +12,7 @@ import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';

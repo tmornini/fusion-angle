@@ -13,7 +13,7 @@ import type {
 import { nowUtc } from
     '../api/types.ts';
 import { canonicalUriCollection } from '../api/message-pair.ts';
-import { documentPairsAt } from '../api/derive-documents.ts';
+import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
     documentCollectionGetHandler,
@@ -74,7 +74,7 @@ const HUMAN_DRIFT_METHOD_FILTER_1 = generateIdentifier();
 // ai_members / memberships / invitations) dual-write stripped.
 // This file no longer compares derive vs old-table oracles —
 // the row plane is empty after seed. Coverage re-homes to
-// wire-byte handleRequest assertions and pair-plane live
+// wire-byte handleRequest assertions and message-plane live
 // fixtures (drift-identity-tokens craftsmanship).
 //
 // The roster is FOUR document families at once: members (the
@@ -555,23 +555,23 @@ test('seat collection counts per org; current identity;'
     );
 });
 
-// -- 5. live-write chain on the pair plane ---------------------
+// -- 5. live-write chain on the message plane ------------------
 
 test('live-write chain: PUT ai-agents, PUT identity, PUT'
-+ ' seat, DELETE seat — pair plane only',
++ ' seat, DELETE seat — message plane only',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const aiId = generateIdentifier();
 
-    const beforeCreate = (await db.pairs.getAll()).length;
+    const beforeCreate = (await db.messagePairs.getAll()).length;
     const created = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token,
         aiMemberDocumentBody('Chain AI'),
     ));
     assert.equal(created.status, 201);
     assert.equal(
-        (await db.pairs.getAll()).length, beforeCreate + 1,
+        (await db.messagePairs.getAll()).length, beforeCreate + 1,
     );
     const agent1 = await handleRequest(
         db, req('GET', '/ai-agents/' + aiId, token),
@@ -596,7 +596,7 @@ async () => {
     );
 
     const humanId = generateIdentifier();
-    const beforeHumanCreate = (await db.pairs.getAll()).length;
+    const beforeHumanCreate = (await db.messagePairs.getAll()).length;
     const humanCreated = await handleRequest(db, req(
         'PUT', '/identities/' + humanId, token, {
             kind: 'person',
@@ -608,7 +608,7 @@ async () => {
     ));
     assert.equal(humanCreated.status, 201);
     assert.equal(
-        (await db.pairs.getAll()).length,
+        (await db.messagePairs.getAll()).length,
         beforeHumanCreate + 1,
     );
     const humanEdited = await handleRequest(db, req(
@@ -672,10 +672,10 @@ async () => {
     );
 });
 
-// -- 6. invitations lifecycle on the pair plane ----------------
+// -- 6. invitations lifecycle on the message plane -------------
 
 test('invitations lifecycle: fresh grant → pending; accept →'
-+ ' accepted + membership on pair plane; decline; revoke;'
++ ' accepted + membership on message plane; decline; revoke;'
 + ' duplicate grant → no phantom; no-op re-accept → stable',
 async () => {
     const db = await seededDb();
@@ -761,7 +761,7 @@ async () => {
     assert.equal(sarahRow.state, 'pending');
     // Phase Final Stage B: roster tables retired.
 
-    // B: accept — accepted + the membership on the pair plane.
+    // B: accept — accepted + the membership on the message plane.
     const jessicaId = 'zyGBRshxOnKHUfcyFRqowg';
     const jessicaGrant = await grantTo(
         INV_ROSTER_JESSICA, 'jessica.park@company.com',
@@ -859,7 +859,7 @@ async () => {
 // -- create ---------------------------------------------------------
 
 test('PUT ai-agents and PUT identities land exactly one'
-+ ' document pair at each address — no composing POST',
++ ' document message pair at each address — no composing POST',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -876,14 +876,14 @@ async () => {
         undefined, '/ai-agents/',
     );
     const [aiRequests, aiResponses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', aiPrefix),
-        db.pairs.getAllWhere('uri_collection', aiPrefix),
+        db.messagePairs.getAllWhere('uri_collection', aiPrefix),
+        db.messagePairs.getAllWhere('uri_collection', aiPrefix),
     ]);
-    const aiDocumentPairs = documentPairsAt(
+    const aiDocumentMessagePairs = documentMessagePairsAt(
         aiRequests, aiPrefix,
-    ).filter((pair) => pair.uriId === aiId);
-    assert.equal(aiDocumentPairs.length, 1);
-    assert.equal(aiDocumentPairs[0]!.method, 'PUT');
+    ).filter((messagePair) => messagePair.uriId === aiId);
+    assert.equal(aiDocumentMessagePairs.length, 1);
+    assert.equal(aiDocumentMessagePairs[0]!.method, 'PUT');
 
     const humanCreated = await handleRequest(db, req(
         'PUT', '/identities/' + humanId, token, {
@@ -900,14 +900,14 @@ async () => {
         undefined, '/identities/',
     );
     const [humanRequests, humanResponses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', humanPrefix),
-        db.pairs.getAllWhere('uri_collection', humanPrefix),
+        db.messagePairs.getAllWhere('uri_collection', humanPrefix),
+        db.messagePairs.getAllWhere('uri_collection', humanPrefix),
     ]);
-    const humanDocumentPairs = documentPairsAt(
+    const humanDocumentMessagePairs = documentMessagePairsAt(
         humanRequests, humanPrefix,
-    ).filter((pair) => pair.uriId === humanId);
-    assert.equal(humanDocumentPairs.length, 1);
-    assert.equal(humanDocumentPairs[0]!.method, 'PUT');
+    ).filter((messagePair) => messagePair.uriId === humanId);
+    assert.equal(humanDocumentMessagePairs.length, 1);
+    assert.equal(humanDocumentMessagePairs[0]!.method, 'PUT');
 });
 
 // -- 8. resend idempotency at drift altitude --------------------
@@ -919,20 +919,20 @@ test('resend idempotency: a byte-identical ai-agents/:id PUT'
     const token = await organizationToken();
     const aiId = generateIdentifier();
 
-    const beforeCount = (await db.pairs.getAll()).length;
+    const beforeCount = (await db.messagePairs.getAll()).length;
     const body = aiMemberDocumentBody('Resend AI Facet');
     const first = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token, body,
     ));
     assert.equal(first.status, 201);
-    const afterFirst = (await db.pairs.getAll()).length;
+    const afterFirst = (await db.messagePairs.getAll()).length;
     assert.equal(afterFirst, beforeCount + 1);
 
     const second = await handleRequest(db, req(
         'PUT', '/ai-agents/' + aiId, token, body,
     ));
     assert.equal(second.status, 201);
-    const afterSecond = (await db.pairs.getAll()).length;
+    const afterSecond = (await db.messagePairs.getAll()).length;
     assert.equal(afterSecond, afterFirst);
     assert.equal(
         first.headers.get('Response-ID'),
@@ -1015,7 +1015,7 @@ async () => {
 
 test('plain PUT-supersession at a seat address — a'
 + ' second PUT (an OLDER domain `at` than the first) still'
-+ ' supersedes by ARRIVAL order on the pair plane',
++ ' supersedes by ARRIVAL order on the message plane',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();

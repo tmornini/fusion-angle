@@ -44,7 +44,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -260,7 +260,7 @@ test(
             throw new Error('no identities/:id spec');
         }
         const memberId = generateIdentifier();
-        const pair = await formWritePair({
+        const messagePair = await formWriteMessagePair({
             method: 'PUT',
             pathname: '/identities/' + memberId,
             routePattern: 'identities/:id',
@@ -282,7 +282,7 @@ test(
         });
         await postIdentityDocumentOp(
             db, memberId, identityBody,
-            SYSTEM_MEMBER_ID, pair,
+            SYSTEM_MEMBER_ID, messagePair,
         );
         await seedSeat(
             db, 'AjdvjuECVZEgZoFajaIEkg', memberId, 'member',

@@ -34,9 +34,9 @@ import {
     objectiveDocumentBodyOf,
     objectiveRevisionBodyOf,
     flowCreateDocumentBody,
-    type RecordWritePairs,
-    type ObjectiveCreationPairs,
-    type FlowCreationPairs,
+    type RecordWriteMessagePairs,
+    type ObjectiveCreationMessagePairs,
+    type FlowCreationMessagePairs,
 } from './routes.ts';
 import type { MessagePair } from
     './message-pair.ts';
@@ -44,9 +44,9 @@ import { appendMessagePair } from
     './message-pair.ts';
 import {
     formBootstrapMessagePair,
-    formDefaultOrganizationSeedPair,
-    formSeedPair,
-    seedPairKey,
+    formDefaultOrganizationSeedMessagePair,
+    formSeedMessagePair,
+    seedMessagePairKey,
     organizationSeedBody,
     seatSeedBody,
     bootstrapCurrentIdentityBody,
@@ -125,17 +125,17 @@ type Hasher = (
 
 const STARK_NAME = 'Stark Industries';
 
-type TenantAdminPairs = {
+type TenantAdminMessagePairs = {
     readonly organizationId: string;
     readonly adminId: string;
     readonly email: string;
     readonly requestAt: string;
     readonly piiBody: Record<string, unknown>;
-    readonly organizationPair: MessagePair;
-    readonly identityPair: MessagePair;
-    readonly piiPair: MessagePair;
-    readonly seatPair: MessagePair;
-    readonly defaultOrganizationPair: MessagePair;
+    readonly organizationMessagePair: MessagePair;
+    readonly identityMessagePair: MessagePair;
+    readonly piiMessagePair: MessagePair;
+    readonly seatMessagePair: MessagePair;
+    readonly defaultOrganizationMessagePair: MessagePair;
 };
 
 function tenantAdminPiiBody(
@@ -704,10 +704,10 @@ export function sliceEntityId(
     return id;
 }
 
-async function formTenantAdminPairs(
+async function formTenantAdminMessagePairs(
     section: ParallelSection,
     requestAt: string,
-): Promise<TenantAdminPairs> {
+): Promise<TenantAdminMessagePairs> {
     const token = sectionToken(section);
     const organizationId = sliceEntityId(
         token + '-org');
@@ -719,9 +719,9 @@ async function formTenantAdminPairs(
         section + ' Admin',
         email,
     );
-    const organizationPair = await formSeedPair(
+    const organizationMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'organizations/:id',
                 organizationId,
             ),
@@ -737,9 +737,9 @@ async function formTenantAdminPairs(
         },
         requestAt,
     );
-    const identityPair = await formSeedPair(
+    const identityMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'identities/:id', adminId,
             ),
             routePattern: 'identities/:id',
@@ -750,9 +750,9 @@ async function formTenantAdminPairs(
         },
         requestAt,
     );
-    const piiPair = await formSeedPair(
+    const piiMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'identities/:id/pii', adminId,
             ),
             routePattern: 'identities/:id/pii',
@@ -763,9 +763,9 @@ async function formTenantAdminPairs(
         },
         requestAt,
     );
-    const seatPair = await formSeedPair(
+    const seatMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 ORGANIZATION_MEMBER_DETAIL_PATTERN,
                 adminId,
             ),
@@ -778,8 +778,8 @@ async function formTenantAdminPairs(
         },
         requestAt,
     );
-    const defaultOrganizationPair =
-        await formDefaultOrganizationSeedPair(
+    const defaultOrganizationMessagePair =
+        await formDefaultOrganizationSeedMessagePair(
             adminId, organizationId, requestAt,
         );
     return {
@@ -788,35 +788,35 @@ async function formTenantAdminPairs(
         email,
         requestAt,
         piiBody,
-        organizationPair,
-        identityPair,
-        piiPair,
-        seatPair,
-        defaultOrganizationPair,
+        organizationMessagePair,
+        identityMessagePair,
+        piiMessagePair,
+        seatMessagePair,
+        defaultOrganizationMessagePair,
     };
 }
 
 async function writeTenantAdmin(
     adapter: DbAdapter,
-    formed: TenantAdminPairs,
+    formed: TenantAdminMessagePairs,
 ): Promise<void> {
     await Promise.all([
         appendMessagePair(
-            adapter, formed.organizationPair,
+            adapter, formed.organizationMessagePair,
         ),
         postIdentityDocumentOp(
             adapter,
             formed.adminId,
             bootstrapCurrentIdentityBody(),
             SYSTEM_MEMBER_ID,
-            formed.identityPair,
+            formed.identityMessagePair,
         ),
         postIdentityPiiDocumentOp(
             adapter,
             formed.adminId,
             formed.piiBody,
             SYSTEM_MEMBER_ID,
-            formed.piiPair,
+            formed.piiMessagePair,
         ),
         postMembershipDocumentOp(
             adapter,
@@ -825,11 +825,11 @@ async function writeTenantAdmin(
                 'admin', formed.requestAt,
             ),
             SYSTEM_MEMBER_ID,
-            formed.seatPair,
+            formed.seatMessagePair,
         ),
         appendMessagePair(
             adapter,
-            formed.defaultOrganizationPair,
+            formed.defaultOrganizationMessagePair,
         ),
     ]);
 }
@@ -838,28 +838,28 @@ type ExtraIdentity = {
     readonly identityId: string;
     readonly requestAt: string;
     readonly piiBody: Record<string, unknown>;
-    readonly identityPair: MessagePair;
-    readonly piiPair: MessagePair;
-    readonly seatPair?: MessagePair;
+    readonly identityMessagePair: MessagePair;
+    readonly piiMessagePair: MessagePair;
+    readonly seatMessagePair?: MessagePair;
 };
 
 type ExtraWrites = {
     readonly identities: readonly ExtraIdentity[];
-    readonly organizationPair?: MessagePair;
+    readonly organizationMessagePair?: MessagePair;
     readonly extraAdminSeat?: {
         readonly identityId: string;
         readonly requestAt: string;
-        readonly pair: MessagePair;
+        readonly messagePair: MessagePair;
     };
     readonly flow?: {
         readonly id: string;
         readonly body: Record<string, unknown>;
-        readonly pair: MessagePair;
+        readonly messagePair: MessagePair;
     };
     readonly ai?: {
         readonly id: string;
         readonly body: Record<string, unknown>;
-        readonly pair: MessagePair;
+        readonly messagePair: MessagePair;
     };
 };
 
@@ -871,9 +871,9 @@ async function formExtraIdentity(
     seatOrganizationId?: string,
 ): Promise<ExtraIdentity> {
     const piiBody = tenantAdminPiiBody(name, email);
-    const identityPair = await formSeedPair(
+    const identityMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'identities/:id', identityId,
             ),
             routePattern: 'identities/:id',
@@ -884,9 +884,9 @@ async function formExtraIdentity(
         },
         requestAt,
     );
-    const piiPair = await formSeedPair(
+    const piiMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'identities/:id/pii', identityId,
             ),
             routePattern: 'identities/:id/pii',
@@ -902,13 +902,13 @@ async function formExtraIdentity(
             identityId,
             requestAt,
             piiBody,
-            identityPair,
-            piiPair,
+            identityMessagePair,
+            piiMessagePair,
         };
     }
-    const seatPair = await formSeedPair(
+    const seatMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 ORGANIZATION_MEMBER_DETAIL_PATTERN,
                 identityId,
             ),
@@ -927,9 +927,9 @@ async function formExtraIdentity(
         identityId,
         requestAt,
         piiBody,
-        identityPair,
-        piiPair,
-        seatPair,
+        identityMessagePair,
+        piiMessagePair,
+        seatMessagePair,
     };
 }
 
@@ -949,9 +949,9 @@ async function formBExtras(
         organization_id: organizationId,
         name: 'B Return Flow',
     };
-    const flowPair = await formSeedPair(
+    const flowMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('flows/:id', 'UXOPfjdZZohCcyCLlQWnuQ'),
+            key: seedMessagePairKey('flows/:id', 'UXOPfjdZZohCcyCLlQWnuQ'),
             routePattern:
                 'organizations/:id/flows/:id',
             idParams: [organizationId, 'UXOPfjdZZohCcyCLlQWnuQ'],
@@ -966,7 +966,7 @@ async function formBExtras(
         flow: {
             id: 'UXOPfjdZZohCcyCLlQWnuQ',
             body: flowBody,
-            pair: flowPair,
+            messagePair: flowMessagePair,
         },
     };
 }
@@ -977,9 +977,9 @@ async function formGExtras(
     requestAt: string,
 ): Promise<ExtraWrites> {
     const secondOrganizationId = 'WlkfISpndVJfICRnWksipQ';
-    const organizationPair = await formSeedPair(
+    const organizationMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'organizations/:id',
                 secondOrganizationId,
             ),
@@ -995,9 +995,9 @@ async function formGExtras(
         },
         requestAt,
     );
-    const extraAdminSeatPair = await formSeedPair(
+    const extraAdminSeatMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 ORGANIZATION_MEMBER_DETAIL_PATTERN,
                 adminId + '-1',
             ),
@@ -1032,9 +1032,12 @@ async function formGExtras(
         skill_focus: firstAi.skill_focus,
         model: firstAi.model,
     };
-    const aiPair = await formSeedPair(
+    const aiMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('ai-agents/:id', 'NAWwhciBiPVcuqxjPhXwYA'),
+            key: seedMessagePairKey(
+                'ai-agents/:id',
+                'NAWwhciBiPVcuqxjPhXwYA',
+            ),
             routePattern: 'ai-agents/:id',
             idParams: ['NAWwhciBiPVcuqxjPhXwYA'],
             organization: undefined,
@@ -1045,16 +1048,16 @@ async function formGExtras(
     );
     return {
         identities: [unseated, member],
-        organizationPair,
+        organizationMessagePair,
         extraAdminSeat: {
             identityId: adminId,
             requestAt,
-            pair: extraAdminSeatPair,
+            messagePair: extraAdminSeatMessagePair,
         },
         ai: {
             id: 'NAWwhciBiPVcuqxjPhXwYA',
             body: aiBody,
-            pair: aiPair,
+            messagePair: aiMessagePair,
         },
     };
 }
@@ -1217,9 +1220,9 @@ async function formF2Extras(
     };
     const validated =
         validateFlowCreateBody(flowBody);
-    const operation = await formSeedPair(
+    const operation = await formSeedMessagePair(
         {
-            key: seedPairKey('flows', flowId),
+            key: seedMessagePairKey('flows', flowId),
             routePattern:
                 'organizations/:id/flows/',
             idParams: [organizationId],
@@ -1230,9 +1233,9 @@ async function formF2Extras(
         },
         requestAt,
     );
-    const document = await formSeedPair(
+    const document = await formSeedMessagePair(
         {
-            key: seedPairKey('flows/:id', flowId),
+            key: seedMessagePairKey('flows/:id', flowId),
             routePattern:
                 'organizations/:id/flows/:id',
             idParams: [organizationId, flowId],
@@ -1259,23 +1262,23 @@ async function writeExtraIdentity(
             formed.identityId,
             bootstrapCurrentIdentityBody(),
             SYSTEM_MEMBER_ID,
-            formed.identityPair,
+            formed.identityMessagePair,
         ),
         postIdentityPiiDocumentOp(
             adapter,
             formed.identityId,
             formed.piiBody,
             SYSTEM_MEMBER_ID,
-            formed.piiPair,
+            formed.piiMessagePair,
         ),
     ];
-    if (formed.seatPair !== undefined) {
+    if (formed.seatMessagePair !== undefined) {
         writes.push(postMembershipDocumentOp(
             adapter,
             formed.identityId,
             seatSeedBody('member', formed.requestAt),
             SYSTEM_MEMBER_ID,
-            formed.seatPair,
+            formed.seatMessagePair,
         ));
     }
     await Promise.all(writes);
@@ -1289,9 +1292,9 @@ async function writeExtras(
         extras.identities.map((identity) =>
             writeExtraIdentity(adapter, identity),
         );
-    if (extras.organizationPair !== undefined) {
+    if (extras.organizationMessagePair !== undefined) {
         writes.push(appendMessagePair(
-            adapter, extras.organizationPair,
+            adapter, extras.organizationMessagePair,
         ));
     }
     if (extras.extraAdminSeat !== undefined) {
@@ -1303,7 +1306,7 @@ async function writeExtras(
                 extras.extraAdminSeat.requestAt,
             ),
             SYSTEM_MEMBER_ID,
-            extras.extraAdminSeat.pair,
+            extras.extraAdminSeat.messagePair,
         ));
     }
     if (extras.flow !== undefined) {
@@ -1312,7 +1315,7 @@ async function writeExtras(
             extras.flow.id,
             extras.flow.body,
             SYSTEM_MEMBER_ID,
-            extras.flow.pair,
+            extras.flow.messagePair,
         ));
     }
     if (extras.ai !== undefined) {
@@ -1321,7 +1324,7 @@ async function writeExtras(
             extras.ai.id,
             extras.ai.body,
             SYSTEM_MEMBER_ID,
-            extras.ai.pair,
+            extras.ai.messagePair,
         ));
     }
     await Promise.all(writes);
@@ -1353,43 +1356,43 @@ const WORK_ORDER_GARDEN = [
 type GardenIdea = {
     readonly id: string;
     readonly body: Record<string, unknown>;
-    readonly pair: MessagePair;
+    readonly messagePair: MessagePair;
     readonly submissionId: string;
     readonly submissionBody:
         Record<string, unknown>;
-    readonly submissionPair: MessagePair;
+    readonly submissionMessagePair: MessagePair;
 };
 
 type GardenProject = {
     readonly id: string;
     readonly body: Record<string, unknown>;
-    readonly pair: MessagePair;
+    readonly messagePair: MessagePair;
 };
 
 type GardenObjective = {
     readonly body: Record<string, unknown>;
-    readonly pairs: ObjectiveCreationPairs;
+    readonly messagePairs: ObjectiveCreationMessagePairs;
 };
 
 type GardenRecord = {
     readonly body: Record<string, unknown>;
-    readonly pairs: RecordWritePairs;
+    readonly messagePairs: RecordWriteMessagePairs;
 };
 
 type GardenFlow = {
     readonly body: Record<string, unknown>;
-    readonly pairs: FlowCreationPairs;
+    readonly messagePairs: FlowCreationMessagePairs;
 };
 
 type GardenWorkOrder = {
     readonly id: string;
     readonly body: Record<string, unknown>;
-    readonly pair: MessagePair;
+    readonly messagePair: MessagePair;
     readonly joinId: string;
     readonly joinBody: Record<string, unknown>;
-    readonly joinPair: MessagePair;
+    readonly joinMessagePair: MessagePair;
     readonly transitionBody: Record<string, unknown>;
-    readonly transitionPair: MessagePair;
+    readonly transitionMessagePair: MessagePair;
 };
 
 type GardenWrites = {
@@ -1422,9 +1425,9 @@ async function formGarden(
             organization_id: organizationId,
             state,
         };
-        const pair = await formSeedPair(
+        const messagePair = await formSeedMessagePair(
             {
-                key: seedPairKey('ideas', id),
+                key: seedMessagePairKey('ideas', id),
                 routePattern:
                     'organizations/:id/ideas/:id',
                 idParams: [organizationId, id],
@@ -1442,9 +1445,9 @@ async function formGarden(
             member_id: adminId,
             at: requestAt,
         };
-        const submissionPair = await formSeedPair(
+        const submissionMessagePair = await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     'idea-submissions', submissionId,
                 ),
                 routePattern:
@@ -1460,9 +1463,9 @@ async function formGarden(
             requestAt,
         );
         ideas.push({
-            id, body, pair,
+            id, body, messagePair,
             submissionId, submissionBody,
-            submissionPair,
+            submissionMessagePair,
         });
     }
     const projectTemplate = buildProjects()[0]!;
@@ -1490,9 +1493,9 @@ async function formGarden(
         const body = projectSeedBody(
             project, event, organizationId,
         );
-        const pair = await formSeedPair(
+        const messagePair = await formSeedMessagePair(
             {
-                key: seedPairKey('projects', id),
+                key: seedMessagePairKey('projects', id),
                 routePattern:
                     'organizations/:id/projects/:id',
                 idParams: [organizationId, id],
@@ -1502,7 +1505,7 @@ async function formGarden(
             },
             requestAt,
         );
-        projects.push({ id, body, pair });
+        projects.push({ id, body, messagePair });
     }
     const objectives: GardenObjective[] = [];
     for (let i = 0; i < OBJECTIVE_SEEDS.length; i++) {
@@ -1517,9 +1520,9 @@ async function formGarden(
         );
         const validated =
             validateObjectiveCreateBody(body);
-        const operation = await formSeedPair(
+        const operation = await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     'objectives', seed.id,
                 ),
                 routePattern:
@@ -1532,9 +1535,9 @@ async function formGarden(
             },
             requestAt,
         );
-        const document = await formSeedPair(
+        const document = await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     'objectives/:id', seed.id,
                 ),
                 routePattern:
@@ -1550,9 +1553,9 @@ async function formGarden(
             },
             requestAt,
         );
-        const revision = await formSeedPair(
+        const revision = await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     'objectives/:id/revisions/:rid',
                     validated.revisionId,
                 ),
@@ -1574,7 +1577,7 @@ async function formGarden(
         );
         objectives.push({
             body,
-            pairs: {
+            messagePairs: {
                 operation, document, revision,
             },
         });
@@ -1622,9 +1625,9 @@ async function formGarden(
     };
     const validatedRecord =
         validateRecordWriteBody(recordBody);
-    const recordOperation = await formSeedPair(
+    const recordOperationMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 RECORD_TYPES_COLLECTION_PATTERN,
                 recordId,
             ),
@@ -1638,9 +1641,9 @@ async function formGarden(
         },
         requestAt,
     );
-    const recordDocument = await formSeedPair(
+    const recordDocumentMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 RECORD_TYPE_DETAIL_PATTERN, recordId,
             ),
             routePattern: RECORD_TYPE_DETAIL_PATTERN,
@@ -1655,9 +1658,9 @@ async function formGarden(
     );
     const attributePuts: MessagePair[] = [];
     for (const attribute of attributeRows) {
-        attributePuts.push(await formSeedPair(
+        attributePuts.push(await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     ATTRIBUTE_DETAIL_PATTERN,
                     attribute.id,
                 ),
@@ -1797,9 +1800,9 @@ async function formGarden(
     };
     const validatedFlow =
         validateFlowCreateBody(flowBody);
-    const flowOperation = await formSeedPair(
+    const flowOperationMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('flows', flowId),
+            key: seedMessagePairKey('flows', flowId),
             routePattern: 'organizations/:id/flows/',
             idParams: [organizationId],
             op: true,
@@ -1809,9 +1812,9 @@ async function formGarden(
         },
         requestAt,
     );
-    const flowDocument = await formSeedPair(
+    const flowDocumentMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey('flows/:id', flowId),
+            key: seedMessagePairKey('flows/:id', flowId),
             routePattern:
                 'organizations/:id/flows/:id',
             idParams: [organizationId, flowId],
@@ -1823,9 +1826,9 @@ async function formGarden(
         },
         requestAt,
     );
-    const flowJoin = await formSeedPair(
+    const flowJoinMessagePair = await formSeedMessagePair(
         {
-            key: seedPairKey(
+            key: seedMessagePairKey(
                 'projects/:id/flows/:pfid',
                 projectFlowId,
             ),
@@ -1864,9 +1867,9 @@ async function formGarden(
             position: spec.position,
             organization_id: organizationId,
         };
-        const pair = await formSeedPair(
+        const messagePair = await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     'work-orders/:id', id,
                 ),
                 routePattern:
@@ -1885,9 +1888,9 @@ async function formGarden(
             work_order_id: id,
             at: requestAt,
         });
-        const joinPair = await formSeedPair(
+        const joinMessagePair = await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     'flows/:id/work-orders/:woid',
                     joinId,
                 ),
@@ -1915,9 +1918,9 @@ async function formGarden(
             release: null,
             transitionAt: requestAt,
         };
-        const transitionPair = await formSeedPair(
+        const transitionMessagePair = await formSeedMessagePair(
             {
-                key: seedPairKey(
+                key: seedMessagePairKey(
                     'work-orders/:id/transition',
                     transitionEventId,
                 ),
@@ -1935,12 +1938,12 @@ async function formGarden(
         workOrders.push({
             id,
             body,
-            pair,
+            messagePair,
             joinId,
             joinBody,
-            joinPair,
+            joinMessagePair,
             transitionBody,
-            transitionPair,
+            transitionMessagePair,
         });
     }
     return {
@@ -1949,19 +1952,19 @@ async function formGarden(
         objectives,
         record: {
             body: recordBody,
-            pairs: {
-                operation: recordOperation,
-                document: recordDocument,
+            messagePairs: {
+                operation: recordOperationMessagePair,
+                document: recordDocumentMessagePair,
                 attributePuts,
                 attributeDeletes: [],
             },
         },
         flow: {
             body: flowBody,
-            pairs: {
-                operation: flowOperation,
-                document: flowDocument,
-                join: flowJoin,
+            messagePairs: {
+                operation: flowOperationMessagePair,
+                document: flowDocumentMessagePair,
+                join: flowJoinMessagePair,
             },
         },
         workOrders,
@@ -1979,7 +1982,7 @@ async function writeGarden(
                 idea.id,
                 idea.body,
                 SYSTEM_MEMBER_ID,
-                idea.pair,
+                idea.messagePair,
             ),
         ),
         ...garden.ideas.map((idea) =>
@@ -1987,7 +1990,7 @@ async function writeGarden(
                 adapter,
                 idea.submissionId,
                 idea.submissionBody,
-                idea.submissionPair,
+                idea.submissionMessagePair,
             ),
         ),
         ...garden.projects.map((project) =>
@@ -1996,27 +1999,27 @@ async function writeGarden(
                 project.id,
                 project.body,
                 SYSTEM_MEMBER_ID,
-                project.pair,
+                project.messagePair,
             ),
         ),
         ...garden.objectives.map((objective) =>
             postObjectiveCreationOp(
                 adapter,
                 objective.body,
-                objective.pairs,
+                objective.messagePairs,
             ),
         ),
         postRecordWriteOp(
             adapter,
             garden.record.body,
             SYSTEM_MEMBER_ID,
-            garden.record.pairs,
+            garden.record.messagePairs,
         ),
         postFlowCreationOp(
             adapter,
             garden.flow.body,
             SYSTEM_MEMBER_ID,
-            garden.flow.pairs,
+            garden.flow.messagePairs,
         ),
         ...garden.workOrders.map((workOrder) =>
             postWorkOrderDocumentOp(
@@ -2024,7 +2027,7 @@ async function writeGarden(
                 workOrder.id,
                 workOrder.body,
                 SYSTEM_MEMBER_ID,
-                workOrder.pair,
+                workOrder.messagePair,
             ),
         ),
         ...garden.workOrders.map((workOrder) =>
@@ -2033,7 +2036,7 @@ async function writeGarden(
                 workOrder.joinId,
                 workOrder.joinBody,
                 SYSTEM_MEMBER_ID,
-                workOrder.joinPair,
+                workOrder.joinMessagePair,
             ),
         ),
         ...garden.workOrders.map((workOrder) =>
@@ -2044,7 +2047,7 @@ async function writeGarden(
                 SYSTEM_MEMBER_ID,
                 undefined,
                 [],
-                workOrder.transitionPair,
+                workOrder.transitionMessagePair,
             ),
         ),
     ]);
@@ -2136,13 +2139,13 @@ export async function postTestPlanSlices(
         adminUsername: 'demo@example.com',
         adminPassword: '',
     }];
-    const formed: TenantAdminPairs[] = [];
+    const formed: TenantAdminMessagePairs[] = [];
     const extras: ExtraWrites[] = [];
     const gardens: GardenWrites[] = [];
     const f2Flows: F2FlowWrites[] = [];
     for (const section of PARALLEL_SECTIONS) {
         if (section === 'AA') continue;
-        const slice = await formTenantAdminPairs(
+        const slice = await formTenantAdminMessagePairs(
             section, requestAt,
         );
         formed.push(slice);
@@ -2244,12 +2247,12 @@ export async function postTestPlanSlices(
         async (view) => {
             await postBootstrapIn(
                 view,
-                bootstrap.identityPair,
-                bootstrap.seatPair,
-                bootstrap.piiPair,
-                bootstrap.systemIdentityPair,
-                bootstrap.defaultOrganizationPair,
-                bootstrap.organizationPair,
+                bootstrap.identityMessagePair,
+                bootstrap.seatMessagePair,
+                bootstrap.piiMessagePair,
+                bootstrap.systemIdentityMessagePair,
+                bootstrap.defaultOrganizationMessagePair,
+                bootstrap.organizationMessagePair,
             );
             await Promise.all(
                 formed.map((slice) =>

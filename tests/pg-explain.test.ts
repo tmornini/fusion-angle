@@ -122,7 +122,7 @@ function jsonWire(body: unknown): string {
     });
 }
 
-async function putPair(
+async function putMessagePair(
     tx: Tx,
     n: number,
     collection: string,
@@ -132,7 +132,7 @@ async function putPair(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('pairs', {
+    await tx.put('message_pairs', {
         id,
         uri_collection: collection,
         uri_id: uriId,
@@ -155,7 +155,7 @@ async function putAuthorize(
 ): Promise<void> {
     const id = id22(n);
     const at = atStamp(n);
-    await tx.put('pairs', {
+    await tx.put('message_pairs', {
         id,
         uri_collection: AUTH_COLLECTION,
         uri_id: '',
@@ -190,7 +190,7 @@ async function seedRows(
                 await putAuthorize(tx, n, 'c' + String(n));
             }
             for (let n = 1; n <= 4; n++) {
-                await putPair(
+                await putMessagePair(
                     tx,
                     n,
                     IDEA_COLLECTION,
@@ -207,7 +207,7 @@ async function seedRows(
             // address ORDER BY prefers responses_address.
             // Keep /organizations/AjdvjuECVZEgZoFajaIEkg/ideas/ small for the
             // collection pin.
-            await putPair(
+            await putMessagePair(
                 tx,
                 VERSION_N,
                 VERSION_COLLECTION,
@@ -220,7 +220,7 @@ async function seedRows(
             );
             for (let i = 0; i < VERSION_EXTRA_COUNT; i++) {
                 const n = VERSION_EXTRA_START + i;
-                await putPair(
+                await putMessagePair(
                     tx,
                     n,
                     VERSION_COLLECTION,
@@ -234,7 +234,7 @@ async function seedRows(
             }
             for (let i = 0; i < FILLER_COUNT; i++) {
                 const n = FILLER_START + i;
-                await putPair(
+                await putMessagePair(
                     tx,
                     n,
                     FILLER_COLLECTION,
@@ -294,7 +294,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         );
         await backend.ensureTables(TABLE_NAMES);
         await seedRows(backend);
-        await sql.query`ANALYZE pairs`;
+        await sql.query`ANALYZE message_pairs`;
     });
 
     after(async () => {
@@ -309,17 +309,17 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         }
     });
 
-    test('pk uses pairs_pkey', async () => {
+    test('pk uses message_pairs_pkey', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE id = ${uuidTextOfIdentifier(ideaId)}
         `;
         assertIndexPlan(
             explainText(plans),
-            ['pairs_pkey'],
+            ['message_pairs_pkey'],
         );
     });
 
@@ -329,27 +329,27 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE uri_collection = ${IDEA_COLLECTION}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['pairs_collection'],
+            ['message_pairs_collection'],
         );
     });
 
-    test('request_hash uses pairs_replay', async () => {
+    test('request_hash uses message_pairs_replay', async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE request_hash = ${ideaHash}
         `;
         assertIndexPlan(
             explainText(plans),
-            ['pairs_replay'],
+            ['message_pairs_replay'],
         );
     });
 
@@ -358,24 +358,24 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE uri_collection = ${VERSION_COLLECTION}
               AND uri_id = ${VERSION_URI_ID}
             ORDER BY response_at, id
         `;
         assertIndexPlan(
             explainText(plans),
-            ['pairs_address'],
+            ['message_pairs_address'],
         );
     });
 
-    test('version triple uses pairs_version',
+    test('version triple uses message_pairs_version',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE uri_collection = ${VERSION_COLLECTION}
               AND uri_id = ${VERSION_URI_ID}
               AND version = ${versionHit}
@@ -383,17 +383,17 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         `;
         assertIndexPlan(
             explainText(plans),
-            ['pairs_version'],
+            ['message_pairs_version'],
         );
     });
 
-    test('body containment uses pairs_body',
+    test('body containment uses message_pairs_body',
     async () => {
         const plans = await sql.query<
             Record<string, unknown>
         >`
             EXPLAIN
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE uri_collection = ${AUTH_COLLECTION}
               AND message_body(response) @>
                   ${AUTH_CONTAINMENT}::jsonb
@@ -401,7 +401,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         `;
         assertIndexPlan(
             explainText(plans),
-            ['pairs_body'],
+            ['message_pairs_body'],
         );
     });
 
@@ -412,7 +412,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         >`
             EXPLAIN
             SELECT id, method
-            FROM pairs
+            FROM message_pairs
             WHERE uri_collection = ${VERSION_COLLECTION}
               AND uri_id = ${VERSION_URI_ID}
               AND method IN ('PUT', 'DELETE')
@@ -422,6 +422,6 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const text = explainText(plans);
         assert.doesNotMatch(text, /requests_pkey/);
         assert.doesNotMatch(text, /Join/);
-        assertIndexPlan(text, ['pairs_address']);
+        assertIndexPlan(text, ['message_pairs_address']);
     });
 }

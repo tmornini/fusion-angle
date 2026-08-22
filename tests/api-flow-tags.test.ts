@@ -17,7 +17,7 @@ import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
 
-// Flow tags: the codebase's FIRST pair-plane-ONLY document
+// Flow tags: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
 // from message pairs at /organizations/:id/flows/:id/tags/:name.
 // PUT/GET/DELETE
@@ -224,7 +224,7 @@ test('e2e: a re-PUT of the same tag name (pinning a DIFFERENT'
     assert.ok(secondId);
     assert.notEqual(secondId, firstId);
 
-    const responses = await db.pairs.getAll();
+    const responses = await db.messagePairs.getAll();
     const secondRow = responses.find(r => r.id === secondId);
     assert.ok(secondRow);
     assert.equal('supersedes' in secondRow!, false);
@@ -256,12 +256,12 @@ test('e2e: DELETE marks the tag — GET 404s after, and the'
     const delId = del.headers.get('Response-ID');
     assert.ok(delId);
 
-    const responses = await db.pairs.getAll();
+    const responses = await db.messagePairs.getAll();
     const delRow = responses.find(r => r.id === delId);
     assert.ok(delRow);
     assert.equal('supersedes' in delRow!, false);
 
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const delRequest = requests.find(r => r.id === delId);
     assert.ok(delRequest);
     // The DELETE row itself is present, unmoved — a marked
@@ -282,7 +282,7 @@ test('e2e: a malformed tag body (extra key) 400s and stores'
     await createFlow(db, token, 'cOOLmJXlyeYuFYrSofTRmw');
     const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(db, token
         , 'cOOLmJXlyeYuFYrSofTRmw');
-    const before = await db.pairs.getAll();
+    const before = await db.messagePairs.getAll();
 
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -290,7 +290,7 @@ test('e2e: a malformed tag body (extra key) 400s and stores'
         { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg, extra: 'nope' },
     ));
     assert.equal(res.status, 400);
-    const after = await db.pairs.getAll();
+    const after = await db.messagePairs.getAll();
     assert.equal(after.length, before.length);
 });
 
@@ -303,7 +303,7 @@ test('e2e: a malformed tag name (disallowed characters) 400s'
     const rOEPOcVMQdJiiiMuiiEhlg = await headResponseId(
         db, token, flowId,
     );
-    const before = await db.pairs.getAll();
+    const before = await db.messagePairs.getAll();
 
     const res = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
@@ -312,7 +312,7 @@ test('e2e: a malformed tag name (disallowed characters) 400s'
         { flow_response_id: rOEPOcVMQdJiiiMuiiEhlg },
     ));
     assert.equal(res.status, 400);
-    const after = await db.pairs.getAll();
+    const after = await db.messagePairs.getAll();
     assert.equal(after.length, before.length);
 });
 

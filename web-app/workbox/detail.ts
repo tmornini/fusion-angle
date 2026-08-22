@@ -517,7 +517,7 @@ function renderDetail(
     }
 }
 
-// Reload the action screen from the pair plane —
+// Reload the action screen from the message plane —
 // claim is NOT re-attempted (init owns that once).
 // Cross-tab release/transition rings the same bell.
 async function refreshDetail(

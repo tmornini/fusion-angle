@@ -62,11 +62,11 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 
 // Phase Final Task 2: invitations ROW half stripped — the
 // row-plane oracle is retired. pendingInvitationFor is the
-// sole pending discovery path (pair plane).
+// sole pending discovery path (message plane).
 
 test('deriveIdentityPiiRows resolves grantInvitation email'
 + ' (Phase Final Task 2: identity_pii ROW half stripped —'
-+ ' pair plane is sole oracle)',
++ ' message plane is sole oracle)',
 async () => {
     const db = await seededDb();
     const email = 'sarah.chen@company.com';
@@ -76,7 +76,7 @@ async () => {
     assert.equal(fromPairs!.email, email);
     // Phase Final Stage B: identity spine tables retired.
 
-    // Unknown email: pair plane misses.
+    // Unknown email: message plane misses.
     const missing = 'nobody@example.invalid';
     assert.equal(
         (await deriveIdentityPiiRows(db))
@@ -85,7 +85,7 @@ async () => {
     );
 });
 
-test('pendingInvitationFor lifecycle on the pair plane'
+test('pendingInvitationFor lifecycle on the message plane'
 + ' (grant/decline/reinvite)', async () => {
     const db = await seededDb();
     const admin = await organizationToken(
@@ -185,7 +185,7 @@ test('loadInvitation shape: deriveInvitations find-by-id'
     assert.equal(derived.organization_id, ORGANIZATION_TWO);
     assert.equal(derived.state, 'pending');
 
-    // Missing id: pair plane absent.
+    // Missing id: message plane absent.
     assert.equal(
         (await deriveInvitations(db))
             .find(r => r.id === INV_GHOST),

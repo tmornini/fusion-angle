@@ -33,14 +33,14 @@ export async function deriveMembers(
     db: DbAdapter,
     organization: Id,
 ): Promise<MemberEntity[]> {
-    const [seats, identityPairs] = await Promise.all([
+    const [seats, identityMessagePairs] = await Promise.all([
         deriveOrganizationMemberSeats(db, organization),
-        db.pairs.getAllWhere(
+        db.messagePairs.getAllWhere(
             'uri_collection', IDENTITIES_PREFIX,
         ),
     ]);
     const identities = deriveDocumentsAt(
-        identityPairs, IDENTITIES_PREFIX,
+        identityMessagePairs, IDENTITIES_PREFIX,
     );
     const rows: MemberEntity[] = [];
     for (const seat of seats) {

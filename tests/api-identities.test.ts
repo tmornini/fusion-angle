@@ -112,7 +112,7 @@ const PII = {
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
 // the pii-subtree authz below reads through the membership
-// pair plane once memberships flips, so a raw row here would go
+// message plane once memberships flips, so a raw row here would go
 // derivation-invisible. Every id/field value stays IDENTICAL to
 // the raw put this replaces — only the write mechanism changes.
 async function seedMembershipPair(

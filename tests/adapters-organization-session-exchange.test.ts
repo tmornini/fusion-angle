@@ -18,7 +18,7 @@ import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
@@ -28,7 +28,7 @@ const AT = '2026-06-04T00:00:00.000000Z';
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
 // postOrganizationSessionExchange's membership-fence check derives
-// from the pair plane once memberships flips, so a raw row here
+// from the message plane once memberships flips, so a raw row here
 // would go derivation-invisible. Every id/field value stays
 // IDENTICAL to the raw put this replaces — only the write
 // mechanism changes.

@@ -279,7 +279,7 @@ test(
         );
 
         // Phase Final Task 2: row halves stripped — assert via
-        // adapter GETs (pair plane).
+        // adapter GETs (message plane).
         const objectives = await getObjectives(ctx);
         assert.equal(objectives.length, 1);
         assert.equal(objectives[0]!.id, 'ohqxgUBEaFQwYbXsonRPmg');
@@ -340,7 +340,7 @@ test(
             ctx, o3, newPos, details.get(o3)!,
         );
 
-        // Phase Final Task 2: positions from GET (pair plane).
+        // Phase Final Task 2: positions from GET (message plane).
         const all = await getObjectives(ctx);
         const map = new Map(
             all.map(o => [o.id, o.position]),
@@ -380,7 +380,7 @@ test(
             ctx, o3, 1.25, details.get(o3)!,
         );
 
-        // Phase Final Task 2: positions from GET (pair plane).
+        // Phase Final Task 2: positions from GET (message plane).
         const all = await getObjectives(ctx);
         const map = new Map(
             all.map(o => [o.id, o.position]),

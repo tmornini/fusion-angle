@@ -6,7 +6,7 @@ import {
 } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
 } from '../api/message-pair.ts';
 import {
@@ -62,7 +62,7 @@ async function appendInstancePair(
     body: Record<string, unknown> | undefined,
     requestAt: string,
 ): Promise<string> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method,
         pathname: pathOf(instanceId),
         routePattern: ROUTE_PATTERN,
@@ -83,9 +83,9 @@ async function appendInstancePair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
-    return pair.id;
+    return messagePair.id;
 }
 
 async function emptyDb(): Promise<MemoryDbAdapter> {
@@ -230,7 +230,7 @@ test(
     + ' → full set as values',
     async () => {
         const db = await emptyDb();
-        const pairId = await appendInstancePair(
+        const messagePairId = await appendInstancePair(
             db, INST_A, 'PUT',
             {
                 set: [
@@ -245,7 +245,7 @@ test(
         );
         assert.deepEqual(head, {
             id: INST_A,
-            pairId,
+            messagePairId,
             values: [
                 val('a', 'AjdvjuECVZEgZoFajaIEkg'),
                 val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
@@ -288,7 +288,7 @@ test(
         );
         assert.deepEqual(head, {
             id: INST_A,
-            pairId: revisionId,
+            messagePairId: revisionId,
             values: [
                 val('a', '3'),
                 val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
@@ -409,17 +409,17 @@ test(
             db, ORGANIZATION, TYPE_ID, INST_A,
         );
         assert.equal(revisions.length, 3);
-        assert.equal(revisions[0]!.pairId, g0);
+        assert.equal(revisions[0]!.messagePairId, g0);
         assert.deepEqual(revisions[0]!.values, [
             val('a', 'AjdvjuECVZEgZoFajaIEkg'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
-        assert.equal(revisions[1]!.pairId, rOEPOcVMQdJiiiMuiiEhlg);
+        assert.equal(revisions[1]!.messagePairId, rOEPOcVMQdJiiiMuiiEhlg);
         assert.deepEqual(revisions[1]!.values, [
             val('a', '3'),
             val('b', 'BBjWJsjYIDkTRKIIPrzWRw'),
         ]);
-        assert.equal(revisions[2]!.pairId, r2);
+        assert.equal(revisions[2]!.messagePairId, r2);
         assert.deepEqual(revisions[2]!.values, [
             val('a', '3'),
         ]);
@@ -429,8 +429,8 @@ test(
         );
         assert.ok(head !== undefined);
         assert.equal(
-            revisions[revisions.length - 1]!.pairId,
-            head!.pairId,
+            revisions[revisions.length - 1]!.messagePairId,
+            head!.messagePairId,
         );
         assert.deepEqual(
             revisions[revisions.length - 1]!.values,

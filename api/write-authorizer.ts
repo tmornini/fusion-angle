@@ -7,7 +7,7 @@ import {
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
 } from './family-registry.ts';
 
-// Pre-write ownership authorizer on the pair plane. Probes
+// Pre-write ownership authorizer on the message plane. Probes
 // THIS route's collection, not any row with this id. Same
 // id at two collections is two documents. owner-null
 // (never written at this address) → genesis proceeds;

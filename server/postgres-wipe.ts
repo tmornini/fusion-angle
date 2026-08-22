@@ -1,4 +1,4 @@
-// Operator wipe. Drops the pair plane and leftover
+// Operator wipe. Drops the message plane and leftover
 // retired objects. Node-only. No seed.
 
 import { resolve } from 'node:path';

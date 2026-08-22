@@ -17,7 +17,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
     IF_MATCH_HEADER,
     strongEtagOf,
@@ -78,7 +78,7 @@ function req(
     });
 }
 
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -99,7 +99,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -268,7 +268,7 @@ async () => {
         db, ORGANIZATION, TYPE_ID, INSTANCE_ID,
     );
     assert.ok(head !== undefined);
-    assert.notEqual(head.pairId, responseId);
+    assert.notEqual(head.messagePairId, responseId);
     assert.deepEqual(head.values, [
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
@@ -502,7 +502,7 @@ async () => {
         await adminDb();
     await putLiveType(db, adminToken);
     await seedWritableTextAttr(db, adminToken);
-    const tombstone = await formWritePair({
+    const tombstone = await formWriteMessagePair({
         method: 'DELETE',
         pathname: INSTANCE_DETAIL,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -570,7 +570,7 @@ async () => {
         originalEtag,
     );
     assert.deepEqual(await second.json(), originalBody);
-    const responses = await db.pairs.getAllWhere(
+    const responses = await db.messagePairs.getAllWhere(
         'uri_collection',
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID
@@ -607,7 +607,7 @@ async () => {
         [a.status, b.status].sort(),
         [201, 428],
     );
-    const responses = await db.pairs.getAllWhere(
+    const responses = await db.messagePairs.getAllWhere(
         'uri_collection',
         '/organizations/' + ORGANIZATION
             + '/record-types/' + TYPE_ID

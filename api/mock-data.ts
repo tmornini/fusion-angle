@@ -22,9 +22,9 @@ import {
     identityDocumentBodyOf,
 } from './routes.ts';
 import type {
-    FlowCreationPairs,
-    RecordWritePairs,
-    ObjectiveCreationPairs,
+    FlowCreationMessagePairs,
+    RecordWriteMessagePairs,
+    ObjectiveCreationMessagePairs,
 } from './routes.ts';
 import {
     SYSTEM_MEMBER_ID,
@@ -97,8 +97,8 @@ import {
     objectiveSeedBody,
     formMockDataMessagePairs,
     formBootstrapMessagePair,
-    formSeedCredentialPairs,
-    seedPairKey,
+    formSeedCredentialMessagePairs,
+    seedMessagePairKey,
     ORGANIZATION_TWO_OBJECTIVE,
     seatSeedBody,
     identityPersonSeedBody,
@@ -124,14 +124,16 @@ import {
 // A missing pair here is a pass-1/pass-2 wiring bug (a dropped
 // or mis-keyed invocation), never an expected condition — crash
 // loud rather than silently write the row with no pair.
-function requirePair(
-    pairs: ReadonlyMap<string, MessagePair>, key: string,
+function requireMessagePair(
+    messagePairs: ReadonlyMap<string, MessagePair>, key: string,
 ): MessagePair {
-    const pair = pairs.get(key);
-    if (pair === undefined) {
-        throw new Error('seed formed no message pair for ' + key);
+    const messagePair = messagePairs.get(key);
+    if (messagePair === undefined) {
+        throw new Error(
+            'seed formed no message pair for ' + key,
+        );
     }
-    return pair;
+    return messagePair;
 }
 
 // The seeded admin credential set, returned to the caller so a
@@ -168,7 +170,7 @@ export interface SeededCredentials {
 // one transaction of pure row ops. Phase 10 Task 6: each
 // credential row ALSO forms its OWN message pair, re-pointed
 // onto postIdentityCredentialDocumentOp — its OWN local pass-1/
-// pass-2 split (formSeedCredentialPairs, seed-message-pairs.ts),
+// pass-2 split (formSeedCredentialMessagePairs, seed-message-pairs.ts),
 // since a credential's body embeds the post-hash secret computed
 // HERE, after formMockDataMessagePairs / formBootstrapMessagePair
 // already ran. The write transaction opens
@@ -269,15 +271,15 @@ export async function seedHumanCredentials(
     // requestAt is minted once, this credential batch's own
     // arrival moment.
     const requestAt = nowUtc();
-    const credentialPairs = await formSeedCredentialPairs(
+    const credentialMessagePairs = await formSeedCredentialMessagePairs(
         planned,
         { id: systemCredentialId, secret: systemSecret },
         requestAt,
     );
-    // Pass 2: pair-plane only (Phase Final Task 2 stripped the
-    // identity_credentials ROW half). postIdentityCredential
-    // DocumentOp is the SAME op every live PUT
-    // identities/:id/credentials/:cid rides.
+    // Pass 2: message-plane only (Phase Final Task 2 stripped
+    // the identity_credentials ROW half).
+    // postIdentityCredential DocumentOp is the SAME op
+    // every live PUT identities/:id/credentials/:cid rides.
     await adapter.transaction(
         MESSAGE_TABLES,
         async (view) => {
@@ -291,9 +293,9 @@ export async function seedHumanCredentials(
                             cred.secret,
                         ),
                         SYSTEM_MEMBER_ID,
-                        requirePair(
-                            credentialPairs,
-                            seedPairKey(
+                        requireMessagePair(
+                            credentialMessagePairs,
+                            seedMessagePairKey(
                                 'identities/:id/credentials/:cid',
                                 cred.id,
                             ),
@@ -307,9 +309,9 @@ export async function seedHumanCredentials(
                         systemSecret,
                     ),
                     SYSTEM_MEMBER_ID,
-                    requirePair(
-                        credentialPairs,
-                        seedPairKey(
+                    requireMessagePair(
+                        credentialMessagePairs,
+                        seedMessagePairKey(
                             'identities/:id/credentials/:cid',
                             systemCredentialId,
                         ),
@@ -338,13 +340,13 @@ export async function postMockDataLoad(
     options?: PostMockDataLoadOptions,
 ): Promise<SeededCredentials> {
     // Pass 1 (no tx): every pair-wired op-invocation's message
-    // pair, formed up front — formWritePair's hashing is async
+    // pair, formed up front — formWriteMessagePair's hashing is async
     // crypto. Formed pre-tx — crypto, hashing, and timers
     // never run inside an open transaction (AGENTS.md §
     // Transaction bodies await only row ops). requestAt is
     // minted once, the seed's own arrival moment, and shared
     // by every pair.
-    const pairs = await formMockDataMessagePairs(nowUtc());
+    const messagePairs = await formMockDataMessagePairs(nowUtc());
     // Pass 2: seed the whole demo dataset in one transaction —
     // row ops only — so a mid-seed failure leaves no
     // half-populated schema. The credentials seed runs after it
@@ -355,7 +357,7 @@ export async function postMockDataLoad(
     await adapter.ensureTables(TABLE_NAMES);
     await adapter.transaction(
         TABLE_NAMES,
-        (view) => postMockDataLoadIn(view, pairs),
+        (view) => postMockDataLoadIn(view, messagePairs),
     );
     // Task 1(d): same buildMembers enumeration that pass 2
     // used for PII — no row read after strip.
@@ -373,7 +375,7 @@ export async function postMockDataLoad(
 
 async function postMockDataLoadIn(
     adapter: DbAdapter,
-    pairs: ReadonlyMap<string, MessagePair>,
+    messagePairs: ReadonlyMap<string, MessagePair>,
 ): Promise<void> {
     const members = buildMembers();
 
@@ -395,9 +397,9 @@ async function postMockDataLoadIn(
                                 : 'member',
                         ),
                         SYSTEM_MEMBER_ID,
-                        requirePair(
-                            pairs,
-                            seedPairKey(
+                        requireMessagePair(
+                            messagePairs,
+                            seedMessagePairKey(
                                 ORGANIZATION_MEMBER_DETAIL_PATTERN,
                                 member.id + '-' + n,
                             ),
@@ -405,9 +407,9 @@ async function postMockDataLoadIn(
                     )),
                 appendMessagePair(
                     adapter,
-                    requirePair(
-                        pairs,
-                        seedPairKey(
+                    requireMessagePair(
+                        messagePairs,
+                        seedMessagePairKey(
                             'identities/:id/default-organization',
                             member.id,
                         ),
@@ -418,9 +420,9 @@ async function postMockDataLoadIn(
                     member.id,
                     identityPersonSeedBody(member),
                     SYSTEM_MEMBER_ID,
-                    requirePair(
-                        pairs,
-                        seedPairKey(
+                    requireMessagePair(
+                        messagePairs,
+                        seedMessagePairKey(
                             'identities/:id', member.id,
                         ),
                     ),
@@ -430,9 +432,9 @@ async function postMockDataLoadIn(
                     member.id,
                     humanMemberPiiSeedBody(member),
                     SYSTEM_MEMBER_ID,
-                    requirePair(
-                        pairs,
-                        seedPairKey(
+                    requireMessagePair(
+                        messagePairs,
+                        seedMessagePairKey(
                             'identities/:id/pii', member.id,
                         ),
                     ),
@@ -444,9 +446,9 @@ async function postMockDataLoadIn(
             SYSTEM_MEMBER_ID,
             identityDocumentBodyOf('service'),
             SYSTEM_MEMBER_ID,
-            requirePair(
-                pairs,
-                seedPairKey('identities/:id', SYSTEM_MEMBER_ID),
+            requireMessagePair(
+                messagePairs,
+                seedMessagePairKey('identities/:id', SYSTEM_MEMBER_ID),
             ),
         ),
         // Role grants retired: membership `type` (admin for
@@ -479,28 +481,28 @@ async function postMockDataLoadIn(
                 idea.id,
                 ideaSeedBody(idea, event, i),
                 event.member_id,
-                requirePair(
-                    pairs, seedPairKey('ideas', idea.id),
+                requireMessagePair(
+                    messagePairs, seedMessagePairKey('ideas', idea.id),
                 ),
             );
         }),
         // Phase Final Task 2: organizations ROW half stripped —
-        // pair-plane only (organizationSeedBody still shapes
-        // the pair body in seed-message-pairs.ts).
+        // message-plane only (organizationSeedBody still
+        // shapes the pair body in seed-message-pairs.ts).
         appendMessagePair(
             adapter,
-            requirePair(
-                pairs,
-                seedPairKey(
+            requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
                     'organizations/:id', STARK_ORGANIZATION,
                 ),
             ),
         ),
         appendMessagePair(
             adapter,
-            requirePair(
-                pairs,
-                seedPairKey(
+            requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
                     'organizations/:id', ORGANIZATION_TWO,
                 ),
             ),
@@ -537,8 +539,8 @@ async function postMockDataLoadIn(
                 project.id,
                 projectSeedBody(project, event, organization),
                 event.member_id,
-                requirePair(
-                    pairs, seedPairKey('projects', project.id),
+                requireMessagePair(
+                    messagePairs, seedMessagePairKey('projects', project.id),
                 ),
             );
         }),
@@ -628,19 +630,19 @@ async function postMockDataLoadIn(
                 pf => pf.flow_id === flow.id,
             )!;
             // Task 5: create threads the triple — the operation
-            // pair plus its two synthesized siblings, each
-            // pre-formed in pass 1 under its own deterministic
-            // key (seed-message-pairs.ts).
-            const flowPairs: FlowCreationPairs = {
-                operation: requirePair(
-                    pairs, seedPairKey('flows', flow.id),
+            // message pair plus its two synthesized siblings,
+            // each pre-formed in pass 1 under its own
+            // deterministic key (seed-message-pairs.ts).
+            const flowMessagePairs: FlowCreationMessagePairs = {
+                operation: requireMessagePair(
+                    messagePairs, seedMessagePairKey('flows', flow.id),
                 ),
-                document: requirePair(
-                    pairs, seedPairKey('flows/:id', flow.id),
+                document: requireMessagePair(
+                    messagePairs, seedMessagePairKey('flows/:id', flow.id),
                 ),
-                join: requirePair(
-                    pairs,
-                    seedPairKey(
+                join: requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
                         'projects/:id/flows/:pfid',
                         projectFlow.id,
                     ),
@@ -652,7 +654,7 @@ async function postMockDataLoadIn(
                     flow, event, projectFlow, flowRelations,
                 ),
                 event.member_id,
-                flowPairs,
+                flowMessagePairs,
             );
         }),
         // Organization 'BBjWJsjYIDkTRKIIPrzWRw' owns a small, self-contained
@@ -671,9 +673,9 @@ async function postMockDataLoadIn(
             seedIdentifier('seed-flow-org2'),
             flowOrg2SeedBody(),
             SYSTEM_MEMBER_ID,
-            requirePair(
-                pairs,
-                seedPairKey(
+            requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
                     'flows/:id',
                     seedIdentifier('seed-flow-org2'),
                 ),
@@ -691,9 +693,9 @@ async function postMockDataLoadIn(
                 adapter,
                 r.id,
                 ideaSubmissionSeedBody(r),
-                requirePair(
-                    pairs,
-                    seedPairKey('idea-submissions', r.id),
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey('idea-submissions', r.id),
                 ),
             ),
         ),
@@ -703,8 +705,11 @@ async function postMockDataLoadIn(
                 r.id,
                 workOrderDocumentSeedBody(r),
                 SYSTEM_MEMBER_ID,
-                requirePair(
-                    pairs, seedPairKey('work-orders/:id', r.id),
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'work-orders/:id', r.id,
+                    ),
                 ),
             ),
         ),
@@ -714,9 +719,9 @@ async function postMockDataLoadIn(
                 r.id,
                 flowWorkOrderJoinSeedBody(r),
                 SYSTEM_MEMBER_ID,
-                requirePair(
-                    pairs,
-                    seedPairKey(
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
                         'flows/:id/work-orders/:woid', r.id,
                     ),
                 ),
@@ -740,9 +745,9 @@ async function postMockDataLoadIn(
                     r.member_id,
                     undefined,
                     [],
-                    requirePair(
-                        pairs,
-                        seedPairKey(
+                    requireMessagePair(
+                        messagePairs,
+                        seedMessagePairKey(
                             'work-orders/:id/transition',
                             r.id,
                         ),
@@ -756,8 +761,8 @@ async function postMockDataLoadIn(
                 m.id,
                 fields,
                 SYSTEM_MEMBER_ID,
-                requirePair(
-                    pairs, seedPairKey('ai-agents/:id', m.id),
+                requireMessagePair(
+                    messagePairs, seedMessagePairKey('ai-agents/:id', m.id),
                 ),
             );
         }),
@@ -767,8 +772,11 @@ async function postMockDataLoadIn(
                 r.id,
                 workOrderDocumentSeedBody(r),
                 SYSTEM_MEMBER_ID,
-                requirePair(
-                    pairs, seedPairKey('work-orders/:id', r.id),
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
+                        'work-orders/:id', r.id,
+                    ),
                 ),
             ),
         ),
@@ -778,9 +786,9 @@ async function postMockDataLoadIn(
                 r.id,
                 flowWorkOrderJoinSeedBody(r),
                 SYSTEM_MEMBER_ID,
-                requirePair(
-                    pairs,
-                    seedPairKey(
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
                         'flows/:id/work-orders/:woid', r.id,
                     ),
                 ),
@@ -799,9 +807,9 @@ async function postMockDataLoadIn(
                     r.member_id,
                     undefined,
                     [],
-                    requirePair(
-                        pairs,
-                        seedPairKey(
+                    requireMessagePair(
+                        messagePairs,
+                        seedMessagePairKey(
                             'work-orders/:id/transition',
                             r.id,
                         ),
@@ -813,31 +821,31 @@ async function postMockDataLoadIn(
         // Append-only (below-facade) — same as every other
         // seed pair write; chain formed pre-tx.
         ...[
-            seedPairKey(
+            seedMessagePairKey(
                 INSTANCE_DETAIL_PATTERN, SEED_INSTANCE_ID,
             ),
-            seedPairKey(
+            seedMessagePairKey(
                 'work-orders/:id/binding', WO01_ID,
             ),
-            seedPairKey(
+            seedMessagePairKey(
                 'work-orders/:id/transition',
                 WO01_REVIEW_EVENT_ID,
             ),
-            seedPairKey(
+            seedMessagePairKey(
                 INSTANCE_DETAIL_PATTERN,
                 SEED_INSTANCE_ID + '-review',
             ),
-            seedPairKey(
+            seedMessagePairKey(
                 'work-orders/:id/transition',
                 WO01_COMPLETE_EVENT_ID,
             ),
-            seedPairKey(
+            seedMessagePairKey(
                 INSTANCE_DETAIL_PATTERN,
                 SEED_INSTANCE_ID + '-complete',
             ),
         ].map((key) =>
             appendMessagePair(
-                adapter, requirePair(pairs, key),
+                adapter, requireMessagePair(messagePairs, key),
             ),
         ),
         ...mockRecords.map((r, i) => {
@@ -845,32 +853,32 @@ async function postMockDataLoadIn(
             const attributes = mockRecordAttributes.filter(
                 a => a.record_id === r.id,
             );
-            // The bundle assembled from per-pair requirePair
-            // lookups (Phase 6 Task 4) — the FlowCreationPairs
+            // The bundle assembled from per-pair requireMessagePair
+            // lookups (Phase 6 Task 4) — the FlowCreationMessagePairs
             // assembly precedent above, generalized from fixed
             // cardinality 3 to 1+1+N: the operation and document
             // pairs each resolve by their own deterministic key,
             // one attribute-PUT pair per seeded attribute, and
             // an empty attributeDeletes (the seed never removes
             // an attribute it just created).
-            const recordPairs: RecordWritePairs = {
-                operation: requirePair(
-                    pairs,
-                    seedPairKey(
+            const recordMessagePairs: RecordWriteMessagePairs = {
+                operation: requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
                         RECORD_TYPES_COLLECTION_PATTERN,
                         r.id,
                     ),
                 ),
-                document: requirePair(
-                    pairs,
-                    seedPairKey(
+                document: requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
                         RECORD_TYPE_DETAIL_PATTERN, r.id,
                     ),
                 ),
                 attributePuts: attributes.map(a =>
-                    requirePair(
-                        pairs,
-                        seedPairKey(
+                    requireMessagePair(
+                        messagePairs,
+                        seedMessagePairKey(
                             ATTRIBUTE_DETAIL_PATTERN, a.id,
                         ),
                     ),
@@ -881,7 +889,7 @@ async function postMockDataLoadIn(
                 adapter,
                 recordSeedBody(r, i, event, attributes),
                 event.member_id,
-                recordPairs,
+                recordMessagePairs,
             );
         }),
         ...mockFlowRecords.map(r =>
@@ -890,9 +898,9 @@ async function postMockDataLoadIn(
                 r.id,
                 flowRecordJoinSeedBody(r),
                 SYSTEM_MEMBER_ID,
-                requirePair(
-                    pairs,
-                    seedPairKey(
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(
                         'flows/:id/records/:frid', r.id,
                     ),
                 ),
@@ -925,25 +933,25 @@ async function postMockDataLoadIn(
             objectiveMemberPools, STARK_ORGANIZATION,
             `${seed.id}:revision`,
         );
-        // Create threads the triple — the operation pair plus
-        // its two synthesized siblings (document, revision),
-        // each pre-formed in pass 1 under its own deterministic
-        // key (seed-message-pairs.ts) — fixed 1+1+1. The
-        // revision id is recomputed identically to
+        // Create threads the triple — the operation message
+        // pair plus its two synthesized siblings (document,
+        // revision), each pre-formed in pass 1 under its own
+        // deterministic key (seed-message-pairs.ts) — fixed
+        // 1+1+1. The revision id is recomputed identically to
         // objectiveSeedBody's own construction (deterministic).
         const revisionId = seedIdentifier(
             `${seed.id}:${MOCK_SEED_TIMESTAMP}`,
         );
-        const objectivePairs: ObjectiveCreationPairs = {
-            operation: requirePair(
-                pairs, seedPairKey('objectives', seed.id),
+        const objectiveMessagePairs: ObjectiveCreationMessagePairs = {
+            operation: requireMessagePair(
+                messagePairs, seedMessagePairKey('objectives', seed.id),
             ),
-            document: requirePair(
-                pairs, seedPairKey('objectives/:id', seed.id),
+            document: requireMessagePair(
+                messagePairs, seedMessagePairKey('objectives/:id', seed.id),
             ),
-            revision: requirePair(
-                pairs,
-                seedPairKey(
+            revision: requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
                     'objectives/:id/revisions/:rid', revisionId,
                 ),
             ),
@@ -953,13 +961,13 @@ async function postMockDataLoadIn(
             objectiveSeedBody(
                 seed, STARK_ORGANIZATION, memberId,
             ),
-            objectivePairs,
+            objectiveMessagePairs,
         );
     }
 
     // Organization 'BBjWJsjYIDkTRKIIPrzWRw' owns one objective so each org
     // owns
-    // at least one (pair plane only after Task 2 strip).
+    // at least one (message plane only after Task 2 strip).
     const org2RevisionId = seedIdentifier(
         `${ORGANIZATION_TWO_OBJECTIVE.id}:${MOCK_SEED_TIMESTAMP}`,
     );
@@ -970,22 +978,22 @@ async function postMockDataLoadIn(
             SYSTEM_MEMBER_ID,
         ),
         {
-            operation: requirePair(
-                pairs,
-                seedPairKey(
+            operation: requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
                     'objectives', ORGANIZATION_TWO_OBJECTIVE.id,
                 ),
             ),
-            document: requirePair(
-                pairs,
-                seedPairKey(
+            document: requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
                     'objectives/:id',
                     ORGANIZATION_TWO_OBJECTIVE.id,
                 ),
             ),
-            revision: requirePair(
-                pairs,
-                seedPairKey(
+            revision: requireMessagePair(
+                messagePairs,
+                seedMessagePairKey(
                     'objectives/:id/revisions/:rid',
                     org2RevisionId,
                 ),
@@ -1000,10 +1008,11 @@ async function postMockDataLoadIn(
     // family already uses. buildScoreSeedProjects resolves each
     // project's organization_id/state PURELY (never a DB read
     // back). This closes the scores half of the Phase 0 seed
-    // deferral WHOLE — baselines AND actuals — one document pair
-    // per row, driven through postBaselineScoreDocumentOp /
-    // postActualScoreDocumentOp exactly as every other seeded
-    // family drives through its own extracted op.
+    // deferral WHOLE — baselines AND actuals — one document
+    // message pair per row, driven through
+    // postBaselineScoreDocumentOp / postActualScoreDocumentOp
+    // exactly as every other seeded family drives through
+    // its own extracted op.
     const baselineScorePattern =
         'projects/:id/objective-baseline-scores/:sid';
     const actualScorePattern =
@@ -1016,18 +1025,18 @@ async function postMockDataLoadIn(
             postBaselineScoreDocumentOp(
                 adapter, row.id, row.fields,
                 row.fields.member_id,
-                requirePair(
-                    pairs,
-                    seedPairKey(baselineScorePattern, row.id),
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(baselineScorePattern, row.id),
                 ),
             )),
         ...scoreRows.actuals.map(row =>
             postActualScoreDocumentOp(
                 adapter, row.id, row.fields,
                 row.fields.member_id,
-                requirePair(
-                    pairs,
-                    seedPairKey(actualScorePattern, row.id),
+                requireMessagePair(
+                    messagePairs,
+                    seedMessagePairKey(actualScorePattern, row.id),
                 ),
             )),
     ]);
@@ -1050,23 +1059,24 @@ export async function postBootstrap(
     // bootstrap's own membership pair — closed the SAME way
     // postMockDataLoad's own membership sites are. Phase 10
     // Task 2: ALSO forms the current member's PII document
-    // pair, closing the intake decomposition's bootstrap
-    // side. Task 6: ALSO forms the system member's own
-    // identities/:id document pair — closed the SAME way
-    // postMockDataLoad's own system-identity site is. The
-    // credential pairs are NOT here — seedHumanCredentials
-    // forms those itself, below, since their content is
-    // unknown until PBKDF2 resolves. Phase 11 Task 8: ALSO
-    // forms bootstrap's own default-organization document
-    // pair — the mock-data seed's own per-member precedent,
-    // mirrored here for bootstrap's lone identity.
+    // message pair, closing the intake decomposition's
+    // bootstrap side. Task 6: ALSO forms the system
+    // member's own identities/:id document message pair —
+    // closed the SAME way postMockDataLoad's own
+    // system-identity site is. The credential pairs are
+    // NOT here — seedHumanCredentials forms those itself,
+    // below, since their content is unknown until PBKDF2
+    // resolves. Phase 11 Task 8: ALSO forms bootstrap's
+    // own default-organization document message pair —
+    // the mock-data seed's own per-member
+    // precedent, mirrored here for bootstrap's lone identity.
     const {
-        identityPair,
-        seatPair,
-        piiPair,
-        systemIdentityPair,
-        defaultOrganizationPair,
-        organizationPair,
+        identityMessagePair,
+        seatMessagePair,
+        piiMessagePair,
+        systemIdentityMessagePair,
+        defaultOrganizationMessagePair,
+        organizationMessagePair,
     } = await formBootstrapMessagePair(nowUtc());
     // Pass 2: seed the pristine bootstrap data in one
     // transaction. Credentials seed after it commits — PBKDF2
@@ -1077,9 +1087,9 @@ export async function postBootstrap(
     await adapter.transaction(
         TABLE_NAMES,
         (view) => postBootstrapIn(
-            view, identityPair, seatPair, piiPair,
-            systemIdentityPair,
-            defaultOrganizationPair, organizationPair,
+            view, identityMessagePair, seatMessagePair, piiMessagePair,
+            systemIdentityMessagePair,
+            defaultOrganizationMessagePair, organizationMessagePair,
         ),
     );
     // Task 1(d): bootstrap's lone human is 'XXZruirZyAOoRpNxaDnpSA' with
@@ -1105,12 +1115,12 @@ export async function postBootstrap(
 
 export async function postBootstrapIn(
     adapter: DbAdapter,
-    identityPair: MessagePair,
-    seatPair: MessagePair,
-    piiPair: MessagePair,
-    systemIdentityPair: MessagePair,
-    defaultOrganizationPair: MessagePair,
-    organizationPair: MessagePair,
+    identityMessagePair: MessagePair,
+    seatMessagePair: MessagePair,
+    piiMessagePair: MessagePair,
+    systemIdentityMessagePair: MessagePair,
+    defaultOrganizationMessagePair: MessagePair,
+    organizationMessagePair: MessagePair,
 ): Promise<void> {
     await Promise.all([
         postIdentityDocumentOp(
@@ -1118,28 +1128,28 @@ export async function postBootstrapIn(
             SYSTEM_MEMBER_ID,
             identityDocumentBodyOf('service'),
             SYSTEM_MEMBER_ID,
-            systemIdentityPair,
+            systemIdentityMessagePair,
         ),
         postIdentityDocumentOp(
             adapter,
             'XXZruirZyAOoRpNxaDnpSA',
             bootstrapCurrentIdentityBody(),
             SYSTEM_MEMBER_ID,
-            identityPair,
+            identityMessagePair,
         ),
         postMembershipDocumentOp(
             adapter,
             'XXZruirZyAOoRpNxaDnpSA',
-            seatSeedBody('admin', seatPair.requestAt),
+            seatSeedBody('admin', seatMessagePair.requestAt),
             SYSTEM_MEMBER_ID,
-            seatPair,
+            seatMessagePair,
         ),
-        appendMessagePair(adapter, defaultOrganizationPair),
+        appendMessagePair(adapter, defaultOrganizationMessagePair),
         postIdentityPiiDocumentOp(
             adapter, 'XXZruirZyAOoRpNxaDnpSA'
                 , bootstrapCurrentMemberPiiBody(),
-            SYSTEM_MEMBER_ID, piiPair,
+            SYSTEM_MEMBER_ID, piiMessagePair,
         ),
-        appendMessagePair(adapter, organizationPair),
+        appendMessagePair(adapter, organizationMessagePair),
     ]);
 }

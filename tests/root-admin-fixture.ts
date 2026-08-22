@@ -11,7 +11,7 @@ import {
 import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     '../api/family-registry.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
@@ -55,10 +55,10 @@ export function organizationRow(
 // db.organizations.put, or a membership pair whose
 // organization was never itself given a document, leaves the
 // identity's membership derivation-invisible. Phase Final Task
-// 2: organizations ROW half stripped — pure pair-plane write,
-// mirroring the live PUT organizations/:id route body. GLOBAL
-// plane (organizationNested: false) — `organization` stays
-// undefined throughout. IDEMPOTENT on the PAIR PLANE
+// 2: organizations ROW half stripped — pure message-plane
+// write, mirroring the live PUT organizations/:id route body.
+// GLOBAL plane (organizationNested: false) — `organization`
+// stays undefined throughout. IDEMPOTENT on the MESSAGE PLANE
 // (deriveOrganizations): seedRootAdmin/seedOrganizationMember
 // still avoid a duplicate pair when both run against the same
 // db.
@@ -78,7 +78,7 @@ export async function seedOrganizationDocument(
             'no per-write response spec for organizations/:id',
         );
     }
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: `/organizations/${id}`,
         routePattern: 'organizations/:id',
@@ -99,12 +99,12 @@ export async function seedOrganizationDocument(
         // Phase Final Task 2: organizations ROW half stripped.
         MESSAGE_TABLES,
         async (view) => {
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
         },
     );
 }
 
-export async function seatDocumentPair(
+export async function seatDocumentMessagePair(
     organization: Id,
     identityId: Id,
     body: Record<string, unknown>,
@@ -118,7 +118,7 @@ export async function seatDocumentPair(
             'no per-write response spec for seat',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/' + organization
             + '/members/' + identityId,
@@ -154,7 +154,7 @@ export async function seedSeat(
     const body = { type, at };
     await postMembershipDocumentOp(
         db, identityId, body, SYSTEM_MEMBER_ID,
-        await seatDocumentPair(
+        await seatDocumentMessagePair(
             organization, identityId, body, requestAt,
         ),
     );

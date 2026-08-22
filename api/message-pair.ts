@@ -1,6 +1,6 @@
 import type { DbAdapter } from './db.ts';
 import type {
-    Id, IdentityTokenEntity, PairEntity,
+    Id, IdentityTokenEntity, MessagePairEntity,
 } from './types.ts';
 import { nowUtc } from './types.ts';
 import {
@@ -39,7 +39,7 @@ import {
 import type { NotificationEvent } from
     './notifications.ts';
 
-// The shadow-ledger message pair: one `pairs` put. Formed
+// The shadow-ledger message pair: one `message_pairs` put. Formed
 // pre-tx — crypto, hashing, and timers never run
 // inside an open transaction (AGENTS.md § Transaction
 // bodies await only row ops). Then appended as the LAST
@@ -68,19 +68,19 @@ export interface MessagePair {
     readonly operationId: string;
     // Pre-tx lock-head pair id, latched when If-Match
     // matches the advertised ETag. In-tx re-query only.
-    readonly latchedHeadPairId?: string;
+    readonly latchedHeadMessagePairId?: string;
 }
 
 // The gate's seed for the two /authentication/* grant routes
-// (Task 3, C1 discharge): everything WritePairInput needs
+// (Task 3, C1 discharge): everything WriteMessagePairInput needs
 // EXCEPT the requester identity and the response side. Both
 // routes are bearerExempt, so the generic pair block never
-// forms a WritePairInput for them (api.ts) — the gate instead
+// forms a WriteMessagePairInput for them (api.ts) — the gate instead
 // assembles this seed once, and the grant itself (the only
 // place that can resolve the requester identity — a code's
 // issuer, a verified token's subject — and the response body)
-// completes it into a MessagePair via formAuthPair, pre-tx.
-export interface AuthPairSeed {
+// completes it into a MessagePair via formAuthMessagePair, pre-tx.
+export interface AuthMessagePairSeed {
     readonly requestAt: string;
     readonly headerFields: readonly FieldLine[];
     readonly method: string;
@@ -90,7 +90,7 @@ export interface AuthPairSeed {
     readonly pathSegments: readonly string[];
 }
 
-export interface WritePairInput {
+export interface WriteMessagePairInput {
     readonly method: string;
     readonly pathname: string;
     readonly routePattern: string;
@@ -112,7 +112,7 @@ export interface WritePairInput {
     // 64-hex advertised ETag this later write is matching.
     // Omitted on genesis / unconditional writes.
     readonly matchedEtag?: string;
-    readonly latchedHeadPairId?: string;
+    readonly latchedHeadMessagePairId?: string;
     // Required on every formed pair. Public writes supply
     // the hoisted Operation-ID; seed and inner PUTs pass
     // the envelope id here. Never minted for a public write.
@@ -202,8 +202,8 @@ function headerFieldsWithOperationId(
     ];
 }
 
-export async function formWritePair(
-    input: WritePairInput,
+export async function formWriteMessagePair(
+    input: WriteMessagePairInput,
 ): Promise<MessagePair> {
     if (!isIdentifier(input.operationId)) {
         throw new Error(
@@ -261,21 +261,21 @@ export async function formWritePair(
         responseHash: await requestMessageHash(responseMessage),
         method: input.method,
         operationId: input.operationId,
-        ...(input.latchedHeadPairId !== undefined
-            ? { latchedHeadPairId: input.latchedHeadPairId }
+        ...(input.latchedHeadMessagePairId !== undefined
+            ? { latchedHeadMessagePairId: input.latchedHeadMessagePairId }
             : {}),
     };
 }
 
-// Complete an AuthPairSeed into a MessagePair for a grant's own
+// Complete an AuthMessagePairSeed into a MessagePair for a grant's own
 // response: operation-addressed (uriId '', global plane — see
 // canonicalUriCollection with organization undefined), never a
 // head-read. The two /authentication/* routes are the only
 // callers; each grant calls this pre-tx, once its own domain
 // read has resolved the requester identity and its response
 // body is fully known.
-export async function formAuthPair(
-    seed: AuthPairSeed,
+export async function formAuthMessagePair(
+    seed: AuthMessagePairSeed,
     body: Record<string, unknown>,
     requesterIdentityId: Id,
     responseStatus: number,
@@ -285,7 +285,7 @@ export async function formAuthPair(
     const hoisted = seed.headerFields.find(
         (f) => f.name === OPERATION_ID_HEADER,
     )?.value;
-    return formWritePair({
+    return formWriteMessagePair({
         ...seed,
         body,
         requesterIdentityId,
@@ -306,9 +306,10 @@ export async function formAuthPair(
 // fixture pairs, real PUT pairs, and these synthesized
 // grant/rotation/revocation pairs uniformly. Kept as a literal
 // here rather than imported from routes.ts: routes.ts imports
-// FROM message-pair.ts (formWritePair, headPairIdAt), never the
-// reverse — the import graph stays acyclic (see
-// formDocumentPairFor's own comment, routes.ts).
+// FROM message-pair.ts (formWriteMessagePair,
+// headMessagePairIdAt), never the reverse — the import
+// graph stays acyclic (see
+// formDocumentMessagePairFor's own comment, routes.ts).
 const TOKEN_EVENT_ROUTE_PATTERN = 'identities/:id/tokens/:tid';
 const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
     TOKEN_EVENT_ROUTE_PATTERN.split('/');
@@ -329,7 +330,7 @@ const TOKEN_EVENT_ROUTE_SEGMENTS: readonly string[] =
 // depth (an internal grant, a rotation, a chain revocation).
 // jti is an identifier, not a bearer secret — stored
 // plaintext as the live wired PUT's own pairs already do.
-export async function formTokenEventPair(
+export async function formTokenEventMessagePair(
     id: Id,
     event: Omit<IdentityTokenEntity, 'id'>,
     operationId: string,
@@ -341,7 +342,7 @@ export async function formTokenEventPair(
         id,
     ];
     const body = event as unknown as Record<string, unknown>;
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
         routePattern: TOKEN_EVENT_ROUTE_PATTERN,
@@ -363,7 +364,7 @@ export async function formTokenEventPair(
 
 // Live PUT pair id at the address. POST/PATCH are not
 // heads. DELETE head and a virgin address are undefined.
-export async function headPairIdAt(
+export async function headMessagePairIdAt(
     db: DbAdapter,
     uriCollection: string,
     uriId: string,
@@ -381,7 +382,7 @@ export async function documentHeadAt(
     uriCollection: string,
     uriId: string,
 ): Promise<{ id: string; method: string } | undefined> {
-    const pairs = await messageStore(db).getPairs(
+    const messagePairs = await messageStore(db).getMessagePairs(
         uriCollection, uriId,
     );
     let head: {
@@ -389,13 +390,13 @@ export async function documentHeadAt(
         id: string;
         method: string;
     } | undefined;
-    for (const pair of pairs) {
-        const method = pair.method;
+    for (const messagePair of messagePairs) {
+        const method = messagePair.method;
         if (method !== 'PUT' && method !== 'DELETE') {
             continue;
         }
-        const at = pair.response_at;
-        const id = pair.id;
+        const at = messagePair.response_at;
+        const id = messagePair.id;
         if (
             head === undefined
             || at > head.at
@@ -416,8 +417,8 @@ export async function documentHeadAt(
 export async function storedResponseFor(
     db: DbAdapter,
     requestHash: string,
-): Promise<PairEntity | undefined> {
-    const prior = await db.pairs.getAllWhere(
+): Promise<MessagePairEntity | undefined> {
+    const prior = await db.messagePairs.getAllWhere(
         'request_hash', requestHash,
     );
     return prior[0];
@@ -472,21 +473,21 @@ export function ifMatchFromMessage(
     return parseIfMatch(field.value);
 }
 
-export function ifMatchFromPair(
-    pair: MessagePair,
+export function ifMatchFromMessagePair(
+    messagePair: MessagePair,
 ): string | undefined {
-    return ifMatchFromMessage(pair.requestMessage);
+    return ifMatchFromMessage(messagePair.requestMessage);
 }
 
 // Raw If-Match header value from a formed pair —
 // undefined means ABSENT. Callers that must speak the
 // 428-vs-400 ladder themselves (transition op) need
 // absent distinguished from malformed;
-// ifMatchFromPair conflates them.
-export function rawIfMatchFromPair(
-    pair: MessagePair,
+// ifMatchFromMessagePair conflates them.
+export function rawIfMatchFromMessagePair(
+    messagePair: MessagePair,
 ): string | undefined {
-    const model = parseWire(pair.requestMessage);
+    const model = parseWire(messagePair.requestMessage);
     const field = model.fields.find(
         (line) => line.name === IF_MATCH_HEADER,
     );
@@ -537,7 +538,7 @@ export function hoistedHeaderFields(request: Request): FieldLine[] {
 // byte-identical replay — both render from the STORED row,
 // never the in-memory pair, so a concurrent-replay's surviving
 // original pair is what the wire advertises either way.
-export function wireHeadersFor(stored: PairEntity): HeadersInit {
+export function wireHeadersFor(stored: MessagePairEntity): HeadersInit {
     const headers: Record<string, string> = {
         'Date': httpDateOf(stored.response_at),
         'Response-ID': stored.id,
@@ -550,7 +551,7 @@ export function wireHeadersFor(stored: PairEntity): HeadersInit {
 // serializeWire message — the one reconstruction path shared
 // by a fresh write's success return and an idempotent replay's
 // early return.
-export function responseFromStored(stored: PairEntity): Response {
+export function responseFromStored(stored: MessagePairEntity): Response {
     const model = parseWire(stored.response);
     if (model.startLine.kind !== 'response') {
         throw new Error(
@@ -572,7 +573,7 @@ export function responseFromStored(stored: PairEntity): Response {
 // octets, Date replaced with now, no Operation-ID.
 // ETag and Response-ID are projection headers.
 export function streamGetFromStored(
-    stored: PairEntity,
+    stored: MessagePairEntity,
     at: string,
 ): Response {
     const model = parseWire(stored.response);
@@ -607,7 +608,7 @@ export function streamGetFromStored(
 // Operation-ID is added here (wireHeadersFor), never stored
 // on the GET-shaped blob.
 export function sendWriteResponse(
-    stored: PairEntity,
+    stored: MessagePairEntity,
     method: string,
     appended: boolean,
 ): Response {
@@ -627,10 +628,10 @@ export function sendWriteResponse(
 // successBody resolver already minted (token rotation's
 // pre-minted jti) reads it back HERE rather than deriving a
 // second, possibly divergent, value. The pair IS the response.
-export function pairResponseBody(
-    pair: MessagePair,
+export function messagePairResponseBody(
+    messagePair: MessagePair,
 ): Record<string, unknown> | undefined {
-    const model = parseWire(pair.responseMessage);
+    const model = parseWire(messagePair.responseMessage);
     const body = HttpMessage.fromModel(model).body();
     return body.exists()
         ? JSON.parse(body.toText()) as Record<string, unknown>
@@ -645,7 +646,7 @@ export function pairResponseBody(
 // generic gate inlines the same shape at its own call sites
 // (api.ts) since it also folds in postWriteNotification between
 // the lookup and the response there.
-export async function storedPairResponse(
+export async function storedMessagePairResponse(
     adapter: DbAdapter,
     requestHash: string,
     opName: string,
@@ -661,7 +662,7 @@ export async function storedPairResponse(
 }
 
 // In-tx put by pair id (row ops only, no crypto): one pairs
-// put keyed by pair.id. Idempotent by id — a second put of
+// put keyed by messagePair.id. Idempotent by id — a second put of
 // the same pair overwrites the same slot. Auth grant pairs
 // use this path so two byte-identical logins each land
 // (their ids differ); hash-keyed appendMessagePair would
@@ -675,47 +676,47 @@ export async function storedPairResponse(
 // unchanged.
 export async function putMessagePair(
     view: DbAdapter,
-    pair: MessagePair,
+    messagePair: MessagePair,
 ): Promise<void> {
-    await coordinateWrite(view, pair, false);
-    await writePairRows(view, pair);
-    await notifyWrite(view, pair);
+    await coordinateWrite(view, messagePair, false);
+    await writeMessagePairRows(view, messagePair);
+    await notifyWrite(view, messagePair);
 }
 
 // In-tx append (row ops only, no crypto): skips silently if a
 // pair with the same request_hash is already stored (the
 // concurrent-retry guard); otherwise one pairs put via
-// writePairRows.
+// writeMessagePairRows.
 export async function appendMessagePair(
     view: DbAdapter,
-    pair: MessagePair,
+    messagePair: MessagePair,
 ): Promise<void> {
-    await coordinateWrite(view, pair, true);
-    const replay = await view.pairs.getAllWhere(
-        'request_hash', pair.requestHash,
+    await coordinateWrite(view, messagePair, true);
+    const replay = await view.messagePairs.getAllWhere(
+        'request_hash', messagePair.requestHash,
     );
     if (replay.length > 0) return;
-    await writePairRows(view, pair);
-    await notifyWrite(view, pair);
+    await writeMessagePairRows(view, messagePair);
+    await notifyWrite(view, messagePair);
 }
 
-async function writePairRows(
+async function writeMessagePairRows(
     view: DbAdapter,
-    pair: MessagePair,
+    messagePair: MessagePair,
 ): Promise<void> {
-    await view.pairs.put(pair.id, {
-        uri_collection: pair.uriCollection,
-        uri_id: pair.uriId,
+    await view.messagePairs.put(messagePair.id, {
+        uri_collection: messagePair.uriCollection,
+        uri_id: messagePair.uriId,
         requester_identity_id:
-            pair.requesterIdentityId,
-        method: pair.method,
-        request_at: pair.requestAt,
-        request_hash: pair.requestHash,
-        request: pair.requestMessage,
+            messagePair.requesterIdentityId,
+        method: messagePair.method,
+        request_at: messagePair.requestAt,
+        request_hash: messagePair.requestHash,
+        request: messagePair.requestMessage,
         response_at: nowUtc(),
-        version: pair.responseEtag,
-        response: pair.responseMessage,
-        operation_id: pair.operationId,
+        version: messagePair.responseEtag,
+        response: messagePair.responseMessage,
+        operation_id: messagePair.operationId,
     });
 }
 
@@ -723,31 +724,31 @@ async function writePairRows(
 // gated, then FOR UPDATE + a new latest SELECT.
 async function coordinateWrite(
     view: DbAdapter,
-    pair: MessagePair,
+    messagePair: MessagePair,
     hashDeduped: boolean,
 ): Promise<void> {
     const locks = view.writeLocks;
     if (locks === undefined) return;
     if (hashDeduped) {
-        await locks.lockDedup(pair.requestHash);
+        await locks.lockDedup(messagePair.requestHash);
     }
-    const gated = isGatedAddress(pair.uriCollection);
+    const gated = isGatedAddress(messagePair.uriCollection);
     if (gated) {
         await locks.lockAddress(
-            pair.uriCollection, pair.uriId,
+            messagePair.uriCollection, messagePair.uriId,
         );
     }
-    const latched = pair.latchedHeadPairId;
+    const latched = messagePair.latchedHeadMessagePairId;
     if (latched !== undefined) {
         await locks.lockHead(latched);
         const latest = await locks.latestPutDelete(
-            pair.uriCollection, pair.uriId,
+            messagePair.uriCollection, messagePair.uriId,
         );
         if (latest === null || latest.id !== latched) {
             throw new ApiError(
                 'If-Match does not match the current'
                 + ' document at '
-                + pair.uriCollection + pair.uriId,
+                + messagePair.uriCollection + messagePair.uriId,
                 HTTP_PRECONDITION_FAILED,
             );
         }
@@ -755,13 +756,13 @@ async function coordinateWrite(
     }
     if (!gated) return;
     const latest = await locks.latestPutDelete(
-        pair.uriCollection, pair.uriId,
+        messagePair.uriCollection, messagePair.uriId,
     );
     if (latest !== null && latest.method === 'PUT') {
         throw new ApiError(
             'If-Match does not match the current'
             + ' document at '
-            + pair.uriCollection + pair.uriId,
+            + messagePair.uriCollection + messagePair.uriId,
             HTTP_PRECONDITION_FAILED,
         );
     }
@@ -769,17 +770,17 @@ async function coordinateWrite(
 
 async function notifyWrite(
     view: DbAdapter,
-    pair: MessagePair,
+    messagePair: MessagePair,
 ): Promise<void> {
     const notify = view.writeLocks?.notify;
     if (notify === undefined) return;
-    await notify(eventForPair(pair));
+    await notify(eventForMessagePair(messagePair));
 }
 
-function eventForPair(
-    pair: MessagePair,
+function eventForMessagePair(
+    messagePair: MessagePair,
 ): NotificationEvent {
-    const parts = pair.uriCollection
+    const parts = messagePair.uriCollection
         .split('/')
         .filter((part) => part !== '');
     const organizationIds =
@@ -790,7 +791,7 @@ function eventForPair(
     return {
         kind: 'scoped',
         organizationIds,
-        identityIds: [pair.requesterIdentityId],
+        identityIds: [messagePair.requesterIdentityId],
     };
 }
 
@@ -828,9 +829,9 @@ const CREATE_BODY_ID_FIELDS: Record<string, string> = {
     'invitations': 'invitationId',
     // Nested composed POST (Task 9): pattern is not a bare
     // family name, so the registry consult never fires — body
-    // `id` collapses the operation pair onto the type's uri_id
-    // (same supersession collapse the retired flat POST
-    // /records used).
+    // `id` collapses the operation message pair onto the
+    // type's uri_id (same supersession collapse the retired
+    // flat POST /records used).
     [RECORD_TYPES_COLLECTION_PATTERN]: 'id',
 };
 
@@ -892,7 +893,7 @@ export function createdEntityUriId(
 // extends it; the Task 6 exit test asserts it covers every
 // write route — so no intermediate commit ever advertises a
 // Response-ID it did not store.
-export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
+export const MESSAGE_PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     'organizations/:id/ideas/:id',
     'organizations/:id/ideas/:id/conversion',
     'organizations/:id/ideas/:id/submissions/:sid',
@@ -938,17 +939,17 @@ export const PAIR_WIRED_ROUTE_PATTERNS: Set<string> = new Set([
     // Nested attributes detail (Task 7): admin PUT/DELETE.
     ATTRIBUTE_DETAIL_PATTERN,
     // Nested instances detail: PATCH create/update +
-    // DELETE (PAIR_WIRED only — R10 keeps DOCUMENT_CLASS
+    // DELETE (MESSAGE_PAIR_WIRED only — R10 keeps DOCUMENT_CLASS
     // clear). Public PUT is 405 (Task 20).
     INSTANCE_DETAIL_PATTERN,
     ORGANIZATION_MEMBER_DETAIL_PATTERN,
     // states/:id/field-values/:fvid RETIRED from live wire
     // (Phase 15 Task 7); seed still forms pairs at that
-    // address via formSeedPair + WRITE_RESPONSE_SPECS.
+    // address via formSeedMessagePair + WRITE_RESPONSE_SPECS.
 ]);
 
-// Route patterns wired for pair STORAGE (PAIR_WIRED_ROUTE_
-// PATTERNS above) whose gate dispatch must NEVER take the
+// Route patterns wired for pair STORAGE (MESSAGE_PAIR_WIRED_
+// ROUTE_PATTERNS above) whose gate dispatch must NEVER take the
 // pre-tx idempotency fast path (storedResponseFor in api.ts) —
 // a byte-identical resend still re-enters the handler instead
 // of returning the first call's cached response. Membership
@@ -985,12 +986,12 @@ export const REPLAY_EXEMPT_ROUTE_PATTERNS: Set<string> =
 // event-append address (a fresh, client-minted id every write,
 // e.g. states/:id) never head-read, even though an event-
 // append uriId is never ''. Grown family by family alongside
-// PAIR_WIRED_ROUTE_PATTERNS.
+// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.
 // 'identities/:id/pii' is RETIRED here (Phase 10 Task 3): the
 // /pii address is the message plane's sanctioned hard-delete
 // zone (api/pii-hard-delete.ts) — CHAINLESS by construction, so
 // this Set's pre-tx head-read must never run for it. It stays
-// wired for pair STORAGE in PAIR_WIRED_ROUTE_PATTERNS above.
+// wired for pair STORAGE in MESSAGE_PAIR_WIRED_ROUTE_PATTERNS above.
 export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
     new Set([
         'organizations/:id/ideas/:id',
@@ -1042,5 +1043,5 @@ export const DOCUMENT_CLASS_ROUTE_PATTERNS: Set<string> =
         ORGANIZATION_MEMBER_DETAIL_PATTERN,
         // states/:id/field-values/:fvid RETIRED from live wire
         // (Phase 15 Task 7); seed still forms pairs at that
-        // address via formSeedPair + WRITE_RESPONSE_SPECS.
+        // address via formSeedMessagePair + WRITE_RESPONSE_SPECS.
     ]);

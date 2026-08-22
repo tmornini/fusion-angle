@@ -15,7 +15,7 @@ import type {
     ObjectiveRevisionEntity,
 } from '../api/types.ts';
 import { canonicalUriCollection } from '../api/message-pair.ts';
-import { documentPairsAt } from '../api/derive-documents.ts';
+import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
     documentCollectionGetHandler,
@@ -559,7 +559,7 @@ test('score collection wire equals derive per project: an'
     );
 });
 
-// -- 5. live-write chain on the pair plane ---------------------
+// -- 5. live-write chain on the message plane ------------------
 
 test('live-write chain: create, reposition, revision edit,'
 + ' archive, reactivate, a conversion with 2 baselines, a'
@@ -569,7 +569,7 @@ test('live-write chain: create, reposition, revision edit,'
     const token = await organizationToken();
     const objectiveId = generateIdentifier();
 
-    const beforeCreate = (await db.pairs.getAll()).length;
+    const beforeCreate = (await db.messagePairs.getAll()).length;
     const created = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/', token,
         objectiveCreateBody(
@@ -579,7 +579,7 @@ test('live-write chain: create, reposition, revision edit,'
     ));
     assert.equal(created.status, 201);
     assert.equal(
-        (await db.pairs.getAll()).length, beforeCreate + 3,
+        (await db.messagePairs.getAll()).length, beforeCreate + 3,
     );
     {
         const getRes = await handleRequest(
@@ -755,7 +755,7 @@ test('live-write chain: create, reposition, revision edit,'
     const baselineIdA = generateIdentifier();
     const baselineIdB = generateIdentifier();
     const secondObjectiveId = OBJECTIVE_SEEDS[0]!.id;
-    const beforeConversion = (await db.pairs.getAll()).length;
+    const beforeConversion = (await db.messagePairs.getAll()).length;
     const conversion = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/' + ideaId
             + '/conversion', token, {
@@ -802,7 +802,7 @@ test('live-write chain: create, reposition, revision edit,'
     ));
     assert.equal(conversion.status, 201);
     assert.equal(
-        (await db.pairs.getAll()).length,
+        (await db.messagePairs.getAll()).length,
         beforeConversion + 5,
     );
     const basePath =
@@ -886,7 +886,7 @@ test('live-write chain: create, reposition, revision edit,'
     );
     const beforeDuplicateIds = new Set(
         (
-            await db.pairs.getAllWhere(
+            await db.messagePairs.getAllWhere(
                 'uri_collection', objectivesPrefix,
             )
         ).filter((r) => r.uri_id === objectiveId)
@@ -910,8 +910,8 @@ test('live-write chain: create, reposition, revision edit,'
     );
 
     const [afterRequests, afterResponses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', objectivesPrefix),
-        db.pairs.getAllWhere('uri_collection', objectivesPrefix),
+        db.messagePairs.getAllWhere('uri_collection', objectivesPrefix),
+        db.messagePairs.getAllWhere('uri_collection', objectivesPrefix),
     ]);
     const afterAtAddress = afterResponses.filter(
         (r) => r.uri_id === objectiveId,
@@ -924,15 +924,16 @@ test('live-write chain: create, reposition, revision edit,'
     for (const row of newRows) {
         assert.equal('supersedes' in row, false);
     }
-    const documentPairsAfter = documentPairsAt(
+    const documentMessagePairsAfter = documentMessagePairsAt(
         afterRequests, objectivesPrefix,
-    ).filter((pair) => pair.uriId === objectiveId);
+    ).filter((messagePair) => messagePair.uriId === objectiveId);
     // create doc + reposition + archive + reactivate +
     // duplicate create's document = 5
-    assert.equal(documentPairsAfter.length, 5);
-    const newestDocumentPair = documentPairsAfter.at(-1)!;
+    assert.equal(documentMessagePairsAfter.length, 5);
+    const newestDocumentMessagePair =
+        documentMessagePairsAfter.at(-1)!;
     const newestDocumentResponseRow = afterAtAddress.find(
-        (r) => r.id === newestDocumentPair.id,
+        (r) => r.id === newestDocumentMessagePair.id,
     )!;
     assert.equal(
         'supersedes' in newestDocumentResponseRow,
@@ -960,7 +961,7 @@ test('live-write chain: create, reposition, revision edit,'
 
 // -- 6. method-filter: create POST is never the document head -
 
-test('the create-op POST pair is not read as a document pair —'
+test('the create-op POST pair is not read as a document message pair —'
 + ' the create body and the document body share zero top-level'
 + ' keys; exactly one PUT pair lands at the objective address'
 + ' after create', async () => {
@@ -982,8 +983,8 @@ test('the create-op POST pair is not read as a document pair —'
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/',
     );
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
     const atAddress = requests.filter(
         (r) => r.uri_collection === prefix
@@ -991,11 +992,11 @@ test('the create-op POST pair is not read as a document pair —'
     );
     assert.equal(atAddress.length, 2);
 
-    const documentPairs = documentPairsAt(
+    const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((pair) => pair.uriId === objectiveId);
-    assert.equal(documentPairs.length, 1);
-    assert.equal(documentPairs[0]!.method, 'PUT');
+    ).filter((messagePair) => messagePair.uriId === objectiveId);
+    assert.equal(documentMessagePairs.length, 1);
+    assert.equal(documentMessagePairs[0]!.method, 'PUT');
 
     const postRow = atAddress.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
@@ -1004,7 +1005,7 @@ test('the create-op POST pair is not read as a document pair —'
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
     const documentBodyKeys = new Set(
-        Object.keys(documentPairs[0]!.body),
+        Object.keys(documentMessagePairs[0]!.body),
     );
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
@@ -1035,14 +1036,14 @@ async () => {
         position: 99,
         state: 'active' as const,
     };
-    const beforeReposition = (await db.pairs.getAll()).length;
+    const beforeReposition = (await db.messagePairs.getAll()).length;
     const first = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + objectiveId, token,
         positionBody,
     ));
     assert.equal(first.status, 201);
-    const afterFirst = (await db.pairs.getAll()).length;
+    const afterFirst = (await db.messagePairs.getAll()).length;
     assert.equal(afterFirst, beforeReposition + 1);
 
     const second = await handleRequest(db, req(
@@ -1051,7 +1052,7 @@ async () => {
         positionBody,
     ));
     assert.equal(second.status, 201);
-    const afterSecond = (await db.pairs.getAll()).length;
+    const afterSecond = (await db.messagePairs.getAll()).length;
     assert.equal(afterSecond, afterFirst);
     assert.equal(
         first.headers.get('Response-ID'),

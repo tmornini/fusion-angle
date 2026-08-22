@@ -136,7 +136,7 @@ function storedDoc(
 ) {
     return {
         uriId,
-        pairId: uriId,
+        messagePairId: uriId,
         method: 'PUT',
         body,
     };

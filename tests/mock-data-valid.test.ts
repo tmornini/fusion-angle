@@ -94,7 +94,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
 // Each entry: table name, getAll fn, validator.
 // Phase Final Task 2: members/humanMembers/aiMembers seed
 // row halves stripped — non-empty pins retired with the
-// tables; pair-plane coverage lives in drift-roster.
+// tables; message-plane coverage lives in drift-roster.
 const TABLES: ReadonlyArray<[
     string,
     (db: MemoryDbAdapter) => Promise<{ id: string }[]>,
@@ -168,7 +168,7 @@ for (const [name, getAll, validate] of TABLES) {
 }
 
 // Phase Final Task 2: ideas(+idea_submissions) seed row halves
-// stripped — validate the derived plane (pair-plane truth).
+// stripped — validate the derived plane (message-plane truth).
 test('mock-data seeds non-empty derived ideas per org',
 async () => {
     const db = await seededDb();
@@ -346,7 +346,7 @@ const ZULU_6 =
     /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
 
 // Phase Final Task 2 / C3: pin derived-plane .at via
-// surviving lifecycle derives (pair plane is truth).
+// surviving lifecycle derives (message plane is truth).
 test('mock-data derived lifecycle .at is 6-digit zulu',
 async () => {
     const db = await seededDb();
@@ -392,7 +392,7 @@ async () => {
 });
 
 // Phase Final Task 2: organizations ROW half stripped —
-// validate the derived plane (pair-plane truth).
+// validate the derived plane (message-plane truth).
 
 test('mock-data seeds non-empty derived organizations',
 async () => {
@@ -415,8 +415,9 @@ async () => {
 });
 
 // Phase Final Task 2: flows seed row half stripped — validate
-// the derived plane (pair-plane truth). Graph shape is pinned
-// by mock-data-flow-relations (pair graph equals authored).
+// the derived plane (message-plane truth). Graph shape is
+// pinned by mock-data-flow-relations (pair graph equals
+// authored).
 test('mock-data seeds non-empty derived flows per org',
 async () => {
     const db = await seededDb();
@@ -448,7 +449,7 @@ async () => {
 });
 
 // Phase Final Task 2: work-orders + joins + SFV from the
-// pair plane (row halves stripped).
+// message plane (row halves stripped).
 test('mock-data seeds non-empty derived work orders',
 async () => {
     const db = await seededDb();
@@ -544,16 +545,16 @@ test(
     + ' the work order\'s org',
     async () => {
         const db = await seededDb();
-        // Phase Final Task 2: WO org from pair plane.
+        // Phase Final Task 2: WO org from message plane.
         const workOrders = await documentCollectionGetHandler(
             WORK_ORDERS_WIRING,
         )(db, [], 'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION) as
             WorkOrderEntity[];
         // C3: bulk deriveStates retired — WO lifecycle
-        // from the pair-plane work-order derive.
+        // from the message-plane work-order derive.
         const states = await deriveWorkOrderLifecycle(db);
         // Phase Final Task 2: memberships + members from
-        // the pair plane.
+        // the message plane.
         const organizationByWo = new Map(
             workOrders.map(w => [w.id, w.organization_id]),
         );
@@ -575,10 +576,10 @@ test(
         }
         const [agentRequests, agentResponses] =
             await Promise.all([
-                db.pairs.getAllWhere(
+                db.messagePairs.getAllWhere(
                     'uri_collection', '/ai-agents/',
                 ),
-                db.pairs.getAllWhere(
+                db.messagePairs.getAllWhere(
                     'uri_collection', '/ai-agents/',
                 ),
             ]);

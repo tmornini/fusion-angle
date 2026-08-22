@@ -19,7 +19,7 @@ function currentReveal(creds: SeededCredentials) {
 }
 
 // Phase Final Task 2: identity_credentials ROW half stripped —
-// admin credential oracle is the pair plane.
+// admin credential oracle is the message plane.
 async function adminCredential(db: MemoryDbAdapter) {
     const rows = await deriveCredentialsFor(db, 'XXZruirZyAOoRpNxaDnpSA');
     return rows.find(r => r.kind === 'password');

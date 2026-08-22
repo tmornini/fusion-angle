@@ -12,7 +12,7 @@ import { DEV_TOKEN } from './token-fixtures.ts';
 import { seedAdminSchema } from './test-fixtures.ts';
 import { seedCurrentMember } from './member-fixtures.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
 } from '../api/message-pair.ts';
 import {
@@ -172,7 +172,7 @@ async function appendTransitionPair(
         'organizations', organization,
         'work-orders', workOrderId, 'transition',
     ];
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: TRANSITION_PATTERN,
@@ -189,9 +189,9 @@ async function appendTransitionPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
-    return pair.id;
+    return messagePair.id;
 }
 
 interface HistoryFieldValue {

@@ -54,7 +54,7 @@ async function setup() {
 }
 
 // Phase Final Task 2: identity_token_revocations ROW half
-// stripped — append count lives on the pair plane.
+// stripped — append count lives on the message plane.
 
 test('logout-everywhere appends, never splices',
 async () => {

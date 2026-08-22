@@ -51,7 +51,7 @@ const EV_ACC_REMOVED = generateIdentifier();
 const MS_SARAH_AGAIN = generateIdentifier();
 const EV_ACC_AGAIN = generateIdentifier();
 
-// Phase Final Task 2: memberships on the pair plane.
+// Phase Final Task 2: memberships on the message plane.
 async function allMemberships(db: MemoryDbAdapter) {
     const organizations = await deriveOrganizations(db);
     const rows: Array<{
@@ -66,10 +66,10 @@ async function allMemberships(db: MemoryDbAdapter) {
             + organization.id + '/members/';
         const [seatRequests, seatResponses] =
             await Promise.all([
-                db.pairs.getAllWhere(
+                db.messagePairs.getAllWhere(
                     'uri_collection', seatPrefix,
                 ),
-                db.pairs.getAllWhere(
+                db.messagePairs.getAllWhere(
                     'uri_collection', seatPrefix,
                 ),
             ]);
@@ -93,7 +93,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 
 // Below-facade pair formation (the member-fixtures.ts idiom,
 // mirroring person()'s own reasoning below): the invitation
-// facade's admin/membership checks derive from the pair plane
+// facade's admin/membership checks derive from the message plane
 // once role_grants/memberships flip, so a raw row here would go
 // derivation-invisible. Every id/field value stays IDENTICAL to
 // the raw puts these replace — only the write mechanism changes.

@@ -6,7 +6,7 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { organizationToken } from './token-fixtures.ts';
-import { documentPairsAt } from '../api/derive-documents.ts';
+import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import { deriveInvitations } from '../api/derive-invitations.ts';
 import { seedIdentityPii } from './identity-fixtures.ts';
@@ -92,12 +92,12 @@ async function person(
 }
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
-// the invitation grant/accept authz below derives from the pair
+// the invitation grant/accept authz below derives from the message
 // plane once role_grants/memberships flip, so a raw row here
 // would go derivation-invisible. Every id/field value stays
 // IDENTICAL to the raw puts these replace — only the write
 // mechanism changes.
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -115,12 +115,12 @@ async function freshDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     // Phase Final Stage B: organizations table retired —
-    // seed the tenant root on the pair plane.
+    // seed the tenant root on the message plane.
     const { seedOrganizationDocument } = await import(
         './root-admin-fixture.ts'
     );
     await seedOrganizationDocument(db, 'AjdvjuECVZEgZoFajaIEkg', 'Stark');
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg'
             , identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         type: 'admin', at: AT,
@@ -147,7 +147,7 @@ async function grant(
     ));
 }
 
-// ── grant: the invitation document pair ──
+// ── grant: the invitation document message pair ──
 
 test('a fresh grant appends 2 pairs — the operation and the'
 + ' invitation document, email ABSENT by construction',
@@ -155,8 +155,8 @@ async () => {
     const db = await freshDb();
     const res = await grant(db, INV_DOC_1);
     assert.equal(res.status, 200);
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
     // 6: the fixture's own membership pair (Phase 13 Task 1;
     // role-grant retired), two identities/:id/pii pairs
     // (Phase 15 gate 6), the organizations/:id document
@@ -168,12 +168,12 @@ async () => {
     );
     assert.equal(atAddress.length, 2);
     // The document head: the ONE PUT/2xx pair at this address —
-    // documentPairsAt excludes the operation pair's POST method
-    // by construction (design decision 6), so a match here IS
-    // the document.
-    const documents = documentPairsAt(
+    // documentMessagePairsAt excludes the operation message pair's POST
+    // method by construction (design decision 6), so a match
+    // here IS the document.
+    const documents = documentMessagePairsAt(
         requests, '/invitations/',
-    ).filter(pair => pair.uriId === INV_DOC_1);
+    ).filter(messagePair => messagePair.uriId === INV_DOC_1);
     assert.equal(documents.length, 1);
     const wire = documents[0]!.body;
     assert.deepEqual(
@@ -186,7 +186,7 @@ async () => {
     assert.equal(wire.email, undefined);
 });
 
-test('a duplicate grant appends ONLY its operation pair — no'
+test('a duplicate grant appends ONLY its operation message pair — no'
 + ' phantom document at the duplicate\'s submitted id',
 async () => {
     const db = await freshDb();
@@ -194,7 +194,7 @@ async () => {
     assert.equal(first.status, 200);
     const second = await grant(db, INV_DOC_2B);
     assert.equal(second.status, 200);
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const atDuplicateId = requests.filter(
         r => r.uri_collection === '/invitations/'
             && r.uri_id === INV_DOC_2B,
@@ -210,7 +210,7 @@ async () => {
 test('a failed (member-conflict) grant appends nothing',
 async () => {
     const db = await freshDb();
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg'
             , identity_id: 'toccYYkLEABmlbpHJalgtQ',
         type: 'member', at: AT,
@@ -222,11 +222,12 @@ async () => {
     // organizations/:id document (Stage B), plus toccYYkLEABmlbpHJalgtQ's own
     // conflicting membership pair (Phase 13 Task 1) — the
     // failed grant appends nothing further. Role-grant retired.
-    assert.equal((await db.pairs.getAll()).length, 5);
-    assert.equal((await db.pairs.getAll()).length, 5);
+    assert.equal((await db.messagePairs.getAll()).length, 5);
+    assert.equal((await db.messagePairs.getAll()).length, 5);
 });
 
-// ── accept: the memberships document pair (the B2 closure) ──
+// ── accept: the memberships document message pair
+// (the B2 closure) ──
 // Distinct, strictly-increasing `at` stamps across grant/accept:
 // both share ONE invitation entity_id in the states log, so a
 // tied `at` would fall to the (at, id) reduction's id tie-break
@@ -262,11 +263,13 @@ test('a fresh accept appends its seat document at the'
         '2026-01-01T00:00:01.000000Z',
     );
     assert.equal(res.status, 204);
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
-    const documents = documentPairsAt(
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
+    const documents = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/members/',
-    ).filter(pair => pair.uriId === 'toccYYkLEABmlbpHJalgtQ');
+    ).filter(
+        messagePair => messagePair.uriId === 'toccYYkLEABmlbpHJalgtQ',
+    );
     assert.equal(documents.length, 1);
     assert.deepEqual(documents[0]!.body, {
         type: 'member',
@@ -310,7 +313,7 @@ async () => {
         '2026-01-01T00:00:02.000000Z',
     );
     assert.equal(second.status, 204);
-    const documents = (await db.pairs.getAll()).filter(
+    const documents = (await db.messagePairs.getAll()).filter(
         r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/'
             && r.uri_id === 'toccYYkLEABmlbpHJalgtQ',
@@ -448,7 +451,7 @@ test('every stored invitation-family message verifies against'
         db, INV_BALANCE_3, CLARK, EV_BALANCE_DEC,
         '2026-01-01T00:00:01.000000Z',
     );
-    const pairs = await db.pairs.getAll();
+    const messagePairs = await db.messagePairs.getAll();
     // 3 grants x 2 (operation + invitation document) + 1 accept
     // x 2 (operation + memberships document) + 1 decline x 1
     // (operation only — decline synthesizes no document) = 9,
@@ -457,8 +460,8 @@ test('every stored invitation-family message verifies against'
     // pairs (current, toccYYkLEABmlbpHJalgtQ, bruce, clark — Phase 15 gate
     // 6),
     // and the organizations/:id document (Stage B) = 15.
-    assert.equal(pairs.length, 15);
-    for (const row of pairs) {
+    assert.equal(messagePairs.length, 15);
+    for (const row of messagePairs) {
         assert.equal(
             await requestMessageHash(row.request),
             row.request_hash,

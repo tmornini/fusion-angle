@@ -28,7 +28,7 @@ import {
     postWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from
@@ -61,8 +61,9 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-// Seed via REAL PUT so the WO carries a document pair (row
-// half stripped; claim/transition gates read the pair plane).
+// Seed via REAL PUT so the WO carries a document message pair
+// (row half stripped; claim/transition gates read the
+// message plane).
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -97,7 +98,7 @@ async function appendLegacyTransition(
         'organizations', STARK_ORGANIZATION,
         'work-orders', 'yNSSnbrpacodQTzUEcdEVA', 'transition',
     ];
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: TRANSITION_PATTERN,
@@ -114,7 +115,7 @@ async function appendLegacyTransition(
     });
     await postWorkOrderTransitionOp(
         db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,
-        undefined, [], pair,
+        undefined, [], messagePair,
     );
 }
 
@@ -143,7 +144,7 @@ test(
 // Spec W2 / Task 8: value-bearing legacy fold is stored-
 // data truth — append below the gate, not the live wire.
 test(
-    'a transition folds field values onto the pair plane'
+    'a transition folds field values onto the message plane'
     + ' alongside the transition event',
     async () => {
         const db = await seededDb();
@@ -190,7 +191,7 @@ test(
         const events = await eventsFor(db);
         assert.equal(events.length, 1);
         assert.equal(events[0]!.state, 'n-next');
-        // Phase Final Task 2: SFV row plane empty; pair-plane
+        // Phase Final Task 2: SFV row plane empty; message-plane
         // transition fold rides work-order history.
         // Phase Final Stage B: state_field_values retired.
         const history = await workOrderHistoryFor(

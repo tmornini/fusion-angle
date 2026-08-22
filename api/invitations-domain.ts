@@ -22,12 +22,12 @@ import {
     validateInvitationTransitionBody,
 } from './validators.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     storedResponseFor,
     appendMessagePair,
 } from './message-pair.ts';
 import type { MessagePair } from './message-pair.ts';
-import { formDocumentPairFor } from './routes.ts';
+import { formDocumentMessagePairFor } from './routes.ts';
 import { ORGANIZATION_MEMBER_DETAIL_PATTERN } from
     './family-registry.ts';
 import {
@@ -50,7 +50,7 @@ import {
 } from './document-family.ts';
 
 // An invitation's current state: the latest lifecycle event on
-// its id, derived from the pair plane.
+// its id, derived from the message plane.
 //
 // FLIPPED (Phase 14 Task 2): re-points onto
 // invitationLifecycleStatesFor (api/derive-states.ts, Task 1) —
@@ -299,7 +299,7 @@ export async function postOrganizationInvitationGrant(
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
-    _pair: MessagePair | undefined,
+    _messagePair: MessagePair | undefined,
     _organization: Id | undefined,
     roles: readonly string[],
     requestAt: string,
@@ -324,7 +324,7 @@ export async function putInvitationOnIdentityNest(
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
-    _pair: MessagePair | undefined,
+    _messagePair: MessagePair | undefined,
     _organization: Id | undefined,
     _roles: readonly string[],
     requestAt: string,
@@ -365,7 +365,7 @@ export async function putInvitationOnOrganizationNest(
     params: string[],
     payload: Record<string, unknown>,
     actor: Id,
-    _pair: MessagePair | undefined,
+    _messagePair: MessagePair | undefined,
     _organization: Id | undefined,
     roles: readonly string[],
     requestAt: string,
@@ -470,7 +470,7 @@ async function grantInvitation(
             identity_id: identityId,
             at: grantAt, state: 'pending',
         };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST', pathname: '/invitations',
         routePattern: 'invitations',
         routeSegments: ['invitations'],
@@ -482,7 +482,7 @@ async function grantInvitation(
         operationId,
     });
     const replay = await storedResponseFor(
-        db, pair.requestHash);
+        db, messagePair.requestHash);
     if (replay !== undefined) {
         return responseBody;
     }
@@ -492,7 +492,7 @@ async function grantInvitation(
         at: grantAt,
     };
     const document = preOutcome.kind === 'fresh'
-        ? await formWritePair({
+        ? await formWriteMessagePair({
             method: 'PUT',
             pathname: '/invitations/' + invitationId,
             routePattern: 'invitations/:id',
@@ -525,7 +525,7 @@ async function grantInvitation(
                     + ' request',
                 );
             }
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
             if (document !== undefined) {
                 await appendMessagePair(view, document);
             }
@@ -580,7 +580,7 @@ export async function pendingInvitationFor(
     return null;
 }
 
-async function formInvitationOpPair(
+async function formInvitationOperationMessagePair(
     actor: Id,
     requestAt: string,
     operationId: string,
@@ -588,7 +588,7 @@ async function formInvitationOpPair(
     invitationId: Id,
     op: string,
 ): Promise<MessagePair> {
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'POST',
         pathname: '/invitations/' + invitationId + '/' + op,
         routePattern: 'invitations/:id/' + op,
@@ -647,11 +647,11 @@ async function acceptInvitation(
         acceptEventId: transition.eventId,
         acceptAt: transition.at,
     };
-    const pair = await formInvitationOpPair(
+    const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'acceptance');
     const replay = await storedResponseFor(
-        db, pair.requestHash);
+        db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
     }
@@ -659,7 +659,7 @@ async function acceptInvitation(
         type: 'member',
         at: transition.at,
     };
-    const seatDocument = await formDocumentPairFor(
+    const seatDocument = await formDocumentMessagePairFor(
         db, {
             routePattern:
                 ORGANIZATION_MEMBER_DETAIL_PATTERN,
@@ -692,7 +692,7 @@ async function acceptInvitation(
             if (!already) {
                 await appendMessagePair(view, seatDocument);
             }
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
             committed = true;
         },
     );
@@ -746,11 +746,11 @@ async function declineInvitation(
         declineEventId: transition.eventId,
         declineAt: transition.at,
     };
-    const pair = await formInvitationOpPair(
+    const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'decline');
     const replay = await storedResponseFor(
-        db, pair.requestHash);
+        db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
     }
@@ -768,7 +768,7 @@ async function declineInvitation(
                 conflict = true;
                 return;
             }
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
             committed = true;
         },
     );
@@ -820,11 +820,11 @@ async function revokeInvitation(
         revokeEventId: transition.eventId,
         revokeAt: transition.at,
     };
-    const pair = await formInvitationOpPair(
+    const messagePair = await formInvitationOperationMessagePair(
         actor, requestAt, operationId,
         storedBody, id, 'revocation');
     const replay = await storedResponseFor(
-        db, pair.requestHash);
+        db, messagePair.requestHash);
     if (replay !== undefined) {
         return undefined;
     }
@@ -837,7 +837,7 @@ async function revokeInvitation(
                 conflict = true;
                 return;
             }
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
         },
     );
     if (conflict) {

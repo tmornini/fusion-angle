@@ -364,7 +364,7 @@ test(
         // the raw snake_case row, so the domain object is
         // fetched first (getWorkOrder) and only its position
         // is patched.
-        // Phase Final Task 2: ids from pair-plane list.
+        // Phase Final Task 2: ids from message-plane list.
         const created = await getWorkOrders(ctx);
         const explicit = [7.5, 2.5, 5];
         for (let i = 0; i < created.length; i++) {

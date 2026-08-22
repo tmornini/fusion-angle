@@ -297,12 +297,12 @@ test(
                 ctx, 'ZOousbbnzpqlxJExVAruYQ',
             );
 
-        // Phase Final Task 2: WO + join on pair plane.
+        // Phase Final Task 2: WO + join on message plane.
         const wo = await getWorkOrder(ctx, woId);
         assert.equal(wo.id, woId);
         assert.equal(wo.position, 1);
         // Phase Final Stage B: work_orders +
-        // flow_work_orders tables retired — pair plane
+        // flow_work_orders tables retired — message plane
         // is residual pin.
 
         const events =
@@ -356,7 +356,7 @@ test(
 
         const secondId = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
 
-        // Phase Final Task 2: position from pair-plane GET.
+        // Phase Final Task 2: position from message-plane GET.
         const second = await getWorkOrder(ctx, secondId);
         assert.equal(second.position, 8.5);
     },
@@ -445,7 +445,7 @@ test(
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', buildLinearGraph());
         const a = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
         const b = await createWorkOrder(ctx, 'ZOousbbnzpqlxJExVAruYQ');
-        // Phase Final Task 2: positions from pair-plane GET.
+        // Phase Final Task 2: positions from message-plane GET.
         const positions = [
             (await getWorkOrder(ctx, a)).position,
             (await getWorkOrder(ctx, b)).position,
@@ -474,7 +474,7 @@ test(
         mutated.nodes[1]!.name = 'EDITED';
         await seedFlow(db, 'ZOousbbnzpqlxJExVAruYQ', mutated);
 
-        // Phase Final Task 2: frozen graph on pair-plane GET.
+        // Phase Final Task 2: frozen graph on message-plane GET.
         const wo = await getWorkOrder(ctx, woId);
         const middle = wo.flowGraph.nodes.find(
             n => n.id === MIDDLE_NODE,

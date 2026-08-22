@@ -22,7 +22,7 @@ async function setup() {
 }
 
 // Phase Final Task 2: identity_credentials ROW half stripped —
-// event count and active state live on the pair plane.
+// event count and active state live on the message plane.
 
 test('ledger retains set, rotate, revoke; latest wins',
 async () => {

@@ -20,7 +20,7 @@ async function mockSeeded(): Promise<MemoryDbAdapter> {
 }
 
 // Phase Final Task 2: identity + membership +
-// default-organization ROW halves stripped — pair-plane
+// default-organization ROW halves stripped — message-plane
 // oracles only.
 
 test('every membership-bearing person has a'

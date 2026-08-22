@@ -88,7 +88,7 @@ function req(
 async function requestCount(
     db: MemoryDbAdapter,
 ): Promise<number> {
-    return (await db.pairs.getAll()).length;
+    return (await db.messagePairs.getAll()).length;
 }
 
 async function instancePairCount(
@@ -97,7 +97,7 @@ async function instancePairCount(
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
-    const responses = await db.pairs.getAllWhere(
+    const responses = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     return responses.filter(
@@ -613,7 +613,7 @@ async () => {
         getEtag !== null
         && HEX64.test(getEtag.slice(1, -1)),
     );
-    assert.notEqual(getEtag, strongEtagOf(head.pairId));
+    assert.notEqual(getEtag, strongEtagOf(head.messagePairId));
     assert.notEqual(
         get.headers.get('ETag'),
         etag,
@@ -1031,7 +1031,7 @@ async () => {
     assert.equal(
         await requestCount(db),
         afterFirstReq,
-        'no second op pair on replay',
+        'no second operation message pair on replay',
     );
 });
 

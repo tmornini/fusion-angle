@@ -24,7 +24,7 @@ import { setClockForTest, resetClock } from '../api/types.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-function pairJsonOf(message: string): {
+function messagePairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
 } {
     const body = HttpMessage.fromWire(message).body();
@@ -158,8 +158,8 @@ test('a byte-identical resend converges: one event,'
     const events = await deriveIdeaStateHistory(db, 'AjdvjuECVZEgZoFajaIEkg'
         , 'YIuEjXvCwXAgrpyvcvLJjg');
     assert.equal(events.length, 1);
-    assert.equal((await db.pairs.getAll()).length, 3);
-    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
 });
 
 test('same-body second PUT on a simple document is 200'
@@ -177,7 +177,7 @@ async () => {
     const firstEtag = first.headers.get('ETag');
     assert.ok(firstEtag !== null && firstEtag !== '');
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
-    const before = (await db.pairs.getAllWhere(
+    const before = (await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
     assert.equal(before.length, 1);
@@ -199,7 +199,7 @@ async () => {
     );
     assert.equal(second.status, 200);
     assert.equal(second.headers.get('ETag'), firstEtag);
-    const after = (await db.pairs.getAllWhere(
+    const after = (await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     )).filter((row) => row.uri_id === 'tmPPRaXkMetWxTSisIPFLA');
     assert.equal(after.length, 1);
@@ -229,10 +229,10 @@ test('the pair request body carries domain state;'
     assert.equal(wire.state, 'in_review');
     assert.equal('state_at' in wire, false);
     assert.equal('state_event_id' in wire, false);
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     // seedRootAdmin 2 + idea PUT 1
     assert.equal(requests.length, 3);
-    const parsed = pairJsonOf(requests[2]!.request) as {
+    const parsed = messagePairJsonOf(requests[2]!.request) as {
         body: { state: string };
     };
     assert.equal(parsed.body.state, 'in_review');
@@ -355,7 +355,7 @@ async () => {
     const expected = ideaEntityOf(
         {
             uriId: id,
-            pairId: id,
+            messagePairId: id,
             method: 'PUT',
             body,
         },

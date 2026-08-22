@@ -35,7 +35,7 @@ test(
     async () => {
         const adapter = memoryDbAdapter();
         await adapter.postSchemaCreation();
-        await adapter.pairs.put('u1', {
+        await adapter.messagePairs.put('u1', {
             uri_collection:
                 '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
             uri_id: '42',
@@ -56,7 +56,7 @@ test(
         });
         await adapter.postSchemaCreation();
         const requests =
-            await adapter.pairs.getAll();
+            await adapter.messagePairs.getAll();
         assert.equal(
             requests.length, 1,
             'second postSchemaCreation preserves'
@@ -141,7 +141,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     });
 
     test(
-        'pairs.id and pairs.operation_id are uuid',
+        'message_pairs.id and message_pairs.operation_id are uuid',
         async () => {
             const rows = await sql.query<{
                 column_name: string;
@@ -150,7 +150,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 SELECT column_name, data_type
                 FROM information_schema.columns
                 WHERE table_schema = current_schema()
-                  AND table_name = 'pairs'
+                  AND table_name = 'message_pairs'
                   AND column_name IN (
                       'id', 'operation_id',
                       'uri_id',

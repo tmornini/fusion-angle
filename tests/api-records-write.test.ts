@@ -546,7 +546,7 @@ test(
         const db = await freshDb();
         // Phase Final Task 2: states ROW half stripped —
         // a raw colliding states row no longer aborts the
-        // pair-plane create.
+        // message-plane create.
     // Phase Final Stage B: states table retired.
         const recId = generateIdentifier();
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/record-types/', {

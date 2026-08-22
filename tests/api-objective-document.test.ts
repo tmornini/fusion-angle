@@ -20,7 +20,7 @@ import {
 } from '../api/validators.ts';
 import { postObjectiveDocumentOp } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
 } from '../api/message-pair.ts';
 import {
@@ -210,7 +210,7 @@ async () => {
         ...documentFields(),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + 'pPvOknZUChYizyOOiXWBVg',
@@ -227,7 +227,8 @@ async () => {
     // Phase Final Task 2: objectives ROW half stripped —
     // op returns the reconstructed entity; only pairs land.
     const written = await postObjectiveDocumentOp(
-        db, 'pPvOknZUChYizyOOiXWBVg', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
+        db, 'pPvOknZUChYizyOOiXWBVg', body,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.deepEqual(written, {
         id: 'pPvOknZUChYizyOOiXWBVg',
@@ -235,8 +236,8 @@ async () => {
         ...entityFields(),
     });
     // Phase Final Stage B: objectives table retired.
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -261,8 +262,8 @@ test('a byte-identical PUT resend to'
             , body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.pairs.getAll()).length, 3);
-    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 4. below-route via the generic handlers, against the REAL
@@ -271,13 +272,13 @@ test('a byte-identical PUT resend to'
 // chain Supersedes-chains and the head derives; a DELETE head
 // derives absent, carrying notFoundTable, never the family. --
 
-async function putDocumentPair(
+async function putDocumentMessagePair(
     db: MemoryDbAdapter,
     id: string,
     body: Record<string, unknown>,
     at: string,
 ): Promise<void> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id,
         routePattern: 'organizations/:id/objectives/:id',
@@ -292,16 +293,16 @@ async function putDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
 }
 
-async function deleteDocumentPair(
+async function deleteDocumentMessagePair(
     db: MemoryDbAdapter,
     id: string,
     at: string,
 ): Promise<void> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'DELETE',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/objectives/' + id,
         routePattern: 'organizations/:id/objectives/:id',
@@ -316,7 +317,7 @@ async function deleteDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
 }
 
@@ -326,12 +327,12 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const id = generateIdentifier();
-    await putDocumentPair(
+    await putDocumentMessagePair(
         db, id,
         documentFields(1, 'active'),
         '2026-01-01T00:00:00.000000Z',
     );
-    await putDocumentPair(
+    await putDocumentMessagePair(
         db, id,
         documentFields(2, 'active'),
         '2026-01-02T00:00:00.000000Z',
@@ -355,12 +356,12 @@ test('a DELETE-head derives absent through the generic'
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const id = generateIdentifier();
-    await putDocumentPair(
+    await putDocumentMessagePair(
         db, id,
         documentFields(1, 'active'),
         '2026-01-01T00:00:00.000000Z',
     );
-    await deleteDocumentPair(
+    await deleteDocumentMessagePair(
         db, id, '2026-01-02T00:00:00.000000Z',
     );
     const wiring = documentFamilyWiring('objectives')!;

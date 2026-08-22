@@ -35,8 +35,8 @@ import {
     identityTokenEntityOf,
 } from '../api/derive-identity-tokens.ts';
 import {
-    formTokenEventPair,
-    formWritePair,
+    formTokenEventMessagePair,
+    formWriteMessagePair,
     appendMessagePair,
 } from '../api/message-pair.ts';
 import { WRITE_RESPONSE_SPECS } from '../api/routes.ts';
@@ -211,7 +211,7 @@ async () => {
     );
     const expected = identityTokenEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: fields,
     });
@@ -225,7 +225,7 @@ async () => {
     assert.deepEqual(stored, wire);
 });
 
-test('formTokenEventPair stored body equals '
+test('formTokenEventMessagePair stored body equals '
 + 'identityTokenEntityOf id-last', async () => {
     const id = generateIdentifier();
     const event = {
@@ -233,15 +233,15 @@ test('formTokenEventPair stored body equals '
         action: 'issued' as const,
         chain_id: CHAIN_G4_SYNTH, at: AT,
     };
-    const pair = await formTokenEventPair(
+    const messagePair = await formTokenEventMessagePair(
         id, event, TEST_OPERATION_ID,
     );
     const stored = JSON.parse(
-        storedMessageBodyText(pair.responseMessage),
+        storedMessageBodyText(messagePair.responseMessage),
     );
     const expected = identityTokenEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: event,
     });
@@ -623,7 +623,7 @@ async () => {
         jti: JTI_FLAT, identity_id: 'XXZruirZyAOoRpNxaDnpSA',
         action: 'issued', chain_id: CHAIN_FLAT, at: AT,
     };
-    const flatPair = await formWritePair({
+    const flatPair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/identity-tokens/' + id,
         routePattern: 'identity-tokens/:id',
@@ -637,7 +637,7 @@ async () => {
         responseStatus: 200,
         responseBody: identityTokenEntityOf({
             uriId: id,
-            pairId: id,
+            messagePairId: id,
             method: 'PUT',
             body: fields,
         }),

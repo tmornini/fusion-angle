@@ -19,7 +19,7 @@ import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
@@ -50,7 +50,7 @@ const WORKORDERID_REL1 = generateIdentifier();
 const WORKORDERID_GENESIS = generateIdentifier();
 
 // The work-order lifecycle derivation — create/claim/
-// transition/release OPERATION pairs (states-address
+// transition/release OPERATION message pairs (states-address
 // retirement: the sole work-order source; bare states/:id
 // births are gone). Seeded traces reshape into transition
 // ops, so this reader also covers historical births.
@@ -89,7 +89,7 @@ afterEach(() => {
 // Below-facade pair formation (the member-fixtures.ts idiom, the
 // derive-states-events.test.ts precedent): every write below
 // authorizes through organizationToken, whose gate check derives
-// from the role_grants/memberships pair plane once they flip, so
+// from the role_grants/memberships message plane once they flip, so
 // a raw row here would go derivation-invisible. Every id/field
 // value stays IDENTICAL to the raw puts these replace — only the
 // write mechanism changes.
@@ -211,8 +211,8 @@ test('a live create births exactly the three initial state'
 // -- and the absence never throws --------------------------------
 
 test('a SEEDED-shape work order (a bare document PUT, no create'
-+ ' operation pair) derives zero rows and never throws — EDGE 1,'
-+ ' the create-pair relaxation', async () => {
++ ' operation message pair) derives zero rows and never throws'
++ ' — EDGE 1, the create-pair relaxation', async () => {
     const db = await seed();
     const token = await organizationToken(ADMIN_A, ORGANIZATION_A);
     const workOrderId = generateIdentifier();

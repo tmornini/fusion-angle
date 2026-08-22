@@ -116,7 +116,7 @@ function norm(g: StoredGraph): StoredGraph {
 }
 
 // Phase Final Task 2: graph relation ROW halves stripped.
-// Pair-plane document graph (GET) is the sole graph truth.
+// Message-plane document graph (GET) is the sole graph truth.
 
 // Build a non-trivial graph: start→mid→end, mid has a
 // member and an attribute, start/end are plain.
@@ -163,11 +163,11 @@ async function seedFlowWithGraph(
     });
 }
 
-// ── 1. ROUND-TRIP: GET returns the pair-plane graph ──
+// ── 1. ROUND-TRIP: GET returns the message-plane graph ──
 
 test(
     'GET /organizations/:id/flows/:id returns the graph from the'
-    + ' document pair plane',
+    + ' document message plane',
     async () => {
         const { ctx } = await setupMemDb();
         const flowId = generateIdentifier();
@@ -175,7 +175,7 @@ test(
         await seedFlowWithGraph(ctx, flowId, intended);
 
         // GET must return the intended graph from the
-        // document pair's graph field (pair-plane truth).
+        // document message pair's graph field (message-plane truth).
         const fetched =
             await ctx.GET<FlowWithGraph>('organizations/'
                 + 'AjdvjuECVZEgZoFajaIEkg/flows/' + flowId);
@@ -193,12 +193,12 @@ test(
 // postFlowVersion freeze RETIRED (Phase 15 Task 7). Work-
 // order freeze below still proves GET graph is frozen.
 
-// WORK ORDER auto-derives: creation captures the pair-plane
+// WORK ORDER auto-derives: creation captures the message-plane
 // graph via GET /organizations/:id/flows/:id.
 
 test(
     'postWorkOrderCreation freezes flow_graph'
-    + ' from the pair-plane GET graph',
+    + ' from the message-plane GET graph',
     async () => {
         const { db, ctx } = await setupMemDb();
         const flowId = generateIdentifier();
@@ -207,7 +207,7 @@ test(
         const graph = buildNonTrivialGraph();
         await seedFlowWithGraph(ctx, flowId, graph);
 
-        // Work-order creation reads the pair-plane graph
+        // Work-order creation reads the message-plane graph
         // via GET /organizations/:id/flows/:id.
         const woId = generateIdentifier();
         await postWorkOrderCreation(ctx, {
@@ -216,19 +216,19 @@ test(
             flowId,
         });
 
-        // Phase Final Task 2: frozen graph on pair-plane GET.
+        // Phase Final Task 2: frozen graph on message-plane GET.
         const wo = await getWorkOrder(ctx, woId);
         assert.ok(wo, 'work order created');
 
         // The frozen flow_graph on the work order must carry
-        // the pair-plane nodes, not an empty blob.
+        // the message-plane nodes, not an empty blob.
         assert.ok(
             wo.flowGraph.nodes.length > 0,
-            'work order flow_graph has nodes from pair plane',
+            'work order flow_graph has nodes from message plane',
         );
         assert.ok(
             wo.flowGraph.edges.length > 0,
-            'work order flow_graph has edges from pair plane',
+            'work order flow_graph has edges from message plane',
         );
     },
 );
@@ -237,12 +237,12 @@ test(
 
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): undo
 // resolves its own restore target from the organizations/:id/flows/:id
-// document-pair history, and computes graphDelta/revivals
+// document-message-pair history, and computes graphDelta/revivals
 // SERVER-SIDE (SIDECAR-KEEP). Phase Final Task 2: no row-
 // plane graph writer remains.
 test(
     'after undo GET /organizations/:id/flows/:id returns the'
-    + ' target (undone) graph from the pair plane',
+    + ' target (undone) graph from the message plane',
     async () => {
         const { ctx } = await setupMemDb();
         const flowId = generateIdentifier();
@@ -255,8 +255,8 @@ test(
             name: 'Undo Test Flow',
         });
 
-        // Step 2: save the target graph — undo's own pair-plane
-        // walk will resolve back to THIS state.
+        // Step 2: save the target graph — undo's own
+        // message-plane walk will resolve back to THIS state.
         const targetGraph = buildNonTrivialGraph();
         await putFlow(ctx, flowId, {
             name: 'Undo Test Flow',

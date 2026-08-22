@@ -20,7 +20,7 @@ import {
     resolveOwningOrganization,
 } from '../api/derive-states.ts';
 import {
-    documentPairsAt,
+    documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import {
     canonicalUriCollection,
@@ -111,7 +111,7 @@ const IDEAID_TRANSITION = generateIdentifier();
 // serves live traffic); this file alone GATES that flip (Task 7)
 // and stays as a regression guard through Phase Final.
 //
-// Every comparison below reads the pair plane through the
+// Every comparison below reads the message plane through the
 // base adapter (Phase Final Task 5 retired the store
 // decorator shell). Mirrors the sibling drift suites
 // (tests/drift-identities.test.ts,
@@ -121,7 +121,7 @@ const IDEAID_TRANSITION = generateIdentifier();
 //
 // C3: bulk deriveStates / bulk lifecycle collection retired.
 // Cases rework onto per-family and collection history parity.
-// Graph sidecars pin document-pair graphDelta / revivals.
+// Graph sidecars pin document-message-pair graphDelta / revivals.
 
 const BASE = 'http://localhost';
 const AT = '2026-01-01T00:00:00.000000Z';
@@ -163,7 +163,7 @@ afterEach(() => {
 // Per-entity history across family sources — production
 // deriveStatesFor / deriveFlowGraphStates retired (C2/C3).
 // Local oracle for mixed-family drift cases only. Graph
-// node/edge events are NOT here — pin pair-plane sidecars
+// node/edge events are NOT here — pin message-plane sidecars
 // in case 5a directly.
 async function entityHistory(
     db: DbAdapter, organization: Id, entityId: Id,
@@ -195,7 +195,7 @@ async function entityHistory(
 }
 
 // Phase Final Task 2: states ROW half stripped — both helpers
-// pin the pair plane only (row plane is empty).
+// pin the message plane only (row plane is empty).
 async function assertHistoryParity(
     db: DbAdapter, organization: Id, entityId: Id,
 ): Promise<StateEntity[]> {
@@ -564,7 +564,7 @@ test('case 2: GET <family>/:id/history parity — one entity'
 
 // ---- case 3: the fence's legs + the deleted-entity leg ---------
 
-// Fence legs on the pair plane. Orphan states/:id writes
+// Fence legs on the message plane. Orphan states/:id writes
 // retired with the address — the own/foreign/deleted legs
 // ride document trios.
 test('case 3: the fence\'s legs — own-org history visible,'
@@ -597,7 +597,7 @@ async () => {
     assert.equal(foreignCreated.status, 201);
 
     // The DELETED-entity leg: org 2 tombstones its OWN idea —
-    // pair plane is IMMUNE to deleted filter, so owner still
+    // message plane is IMMUNE to deleted filter, so owner still
     // resolves. STARK history is a miss at this address.
     const foreignDeleted = await handleRequest(db, req(
         'PUT',
@@ -904,9 +904,10 @@ async () => {
 
 test('case 4d: claim, release via POST organizations/:id/work-orders/:id/'
 + 'release (the deleteWorkOrderClaim shape — a claim_released'
-+ ' event with no claim/transition op pair beside it), then'
-+ ' RE-claim — the replay must see that release as the prior'
-+ ' claim event (exactly as postWorkOrderClaimOp\'s own in-tx'
++ ' event with no claim/transition operation message pair'
++ ' beside it), then RE-claim — the replay must see that'
++ ' release as the prior claim event (exactly as'
++ ' postWorkOrderClaimOp\'s own in-tx'
 + ' read sees it), so the fresh claim posts a PLAIN \'claimed\''
 + ' event with no synthetic \'claim_expired\' — parity holds'
 + ' at every step',
@@ -981,7 +982,7 @@ async () => {
 
     // The RE-claim, MILLISECONDS after the release and nowhere
     // near the (large) lock_timeout of the ORIGINAL claim. The
-    // live route grants it outright (pair-plane claim history
+    // live route grants it outright (message-plane claim history
     // finds the release, not the stale claim, as the prior
     // claim-vocabulary event).
     const reclaimAt = nowUtc();
@@ -1019,9 +1020,9 @@ async () => {
 // ---- invitation grant/accept/decline (the seed has NEITHER) ------
 
 // C3: deriveFlowGraphStates retired — pin graphDelta.deletions
-// / revivals on the flow document pairs directly (SIDECAR-KEEP).
+// / revivals on the flow document message pairs directly (SIDECAR-KEEP).
 test('case 5a: a LIVE flow-node delete + undo — the'
-+ ' deleted/restored sidecar events on the pair plane',
++ ' deleted/restored sidecar events on the message plane',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -1093,15 +1094,15 @@ async () => {
         STARK_ORGANIZATION, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
     );
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
-    const pairs = documentPairsAt(
+    const messagePairs = documentMessagePairsAt(
         requests, prefix,
     ).filter((p) => p.uriId === flowId);
     const states: { state: string; at: string }[] = [];
-    for (const pair of pairs) {
-        const delta = pair.body['graphDelta'];
+    for (const messagePair of messagePairs) {
+        const delta = messagePair.body['graphDelta'];
         const deletions =
             typeof delta === 'object' && delta !== null
                 ? (delta as Record<string, unknown>)[
@@ -1122,7 +1123,7 @@ async () => {
                 });
             }
         }
-        const revivals = pair.body['revivals'];
+        const revivals = messagePair.body['revivals'];
         if (Array.isArray(revivals)) {
             for (const entry of revivals) {
                 if (
@@ -1272,10 +1273,10 @@ test('case 5b: a LIVE invitation grant/accept chain, a LIVE'
 
 // ---- case 6: the state_field_values JOIN (lens 6) ---------------
 
-// Phase Final Task 2: SFV row half stripped — join is pair-
-// plane only (work-order history inline fold; C4).
+// Phase Final Task 2: SFV row half stripped — join is
+// message-plane only (work-order history inline fold; C4).
 test('case 6: the state_field_values JOIN — WO01\'s derived'
-+ ' history resolves field values on the pair plane; seed'
++ ' history resolves field values on the message plane; seed'
 + ' leaf pairs total 7', async () => {
     const db = await seededDb();
     const workOrderId = buildWorkOrders()[0]!.id;
@@ -1346,9 +1347,9 @@ async () => {
 });
 
 // States-address retirement: archive/reactivate ride PUT
-// /members/:id with the lifecycle trio — pair-plane pin.
+// /members/:id with the lifecycle trio — message-plane pin.
 test('case 7b: live-write chain — AI agent create then'
-+ ' update — pair-plane pin via PUT ai-agents/:id',
++ ' update — message-plane pin via PUT ai-agents/:id',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(
@@ -1388,9 +1389,9 @@ async () => {
 
 // States-address retirement: archive/reactivate ride PUT
 // /organizations/:id/objectives/:id with the lifecycle
-// trio — pair-plane pin.
+// trio — message-plane pin.
 test('case 7c: live-write chain — objective archive, reactivate'
-+ ' — pair-plane pin via PUT organizations/:id/objectives/:id',
++ ' — message-plane pin via PUT organizations/:id/objectives/:id',
 async () => {
     const db = await seededDb();
     const token = await organizationToken(

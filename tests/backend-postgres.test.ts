@@ -80,7 +80,7 @@ function fakeClient(): {
     return state;
 }
 
-const PAIR_ROW = {
+const MESSAGE_PAIR_ROW = {
     id: 'UuPWIGbUyaAgmEgGDRfnvA',
     uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     uri_id: '42',
@@ -101,7 +101,7 @@ const PAIR_ROW = {
 test('ensureTables runs compile-time SCHEMA', async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
-    await backend.ensureTables(['pairs']);
+    await backend.ensureTables(['message_pairs']);
     assert.equal(fake.calls.length, 1);
     assert.equal(fake.calls[0]!.text, POSTGRES_SCHEMA);
 });
@@ -109,11 +109,11 @@ test('ensureTables runs compile-time SCHEMA', async () => {
 test('schema declares collection indexes', () => {
     assert.match(
         POSTGRES_SCHEMA,
-        /CREATE INDEX IF NOT EXISTS pairs_collection/,
+        /CREATE INDEX IF NOT EXISTS message_pairs_collection/,
     );
     assert.match(
         POSTGRES_SCHEMA,
-        /ON pairs \(uri_collection, response_at, id\)/,
+        /ON message_pairs \(uri_collection, response_at, id\)/,
     );
 });
 
@@ -123,6 +123,9 @@ async () => {
     const backend = new PostgresBackend(fake.sql);
     await backend.deleteSchema();
     const text = fake.calls[0]!.text;
+    assert.match(
+        text, /DROP TABLE IF EXISTS message_pairs/,
+    );
     assert.match(text, /DROP TABLE IF EXISTS pairs/);
     assert.match(text, /DROP TABLE IF EXISTS responses/);
     assert.match(text, /DROP TABLE IF EXISTS requests/);
@@ -135,10 +138,12 @@ async () => {
     );
 });
 
-test('POSTGRES_DROP_SCHEMA drops pairs first', () => {
+test('POSTGRES_DROP_SCHEMA drops message_pairs first',
+() => {
     assert.equal(
         POSTGRES_DROP_SCHEMA,
-        'DROP TABLE IF EXISTS pairs;\n'
+        'DROP TABLE IF EXISTS message_pairs;\n'
+        + 'DROP TABLE IF EXISTS pairs;\n'
         + 'DROP TABLE IF EXISTS responses;\n'
         + 'DROP TABLE IF EXISTS requests;\n'
         + 'DROP TABLE IF EXISTS schema_marker;\n'
@@ -165,10 +170,10 @@ test('getWhere throws for uri_id', async () => {
     const backend = new PostgresBackend(fake.sql);
     await assert.rejects(
         () => backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'pairs', 'uri_id', '42',
+                'message_pairs', 'uri_id', '42',
             ),
         ),
         (error: unknown) =>
@@ -184,10 +189,10 @@ async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.transaction(
-        ['pairs'],
+        ['message_pairs'],
         'readonly',
         (tx) => tx.getWhere(
-            'pairs', 'uri_collection'
+            'message_pairs', 'uri_collection'
                 , '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         ),
     );
@@ -201,7 +206,9 @@ async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.getAddress(
-        'pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
+        'message_pairs',
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        '42',
     );
     const text = fake.calls[0]!.text;
     assert.match(text, /WHERE uri_collection = \$1/);
@@ -218,15 +225,16 @@ async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.transaction(
-        ['pairs'],
+        ['message_pairs'],
         'readonly',
         (tx) => tx.getAddressVersion(
-            'pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42'
-                , 'ab',
+            'message_pairs',
+            '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+            '42', 'ab',
         ),
     );
     const text = fake.calls[0]!.text;
-    assert.match(text, /FROM pairs/);
+    assert.match(text, /FROM message_pairs/);
     assert.match(text, /uri_collection = \$1/);
     assert.match(text, /uri_id = \$2/);
     assert.match(text, /version = \$3/);
@@ -242,10 +250,10 @@ test('getWhere throws for version', async () => {
     const backend = new PostgresBackend(fake.sql);
     await assert.rejects(
         () => backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'pairs', 'version', 'ab',
+                'message_pairs', 'version', 'ab',
             ),
         ),
         (error: unknown) =>
@@ -267,10 +275,10 @@ test('getWhere throws for operation_id', async () => {
     const backend = new PostgresBackend(fake.sql);
     await assert.rejects(
         () => backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'pairs',
+                'message_pairs',
                 'operation_id',
                 'WvNiHVgksjrlfhPfdgfcyQ',
             ),
@@ -288,16 +296,16 @@ async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.transaction(
-        ['pairs'],
+        ['message_pairs'],
         'readonly',
         (tx) => tx.getWhereBody(
-            'pairs',
+            'message_pairs',
             '/authentication/authorize/',
             { code: 'abc' },
         ),
     );
     const text = fake.calls[0]!.text;
-    assert.match(text, /FROM pairs/);
+    assert.match(text, /FROM message_pairs/);
     assert.match(text, /uri_collection = \$1/);
     assert.match(
         text, /message_body\(response\) @>/,
@@ -318,9 +326,9 @@ async () => {
     const fake = fakeClient();
     const backend = new PostgresBackend(fake.sql);
     await backend.transaction(
-        ['pairs'],
+        ['message_pairs'],
         'readwrite',
-        (tx) => tx.put('pairs', PAIR_ROW),
+        (tx) => tx.put('message_pairs', MESSAGE_PAIR_ROW),
     );
     const values = fake.calls[0]!.values;
     const bytes = values.filter(
@@ -329,30 +337,30 @@ async () => {
     assert.equal(bytes.length, 2);
     assert.deepEqual(
         bytes[0],
-        Octets.fromLatin1(PAIR_ROW.request).asBytes(),
+        Octets.fromLatin1(MESSAGE_PAIR_ROW.request).asBytes(),
     );
     assert.deepEqual(
         bytes[1],
-        Octets.fromLatin1(PAIR_ROW.response).asBytes(),
+        Octets.fromLatin1(MESSAGE_PAIR_ROW.response).asBytes(),
     );
 });
 
 test('get reads BYTEA via latin1, not TextDecoder',
 async () => {
     const fake = fakeClient();
-    const wire = PAIR_ROW.request;
+    const wire = MESSAGE_PAIR_ROW.request;
     const bytes = Octets.fromLatin1(wire).asBytes();
     fake.rows = [{
-        ...PAIR_ROW,
+        ...MESSAGE_PAIR_ROW,
         request: Buffer.from(bytes),
         response: Buffer.from(bytes),
     }];
     const backend = new PostgresBackend(fake.sql);
     const row = await backend.transaction(
-        ['pairs'],
+        ['message_pairs'],
         'readonly',
-        (tx) => tx.get<typeof PAIR_ROW>(
-            'pairs', PAIR_ROW.id,
+        (tx) => tx.get<typeof MESSAGE_PAIR_ROW>(
+            'message_pairs', MESSAGE_PAIR_ROW.id,
         ),
     );
     assert.equal(row?.request, wire);
@@ -369,9 +377,9 @@ async () => {
     const backend = new PostgresBackend(fake.sql);
     await assert.rejects(
         () => backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
-            (tx) => tx.getAll('pairs'),
+            (tx) => tx.getAll('message_pairs'),
         ),
         (error: unknown) =>
             error instanceof ApiError

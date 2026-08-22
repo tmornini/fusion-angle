@@ -9,7 +9,7 @@ import {
     documentVersion,
     HEX64,
 } from '../api/message-form.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import {
@@ -108,16 +108,16 @@ async () => {
 
 test('stored pair message is serializeWire',
 async () => {
-    const pair = await formWritePair(validInput);
+    const messagePair = await formWriteMessagePair(validInput);
     assert.equal(
-        pair.requestMessage.includes('\r\n\r\n'),
+        messagePair.requestMessage.includes('\r\n\r\n'),
         true,
     );
     assert.equal(
-        pair.requestMessage.includes('"startLine"'),
+        messagePair.requestMessage.includes('"startLine"'),
         false,
     );
-    const model = parseWire(pair.requestMessage);
+    const model = parseWire(messagePair.requestMessage);
     assert.equal(model.startLine.kind, 'request');
 });
 

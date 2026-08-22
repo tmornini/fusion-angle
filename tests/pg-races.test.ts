@@ -15,8 +15,10 @@ import { seedAdminSchema } from './test-fixtures.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
 } from './http-fixtures.ts';
-import { generateIdentifier } from
-    '../shared/identifier.ts';
+import {
+    decodeIdentifier,
+    generateIdentifier,
+} from '../shared/identifier.ts';
 import { DEFAULT_LOCK_TIMEOUT } from '../api/types.ts';
 import {
     advisoryKey,
@@ -120,13 +122,28 @@ function flowFields(name: string): Record<string, unknown> {
     };
 }
 
+function uuidTextOfIdentifier(id: string): string {
+    const bytes = decodeIdentifier(id);
+    let hex = '';
+    for (const b of bytes) {
+        hex += b.toString(16).padStart(2, '0');
+    }
+    return (
+        hex.slice(0, 8) + '-'
+        + hex.slice(8, 12) + '-'
+        + hex.slice(12, 16) + '-'
+        + hex.slice(16, 20) + '-'
+        + hex.slice(20)
+    );
+}
+
 function flowCreate(id: string): Record<string, unknown> {
     return {
         id,
         flow: flowFields('Race'),
-        projectFlowId: id + '-pf',
+        projectFlowId: generateIdentifier(),
         projectFlow: {
-            project_id: 'race-project',
+            project_id: 'pnXmXrxOWayANgDLdCjuBw',
             flow_id: id,
             at: AT,
         },
@@ -144,18 +161,20 @@ function flowDocument(
     return {
         ...flowFields(name),
         state: 'updated',
+        state_at: AT,
+        state_event_id: stateEventId,
         graph: { nodes: [], edges: [] },
         graphDelta: emptyDelta(),
         revivals: [],
     };
 }
 
-async function pairsAt(
+async function messagePairsAt(
     db: DbAdapter,
     collection: string,
     uriId: string,
 ): Promise<number> {
-    const rows = await db.pairs.getAllWhere(
+    const rows = await db.messagePairs.getAllWhere(
         'uri_collection', collection,
     );
     return rows.filter((row) => row.uri_id === uriId)
@@ -167,7 +186,7 @@ async function putHeadsAt(
     collection: string,
     uriId: string,
 ): Promise<number> {
-    const rows = await db.pairs.getAllWhere(
+    const rows = await db.messagePairs.getAllWhere(
         'uri_collection', collection,
     );
     return rows.filter((row) =>
@@ -223,7 +242,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
     test('two first-writers: one 201, not a double insert',
     async () => {
         const token = await organizationToken();
-        const id = 'race-first';
+        const id = generateIdentifier();
         const holder = connectPostgres(
             urlWithSearchPath(POSTGRES_URL, schema),
         );
@@ -243,14 +262,14 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                     handleRequest(db, req(
                         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
-                        flowDocument('A', id + '-a'),
+                        flowDocument('A', generateIdentifier()),
                         undefined,
                         generateIdentifier(),
                     )),
                     handleRequest(db, req(
                         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
-                        flowDocument('B', id + '-b'),
+                        flowDocument('B', generateIdentifier()),
                         undefined,
                         generateIdentifier(),
                     )),
@@ -280,7 +299,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
 
     test('If-Match race: one 201, one 412', async () => {
         const token = await organizationToken();
-        const id = 'race-match';
+        const id = generateIdentifier();
         const created = await handleRequest(db, req(
             'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/', token
                 , flowCreate(id),
@@ -293,7 +312,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assert.equal(live.status, 200);
         const etag = live.headers.get('ETag');
         assert.ok(etag !== null && etag !== '');
-        const heads = await db.pairs.getAllWhere(
+        const heads = await db.messagePairs.getAllWhere(
             'uri_collection', FLOW_PREFIX,
         );
         const liveHead = heads
@@ -314,22 +333,28 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         try {
             await holder.begin(async (tx) => {
                 await tx.query`
-                    SELECT id FROM responses
-                    WHERE id = ${liveHead.id}
+                    SELECT id FROM message_pairs
+                    WHERE id = ${uuidTextOfIdentifier(
+                        liveHead.id,
+                    )}
                     FOR UPDATE
                 `;
                 raced = Promise.all([
                     handleRequest(db, req(
                         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
-                        flowDocument('Left', id + '-l'),
+                        flowDocument(
+                            'Left', generateIdentifier(),
+                        ),
                         { 'if-match': etag },
                         generateIdentifier(),
                     )),
                     handleRequest(db, req(
                         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/'
                             + '' + id, token,
-                        flowDocument('Right', id + '-r'),
+                        flowDocument(
+                            'Right', generateIdentifier(),
+                        ),
                         { 'if-match': etag },
                         generateIdentifier(),
                     )),
@@ -373,7 +398,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         assert.equal(left.status, 201);
         assert.equal(right.status, 201);
         assert.equal(
-            await pairsAt(db, IDEA_PREFIX, 'rZrIDSkakoKzerGHZzJnJw'),
+            await messagePairsAt(db, IDEA_PREFIX, 'rZrIDSkakoKzerGHZzJnJw'),
             1,
         );
     });
@@ -384,7 +409,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
         const leftHeld = Promise.withResolvers<void>();
         const rightHeld = Promise.withResolvers<void>();
         const left = backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
@@ -395,7 +420,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
             },
         );
         const right = backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             async (tx) => {
                 const pg = tx as PostgresTx;
@@ -443,7 +468,7 @@ if (POSTGRES_URL === undefined || POSTGRES_URL === '') {
                 `;
                 await assert.rejects(
                     () => tight.transaction(
-                        ['pairs'],
+                        ['message_pairs'],
                         'readonly',
                         (txn) => (
                             txn as PostgresTx

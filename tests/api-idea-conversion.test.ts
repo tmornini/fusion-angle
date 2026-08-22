@@ -95,10 +95,10 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     await seedAdminSchema(db);
     // The source idea, already approved — seeded through the
     // wire (Phase 15 Task 7): bare per-entity current-state
-    // alias retired; surviving /versions derives from the pair
-    // plane, so a raw ideas.put + states.postEvent leaves no
-    // pair and history would read empty after a rolled-back
-    // conversion.
+    // alias retired; surviving /versions derives from the
+    // message plane, so a raw ideas.put + states.postEvent
+    // leaves no pair and history would read empty after a
+    // rolled-back conversion.
     await PUT(db
         , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
         + 'gVvtDIaqhnkXZQcxZeSuiw', {
@@ -107,7 +107,7 @@ async function seededDb(): Promise<MemoryDbAdapter> {
     }, DEV_TOKEN);
     // Phase Final Stage B: objectives table retired — seed
     // through the live document PUT with the lifecycle trio
-    // (states-address retirement) so the pair plane owns it.
+    // (states-address retirement) so the message plane owns it.
     await PUT(db,
         'organizations/AjdvjuECVZEgZoFajaIEkg/objectives/'
             + OBJ_1, {
@@ -205,8 +205,9 @@ test(
 );
 
 test(
-    'POST organizations/:id/ideas/:id/conversion also appends document pairs'
-    + ' at the project\'s and the idea\'s own addresses',
+    'POST organizations/:id/ideas/:id/conversion also'
+    + ' appends document message pairs at the project\'s'
+    + ' and the idea\'s own addresses',
     async () => {
         const db = await seededDb();
         await POST(db
@@ -234,15 +235,15 @@ test(
         }, DEV_TOKEN);
 
         // Balance invariant: the wire-seeded idea genesis PUT
-        // (1) + two objective document PUTs (Stage B: pair
+        // (1) + two objective document PUTs (Stage B: message
         // plane owns objectives) + five conversion pairs
-        // (the operation pair, the synthesized project
-        // document pair, the synthesized idea document pair,
-        // and TWO synthesized baseline pairs — Phase 7 Task
-        // 4's 3+N widening, N=2 here) + three schema/
-        // bootstrap pairs = 11.
-        const allRequests = await db.pairs.getAll();
-        const allResponses = await db.pairs.getAll();
+        // (the operation message pair, the synthesized
+        // project document message pair, the synthesized
+        // idea document message pair, and TWO synthesized
+        // baseline pairs — Phase 7 Task 4's 3+N widening,
+        // N=2 here) + three schema/bootstrap pairs = 11.
+        const allRequests = await db.messagePairs.getAll();
+        const allResponses = await db.messagePairs.getAll();
         assert.equal(allRequests.length, 10);
         assert.equal(allResponses.length, 10);
         assert.equal(allRequests.length, allResponses.length);
@@ -275,7 +276,8 @@ test(
         });
 
         // Seed genesis PUT + conversion's synthesized idea
-        // document pair both land at gVvtDIaqhnkXZQcxZeSuiw's address.
+        // document message pair both land at
+        // gVvtDIaqhnkXZQcxZeSuiw's address.
         const atIdeaAddress = allRequests.filter(
             (r) =>
                 r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
@@ -364,7 +366,7 @@ test(
         const db = await seededDb();
         // Phase Final Task 2: states ROW half stripped —
         // a raw colliding states row no longer aborts the
-        // pair-plane conversion.
+        // message-plane conversion.
     // Phase Final Stage B: states table retired.
         await POST(db
             , 'organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'

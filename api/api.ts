@@ -20,7 +20,7 @@ import type { Id } from './types.ts';
 import { messageAddress } from './message-address.ts';
 import { pathSegmentsOf } from './path-segments.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
     storedResponseFor,
     createdEntityUriId,
@@ -34,7 +34,7 @@ import {
     parseIfMatch,
     requireOperationId,
     OPERATION_ID_HEADER,
-    PAIR_WIRED_ROUTE_PATTERNS,
+    MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     REPLAY_EXEMPT_ROUTE_PATTERNS,
     IF_MATCH_HEADER,
 } from './message-pair.ts';
@@ -43,7 +43,9 @@ import {
 } from './message-form.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
-import type { MessagePair, AuthPairSeed } from './message-pair.ts';
+import type {
+    MessagePair, AuthMessagePairSeed,
+} from './message-pair.ts';
 import {
     familyRegistration,
     INSTANCE_DETAIL_PATTERN,
@@ -52,7 +54,7 @@ import {
 } from './family-registry.ts';
 import {
     documentFamilyWiring,
-    documentHeadPairId,
+    documentHeadMessagePairId,
     entityIdParam,
     idFamilyOf,
     lookupStoredRevision,
@@ -259,14 +261,20 @@ async function livePutVersion(
     db: DbAdapter,
     prefix: string,
     uriId: string,
-): Promise<{ pairId: string; version: string } | undefined> {
-    const pairId = await documentHeadPairId(
+): Promise<{
+    messagePairId: string; version: string;
+} | undefined> {
+    const messagePairId = await documentHeadMessagePairId(
         db, prefix, uriId,
     );
-    if (pairId === undefined) return undefined;
-    const stored = await db.pairs.getById(pairId);
+    if (messagePairId === undefined) return undefined;
+    const stored = await db.messagePairs.getById(
+        messagePairId,
+    );
     if (stored === undefined) return undefined;
-    return { pairId, version: stored.version };
+    return {
+        messagePairId, version: stored.version,
+    };
 }
 
 async function instanceAdvertised(
@@ -278,7 +286,7 @@ async function instanceAdvertised(
 ): Promise<{
     tag: string;
     limited: boolean;
-    pairId: string;
+    messagePairId: string;
 } | undefined> {
     const head = await deriveInstanceHead(
         db, organization, typeId, instanceId,
@@ -290,7 +298,7 @@ async function instanceAdvertised(
     const projected = projectReadableValues(
         head.values, attributesById, roles,
     );
-    const parent = await instanceParentEtag(db, head.pairId);
+    const parent = await instanceParentEtag(db, head.messagePairId);
     const tag = await advertisedInstanceEtag(
         instanceGetBody(
             instanceId, organization, typeId, projected,
@@ -302,7 +310,7 @@ async function instanceAdvertised(
         limited: projectionOmitsStored(
             head.values, projected,
         ),
-        pairId: head.pairId,
+        messagePairId: head.messagePairId,
     };
 }
 
@@ -335,34 +343,36 @@ function preconditionDocument(
     );
 }
 
-async function revisionPairIdForPatch(
+async function revisionMessagePairIdForPatch(
     db: DbAdapter,
-    wirePairId: string,
+    wireMessagePairId: string,
 ): Promise<string | undefined> {
-    const wireReq = await db.pairs.getById(wirePairId);
+    const wireReq = await db.messagePairs.getById(
+        wireMessagePairId,
+    );
     if (wireReq === undefined) return undefined;
-    const siblings = await db.pairs.getAllWhere(
+    const siblings = await db.messagePairs.getAllWhere(
         'uri_collection', wireReq.uri_collection,
     );
     const revision = siblings.find(
         (row) =>
             row.uri_id === wireReq.uri_id
             && row.request_at === wireReq.request_at
-            && row.id !== wirePairId,
+            && row.id !== wireMessagePairId,
     );
     return revision?.id;
 }
 
-async function advertisedForRevisionPair(
+async function advertisedForRevisionMessagePair(
     db: DbAdapter,
     organization: string,
     typeId: string,
     instanceId: string,
     roles: readonly string[],
-    revisionPairId: string,
+    revisionMessagePairId: string,
 ): Promise<string | undefined> {
-    const stored = await db.pairs.getById(
-        revisionPairId,
+    const stored = await db.messagePairs.getById(
+        revisionMessagePairId,
     );
     if (stored === undefined) return undefined;
     const model = parseWire(stored.request);
@@ -380,7 +390,7 @@ async function advertisedForRevisionPair(
         values, attributesById, roles,
     );
     const parent = await instanceParentEtag(
-        db, revisionPairId,
+        db, revisionMessagePairId,
     );
     return advertisedInstanceEtag(
         instanceGetBody(
@@ -465,7 +475,7 @@ export async function handleRequest(
     // fenceRequest, which completes the vessel: the
     // organization, the live memberships, and the roles.
     // Surviving stores are global (message plane);
-    // pair-plane tenancy rides uri_collection. effective stays
+    // message-plane tenancy rides uri_collection. effective stays
     // the unfenced base adapter.
     let effective: DbAdapter = adapter;
     // The acting member, sourced from the verified token and
@@ -785,8 +795,8 @@ export async function handleRequest(
         // families' existing-id PUT/DELETE. Pair-plane
         // owner-null → genesis proceeds; foreign →
         // ForeignOrganizationError (HTTP 403). Runs BEFORE
-        // formWritePair so a forged foreign id never pays
-        // crypto or stores a pair.
+        // formWriteMessagePair so a forged foreign id never
+        // pays crypto or stores a pair.
         if (
             isWrite
             && hasWriteHandler
@@ -812,15 +822,15 @@ export async function handleRequest(
         // The shadow-ledger pair: formed pre-tx (all crypto and
         // address resolution happen before a transaction opens
         // — see api/message-pair.ts), gated to routes wired in
-        // PAIR_WIRED_ROUTE_PATTERNS so no unwired route ever
+        // MESSAGE_PAIR_WIRED_ROUTE_PATTERNS so no unwired route ever
         // advertises a Response-ID it did not store. Runs
         // INSIDE the try so a validation error raised while
         // precomputing the success body (below) is caught and
         // mapped to its usual HTTP status, exactly as if the
         // handler itself had raised it.
-        let pair: MessagePair | undefined;
+        let messagePair: MessagePair | undefined;
         if (isWrite && hasWriteHandler && !bearerExempt
-            && PAIR_WIRED_ROUTE_PATTERNS.has(routePattern)) {
+            && MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(routePattern)) {
             // Nested attribute paths store under the type
             // attributes prefix directly (flat rewrite retired
             // Task 23).
@@ -862,7 +872,7 @@ export async function handleRequest(
                     ?.concurrency === 'locked';
             // Advertised ETag is the live PUT's version,
             // never the lock-head pair id. DELETE heads have
-            // no If-Match target (documentHeadPairId skips
+            // no If-Match target (documentHeadMessagePairId skips
             // them). Same-body no-append uses this for both
             // PUT kinds (simple and locked).
             const livePut = isDocumentPut
@@ -953,7 +963,7 @@ export async function handleRequest(
                         actor,
                         organization,
                     );
-            pair = await formWritePair({
+            messagePair = await formWriteMessagePair({
                 method, pathname, routePattern,
                 routeSegments: matched.segments,
                 pathSegments,
@@ -978,7 +988,8 @@ export async function handleRequest(
                     && livePut !== undefined
                     ? {
                         matchedEtag: echo,
-                        latchedHeadPairId: livePut.pairId,
+                        latchedHeadMessagePairId:
+                            livePut.messagePairId,
                     }
                     : {}),
             });
@@ -996,7 +1007,7 @@ export async function handleRequest(
             // 412ing.
             if (!REPLAY_EXEMPT_ROUTE_PATTERNS.has(routePattern)) {
                 const replay = await storedResponseFor(
-                    effective, pair.requestHash,
+                    effective, messagePair.requestHash,
                 );
                 if (replay !== undefined) {
                     const response = sendWriteResponse(
@@ -1008,14 +1019,14 @@ export async function handleRequest(
                     ) {
                         if (method === 'PATCH') {
                             const revisionId =
-                                await revisionPairIdForPatch(
+                                await revisionMessagePairIdForPatch(
                                     effective, replay.id,
                                 );
                             if (
                                 revisionId !== undefined
                             ) {
                                 const tag =
-                                    await advertisedForRevisionPair(
+                                    await advertisedForRevisionMessagePair(
                                         effective,
                                         param(params, 0),
                                         param(params, 1),
@@ -1326,14 +1337,14 @@ export async function handleRequest(
                     || echoMatchesHead
                 )
             ) {
-                const liveReq = await effective.pairs
-                    .getById(livePut.pairId);
+                const liveReq = await effective.messagePairs
+                    .getById(livePut.messagePairId);
                 if (liveReq !== undefined) {
                     const liveOctets = bodyOctetsOf(
                         parseWire(liveReq.request),
                     );
                     const newOctets = bodyOctetsOf(
-                        parseWire(pair.requestMessage),
+                        parseWire(messagePair.requestMessage),
                     );
                     if (octetsEqual(liveOctets, newOctets)) {
                         const raced =
@@ -1341,13 +1352,13 @@ export async function handleRequest(
                                 MESSAGE_TABLES,
                                 async (view) => {
                                     const latest =
-                                        await documentHeadPairId(
+                                        await documentHeadMessagePairId(
                                             view,
                                             canonicalPrefix,
                                             uriId,
                                         );
                                     return latest
-                                        !== livePut.pairId;
+                                        !== livePut.messagePairId;
                                 },
                             );
                         if (raced) {
@@ -1394,8 +1405,8 @@ export async function handleRequest(
                             );
                         }
                         const stored =
-                            await effective.pairs
-                                .getById(livePut.pairId);
+                            await effective.messagePairs
+                                .getById(livePut.messagePairId);
                         if (stored !== undefined) {
                             return attachEtag(
                                 sendWriteResponse(
@@ -1413,20 +1424,22 @@ export async function handleRequest(
             if (
                 method === 'PUT'
                 && body === undefined
-                && pair !== undefined
+                && messagePair !== undefined
             ) {
-                const emptyPair = pair;
+                const emptyMessagePair = messagePair;
                 await effective.transaction(
                     MESSAGE_TABLES,
                     async (view) => {
                         const latchedId =
-                            emptyPair.latchedHeadPairId;
+                            emptyMessagePair
+                                .latchedHeadMessagePairId;
                         if (latchedId !== undefined) {
                             const latest =
-                                await documentHeadPairId(
+                                await documentHeadMessagePairId(
                                     view,
-                                    emptyPair.uriCollection,
-                                    emptyPair.uriId,
+                                    emptyMessagePair
+                                        .uriCollection,
+                                    emptyMessagePair.uriId,
                                 );
                             if (latest !== latchedId) {
                                 throw new ApiError(
@@ -1438,12 +1451,12 @@ export async function handleRequest(
                             }
                         }
                         await appendMessagePair(
-                            view, emptyPair,
+                            view, emptyMessagePair,
                         );
                     },
                 );
                 const stored = await storedResponseFor(
-                    effective, emptyPair.requestHash,
+                    effective, emptyMessagePair.requestHash,
                 );
                 if (stored === undefined) {
                     throw new Error(
@@ -1534,24 +1547,30 @@ export async function handleRequest(
                     // The derivation's OWN head pair id (Phase 4
                     // Task 8) — the SAME reduction the flipped GET
                     // above just ran to build `result`, not a
-                    // second, divergent one (headPairIdAt's own
+                    // second, divergent one
+                    // (headMessagePairIdAt's own
                     // ANY-method LOCK head, still the write path's
                     // source above). Same value for a document-
                     // class address (tests/api-flow-document.test.ts
                     // pins the equality); one mechanism now.
-                    const headPairId = await documentHeadPairId(
-                        effective, prefix,
-                        entityIdParam(readWiring, params),
-                    );
-                    if (headPairId !== undefined) {
+                    const headMessagePairId =
+                        await documentHeadMessagePairId(
+                            effective, prefix,
+                            entityIdParam(
+                                readWiring, params,
+                            ),
+                        );
+                    if (headMessagePairId !== undefined) {
                         const stored = await effective
-                            .pairs.getById(headPairId);
+                            .messagePairs.getById(
+                                headMessagePairId,
+                            );
                         if (stored !== undefined) {
                             return attachEtag(
                                 Response.json(result, {
                                     headers: {
                                         'Response-ID':
-                                            headPairId,
+                                            headMessagePairId,
                                     },
                                 }),
                                 stored.version,
@@ -1659,7 +1678,7 @@ export async function handleRequest(
                         params,
                         body!,
                         actor,
-                        pair,
+                        messagePair,
                         organization,
                         roles,
                         ctx.requestAt,
@@ -1667,9 +1686,9 @@ export async function handleRequest(
                             OPERATION_ID_HEADER,
                         ) ?? '',
                     );
-                if (pair !== undefined) {
+                if (messagePair !== undefined) {
                     const stored = await storedResponseFor(
-                        effective, pair.requestHash,
+                        effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
                         throw new Error(
@@ -1745,13 +1764,13 @@ export async function handleRequest(
                         params,
                         body!,
                         actor,
-                        pair,
+                        messagePair,
                         organization,
                         roles,
                     );
-                if (pair !== undefined) {
+                if (messagePair !== undefined) {
                     const stored = await storedResponseFor(
-                        effective, pair.requestHash,
+                        effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
                         throw new Error(
@@ -1820,13 +1839,13 @@ export async function handleRequest(
                     effective,
                     params,
                     actor,
-                    pair,
+                    messagePair,
                     organization,
                     roles,
                 );
-                if (pair !== undefined) {
+                if (messagePair !== undefined) {
                     const stored = await storedResponseFor(
-                        effective, pair.requestHash,
+                        effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
                         throw new Error(
@@ -1861,8 +1880,9 @@ export async function handleRequest(
                 // and a non-POST verb still 405s via the
                 // ordinary matched.get/put/delete checks). The
                 // seed carries everything
-                // WritePairInput needs except the requester
-                // identity and the response — only the grant
+                // WriteMessagePairInput needs except the
+                // requester identity and the response — only
+                // the grant
                 // itself, deep inside postToken/postAuthorize,
                 // can resolve those (a code's issuer, a verified
                 // token's subject) — so the grant forms its OWN
@@ -1872,7 +1892,7 @@ export async function handleRequest(
                     routePattern === 'authentication/token'
                     || routePattern === 'authentication/authorize'
                 ) {
-                    const seed: AuthPairSeed = {
+                    const seed: AuthMessagePairSeed = {
                         requestAt: ctx.requestAt,
                         headerFields: hoistedHeaderFields(request),
                         method, pathname, routePattern,
@@ -1922,14 +1942,14 @@ export async function handleRequest(
                     // hop, not a route dispatch). Auth pairs are
                     // keyed by id (putMessagePair), not hash —
                     // two identical logins each land a row.
-                    if (dispatched.pairId === undefined) {
+                    if (dispatched.messagePairId === undefined) {
                         throw new Error(
                             'authentication grant stored no'
                             + ' pair: ' + routePattern,
                         );
                     }
-                    const authStored = await effective.pairs
-                        .getById(dispatched.pairId);
+                    const authStored = await effective.messagePairs
+                        .getById(dispatched.messagePairId);
                     // authentication/authorize mints an
                     // authorization code, not a session — no UI
                     // subscribes to it, so it posts nothing.
@@ -1995,7 +2015,7 @@ export async function handleRequest(
                     params,
                     body!,
                     actor,
-                    pair,
+                    messagePair,
                     organization,
                     roles,
                     ctx.requestAt,
@@ -2003,9 +2023,9 @@ export async function handleRequest(
                         OPERATION_ID_HEADER,
                     ) ?? '',
                 );
-                if (pair !== undefined) {
+                if (messagePair !== undefined) {
                     const stored = await storedResponseFor(
-                        effective, pair.requestHash,
+                        effective, messagePair.requestHash,
                     );
                     if (stored === undefined) {
                         throw new Error(

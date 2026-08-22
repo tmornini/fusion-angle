@@ -9,7 +9,7 @@ import type { DbAdapter } from '../api/db.ts';
 import type {
     Id,
     WorkOrderEntity,
-    PairEntity,
+    MessagePairEntity,
     StateEntity,
 } from '../api/types.ts';
 import {
@@ -18,8 +18,8 @@ import {
 } from '../api/types.ts';
 import { canonicalUriCollection } from '../api/message-pair.ts';
 import {
-    documentPairsAt,
-    type DocumentPair,
+    documentMessagePairsAt,
+    type DocumentMessagePair,
 } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
@@ -640,7 +640,7 @@ async () => {
     // workOrder.flow_graph against the entity PUT's STORED,
     // round-tripped response — two independently re-encoded
     // values, not the same in-memory literal.
-    const storedCreatePostRow = (await db.pairs.getAllWhere(
+    const storedCreatePostRow = (await db.messagePairs.getAllWhere(
         'uri_collection',
         canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
@@ -708,7 +708,7 @@ async () => {
 
     // Claim attempt by actor B — 409, nothing stored.
     const beforeReject =
-        (await db.pairs.getAll()).length;
+        (await db.messagePairs.getAll()).length;
     const claimRejectAt = nowUtc();
     const claimReject = await handleRequest(db, req(
         'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -722,7 +722,7 @@ async () => {
     ));
     assert.equal(claimReject.status, 409);
     assert.equal(
-        (await db.pairs.getAll()).length, beforeReject,
+        (await db.messagePairs.getAll()).length, beforeReject,
     );
     await assertEntityAndJoinParity(db, workOrderId, flowId);
 
@@ -740,7 +740,7 @@ async () => {
     // The full chain: create(3) + transition1(1) +
     // transition2(2) + entity PUT(0) + fresh claim(1) +
     // repeat-claim(0) + rejected claim(0) + unclaim(1) = 8.
-    // Release is pair-plane-only — pin via lifecycle derive.
+    // Release is message-plane-only — pin via lifecycle derive.
     assert.equal(
         (await workOrderLifecycleStatesFor(
             db, STARK_ORGANIZATION, workOrderId,
@@ -902,9 +902,10 @@ async () => {
 // -- 8. method-filter: the create's POST pair is never the -----
 // -- derived head (the shape-incompatibility mirror) -----------
 
-test('the create-op POST pair is not read as a document pair —'
-+ ' documentPairsAt returns exactly one pair (the PUT), and the'
-+ ' create/document bodies share zero top-level keys',
+test('the create-op POST pair is not read as a document'
++ ' message pair — documentMessagePairsAt returns exactly one'
++ ' pair (the PUT), and the create/document bodies share zero'
++ ' top-level keys',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -940,8 +941,8 @@ async () => {
             , '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
     const atAddress = requests.filter(
         (r) => r.uri_collection === prefix
@@ -951,11 +952,11 @@ async () => {
     // pair share the SAME uriId.
     assert.equal(atAddress.length, 2);
 
-    const documentPairs = documentPairsAt(
+    const documentMessagePairs = documentMessagePairsAt(
         requests, prefix,
-    ).filter((pair) => pair.uriId === workOrderId);
-    assert.equal(documentPairs.length, 1);
-    assert.equal(documentPairs[0]!.method, 'PUT');
+    ).filter((messagePair) => messagePair.uriId === workOrderId);
+    assert.equal(documentMessagePairs.length, 1);
+    assert.equal(documentMessagePairs[0]!.method, 'PUT');
 
     const postRow = atAddress.find(
         (r) => decodeRequestMessage(r.request).method === 'POST',
@@ -964,7 +965,7 @@ async () => {
         Object.keys(decodeRequestMessage(postRow.request).body),
     );
     const documentBodyKeys = new Set(
-        Object.keys(documentPairs[0]!.body),
+        Object.keys(documentMessagePairs[0]!.body),
     );
     const overlap = [...createBodyKeys].filter(
         (key) => documentBodyKeys.has(key),
@@ -1006,15 +1007,15 @@ function decodeRequestMessage(message: string): {
 // see the task brief for the authoritative wording.
 
 // Every successful pair at a prefix, ANY method — the test-side
-// counterpart of derive-documents.ts's documentPairsAt, which
+// counterpart of derive-documents.ts's documentMessagePairsAt, which
 // deliberately EXCLUDES POST (the DOCUMENT head is PUT/DELETE
 // only). The create's own 3-slot birth arrays live in the POST
-// operation pair, so this replay needs the unfiltered read the
+// operation message pair, so this replay needs the unfiltered read the
 // production reduction intentionally never exposes — named for
-// its role (every pair, any method) rather than "documentPairsAt
+// its role (every pair, any method) rather than "documentMessagePairsAt
 // without the filter", so no reader mistakes it for a production
 // substitute.
-interface AnyPair {
+interface AnyMessagePair {
     readonly id: string;
     readonly at: string;
     readonly uriId: string;
@@ -1034,17 +1035,17 @@ function atIdCompare(
                     : 0;
 }
 
-function allPairsAt(
-    rows: readonly PairEntity[],
+function allMessagePairsAt(
+    rows: readonly MessagePairEntity[],
     uriCollection: string,
-): AnyPair[] {
-    const pairs: AnyPair[] = [];
+): AnyMessagePair[] {
+    const messagePairs: AnyMessagePair[] = [];
     for (const row of rows) {
         if (row.uri_collection !== uriCollection) {
             continue;
         }
         const decoded = decodeRequestMessage(row.request);
-        pairs.push({
+        messagePairs.push({
             id: row.id,
             at: row.response_at,
             uriId: row.uri_id,
@@ -1053,7 +1054,7 @@ function allPairsAt(
             requesterIdentityId: row.requester_identity_id,
         });
     }
-    return pairs.sort(atIdCompare);
+    return messagePairs.sort(atIdCompare);
 }
 
 // A pure Date-parse subtraction — the replay's own comparator,
@@ -1074,22 +1075,22 @@ function isExpiredAsOf(
 
 // LOCKTIMEOUT SOURCING: the WO's DOCUMENT HEAD as of `momentAt`
 // — the (at, id) winner among PUT/DELETE pairs whose response
-// `at` strictly precedes it. `entityPairs` is ascending by (at,
-// id) already (documentPairsAt's own contract), so the last
+// `at` strictly precedes it. `entityMessagePairs` is ascending by (at,
+// id) already (documentMessagePairsAt's own contract), so the last
 // entry passing the filter IS that winner.
 function documentHeadBefore(
-    entityPairs: readonly DocumentPair[],
+    entityMessagePairs: readonly DocumentMessagePair[],
     momentAt: string,
-): DocumentPair | undefined {
-    const before = entityPairs.filter((p) => p.at < momentAt);
+): DocumentMessagePair | undefined {
+    const before = entityMessagePairs.filter((p) => p.at < momentAt);
     return before[before.length - 1];
 }
 
 function lockTimeoutAsOf(
-    entityPairs: readonly DocumentPair[],
+    entityMessagePairs: readonly DocumentMessagePair[],
     momentAt: string,
 ): number {
-    const head = documentHeadBefore(entityPairs, momentAt);
+    const head = documentHeadBefore(entityMessagePairs, momentAt);
     if (head === undefined) {
         throw new Error(
             'no document head before ' + momentAt,
@@ -1115,10 +1116,10 @@ interface FieldValueTriple {
 // rows) via latestClaimEvent's own CLAIM_STATES filter + (at,
 // id) max — the mechanics are pure and Date.now-free, so
 // reusing them here does not reintroduce the barred coupling.
-function applyClaimPair(
+function applyClaimMessagePair(
     replayed: StateEntity[],
-    entityPairs: readonly DocumentPair[],
-    claim: AnyPair,
+    entityMessagePairs: readonly DocumentMessagePair[],
+    claim: AnyMessagePair,
     workOrderId: string,
 ): void {
     const claimEventId = pickString(claim.body, 'claimEventId');
@@ -1130,7 +1131,7 @@ function applyClaimPair(
     if (replayed.some((row) => row.id === claimEventId)) {
         return;
     }
-    const lockTimeout = lockTimeoutAsOf(entityPairs, claim.at);
+    const lockTimeout = lockTimeoutAsOf(entityMessagePairs, claim.at);
     const prior = latestClaimEvent(replayed, workOrderId);
     const priorLive = prior !== null
         && prior.state === 'claimed'
@@ -1163,10 +1164,10 @@ function applyClaimPair(
     });
 }
 
-function applyTransitionPair(
+function applyTransitionMessagePair(
     replayed: StateEntity[],
     replayedFieldValues: FieldValueTriple[],
-    transition: AnyPair,
+    transition: AnyMessagePair,
     workOrderId: string,
 ): void {
     const transitionEventId = pickString(
@@ -1228,10 +1229,10 @@ function applyTransitionPair(
 
 // Replays postWorkOrderReleaseOp: a live unexpired claim as
 // of releaseAt → claim_released; otherwise zero events.
-function applyReleasePair(
+function applyReleaseMessagePair(
     replayed: StateEntity[],
-    entityPairs: readonly DocumentPair[],
-    release: AnyPair,
+    entityMessagePairs: readonly DocumentMessagePair[],
+    release: AnyMessagePair,
     workOrderId: string,
 ): void {
     const legacy = Object.hasOwn(
@@ -1246,7 +1247,7 @@ function applyReleasePair(
     const prior = latestClaimEvent(replayed, workOrderId);
     if (legacy) {
         const lockTimeout = lockTimeoutAsOf(
-            entityPairs, release.at,
+            entityMessagePairs, release.at,
         );
         const priorLive = prior !== null
             && prior.state === 'claimed'
@@ -1287,21 +1288,21 @@ async function replayWorkOrderStates(
         organization, '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/',
     );
     const [woRequests, woResponses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', woPrefix),
-        db.pairs.getAllWhere('uri_collection', woPrefix),
+        db.messagePairs.getAllWhere('uri_collection', woPrefix),
+        db.messagePairs.getAllWhere('uri_collection', woPrefix),
     ]);
-    const allWoPairs = allPairsAt(woRequests, woPrefix);
-    const createPair = allWoPairs.find(
+    const allWoMessagePairs = allMessagePairsAt(woRequests, woPrefix);
+    const createMessagePair = allWoMessagePairs.find(
         (p) => p.method === 'POST' && p.uriId === workOrderId,
     );
-    if (createPair === undefined) {
+    if (createMessagePair === undefined) {
         throw new Error(
             'no create pair found for ' + workOrderId,
         );
     }
-    const entityPairs = documentPairsAt(
+    const entityMessagePairs = documentMessagePairsAt(
         woRequests, woPrefix,
-    ).filter((pair) => pair.uriId === workOrderId);
+    ).filter((messagePair) => messagePair.uriId === workOrderId);
 
     const claimPrefix = canonicalUriCollection(
         organization,
@@ -1309,15 +1310,15 @@ async function replayWorkOrderStates(
             + '/claim/',
     );
     const [claimRequests, claimResponses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', claimPrefix),
-        db.pairs.getAllWhere('uri_collection', claimPrefix),
+        db.messagePairs.getAllWhere('uri_collection', claimPrefix),
+        db.messagePairs.getAllWhere('uri_collection', claimPrefix),
     ]);
-    const claimPairs = allPairsAt(
+    const claimMessagePairs = allMessagePairsAt(
         claimRequests, claimPrefix,
     ).filter(
         (p) => p.method === 'POST' || p.method === 'PUT',
     );
-    const claimDeletes = allPairsAt(
+    const claimDeletes = allMessagePairsAt(
         claimRequests, claimPrefix,
     ).filter((p) => p.method === 'DELETE');
 
@@ -1328,15 +1329,15 @@ async function replayWorkOrderStates(
     );
     const [releaseRequests, releaseResponses] =
         await Promise.all([
-            db.pairs.getAllWhere(
+            db.messagePairs.getAllWhere(
                 'uri_collection', releasePrefix,
             ),
-            db.pairs.getAllWhere(
+            db.messagePairs.getAllWhere(
                 'uri_collection', releasePrefix,
             ),
         ]);
-    const releasePairs = [
-        ...allPairsAt(
+    const releaseMessagePairs = [
+        ...allMessagePairsAt(
             releaseRequests, releasePrefix,
         ).filter((p) => p.method === 'POST'),
         ...claimDeletes,
@@ -1350,10 +1351,10 @@ async function replayWorkOrderStates(
     const [
         transitionRequests, transitionResponses,
     ] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', transitionPrefix),
-        db.pairs.getAllWhere('uri_collection', transitionPrefix),
+        db.messagePairs.getAllWhere('uri_collection', transitionPrefix),
+        db.messagePairs.getAllWhere('uri_collection', transitionPrefix),
     ]);
-    const transitionPairs = allPairsAt(
+    const transitionMessagePairs = allMessagePairsAt(
         transitionRequests, transitionPrefix,
     ).filter((p) => p.method === 'POST');
 
@@ -1361,48 +1362,55 @@ async function replayWorkOrderStates(
     // events, all authored by the create pair's own
     // requesterIdentityId.
     const events: StateEntity[] = [];
-    const ids = createPair.body['stateEventIds'] as
+    const ids = createMessagePair.body['stateEventIds'] as
         readonly string[];
-    const ats = createPair.body['stateEventAts'] as
+    const ats = createMessagePair.body['stateEventAts'] as
         readonly string[];
-    const states = createPair.body['states'] as
+    const states = createMessagePair.body['states'] as
         readonly string[];
     for (let i = 0; i < 3; i++) {
         events.push({
             id: ids[i]!,
             entity_id: workOrderId,
             state: states[i]!,
-            member_id: createPair.requesterIdentityId,
+            member_id: createMessagePair.requesterIdentityId,
             at: ats[i]!,
         });
     }
 
     const fieldValues: FieldValueTriple[] = [];
     type Kind = 'claim' | 'transition' | 'release';
-    const actions: { kind: Kind; pair: AnyPair }[] = [
-        ...claimPairs.map((pair) => ({
-            kind: 'claim' as const, pair,
+    const actions: {
+        kind: Kind; messagePair: AnyMessagePair;
+    }[] = [
+        ...claimMessagePairs.map((messagePair) => ({
+            kind: 'claim' as const, messagePair,
         })),
-        ...transitionPairs.map((pair) => ({
-            kind: 'transition' as const, pair,
+        ...transitionMessagePairs.map((messagePair) => ({
+            kind: 'transition' as const, messagePair,
         })),
-        ...releasePairs.map((pair) => ({
-            kind: 'release' as const, pair,
+        ...releaseMessagePairs.map((messagePair) => ({
+            kind: 'release' as const, messagePair,
         })),
-    ].sort((a, b) => atIdCompare(a.pair, b.pair));
+    ].sort((a, b) => atIdCompare(
+        a.messagePair, b.messagePair,
+    ));
 
     for (const action of actions) {
         if (action.kind === 'claim') {
-            applyClaimPair(
-                events, entityPairs, action.pair, workOrderId,
+            applyClaimMessagePair(
+                events, entityMessagePairs,
+                action.messagePair, workOrderId,
             );
         } else if (action.kind === 'transition') {
-            applyTransitionPair(
-                events, fieldValues, action.pair, workOrderId,
+            applyTransitionMessagePair(
+                events, fieldValues,
+                action.messagePair, workOrderId,
             );
         } else {
-            applyReleasePair(
-                events, entityPairs, action.pair, workOrderId,
+            applyReleaseMessagePair(
+                events, entityMessagePairs,
+                action.messagePair, workOrderId,
             );
         }
     }
@@ -1484,7 +1492,7 @@ async () => {
     // independently re-encoded values, not the same in-memory
     // literal — so a canonical-JSON regression that mangled
     // either differently would be caught.
-    const storedCreatePostRow = (await db.pairs.getAllWhere(
+    const storedCreatePostRow = (await db.messagePairs.getAllWhere(
         'uri_collection',
         canonicalUriCollection(STARK_ORGANIZATION, '/work-orders/'),
     )).find(
@@ -1624,7 +1632,7 @@ async () => {
     );
     // Pin the test-side pair replay against the live
     // production derive (lifecycle) — both read the same
-    // op-pair composition (create/claim/release/transition).
+    // operation-message-pair composition (create/claim/release/transition).
     const derivedHistory = await workOrderLifecycleStatesFor(
         db, STARK_ORGANIZATION, workOrderId,
     );
@@ -1634,7 +1642,7 @@ async () => {
     // + finish-transition(1) + unclaim(1) = 11.
     assert.equal(replay.events.length, 11);
 
-    // Phase Final Task 2: SFV row plane empty; pair-plane
+    // Phase Final Task 2: SFV row plane empty; message-plane
     // transition fold rides work-order history (C4).
     const history = await workOrderHistoryFor(
         db, STARK_ORGANIZATION, workOrderId,
@@ -1665,7 +1673,8 @@ async () => {
 
 // -- 10. same-join-id retry: the join stays chain-less ----------
 // (Phase 9 Task 2 Step 0(d') pin, additive and pass-first against
-// HEAD: the create route's join pair hardcodes headPairId:
+// HEAD: the create route's join pair hardcodes
+// headMessagePairId:
 // undefined by design — no head-read at all — so a SECOND,
 // genuinely different create [a fresh work-order id, a fresh
 // operation] that happens to reuse a prior create's flow-work-
@@ -1735,7 +1744,7 @@ test('same-join-id retry: two different work-order creates '
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/' + flowId
             + '/work-orders/',
     );
-    const joinResponses = await db.pairs.getAllAtAddress(
+    const joinResponses = await db.messagePairs.getAllAtAddress(
         joinPrefix, sharedFwoId,
     );
     assert.equal(joinResponses.length, 2);

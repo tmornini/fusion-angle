@@ -9,7 +9,7 @@ import { generateIdentifier } from
     '../shared/identifier.ts';
 import {
     appendMessagePair,
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import { messageStore } from '../api/message-store.ts';
 
@@ -33,7 +33,7 @@ async function writePair(
     },
 ): Promise<{ id: string; version: string }> {
     const deleted = input.method === 'DELETE';
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: input.method,
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + input.uriId,
@@ -53,11 +53,11 @@ async function writePair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
     return {
-        id: pair.id,
-        version: pair.responseEtag,
+        id: messagePair.id,
+        version: messagePair.responseEtag,
     };
 }
 

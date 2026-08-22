@@ -19,7 +19,7 @@ import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import {
@@ -35,7 +35,7 @@ const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 // Below-facade pair formation (the member-fixtures.ts idiom):
 // postPasswordLogin's own gate-valid GET /members below depends
-// on role_grants/memberships deriving from the pair plane once
+// on role_grants/memberships deriving from the message plane once
 // they flip, so a raw row here would go derivation-invisible.
 // Every id/field value stays IDENTICAL to the raw puts these
 // replace — only the write mechanism changes.

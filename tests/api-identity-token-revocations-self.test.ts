@@ -143,14 +143,14 @@ test('a member PUT identities/:id/token-revocations/:rid'
     assert.deepEqual(
         row, { id: rid, identity_id: 'nkgaOHZISTQrILTfPThWCA', at },
     );
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const own = requests.find(
         r => r.uri_collection
             === '/identities/nkgaOHZISTQrILTfPThWCA/token-revocations/'
             && r.uri_id === rid,
     );
     assert.ok(own);
-    const responses = await db.pairs.getAll();
+    const responses = await db.messagePairs.getAll();
     const ownResponse = responses.find(
         r => r.uri_collection
             === '/identities/nkgaOHZISTQrILTfPThWCA/token-revocations/'
@@ -252,7 +252,7 @@ test('a member PUT naming ANOTHER identity 403s, byte-pinned'
         error: 'forbidden: PUT ' + path
             + ' requires a role this principal lacks',
     });
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     assert.equal(
         requests.filter(
             r => r.uri_id === rid,
@@ -281,7 +281,7 @@ async () => {
     );
     const expected = tokenRevocationEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: fields,
     });

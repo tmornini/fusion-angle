@@ -12,9 +12,9 @@ import type { DbAdapter } from '../api/db.ts';
 import type { Id } from '../api/types.ts';
 import { handleRequest } from '../api/api.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
-    headPairIdAt,
+    headMessagePairIdAt,
     IF_MATCH_HEADER,
     strongEtagOf,
 } from '../api/message-pair.ts';
@@ -27,7 +27,7 @@ import {
     type WriteResponseSpec,
 } from '../api/routes.ts';
 import {
-    PAIR_WIRED_ROUTE_PATTERNS,
+    MESSAGE_PAIR_WIRED_ROUTE_PATTERNS,
     DOCUMENT_CLASS_ROUTE_PATTERNS,
 } from '../api/message-pair.ts';
 import {
@@ -198,7 +198,7 @@ test('documentEntityRoute (simple arm) PUTs through the'
         state: 'active',
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT'
             , pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'gZsGVjTnvrgHQLzbKnQckg',
@@ -212,7 +212,7 @@ test('documentEntityRoute (simple arm) PUTs through the'
     });
     const written = await route.put!(
         db, ['AjdvjuECVZEgZoFajaIEkg', 'gZsGVjTnvrgHQLzbKnQckg'], body
-            , 'XXZruirZyAOoRpNxaDnpSA', pair,
+            , 'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.equal(
         (written as { title: string }).title, 'Generic',
@@ -249,15 +249,15 @@ async function testDocumentOp(
     id: Id,
     body: Record<string, unknown>,
     _actor: Id,
-    pair?: MessagePair,
+    messagePair?: MessagePair,
 ): Promise<unknown> {
     return db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            if (pair !== undefined) {
-                const latchedId = pair.latchedHeadPairId;
-                const latest = await headPairIdAt(
-                    view, pair.uriCollection, pair.uriId,
+            if (messagePair !== undefined) {
+                const latchedId = messagePair.latchedHeadMessagePairId;
+                const latest = await headMessagePairIdAt(
+                    view, messagePair.uriCollection, messagePair.uriId,
                 );
                 if (
                     latchedId !== undefined
@@ -270,7 +270,7 @@ async function testDocumentOp(
                         HTTP_PRECONDITION_FAILED,
                     );
                 }
-                await appendMessagePair(view, pair);
+                await appendMessagePair(view, messagePair);
             }
             return { id, ...body };
         },
@@ -330,13 +330,14 @@ async function withSyntheticLockedFamily<T>(
     // a hand-written sub-resource has today.
     const childRouteEntry: Route = {
         segments: [TEST_FAMILY, ':id', 'child'],
-        put: (db, p, body, _actor, pair) => testDocumentOp(
-            db, param(p, 0), body, _actor, pair,
-        ),
+        put: (db, p, body, _actor, messagePair) =>
+            testDocumentOp(
+                db, param(p, 0), body, _actor, messagePair,
+            ),
     };
     routes.push(routeEntry, childRouteEntry);
-    PAIR_WIRED_ROUTE_PATTERNS.add(TEST_PATTERN);
-    PAIR_WIRED_ROUTE_PATTERNS.add(CHILD_PATTERN);
+    MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.add(TEST_PATTERN);
+    MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.add(CHILD_PATTERN);
     DOCUMENT_CLASS_ROUTE_PATTERNS.add(TEST_PATTERN);
     DOCUMENT_CLASS_ROUTE_PATTERNS.add(CHILD_PATTERN);
     const mutableSpecs = WRITE_RESPONSE_SPECS as
@@ -351,8 +352,8 @@ async function withSyntheticLockedFamily<T>(
             const index = routes.indexOf(entry);
             if (index >= 0) routes.splice(index, 1);
         }
-        PAIR_WIRED_ROUTE_PATTERNS.delete(TEST_PATTERN);
-        PAIR_WIRED_ROUTE_PATTERNS.delete(CHILD_PATTERN);
+        MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.delete(TEST_PATTERN);
+        MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.delete(CHILD_PATTERN);
         DOCUMENT_CLASS_ROUTE_PATTERNS.delete(TEST_PATTERN);
         DOCUMENT_CLASS_ROUTE_PATTERNS.delete(CHILD_PATTERN);
         delete mutableSpecs[TEST_PATTERN];
@@ -469,7 +470,7 @@ test('locked arm: a matching echo stores no predecessor'
         assert.equal(second.headers.get('Follows'), null);
         assert.equal(second.headers.get('Supersedes'), null);
         const secondId = second.headers.get('Response-ID')!;
-        const stored = (await db.pairs.getAll())
+        const stored = (await db.messagePairs.getAll())
             .find((row) => row.id === secondId);
         assert.equal(
             stored !== undefined
@@ -510,7 +511,7 @@ async () => {
             resend.headers.get('Response-ID'),
             edit.headers.get('Response-ID'),
         );
-        assert.equal((await db.pairs.getAll()).length, 4);
+        assert.equal((await db.messagePairs.getAll()).length, 4);
     });
 });
 
@@ -546,7 +547,7 @@ test('locked arm: two writers racing the SAME echo — the'
 + ' second aborts via the in-tx head re-read', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const genesis = await formWritePair({
+    const genesis = await formWriteMessagePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
         routePattern: TEST_PATTERN,
         routeSegments: [TEST_FAMILY, ':id'],
@@ -568,7 +569,7 @@ test('locked arm: two writers racing the SAME echo — the'
         name: IF_MATCH_HEADER,
         value: strongEtagOf(genesis.responseEtag),
     };
-    const writerA = await formWritePair({
+    const writerA = await formWriteMessagePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
         routePattern: TEST_PATTERN,
         routeSegments: [TEST_FAMILY, ':id'],
@@ -577,11 +578,11 @@ test('locked arm: two writers racing the SAME echo — the'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
-        latchedHeadPairId: genesis.id,
+        latchedHeadMessagePairId: genesis.id,
         matchedEtag: genesis.responseEtag,
         operationId: TEST_OPERATION_ID,
     });
-    const writerB = await formWritePair({
+    const writerB = await formWriteMessagePair({
         method: 'PUT', pathname: '/' + TEST_PATTERN,
         routePattern: TEST_PATTERN,
         routeSegments: [TEST_FAMILY, ':id'],
@@ -590,7 +591,7 @@ test('locked arm: two writers racing the SAME echo — the'
         requesterIdentityId: 'XXZruirZyAOoRpNxaDnpSA', requestAt: AT,
         organization: 'AjdvjuECVZEgZoFajaIEkg', responseStatus: 200,
         responseBody: undefined,
-        latchedHeadPairId: genesis.id,
+        latchedHeadMessagePairId: genesis.id,
         matchedEtag: genesis.responseEtag,
         operationId: TEST_OPERATION_ID,
     });
@@ -609,11 +610,11 @@ test('locked arm: two writers racing the SAME echo — the'
 
 // The e2e sibling of the storage-level race above: TWO PUTs
 // echoing the SAME valid head, launched together through
-// handleRequest itself — never formWritePair/appendMessagePair
+// handleRequest itself — never formWriteMessagePair/appendMessagePair
 // directly — so the in-tx head re-read's 412 is what's under
 // test. On the memory backend, the global transaction
 // serializer (store-serializer.ts) processes each racer's
-// headPairIdAt read and dispatch as separate queued steps, so
+// headMessagePairIdAt read and dispatch as separate queued steps, so
 // BOTH racers observe genesis as their head and pass the
 // pre-dispatch echo check before either's write commits — the
 // SECOND-dispatched racer's in-tx re-read then 412s.
@@ -649,8 +650,8 @@ async () => {
             'If-Match does not match the current document at '
             + path,
         );
-        const pairs = await db.pairs.getAll();
-        const atPath = pairs.filter(
+        const messagePairs = await db.messagePairs.getAll();
+        const atPath = messagePairs.filter(
             (row) =>
                 row.uri_collection
                     === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
@@ -660,7 +661,7 @@ async () => {
         assert.equal(atPath.length, 2);
         // Genesis + exactly one winner write landed; the
         // loser stored NOTHING — no partial write survives.
-        assert.equal(pairs.length, 4);
+        assert.equal(messagePairs.length, 4);
     });
 });
 
@@ -668,7 +669,7 @@ test('withSyntheticLockedFamily leaves no residue behind',
 () => {
     assert.equal(documentFamilyWiring(TEST_FAMILY), undefined);
     assert.equal(
-        PAIR_WIRED_ROUTE_PATTERNS.has(TEST_PATTERN), false,
+        MESSAGE_PAIR_WIRED_ROUTE_PATTERNS.has(TEST_PATTERN), false,
     );
     assert.equal(
         DOCUMENT_CLASS_ROUTE_PATTERNS.has(TEST_PATTERN), false,
@@ -722,12 +723,12 @@ const statelessWiring: DocumentFamilyWiring = {
     entityOf: statelessEntityOf,
 };
 
-async function putStatelessDocumentPair(
+async function putStatelessDocumentMessagePair(
     db: DbAdapter,
     id: Id,
     body: Record<string, unknown>,
 ): Promise<void> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/' + STATELESS_FAMILY + '/' + id,
         routePattern: STATELESS_FAMILY + '/:id',
@@ -741,15 +742,15 @@ async function putStatelessDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
 }
 
-async function deleteStatelessDocumentPair(
+async function deleteStatelessDocumentMessagePair(
     db: DbAdapter,
     id: Id,
 ): Promise<void> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'DELETE',
         pathname: '/' + STATELESS_FAMILY + '/' + id,
         routePattern: STATELESS_FAMILY + '/:id',
@@ -763,7 +764,7 @@ async function deleteStatelessDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
 }
 
@@ -771,7 +772,7 @@ test('stateless lifecycle: a trio-less document PUT derives'
 + ' through documentGetHandler with no throw', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, SL_1, { v: 'first' });
+    await putStatelessDocumentMessagePair(db, SL_1, { v: 'first' });
     const got = await documentGetHandler(statelessWiring)(
         db, ['AjdvjuECVZEgZoFajaIEkg', SL_1], 'XXZruirZyAOoRpNxaDnpSA'
             , 'AjdvjuECVZEgZoFajaIEkg',
@@ -785,7 +786,7 @@ test('stateless lifecycle: documentCollectionGetHandler skips'
 + ' the per-document history walk too', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, SL_2, { v: 'listed' });
+    await putStatelessDocumentMessagePair(db, SL_2, { v: 'listed' });
     const rows = await documentCollectionGetHandler(
         statelessWiring,
     )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');
@@ -799,8 +800,8 @@ test('stateless lifecycle: a DELETE head 404s carrying'
 + ' notFoundTable, never the family', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, SL_3, { v: 'first' });
-    await deleteStatelessDocumentPair(db, SL_3);
+    await putStatelessDocumentMessagePair(db, SL_3, { v: 'first' });
+    await deleteStatelessDocumentMessagePair(db, SL_3);
     await assert.rejects(
         documentGetHandler(statelessWiring)(
             db, ['AjdvjuECVZEgZoFajaIEkg', SL_3], 'XXZruirZyAOoRpNxaDnpSA'
@@ -821,8 +822,8 @@ test('stateless lifecycle: a DELETE head is absent from the'
 + ' collection too', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await putStatelessDocumentPair(db, SL_4, { v: 'first' });
-    await deleteStatelessDocumentPair(db, SL_4);
+    await putStatelessDocumentMessagePair(db, SL_4, { v: 'first' });
+    await deleteStatelessDocumentMessagePair(db, SL_4);
     const rows = await documentCollectionGetHandler(
         statelessWiring,
     )(db, [], 'XXZruirZyAOoRpNxaDnpSA', 'AjdvjuECVZEgZoFajaIEkg');

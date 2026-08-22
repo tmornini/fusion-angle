@@ -22,8 +22,9 @@ import {
 // FAMILY-ROOTED objectives/ prefix — OBJECTIVES_WIRING IS that
 // derivation — so this nested sub-resource needs its own bespoke
 // module, exactly as flow_records did (research finding 10:
-// param() throws on '', and documentPairsAt matches uri_collection
-// by EQUALITY, so a revision pair at .../objectives/{id}/
+// param() throws on '', and documentMessagePairsAt
+// matches uri_collection by EQUALITY, so a revision pair
+// at .../objectives/{id}/
 // revisions/ can never leak into the objectives-collection
 // derivation, or vice versa).
 //
@@ -86,10 +87,12 @@ export async function deriveObjectiveRevisions(
     const prefix = objectiveRevisionsUriPrefix(
         organization, objectiveId,
     );
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const documents = deriveDocumentsAt(pairs, prefix);
+    const documents = deriveDocumentsAt(
+        messagePairs, prefix,
+    );
     const rows: ObjectiveRevisionEntity[] = [];
     for (const document of documents.values()) {
         rows.push(objectiveRevisionEntityOf(document));

@@ -12,9 +12,9 @@ import { seededMockDb } from './mock-seed.ts';
 const STARK_ORGANIZATION = 'AjdvjuECVZEgZoFajaIEkg';
 
 // Phase Final Task 2: graph relation ROW halves stripped.
-// The decompose covenant re-homes to the pair plane: every
+// The decompose covenant re-homes to the message plane: every
 // seeded flow's AUTHORED build-time graph must equal the
-// graph deriveFlow returns from the document pair (graph
+// graph deriveFlow returns from the document message pair (graph
 // field, not graphDelta). Relations are SETS, so comparison
 // is order-normalized.
 function normalizeGraph(graph: StoredGraph): StoredGraph {
@@ -36,7 +36,7 @@ function normalizeGraph(graph: StoredGraph): StoredGraph {
     };
 }
 
-test('seed pair-plane graph equals each flow\'s'
+test('seed message-plane graph equals each flow\'s'
     + ' authored graph',
 async () => {
     const db = await seededMockDb();

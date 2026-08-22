@@ -53,7 +53,7 @@ const AT = '2026-01-01T00:00:00.000000Z';
 // Below-facade pair formation (the member-fixtures.ts idiom,
 // mirroring seedOrganizationDocument's own reasoning just below):
 // postInvitationGrant's admin/membership checks derive from the
-// pair plane once role_grants/memberships flip, so a raw row
+// message plane once role_grants/memberships flip, so a raw row
 // here would go derivation-invisible — and, like
 // seedOrganizationDocument, these below-facade ops post no
 // notification, so seedWithNotify's counting spy stays clean.
@@ -173,10 +173,10 @@ async function deriveMembershipsAll(db: DbAdapter) {
             + organization.id + '/members/';
         const [seatRequests, seatResponses] =
             await Promise.all([
-                db.pairs.getAllWhere(
+                db.messagePairs.getAllWhere(
                     'uri_collection', seatPrefix,
                 ),
-                db.pairs.getAllWhere(
+                db.messagePairs.getAllWhere(
                     'uri_collection', seatPrefix,
                 ),
             ]);
@@ -275,7 +275,7 @@ test('validateInvitationEntity rejects a bad timestamp', () => {
 });
 
 // Phase Final Stage B: invitations table retired — store
-// round-trip pins live on pair-plane document tests.
+// round-trip pins live on message-plane document tests.
 
 test('grant by email appends a pending invitation', async () => {
     const { db, ctx } = await ctxFor('XXZruirZyAOoRpNxaDnpSA'

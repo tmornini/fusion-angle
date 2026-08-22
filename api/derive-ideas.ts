@@ -14,7 +14,7 @@ import { canonicalUriCollection } from './message-pair.ts';
 import { withoutId } from './document-family.ts';
 import {
     deriveDocumentsAt,
-    documentPairsAt,
+    documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
@@ -22,7 +22,7 @@ import {
     byIdAscending,
     DELETED_STATE,
     type DerivedDocument,
-    type DocumentPair,
+    type DocumentMessagePair,
 } from './derive-documents.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
@@ -91,19 +91,21 @@ export function ideaEntityOf(
 // never arrival order and never the envelope's `at`
 // (postIdeaDocumentOp's genesis-wins-under-skew guarantee).
 
-async function fetchIdeaPairs(
+async function fetchIdeaMessagePairs(
     db: DbAdapter,
     prefix: string,
 ): Promise<{
     readonly documents: Map<string, DerivedDocument>;
-    readonly pairs: readonly DocumentPair[];
+    readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     return {
-        documents: deriveDocumentsAt(pairs, prefix),
-        pairs: documentPairsAt(pairs, prefix),
+        documents: deriveDocumentsAt(messagePairs, prefix),
+        messagePairs: documentMessagePairsAt(
+            messagePairs, prefix,
+        ),
     };
 }
 
@@ -118,21 +120,27 @@ export async function deriveIdeas(
     organization: Id,
 ): Promise<IdeaEntity[]> {
     const prefix = ideasUriPrefix(organization);
-    const { documents, pairs } = await fetchIdeaPairs(db, prefix);
-    const pairsByIdeaId = new Map<Id, DocumentPair[]>();
-    for (const pair of pairs) {
-        const list = pairsByIdeaId.get(pair.uriId);
+    const { documents, messagePairs } =
+        await fetchIdeaMessagePairs(db, prefix);
+    const messagePairsByIdeaId =
+        new Map<Id, DocumentMessagePair[]>();
+    for (const messagePair of messagePairs) {
+        const list = messagePairsByIdeaId.get(
+            messagePair.uriId,
+        );
         if (list === undefined) {
-            pairsByIdeaId.set(pair.uriId, [pair]);
+            messagePairsByIdeaId.set(
+                messagePair.uriId, [messagePair],
+            );
         } else {
-            list.push(pair);
+            list.push(messagePair);
         }
     }
     const byId = new Map<Id, IdeaEntity>();
     for (const [ideaId, document] of documents) {
         const history = stateHistoryFrom(
             documentLifecycleEvents(
-                pairsByIdeaId.get(ideaId) ?? [],
+                messagePairsByIdeaId.get(ideaId) ?? [],
             ),
             ideaId,
         );
@@ -162,7 +170,8 @@ export async function deriveIdea(
     ideaId: Id,
 ): Promise<IdeaEntity> {
     const prefix = ideasUriPrefix(organization);
-    const { documents, pairs } = await fetchIdeaPairs(db, prefix);
+    const { documents, messagePairs } =
+        await fetchIdeaMessagePairs(db, prefix);
     const document = documents.get(ideaId);
     if (document === undefined) {
         throw await missedReadError(
@@ -171,7 +180,8 @@ export async function deriveIdea(
     }
     const history = stateHistoryFrom(
         documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === ideaId),
+            messagePairs.filter((messagePair) =>
+                messagePair.uriId === ideaId),
         ),
         ideaId,
     );
@@ -203,10 +213,12 @@ export async function deriveIdeaSubmissions(
     ideaId: Id,
 ): Promise<IdeaSubmissionEntity[]> {
     const prefix = submissionsUriPrefix(organization, ideaId);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const documents = deriveDocumentsAt(pairs, prefix);
+    const documents = deriveDocumentsAt(
+        messagePairs, prefix,
+    );
     const submissions: IdeaSubmissionEntity[] = [];
     for (const document of documents.values()) {
         submissions.push(ideaSubmissionEntityOf(document));
@@ -226,10 +238,12 @@ export async function deriveIdeaStateHistory(
     ideaId: Id,
 ): Promise<StateEntity[]> {
     const prefix = ideasUriPrefix(organization);
-    const { pairs } = await fetchIdeaPairs(db, prefix);
+    const { messagePairs } =
+        await fetchIdeaMessagePairs(db, prefix);
     return stateHistoryFrom(
         documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === ideaId),
+            messagePairs.filter((messagePair) =>
+                messagePair.uriId === ideaId),
         ),
         ideaId,
     );

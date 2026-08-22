@@ -1,5 +1,6 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
     hasSchemaMarker,
 } from '../server/boot.ts';
@@ -158,18 +159,20 @@ test('seedErrorMessage never echoes a URL', () => {
 test('isDatabaseEmpty is true when no rows exist',
 async () => {
     const empty = fakeClient([{
-        pairs: false,
+        message_pairs: false,
         marker: false,
     }]);
     assert.equal(await isDatabaseEmpty(empty.sql), true);
-    assert.match(empty.texts[0] ?? '', /FROM pairs/);
+    assert.match(
+        empty.texts[0] ?? '', /FROM message_pairs/,
+    );
     assert.match(empty.texts[0] ?? '', /schema_marker/);
 });
 
 test('assertEmptyDatabase refuses any message row',
 async () => {
     const nonempty = fakeClient([{
-        pairs: true,
+        message_pairs: true,
         marker: false,
     }]);
     await assert.rejects(
@@ -183,7 +186,7 @@ async () => {
 test('assertEmptyDatabase refuses a marker row',
 async () => {
     const marked = fakeClient([{
-        pairs: false,
+        message_pairs: false,
         marker: true,
     }]);
     await assert.rejects(
@@ -192,6 +195,20 @@ async () => {
             error instanceof Error
             && error.message === SEED_NONEMPTY,
     );
+});
+
+test('postgres-seed refuses leftover pairs before DDL',
+() => {
+    const src = readFileSync(
+        'server/postgres-seed.ts', 'utf8',
+    );
+    const legacy = src.indexOf(
+        'assertNoLegacyMessageTables',
+    );
+    const ensure = src.indexOf('ensureTables');
+    assert.ok(legacy >= 0);
+    assert.ok(ensure >= 0);
+    assert.ok(legacy < ensure);
 });
 
 test('serial hasher never overlaps', async () => {
@@ -376,7 +393,7 @@ test('non-empty refuses without seeding or printing',
 async () => {
     const db = memoryDbAdapter();
     const nonempty = fakeClient([{
-        pairs: true,
+        message_pairs: true,
         marker: false,
     }]);
     let wrote = false;
@@ -401,7 +418,7 @@ test('seedPostgres seeds when mode is required',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        pairs: false,
+        message_pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];
@@ -424,7 +441,7 @@ test('bootstrap seed prints credentials once',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        pairs: false,
+        message_pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];
@@ -447,7 +464,7 @@ test('mock-data seed prints every human sign-in',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        pairs: false,
+        message_pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];
@@ -474,7 +491,7 @@ test('slices seed prints the section map',
 async () => {
     const db = memoryDbAdapter();
     const empty = fakeClient([{
-        pairs: false,
+        message_pairs: false,
         marker: false,
     }]);
     const chunks: string[] = [];

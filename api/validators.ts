@@ -50,7 +50,7 @@ import type {
     ObjectiveRevisionEntity,
     ProjectObjectiveBaselineScoreEntity,
     ProjectObjectiveActualScoreEntity,
-    PairEntity,
+    MessagePairEntity,
     StateEntity,
 } from './types.ts';
 import {
@@ -2359,7 +2359,7 @@ const MESSAGE_HASH = /^[0-9a-f]{64}$/;
 
 const HTTP_METHOD = /^[A-Z]+$/;
 
-const PAIR_BODY_KEYS: readonly string[] = [
+const MESSAGE_PAIR_BODY_KEYS: readonly string[] = [
     'uri_collection', 'uri_id',
     'requester_identity_id', 'method',
     'request_at', 'request_hash', 'request',
@@ -2367,18 +2367,18 @@ const PAIR_BODY_KEYS: readonly string[] = [
     'operation_id',
 ];
 
-export function validatePairEntity(
+export function validateMessagePairEntity(
     body: Record<string, unknown>,
-): Omit<PairEntity, 'id'> {
+): Omit<MessagePairEntity, 'id'> {
     assertOnlyKeys(
-        body, PAIR_BODY_KEYS, 'PairEntity',
+        body, MESSAGE_PAIR_BODY_KEYS, 'MessagePairEntity',
     );
     const uriCollection = pickString(
         body, 'uri_collection',
     );
     if (!uriCollection.endsWith('/')) {
         throw new ValidationError(
-            'PairEntity.uri_collection must end'
+            'MessagePairEntity.uri_collection must end'
             + ' with "/"',
         );
     }
@@ -2387,20 +2387,20 @@ export function validatePairEntity(
     );
     if (!MESSAGE_HASH.test(requestHash)) {
         throw new ValidationError(
-            'PairEntity.request_hash must be a 64-'
+            'MessagePairEntity.request_hash must be a 64-'
             + 'character lowercase hex sha256 digest',
         );
     }
     const method = pickString(body, 'method');
     if (!HTTP_METHOD.test(method)) {
         throw new ValidationError(
-            'PairEntity.method must match ^[A-Z]+$',
+            'MessagePairEntity.method must match ^[A-Z]+$',
         );
     }
     const version = pickString(body, 'version');
     if (!HEX64.test(version)) {
         throw new ValidationError(
-            'PairEntity.version must be a 64-'
+            'MessagePairEntity.version must be a 64-'
             + 'character lowercase hex digest',
         );
     }
@@ -2415,12 +2415,12 @@ export function validatePairEntity(
         ),
         method,
         request_at: validateTimestampField(
-            body, 'request_at', 'PairEntity',
+            body, 'request_at', 'MessagePairEntity',
         ),
         request_hash: requestHash,
         request: pickString(body, 'request'),
         response_at: validateTimestampField(
-            body, 'response_at', 'PairEntity',
+            body, 'response_at', 'MessagePairEntity',
         ),
         version,
         response: pickString(body, 'response'),
@@ -3128,12 +3128,13 @@ export function validateFlowTagName(value: string): string {
 }
 
 // The tag's own body (design decision — Step 0, Phase 14 Task
-// 9): MINIMAL — the pinned response id of the flow document pair
-// this tag names, and nothing else. `flow_id` is never a client
-// key here (the address's own :id segment already names it; the
-// route stamps it onto the wire response) — Omit<FlowTagEntity,
-// 'id' | 'flow_id'> mirrors validateFlowRecordEntity's own
-// Omit<_, 'id'> shape, one field narrower.
+// 9): MINIMAL — the pinned response id of the flow document
+// message pair this tag names, and nothing else. `flow_id` is
+// never a client key here (the address's own :id segment
+// already names it; the route stamps it onto the wire
+// response) — Omit<FlowTagEntity, 'id' | 'flow_id'> mirrors
+// validateFlowRecordEntity's own Omit<_, 'id'> shape, one
+// field narrower.
 const FLOW_TAG_BODY_KEYS: readonly string[] = ['flow_response_id'];
 
 export function validateFlowTagEntity(
@@ -3462,7 +3463,7 @@ const OBJECTIVE_CREATE_KEYS: readonly string[] = [
 // plus its FIRST revision and the genesis lifecycle trio,
 // written atomically. Genesis is an explicit event minted at
 // create (states-address retirement); the trio folds onto
-// the document pair via objectiveDocumentBodyOf. The
+// the document message pair via objectiveDocumentBodyOf. The
 // objective fields are NOT fully validated here: the org-
 // scoped store stamps organization_id from the verified
 // token and re-validates through validateObjectiveEntity
@@ -3604,7 +3605,7 @@ export function validateFlowCreateBody(
 // 6-field body carried (`flow`, `consumedVersionId`, `graph`,
 // `graphDelta`, `revivals`) is now resolved/computed
 // SERVER-SIDE (api/derive-flows.ts's resolveFlowUndoTarget,
-// api/flow-graph-diff.ts) from the pair-plane, never the wire.
+// api/flow-graph-diff.ts) from the message-plane, never the wire.
 // Both remaining fields stay (not dropped to an empty body):
 // an empty body would make every undo POST for the same flow
 // canonically byte-identical (same method/path/headers),
@@ -3641,7 +3642,7 @@ function validateRevivals(
 // at a valid timestamp. The restore target, the flow row's
 // scalar fields, the graph, and the graphDelta/revivals
 // sidecars are ALL resolved/computed by the route itself
-// (api/routes.ts) from the pair plane, never from this body.
+// (api/routes.ts) from the message plane, never from this body.
 export function validateFlowUndoBody(
     body: Record<string, unknown>,
 ): FlowUndoBody {
@@ -4014,7 +4015,7 @@ function validateWorkOrderLegacyTransitionBody(
             );
         }
         // Phase Final Task 2: re-home store put validation —
-        // field values ride the op pair body only.
+        // field values ride the operation message pair body only.
         validateStateFieldValueEntity(fields);
         return { id, fields };
     });

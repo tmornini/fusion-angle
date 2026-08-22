@@ -77,10 +77,10 @@ function req(
     });
 }
 
-async function pairCount(
+async function messagePairCount(
     db: MemoryDbAdapter,
 ): Promise<number> {
-    return (await db.pairs.getAll()).length;
+    return (await db.messagePairs.getAll()).length;
 }
 
 function graphJson(): Record<string, unknown> {
@@ -492,7 +492,7 @@ async () => {
         },
     ));
     assert.equal(inst.status, 201);
-    const before = await pairCount(db);
+    const before = await messagePairCount(db);
     const res = await handleRequest(db, req(
         'PUT', BINDING, token,
         bindBody(otherInst, TYPE_OTHER),
@@ -503,7 +503,7 @@ async () => {
         err.error,
         /not joined to the work order's flow/,
     );
-    assert.equal(await pairCount(db), before);
+    assert.equal(await messagePairCount(db), before);
 });
 
 // 6. fresh bind → 201 + GET embed; unbound omits keys
@@ -561,12 +561,12 @@ async () => {
         'PUT', BINDING, token, bindBody(),
     ));
     assert.equal(first.status, 201);
-    const before = await pairCount(db);
+    const before = await messagePairCount(db);
     const second = await handleRequest(db, req(
         'PUT', BINDING, token, bindBody(),
     ));
     assert.equal(second.status, 201);
-    assert.equal(await pairCount(db), before);
+    assert.equal(await messagePairCount(db), before);
 });
 
 // 8. bind different instance → 409

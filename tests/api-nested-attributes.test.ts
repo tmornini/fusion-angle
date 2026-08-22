@@ -16,7 +16,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     IF_MATCH_HEADER,
 } from '../api/message-pair.ts';
 import {
@@ -85,7 +85,7 @@ function req(
     });
 }
 
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -106,7 +106,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -511,8 +511,8 @@ async () => {
         },
     ));
     assert.equal(putInst.status, 201);
-    const requestsBefore = await db.pairs.getAll();
-    const responsesBefore = await db.pairs.getAll();
+    const requestsBefore = await db.messagePairs.getAll();
+    const responsesBefore = await db.messagePairs.getAll();
     const edit = await handleRequest(db, req(
         'POST', COLLECTION, adminToken, {
             kind: 'edit',
@@ -549,11 +549,11 @@ async () => {
     ));
     assert.equal(attrGet.status, 200);
     assert.equal(
-        (await db.pairs.getAll()).length,
+        (await db.messagePairs.getAll()).length,
         requestsBefore.length,
     );
     assert.equal(
-        (await db.pairs.getAll()).length,
+        (await db.messagePairs.getAll()).length,
         responsesBefore.length,
     );
 });

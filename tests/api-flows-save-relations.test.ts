@@ -34,7 +34,7 @@ import {
     seedAdminSchema,
 } from './test-fixtures.ts';
 import {
-    documentPairsAt,
+    documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import { generateIdentifier } from
     '../shared/identifier.ts';
@@ -50,8 +50,8 @@ const ATTR_Z = generateIdentifier();
 const MEMBER_TWO = generateIdentifier();
 
 // Phase Final Task 2: graph relation ROW halves stripped.
-// Save oracles re-home to pair-plane graph (GET) and to
-// document-pair graphDelta member/attribute event ledgers.
+// Save oracles re-home to message-plane graph (GET) and to
+// document-message-pair graphDelta member/attribute event ledgers.
 
 async function setupMemDb(): Promise<{
     db: MemoryDbAdapter;
@@ -120,7 +120,7 @@ function save(
     };
 }
 
-async function pairPlaneGraph(
+async function messagePairPlaneGraph(
     ctx: RequestContext,
     flowId: string,
 ): Promise<StoredGraph> {
@@ -150,8 +150,8 @@ function norm(g: StoredGraph): StoredGraph {
 }
 
 // graphDelta member/attribute events across every document
-// pair at this flow (SIDECAR-KEEP append-only ledger).
-async function pairGraphDeltaEvents(
+// message pair at this flow (SIDECAR-KEEP append-only ledger).
+async function messagePairGraphDeltaEvents(
     db: MemoryDbAdapter,
     flowId: string,
 ): Promise<{
@@ -167,9 +167,9 @@ async function pairGraphDeltaEvents(
         action: string;
     }[];
 }> {
-    const requests = await db.pairs.getAll();
-    const responses = await db.pairs.getAll();
-    const pairs = documentPairsAt(
+    const requests = await db.messagePairs.getAll();
+    const responses = await db.messagePairs.getAll();
+    const messagePairs = documentMessagePairsAt(
         requests, '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/',
     ).filter((p) => p.uriId === flowId);
     const memberEvents: {
@@ -183,8 +183,8 @@ async function pairGraphDeltaEvents(
         mode: string;
         action: string;
     }[] = [];
-    for (const pair of pairs) {
-        const delta = pair.body['graphDelta'];
+    for (const messagePair of messagePairs) {
+        const delta = messagePair.body['graphDelta'];
         if (typeof delta !== 'object' || delta === null) {
             continue;
         }
@@ -307,7 +307,7 @@ async function seedKnownBaseline(
 }
 
 test(
-    'PUT /organizations/:id/flows/:id ROUND-TRIP: pair-plane graph'
+    'PUT /organizations/:id/flows/:id ROUND-TRIP: message-plane graph'
     + ' equals the intended saved graph',
     async () => {
         const { ctx } = await setupMemDb();
@@ -319,7 +319,7 @@ test(
             working.nodes, working.edges,
         ));
 
-        const graph = await pairPlaneGraph(ctx, flowId);
+        const graph = await messagePairPlaneGraph(ctx, flowId);
 
         // node c deleted, edge e2 deleted
         const nodeIds = graph.nodes
@@ -379,7 +379,7 @@ test(
         ));
 
         const { memberEvents, attributeEvents } =
-            await pairGraphDeltaEvents(db, flowId);
+            await messagePairGraphDeltaEvents(db, flowId);
         // m2 on node a: an 'added' (baseline) then a
         // 'removed' (save #2). The 'added' is never spliced.
         const aM2 = memberEvents.filter(
@@ -473,7 +473,7 @@ test(
         assert.ok(captured, 'a PUT body was captured');
 
         const firstGraph = norm(
-            await pairPlaneGraph(ctx, flowId),
+            await messagePairPlaneGraph(ctx, flowId),
         );
 
         // Replay the EXACT captured body (and its echo header).
@@ -484,14 +484,14 @@ test(
 
         // Derived state identical (byte-identical resend).
         const replayGraph = norm(
-            await pairPlaneGraph(ctx, flowId),
+            await messagePairPlaneGraph(ctx, flowId),
         );
         assert.deepEqual(replayGraph, firstGraph);
     },
 );
 
 test(
-    'PUT /organizations/:id/flows/:id pair-plane graph equals the'
+    'PUT /organizations/:id/flows/:id message-plane graph equals the'
     + ' intended working graph after save',
     async () => {
         const { ctx } = await setupMemDb();

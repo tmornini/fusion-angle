@@ -44,7 +44,7 @@ function genesisTrio(id: string) {
 
 test(
     'POST objectives writes the objective and its first'
-    + ' revision on the pair plane in one operation',
+    + ' revision on the message plane in one operation',
     async () => {
         const db = await freshDb();
         const id = generateIdentifier();

@@ -22,7 +22,7 @@ import {
     storedPutBodyText,
 } from './http-fixtures.ts';
 import {
-    seatDocumentPair,
+    seatDocumentMessagePair,
 } from './root-admin-fixture.ts';
 
 // Seat document body is type + at. Privilege type (admin|
@@ -109,16 +109,17 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = { type: 'member', at: documentFields().at };
-    const pair = await seatDocumentPair(
+    const messagePair = await seatDocumentMessagePair(
         'AjdvjuECVZEgZoFajaIEkg', 'toccYYkLEABmlbpHJalgtQ', body,
         '2026-01-01T00:00:00.000000Z',
     );
     const written = await postMembershipDocumentOp(
-        db, 'toccYYkLEABmlbpHJalgtQ', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
+        db, 'toccYYkLEABmlbpHJalgtQ', body,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.deepEqual(written, body);
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
@@ -139,8 +140,8 @@ test('a byte-identical PUT resend to a seat converges'
     assert.deepEqual(first, second);
     // seedAdminSchema: org + current seat; one unique
     // toccYYkLEABmlbpHJalgtQ seat PUT. Byte-identical resend dedups.
-    assert.equal((await db.pairs.getAll()).length, 4);
-    assert.equal((await db.pairs.getAll()).length, 4);
+    assert.equal((await db.messagePairs.getAll()).length, 4);
+    assert.equal((await db.messagePairs.getAll()).length, 4);
 });
 
 test('a seat PUT chain derives the latest body',

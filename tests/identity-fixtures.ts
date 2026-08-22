@@ -11,7 +11,7 @@ import {
 } from '../api/routes.ts';
 import {
     appendMessagePair,
-    formWritePair,
+    formWriteMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
@@ -29,7 +29,7 @@ import { TEST_OPERATION_ID } from './http-fixtures.ts';
 // stays undefined throughout, the drift-identities.test.ts
 // GLOBAL_PLANE_PLACEHOLDER precedent.
 
-async function identityDocumentPair(
+async function identityDocumentMessagePair(
     id: Id,
     kind: 'person' | 'service',
     requestAt: string,
@@ -41,7 +41,7 @@ async function identityDocumentPair(
         );
     }
     const body = identityDocumentBodyOf(kind);
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: `/identities/${id}`,
         routePattern: 'identities/:id',
@@ -60,7 +60,7 @@ async function identityDocumentPair(
     });
 }
 
-async function identityPiiDocumentPair(
+async function identityPiiDocumentMessagePair(
     id: Id,
     pii: Record<string, unknown>,
     requestAt: string,
@@ -72,7 +72,7 @@ async function identityPiiDocumentPair(
             + ' identities/:id/pii',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: `/identities/${id}/pii`,
         routePattern: 'identities/:id/pii',
@@ -91,7 +91,7 @@ async function identityPiiDocumentPair(
     });
 }
 
-async function identityCredentialDocumentPair(
+async function identityCredentialDocumentMessagePair(
     id: Id,
     cid: Id,
     fields: Record<string, unknown>,
@@ -105,7 +105,7 @@ async function identityCredentialDocumentPair(
             + ' identities/:id/credentials/:cid',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: `/identities/${id}/credentials/${cid}`,
         routePattern: 'identities/:id/credentials/:cid',
@@ -126,7 +126,7 @@ async function identityCredentialDocumentPair(
     });
 }
 
-async function identityProviderDocumentPair(
+async function identityProviderDocumentMessagePair(
     identityId: Id,
     id: Id,
     body: Record<string, unknown>,
@@ -140,7 +140,7 @@ async function identityProviderDocumentPair(
             + ' identities/:id/providers/:eid',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname:
             `/identities/${identityId}/providers/${id}`,
@@ -176,7 +176,7 @@ export async function seedIdentityProvider(
     const requestAt = nowUtc();
     await postIdentityProviderDocumentOp(
         db, identityId, id, body, SYSTEM_MEMBER_ID,
-        await identityProviderDocumentPair(
+        await identityProviderDocumentMessagePair(
             identityId, id, body, requestAt,
         ),
     );
@@ -198,7 +198,7 @@ export async function seedIdentityPii(
     const requestAt = nowUtc();
     await postIdentityPiiDocumentOp(
         db, id, pii, SYSTEM_MEMBER_ID,
-        await identityPiiDocumentPair(id, pii, requestAt),
+        await identityPiiDocumentMessagePair(id, pii, requestAt),
     );
 }
 
@@ -214,7 +214,7 @@ export async function seedIdentityCredential(
     const requestAt = nowUtc();
     await postIdentityCredentialDocumentOp(
         db, cid, fields, SYSTEM_MEMBER_ID,
-        await identityCredentialDocumentPair(
+        await identityCredentialDocumentMessagePair(
             id, cid, fields, requestAt,
         ),
     );
@@ -232,7 +232,7 @@ export async function seedPersonIdentity(
     await postIdentityDocumentOp(
         db, id, identityDocumentBodyOf('person'),
         SYSTEM_MEMBER_ID,
-        await identityDocumentPair(id, 'person', requestAt),
+        await identityDocumentMessagePair(id, 'person', requestAt),
     );
     await seedIdentityPii(db, id, pii);
 }
@@ -245,15 +245,15 @@ export async function seedServiceIdentity(
     await postIdentityDocumentOp(
         db, id, identityDocumentBodyOf('service'),
         SYSTEM_MEMBER_ID,
-        await identityDocumentPair(id, 'service', requestAt),
+        await identityDocumentMessagePair(id, 'service', requestAt),
     );
 }
 
-// One identities/:id/registration document pair — the
+// One identities/:id/registration document message pair — the
 // clients-elimination facet. Chainless below-facade append
 // (headPairId undefined): deriveDocumentsAt's (at, id)
 // reduction decides currency; Supersedes is provenance-only.
-async function clientRegistrationDocumentPair(
+async function clientRegistrationDocumentMessagePair(
     id: Id,
     fields: Record<string, unknown>,
     requestAt: string,
@@ -266,7 +266,7 @@ async function clientRegistrationDocumentPair(
             + ' identities/:id/registration',
         );
     }
-    return formWritePair({
+    return formWriteMessagePair({
         method: 'PUT',
         pathname: `/identities/${id}/registration`,
         routePattern: 'identities/:id/registration',
@@ -290,13 +290,13 @@ export async function seedClientRegistration(
     id: string,
     fields: Record<string, unknown>,
 ): Promise<void> {
-    const pair = await clientRegistrationDocumentPair(
+    const messagePair = await clientRegistrationDocumentMessagePair(
         id, fields, nowUtc(),
     );
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
         },
     );
 }
@@ -308,7 +308,7 @@ export async function seedClientRegistrationTombstone(
     db: DbAdapter,
     id: string,
 ): Promise<void> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'DELETE',
         pathname: `/identities/${id}/registration`,
         routePattern: 'identities/:id/registration',
@@ -326,7 +326,7 @@ export async function seedClientRegistrationTombstone(
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
         },
     );
 }

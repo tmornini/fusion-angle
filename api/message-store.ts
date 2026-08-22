@@ -1,5 +1,5 @@
 import type { DbAdapter } from './db.ts';
-import type { PairEntity } from './types.ts';
+import type { MessagePairEntity } from './types.ts';
 import { latestByKey } from
     '../shared/ledger-reduction.ts';
 import { HttpMessage } from
@@ -25,18 +25,18 @@ export interface MessageStore {
     get(
         collection: string,
         id: string,
-    ): Promise<PairEntity | undefined>;
-    getPairs(
+    ): Promise<MessagePairEntity | undefined>;
+    getMessagePairs(
         collection: string,
         id: string,
-    ): Promise<readonly PairEntity[]>;
+    ): Promise<readonly MessagePairEntity[]>;
     getAllAt(
         collection: string,
-    ): Promise<readonly PairEntity[]>;
+    ): Promise<readonly MessagePairEntity[]>;
     getAllWhereBody(
         collection: string,
         containment: Record<string, unknown>,
-    ): Promise<readonly PairEntity[]>;
+    ): Promise<readonly MessagePairEntity[]>;
     getCollection(
         collection: string,
     ): Promise<unknown[]>;
@@ -48,31 +48,31 @@ export interface MessageStore {
         collection: string,
         id: string,
         version: string,
-    ): Promise<PairEntity | undefined>;
+    ): Promise<MessagePairEntity | undefined>;
 }
 
 export function messageStore(db: DbAdapter): MessageStore {
     return {
         async get(collection, id) {
             return livePutOf(
-                await pairsAt(db, collection, id),
+                await messagePairsAt(db, collection, id),
             );
         },
-        async getPairs(collection, id) {
-            return pairsAt(db, collection, id);
+        async getMessagePairs(collection, id) {
+            return messagePairsAt(db, collection, id);
         },
         async getAllAt(collection) {
-            return pairsInCollection(db, collection);
+            return messagePairsInCollection(db, collection);
         },
         async getAllWhereBody(collection, containment) {
-            return (await db.pairs.getAllWhereBody(
+            return (await db.messagePairs.getAllWhereBody(
                 collection, containment,
-            )).slice().sort(comparePair);
+            )).slice().sort(compareMessagePair);
         },
         async getCollection(collection) {
             return entitiesOf(
                 livePutsOf(
-                    await pairsInCollection(
+                    await messagePairsInCollection(
                         db, collection,
                     ),
                 ),
@@ -81,7 +81,7 @@ export function messageStore(db: DbAdapter): MessageStore {
         async getCollectionFiltered(collection, filters) {
             const rows = entitiesOf(
                 livePutsOf(
-                    await pairsInCollection(
+                    await messagePairsInCollection(
                         db, collection,
                     ),
                 ),
@@ -92,7 +92,7 @@ export function messageStore(db: DbAdapter): MessageStore {
         },
         async getByVersion(collection, id, version) {
             return latestOf(
-                await db.pairs.getAllAtVersion(
+                await db.messagePairs.getAllAtVersion(
                     collection, id, version,
                 ),
             );
@@ -126,8 +126,8 @@ function matchesFilters(
     return true;
 }
 
-function comparePair(
-    a: PairEntity, b: PairEntity,
+function compareMessagePair(
+    a: MessagePairEntity, b: MessagePairEntity,
 ): number {
     if (a.response_at < b.response_at) return -1;
     if (a.response_at > b.response_at) return 1;
@@ -135,24 +135,26 @@ function comparePair(
 }
 
 function latestOf(
-    pairs: readonly PairEntity[],
-): PairEntity | undefined {
-    if (pairs.length === 0) return undefined;
-    const rows = pairs.map((pair) => ({
-        at: pair.response_at,
-        id: pair.id,
-        pair,
+    messagePairs: readonly MessagePairEntity[],
+): MessagePairEntity | undefined {
+    if (messagePairs.length === 0) return undefined;
+    const rows = messagePairs.map((messagePair) => ({
+        at: messagePair.response_at,
+        id: messagePair.id,
+        messagePair,
     }));
     return latestByKey(rows, () => 'head').get('head')
-        ?.pair;
+        ?.messagePair;
 }
 
 function livePutOf(
-    pairs: readonly PairEntity[],
-): PairEntity | undefined {
+    messagePairs: readonly MessagePairEntity[],
+): MessagePairEntity | undefined {
     const head = latestOf(
-        pairs.filter(
-            (pair) => isDocumentMethod(pair.method),
+        messagePairs.filter(
+            (messagePair) => isDocumentMethod(
+                messagePair.method,
+            ),
         ),
     );
     if (head?.method !== PUT_METHOD) {
@@ -162,34 +164,36 @@ function livePutOf(
 }
 
 function livePutsOf(
-    pairs: readonly PairEntity[],
-): PairEntity[] {
-    const documents = pairs.filter(
-        (pair) => isDocumentMethod(pair.method),
+    messagePairs: readonly MessagePairEntity[],
+): MessagePairEntity[] {
+    const documents = messagePairs.filter(
+        (messagePair) => isDocumentMethod(
+            messagePair.method,
+        ),
     );
-    const rows = documents.map((pair) => ({
-        at: pair.response_at,
-        id: pair.id,
-        pair,
+    const rows = documents.map((messagePair) => ({
+        at: messagePair.response_at,
+        id: messagePair.id,
+        messagePair,
     }));
     const heads = latestByKey(
-        rows, (row) => row.pair.uri_id,
+        rows, (row) => row.messagePair.uri_id,
     );
-    const live: PairEntity[] = [];
+    const live: MessagePairEntity[] = [];
     for (const row of heads.values()) {
-        if (row.pair.method === PUT_METHOD) {
-            live.push(row.pair);
+        if (row.messagePair.method === PUT_METHOD) {
+            live.push(row.messagePair);
         }
     }
-    return live.sort(comparePair);
+    return live.sort(compareMessagePair);
 }
 
 function entitiesOf(
-    pairs: readonly PairEntity[],
+    messagePairs: readonly MessagePairEntity[],
 ): unknown[] {
     const entities: unknown[] = [];
-    for (const pair of pairs) {
-        const entity = jsonBodyOf(pair.response);
+    for (const messagePair of messagePairs) {
+        const entity = jsonBodyOf(messagePair.response);
         if (entity !== undefined) entities.push(entity);
     }
     return entities;
@@ -210,27 +214,27 @@ export function liveHeadId(entity: unknown): string {
     return entity.id;
 }
 
-async function pairsInCollection(
+async function messagePairsInCollection(
     db: DbAdapter,
     collection: string,
-): Promise<PairEntity[]> {
-    const pairs = [
-        ...await db.pairs.getAllWhere(
+): Promise<MessagePairEntity[]> {
+    const messagePairs = [
+        ...await db.messagePairs.getAllWhere(
             'uri_collection', collection,
         ),
     ];
-    return pairs.sort(comparePair);
+    return messagePairs.sort(compareMessagePair);
 }
 
-async function pairsAt(
+async function messagePairsAt(
     db: DbAdapter,
     collection: string,
     id: string,
-): Promise<PairEntity[]> {
-    const pairs = [
-        ...await db.pairs.getAllAtAddress(
+): Promise<MessagePairEntity[]> {
+    const messagePairs = [
+        ...await db.messagePairs.getAllAtAddress(
             collection, id,
         ),
     ];
-    return pairs.sort(comparePair);
+    return messagePairs.sort(compareMessagePair);
 }

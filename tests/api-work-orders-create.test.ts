@@ -114,9 +114,9 @@ function createBody() {
 }
 
 // Phase Final Task 2: work_orders + flow_work_orders ROW
-// halves stripped — GET derives the document; join is pair-
-// plane; three state events still dual-write until states-
-// trace.
+// halves stripped — GET derives the document; join is
+// message-plane; three state events still dual-write until
+// states-trace.
 test(
     'POST work-orders writes three state events and pair-'
     + 'plane document + join in one operation',
@@ -142,7 +142,7 @@ test(
         // The fence stamped the bound org — never the body.
         assert.equal(wo.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 
-        // Row plane empty; join lives on the pair plane.
+        // Row plane empty; join lives on the message plane.
         // Phase Final Stage B: work_orders +
         // flow_work_orders tables retired.
         const links = await GET<{
@@ -214,7 +214,7 @@ test(
         const db = await freshDb();
         // Phase Final Task 2: states ROW half stripped —
         // a raw colliding states row no longer aborts the
-        // pair-plane create.
+        // message-plane create.
     // Phase Final Stage B: states table retired.
         await POST(
             db, 'organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'

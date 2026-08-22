@@ -577,7 +577,7 @@ export interface IdentityTokenEntity {
 
 export type ClientStatus = 'active' | 'disabled';
 
-// The client-registration facet — the pair-plane document at
+// The client-registration facet — the message-plane document at
 // identities/:id/registration that replaces the clients
 // table (clients elimination). Same five columns; `id` is
 // the OWNING kind-'service' identity's id. PUT-overwrite via
@@ -939,7 +939,7 @@ export interface ProjectObjectiveActualScoreEntity {
 // messages ARE the two BYTEA columns; the
 // columns beside them are addressing and index
 // machinery, never a second truth.
-export interface PairEntity {
+export interface MessagePairEntity {
     id: Id;
     uri_collection: string;
     uri_id: string;
@@ -1026,20 +1026,21 @@ export interface FlowEntity {
 }
 
 // The GET-response shape for a flow: the stored row plus the
-// `graph` field (the head document pair's OWN `graph` field as
-// native nested JSON — api/derive-flows.ts's flowEntityOf;
-// single GET /flows/:id and the list GET /flows both serve this
-// shape). The live graph rides the flow document body; the
-// frozen plane (`work_orders.flow_graph`) keeps its own copy.
+// `graph` field (the head document message pair's OWN `graph`
+// field as native nested JSON — api/derive-flows.ts's
+// flowEntityOf; single GET /flows/:id and the list GET
+// /flows both serve this shape). The live graph rides the
+// flow document body; the frozen plane
+// (`work_orders.flow_graph`) keeps its own copy.
 // `hasUndoHistory` (Phase 14 Task 8) is a CHEAP, approximate
-// signal — this flow's own flows/:id document-pair count exceeds
-// 1 (i.e. it has been edited past genesis) — reusing whatever
-// GET already fetched the flow (page load, the post-undo
-// refresh) rather than a new wire read; a rare false positive
-// (undo has already reached genesis, but a save/undo cycle
-// since kept the pair count above 1) degrades to a silent
-// server-side no-op on the next undo, never a crash or wrong
-// restore.
+// signal — this flow's own flows/:id document-message-pair
+// count exceeds 1 (i.e. it has been edited past genesis) —
+// reusing whatever GET already fetched the flow (page load,
+// the post-undo refresh) rather than a new wire read; a rare
+// false positive (undo has already reached genesis, but a
+// save/undo cycle since kept the pair count above 1)
+// degrades to a silent server-side no-op on the next undo,
+// never a crash or wrong restore.
 export type FlowWithGraph = FlowEntity & {
     graph: Record<string, unknown>;
     hasUndoHistory: boolean;
@@ -1241,14 +1242,14 @@ export interface FlowRecordEntity {
     at: string;
 }
 
-// A flow tag: the codebase's FIRST pair-plane-ONLY document
+// A flow tag: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
 // from message pairs at /flows/:id/tags/:name. `id` is the tag's
 // own NAME — user-authored address text (validateFlowTagName,
 // api/validators.ts), never a generated id, unlike every sibling
 // entity's `id` above. The body carries ONLY the pinned response
-// id of the flow document pair this tag names — never a copy of
-// the flow's own content (Entangled Nouns).
+// id of the flow document message pair this tag names — never a
+// copy of the flow's own content (Entangled Nouns).
 export interface FlowTagEntity {
     id: string;
     flow_id: Id;

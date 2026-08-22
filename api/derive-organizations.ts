@@ -34,7 +34,7 @@ import {
 // organizationEntityOf instead re-runs the head pair's own
 // REQUEST body through validateOrganizationEntity — the SAME
 // validator WRITE_RESPONSE_SPECS['organizations/:id']
-// .successBody already runs (api/routes.ts; pair-plane only
+// .successBody already runs (api/routes.ts; message-plane only
 // since Phase Final Task 2 retired the organizations ROW) —
 // so the derived shape is byte-identical to the STORED wire
 // body, id-LAST, never id-first. GET wins: the writer emits
@@ -45,13 +45,13 @@ import {
 // strips a stray `id` FIRST — the fetch-edit-PUT client
 // pattern echoes the GET body's own `id` right back into
 // the PUT payload, and the STORED request body is the raw
-// wire body, echoed id and all (formWritePair stores the
+// wire body, echoed id and all (formWriteMessagePair stores the
 // caller's body verbatim; successBody's withoutId(body)
 // strips it before validating). Mirroring that same strip
 // here is what keeps assertOnlyKeys from rejecting a head
 // pair the live PUT legitimately formed.
 //
-// ONE shared readonly tx per call (Efficiency): db.pairs
+// ONE shared readonly tx per call (Efficiency): db.messagePairs
 // read inside the SAME db.readTransaction(
 // MESSAGE_TABLES, ...) rather than an independent
 // getAllWhere that would open its own transaction. One
@@ -61,10 +61,10 @@ import {
 // not a hard-delete zone, so here it is simply the
 // cheaper shape.
 //
-// Reads db.pairs ONLY;
+// Reads db.messagePairs ONLY;
 // tests/derive-organizations.test.ts is the proof of parity
 // against the live PUT's own wire body (Phase Final Task 2:
-// organizations ROW half stripped — pair plane is truth).
+// organizations ROW half stripped — message plane is truth).
 
 const ORGANIZATIONS_TABLE = 'organizations';
 
@@ -88,11 +88,11 @@ export async function deriveOrganizations(
     return db.readTransaction(
         MESSAGE_TABLES,
         async (view) => {
-            const pairs = await view.pairs.getAllWhere(
+            const messagePairs = await view.messagePairs.getAllWhere(
                 'uri_collection', ORGANIZATIONS_PREFIX,
             );
             const documents = deriveDocumentsAt(
-                pairs, ORGANIZATIONS_PREFIX,
+                messagePairs, ORGANIZATIONS_PREFIX,
             );
             const rows: OrganizationEntity[] = [];
             for (const document of documents.values()) {
@@ -114,11 +114,11 @@ export async function deriveOrganization(
     return db.readTransaction(
         MESSAGE_TABLES,
         async (view) => {
-            const pairs = await view.pairs.getAllWhere(
+            const messagePairs = await view.messagePairs.getAllWhere(
                 'uri_collection', ORGANIZATIONS_PREFIX,
             );
             const document = deriveDocumentsAt(
-                pairs, ORGANIZATIONS_PREFIX,
+                messagePairs, ORGANIZATIONS_PREFIX,
             ).get(id);
             if (document === undefined) {
                 throw new EntityNotFoundError(

@@ -27,7 +27,7 @@ import {
     postWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
@@ -187,7 +187,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
         'work-orders', WORK_ORDER_ID, 'transition',
     ];
     const pattern = 'organizations/:id/work-orders/:id/transition';
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: pattern,
@@ -204,7 +204,7 @@ async function seededChainDb(): Promise<MemoryDbAdapter> {
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, transitionBody,
-        'XXZruirZyAOoRpNxaDnpSA', undefined, [], pair,
+        'XXZruirZyAOoRpNxaDnpSA', undefined, [], messagePair,
     );
 
     const release = await handleRequest(

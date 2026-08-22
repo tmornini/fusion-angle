@@ -26,11 +26,11 @@ async function bootstrappedDb(): Promise<MemoryDbAdapter> {
 
 test('pristine bootstrap seeds no Records', async () => {
     const db = await bootstrappedDb();
-    // Pair plane: no records-family document pairs. Sample
+    // Message plane: no records-family document message pairs. Sample
     // Records are demo content from postMockDataLoad, not
     // bootstrap. Covers records, record-attributes, and
     // flow_records joins (…/organizations/:id/flows/:id/records/).
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const recordFamily = requests.filter((r) =>
         r.uri_collection.includes('/records/')
         || r.uri_collection.includes('/record-attributes/')
@@ -45,7 +45,7 @@ test(
     'pristine bootstrap seeds required infrastructure',
     async () => {
         const db = await bootstrappedDb();
-        const requests = await db.pairs.getAll();
+        const requests = await db.messagePairs.getAll();
         assert.ok(
             requests.some(r =>
                 r.uri_collection === '/identities/'

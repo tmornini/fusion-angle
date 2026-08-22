@@ -1,6 +1,6 @@
 // Operator seed below HTTP. Flags seed an empty
 // database and print credentials once. Non-empty
-// refuses. formSeedPair already mints operation_id.
+// refuses. formSeedMessagePair already mints operation_id.
 
 import type { DbAdapter } from '../api/db.ts';
 import {
@@ -114,20 +114,20 @@ export async function isDatabaseEmpty(
     sql: SqlClient,
 ): Promise<boolean> {
     const rows = await sql.query<{
-        pairs: boolean;
+        message_pairs: boolean;
         marker: boolean;
     }>`
         SELECT
             EXISTS (
-                SELECT 1 FROM pairs
-            ) AS pairs,
+                SELECT 1 FROM message_pairs
+            ) AS message_pairs,
             EXISTS (
                 SELECT 1 FROM schema_marker
             ) AS marker
     `;
     const row = rows[0];
     if (row === undefined) return true;
-    return !row.pairs && !row.marker;
+    return !row.message_pairs && !row.marker;
 }
 
 export async function assertEmptyDatabase(

@@ -22,7 +22,7 @@ import { HttpMessage } from
 import { generateIdentifier } from
     '../shared/identifier.ts';
 
-function pairJsonOf(message: string): {
+function messagePairJsonOf(message: string): {
     readonly body: Record<string, unknown>;
 } {
     const body = HttpMessage.fromWire(message).body();
@@ -159,8 +159,8 @@ test('a byte-identical resend converges: one event,'
     const events = await deriveProjectStateHistory(db
         , 'AjdvjuECVZEgZoFajaIEkg', 'YIuEjXvCwXAgrpyvcvLJjg');
     assert.equal(events.length, 1);
-    assert.equal((await db.pairs.getAll()).length, 3);
-    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
 });
 
 test('the pair request body carries domain state;'
@@ -184,10 +184,10 @@ test('the pair request body carries domain state;'
     assert.equal(wire.title, 'Wired');
     assert.equal(wire.state, 'under_review');
     assert.equal('state_at' in wire, false);
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     // seedRootAdmin 2 + project PUT 1
     assert.equal(requests.length, 3);
-    const parsed = pairJsonOf(requests[2]!.request) as {
+    const parsed = messagePairJsonOf(requests[2]!.request) as {
         body: { state: string };
     };
     assert.equal(parsed.body.state, 'under_review');
@@ -258,7 +258,7 @@ test('stored PUT body equals projectEntityOf of the same'
     const expected = projectEntityOf(
         {
             uriId: id,
-            pairId: id,
+            messagePairId: id,
             method: 'PUT',
             body,
         },

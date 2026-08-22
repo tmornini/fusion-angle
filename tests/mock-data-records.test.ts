@@ -35,7 +35,7 @@ import {
 import { seededMockDb } from './mock-seed.ts';
 
 // Phase Final Task 2: records(+attributes+flow_records) seed
-// row halves stripped — assertions ride the pair plane.
+// row halves stripped — assertions ride the message plane.
 
 async function seeded(): Promise<MemoryDbAdapter> {
     return seededMockDb();
@@ -248,7 +248,7 @@ test(
     async () => {
         const db = await seeded();
         const woId = 'eOlNZpGQfmCdpSFWXGkzFQ';
-        // Phase Final Task 2: WO + SFV on the pair plane.
+        // Phase Final Task 2: WO + SFV on the message plane.
         const token = await organizationToken();
         const woRes = await handleRequest(
             db,
@@ -345,11 +345,11 @@ test(
 
 test(
     'every seeded flow graph carries attributes[]'
-    + ' (no fields[]) via pair-plane derive',
+    + ' (no fields[]) via message-plane derive',
     async () => {
         const db = await seeded();
         // Wire GET /flows carries graph as native nested
-        // JSON on each FlowWithGraph row (pair-plane head).
+        // JSON on each FlowWithGraph row (message-plane head).
         async function assertGraphShape(
             token: string,
             organization: string,

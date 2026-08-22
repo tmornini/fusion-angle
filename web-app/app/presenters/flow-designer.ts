@@ -197,7 +197,7 @@ export class FlowDesignerPresenter {
     // redo's) now leaves an off-center snapshot exactly as
     // given: no silent recenter, no silent save. That silent
     // save was landing as a "genuine" (non-undo-correlated)
-    // document pair 3-7s after undo/redo — exactly the kind of
+    // document message pair 3-7s after undo/redo — exactly the kind of
     // pair resolveFlowUndoTarget's stack+pointer walk treats as
     // a real edit, corrupting the target for the NEXT undo
     // click (it kept re-resolving to "one step back from the
@@ -250,7 +250,7 @@ export class FlowDesignerPresenter {
     // archive the pre-edit state through postFlowVersion
     // first (feeding the OLD undo mechanism's flow_versions
     // consume) — undo now resolves its target from the
-    // flows/:id document-pair history instead, so that
+    // flows/:id document-message-pair history instead, so that
     // archive write served no purpose once its one reader
     // (the undo route's own consume) was retired, whichever
     // call site queued it.

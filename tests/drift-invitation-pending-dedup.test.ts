@@ -24,7 +24,7 @@ const INV_DEDUP_STEP0_SECOND_ACCEPT = generateIdentifier();
 // Phase Final Task 2: invitations ROW half stripped — the
 // row-plus-lifecycle dual-write oracle is retired.
 // pendingInvitationFor is the sole pending discovery path
-// (pair plane). Declined-reinvite is the drift pin: a stale
+// (message plane). Declined-reinvite is the drift pin: a stale
 // DECLINED invitation must never be mistaken for the
 // outstanding pending one.
 
@@ -46,7 +46,8 @@ function req(
 }
 
 test('Step 0: pendingInvitationFor over live grant/decline/'
-+ ' re-grant — declined-reinvite is the drift pin (pair plane)',
++ ' re-grant — declined-reinvite is the drift pin (message'
++ ' plane)',
 async () => {
     const db = await seededMockDb();
     const admin = await organizationToken(

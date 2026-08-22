@@ -134,7 +134,7 @@ function buildBackupWithMembersAndAttrs(
 }
 
 // Phase Final Task 2: graph relation ROW halves stripped —
-// read the pair-plane working graph via GET.
+// read the message-plane working graph via GET.
 async function readPairGraph(
     ctx: RequestContext,
     flowId: string,
@@ -214,7 +214,7 @@ test(
 // + complete via the import auto-wire path.
 test(
     'postFlowFromMermaid creates a flow with'
-    + ' a pair-plane graph from simple .mmd',
+    + ' a message-plane graph from simple .mmd',
     async () => {
         const { ctx } = await setup();
         const flowId = generateIdentifier();

@@ -9,13 +9,13 @@ usage() {
 Usage: ./postgres-wipe --postgres render TOKEN
        ./postgres-wipe --postgres local
 
-Drop the pair plane (pairs), retired leftovers
-(responses, requests), schema_marker, and
-message_body. Does not seed. --postgres is
-required and has no default. --postgres render
-needs TOKEN (the confirmation). --postgres local
-uses POSTGRES_URL (loopback only); it takes no
-TOKEN.
+Drop the message plane (message_pairs), leftover
+pairs, retired leftovers (responses, requests),
+schema_marker, and message_body. Does not seed.
+--postgres is required and has no default.
+--postgres render needs TOKEN (the confirmation).
+--postgres local uses POSTGRES_URL (loopback
+only); it takes no TOKEN.
 
 Options:
   --postgres render|local   Target (required)

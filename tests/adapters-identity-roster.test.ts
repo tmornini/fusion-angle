@@ -23,7 +23,7 @@ import {
     postAiMemberDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
 import { generateIdentifier } from

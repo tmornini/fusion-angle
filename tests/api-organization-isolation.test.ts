@@ -29,7 +29,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
     type MessagePair,
 } from '../api/message-pair.ts';
@@ -143,7 +143,7 @@ async () => {
         }));
     assert.equal(res.status, 201);
     // Phase Final Task 2: ideas row half stripped — org stamp
-    // is on the wire/pair plane (WRITE_RESPONSE_SPECS), not a
+    // is on the wire/message plane (WRITE_RESPONSE_SPECS), not a
     // row. GET re-derives organization_id from the bound org.
     const wire = await res.json() as {
         organization_id: string;
@@ -357,7 +357,7 @@ async function seedChain(
 ): Promise<ChainIds> {
     const ids = mintChainIds();
     // Seeded through the wire (NAMED re-pin: the READ-side
-    // pair-plane fence, api/derive-states.ts's
+    // message-plane fence, api/derive-states.ts's
     // resolveOwningOrganization, resolves an org-nested entity's
     // owner ONLY from a genuine response row at its own uri_id —
     // a raw db.ideas.put leaves none, so 'i'+s's own 'se'+s
@@ -377,7 +377,7 @@ async function seedChain(
         },
     ));
     // Phase Final Task 2: projects row half stripped — seed
-    // through the live document PUT so the pair plane owns it.
+    // through the live document PUT so the message plane owns it.
     const {
         organization_id: _projectOrganizationId,
         ...projectFields
@@ -393,7 +393,7 @@ async function seedChain(
         },
     ));
     // Phase Final Stage B: flows table retired — seed through
-    // the live document PUT so the pair plane owns it.
+    // the live document PUT so the message plane owns it.
     const {
         organization_id: _flowOrganizationId,
         ...flowFields
@@ -422,7 +422,7 @@ async function seedChain(
     assert.equal(flowWrite.status, 201);
     // Phase Final Task 2: objectives row half stripped — seed
     // through the live document PUT with the lifecycle trio
-    // (states-address retirement) so the pair plane owns it
+    // (states-address retirement) so the message plane owns it
     // (nested revisions/scores re-pins already ride pairs).
     await handleRequest(db, req(
         'PUT',
@@ -457,7 +457,7 @@ async function seedChain(
     ));
     assert.equal(recWrite.status, 201);
     // Phase Final Stage B: work_orders table retired — seed
-    // through the live document PUT so the pair plane owns it.
+    // through the live document PUT so the message plane owns it.
     const {
         organization_id: _woOrganizationId,
         ...woFields
@@ -525,7 +525,7 @@ async function seedChain(
         },
     ));
     // Phase Final Stage B: idea_submissions table retired —
-    // seed through the live nested PUT so the pair plane owns
+    // seed through the live nested PUT so the message plane owns
     // the leaf (same shape as objective_revisions below).
     await handleRequest(db, req(
         'PUT',
@@ -543,7 +543,7 @@ async function seedChain(
     // organizations/:id/projects/:id/
     // objective-<kind>-scores routes derive from the message
     // ledger — a raw put leaves no pair at these addresses.
-    // Objectives themselves are pair-plane seeded above.
+    // Objectives themselves are message-plane seeded above.
     await handleRequest(db, req(
         'PUT',
         '/organizations/' + organization
@@ -605,7 +605,7 @@ async function seedChain(
         'work-orders', woId, 'transition',
     ];
     const pattern = 'organizations/:id/work-orders/:id/transition';
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: pattern,
@@ -622,7 +622,7 @@ async function seedChain(
     });
     await postWorkOrderTransitionOp(
         db, woId, body, identity,
-        undefined, [], pair,
+        undefined, [], messagePair,
     );
     return ids;
 }
@@ -635,7 +635,7 @@ async function seedChain(
 //
 // Below-facade pair formation for pa/pb's memberships (Phase 10
 // Task 8 Session B): gate 15's THREE-WAY fence derives visibility
-// from the membership PAIR PLANE (api/routes.ts), so a raw
+// from the membership MESSAGE PLANE (api/routes.ts), so a raw
 // db.memberships.put with no pair reads as an orphan (null owner,
 // visible everywhere) rather than a foreign-org member — silently
 // defeating the co-member/foreign distinction the tests below
@@ -1038,7 +1038,7 @@ for (const seg of NESTED_PROJECT_SEGS) {
     async () => {
         const fx = await deepDb();
         const ids = nestedProjectIds(fx, seg);
-        // Foreign join/score exists on B's pair plane.
+        // Foreign join/score exists on B's message plane.
         const foreign = await handleRequest(fx.db, req(
             'GET',
             '/organizations/' + fx.organizationB + '/projects/'
@@ -1148,7 +1148,7 @@ async () => {
     assert.equal(mine.status, 200);
     const mineRows = await mine.json() as { id: string }[];
     assert.ok(mineRows.length >= 1);
-    // iB exists on the pair plane (seedChain PUT), but A does
+    // iB exists on the message plane (seedChain PUT), but A does
     // not own it — the history-leak bug. Phase Final Task 2:
     // no ideas row to assert; B-org GET proves presence.
     const bOwns = await handleRequest(fx.db, req(
@@ -1177,7 +1177,7 @@ async () => {
             'XXZruirZyAOoRpNxaDnpSA', fx.organizationA,
         )));
     assert.equal(res.status, 404);
-    // Pair plane proves pb's pii still exists while the
+    // Message plane proves pb's pii still exists while the
     // collection is gone. Nested GET of a FOREIGN-org
     // identity: authorizeIdentityPii allows admin; the org
     // fence should still 403 pb.
@@ -1220,7 +1220,7 @@ async () => {
     }
     // pb is a B-only member — its nested collection 403s
     // through the A facade (honest foreign ownership).
-    // Phase Final Task 2: pair plane proves pb's credential
+    // Phase Final Task 2: message plane proves pb's credential
     // exists while fence 403s under A.
     assert.equal(
         (await deriveCredential(fx.db, fx.pb, fx.pbCred)).id,

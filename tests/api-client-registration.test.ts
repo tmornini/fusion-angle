@@ -152,13 +152,13 @@ async () => {
     await PUT(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         { ...REGISTRATION }, DEV_TOKEN);
     const prefix = '/identities/uWzjNIEeEtVWqZoJMLeYpw/registration/';
-    const afterPut = (await db.pairs.getAll()).filter(
+    const afterPut = (await db.messagePairs.getAll()).filter(
         (row) => row.uri_collection === prefix,
     );
     assert.equal(afterPut.length, 1);
     await DELETE(db, 'identities/uWzjNIEeEtVWqZoJMLeYpw/registration',
         DEV_TOKEN);
-    const afterDel = (await db.pairs.getAll()).filter(
+    const afterDel = (await db.messagePairs.getAll()).filter(
         (row) => row.uri_collection === prefix,
     );
     // G5: DELETE appends a tombstone; it does not replace
@@ -201,7 +201,7 @@ async () => {
     );
     const expected = registrationEntityOf(id, {
         uriId: '',
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: { ...REGISTRATION },
     });

@@ -22,7 +22,7 @@ import {
 // (api/store-history-entity.ts): from Phase 13 Task 5 on, EVERY
 // row-write appends its own event pair at
 // 'identities/<identityId>/tokens/<rowId>'
-// (api/message-pair.ts's formTokenEventPair — the SAME
+// (api/message-pair.ts's formTokenEventMessagePair — the SAME
 // address/method/response shape a real PUT
 // identities/:id/tokens/:tid would store) — issued roots
 // (grant, client-credentials, token-
@@ -36,7 +36,7 @@ import {
 // THE KEY-ORDER SUBTLETY: the derived row is id-LAST —
 // validateIdentityTokenEntity's return-literal order plus `id`.
 // G4: GET wins. WRITE_RESPONSE_SPECS['identities/:id/tokens/:tid']
-// and formTokenEventPair emit this mapper, not the older
+// and formTokenEventMessagePair emit this mapper, not the older
 // id-first stamp. withoutId FIRST, always (the
 // organizationEntityOf / deriveMembershipsForIdentity
 // precedent): a synthesized event pair's request body never
@@ -70,11 +70,11 @@ import {
 // organizations.ts / deriveIdentityPiiRows): identity_tokens is
 // never a hard-delete zone (api/derive-identity-spine.ts's own
 // header draws this line for its own siblings) — one
-// getAllWhere on db.pairs, outside any transaction, is the
+// getAllWhere on db.messagePairs, outside any transaction, is the
 // cheaper shape every OTHER derive-identity-spine.ts facet
 // but pii already uses.
 //
-// Reads db.pairs (+ pickString/validate-
+// Reads db.messagePairs (+ pickString/validate-
 // IdentityTokenEntity over their decoded bodies) ONLY — never
 // db.identityTokens, the row-plane table this task's GET flip
 // retired as a production READ; Phase 13 Task 9 retires the
@@ -125,10 +125,10 @@ async function fetchTokenDocumentsAt(
     dbOrView: DbAdapter,
     prefix: string,
 ): Promise<Map<string, DerivedDocument>> {
-    const pairs = await dbOrView.pairs.getAllWhere(
+    const messagePairs = await dbOrView.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    return deriveDocumentsAt(pairs, prefix);
+    return deriveDocumentsAt(messagePairs, prefix);
 }
 
 // Nested docs plus leftover flat docs whose identity_id
@@ -190,25 +190,25 @@ export async function deriveIdentityToken(
 export async function deriveIdentityTokens(
     db: DbAdapter,
 ): Promise<IdentityTokenEntity[]> {
-    const pairs = await db.pairs.getAll();
+    const messagePairs = await db.messagePairs.getAll();
     const byId = new Map<string, IdentityTokenEntity>();
     const flat = deriveDocumentsAt(
-        pairs, IDENTITY_TOKENS_FLAT_PREFIX,
+        messagePairs, IDENTITY_TOKENS_FLAT_PREFIX,
     );
     for (const document of flat.values()) {
         byId.set(document.uriId, identityTokenEntityOf(document));
     }
     const prefixes = new Set<string>();
-    for (const pair of pairs) {
-        if (TOKENS_ADDRESS_PATTERN.test(pair.uri_collection)) {
-            prefixes.add(pair.uri_collection);
+    for (const messagePair of messagePairs) {
+        if (TOKENS_ADDRESS_PATTERN.test(messagePair.uri_collection)) {
+            prefixes.add(messagePair.uri_collection);
         }
     }
     for (const prefix of prefixes) {
         const match = TOKENS_ADDRESS_PATTERN.exec(prefix)!;
         const identityId = match[1]!;
         const documents = deriveDocumentsAt(
-            pairs, prefix,
+            messagePairs, prefix,
         );
         for (const document of documents.values()) {
             byId.set(

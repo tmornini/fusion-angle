@@ -16,9 +16,9 @@ import {
 import { seedAdminSchema } from './test-fixtures.ts';
 import { devToken } from './token-fixtures.ts';
 import {
-    putMessagePair, formAuthPair,
+    putMessagePair, formAuthMessagePair,
 } from '../api/message-pair.ts';
-import type { AuthPairSeed } from '../api/message-pair.ts';
+import type { AuthMessagePairSeed } from '../api/message-pair.ts';
 import { nowUtc } from '../api/types.ts';
 import { refreshTokenFromSetCookie } from './http-fixtures.ts';
 
@@ -38,11 +38,11 @@ async function freshDb() {
 // code, so a bare pair — the SAME shape a real login forms
 // (Phase 13 Task 9: the authorization_codes row half retired) —
 // is all a seed needs.
-async function seedAuthorizationCodePair(
+async function seedAuthorizationCodeMessagePair(
     db: MemoryDbAdapter,
     code: string,
 ): Promise<void> {
-    const seed: AuthPairSeed = {
+    const seed: AuthMessagePairSeed = {
         requestAt: nowUtc(),
         headerFields: [],
         method: 'POST',
@@ -55,10 +55,10 @@ async function seedAuthorizationCodePair(
         method: 'password', username: 'seed@example.com',
         password: 'seed-password', client_id: 'web',
     };
-    const pair = await formAuthPair(
+    const messagePair = await formAuthMessagePair(
         seed, requestBody, 'XXZruirZyAOoRpNxaDnpSA', 200, { code },
     );
-    await putMessagePair(db, pair);
+    await putMessagePair(db, messagePair);
 }
 
 // Drive the real authorization_code grant to mint a genuine
@@ -66,7 +66,7 @@ async function seedAuthorizationCodePair(
 async function issuePair(db: MemoryDbAdapter): Promise<{
     access_token: string; refresh_token: string;
 }> {
-    await seedAuthorizationCodePair(db, 'the-code');
+    await seedAuthorizationCodeMessagePair(db, 'the-code');
     const res = await handleRequest(db, new Request(
         `${BASE}/authentication/token`, {
             method: 'POST',

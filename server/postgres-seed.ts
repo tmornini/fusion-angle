@@ -15,6 +15,7 @@ import {
 import {
     POOL_ACQUIRE_TIMEOUT_MS,
     STATEMENT_TIMEOUT_MS,
+    assertNoLegacyMessageTables,
     assertUtf8,
     requiredEnv,
 } from './postgres-gate.ts';
@@ -82,6 +83,7 @@ async function run(
     );
     try {
         await assertUtf8(sql);
+        await assertNoLegacyMessageTables(sql);
         const adapter = new BackedDbAdapter(
             new PostgresBackend(sql),
             async () => {},

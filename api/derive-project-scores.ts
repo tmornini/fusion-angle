@@ -79,10 +79,10 @@ async function fetchScoreDocuments(
     segment: string,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = scoresUriPrefix(organization, projectId, segment);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    return deriveDocumentsAt(pairs, prefix);
+    return deriveDocumentsAt(messagePairs, prefix);
 }
 
 // id-lex ordered (byIdAscending — the derivation's own

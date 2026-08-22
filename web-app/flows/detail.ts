@@ -307,7 +307,7 @@ async function reportOpFailure(
 // auto-layout flow, purely client-side, no write). A further
 // reconcile-and-save was therefore redundant for display AND
 // actively harmful for undo-as-replay: it landed its OWN
-// document pair immediately after every undo/redo, which the
+// document message pair immediately after every undo/redo, which the
 // cursor (api/derive-flows.ts's resolveFlowUndoTarget) treats as
 // a full, indistinguishable history step — so the NEXT undo
 // click reverted that reconcile-only noise instead of reaching
@@ -1490,7 +1490,7 @@ export async function init(
 // being written on the live path entirely (Step 0), so that
 // list would always be empty. getFlowGraph's own response now
 // carries hasUndoHistory verbatim (FlowGraph.hasUndoHistory,
-// api/derive-flows.ts's cheap document-pair-count
+// api/derive-flows.ts's cheap document-message-pair-count
 // approximation) — one fewer round-trip at load, not one more.
 async function loadFlowDesignerBundle(
     flowId: string,

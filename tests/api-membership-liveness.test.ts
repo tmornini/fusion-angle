@@ -79,7 +79,7 @@ async () => {
     const before = await handleRequest(
         db, req('/organizations/AjdvjuECVZEgZoFajaIEkg/members/', token));
     assert.equal(before.status, 200);
-    // Claim-based fence: de-membership lands on the pair plane
+    // Claim-based fence: de-membership lands on the message plane
     // but the existing token's organizations claim still holds
     // until mint/refresh/exchange or exp.
     await deleteMembership(db, 'XXZruirZyAOoRpNxaDnpSA');

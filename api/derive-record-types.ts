@@ -4,14 +4,14 @@ import type { Id, StateEntity } from './types.ts';
 import { pickString, pickNumber } from './validators.ts';
 import {
     deriveDocumentsAt,
-    documentPairsAt,
+    documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
     currentLifecycleEvent,
     DELETED_STATE,
     type DerivedDocument,
-    type DocumentPair,
+    type DocumentMessagePair,
 } from './derive-documents.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
@@ -57,19 +57,21 @@ export function recordTypeEntityOf(
     };
 }
 
-async function fetchRecordTypePairs(
+async function fetchRecordTypeMessagePairs(
     db: DbAdapter,
     prefix: string,
 ): Promise<{
     readonly documents: Map<string, DerivedDocument>;
-    readonly pairs: readonly DocumentPair[];
+    readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     return {
-        documents: deriveDocumentsAt(pairs, prefix),
-        pairs: documentPairsAt(pairs, prefix),
+        documents: deriveDocumentsAt(messagePairs, prefix),
+        messagePairs: documentMessagePairsAt(
+            messagePairs, prefix,
+        ),
     };
 }
 
@@ -78,22 +80,25 @@ export async function deriveRecordTypeCollection(
     organization: Id,
 ): Promise<RecordTypeWireRow[]> {
     const prefix = recordTypesUriPrefix(organization);
-    const { documents, pairs } =
-        await fetchRecordTypePairs(db, prefix);
-    const pairsById = new Map<Id, DocumentPair[]>();
-    for (const pair of pairs) {
-        const list = pairsById.get(pair.uriId);
+    const { documents, messagePairs } =
+        await fetchRecordTypeMessagePairs(db, prefix);
+    const messagePairsById =
+        new Map<Id, DocumentMessagePair[]>();
+    for (const messagePair of messagePairs) {
+        const list = messagePairsById.get(messagePair.uriId);
         if (list === undefined) {
-            pairsById.set(pair.uriId, [pair]);
+            messagePairsById.set(
+                messagePair.uriId, [messagePair],
+            );
         } else {
-            list.push(pair);
+            list.push(messagePair);
         }
     }
     const byId = new Map<Id, RecordTypeWireRow>();
     for (const [id, document] of documents) {
         const history = stateHistoryFrom(
             documentLifecycleEvents(
-                pairsById.get(id) ?? [],
+                messagePairsById.get(id) ?? [],
             ),
             id,
         );
@@ -123,8 +128,8 @@ export async function deriveRecordTypeEntity(
     id: Id,
 ): Promise<RecordTypeWireRow> {
     const prefix = recordTypesUriPrefix(organization);
-    const { documents, pairs } =
-        await fetchRecordTypePairs(db, prefix);
+    const { documents, messagePairs } =
+        await fetchRecordTypeMessagePairs(db, prefix);
     const document = documents.get(id);
     if (document === undefined) {
         throw await missedReadError(
@@ -133,7 +138,8 @@ export async function deriveRecordTypeEntity(
     }
     const history = stateHistoryFrom(
         documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === id),
+            messagePairs.filter((messagePair) =>
+                messagePair.uriId === id),
         ),
         id,
     );
@@ -157,11 +163,12 @@ export async function deriveRecordTypeStateHistory(
     id: Id,
 ): Promise<StateEntity[]> {
     const prefix = recordTypesUriPrefix(organization);
-    const { pairs } =
-        await fetchRecordTypePairs(db, prefix);
+    const { messagePairs } =
+        await fetchRecordTypeMessagePairs(db, prefix);
     return stateHistoryFrom(
         documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === id),
+            messagePairs.filter((messagePair) =>
+                messagePair.uriId === id),
         ),
         id,
     );

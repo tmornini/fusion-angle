@@ -46,7 +46,7 @@ async () => {
     });
     await postSessionLogout(ctx);
     // Phase Final Task 2: identity_token_revocations ROW half
-    // stripped — oracle is the pair plane.
+    // stripped — oracle is the message plane.
     const rows = await deriveTokenRevocationsFor(
         db, 'XXZruirZyAOoRpNxaDnpSA',
     );

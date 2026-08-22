@@ -15,7 +15,7 @@ import type {
 import { nowUtc } from
     '../api/types.ts';
 import { canonicalUriCollection } from '../api/message-pair.ts';
-import { documentPairsAt } from '../api/derive-documents.ts';
+import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import {
     documentGetHandler,
     documentCollectionGetHandler,
@@ -55,7 +55,7 @@ const INV_A = generateIdentifier();
 // Phase Final Task 2: identity spine dual-write stripped.
 // This file no longer compares derive vs old-table oracles —
 // the row plane is empty after seed. Coverage re-homes to
-// wire-byte handleRequest assertions and pair-plane live
+// wire-byte handleRequest assertions and message-plane live
 // fixtures (drift-roster / drift-identity-tokens craftsmanship).
 //
 // Hand-builds an IDENTITIES_TEST_WIRING mirror (the drift-roster
@@ -189,7 +189,7 @@ async function derivedIdentity(
 }
 
 // -- gate 15: the membership-fence inputs, derived from the ----
-// -- membership PAIR plane (NEVER the org-scoped memberships -----
+// -- membership message plane (NEVER the org-scoped memberships --
 // -- store, which hides foreign rows and could not distinguish ---
 // -- foreign from orphan) ------------------------------------------
 //
@@ -224,7 +224,7 @@ async function pairPlaneMembershipsAcrossKnownOrganizations(
 }
 
 // viaMembership's OWN three-way algorithm (api/store-parent-
-// scoped.ts), re-derived here over the PAIR-PLANE union above
+// scoped.ts), re-derived here over the message-plane union above
 // rather than the row-plane's identity_id index: null (orphan,
 // visible), the bound org (co-member, visible), or a DIFFERENT
 // org (foreign, hidden).
@@ -258,7 +258,7 @@ async function pairPlaneFencedPii(
     });
 }
 
-// One fence leg: PROVES the pair-plane construction's visibility
+// One fence leg: PROVES the message-plane construction's visibility
 // decision equals the row-plane parentScope resolver's ACTUAL
 // decision (organizationScopedAdapter's identityPii.getById,
 // gate 15) — never assumed, always independently re-derived from
@@ -268,7 +268,7 @@ async function assertPiiFenceLeg(
     db: DbAdapter, organization: Id, identityId: Id,
 ): Promise<boolean> {
     // Phase Final Task 2: row plane empty — fence decision is
-    // pair-plane only. deriveIdentityPii is unfenced (leaf
+    // message-plane only. deriveIdentityPii is unfenced (leaf
     // always derives when a slot exists); visibility is the
     // membership fence alone.
     const memberships =
@@ -344,7 +344,7 @@ test('identity-pii derive (11 seeded slots) fenced both'
     const derivedRows = sortById(await deriveIdentityPiiRows(db));
     assert.equal(derivedRows.length, 11);
 
-    // -- fenced collection both orgs (pair-plane fence) --
+    // -- fenced collection both orgs (message-plane fence) --
     for (const organization of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
     ]) {
@@ -455,7 +455,7 @@ test('identity-pii derive (11 seeded slots) fenced both'
 // -- null, the no-enumeration shape) -------------------------------
 
 test('by-email login-shape: identityByEmail resolves every'
-+ ' seeded email on the pair plane + unknown is null',
++ ' seeded email on the message plane + unknown is null',
 async () => {
     const db = await seededDb();
     const derivedRows = await deriveIdentityPiiRows(db);
@@ -480,7 +480,7 @@ test('credentials per identity + per cid (12 seeded) + the'
     const db = await seededDb();
     // Phase Final Stage B: identity spine tables retired.
 
-    // Collect identity ids from pair plane via parents + current
+    // Collect identity ids from message plane via parents + current
     // + system — credentials nest under identities.
     const parents = await derivedIdentities(
         db, GLOBAL_PLANE_PLACEHOLDER,

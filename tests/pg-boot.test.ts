@@ -221,6 +221,22 @@ async () => {
     );
 });
 
+test('boot refuses leftover pairs table',
+async () => {
+    const present = fakeClient([
+        { rel: 'pairs' },
+    ]);
+    await assert.rejects(
+        () => assertNoLegacyMessageTables(
+            present.sql,
+        ),
+        (error: unknown) =>
+            error instanceof Error
+            && error.message
+                === LEGACY_MESSAGE_TABLES,
+    );
+});
+
 test('boot refuses argv before connecting', async () => {
     await assert.rejects(
         () => boot({

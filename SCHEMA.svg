@@ -45,7 +45,7 @@
   <g class="table">
     <rect class="box" x="56" y="40" width="303" height="362" rx="6" />
     <rect class="head" x="56" y="40" width="303" height="26" rx="6" />
-    <text class="thead" x="66" y="58">pairs</text>
+    <text class="thead" x="66" y="58">message_pairs</text>
     <text class="pk" x="88" y="80">id</text>
     <text class="type" x="271" y="80">id</text>
     <text class="diamond diamond-pk" x="283" y="80" fill="hsl(217 45% 15%)">◆</text>

@@ -46,11 +46,11 @@ and the read-only stats variant — lives in
 
 ### Flow-graph storage seam
 
-The live flow graph is **pair-plane only**. The retired
+The live flow graph is **message-plane only**. The retired
 four-relation row plane (`flow_nodes`, `flow_edges`,
 `flow_node_members`, `flow_node_attributes`) and the
 `flow_versions` table are GONE (Phase Final). Graph truth
-rides the flow document pair body as native nested JSON:
+rides the flow document message pair body as native nested JSON:
 the head `graph` object (nodes/edges in the stored
 tongue), plus write-side `graphDelta` (node/edge upserts
 by stable id, node/edge `'deleted'` events,
@@ -62,13 +62,13 @@ sidecars (SIDECAR-KEEP) for undo restore and RESTRICT
 bindings (`flowGraphBindingsFromPairs`). A work order
 freezes its own `flow_graph` as the same native shape
 plus `name` / `lockTimeout` inside the work-order
-document pair at creation — a frozen value, not a live
+document message pair at creation — a frozen value, not a live
 relationship.
 
 The **route is the single divorce point**.
 `GET /api/organizations/:id/flows/:id` AND
 `GET /api/organizations/:id/flows/` (list) reassemble
-`FlowWithGraph` from the pair plane
+`FlowWithGraph` from the message plane
 (`= FlowEntity & { graph; hasUndoHistory }` — the
 read DTO).
 Freeze, work-order creation, stats, the member-hazard
@@ -78,11 +78,12 @@ unchanged. Writes append pairs only (`tx`
 `MESSAGE_TABLES`); ids and `at` are client-minted
 (Idempotency), the author server-derived from the verified
 token. Undo resolves its restore target SERVER-SIDE
-(stack+pointer over this flow's document-pair history vs
-its undo operation-pair history) and lands a restore
-document pair with SERVER-computed `graphDelta`/`revivals`.
+(stack+pointer over this flow's document-message-pair
+history vs its undo operation-message-pair history) and
+lands a restore document message pair with SERVER-computed
+`graphDelta`/`revivals`.
 
-Cross-tenant fencing of graph history walks the pair plane
+Cross-tenant fencing of graph history walks the message plane
 (`resolveOwningOrganization` flow-graph leg + the
 write authorizer for org-scoped PUT/DELETE).
 
@@ -165,7 +166,7 @@ strings.
 
 ## Auth, Org-scoping & Identity
 
-### Org-scoping at the gate (pair-plane first)
+### Org-scoping at the gate (message-plane first)
 
 Every authenticated request runs org-scoped, riding one
 request vessel — the server half of the Office of the
@@ -177,12 +178,12 @@ enriches it to `AuthenticatedContext` (principal), and
 `RequestContext` — organization, live
 `memberOrganizations`, and roles — each field set exactly
 once. There is **no org-scoped adapter wrapper**: the
-message plane (`pairs`) is global; tenancy
-rides `uri_collection` on the pair plane. Handlers receive
+message plane (`message_pairs`) is global; tenancy
+rides `uri_collection` on the message plane. Handlers receive
 `ctx.base`. The org rides the VERIFIED token claim,
 never the path; a flat (un-exchanged) token has none and
 resolves via `identityDefaultOrganization`: the identity's
-SET default organization (pair-plane
+SET default organization (message-plane
 `/identities/:id/default-organization` document) if that
 organization is a live seat, else PRIMARY (earliest
 remaining join `at`, identifier order on tie), else a
@@ -193,9 +194,9 @@ roles baked at every mint/refresh/exchange from membership
 `type`). The gate projects claim roles for the FENCED org
 and checks membership against the claim set — no identity-
 spine reads (memberships / roles / revocation) on the
-per-request path. Ownership fences still read the pair
-plane. NAMED COVENANT: de-membership, demotion, and
-logout-everywhere bite at the next mint/refresh/exchange
+per-request path. Ownership fences still read the
+message plane. NAMED COVENANT: de-membership, demotion,
+and logout-everywhere bite at the next mint/refresh/exchange
 or access-token expiry (≤ `ACCESS_TTL_SECONDS`, 15 min),
 not on the very next request. Revocation ledger checks
 remain on mint/refresh/exchange only. Two covenants bound
@@ -234,12 +235,13 @@ leaf ownership through already-fenced parents. Phase Final
 Stage B deleted those three decorator modules and the
 `StateStore` class; `EntityStore` remains as the store
 interface implemented by `HistoryEntityStore` on the
-message plane (`pairs` only). The pair
-plane + write authorizer is the as-built successor.
+message plane (`message_pairs` only). The
+message plane + write authorizer is the as-built
+successor.
 
 ### Multitenancy model
 
-`organizations` is the tenant root (pair-plane document
+`organizations` is the tenant root (message-plane document
 family); the seat at
 `organizations/:organization-id/members/:identity-id`
 is the identity↔org relationship, carrying `type`:
@@ -260,11 +262,12 @@ before). `invitations` (id, organization_id, identity_id,
 at) is GLOBAL spine, pass-through, NOT org-fenced: the
 invitee must read an invitation to an org it is not yet
 in, so the row cannot hide behind the org fence. Its
-lifecycle is event-sourced on the pair plane under the
+lifecycle is event-sourced on the message plane under the
 alphabet {pending, accepted, declined, revoked}. State is
 pending when the invitation document head exists and no
-terminal op-pair is present; terminal ops are pair-plane
-addresses invitations/:id/{acceptance,decline,revocation}/
+terminal operation-message-pair is present; terminal
+operations are message-plane addresses
+invitations/:id/{acceptance,decline,revocation}/
 mapping to accepted|declined|revoked. Current status is the
 LATEST event, derived and never mutated — the invitation
 document persists as audit through every transition.
@@ -516,7 +519,7 @@ ids; omitted from stored JSON when empty),
 `GraphNode.attributes: NodeAttribute[]`, record/constraint
 shapes, `StateEntity` as the **derived** event DTO, the
 state alphabets, and `SYSTEM_MEMBER_ID`), `api/db.ts`
-(`DbAdapter` + `TABLE_NAMES` = `pairs` only —
+(`DbAdapter` + `TABLE_NAMES` = `message_pairs` only —
 [SCHEMA.md](SCHEMA.md) is the
 authoritative list and per-column reference),
 `api/store-history-entity.ts` (`HistoryEntityStore` — the
@@ -527,7 +530,7 @@ tombstone filter, no lifecycle log), `api/db-postgres.ts`
 `GET/PUT/DELETE/POST` helpers, **no module-level adapter;
 threaded explicitly**), `api/routes.ts` (the route table —
 document families plus the surviving state routes),
-`api/mock-data.ts` (seeds pair-plane demo data — the
+`api/mock-data.ts` (seeds message-plane demo data — the
 `'system'` member plus human seats and AI agents as
 pairs), `api/validators.ts` (wire/body validators still
 consumed by `WRITE_RESPONSE_SPECS`, seed pair formation,
@@ -573,7 +576,7 @@ RESTRICT / ownership 3-tier probe. Every verb on the
 retired shared event-append address is router 404.
 Flat `/records` and `/record-attributes` are also
 router 404. Lifecycle writes ride document-trio PUTs
-and named ops (work-order create/claim/transition/
+and named operations (work-order create/claim/transition/
 bind, invitations), not a shared event-append
 address. Instance public PUT is **405**; PATCH
 creates and updates (If-Match). GET streams the
@@ -587,8 +590,8 @@ The process refuses to listen without
 ### The view-accepting convention, generalized
 
 Several write-path decision reads — "what is the CURRENT
-state before I write?" — derive from the pair plane
-(`pairs`) rather than a table read, so a gate
+state before I write?" — derive from the message plane
+(`message_pairs`) rather than a table read, so a gate
 never trusts a stale row-plane snapshot the ledger has
 already superseded. Earlier phases established the shape for
 invitations, memberships, and identity tokens; Phase 14
@@ -609,7 +612,7 @@ authority; (d) every write-gate read is ENTITY-SCOPED —
 indexed or address reads (`getAllAtAddress`,
 `getAllWhere('uri_collection', ...)`,
 `getAllWhere('request_hash', ...)`), never a
-whole-plane `getAll()` of `pairs` on a hot path (the one)
+whole-plane `getAll()` of `message_pairs` on a hot path (the one)
 named exception is below); (e) a pre-tx call and an in-tx
 call of the same core return byte-identical results, pinned
 by drift/parity tests.
@@ -620,10 +623,11 @@ New Phase 14 cores riding this shape: `invitationOpStateFor`
 whole-ledger `invitationOpStates` /
 `deriveInvitationStates`, wired into
 `pendingInvitationFor`/`currentInvitationState`);
-`workOrderClaimHistoryFor` (`derive-states.ts`, pair-plane
-claim history — op pairs only: create/claim/transition/
-release; the shared event-append arm is retired with the
-address); and `stateFieldValuesFrom` /
+`workOrderClaimHistoryFor` (`derive-states.ts`,
+message-plane claim history — operation message pairs
+only: create/claim/transition/release; the shared
+event-append arm is retired with the address); and
+`stateFieldValuesFrom` /
 `deriveStateFieldValueReferrers`
 (`derive-state-field-values.ts`, SINGLE-SOURCE —
 transition-pair-folded field values only, head-reduced by
@@ -674,21 +678,22 @@ event-append address.
 
 Flow undo (`POST /flows/:id/undo`) resolves its restore
 target SERVER-SIDE, pre-tx, by replaying this flow's own
-`flows/:id` document-pair history against its own
-`flows/:id/undo` OPERATION-pair history — a stack+pointer
-replay, not a naive "N pairs back" count, since a genuine
-save after an undo truncates the abandoned branch rather
-than oscillating back into it. The cursor correlates by the
-STORED REQUEST `at` (never the response `at`, independently
-minted per pair) against the undo address's own
-operation-pair `at` values. `graphDelta`/`revivals` still
-land in the restore's own document-pair body as write-side
-sidecars, exactly like an ordinary save's —
-SIDECAR-KEEP names this MECHANISM persisting even though the
-VALUES are now SERVER-computed rather than client-supplied
-(the client cannot diff against a target it is never told;
-no new GET route is sanctioned for this). `hasUndoHistory`
-rides the flow's own `GET` response (a document-pair-count
+`flows/:id` document-message-pair history against its own
+`flows/:id/undo` OPERATION-message-pair history — a
+stack+pointer replay, not a naive "N pairs back" count,
+since a genuine save after an undo truncates the abandoned
+branch rather than oscillating back into it. The cursor
+correlates by the STORED REQUEST `at` (never the response
+`at`, independently minted per pair) against the undo
+address's own operation-message-pair `at` values.
+`graphDelta`/`revivals` still land in the restore's own
+document-message-pair body as write-side sidecars, exactly
+like an ordinary save's — SIDECAR-KEEP names this
+MECHANISM persisting even though the VALUES are now
+SERVER-computed rather than client-supplied (the client
+cannot diff against a target it is never told; no new GET
+route is sanctioned for this). `hasUndoHistory` rides the
+flow's own `GET` response (a document-message-pair-count
 signal, zero marginal reads). `flow_versions` consume
 (undo) and publish (every content edit) both STOPPED on
 the live path at Phase 14; Phase 15 Task 7 RETIRED the
@@ -702,12 +707,12 @@ than silently reaching for a workaround:
 
 1. **SFV RESTRICT whole-plane scan** (Task 6).
    `deriveStateFieldValueReferrers` reads
-   `view.pairs.getAll()` inside
+   `view.messagePairs.getAll()` inside
    the RESTRICT write gate — a whole-plane scan rule (d)
    above otherwise forbids. No `attribute_id` index exists on
-   the pair plane; transition-fold field values live on
-   work-order op bodies with no cheaper entity-id source.
-   Stands post-Final (pair-only RESTRICT).
+   the message plane; transition-fold field values live on
+   work-order operation bodies with no cheaper entity-id
+   source. Stands post-Final (pair-only RESTRICT).
 2. **Region B / leaf SFV routes** (Task 7). Phase 15 RETIRED
    the leaf PUT/DELETE routes (and their Region B fence
    arm); states-address retirement also retired the GET
@@ -722,19 +727,19 @@ than silently reaching for a workaround:
    the server-side restore-resolution default: the client is
    never told the target it would need to diff against.
    Elected reading: "client-owned" names the WIRE SHAPE
-   (every document pair, including undo's, carries these
+   (every document message pair, including undo's, carries these
    fields), not literally who computes the values — the
    SERVER now does, reusing the exact diff semantics
    `web-app/app/adapters/flow-mutations.ts` uses for an
    ordinary save, duplicated (not imported, per the `api/` →
    `web-app/` layering rule) into `api/flow-graph-diff.ts`.
 
-### Flow tags: the first pair-plane-only document family
+### Flow tags: the first message-plane-only document family
 
 `flows/:id/tags/:name` (PUT/GET/DELETE, SIMPLE class) is the
 first document family with NO backing table at all —
 `postFlowTagDocumentOp`'s transaction touches only
-`pairs`. A tag pins one flow document pair's
+`message_pairs`. A tag pins one flow document message pair's
 response id (`flow_response_id`, the tag's only body field);
 GET replays the tag's own stored body, so a tag's pin
 survives every later save of the flow it names. DELETE is a
@@ -749,7 +754,7 @@ the API surface is the sole coverage.
 ## Last readers → Phase Final as-built
 
 Phase 15 re-anchored every remaining production decision
-read onto the pair plane and retired four zero-caller
+read onto the message plane and retired four zero-caller
 route families (DELETE NOTHING held through Phase 15).
 **Phase Final DELETED the residual.** Dual-write row
 halves stripped (Stage A); doomed tables + `StateStore`
@@ -784,7 +789,7 @@ EXPECTED_PAIR_COUNT 1448 / bootstrap 8;
    forgery closed.
 3. **Write-path re-anchors** (claim graph, RESTRICT legs,
    invitation discovery, identity_pii, clients):
-   pair-plane only post-Final.
+   message-plane only post-Final.
 4. **Dangling `state_event_id`** on transition-fold field
    values → 400 at the gate (forged clients only).
 
@@ -840,8 +845,8 @@ measure). No entity_id index.
 
 ### Exit residual (named, not dual-write)
 
-Gate 6 **PII leave-inert** still stands on the pair
-plane (erasure completeness is pair-plane only).
+Gate 6 **PII leave-inert** still stands on the
+message plane (erasure completeness is message-plane only).
 Dual-write mechanics are GONE.
 
 ## Storage tiers
@@ -1029,7 +1034,7 @@ the API layer; only adapters invoke the verbs.
   (`clipboard.ts`, `viewport.ts`, `location.ts`, etc.)
   wrap browser primitives behind adapters the app owns.
 - **`getFlowStats(ctx, flowId)`.** Resolves the work-order
-  set via GET `flows/:id/work-orders` (pair-plane join
+  set via GET `flows/:id/work-orders` (message-plane join
   documents with derived `flow_id` / `work_order_id`),
   since the frozen `flow_graph` carries no flow id of its
   own. Returns `{ model, graph }` so the page derives

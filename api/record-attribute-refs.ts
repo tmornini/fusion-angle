@@ -15,7 +15,7 @@ import {
     deriveStateFieldValueReferrers,
 } from './derive-state-field-values.ts';
 import {
-    flowGraphBindingsFromPairs,
+    flowGraphBindingsFromMessagePairs,
 } from './derive-flows.ts';
 import { deriveDocumentsAt } from './derive-documents.ts';
 import { canonicalUriCollection } from './message-pair.ts';
@@ -45,18 +45,18 @@ export interface AttributeReferrers {
 }
 
 // Every table the referrer scan touches. The state-field-value
-// leg is pair-plane derived (Phase 14 Task 6,
+// leg is message-plane derived (Phase 14 Task 6,
 // deriveStateFieldValueReferrers in api/derive-state-field-
 // values.ts): pairs feed the derive, and each
 // candidate row's visibility is settled by
 // stateEventVisibilityFor (Phase 15 Task 3) on its parent
-// state event — pair-plane, not the row-plane
+// state event — message-plane, not the row-plane
 // rawHasRow/getById fence. The three graph legs (Phase 15
-// Task 4, Author gate 5) also read the pair plane:
+// Task 4, Author gate 5) also read the message plane:
 // work-order document heads via the organization-scoped
 // work-orders collection prefix, and live node-attribute
-// bindings via flowGraphBindingsFromPairs (graphDelta
-// attributeEvents + nodeFlowIds). RESTRICT is pair-plane
+// bindings via flowGraphBindingsFromMessagePairs (graphDelta
+// attributeEvents + nodeFlowIds). RESTRICT is message-plane
 // only (`pairs` via derive helpers). An in-tx caller must
 // declare every table it touches — the transaction scope
 // is the declared set, and the memory backend rejects an
@@ -86,20 +86,20 @@ function graphBindsAttribute(
 // Referrers for each of `attributeIds`. `view` is the
 // organization-fenced transaction view; `boundOrganization`
 // is the verified token claim that fence was bound to (the
-// pair-plane visibility probe and the organization-scoped
+// message-plane visibility probe and the organization-scoped
 // pair prefixes need it explicitly). `recordTypeId` is the
 // parent type id (nested path) or the flat body's
 // `record_id` — scopes the fourth-leg instance scan.
-// Live-flow referrers REPLAY the flow document pair
+// Live-flow referrers REPLAY the flow document message pair
 // history's graphDelta attributeEvents with the same
 // latestByKey/fail-closed reduction the row plane used
-// (flowGraphBindingsFromPairs — Phase 15 Task 1);
+// (flowGraphBindingsFromMessagePairs — Phase 15 Task 1);
 // node→flow naming rides nodeFlowIds from the same binding
 // result, NEVER client-authored flow document graph
 // snapshots. Frozen work-order referrers walk WO document
 // heads from the organization-scoped collection prefix
 // (deriveDocumentsAt — NEVER whole-plane getAll of
-// pairs). Field-value referrers are pair-plane
+// pairs). Field-value referrers are message-plane
 // derived (Phase 14 Task 6) — ONE
 // deriveStateFieldValueReferrers pass ahead of the loop,
 // keyed by attribute_id.
@@ -109,17 +109,17 @@ export async function collectAttributeReferrers(
     attributeIds: readonly string[],
     recordTypeId: string,
 ): Promise<Map<string, AttributeReferrers>> {
-    // Organization-scoped WO document heads — the pair-plane
+    // Organization-scoped WO document heads — the message-plane
     // successor of view.workOrders.getAll() for the frozen
     // graph walk. Prefix-indexed, never whole-plane.
     const workOrdersPrefix = canonicalUriCollection(
         boundOrganization, '/work-orders/',
     );
-    const woPairs = await view.pairs.getAllWhere(
+    const woMessagePairs = await view.messagePairs.getAllWhere(
         'uri_collection', workOrdersPrefix,
     );
     const woHeads = deriveDocumentsAt(
-        woPairs, workOrdersPrefix,
+        woMessagePairs, workOrdersPrefix,
     );
     const workOrderGraphs = [...woHeads.entries()].map(
         ([id, doc]) => ({
@@ -132,7 +132,7 @@ export async function collectAttributeReferrers(
     );
     // ONE org-wide graphDelta replay serves every attribute
     // id the caller's loop asks about (no per-id pair scan).
-    const bindings = await flowGraphBindingsFromPairs(
+    const bindings = await flowGraphBindingsFromMessagePairs(
         view, boundOrganization,
     );
     const sfvReferrersByAttribute =
@@ -194,12 +194,12 @@ export async function collectAttributeReferrers(
 // view: a referenced attribute 409s (naming its referrers)
 // and nothing is written. Phase Final Task 2: the
 // record_attributes ROW splice is stripped — DELETE is a
-// pair-plane tombstone only (the route appends the pair
+// message-plane tombstone only (the route appends the pair
 // after this check). The standalone DELETE route wraps this
 // in its own transaction; a composing POST runs the same
 // RESTRICT scan on the view it already holds.
 // `boundOrganization` is the verified token claim (or the
-// pair-plane organization resolve on the DELETE route).
+// message-plane organization resolve on the DELETE route).
 // `recordTypeId` scopes the fourth-leg instance scan.
 export async function deleteRecordAttributeSafe(
     view: DbAdapter,

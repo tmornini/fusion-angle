@@ -45,7 +45,7 @@ async function seeded() {
     return { db, reveal };
 }
 
-const EXPECTED_SLICE_PAIRS = 380;
+const EXPECTED_SLICE_MESSAGE_PAIRS = 380;
 
 test('slices stamp schema last and reveal 14',
 async () => {
@@ -170,7 +170,7 @@ async () => {
 test('system identity exists once',
 async () => {
     const { db } = await seeded();
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const system = requests.filter((r) =>
         r.uri_collection === '/identities/'
         && r.uri_id === SYSTEM_MEMBER_ID,
@@ -244,7 +244,7 @@ async () => {
         memberSeats[0]!.organization_id,
         g.organizationId,
     );
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const agents = requests.filter((r) =>
         r.uri_collection === '/ai-agents/'
         && r.uri_id === 'NAWwhciBiPVcuqxjPhXwYA',
@@ -320,7 +320,7 @@ async () => {
 test('garden ideas each have one submission',
 async () => {
     const { db, reveal } = await seeded();
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     for (const section of GARDEN) {
         const row = reveal.find(
             (s) => s.section === section,
@@ -385,8 +385,8 @@ async () => {
         assert.ok(row, section);
         const [requests, responses] =
             await Promise.all([
-                db.pairs.getAll(),
-                db.pairs.getAll(),
+                db.messagePairs.getAll(),
+                db.messagePairs.getAll(),
             ]);
         const prefix =
             canonicalUriCollection(
@@ -515,16 +515,16 @@ test('slice seed pair count is pinned',
 async () => {
     const { db } = await seeded();
     const requests =
-        await db.pairs.getAll();
+        await db.messagePairs.getAll();
     assert.equal(
-        requests.length, EXPECTED_SLICE_PAIRS,
+        requests.length, EXPECTED_SLICE_MESSAGE_PAIRS,
     );
 });
 
 test('slice seed request hashes are unique',
 async () => {
     const { db } = await seeded();
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const distinctHashes = new Set(
         requests.map((r) => r.request_hash),
     );

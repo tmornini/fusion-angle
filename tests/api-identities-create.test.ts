@@ -113,7 +113,7 @@ test(
         const creds = await deriveCredentialsFor(db
             , 'syWUUcdBSbBgMwBiCrgbDw');
         const cred = creds.find(c => c.kind === 'client_secret');
-        assert.ok(cred, 'credential exists on pair plane');
+        assert.ok(cred, 'credential exists on message plane');
         assert.equal(cred.status, 'set');
         // A service carries no PII.
         await assert.rejects(
@@ -226,7 +226,7 @@ test(
                 kind: 'person',
             }));
         assert.equal(denied.status, 403);
-        // The denied member wrote nothing on the pair plane
+        // The denied member wrote nothing on the message plane
         // — no identities/prBESZPjJDiuXCeZLmbiVw document.
         await assert.rejects(
             () => GET(memberDb, 'identities/prBESZPjJDiuXCeZLmbiVw', token),
@@ -250,7 +250,7 @@ async () => {
         identityDocumentEntityOf(
             {
                 uriId: id,
-                pairId: id,
+                messagePairId: id,
                 method: 'PUT',
                 body: { kind: 'person' },
             },

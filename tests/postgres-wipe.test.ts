@@ -55,6 +55,12 @@ test('render wipe command embeds the drop list',
         true,
     );
     assert.equal(
+        script.includes(
+            'DROP TABLE IF EXISTS message_pairs',
+        ),
+        true,
+    );
+    assert.equal(
         script.includes('DROP TABLE IF EXISTS pairs'),
         true,
     );

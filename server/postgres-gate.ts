@@ -77,7 +77,9 @@ export async function assertSchemaMarker(
 export async function assertNoLegacyMessageTables(
     sql: SqlClient,
 ): Promise<void> {
-    const names = ['requests', 'responses'] as const;
+    const names = [
+        'pairs', 'requests', 'responses',
+    ] as const;
     for (const name of names) {
         const rows = await sql.query<{
             rel: string | null;

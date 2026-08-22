@@ -11,7 +11,7 @@ import {
 // commit just dropped.
 test('TABLE_NAMES keeps the permanent survivors', () => {
     for (const name of [
-        'pairs',
+        'message_pairs',
     ] as const) {
         assert.ok(
             TABLE_NAMES.includes(name),
@@ -24,7 +24,7 @@ test('MESSAGE_TABLES is TABLE_NAMES', () => {
     assert.equal(MESSAGE_TABLES, TABLE_NAMES);
     assert.deepEqual(
         [...MESSAGE_TABLES],
-        ['pairs'],
+        ['message_pairs'],
     );
 });
 
@@ -80,7 +80,7 @@ test(
 test('MemoryDbAdapter exposes message stores', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    await db.pairs.put('pair-1', {
+    await db.messagePairs.put('pair-1', {
         uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
         uri_id: '42',
         requester_identity_id: 'XXZruirZyAOoRpNxaDnpSA',
@@ -93,7 +93,7 @@ test('MemoryDbAdapter exposes message stores', async () => {
         response: '{"kind":"response"}',
         operation_id: '0123456789ABCDEFGHIJKw',
     });
-    const rows = await db.pairs.getAll();
+    const rows = await db.messagePairs.getAll();
     assert.equal(rows.length, 1);
     assert.equal(rows[0]!.id, 'pair-1');
 });

@@ -113,7 +113,7 @@ async () => {
         res.headers.get('Operation-ID'),
         TEST_OPERATION_ID,
     );
-    const rows = await db.pairs.getAll();
+    const rows = await db.messagePairs.getAll();
     const written = rows.find((r) => r.uri_id === 'gBbNAWlPwMfXZvevoUPhFQ');
     assert.ok(written);
     assert.equal(written.method, 'PUT');
@@ -147,7 +147,7 @@ async () => {
     );
     assert.equal(seed.status, 201);
     const before = new Set(
-        (await db.pairs.getAll()).map((r) => r.id),
+        (await db.messagePairs.getAll()).map((r) => r.id),
     );
     const res = await handleRequest(
         db,
@@ -161,7 +161,7 @@ async () => {
         }),
     );
     assert.equal(res.status, 201);
-    const fresh = (await db.pairs.getAll())
+    const fresh = (await db.messagePairs.getAll())
         .filter((r) => !before.has(r.id));
     assert.ok(fresh.length > 1);
     const outer = fresh.find((r) =>

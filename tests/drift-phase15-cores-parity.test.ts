@@ -22,7 +22,7 @@ import {
 } from './legacy-transition-fixture.ts';
 import { buildIdeas } from '../api/mock-data/ideas.ts';
 import {
-    flowGraphBindingsFromPairs,
+    flowGraphBindingsFromMessagePairs,
     deriveFlows,
 } from '../api/derive-flows.ts';
 import {
@@ -161,7 +161,7 @@ const EMPTY_FLOW_ID = 'GgfDbXOJUvvaCekCTcvhuw';
 // -- workOrderDocumentHeadFor ------------------------------------
 
 // Phase Final Task 2: work_orders ROW half stripped — wire +
-// pair-plane head are the oracles (row plane empty).
+// message-plane head are the oracles (row plane empty).
 test('workOrderDocumentHeadFor: wire GET equals head for a'
 + ' live create; null for absent; pre-tx vs in-tx parity',
 async () => {
@@ -214,7 +214,7 @@ async () => {
     assert.deepEqual(preTx, wire);
     // Phase Final Stage B: work_orders table retired.
 
-    // Absent id: pair plane returns null (Task 2 maps to the
+    // Absent id: message plane returns null (Task 2 maps to the
     // same EntityNotFoundError bytes as workOrders.getById).
     const preTxMissing = await workOrderDocumentHeadFor(
         db, STARK_ORGANIZATION, 'oYnbiWXzroVnyolOhmkBIQ',
@@ -236,7 +236,7 @@ async () => {
 });
 
 test('workOrderDocumentHeadFor: tracks a later document PUT'
-+ ' (head, not create-time body) on wire + pair plane',
++ ' (head, not create-time body) on wire + message plane',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -283,11 +283,11 @@ async () => {
 
 // -- claim graph parity (Phase 15 Task 2) ------------------------
 
-// Phase Final Task 2: claim graph is pair-plane only.
-// Seed via PUT (document pair, no birth claim) so the live
+// Phase Final Task 2: claim graph is message-plane only.
+// Seed via PUT (document message pair, no birth claim) so the live
 // claim is a real append, not an idempotent re-claim.
 test('claim graph: pre-tx vs in-tx flow_graph parity and'
-+ ' claim-outcome on the pair plane',
++ ' claim-outcome on the message plane',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -381,7 +381,7 @@ async () => {
 // Phase Final Task 2: states ROW half stripped — the old
 // rawHasRow/fenced-getById three-way is retired. Callers that
 // still need a visibility label use stateEventVisibilityFor
-// on the pair plane (the production source of truth).
+// on the message plane (the production source of truth).
 async function pairPlaneVisibility(
     db: DbAdapter,
     organization: string,
@@ -529,7 +529,7 @@ test('stateEventVisibilityFor: tier (ii) op-born transition'
 
     // Op-born: no states/:id pair at transitionEventId;
     // lives only inside the transition op body.
-    const byId = (await db.pairs.getAll()).filter(
+    const byId = (await db.messagePairs.getAll()).filter(
         (row) => row.uri_id === transitionEventId,
     );
     const statesTail = '/' + 'states' + '/';
@@ -610,7 +610,7 @@ async () => {
     );
 });
 
-// -- flowGraphBindingsFromPairs ----------------------------------
+// -- flowGraphBindingsFromMessagePairs ----------------------------------
 
 function sortById<T extends { id: string }>(
     rows: readonly T[],
@@ -620,18 +620,18 @@ function sortById<T extends { id: string }>(
 }
 
 // Phase Final Task 2: graph relation ROW halves stripped —
-// pair plane (flowGraphBindingsFromPairs) is sole oracle.
-test('flowGraphBindingsFromPairs: seed attribute + member'
+// message plane (flowGraphBindingsFromMessagePairs) is sole oracle.
+test('flowGraphBindingsFromMessagePairs: seed attribute + member'
 + ' ledgers non-empty; pre-tx vs in-tx parity; nodeFlowIds'
 + ' cover every bound node', async () => {
     const db = await seededDb();
     const txTables = MESSAGE_TABLES;
-    const preTx = await flowGraphBindingsFromPairs(
+    const preTx = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     const inTx = await db.transaction(
         txTables,
-        (view) => flowGraphBindingsFromPairs(
+        (view) => flowGraphBindingsFromMessagePairs(
             view, STARK_ORGANIZATION,
         ),
     );
@@ -647,7 +647,7 @@ test('flowGraphBindingsFromPairs: seed attribute + member'
         'seed memberEvents empty',
     );
     // Phase Final Stage B: flow graph tables retired — the
-    // pair-plane bindings above are the residual pin.
+    // message-plane bindings above are the residual pin.
 
     // Every attribute/member event's node resolves a flow.
     for (const event of preTx.attributeEvents) {
@@ -776,7 +776,7 @@ test('residual pin: stateEventVisibilityFor matches the'
             const derived = await stateEventVisibilityFor(
                 db, organization, eventId,
             );
-            // Phase Final Task 2: pair-plane only (row oracle
+            // Phase Final Task 2: message-plane only (row oracle
             // retired with the states dual-write strip).
             assert.ok(
                 derived === 'visible'
@@ -817,10 +817,10 @@ async () => {
     );
 });
 
-// -- Task 5: pair-plane ownership (row-plane fence retired) --
+// -- Task 5: message-plane ownership (row-plane fence retired) --
 
 test('fence pin: resolveOwningOrganization owns seed'
-+ ' entities on the pair plane; orphan stays null',
++ ' entities on the message plane; orphan stays null',
 async () => {
     const db = await seededDb();
     async function pairOwner(
@@ -832,8 +832,8 @@ async () => {
         );
     }
 
-    // Ideas + projects + flows + records load from the pair
-    // plane (row halves retired across Stage B).
+    // Ideas + projects + flows + records load from the
+    // message plane (row halves retired across Stage B).
     const ideasStark = await deriveIdeas(
         db, STARK_ORGANIZATION,
     );
@@ -887,7 +887,7 @@ async () => {
     const flowTwo = flowsTwo[0]!;
     assert.ok(flowStark, 'stark flows non-empty');
     assert.ok(flowTwo, 'org-two flows non-empty');
-    // A live node id from the pair-plane graph (graphDelta
+    // A live node id from the message-plane graph (graphDelta
     // upserts) — seed Customer Onboarding create node.
     const nodeStarkId = 'laXQcGGyWrbEiExtgkyCcw';
 
@@ -913,7 +913,7 @@ async () => {
     }
 
     // Identity ownership resolves through memberships on
-    // the pair plane: bound organization when a membership
+    // the message plane: bound organization when a membership
     // document exists there.
     for (const bound of [
         STARK_ORGANIZATION, ORGANIZATION_TWO,
@@ -923,7 +923,7 @@ async () => {
                 memberStark.identity_id, bound,
             ),
             bound,
-            'pair-plane owner for '
+            'message-plane owner for '
             + memberStark.identity_id
             + ' bound=' + bound,
         );
@@ -951,7 +951,7 @@ async () => {
         STARK_ORGANIZATION,
     );
 
-    // Records retain pair-plane ownership after row strip.
+    // Records retain message-plane ownership after row strip.
     assert.equal(
         await pairOwner(
             recordStark.id, STARK_ORGANIZATION,
@@ -966,11 +966,11 @@ async () => {
     );
 });
 
-// Phase Final Task 2: graph ROW half stripped — pair plane
+// Phase Final Task 2: graph ROW half stripped — message plane
 // alone tracks the live attribute add/remove ledger.
-test('residual pin: flowGraphBindingsFromPairs tracks a'
+test('residual pin: flowGraphBindingsFromMessagePairs tracks a'
 + ' live attribute add then remove (fail-closed) on the'
-+ ' pair plane', async () => {
++ ' message plane', async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const flowId = generateIdentifier();
@@ -1039,7 +1039,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
     ));
     assert.equal(created.status, 201);
 
-    const afterAdd = await flowGraphBindingsFromPairs(
+    const afterAdd = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     const addRow = afterAdd.attributeEvents.find(
@@ -1115,7 +1115,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
     ));
     assert.equal(putRemove.status, 201);
 
-    const afterRm = await flowGraphBindingsFromPairs(
+    const afterRm = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     const rmRow = afterRm.attributeEvents.find(
@@ -1137,7 +1137,7 @@ test('residual pin: flowGraphBindingsFromPairs tracks a'
 
 // F1 fix pin: soft-deleting a node via graphDelta.deletions
 // must drop it from nodeFlowIds. Residual 'added' must NOT
-// RESTRICT attribute DELETE (pair-plane path).
+// RESTRICT attribute DELETE (message-plane path).
 test('residual pin: soft-deleted node drops from'
 + ' nodeFlowIds so residual attribute binding is not a'
 + ' RESTRICT referrer (DELETE → 204)', async () => {
@@ -1207,7 +1207,7 @@ test('residual pin: soft-deleted node drops from'
     ));
     assert.equal(created.status, 201);
 
-    const afterAdd = await flowGraphBindingsFromPairs(
+    const afterAdd = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     assert.equal(
@@ -1262,7 +1262,7 @@ test('residual pin: soft-deleted node drops from'
     ));
     assert.equal(putDelete.status, 201);
 
-    const afterDel = await flowGraphBindingsFromPairs(
+    const afterDel = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     assert.equal(
@@ -1551,7 +1551,7 @@ async () => {
 
 // Phase Final Task 2: flow_node_attributes/flow_nodes +
 // work_orders ROW halves stripped — collectAttributeReferrers
-// graph + WO legs are pair-plane-only.
+// graph + WO legs are message-plane-only.
 function sortedReferrerShape(
     refs: AttributeReferrers,
 ): {
@@ -1588,12 +1588,12 @@ function assertReferrerParity(
 }
 
 test('collectAttributeReferrers graph legs: seed attributes'
-+ ' with any referrer; pre-tx vs in-tx parity (pair plane)',
++ ' with any referrer; pre-tx vs in-tx parity (message plane)',
 async () => {
     const db = await seededDb();
-    // Seed attributes from pair-plane graph bindings + WO
+    // Seed attributes from message-plane graph bindings + WO
     // frozen graphs.
-    const bindings = await flowGraphBindingsFromPairs(
+    const bindings = await flowGraphBindingsFromMessagePairs(
         db, STARK_ORGANIZATION,
     );
     const attrFromRelations = new Set(
@@ -1601,7 +1601,7 @@ async () => {
             (r) => r.attribute_id,
         ),
     );
-    // Phase Final Task 2: WO graphs from the pair plane.
+    // Phase Final Task 2: WO graphs from the message plane.
     const attrFromWorkOrders = new Set<string>();
     const woToken = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', STARK_ORGANIZATION,
@@ -1661,7 +1661,7 @@ async () => {
 });
 
 test('collectAttributeReferrers graph legs: live-minted'
-+ ' flow binding + work-order head stay pair-plane stable',
++ ' flow binding + work-order head stay message-plane stable',
 async () => {
     const db = await seededDb();
     const token = await organizationToken();
@@ -1776,7 +1776,7 @@ async () => {
     const pairPlane = await collectAttributeReferrers(
         db, STARK_ORGANIZATION, [attrId], 'rOEPOcVMQdJiiiMuiiEhlg',
     );
-    // Pre-tx vs in-tx parity (pair plane only).
+    // Pre-tx vs in-tx parity (message plane only).
     const inTx = await db.transaction(
         // Stage B: roster + records/work_orders retired.
         MESSAGE_TABLES,

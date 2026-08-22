@@ -126,7 +126,7 @@ test(
 );
 
 // The client vessel mints one requestId; the wire verbs must
-// hoist it so incomingContext reuses it (pair-plane request
+// hoist it so incomingContext reuses it (message-plane request
 // message carries the header) instead of minting a second
 // unrelated trace that reportFault cannot correlate.
 test(
@@ -139,7 +139,7 @@ test(
             'identities/' + generateIdentifier(),
             { kind: 'person' },
         );
-        const rows = await db.pairs.getAll();
+        const rows = await db.messagePairs.getAll();
         assert.ok(
             rows.some(
                 r => r.request.includes(

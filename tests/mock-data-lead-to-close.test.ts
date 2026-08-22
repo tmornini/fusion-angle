@@ -32,7 +32,7 @@ const COLD_WORKING_NODE_HEAT_MAX = 0.25;
 async function seededLeadToClose() {
     const db = await seededMockDb();
     // Phase Final Task 2: flows row half stripped — resolve
-    // the seed flow from the pair plane.
+    // the seed flow from the message plane.
     const flows = await deriveFlows(db, 'AjdvjuECVZEgZoFajaIEkg');
     const flow = flows.find(
         f => f.name === FLOW_NAME,

@@ -62,7 +62,7 @@ async function putPair(
     adapter: DbAdapter,
     id: string,
 ): Promise<void> {
-    await adapter.pairs.put(id, {
+    await adapter.messagePairs.put(id, {
         uri_collection:
             '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
@@ -88,7 +88,7 @@ async function putPair(
 async function idsAtAddress(
     adapter: DbAdapter,
 ): Promise<string[]> {
-    const rows = await adapter.pairs.getAllAtAddress(
+    const rows = await adapter.messagePairs.getAllAtAddress(
         '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'ideas/',
         '42',

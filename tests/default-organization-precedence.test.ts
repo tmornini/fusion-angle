@@ -6,7 +6,9 @@ import {
 } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
 import { identityDefaultOrganization } from '../api/authentication.ts';
-import { formWritePair, appendMessagePair } from '../api/message-pair.ts';
+import {
+    formWriteMessagePair, appendMessagePair,
+} from '../api/message-pair.ts';
 import { SYSTEM_MEMBER_ID } from '../api/types.ts';
 import { seedOrganizationDocument } from './test-fixtures.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
@@ -29,7 +31,7 @@ async function freshDb() {
 // Below-facade pair formation (the seedDefaultOrganizationEvent
 // precedent just above, applied to memberships): the primary-
 // membership fallback this file's own tests exercise derives
-// from the pair plane once memberships flips, so a raw row here
+// from the message plane once memberships flips, so a raw row here
 // would go derivation-invisible. PLUMBING ONLY: the assertions
 // this helper feeds stay byte-identical.
 async function seedMembershipPair(
@@ -63,7 +65,7 @@ async function seedDefaultOrganizationEvent(
     const pathSegments = [
         'identities', identityId, 'default-organization',
     ];
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/' + pathSegments.join('/'),
         routePattern: 'identities/:id/default-organization',
@@ -83,7 +85,7 @@ async function seedDefaultOrganizationEvent(
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
         },
     );
 }
@@ -184,7 +186,7 @@ test(
         await seedDefaultOrganizationEvent(
             db, IDENTITY_ID, ORGANIZATION_TWO, T2,
         );
-        const tombstone = await formWritePair({
+        const tombstone = await formWriteMessagePair({
             method: 'DELETE',
             pathname: '/organizations/'
                 + ORGANIZATION_TWO

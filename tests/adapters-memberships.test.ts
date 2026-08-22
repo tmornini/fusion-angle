@@ -52,4 +52,4 @@ test('rejects a membership missing type', () => {
 });
 
 // Phase Final Stage B: memberships table retired — store
-// round-trip pins live on pair-plane document tests.
+// round-trip pins live on message-plane document tests.

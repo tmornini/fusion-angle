@@ -21,7 +21,7 @@ import {
 
 // The Phase 14 Task 1 core: invitationLifecycleStatesFor is the
 // ENTITY-SCOPED sibling of deriveInvitationStates — INDEXED
-// getAllWhere reads (uri_id for the grant/document pair,
+// getAllWhere reads (uri_id for the grant/document message pair,
 // uri_collection per op address) restricted to ONE known invitation
 // id, rather than the whole-collection + whole-ledger scans the
 // multi-invitation reader needs to DISCOVER every id. This file
@@ -202,8 +202,9 @@ test('invitationLifecycleStatesFor: a never-granted id derives'
 // -- is the grant proof") ----------------------------------------
 
 test('invitationLifecycleStatesFor: a duplicate-grant\'s'
-+ ' PHANTOM echo id (an operation pair with no document) derives'
-+ ' an EMPTY array — never a false \'pending\' row', async () => {
++ ' PHANTOM echo id (an operation message pair with no document)'
++ ' derives an EMPTY array — never a false \'pending\' row',
+async () => {
     const db = await seededDb();
     const freshId = generateIdentifier();
     await grant(db, freshId, 'sarah.chen@company.com');

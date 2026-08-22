@@ -5,7 +5,7 @@ import {
     MESSAGE_TABLES,
 } from './db.ts';
 import type {
-    Id, PairEntity, StateEntity,
+    Id, MessagePairEntity, StateEntity,
     TransitionFieldValueEntity,
     WorkOrderEntity,
     WorkOrderHistoryEventEntity,
@@ -17,10 +17,10 @@ import {
 } from './validators.ts';
 import { canonicalUriCollection } from './message-pair.ts';
 import {
-    documentPairsAt,
+    documentMessagePairsAt,
     deriveDocumentsAt,
     byIdAscending,
-    type DocumentPair,
+    type DocumentMessagePair,
 } from './derive-documents.ts';
 import { latestByKey } from '../shared/ledger-reduction.ts';
 import { compareIdentifiers } from
@@ -33,7 +33,7 @@ import {
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 
-// Pair-plane lifecycle derives and ownership resolution
+// Message-plane lifecycle derives and ownership resolution
 // (Phase 11
 // onward; bulk lifecycle collection retired — states-URI
 // elimination C3). Per-entity history rides GET
@@ -47,7 +47,7 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 //       /members/ document-trio history; nothing reads
 //       that collection.
 //   (c) deriveWorkOrderLifecycle / workOrderLifecycleStatesFor /
-//       workOrderHistoryFor — the work-order op-pair replay
+//       workOrderHistoryFor — the work-order operation-message-pair replay
 //       (gate 5d).
 //   (d) flow-graph node/edge sidecars — live on the flow
 //       document-pair body (graphDelta.deletions / revivals);
@@ -60,16 +60,16 @@ import { parseWire } from '../shared/http-message/wire-codec.ts';
 // and nested field-values collection are RETIRED (C3/C4).
 //
 // THE GATE-15 PRECEDENT (Phase 10): an org fence can be
-// reproduced from the MEMBERSHIP PAIR PLANE. This module's
+// reproduced from the MEMBERSHIP MESSAGE PLANE. This module's
 // resolveOwningOrganization / resolveGlobalOwner /
 // stateEventVisibilityFor / missedReadError apply that
 // technique for ownership and event-id fences.
 //
 // IMMUNE TO THE DELETED FILTER: pairs are append-
-// only, so a family's document pair still names its organization
+// only, so a family's document message pair still names its organization
 // forever, regardless of the entity's later lifecycle state.
 
-// ---- resolveOwningOrganization — the PAIR-PLANE fence (gate 4) -
+// ---- resolveOwningOrganization — the MESSAGE-PLANE fence (gate 4) -
 
 // The org-owned, org-nested document families whose OWN id can
 // appear as a states.entity_id — mirrors
@@ -99,7 +99,7 @@ const ORGANIZATIONS_ADDRESS_PREFIX =
 // identity's live seats. This walk NEVER
 // filters by caller: it resolves which org OWNS an entity,
 // independent of who is asking (Phase 12 Task 5: the row source
-// flips to the pair-plane derivation; the ALL-orgs, uncaller-
+// flips to the message-plane derivation; the ALL-orgs, uncaller-
 // filtered shape is untouched).
 async function organizationIds(
     db: DbAdapter,
@@ -118,11 +118,11 @@ async function resolveInvitationOwner(
     db: DbAdapter,
     entityId: Id,
 ): Promise<Id | null> {
-    const pairs = await db.pairs.getAllAtAddress(
+    const messagePairs = await db.messagePairs.getAllAtAddress(
         INVITATIONS_PREFIX, entityId,
     );
     const document = deriveDocumentsAt(
-        pairs, INVITATIONS_PREFIX,
+        messagePairs, INVITATIONS_PREFIX,
     ).get(entityId);
     return document === undefined
         ? null
@@ -130,7 +130,8 @@ async function resolveInvitationOwner(
 }
 
 // flow_nodes/flow_edges carry NO address of their own
-// (message-pair.ts: absent from both PAIR_WIRED_ROUTE_PATTERNS and
+// (message-pair.ts: absent from both
+// MESSAGE_PAIR_WIRED_ROUTE_PATTERNS and
 // DOCUMENT_CLASS_ROUTE_PATTERNS) — they ride folded inside the
 // flow's own document body, as graphDelta.nodes/.edges upserts
 // (api/routes.ts's writeFlowGraphDelta). A node/edge that is later
@@ -173,13 +174,13 @@ async function resolveFlowGraphOwner(
     ];
     for (const organization of ordered) {
         const prefix = canonicalUriCollection(organization, '/flows/');
-        const stored = await db.pairs.getAllWhere(
+        const stored = await db.messagePairs.getAllWhere(
             'uri_collection', prefix,
         );
-        for (const pair of documentPairsAt(
+        for (const messagePair of documentMessagePairsAt(
             stored, prefix,
         )) {
-            if (graphDeltaHasMember(pair.body, entityId)) {
+            if (graphDeltaHasMember(messagePair.body, entityId)) {
                 return organization;
             }
         }
@@ -205,18 +206,18 @@ async function resolveFlowGraphOwner(
 // visible) — which OTHER org it resolves to in that case is never
 // observed by fenceStatesByOwner's isVisible check, so no further
 // tie-break is needed.
-async function organizationHasMemberPair(
+async function organizationHasMemberMessagePair(
     db: DbAdapter,
     organization: Id,
     identityId: Id,
 ): Promise<boolean> {
     const seatPrefix = '/organizations/' + organization
         + '/members/';
-    const seatPairs = await db.pairs.getAllAtAddress(
+    const seatMessagePairs = await db.messagePairs.getAllAtAddress(
         seatPrefix, identityId,
     );
     return deriveDocumentsAt(
-        seatPairs, seatPrefix,
+        seatMessagePairs, seatPrefix,
     ).has(identityId);
 }
 
@@ -226,7 +227,7 @@ async function resolveViaMembershipPairPlane(
     boundOrganization: Id,
 ): Promise<Id | null> {
     if (
-        await organizationHasMemberPair(
+        await organizationHasMemberMessagePair(
             db, boundOrganization, entityId,
         )
     ) {
@@ -235,7 +236,7 @@ async function resolveViaMembershipPairPlane(
     for (const organization of await organizationIds(db)) {
         if (organization === boundOrganization) continue;
         if (
-            await organizationHasMemberPair(
+            await organizationHasMemberMessagePair(
                 db, organization, entityId,
             )
         ) {
@@ -254,7 +255,7 @@ async function computeOwningOrganization(
     // the owning organization. Address read of this id at
     // the organizations collection.
     const organizationRows =
-        await db.pairs.getAllAtAddress(
+        await db.messagePairs.getAllAtAddress(
             ORGANIZATIONS_ADDRESS_PREFIX, entityId,
         );
     if (organizationRows.length > 0) {
@@ -278,7 +279,7 @@ async function computeOwningOrganization(
                 organization, '/' + family + '/',
             );
             const rows =
-                await db.pairs.getAllAtAddress(
+                await db.messagePairs.getAllAtAddress(
                     prefix, entityId,
                 );
             if (rows.length > 0) {
@@ -299,13 +300,13 @@ async function computeOwningOrganization(
     );
     if (graphOwner !== null) return graphOwner;
 
-    // (b) the membership pair plane: org-less member/identity ids.
+    // (b) the membership message plane: org-less member/identity ids.
     return await resolveViaMembershipPairPlane(
         db, entityId, boundOrganization,
     );
 }
 
-// The PAIR-PLANE fence resolver (gate 4 + Phase 15 gate 3).
+// The MESSAGE-PLANE fence resolver (gate 4 + Phase 15 gate 3).
 // Resolves entityId's owning organization across the five
 // sources above (org-nested, invitations, flow-graph,
 // membership, organizations self-as-owner), or null for a
@@ -321,7 +322,7 @@ async function computeOwningOrganization(
 // unmemoized across calls.
 //
 // boundOrganization is a required argument, not merely
-// fenceStatesByOwner's own concern: the membership-pair-plane leg
+// fenceStatesByOwner's own concern: the membership-message-plane leg
 // is intrinsically asker-relative (see
 // resolveViaMembershipPairPlane's own header), exactly like
 // api/store-parent-scoped.ts's ownerOrganizationOfEntity already
@@ -441,15 +442,15 @@ export async function resolveGlobalOwner(
         : ownerProbeCollection(boundOrganization, table);
     if (collection !== undefined) {
         const atAddress =
-            await db.pairs.getAllAtAddress(
+            await db.messagePairs.getAllAtAddress(
                 collection, entityId,
             );
         if (atAddress.length === 0) return null;
-        for (const pair of atAddress) {
+        for (const messagePair of atAddress) {
             const owner = ownerFromAddress(
-                pair.uri_collection,
+                messagePair.uri_collection,
                 entityId,
-                pair.response,
+                messagePair.response,
             );
             if (owner !== null) return owner;
         }
@@ -575,7 +576,7 @@ function bodyNamesStateEvent(
     return false;
 }
 
-// Tier (i)/(ii): does any of this organization's op-pair
+// Tier (i)/(ii): does any of this organization's operation-message-pair
 // families name eventId? Indexed prefix reads only (the
 // workOrderClaimSourcesFor shape) — never a whole-plane
 // getAll of pairs.
@@ -590,20 +591,20 @@ async function organizationHasOpBornEvent(
         const prefix = canonicalUriCollection(
             organization, '/' + family + '/',
         );
-        const stored = await dbOrView.pairs.getAllWhere(
+        const stored = await dbOrView.messagePairs.getAllWhere(
             'uri_collection', prefix,
         );
-        for (const pair of documentPairsAt(
+        for (const messagePair of documentMessagePairsAt(
             stored, prefix,
         )) {
-            if (bodyNamesStateEvent(pair.body, eventId)) {
+            if (bodyNamesStateEvent(messagePair.body, eventId)) {
                 return true;
             }
         }
-        for (const pair of operationPairsAt(
+        for (const messagePair of operationMessagePairsAt(
             stored, prefix,
         )) {
-            if (bodyNamesStateEvent(pair.body, eventId)) {
+            if (bodyNamesStateEvent(messagePair.body, eventId)) {
                 return true;
             }
         }
@@ -617,12 +618,12 @@ async function organizationHasOpBornEvent(
     const workOrdersPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
-    const workOrderPairs =
-        await dbOrView.pairs.getAllWhere(
+    const workOrderMessagePairs =
+        await dbOrView.messagePairs.getAllWhere(
             'uri_collection', workOrdersPrefix,
         );
     const workOrderIds = new Set<Id>(
-        workOrderPairs.map((row) => row.uri_id),
+        workOrderMessagePairs.map((row) => row.uri_id),
     );
     for (const workOrderId of workOrderIds) {
         for (const sub of [
@@ -634,14 +635,16 @@ async function organizationHasOpBornEvent(
                     + '/' + sub + '/',
             );
             const stored =
-                await dbOrView.pairs.getAllWhere(
+                await dbOrView.messagePairs.getAllWhere(
                     'uri_collection', prefix,
                 );
-            for (const pair of operationPairsAt(
+            for (const messagePair of operationMessagePairsAt(
                 stored, prefix,
             )) {
                 if (
-                    bodyNamesStateEvent(pair.body, eventId)
+                    bodyNamesStateEvent(
+                        messagePair.body, eventId,
+                    )
                 ) {
                     return true;
                 }
@@ -661,17 +664,17 @@ async function organizationHasOpBornEvent(
         canonicalUriCollection(undefined, '/ai-members/'),
         canonicalUriCollection(undefined, '/human-members/'),
     ]) {
-        const stored = await dbOrView.pairs.getAllWhere(
+        const stored = await dbOrView.messagePairs.getAllWhere(
             'uri_collection', prefix,
         );
-        for (const pair of operationPairsAt(
+        for (const messagePair of operationMessagePairsAt(
             stored, prefix,
         )) {
-            if (!bodyNamesStateEvent(pair.body, eventId)) {
+            if (!bodyNamesStateEvent(messagePair.body, eventId)) {
                 continue;
             }
             const owner = await resolveOwningOrganization(
-                dbOrView, pair.uriId, organization,
+                dbOrView, messagePair.uriId, organization,
             );
             if (
                 owner === null
@@ -685,15 +688,17 @@ async function organizationHasOpBornEvent(
     // Invitations (flat address): organization lives in the
     // grant body; answering ops nest under invitations/:id/.
     {
-        const stored = await dbOrView.pairs.getAllWhere(
+        const stored = await dbOrView.messagePairs.getAllWhere(
             'uri_collection', INVITATIONS_PREFIX,
         );
-        for (const pair of operationPairsAt(
+        for (const messagePair of operationMessagePairsAt(
             stored, INVITATIONS_PREFIX,
         )) {
             if (
-                bodyNamesStateEvent(pair.body, eventId)
-                && pickString(pair.body, 'organization_id')
+                bodyNamesStateEvent(messagePair.body, eventId)
+                && pickString(
+                    messagePair.body, 'organization_id',
+                )
                     === organization
             ) {
                 return true;
@@ -711,15 +716,15 @@ async function organizationHasOpBornEvent(
                     '/invitations/' + invitationId
                         + '/' + sub + '/',
                 );
-                const opPairs =
-                    await dbOrView.pairs.getAllWhere(
+                const operationMessagePairs =
+                    await dbOrView.messagePairs.getAllWhere(
                         'uri_collection', prefix,
                     );
-                for (const pair of operationPairsAt(
-                    opPairs, prefix,
+                for (const messagePair of operationMessagePairsAt(
+                    operationMessagePairs, prefix,
                 )) {
                     if (!bodyNamesStateEvent(
-                        pair.body, eventId,
+                        messagePair.body, eventId,
                     )) {
                         continue;
                     }
@@ -739,13 +744,13 @@ async function organizationHasOpBornEvent(
     return false;
 }
 
-// Tiered pair-plane visibility disposition (successor of the
+// Tiered message-plane visibility disposition (successor of the
 // retired isVisibleStateEvent row-plane fence; live callers
 // re-pointed Phase 15 Task 3). Always view-accepting
 // (dbOrView); opens no nested transaction. The states/:id
 // event-append tier is RETIRED with the address itself —
 // cheapest remaining first:
-//   (i) own-org op-pair family scan — op-born claim /
+//   (i) own-org operation-message-pair family scan — op-born claim /
 //       transition / document-trio ids;
 //   (ii) widen-on-miss cross-org scan — foreign vs nowhere,
 //       only on the rare miss tail.
@@ -779,12 +784,13 @@ export async function stateEventVisibilityFor(
     return 'orphan';
 }
 
-// ---- deriveWorkOrderLifecycle — the op-pair reader (gate 5d) ---
+// ---- deriveWorkOrderLifecycle — the operation-message-pair
+// reader (gate 5d) ---
 
 // Source (c) of the states-log union — the only one that reads
-// work-order CREATE/CLAIM/TRANSITION/RELEASE operation pairs.
+// work-order CREATE/CLAIM/TRANSITION/RELEASE operation message pairs.
 // Seeded work orders (buildWorkOrders/buildLeadToCloseWorkload)
-// form via a bare document PUT with ZERO operation pairs, so
+// form via a bare document PUT with ZERO operation message pairs, so
 // this function emits NOTHING for them; their births ride the
 // work-order document trio (state_event_id on the document
 // body) once the seed stage embeds them there. Output
@@ -844,7 +850,7 @@ const WORK_ORDER_RELEASE_PATTERN =
     /^\/organizations\/[^/]+\/work-orders\/([^/]+)\/release\/$/;
 
 // One decoded 2xx POST pair — an OPERATION address (create/claim/
-// transition are POST-only), the documentPairsAt (derive-
+// transition are POST-only), the documentMessagePairsAt (derive-
 // documents.ts) twin restricted to the OTHER method: that reader
 // deliberately EXCLUDES POST (the DOCUMENT head is PUT/DELETE
 // only); this one deliberately admits POST ALONE, since a work
@@ -853,7 +859,7 @@ const WORK_ORDER_RELEASE_PATTERN =
 // AnyPair/allPairsAt, narrowed to exactly what a work-order
 // replay ever consumes — never a configurable multi-method reader
 // nobody asked for.
-interface OperationPair {
+interface OperationMessagePair {
     readonly id: Id;
     readonly at: string;
     readonly uriId: Id;
@@ -862,7 +868,7 @@ interface OperationPair {
 }
 
 // requestMethodOf/requestBodyOf's own twin (api/derive-
-// documents.ts), needed here ONLY because operationPairsAt reads
+// documents.ts), needed here ONLY because operationMessagePairsAt reads
 // POST — mirrors derive-identity-spine.ts's own responseBodyOf,
 // which duplicates the same decode plumbing for its OWN reason
 // (the response side, there; the POST method, here) rather than
@@ -917,42 +923,45 @@ const POST_OR_PUT: ReadonlySet<string> = new Set([
     'POST', 'PUT',
 ]);
 
-export function operationPairsAt(
-    pairs: readonly PairEntity[],
+export function operationMessagePairsAt(
+    messagePairs: readonly MessagePairEntity[],
     uriCollection: string,
     methods: ReadonlySet<string> = POST_ONLY,
-): OperationPair[] {
-    const out: OperationPair[] = [];
-    for (const pair of pairs) {
-        if (pair.uri_collection !== uriCollection) {
+): OperationMessagePair[] {
+    const out: OperationMessagePair[] = [];
+    for (const messagePair of messagePairs) {
+        if (messagePair.uri_collection !== uriCollection) {
             continue;
         }
-        const decoded = decodeRequestOperation(pair.request);
+        const decoded = decodeRequestOperation(
+            messagePair.request,
+        );
         if (!methods.has(decoded.method)) continue;
         out.push({
-            id: pair.id,
-            at: pair.response_at,
-            uriId: pair.uri_id,
+            id: messagePair.id,
+            at: messagePair.response_at,
+            uriId: messagePair.uri_id,
             body: decoded.body,
             requesterIdentityId:
-                pair.requester_identity_id,
+                messagePair.requester_identity_id,
         });
     }
     return out.sort(atIdCompare);
 }
 
 function documentDeletesAsOperations(
-    pairs: readonly DocumentPair[],
-): OperationPair[] {
-    const out: OperationPair[] = [];
-    for (const pair of pairs) {
-        if (pair.method !== 'DELETE') continue;
+    messagePairs: readonly DocumentMessagePair[],
+): OperationMessagePair[] {
+    const out: OperationMessagePair[] = [];
+    for (const messagePair of messagePairs) {
+        if (messagePair.method !== 'DELETE') continue;
         out.push({
-            id: pair.id,
-            at: pair.at,
-            uriId: pair.uriId,
-            body: pair.body,
-            requesterIdentityId: pair.requesterIdentityId,
+            id: messagePair.id,
+            at: messagePair.at,
+            uriId: messagePair.uriId,
+            body: messagePair.body,
+            requesterIdentityId:
+                messagePair.requesterIdentityId,
         });
     }
     return out;
@@ -978,14 +987,14 @@ function isExpiredAsOf(
 
 // LOCKTIMEOUT SOURCING: the work order's DOCUMENT HEAD as of
 // `momentAt` — the (at, id) winner among PUT/DELETE pairs whose
-// response `at` strictly precedes it. `entityPairs` is ascending
-// by (at, id) already (documentPairsAt's own contract), so the
+// response `at` strictly precedes it. `entityMessagePairs` is ascending
+// by (at, id) already (documentMessagePairsAt's own contract), so the
 // last entry passing the filter IS that winner.
 function documentHeadBefore(
-    entityPairs: readonly DocumentPair[],
+    entityMessagePairs: readonly DocumentMessagePair[],
     momentAt: string,
-): DocumentPair | undefined {
-    const before = entityPairs.filter((p) => p.at < momentAt);
+): DocumentMessagePair | undefined {
+    const before = entityMessagePairs.filter((p) => p.at < momentAt);
     return before[before.length - 1];
 }
 
@@ -994,17 +1003,17 @@ function documentHeadBefore(
 // head as of that claim's OWN response.at, never a single graph
 // read cached across the whole replay.
 function lockTimeoutAsOf(
-    entityPairs: readonly DocumentPair[],
+    entityMessagePairs: readonly DocumentMessagePair[],
     momentAt: string,
 ): number {
-    const head = documentHeadBefore(entityPairs, momentAt);
+    const head = documentHeadBefore(entityMessagePairs, momentAt);
     if (head === undefined) {
         // A genuine invariant violation, not a defensive
         // fallback: postWorkOrderClaimOp requires the work order
         // to already exist (view.workOrders.getById), and every
-        // path that can create one also writes a document pair
+        // path that can create one also writes a document message pair
         // beside it — so a claim/transition pair can never
-        // legitimately precede every document pair at this id.
+        // legitimately precede every document message pair at this id.
         throw new Error(
             'no document head before ' + momentAt,
         );
@@ -1018,7 +1027,7 @@ function lockTimeoutAsOf(
 // Every candidate event a claim pair's prior-claim decision may
 // draw from: the replay's OWN emitted events so far (create
 // births, prior claims/releases/transitions). Releases ride
-// the release op pair now (postWorkOrderReleaseOp) — the
+// the release operation message pair now (postWorkOrderReleaseOp) — the
 // retired standalone PUT states/:id path is no longer a
 // candidate source. The `replayed` half is already bounded to
 // "earlier" by the caller's own (at, id)-ordered processing;
@@ -1026,7 +1035,7 @@ function lockTimeoutAsOf(
 // merge cannot leak later events into the prior-claim decision.
 function priorClaimCandidates(
     replayed: readonly StateEntity[],
-    claim: OperationPair,
+    claim: OperationMessagePair,
 ): StateEntity[] {
     return replayed
         .filter((row) => atIdCompare(row, claim) < 0)
@@ -1039,10 +1048,10 @@ function priorClaimCandidates(
 // PRIOR state reduces from priorClaimCandidates above (never
 // old-plane rows) via latestClaimEvent's own CLAIM_STATES filter +
 // (at, id) max.
-function applyClaimPair(
+function applyClaimMessagePair(
     replayed: StateEntity[],
-    entityPairs: readonly DocumentPair[],
-    claim: OperationPair,
+    entityMessagePairs: readonly DocumentMessagePair[],
+    claim: OperationMessagePair,
     workOrderId: Id,
 ): void {
     const claimEventId = pickString(claim.body, 'claimEventId');
@@ -1057,7 +1066,7 @@ function applyClaimPair(
     if (replayed.some((row) => row.id === claimEventId)) {
         return;
     }
-    const lockTimeout = lockTimeoutAsOf(entityPairs, claim.at);
+    const lockTimeout = lockTimeoutAsOf(entityMessagePairs, claim.at);
     const prior = latestClaimEvent(
         priorClaimCandidates(replayed, claim),
         workOrderId,
@@ -1097,9 +1106,9 @@ function applyClaimPair(
 // release event — field values ride a SEPARATE table
 // (state_field_values), outside this states-log derivation's own
 // contract (StateEntity rows only).
-function applyTransitionPair(
+function applyTransitionMessagePair(
     replayed: StateEntity[],
-    transition: OperationPair,
+    transition: OperationMessagePair,
     workOrderId: Id,
 ): void {
     replayed.push({
@@ -1135,10 +1144,10 @@ function applyTransitionPair(
 // idempotent no-op — its pair still exists, and derives
 // nothing). Deciding here, not at the gate, keeps gate and
 // derive from ever disagreeing about liveness.
-function applyReleasePair(
+function applyReleaseMessagePair(
     replayed: StateEntity[],
-    entityPairs: readonly DocumentPair[],
-    release: OperationPair,
+    entityMessagePairs: readonly DocumentMessagePair[],
+    release: OperationMessagePair,
     workOrderId: Id,
 ): void {
     const legacy = Object.hasOwn(
@@ -1156,7 +1165,7 @@ function applyReleasePair(
     );
     if (legacy) {
         const lockTimeout = lockTimeoutAsOf(
-            entityPairs, release.at,
+            entityMessagePairs, release.at,
         );
         const priorLive = prior !== null
             && prior.state === 'claimed'
@@ -1183,9 +1192,18 @@ function applyReleasePair(
 }
 
 type WorkOrderAction =
-    | { readonly kind: 'claim'; readonly pair: OperationPair }
-    | { readonly kind: 'release'; readonly pair: OperationPair }
-    | { readonly kind: 'transition'; readonly pair: OperationPair };
+    | {
+        readonly kind: 'claim';
+        readonly messagePair: OperationMessagePair;
+    }
+    | {
+        readonly kind: 'release';
+        readonly messagePair: OperationMessagePair;
+    }
+    | {
+        readonly kind: 'transition';
+        readonly messagePair: OperationMessagePair;
+    };
 
 // One work order's full replay: its births (EDGE 1 — zero or
 // more three-slot arrays, one per create pair found), then its
@@ -1193,62 +1211,68 @@ type WorkOrderAction =
 // each claim's prior-claim lookup only ever sees
 // chronologically earlier events.
 function replayWorkOrderOperations(
-    createPairs: readonly OperationPair[],
-    entityPairs: readonly DocumentPair[],
-    claimPairs: readonly OperationPair[],
-    releasePairs: readonly OperationPair[],
-    transitionPairs: readonly OperationPair[],
+    createMessagePairs: readonly OperationMessagePair[],
+    entityMessagePairs: readonly DocumentMessagePair[],
+    claimMessagePairs: readonly OperationMessagePair[],
+    releaseMessagePairs: readonly OperationMessagePair[],
+    transitionMessagePairs: readonly OperationMessagePair[],
     workOrderId: Id,
 ): StateEntity[] {
     const events: StateEntity[] = [];
-    for (const createPair of createPairs) {
-        const ids = createPair.body['stateEventIds'] as
+    for (const createMessagePair of createMessagePairs) {
+        const ids = createMessagePair.body['stateEventIds'] as
             readonly string[];
-        const ats = createPair.body['stateEventAts'] as
+        const ats = createMessagePair.body['stateEventAts'] as
             readonly string[];
-        const states = createPair.body['states'] as
+        const states = createMessagePair.body['states'] as
             readonly string[];
         for (let i = 0; i < ids.length; i++) {
             events.push({
                 id: ids[i]!,
                 entity_id: workOrderId,
                 state: states[i]!,
-                member_id: createPair.requesterIdentityId,
+                member_id: createMessagePair.requesterIdentityId,
                 at: ats[i]!,
             });
         }
     }
 
     const actions: WorkOrderAction[] = [
-        ...claimPairs.map((pair) => (
-            { kind: 'claim' as const, pair }
+        ...claimMessagePairs.map((messagePair) => (
+            { kind: 'claim' as const, messagePair }
         )),
-        ...releasePairs.map((pair) => (
-            { kind: 'release' as const, pair }
+        ...releaseMessagePairs.map((messagePair) => (
+            { kind: 'release' as const, messagePair }
         )),
-        ...transitionPairs.map((pair) => (
-            { kind: 'transition' as const, pair }
+        ...transitionMessagePairs.map((messagePair) => (
+            { kind: 'transition' as const, messagePair }
         )),
-    ].sort((a, b) => atIdCompare(a.pair, b.pair));
+    ].sort((a, b) => atIdCompare(
+        a.messagePair, b.messagePair,
+    ));
 
     for (const action of actions) {
         if (action.kind === 'claim') {
-            applyClaimPair(
-                events, entityPairs, action.pair, workOrderId,
+            applyClaimMessagePair(
+                events, entityMessagePairs,
+                action.messagePair, workOrderId,
             );
         } else if (action.kind === 'release') {
-            applyReleasePair(
-                events, entityPairs, action.pair, workOrderId,
+            applyReleaseMessagePair(
+                events, entityMessagePairs,
+                action.messagePair, workOrderId,
             );
         } else {
-            applyTransitionPair(events, action.pair, workOrderId);
+            applyTransitionMessagePair(
+                events, action.messagePair, workOrderId,
+            );
         }
     }
 
     return events;
 }
 
-// Prefix-filtered pure core of the op-pair reader (gate 5d).
+// Prefix-filtered pure core of the operation-message-pair reader (gate 5d).
 // When `organization` is set, only that org's work-orders
 // uri_collection family is considered (collection + claim/release/
 // transition); when undefined, every org — the whole-plane
@@ -1257,11 +1281,11 @@ function replayWorkOrderOperations(
 // field_values without a second plane pass.
 interface WorkOrderLifecyclePlane {
     readonly events: readonly StateEntity[];
-    readonly transitionPairs: readonly OperationPair[];
+    readonly transitionMessagePairs: readonly OperationMessagePair[];
 }
 
 function workOrderLifecycleFromPlane(
-    pairs: readonly PairEntity[],
+    messagePairs: readonly MessagePairEntity[],
     organization: Id | undefined,
 ): WorkOrderLifecyclePlane {
     const collectionPrefixes = new Set<string>();
@@ -1270,29 +1294,31 @@ function workOrderLifecycleFromPlane(
             canonicalUriCollection(organization, '/work-orders/'),
         );
     } else {
-        for (const pair of pairs) {
+        for (const messagePair of messagePairs) {
             if (WORK_ORDERS_COLLECTION_PATTERN.test(
-                pair.uri_collection,
+                messagePair.uri_collection,
             )) {
-                collectionPrefixes.add(pair.uri_collection);
+                collectionPrefixes.add(
+                    messagePair.uri_collection,
+                );
             }
         }
     }
-    const createPairs: OperationPair[] = [];
-    const entityPairs: DocumentPair[] = [];
+    const createMessagePairs: OperationMessagePair[] = [];
+    const entityMessagePairs: DocumentMessagePair[] = [];
     for (const prefix of collectionPrefixes) {
-        createPairs.push(...operationPairsAt(
-            pairs, prefix,
+        createMessagePairs.push(...operationMessagePairsAt(
+            messagePairs, prefix,
         ));
-        entityPairs.push(...documentPairsAt(
-            pairs, prefix,
+        entityMessagePairs.push(...documentMessagePairsAt(
+            messagePairs, prefix,
         ));
     }
-    const createPairsByWorkOrder = Map.groupBy(
-        createPairs, (pair) => pair.uriId,
+    const createMessagePairsByWorkOrder = Map.groupBy(
+        createMessagePairs, (messagePair) => messagePair.uriId,
     );
-    const entityPairsByWorkOrder = Map.groupBy(
-        entityPairs, (pair) => pair.uriId,
+    const entityMessagePairsByWorkOrder = Map.groupBy(
+        entityMessagePairs, (messagePair) => messagePair.uriId,
     );
 
     const organizationRoot = organization === undefined
@@ -1302,52 +1328,54 @@ function workOrderLifecycleFromPlane(
     const claimPrefixByWorkOrder = new Map<Id, string>();
     const releasePrefixByWorkOrder = new Map<Id, string>();
     const transitionPrefixByWorkOrder = new Map<Id, string>();
-    for (const pair of pairs) {
+    for (const messagePair of messagePairs) {
         if (
             organizationRoot !== null
-            && !pair.uri_collection.startsWith(
+            && !messagePair.uri_collection.startsWith(
                 organizationRoot,
             )
         ) {
             continue;
         }
         const claimMatch = WORK_ORDER_CLAIM_PATTERN.exec(
-            pair.uri_collection,
+            messagePair.uri_collection,
         );
         if (claimMatch !== null) {
             claimPrefixByWorkOrder.set(
-                claimMatch[1]!, pair.uri_collection,
+                claimMatch[1]!, messagePair.uri_collection,
             );
         }
         const releaseMatch =
             WORK_ORDER_RELEASE_PATTERN.exec(
-                pair.uri_collection,
+                messagePair.uri_collection,
             );
         if (releaseMatch !== null) {
             releasePrefixByWorkOrder.set(
-                releaseMatch[1]!, pair.uri_collection,
+                releaseMatch[1]!,
+                messagePair.uri_collection,
             );
         }
         const transitionMatch =
             WORK_ORDER_TRANSITION_PATTERN.exec(
-                pair.uri_collection,
+                messagePair.uri_collection,
             );
         if (transitionMatch !== null) {
             transitionPrefixByWorkOrder.set(
-                transitionMatch[1]!, pair.uri_collection,
+                transitionMatch[1]!,
+                messagePair.uri_collection,
             );
         }
     }
 
     const workOrderIds = new Set<Id>([
-        ...createPairsByWorkOrder.keys(),
+        ...createMessagePairsByWorkOrder.keys(),
         ...claimPrefixByWorkOrder.keys(),
         ...releasePrefixByWorkOrder.keys(),
         ...transitionPrefixByWorkOrder.keys(),
     ]);
 
     const events: StateEntity[] = [];
-    const allTransitionPairs: OperationPair[] = [];
+    const allTransitionMessagePairs: OperationMessagePair[] = [];
     for (const workOrderId of workOrderIds) {
         const claimPrefix =
             claimPrefixByWorkOrder.get(workOrderId);
@@ -1355,48 +1383,50 @@ function workOrderLifecycleFromPlane(
             releasePrefixByWorkOrder.get(workOrderId);
         const transitionPrefix =
             transitionPrefixByWorkOrder.get(workOrderId);
-        const claimPairs = claimPrefix === undefined
+        const claimMessagePairs = claimPrefix === undefined
             ? []
-            : operationPairsAt(
-                pairs, claimPrefix, POST_OR_PUT,
+            : operationMessagePairsAt(
+                messagePairs, claimPrefix, POST_OR_PUT,
             );
         const releasePosts = releasePrefix === undefined
             ? []
-            : operationPairsAt(
-                pairs, releasePrefix,
+            : operationMessagePairsAt(
+                messagePairs, releasePrefix,
             );
         const releaseDeletes = claimPrefix === undefined
             ? []
             : documentDeletesAsOperations(
-                documentPairsAt(pairs, claimPrefix),
+                documentMessagePairsAt(
+                    messagePairs, claimPrefix,
+                ),
             );
-        const releasePairs = [
+        const releaseMessagePairs = [
             ...releasePosts, ...releaseDeletes,
         ];
-        const transitionPairs =
+        const transitionMessagePairs =
             transitionPrefix === undefined
                 ? []
-                : operationPairsAt(
-                    pairs, transitionPrefix,
+                : operationMessagePairsAt(
+                    messagePairs, transitionPrefix,
                 );
-        allTransitionPairs.push(...transitionPairs);
+        allTransitionMessagePairs.push(...transitionMessagePairs);
         events.push(...replayWorkOrderOperations(
-            createPairsByWorkOrder.get(workOrderId) ?? [],
-            entityPairsByWorkOrder.get(workOrderId) ?? [],
-            claimPairs,
-            releasePairs,
-            transitionPairs,
+            createMessagePairsByWorkOrder.get(workOrderId) ?? [],
+            entityMessagePairsByWorkOrder.get(workOrderId) ?? [],
+            claimMessagePairs,
+            releaseMessagePairs,
+            transitionMessagePairs,
             workOrderId,
         ));
     }
     return {
         events: events.sort(atIdCompare),
-        transitionPairs: allTransitionPairs,
+        transitionMessagePairs: allTransitionMessagePairs,
     };
 }
 
-// The op-pair reader (gate 5d). ONE shared readonly tx over
-// db.pairs (torn-read closure) — every grouping and
+// The operation-message-pair reader (gate 5d). ONE shared readonly tx over
+// db.messagePairs (torn-read closure) — every grouping and
 // replay step below is pure over the fetched array, no
 // further db reads. (at, id) ascending overall: these rows are
 // SYNTHESIZED (no address of their own to read 1:1), so there
@@ -1409,10 +1439,10 @@ export async function deriveWorkOrderLifecycle(
     return db.readTransaction(
         MESSAGE_TABLES,
         async (view) => {
-            const pairs = await view.pairs.getAll();
+            const messagePairs = await view.messagePairs.getAll();
             return [
                 ...workOrderLifecycleFromPlane(
-                    pairs, undefined,
+                    messagePairs, undefined,
                 ).events,
             ];
         },
@@ -1425,7 +1455,7 @@ export async function deriveWorkOrderLifecycle(
 // known (organization, workOrderId) pair, rather than the
 // whole-org scan the multi-work-order reader needs to discover
 // EVERY id at once —
-//   * create + document pairs: address read at the
+//   * create + document message pairs: address read at the
 //     work-orders prefix + this workOrderId (both
 //     a create's response and its later document PUT/DELETE
 //     share ONE uriId — drift-work-orders.test.ts case 8);
@@ -1438,8 +1468,8 @@ export async function deriveWorkOrderLifecycle(
 // WITHIN an already-open write-gate transaction. Phase 14 Task 4
 // wires the claim gate to workOrderClaimHistoryFor below; with
 // the states/:id address retired both siblings return the SAME
-// op-pair replay (releases ride the release op, not a standalone
-// event-append).
+// operation-message-pair replay (releases ride the release op,
+// not a standalone event-append).
 interface WorkOrderClaimSources {
     readonly replayed: readonly StateEntity[];
 }
@@ -1456,40 +1486,40 @@ async function workOrderClaimSourcesFor(
     const collectionPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
-    const collectionPairs =
-        await dbOrView.pairs.getAllAtAddress(
+    const collectionMessagePairs =
+        await dbOrView.messagePairs.getAllAtAddress(
             collectionPrefix, workOrderId,
         );
-    const createPairs = operationPairsAt(
-        collectionPairs, collectionPrefix,
+    const createMessagePairs = operationMessagePairsAt(
+        collectionMessagePairs, collectionPrefix,
     );
-    const entityPairs = documentPairsAt(
-        collectionPairs, collectionPrefix,
+    const entityMessagePairs = documentMessagePairsAt(
+        collectionMessagePairs, collectionPrefix,
     );
 
     const claimPrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
-    const claimStored = await dbOrView.pairs.getAllWhere(
+    const claimStored = await dbOrView.messagePairs.getAllWhere(
         'uri_collection', claimPrefix,
     );
-    const claimPairs = operationPairsAt(
+    const claimMessagePairs = operationMessagePairsAt(
         claimStored, claimPrefix, POST_OR_PUT,
     );
     const releaseDeletes = documentDeletesAsOperations(
-        documentPairsAt(claimStored, claimPrefix),
+        documentMessagePairsAt(claimStored, claimPrefix),
     );
 
     const releasePrefix = canonicalUriCollection(
         organization,
         '/work-orders/' + workOrderId + '/release/',
     );
-    const releaseStored = await dbOrView.pairs.getAllWhere(
+    const releaseStored = await dbOrView.messagePairs.getAllWhere(
         'uri_collection', releasePrefix,
     );
-    const releasePairs = [
-        ...operationPairsAt(
+    const releaseMessagePairs = [
+        ...operationMessagePairsAt(
             releaseStored, releasePrefix,
         ),
         ...releaseDeletes,
@@ -1500,17 +1530,18 @@ async function workOrderClaimSourcesFor(
         '/work-orders/' + workOrderId + '/transition/',
     );
     const transitionStored =
-        await dbOrView.pairs.getAllWhere(
+        await dbOrView.messagePairs.getAllWhere(
             'uri_collection', transitionPrefix,
         );
-    const transitionPairs = operationPairsAt(
+    const transitionMessagePairs = operationMessagePairsAt(
         transitionStored, transitionPrefix,
     );
 
     return {
         replayed: replayWorkOrderOperations(
-            createPairs, entityPairs,
-            claimPairs, releasePairs, transitionPairs,
+            createMessagePairs, entityMessagePairs,
+            claimMessagePairs, releaseMessagePairs,
+            transitionMessagePairs,
             workOrderId,
         ),
     };
@@ -1534,12 +1565,12 @@ export async function workOrderLifecycleStatesFor(
 // set/clear — shape-disjoint; they never enter latestByKey.
 // Shared by workOrderHistoryFor (per-item /history).
 function fieldValuesByTransitionEvent(
-    transitionPairs: readonly OperationPair[],
+    transitionMessagePairs: readonly OperationMessagePair[],
 ): Map<Id, TransitionFieldValueEntity[]> {
-    const candidates: DocumentPair[] = [];
+    const candidates: DocumentMessagePair[] = [];
     const newShapeRows =
         new Map<Id, TransitionFieldValueEntity[]>();
-    for (const transition of transitionPairs) {
+    for (const transition of transitionMessagePairs) {
         const raw = transition.body['fieldValues'];
         if (raw !== undefined) {
             // Legacy shape: pool candidates for head-reduce.
@@ -1600,7 +1631,7 @@ function fieldValuesByTransitionEvent(
         }
     }
     const heads = latestByKey(
-        candidates, (pair) => pair.uriId,
+        candidates, (messagePair) => messagePair.uriId,
     );
     const byEvent = new Map<Id, TransitionFieldValueEntity[]>();
     for (const [uriId, head] of heads) {
@@ -1635,10 +1666,10 @@ function fieldValuesByTransitionEvent(
 // carry field_values: [].
 function historyEventsWithFieldValues(
     lifecycleAsc: readonly StateEntity[],
-    transitionPairs: readonly OperationPair[],
+    transitionMessagePairs: readonly OperationMessagePair[],
 ): WorkOrderHistoryEventEntity[] {
     const byEvent = fieldValuesByTransitionEvent(
-        transitionPairs,
+        transitionMessagePairs,
     );
     return lifecycleAsc.map((event) => ({
         ...event,
@@ -1673,28 +1704,28 @@ export async function workOrderHistoryFor(
         organization,
         '/work-orders/' + workOrderId + '/transition/',
     );
-    const transitionStored = await db.pairs.getAllWhere(
+    const transitionStored = await db.messagePairs.getAllWhere(
         'uri_collection', transitionPrefix,
     );
-    const transitionPairs = operationPairsAt(
+    const transitionMessagePairs = operationMessagePairsAt(
         transitionStored, transitionPrefix,
     );
 
     return historyEventsWithFieldValues(
-        lifecycle, transitionPairs,
+        lifecycle, transitionMessagePairs,
     );
 }
 
 // THE CLAIM GATE'S OWN SOURCE (Phase 14 Task 4): the work-
-// order op-pair replay, over INDEXED entity-scoped reads
+// order operation-message-pair replay, over INDEXED entity-scoped reads
 // workOrderClaimSourcesFor already performs, rather than
 // deriveStatesFor's own whole-plane getAll (forbidden inside
 // a write-gate transaction — AGENTS.md's tx-body gotcha:
 // entity-scoped in-tx reads only, never a whole-plane getAll of
 // pairs). With the states/:id address retired this
 // is the sole claim-history source — create/claim/transition/
-// release op pairs cover every live writer. postWorkOrderClaimOp
-// (api/routes.ts) is its only live caller.
+// release operation message pairs cover every live writer.
+// postWorkOrderClaimOp (api/routes.ts) is its only live caller.
 export async function workOrderClaimHistoryFor(
     dbOrView: DbAdapter,
     organization: Id,
@@ -1721,13 +1752,13 @@ export async function workOrderBindingFor(
         organization,
         '/work-orders/' + workOrderId + '/binding/',
     );
-    const stored = await dbOrView.pairs.getAllWhere(
+    const stored = await dbOrView.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const pairs = operationPairsAt(
+    const messagePairs = operationMessagePairsAt(
         stored, prefix, POST_OR_PUT,
     );
-    const latest = pairs[pairs.length - 1];
+    const latest = messagePairs[messagePairs.length - 1];
     if (latest === undefined) {
         return null;
     }
@@ -1759,11 +1790,13 @@ export async function workOrderClaimDocumentFor(
         organization,
         '/work-orders/' + workOrderId + '/claim/',
     );
-    const fetched = await dbOrView.pairs.getAllWhere(
+    const fetched = await dbOrView.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const pairs = documentPairsAt(fetched, prefix);
-    const latest = pairs[pairs.length - 1];
+    const messagePairs = documentMessagePairsAt(
+        fetched, prefix,
+    );
+    const latest = messagePairs[messagePairs.length - 1];
     if (
         latest === undefined
         || latest.method === 'DELETE'
@@ -1804,17 +1837,17 @@ export async function workOrderClaimDocumentFor(
 
 // Derives the work order's CURRENT document head
 // ({display_id, flow_graph, position, …}) from the entity's
-// OWN document pairs — the pair-plane successor of
+// OWN document message pairs — the message-plane successor of
 // view.workOrders.getById that postWorkOrderClaimOp still
 // reads for flow_graph (Task 2 re-anchors the call site).
 //
-// REUSE TARGET: the entity-scoped entityPairs computation
+// REUSE TARGET: the entity-scoped entityMessagePairs computation
 // inside workOrderClaimSourcesFor (address read) — NOT
 // derivedDocumentEntity / documentGetHandler, whose
 // collection-wide prefix scan is the forbidden whole-plane
 // shape inside a write gate.
 //
-// HEAD REDUCTION: documentPairsAt already sorts by (at, id)
+// HEAD REDUCTION: documentMessagePairsAt already sorts by (at, id)
 // ascending and admits only PUT/DELETE, so the last pair IS
 // the document head; a DELETE head (or no pairs) yields null
 // so the claim gate can map absent to the same
@@ -1829,15 +1862,15 @@ export async function workOrderDocumentHeadFor(
     const collectionPrefix = canonicalUriCollection(
         organization, '/work-orders/',
     );
-    const collectionPairs =
-        await dbOrView.pairs.getAllAtAddress(
+    const collectionMessagePairs =
+        await dbOrView.messagePairs.getAllAtAddress(
             collectionPrefix, workOrderId,
         );
-    const entityPairs = documentPairsAt(
-        collectionPairs, collectionPrefix,
+    const entityMessagePairs = documentMessagePairsAt(
+        collectionMessagePairs, collectionPrefix,
     );
-    if (entityPairs.length === 0) return null;
-    const head = entityPairs[entityPairs.length - 1]!;
+    if (entityMessagePairs.length === 0) return null;
+    const head = entityMessagePairs[entityMessagePairs.length - 1]!;
     if (head.method === 'DELETE') return null;
     return {
         id: workOrderId,
@@ -1866,11 +1899,12 @@ export async function workOrderDocumentHeadFor(
 
 // Source (f) of the states-log union. An invitation's own states
 // never ride the states/:id address (source a) — the invitations
-// side channel forms its own operation pairs at the flat
+// side channel forms its own operation message pairs at the flat
 // '/invitations/' collection (the grant) and at
 // 'invitations/:id/<op>/' (the three answering ops), api/
-// invitations-domain.ts's own formWritePair/formInvitationOpPair
-// calls. Deliberately NOT built atop deriveInvitations/
+// invitations-domain.ts's own formWriteMessagePair/
+// formInvitationOperationMessagePair calls. Deliberately
+// NOT built atop deriveInvitations/
 // invitationOpStates (api/derive-invitations.ts) — both resolve
 // only a RESOLVED CURRENT STATE and DISCARD the event id and
 // member_id a StateEntity row needs (the brief's own NOTE) — this
@@ -1879,17 +1913,17 @@ export async function workOrderDocumentHeadFor(
 //
 // THE GRANT'S OWN DUPLICATE-ECHO (grantInvitation, api/invitations-
 // domain.ts): an ALREADY-pending (org, identity) pair still forms
-// its OWN operation pair at whatever invitationId the SECOND
+// its OWN operation message pair at whatever invitationId the SECOND
 // caller submitted (the 'existing' outcome branch) — but writes
 // NEITHER a states event NOR a document there. Cross-referencing
 // against the invitation's DOCUMENT plane (formed ONLY on the
 // 'fresh' outcome, at the SAME invitationId) excludes that phantom
-// pair: a document exists at an id iff its grant operation pair
+// pair: a document exists at an id iff its grant operation message pair
 // genuinely posted 'pending'.
 //
 // THE ANSWERING OPS' OWN NO-OP RESENDS (accept/decline/revoke):
 // each is idempotent on its OWN already-reached terminal state (a
-// re-accept/re-decline/re-revoke still forms an operation pair but
+// re-accept/re-decline/re-revoke still forms an operation message pair but
 // posts NO event) — mutual exclusivity across the three op KINDS
 // is the domain gate's own covenant (derive-invitations.ts's
 // header), so at most one op kind ever succeeds per invitation,
@@ -1898,7 +1932,7 @@ export async function workOrderDocumentHeadFor(
 // inside its own (serialized) transaction, the group's
 // chronologically EARLIEST (at, id) pair is always the one that
 // found the invitation still 'pending' and genuinely posted the
-// event — operationPairsAt already returns each group (at, id)
+// event — operationMessagePairsAt already returns each group (at, id)
 // ascending, so its first entry is that pair.
 const INVITATION_OP_ADDRESS_PATTERN =
     /^\/invitations\/([^/]+)\/(acceptance|decline|revocation)\/$/;
@@ -1935,33 +1969,37 @@ export async function deriveInvitationStates(
     return db.readTransaction(
         MESSAGE_TABLES,
         async (view) => {
-            const stored = await view.pairs.getAll();
+            const stored = await view.messagePairs.getAll();
             const rows: StateEntity[] = [];
 
             const documentIds = new Set(
-                documentPairsAt(
+                documentMessagePairsAt(
                     stored, INVITATIONS_PREFIX,
-                ).map((pair) => pair.uriId),
+                ).map((messagePair) => messagePair.uriId),
             );
-            for (const pair of operationPairsAt(
+            for (const messagePair of operationMessagePairsAt(
                 stored, INVITATIONS_PREFIX,
             )) {
-                if (!documentIds.has(pair.uriId)) continue;
+                if (!documentIds.has(messagePair.uriId)) {
+                    continue;
+                }
                 rows.push({
-                    id: pickString(pair.body, 'grantEventId'),
-                    entity_id: pair.uriId,
+                    id: pickString(
+                        messagePair.body, 'grantEventId',
+                    ),
+                    entity_id: messagePair.uriId,
                     state: 'pending',
-                    member_id: pair.requesterIdentityId,
-                    at: pickString(pair.body, 'grantAt'),
+                    member_id: messagePair.requesterIdentityId,
+                    at: pickString(messagePair.body, 'grantAt'),
                 });
             }
 
             const opPrefixes = new Set<string>();
-            for (const pair of stored) {
+            for (const messagePair of stored) {
                 if (INVITATION_OP_ADDRESS_PATTERN.test(
-                    pair.uri_collection,
+                    messagePair.uri_collection,
                 )) {
-                    opPrefixes.add(pair.uri_collection);
+                    opPrefixes.add(messagePair.uri_collection);
                 }
             }
             for (const prefix of opPrefixes) {
@@ -1969,7 +2007,7 @@ export async function deriveInvitationStates(
                     INVITATION_OP_ADDRESS_PATTERN.exec(prefix)!;
                 const fields = INVITATION_OP_FIELDS[match[2]!];
                 if (fields === undefined) continue;
-                const earliest = operationPairsAt(
+                const earliest = operationMessagePairsAt(
                     stored, prefix,
                 )[0];
                 if (earliest === undefined) continue;
@@ -2007,7 +2045,7 @@ export async function deriveInvitationStates(
 // THE PHANTOM-ECHO EXCLUSION carries over unchanged (deriveInvit-
 // ationStates' own header): the documentIds cross-reference,
 // applied here to the id-scoped read alone, still excludes a
-// duplicate grant's own operation pair when no document was ever
+// duplicate grant's own operation message pair when no document was ever
 // written at this id.
 export async function invitationLifecycleStatesFor(
     dbOrView: DbAdapter,
@@ -2015,23 +2053,25 @@ export async function invitationLifecycleStatesFor(
 ): Promise<StateEntity[]> {
     const rows: StateEntity[] = [];
 
-    const collectionPairs =
-        await dbOrView.pairs.getAllAtAddress(
+    const collectionMessagePairs =
+        await dbOrView.messagePairs.getAllAtAddress(
             INVITATIONS_PREFIX, id,
         );
-    const hasDocument = documentPairsAt(
-        collectionPairs, INVITATIONS_PREFIX,
-    ).some((pair) => pair.uriId === id);
+    const hasDocument = documentMessagePairsAt(
+        collectionMessagePairs, INVITATIONS_PREFIX,
+    ).some((messagePair) => messagePair.uriId === id);
     if (hasDocument) {
-        for (const pair of operationPairsAt(
-            collectionPairs, INVITATIONS_PREFIX,
+        for (const messagePair of operationMessagePairsAt(
+            collectionMessagePairs, INVITATIONS_PREFIX,
         )) {
             rows.push({
-                id: pickString(pair.body, 'grantEventId'),
-                entity_id: pair.uriId,
+                id: pickString(
+                    messagePair.body, 'grantEventId',
+                ),
+                entity_id: messagePair.uriId,
                 state: 'pending',
-                member_id: pair.requesterIdentityId,
-                at: pickString(pair.body, 'grantAt'),
+                member_id: messagePair.requesterIdentityId,
+                at: pickString(messagePair.body, 'grantAt'),
             });
         }
     }
@@ -2042,12 +2082,12 @@ export async function invitationLifecycleStatesFor(
         const prefix = canonicalUriCollection(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
-        const opPairs = await dbOrView.pairs.getAllWhere(
+        const operationMessagePairs = await dbOrView.messagePairs.getAllWhere(
             'uri_collection', prefix,
         );
         const fields = INVITATION_OP_FIELDS[op]!;
-        const earliest = operationPairsAt(
-            opPairs, prefix,
+        const earliest = operationMessagePairsAt(
+            operationMessagePairs, prefix,
         )[0];
         if (earliest === undefined) continue;
         rows.push({

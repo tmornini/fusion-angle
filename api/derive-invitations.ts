@@ -16,13 +16,13 @@ import {
 // since an invitation's lifecycle never rides the document
 // address (Decision 6 would require a trio the wire body has
 // no room for — the invitations side channel forms its
-// operation pairs at 'invitations/:id/acceptance' etc,
-// api/invitations-domain.ts's formInvitationOpPair).
+// operation message pairs at 'invitations/:id/acceptance' etc,
+// api/invitations-domain.ts's formInvitationOperationMessagePair).
 //
 // E13 FULL-SCAN NAMED CLASS: no index can serve "every pair
 // whose uri_collection has the shape /invitations/<id>/<op>/"
 // for an arbitrary id, so invitationOpStates below reads
-// db.pairs.getAll() — ONE full table scan, regardless of how
+// db.messagePairs.getAll() — ONE full table scan, regardless of how
 // many invitations exist. Grown alongside every future
 // full-ledger scan; its measured cost is recorded at the
 // Task 9 CLI leg, not here.
@@ -67,9 +67,9 @@ async function invitationOpStates(
     db: DbAdapter,
 ): Promise<Map<Id, InvitationState>> {
     const states = new Map<Id, InvitationState>();
-    for (const pair of await db.pairs.getAll()) {
+    for (const messagePair of await db.messagePairs.getAll()) {
         const match = OP_ADDRESS_PATTERN.exec(
-            pair.uri_collection,
+            messagePair.uri_collection,
         );
         if (match === null) continue;
         const state = OP_STATES[match[2]!];
@@ -83,7 +83,7 @@ async function invitationOpStates(
 // Task 1): the SAME OP_STATES mutual-exclusivity covenant,
 // restricted to ONE known invitation id via three INDEXED
 // getAllWhere('uri_collection', ...) reads (one per op kind) rather
-// than the whole-ledger db.pairs.getAll() invitationOpStates
+// than the whole-ledger db.messagePairs.getAll() invitationOpStates
 // needs to DISCOVER every invitation's own op prefix out of an
 // unknown set of ids. dbOrView-shaped and opens no nested
 // transaction — callable from WITHIN an already-open write-gate
@@ -102,7 +102,7 @@ export async function invitationOpStateFor(
         const prefix = canonicalUriCollection(
             undefined, '/invitations/' + id + '/' + op + '/',
         );
-        const rows = await dbOrView.pairs.getAllWhere(
+        const rows = await dbOrView.messagePairs.getAllWhere(
             'uri_collection', prefix,
         );
         if (rows.length > 0) return OP_STATES[op];
@@ -110,17 +110,17 @@ export async function invitationOpStateFor(
     return undefined;
 }
 
-// Reads db.pairs ONLY. invitationsForInvitee and
+// Reads db.messagePairs ONLY. invitationsForInvitee and
 // sentInvitations derive their rows + state through this; the
 // enrichment joins (organization/pii) stay old-plane reads.
 export async function deriveInvitations(
     db: DbAdapter,
 ): Promise<DerivedInvitationRow[]> {
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', INVITATIONS_PREFIX,
     );
     const documents = deriveDocumentsAt(
-        pairs, INVITATIONS_PREFIX,
+        messagePairs, INVITATIONS_PREFIX,
     );
     const opStates = await invitationOpStates(db);
     const rows: DerivedInvitationRow[] = [];

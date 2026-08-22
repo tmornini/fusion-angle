@@ -4,8 +4,8 @@ import { memoryDbAdapter } from '../api/db-memory.ts';
 import { MESSAGE_TABLES } from '../api/db.ts';
 import { requestMessageHash } from '../api/message-form.ts';
 import {
-    formWritePair,
-    headPairIdAt,
+    formWriteMessagePair,
+    headMessagePairIdAt,
     storedResponseFor,
     appendMessagePair,
 } from '../api/message-pair.ts';
@@ -30,15 +30,16 @@ const INPUT = {
 
 test('an org-owned pair stores at the org-nested prefix',
 async () => {
-    const pair = await formWritePair({ ...INPUT });
+    const messagePair = await formWriteMessagePair({ ...INPUT });
     assert.equal(
-        pair.uriCollection, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        messagePair.uriCollection,
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
 });
 
 test('a global-plane pair keeps its flat prefix',
 async () => {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         ...INPUT,
         pathname: '/identities/ada/pii',
         routePattern: 'identities/:id/pii',
@@ -48,14 +49,14 @@ async () => {
         operationId: TEST_OPERATION_ID,
     });
     assert.equal(
-        pair.uriCollection, '/identities/ada/pii/',
+        messagePair.uriCollection, '/identities/ada/pii/',
     );
 });
 
 test('nested attribute pattern stores under type attributes',
 async () => {
     const typeId = 'sJxkGGTrPegHqFbQAkXnjw';
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         ...INPUT,
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + typeId + '/attributes/rWOtgTQUhMrUpjULbVdncg',
@@ -82,7 +83,7 @@ async () => {
         operationId: TEST_OPERATION_ID,
     });
     assert.equal(
-        pair.uriCollection,
+        messagePair.uriCollection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/',
     );
@@ -90,7 +91,7 @@ async () => {
 
 test('nested record-type detail stores at type prefix',
 async () => {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         ...INPUT,
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + 'rOEPOcVMQdJiiiMuiiEhlg',
@@ -108,49 +109,50 @@ async () => {
         operationId: TEST_OPERATION_ID,
     });
     assert.equal(
-        pair.uriCollection,
+        messagePair.uriCollection,
         '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/',
     );
 });
 
 test('a formed pair binds request and response by one id',
 async () => {
-    const pair = await formWritePair({ ...INPUT });
+    const messagePair = await formWriteMessagePair({ ...INPUT });
     assert.equal(
-        pair.uriCollection, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
+        messagePair.uriCollection,
+        '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(pair.uriId, '42');
+    assert.equal(messagePair.uriId, '42');
     assert.equal(
-        pair.requestHash,
-        await requestMessageHash(pair.requestMessage),
+        messagePair.requestHash,
+        await requestMessageHash(messagePair.requestMessage),
     );
     assert.equal(
-        pair.responseHash,
-        await requestMessageHash(pair.responseMessage),
+        messagePair.responseHash,
+        await requestMessageHash(messagePair.responseMessage),
     );
 });
 
 test('the event at rides the body byte-exact; the arrival '
 + 'stamp passes through verbatim', async () => {
-    const pair = await formWritePair({ ...INPUT });
-    assert.ok(pair.requestMessage
+    const messagePair = await formWriteMessagePair({ ...INPUT });
+    assert.ok(messagePair.requestMessage
         .includes('2026-01-02T03:04:05.000111Z'));
-    assert.equal(pair.requestAt, INPUT.requestAt);
+    assert.equal(messagePair.requestAt, INPUT.requestAt);
 });
 
 test('formed response has no follows or supersedes',
 async () => {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         ...INPUT,
         operationId: TEST_OPERATION_ID,
     });
     assert.equal(
-        'follows' in pair, false,
+        'follows' in messagePair, false,
     );
     assert.equal(
-        'supersedes' in pair, false,
+        'supersedes' in messagePair, false,
     );
-    const model = parseWire(pair.responseMessage);
+    const model = parseWire(messagePair.responseMessage);
     assert.equal(
         model.fields.some(
             (f) => f.name === 'follows'
@@ -163,24 +165,24 @@ async () => {
 test('append then head-read round-trips', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const pair = await formWritePair({ ...INPUT });
+    const messagePair = await formWriteMessagePair({ ...INPUT });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
     assert.equal(
-        await headPairIdAt(
+        await headMessagePairIdAt(
             db, '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/', '42',
         ),
-        pair.id,
+        messagePair.id,
     );
     const stored =
-        await storedResponseFor(db, pair.requestHash);
-    assert.equal(stored?.id, pair.id);
+        await storedResponseFor(db, messagePair.requestHash);
+    assert.equal(stored?.id, messagePair.id);
     // Early request, late response: the request row keeps
     // the arrival stamp verbatim; response_at was minted
     // at append time, strictly after arrival.
-    const request = await db.pairs.getById(pair.id);
+    const request = await db.messagePairs.getById(messagePair.id);
     assert.equal(request.request_at, INPUT.requestAt);
     assert.ok(request.request_at < stored!.response_at);
 });
@@ -188,14 +190,14 @@ test('append then head-read round-trips', async () => {
 test('a same-hash re-append writes nothing', async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
-    const pair = await formWritePair({ ...INPUT });
-    const replay = { ...pair, id: 'other-uuidAAAAAAAAAAAAw' };
+    const messagePair = await formWriteMessagePair({ ...INPUT });
+    const replay = { ...messagePair, id: 'other-uuidAAAAAAAAAAAAw' };
     await db.transaction(
         MESSAGE_TABLES,
         async (view) => {
-            await appendMessagePair(view, pair);
+            await appendMessagePair(view, messagePair);
             await appendMessagePair(view, replay);
         },
     );
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });

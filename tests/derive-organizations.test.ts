@@ -28,7 +28,7 @@ import {
 // Phase Final Task 2: organizations dual-write stripped. This
 // file no longer compares derive vs row-plane oracles — the
 // row plane is empty after a live PUT. Coverage re-homes to
-// wire-body / derive agreement and pair-plane address proofs.
+// wire-body / derive agreement and message-plane address proofs.
 // Every pair is still built through the live PUT route.
 
 const BASE = 'http://localhost';
@@ -157,7 +157,7 @@ async () => {
     const db = await freshDb();
     const organizationId = generateIdentifier();
     await putOrganization(db, organizationId, 'Flat');
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     // seedAdminSchema forms 2 pairs (role-grants retired);
     // this PUT is the 3rd.
     assert.equal(requests.length, 3);
@@ -205,7 +205,7 @@ async () => {
     );
     const expected = organizationEntityOf({
         uriId: id,
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: fields,
     });

@@ -82,10 +82,10 @@ function humanCreateBody(id: string, eventId: string) {
 async function allMessages(
     db: MemoryDbAdapter,
 ): Promise<string[]> {
-    const pairs = await db.pairs.getAll();
+    const messagePairs = await db.messagePairs.getAll();
     return [
-        ...pairs.map(r => r.request),
-        ...pairs.map(r => r.response),
+        ...messagePairs.map(r => r.request),
+        ...messagePairs.map(r => r.response),
     ];
 }
 
@@ -108,8 +108,8 @@ test('PUT-PUT at one address leaves exactly ONE pair (the'
     // ABSENCE — stated explicitly, not merely the old assertion
     // deleted.
     assert.equal(second.headers.get('Supersedes'), null);
-    const pairs = await db.pairs.getAll();
-    const atAddress = pairs.filter(
+    const messagePairs = await db.messagePairs.getAll();
+    const atAddress = messagePairs.filter(
         r => r.uri_collection === '/identities/tyqfBGunVEufdtzApefuyw/pii/',
     );
     assert.equal(atAddress.length, 1);
@@ -142,8 +142,8 @@ async () => {
     // Case 7 (the DELETE half): the tombstone carries no
     // Supersedes either — chainless applies to BOTH verbs.
     assert.equal(del.headers.get('Supersedes'), null);
-    const pairs = await db.pairs.getAll();
-    const atAddress = pairs.filter(
+    const messagePairs = await db.messagePairs.getAll();
+    const atAddress = messagePairs.filter(
         r => r.uri_collection === '/identities/uEYoNLWQrgIToJPFkyvdPw/pii/',
     );
     assert.equal(atAddress.length, 1);
@@ -170,8 +170,8 @@ async () => {
     ));
     assert.equal(put.status, 201);
     assert.equal(put.headers.get('Supersedes'), null);
-    const pairs = await db.pairs.getAll();
-    const atAddress = pairs.filter(
+    const messagePairs = await db.messagePairs.getAll();
+    const atAddress = messagePairs.filter(
         r => r.uri_collection === '/identities/uFgKFelNjvJcrtefsfZxrA/pii/',
     );
     assert.equal(atAddress.length, 1);
@@ -193,7 +193,7 @@ test('a byte-identical resend against the LIVE slot replays'
     ));
     assert.equal(first.status, 201);
     const firstId = first.headers.get('Response-ID');
-    const countAfterFirst = (await db.pairs.getAll()).length;
+    const countAfterFirst = (await db.messagePairs.getAll()).length;
     const resend = await handleRequest(db, req(
         'PUT', '/identities/uKYubOSYwiunzyPztWBtkw/pii', DEV_TOKEN,
         humanPii('Dana'),
@@ -204,7 +204,7 @@ test('a byte-identical resend against the LIVE slot replays'
     // answers this resend; the live slot's row is untouched.
     assert.equal(resend.headers.get('Response-ID'), firstId);
     assert.equal(
-        (await db.pairs.getAll()).length, countAfterFirst,
+        (await db.messagePairs.getAll()).length, countAfterFirst,
     );
 });
 
@@ -234,8 +234,8 @@ test('a byte-identical resend AFTER supersession finds no'
     assert.equal(resend.status, 201);
     assert.equal(resend.headers.get('Supersedes'), null);
     assert.notEqual(resend.headers.get('Response-ID'), firstId);
-    const pairs = await db.pairs.getAll();
-    const atAddress = pairs.filter(
+    const messagePairs = await db.messagePairs.getAll();
+    const atAddress = messagePairs.filter(
         r => r.uri_collection === '/identities/uLUQPJnlVuzeGqXLYqCItA/pii/',
     );
     assert.equal(atAddress.length, 1);
@@ -323,8 +323,7 @@ test('grant -> accept -> human-member create -> edit -> erase'
     // localStorage session-credentials JWT name claim, and
     // replay resurrection of a RETAINED pre-erasure PUT request
     // are named residuals OUTSIDE this theorem — see API.md.
-    // Gate 6 residual: SCHEMA.md § Orphan stores (canonical).
-    // Phase Final Stage B: identity spine tables retired.
+    // residual: SCHEMA.md § PII erasure.
 });
 
 // ── 6. The zone's confinement: a non-/pii DELETE still APPENDS ──
@@ -349,8 +348,8 @@ test("the zone's confinement: a non-/pii DELETE (a memberships"
     // Unlike /pii, a seat DELETE still APPENDS — the
     // hard-delete zone is confined to identities/:id/pii alone.
     assert.equal(del.headers.get('Supersedes'), null);
-    const pairs = await db.pairs.getAll();
-    const atAddress = pairs.filter(
+    const messagePairs = await db.messagePairs.getAll();
+    const atAddress = messagePairs.filter(
         r => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'members/'
             && r.uri_id === 'XSNEaxodzAorrAiVBegDGw',
@@ -376,7 +375,7 @@ test('stored PUT body equals piiEntityOf', async () => {
     );
     const expected = piiEntityOf(id, {
         uriId: '',
-        pairId: id,
+        messagePairId: id,
         method: 'PUT',
         body: fields,
     });

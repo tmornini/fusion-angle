@@ -451,7 +451,7 @@ Org-nested. No flat `/objectives` collection. No bulk
 
 ### 2.10 Lifecycle history — the per-URI event log
 
-Lifecycle is pair-plane only. The `states` table and
+Lifecycle is message-plane only. The `states` table and
 every verb on the shared event-append address are
 RETIRED. There is **no** bulk
 `GET work-orders/history` and **no** bulk
@@ -482,7 +482,7 @@ GET rows. Flows keep `StateEntity[]` on the list
 (deferred).
 
 `GET /api/organizations/:id/work-orders/:id/history` —
-`workOrderHistoryFor` (entity-scoped op-pair replay
+`workOrderHistoryFor` (entity-scoped operation-message-pair replay
 + transition fold). Wire:
 `WorkOrderHistoryEventEntity` with inline
 `field_values`. Empty → `missedReadError` → foreign
@@ -512,7 +512,8 @@ alias; nested field-values write (and the retired
 field-values GET). Live field-value writes ride the
 work-order transition fold only. No
 `WRITE_RESPONSE_SPECS` leaf; seed forms transition
-op pairs, not bare leaf pairs (§5.16 / §5.19).
+operation message pairs, not bare leaf pairs
+(§5.16 / §5.19).
 
 Lifecycle **writes** ride document-trio PUTs
 (ideas / projects / record-types / flows /
@@ -529,7 +530,7 @@ Org-scoped document PUT/DELETE hit the write authorizer
 `resolveOwningOrganization` fallback) so a foreign id
 403s rather than genesis-ing in the caller's namespace;
 genuine absence still 404s (or genesis on PUT).
-Surviving stores are global (`pairs`);
+Surviving stores are global (`message_pairs`);
 tenancy rides `uri_collection`. There is no
 org-scoped adapter.
 
@@ -597,20 +598,22 @@ mapping (single-noun HTTP primitives composed as a
 `post_operation`); and **properties** (atomicity, idempotency,
 TOCTOU-safety, validator, actor source).
 
-**Pair-plane only (Phase Final).** Surviving stores are
-exactly `pairs`. Every write composition
+**Message-plane only (Phase Final).** Surviving stores are
+exactly `message_pairs`. Every write composition
 below opens `db.transaction(MESSAGE_TABLES, …)`
 and appends message pairs — there is no entity-table put
-and no `states.postEvent`. Lifecycle rides document-pair
-bodies (trio families fold `state` / `state_at` /
-`state_event_id` into the document body) or named-op pairs
+and no `states.postEvent`. Lifecycle rides
+document-message-pair bodies (trio families fold
+`state` / `state_at` / `state_event_id` into the
+document body) or named-operation message pairs
 (work-order claim / transition / binding,
 invitations).
 
-Notation in the doctrinal lines: `put_x` ≈ the document
-pair a live `PUT /x/:id` would form; `post_op` ≈ the
-operation pair at the POST address; `delete_x` ≈ a
-marked tombstone pair at `DELETE /x/:id`. The retired
+Notation in the doctrinal lines: `put_x` ≈ the
+document message pair a live `PUT /x/:id` would
+form; `post_op` ≈ the operation message pair at
+the POST address; `delete_x` ≈ a marked tombstone
+pair at `DELETE /x/:id`. The retired
 `post_state_event` ≈ shared event-append mapping is GONE
 with the address.
 
@@ -782,7 +785,7 @@ PII, so it stays one atomic write).
 - actual: the bundle (Phase 10 Task 5, §5.14):
   `appendMessagePair(operation)`, then
   `appendMessagePair(identityDocument)`, then — service only —
-  `appendMessagePair(credentialDocument)`. Pair-plane only.
+  `appendMessagePair(credentialDocument)`. Message-plane only.
 - doctrinal: `post_op` + `put_identity` (+
   `put_identity_credential` for service) as
   `post_create_identity`.
@@ -985,7 +988,7 @@ The lone cross-aggregate write.
 - actual: 3+N `appendMessagePair` calls (operation + project
   document with genesis trio + idea document with
   `promoted` trio + N baseline documents) when the gate
-  supplied the bundle — pair-plane only.
+  supplied the bundle — message-plane only.
 - doctrinal: `post_op` + `put_project` + `put_idea` + N
   `put_baseline_score` as `post_convert_idea` (lifecycle on
   document bodies).
@@ -995,7 +998,7 @@ The lone cross-aggregate write.
 
 **3+N pairs, one tx (Phase 3 Task 4 + Phase 5 Task 5 + Phase 7
 Task 4).** The route pre-forms 2+N extra pairs beside the
-gate's own operation pair, ONLY when the gate supplied both a
+gate's own operation message pair, ONLY when the gate supplied both a
 pair and a fence organization — a below-facade caller
 (`api/mock-data.ts`) skips all 3+N:
 
@@ -1012,7 +1015,7 @@ pair and a fence organization — a below-facade caller
   `validateIdeaDocumentBody` — byte-indistinguishable from a
   live `PUT /ideas/:id`. UNLIKE the project pair, the idea's
   address is NOT fresh — the idea already exists, so
-  `headPairIdAt` finds its prior document pair and this one
+  `headPairIdAt` finds its prior document message pair and this one
   records `Supersedes` against it. **This closes the standing
   'promoted' watch-point** (named at Phase BBjWJsjYIDkTRKIIPrzWRw/3): before
   this
@@ -1041,7 +1044,7 @@ atomic write in this catalog.
 - tx: `MESSAGE_TABLES`
 - actual: three `appendMessagePair` calls (operation, flow
   document with initial trio + graphDelta/revivals, project-
-  flow join) when the gate supplied the bundle — pair-plane
+  flow join) when the gate supplied the bundle — message-plane
   only.
 - doctrinal: `post_op` + `put_flow` + `put_project_flow` as
   `post_create_flow` (lifecycle on the flow document body).
@@ -1049,15 +1052,15 @@ atomic write in this catalog.
 
 **Three pairs, one tx (Phase 4 Task 5), mirrored by work-orders'
 own create (§3.17).** The route pre-forms two extra pairs beside
-the gate's own operation pair, ONLY when the gate supplied both a
+the gate's own operation message pair, ONLY when the gate supplied both a
 pair and a fence organization — a below-facade caller
 (`api/mock-data.ts`) skips all three:
 
-- **The operation pair** — the gate's own, at the SAME address a
+- **The operation message pair** — the gate's own, at the SAME address a
   live genesis `PUT /flows/:id` would use: `createdEntityUriId`'s
   override collapses `POST /flows` onto `flows/:id`'s own
   (uriCollection, uriId), so the two verbs chain against one address.
-- **The document pair** — PUT-shaped, at `flows/:id`'s own
+- **The document message pair** — PUT-shaped, at `flows/:id`'s own
   address, body `flowCreateDocumentBody(b)` (the flow's own five
   fields, the initial-state trio, the reduced graph via
   `reduceCreateGraphDelta`, and the two transitional sidecars
@@ -1074,12 +1077,14 @@ pair and a fence organization — a below-facade caller
 
 All three pairs share ONE `requestAt` (the create's own
 origination) yet strictly-later response `at` stamps, so the
-document pair — appended AFTER the operation pair — becomes the
-entity address's head. A duplicate create (same flow id) therefore
-records `Supersedes` on its own new document pair against the
-prior document pair; the duplicate's own operation pair, reading
-that SAME shared address fresh at gate entry, supersedes that same
-prior document pair too (`POST` never rides the locked
+document message pair — appended AFTER the operation
+message pair — becomes the entity address's head. A
+duplicate create (same flow id) therefore records
+`Supersedes` on its own new document message pair against
+the prior document message pair; the duplicate's own
+operation message pair, reading that SAME shared address
+fresh at gate entry, supersedes that same prior document
+message pair too (`POST` never rides the locked
 four-outcome table — that arm is `PUT`-only on `flows/:id` itself,
 §5.4 — so a duplicate create always chains via `Supersedes`, never
 412s). Three pairs commit or none: a mid-transaction failure (a
@@ -1094,7 +1099,7 @@ plus the lifecycle trio (`state`, `state_at`, `state_event_id`),
 the client-authored post-save `graph` (byte-identical to the GET
 wire form, no transform — GET reassembles from body.graph via
 `flowEntityOf`), and two write-side SIDECAR-KEEP fields
-(`graphDelta`, `revivals` — pair-plane RESTRICT/bindings via
+(`graphDelta`, `revivals` — message-plane RESTRICT/bindings via
 `flowGraphBindingsFromPairs` in `api/derive-flows.ts`; the
 old-plane relation writer `writeFlowGraphDelta` and
 `deriveFlowGraphStates` are RETIRED). UNLIKE
@@ -1118,7 +1123,7 @@ Task 8, undo-as-replay): `POST /flows/:id/versions` stays
 unwired (405). Pair-chain `GET /flows/:id/versions` and
 `GET /flows/:id/versions/:version` are live. Undo
 resolves its restore target from THIS route's
-own document-pair history (§3.14); nothing archives a
+own document-message-pair history (§3.14); nothing archives a
 versions snapshot before a save.
 
 - tx: `MESSAGE_TABLES`
@@ -1142,8 +1147,8 @@ versions snapshot before a save.
   `deriveFlow` so it can embed `hasUndoHistory`; it does
   not stream the stored PUT.
 - **Undo advances the shadow head.** Undo forms its own
-  document pair (PUT-shaped, at `flows/:id`'s own address) in
-  the SAME transaction as its own operation pair. Undo
+  document message pair (PUT-shaped, at `flows/:id`'s own address) in
+  the SAME transaction as its own operation message pair. Undo
   therefore moves `flows/:id`'s own head exactly like any
   other save. A save racing an undo for the same head
   412s on the in-tx live-PUT latch; the client absorbs
@@ -1163,11 +1168,11 @@ more. The restore target is resolved SERVER-SIDE, formed
 pre-tx — crypto, hashing, and timers never run inside an
 open transaction (AGENTS.md § Transaction bodies await
 only row ops), by walking this flow's OWN `flows/:id`
-document-pair history and this flow's OWN `flows/:id/undo`
-operation-pair history together
+document-message-pair history and this flow's OWN `flows/:id/undo`
+operation-message-pair history together
 (`resolveFlowUndoTarget`, `api/derive-flows.ts`): a stack+pointer
-replay where a document pair correlated (by its STORED REQUEST
-`at`, never the response `at`) to an undo operation pair only
+replay where a document message pair correlated (by its STORED REQUEST
+`at`, never the response `at`) to an undo operation message pair only
 moves the pointer back, never pushes a new logical state — the
 one piece a naive "N pairs back" count gets wrong across an
 undo-save-undo sequence. `target === undefined` is exhaustion
@@ -1186,17 +1191,18 @@ below.
 - tx (target resolved): `MESSAGE_TABLES` — NO
   `flow_versions` (table DELETED Phase Final).
 - actual (target resolved): server computes graphDelta /
-  revivals from CURRENT vs TARGET document-pair graphs
+  revivals from CURRENT vs TARGET document-message-pair graphs
   (`api/flow-graph-diff.ts`); then `appendMessagePair(pair)`
   + `appendMessagePair(documentPair)` with the restore body
-  (SIDECAR-KEEP). Pair-plane only.
+  (SIDECAR-KEEP). Message-plane only.
 - **Exhaustion is a graceful no-op, not an error.** When
   resolution finds no target, the route still appends its OWN
-  operation pair alone — no document pair, no domain writes —
+  operation message pair alone — no document message
+  pair, no domain writes —
   since the gate requires every wired write to have stored a
   pair (`api.ts`'s "wired write stored no pair" guard fires
   otherwise). A LATER resolution walk correctly ignores this
-  attempt: it carries no correlated document pair to displace
+  attempt: it carries no correlated document message pair to displace
   anything. Send-time **201** either way — undo
   appends (target resolved or exhaustion). The
   client cannot and does not need to distinguish
@@ -1207,13 +1213,13 @@ below.
   computed PRE-HANDLER, from request params/body alone — this
   route's own 201 can never carry post-resolution data. Instead,
   `FlowWithGraph`/`FlowGraph` (§5.x) carry a `hasUndoHistory`
-  boolean — this flow's own document-pair count exceeding one —
+  boolean — this flow's own document-message-pair count exceeding one —
   computed by `flowEntityOf` (`api/derive-flows.ts`) and reused
   by the trailing `GET /flows/:id` the client already makes
   after every undo (and at page load), so the signal costs zero
   new wire reads.
 - **SIDECAR-KEEP.** `graphDelta`/`revivals` still land in the
-  restore's own document pair body, feeding
+  restore's own document message pair body, feeding
   the live graph reassembly on the next GET exactly like
   any other save's — the MECHANISM persists even though the
   VALUES are now server-computed rather than client-supplied
@@ -1224,9 +1230,9 @@ below.
   document body).
 - **Two pairs, one tx (or one pair, zero domain writes, on
   exhaustion).** Undo synthesizes a second pair — a PUT-shaped
-  document pair at `flows/:id`'s own address
+  document message pair at `flows/:id`'s own address
   (`put_flow_document`, §3.13), taking the FOLLOWS slot at the
-  pre-undo head — beside its own operation pair; both append in
+  pre-undo head — beside its own operation message pair; both append in
   the ONE transaction when a target resolves, so a pair count of
   two or one (exhaustion) or zero (a genuinely missing flow —
   `EntityNotFoundError`), never anything else. See §3.13's own
@@ -1242,9 +1248,9 @@ originally described (archive the current state through
 `POST /flows/:id/versions`, THEN save) collapsed to one write at
 Phase 14 Task 8 (undo-as-replay): that archive existed solely to
 give the OLD undo mechanism a `flow_versions` row to consume: now
-that undo resolves its target from the `flows/:id` document-pair
-history instead, this PUT's OWN document pair is exactly what a
-LATER undo's pair-plane walk finds as "the state before the
+that undo resolves its target from the `flows/:id` document-message-pair
+history instead, this PUT's OWN document message pair is exactly what a
+LATER undo's message-plane walk finds as "the state before the
 redo," with no archive needed. Any fault — putFlow's own
 exhausted retry or a non-412 error — propagates to the caller
 (§3.13's own retry loop absorbs a 412 internally). The route
@@ -1290,11 +1296,11 @@ re-implement):
 
 **The create-triple (Phase 5 Task 3), mirroring flows' own create
 (§3.12).** The route (not `postWorkOrderCreationOp`) pre-forms two
-extra pairs beside the gate's own operation pair, ONLY when the
+extra pairs beside the gate's own operation message pair, ONLY when the
 gate supplied both a pair and a fence organization — a
 below-facade caller (`api/mock-data.ts`) skips all three:
 
-- **The document pair** — PUT-shaped, at `work-orders/:id`'s own
+- **The document message pair** — PUT-shaped, at `work-orders/:id`'s own
   address (the SAME address `POST /work-orders` collapses onto,
   via the registry's create-address override — §5.6), body
   `{display_id, flow_graph, position}` picked directly from the
@@ -1313,8 +1319,9 @@ below-facade caller (`api/mock-data.ts`) skips all three:
 
 All three pairs share ONE `requestAt` (the create's own
 origination) yet strictly-later response `at` stamps, so the
-document pair — appended AFTER the operation pair — becomes the
-entity address's head. A duplicate create (same work-order id)
+document message pair — appended AFTER the operation
+message pair — becomes the entity address's head. A
+duplicate create (same work-order id)
 still appends; `(at, id)` reduction alone decides the new head
 (`work-orders` is `'simple'` concurrency, §5.4 — last-writer-wins,
 no `If-Match`, never 412s). Send-time **201** on append (§5.1).
@@ -1341,7 +1348,7 @@ PUT .../work-orders/{work-order-id}/claim
 ```
 
 - tx: `MESSAGE_TABLES`
-- actual: pair-plane claim history
+- actual: message-plane claim history
   (`workOrderClaimHistoryFor` / derive) → if a live claim by
   another member → 409; by the caller → no-op; else
   `appendMessagePair(pair)` for the claim document (expiry
@@ -1385,11 +1392,11 @@ If-Match: "<instance-head-etag>"
   (targetState, delta, optional release) and — when
   `set`/`clear` present — the instance **revision** pair
   (server-formed full-state document via
-  `formDocumentPairFor`). Pure moves append the op pair
-  only. No separate states or state_field_values row
-  writes.
-- doctrinal: transition op pair (+ instance revision when
-  value-bearing; optional claim release) as
+  `formDocumentPairFor`). Pure moves append the operation
+  message pair only. No separate states or
+  state_field_values row writes.
+- doctrinal: transition operation message pair (+ instance
+  revision when value-bearing; optional claim release) as
   `post_transition_work_order`.
 - props: atomic (op + revision both-or-neither);
   member-tier; claim-agnostic server-side;
@@ -1453,7 +1460,7 @@ changed (admin, not member).
 
 - tx: `MESSAGE_TABLES`
 - actual: `validateRecordWriteBody(body)`; if removals,
-  RESTRICT referrer check (pair-plane) → 409 rolls back;
+  RESTRICT referrer check (message-plane) → 409 rolls back;
   then the bundle's pairs appended LAST: operation,
   document (lifecycle trio on body), N attribute-PUTs,
   M attribute-DELETEs.
@@ -1469,18 +1476,18 @@ VARIABLE-CARDINALITY synthesis; re-homed nested by the
 org-nested record-types wave).** Unlike the
 flows/work-orders create-triple (§3.12/§3.17, always
 exactly three), a record-type write's pair count scales
-with its own attribute arrays: the operation pair, the
-document pair, one attribute-PUT pair per
+with its own attribute arrays: the operation message pair, the
+document message pair, one attribute-PUT pair per
 `attributes[]` entry (N), and — edit only — one
 attribute-DELETE pair per `removedAttributeIds` entry
 (M; a create body has no `removedAttributeIds` field at
 all, so M is always 0 there). The route pre-forms every
-non-operation pair beside the gate's own operation pair,
+non-operation message pair beside the gate's own operation message pair,
 ONLY when the gate supplied both a pair and a fence
 organization — a below-facade caller (`api/mock-data.ts`)
 skips them all:
 
-- **The document pair** — PUT-shaped, at
+- **The document message pair** — PUT-shaped, at
   `organizations/:org/record-types/:id`'s own address
   (the SAME address nested `POST .../record-types`
   collapses onto), body `recordDocumentBodyOf(b)`: the
@@ -1524,14 +1531,14 @@ dispatched route to resolve a fence organization or response
 spec from.
 
 All pairs share ONE `requestAt` (the write's own origination) yet
-strictly-later response `at` stamps, so the document pair —
-appended AFTER the operation pair — becomes the entity address's
+strictly-later response `at` stamps, so the document message pair —
+appended AFTER the operation message pair — becomes the entity address's
 head, exactly like flows'/work-orders' own create (§3.12/§3.17).
 A duplicate create (same record-type id) therefore records
-`Supersedes` on its own new document pair against the PRIOR
-document pair; the duplicate's own operation pair, reading
+`Supersedes` on its own new document message pair against the PRIOR
+document message pair; the duplicate's own operation message pair, reading
 that SAME shared address fresh at gate entry, supersedes
-that same prior document pair too (`record-types` is
+that same prior document message pair too (`record-types` is
 `'simple'` concurrency, §5.4). The whole bundle commits or
 none: a mid-transaction failure (a state-ledger collision,
 or a RESTRICTed removal) leaves ZERO of the bundle's pairs,
@@ -1558,7 +1565,7 @@ UNCHANGED (`initialState`/`initialStateEventId`/
 - tx: `MESSAGE_TABLES`
 - actual: three `appendMessagePair` calls (operation,
   objective document with lifecycle trio, revision document)
-  when the gate supplied the bundle — pair-plane only.
+  when the gate supplied the bundle — message-plane only.
 - doctrinal: `post_op` + `put_objective` +
   `put_objective_revision` as `post_create_objective`.
 - props: atomic; lifecycle on the document body (trio family);
@@ -1566,16 +1573,16 @@ UNCHANGED (`initialState`/`initialStateEventId`/
 
 **Three pairs, one tx (Phase 7 Task 3), the flows/work-orders
 fixed-triple precedent (§3.12/§3.17).** The route pre-forms two
-extra pairs beside the gate's own operation pair, ONLY when the
+extra pairs beside the gate's own operation message pair, ONLY when the
 gate supplied both a pair and a fence organization — a
 below-facade caller (`api/mock-data.ts`) skips all three:
 
-- **The operation pair** — the gate's own, at the SAME address a
+- **The operation message pair** — the gate's own, at the SAME address a
   live genesis `PUT /objectives/:id` would use:
   `createdEntityUriId`'s override collapses `POST /objectives`
   onto `objectives/:id`'s own (uriCollection, uriId), so the two
   verbs chain against one address.
-- **The document pair** — PUT-shaped, at `objectives/:id`'s own
+- **The document message pair** — PUT-shaped, at `objectives/:id`'s own
   address, body `objectiveDocumentBodyOf(b)` (the create body's
   `objective` sub-object with `organization_id` stripped, plus
   the genesis lifecycle trio — the live `PUT /objectives/:id`
@@ -1609,12 +1616,14 @@ spec from.
 
 All three pairs share ONE `requestAt` (the create's own
 origination) yet strictly-later response `at` stamps, so the
-document pair — appended AFTER the operation pair — becomes the
-shared objective address's head. A duplicate create (same
-objective id) therefore records `Supersedes` on its own new
-document pair against the prior document pair; the duplicate's
-own operation pair, reading that SAME shared address fresh at
-gate entry, supersedes that same prior document pair too
+document message pair — appended AFTER the operation
+message pair — becomes the shared objective address's
+head. A duplicate create (same objective id) therefore
+records `Supersedes` on its own new document message pair
+against the prior document message pair; the duplicate's
+own operation message pair, reading that SAME shared
+address fresh at gate entry, supersedes that same prior
+document message pair too
 (`objectives` is `'simple'` concurrency, §5.4). Three pairs
 commit or none: a mid-transaction failure (a validation 400 on
 the derived document or revision body, say) leaves zero of the
@@ -1633,13 +1642,13 @@ three, exactly like every other atomic write in this catalog.
   `headPairIdAt` feeds the `Supersedes` chain)
   → the pre-tx idempotency point-read (`storedResponseFor`).
 - tx: `MESSAGE_TABLES`
-- actual: pair-plane guards (already-member; pending
+- actual: message-plane guards (already-member; pending
   invitation derive) → on fresh: `appendMessagePair(pair)`
   (operation) + `appendMessagePair(document)` (invitation
   document with pending lifecycle); duplicate echo appends
   operation only (§5.11).
-- doctrinal: member/pending guards + invitation document
-  pair as `post_grant_invitation`.
+- doctrinal: member/pending guards + invitation
+  document message pair as `post_grant_invitation`.
 - props: atomic; admin-only; idempotent on an outstanding pending
   invite (the duplicate-echo branch still appends its own pair);
   TOCTOU-safe (the guards ride the write tx, re-verified against the
@@ -1657,7 +1666,7 @@ a seat, not a leftover `/memberships/:id` row.
   (operation-addressed, no head-read) → the pre-tx idempotency
   point-read.
 - tx: `MESSAGE_TABLES`
-- actual: pair-plane invitation state guard (`accepted` →
+- actual: message-plane invitation state guard (`accepted` →
   no-op pair; not `pending` → 409, nothing); already-member
   guard; if new member: `appendMessagePair(seatDocument)` —
   `PUT /organizations/:organization-id/members/:identity-id`
@@ -1665,8 +1674,9 @@ a seat, not a leftover `/memberships/:id` row.
   accept; always `appendMessagePair(pair)` on no-op/pending
   paths. Seats win leftover `/memberships` rows until Task
   55.
-- doctrinal: state guard + seat document pair + accept op
-  pair as `post_accept_invitation`.
+- doctrinal: state guard + seat document message pair +
+  accept operation message pair as
+  `post_accept_invitation`.
 - props: atomic; invitee-only; idempotent (re-accept is a no-op,
   still its own genesis pair — never a `Supersedes` chain);
   the seat is written in the **invitation's** org, never the
@@ -1679,11 +1689,11 @@ a seat, not a leftover `/memberships/:id` row.
 - before tx: `loadInvitation`; assert invitee (403 otherwise);
   `formInvitationOpPair` → the pre-tx idempotency point-read.
 - tx: `MESSAGE_TABLES`
-- actual: pair-plane invitation state guard; `declined` →
-  no-op pair; not `pending` → 409; else accept-style op
-  pair with declined lifecycle.
-- doctrinal: state guard + decline op pair as
-  `post_decline_invitation`.
+- actual: message-plane invitation state guard; `declined` →
+  no-op pair; not `pending` → 409; else accept-style
+  operation message pair with declined lifecycle.
+- doctrinal: state guard + decline operation message
+  pair as `post_decline_invitation`.
 - props: atomic; invitee-only; idempotent, its own genesis pair; the
   invitation row persists as audit (no membership written).
 
@@ -1695,10 +1705,11 @@ a seat, not a leftover `/memberships/:id` row.
   (403 otherwise); `formInvitationOpPair` → the pre-tx idempotency
   point-read.
 - tx: `MESSAGE_TABLES`
-- actual: pair-plane invitation state guard; `revoked` →
-  no-op pair; not `pending` → 409; else revoke op pair.
-- doctrinal: state guard + revoke op pair as
-  `post_revoke_invitation`.
+- actual: message-plane invitation state guard; `revoked` →
+  no-op pair; not `pending` → 409; else revoke operation
+  message pair.
+- doctrinal: state guard + revoke operation message pair
+  as `post_revoke_invitation`.
 - props: atomic; admin-only; idempotent, its own genesis pair; the
   invitation row persists as audit.
 
@@ -1758,7 +1769,7 @@ the new position. There is no shared `states` log
 
 - tx: `MESSAGE_TABLES`
 - actual: `validateObjectiveDocumentBody(body)` →
-  `appendMessagePair(pair)` (pair-plane only; lifecycle trio
+  `appendMessagePair(pair)` (message-plane only; lifecycle trio
   on the document body).
 - props: atomic; document-class (a repeat PUT records
   `Supersedes`, §5.1); `validateObjectiveDocumentBody`'s
@@ -1784,7 +1795,7 @@ organization_id, identity_id, type, at }`.
 ### — RETIRED (Phase 15 Task 7)
 
 **Table-backed PUT/DELETE retired** with the publish
-op (§3.16). Pair-plane GET
+op (§3.16). Message-plane GET
 `/flows/:id/versions/:version` is live
 (`documentVersionRoute`, §2.10). Historical leaf
 shape: DOCUMENT-class PUT/DELETE over
@@ -1805,7 +1816,7 @@ the shared event-append address is retired (§2.10).
 
 - tx: `MESSAGE_TABLES`
 - actual: `appendMessagePair(pair)` — entity fields plus
-  lifecycle trio on the document body; pair-plane only.
+  lifecycle trio on the document body; message-plane only.
 - doctrinal: `put_project_document` (lifecycle on the body).
 - props: atomic; member-tier; `validateProjectDocumentBody`;
   idempotent; MEMBER_ID CAVEAT — a state-unchanged edit
@@ -1834,7 +1845,7 @@ the RESTRICT tombstone (§5.7). **Admin-tier** mutation
 
 - tx: `MESSAGE_TABLES`
 - actual: `appendMessagePair(pair)` — entity fields plus
-  lifecycle trio on the document body; pair-plane only.
+  lifecycle trio on the document body; message-plane only.
 - doctrinal: `put_record_type_document` (lifecycle on
   the body).
 - props: atomic; admin-tier;
@@ -1852,22 +1863,24 @@ record-type. Body:
 { "instance_id": "...", "record_type_id": "..." }
 ```
 
-→ **201** on first append. One binding op pair, one
-tx — no document write, no instance revision. The
-CURRENT bind derives from the WO's own binding
-op-pair prefix (latest `(at, id)` wins) — claim-op
-derive precedent. WO entity GET (detail and list
+→ **201** on first append. One binding operation
+message pair, one tx — no document write, no
+instance revision. The CURRENT bind derives from
+the WO's own binding operation-message-pair prefix
+(latest `(at, id)` wins) — claim-op derive
+precedent. WO entity GET (detail and list
 rows) EMBEDS the derived bind as `instance_id` +
 `record_type_id` wire fields
 (derive-at-read; never a document field; the
 `hasUndoHistory` embed precedent).
 
 - tx: `MESSAGE_TABLES`
-- actual: derive current bind (op-pair prefix) → if a
+- actual: derive current bind (operation-message-pair prefix) → if a
   prior pair names a DIFFERENT
   `(instance_id, record_type_id)` → 409; else
   `appendMessagePair(pair)` for the binding op.
-- doctrinal: binding op pair as `put_bind_work_order`.
+- doctrinal: binding operation message pair as
+  `put_bind_work_order`.
 - props: atomic; **TOCTOU-safe** (in-tx rebind check);
   **claim-agnostic** member-tier (A7 — parity with the
   transition op's shipped posture; workbox UX may still
@@ -1929,7 +1942,7 @@ The message plane IS the schema of record (Phase Final).
 Every pair-wired write (`PAIR_WIRED_ROUTE_PATTERNS`, plus the
 invitations/XmzGzKMbFITEJlKoyPPSww side channels and the two
 `/authentication` grant routes) appends one row to
-`pairs` — request and response sharing an `id` — as
+`message_pairs` — request and response sharing an `id` — as
 the LAST (and only storage) act of its own transaction
 (`appendMessagePair`, `api/message-pair.ts`). There is no
 dual-write row half and no entity table beside the ledger.
@@ -2032,8 +2045,8 @@ Task 8, §5.17) — no dedicated op wraps that family, so it stands
 outside the FIFTEEN
 (`buildMockDataInvocations`, `api/mock-data/seed-message-pairs.ts`),
 so the seed forms each family's pair the SAME way a live
-request would, then appends it on the pair plane only
-(`pairs` — Phase Final deleted every entity
+request would, then appends it on the message plane only
+(`message_pairs` — Phase Final deleted every entity
 table; no dual-write beside a seeded row):
 
 - The mock-data seed pre-forms **1498** message pairs — one pair per seeded
@@ -2045,27 +2058,28 @@ table; no dual-write beside a seeded row):
   the objectives-family 1+1+1 precedent generalized to the roster —
   that member-document trio is RETIRED, §3.1–§3.4), PLUS each
   seeded human ALSO folds in its OWN
-  `identities/:id/pii` document pair (11 more — Phase 10 Task 2's
+  `identities/:id/pii` document message pair (11 more — Phase 10 Task 2's
   intake decomposition, prose at §3.4: `postIdentityPiiDocumentOp`
   nested in the SAME transaction as the member-facet writes, ordered
   BEFORE `seedHumanCredentials` runs so its pii-presence filter still
   finds every login-capable person), PLUS each seeded human ALSO folds
-  in its OWN `identities/:id` document pair (11 more — Phase 10 Task 5,
+  in its OWN `identities/:id` document message pair (11 more
+  — Phase 10 Task 5,
   §5.14: the human-member create-time bundle widens from a triple to a
   quadruple, human-only — an AI member forms no identities row,
-  finding 10, so its own triple is unchanged), each seeded membership
-  row folds
-  in its OWN document
-  pair (16 — 11 human-member-organization rows, `current` counted
+  finding 10, so its own triple is unchanged), each seeded
+  membership row folds in its OWN document message pair
+  (16 — 11 human-member-organization rows, `current` counted
   twice for its two-organization membership, + 4 ai-member rows,
   closed through `postMembershipDocumentOp`), the system member's own
   `members/:id` document forms ONE more pair (closed through
   `postMemberDocumentOp`, Phase 8 Task 5, the LAST whole-slice seed
   deferral to close), each seeded flow folds in an
   operation/document/join triple (4 creates × 3 pair triples + 1 genesis
-  document = 13, §3.12), each seeded work order forms both a document
-  pair and a join pair (145 + 145, §3.17), each seeded record folds
-  in its OWN document pair plus one attribute-PUT pair per seeded
+  document = 13, §3.12), each seeded work order forms both a
+  document message pair and a join pair (145 + 145, §3.17),
+  each seeded record folds
+  in its OWN document message pair plus one attribute-PUT pair per seeded
   attribute (2 operations + 2 documents + 14 attribute documents = 18,
   §3.20's bundle synthesis, generalized from flows'/work-orders' fixed
   1+1+1 to 1+1+N), each seeded objective folds in an
@@ -2073,14 +2087,15 @@ table; no dual-write beside a seeded row):
   flows'/work-orders' fixed 1+1+1 precedent verbatim), each seeded
   flow_records binding forms its own join pair (3 flow-record joins,
   closed through `postFlowRecordDocumentOp`), each seeded baseline/
-  actual score row forms its own document pair (49 baseline + 92 actual
+  actual score row forms its own document message pair
+  (49 baseline + 92 actual
   = 141, closed through `postBaselineScoreDocumentOp` /
   `postActualScoreDocumentOp`), PLUS the 4 AI members + the system
-  member each fold in their OWN `identities/:id` document pair (5
+  member each fold in their OWN `identities/:id` document message pair (5
   more — Phase 10 Task 6, §5.15: a standalone invocation, not a
   bundle-widening, since neither create-time bundle ever carried
   one), PLUS every seeded human/system credential row folds in its
-  OWN `identities/:id/credentials/:cid` document pair (12 more —
+  OWN `identities/:id/credentials/:cid` document message pair (12 more —
   11 human passwords + the system client secret, formed by
   `seedHumanCredentials`' OWN local pass-1/pass-2 split since a
   credential's hashed secret is unknown until PBKDF2 resolves),
@@ -2101,7 +2116,7 @@ table; no dual-write beside a seeded row):
   inside an open transaction (AGENTS.md § Transaction
   bodies await only row ops)); a second pass then appends
   each pre-formed pair in one `MESSAGE_TABLES` transaction
-  (pair-plane only —
+  (message-plane only —
   Phase Final deleted every entity table). The bootstrap seed
   forms exactly **twelve** such pairs (absolute; see
   `tests/mock-data-pairs.test.ts`). Total mock seed:
@@ -2286,7 +2301,7 @@ now declares:
   <table>/<id>`). Family name for ideas/projects/flows;
   `'work_orders'` for work-orders — a 404 label only (Phase
   Final deleted domain entity tables; surviving
-  `EntityStore` keys are `pairs` only).
+  `EntityStore` keys are `messagePairs` only).
 
 **PUT /work-orders/:id** now dispatches through
 `documentPutHandler(WORK_ORDERS_WIRING)` — the SAME `'simple'`
@@ -2485,7 +2500,7 @@ not standing doctrine.
   identical to the old-plane getById/getAll it replaced.
 - **DELETE stays hand-written** — the `records/:id` template
   (§5.7): no generic DELETE component exists for any family;
-  memberships DELETE is a pure pair-plane tombstone append.
+  memberships DELETE is a pure message-plane tombstone append.
 
 **PUT /memberships/:id** now dispatches through
 `documentPutHandler(MEMBERSHIPS_WIRING)` — the SAME `'simple'`
@@ -2502,7 +2517,7 @@ wire — all four keys (`organization_id`, `identity_id`,
 accept path stamps `type: 'member'` the same way); none
 tolerated-but-optional; `organization_id` rides the document
 body and the write-response spec's fence organization
-(pair-plane only — no org-scoped EntityStore stamp), so the
+(message-plane only — no org-scoped EntityStore stamp), so the
 wire acceptance and the stored pair body agree whenever a
 client's own organization_id is honest. THE
 LABEL MANDATE: the stray-key 400 body stays byte-identical
@@ -2616,7 +2631,7 @@ organization_id, identity_id, type, at }`.
 
 Phase 8 Task 6 gives the invitations side channel
 (`api/invitations-domain.ts`, §2.12/§3.22-3.25) its own
-document pairs and derivation, WITHOUT joining the route
+document message pairs and derivation, WITHOUT joining the route
 table — Author gate 2 is permanent: no `route()` entry, no
 `DocumentFamilyWiring` registration, no `WRITE_RESPONSE_SPECS`
 entry for `invitations/:id` exists or ever will. Task 8
@@ -2626,10 +2641,10 @@ are the live invitation read source. Author gate 2 still
 holds (no `route()` / wiring).
 
 **Grant: 2 pairs on a fresh outcome, 1 on a duplicate echo.**
-`grantInvitation` forms its existing operation pair (POST,
+`grantInvitation` forms its existing operation message pair (POST,
 `/invitations/`, `uriId` = the client-minted `invitationId`) as
 before; on the 'fresh' outcome ONLY it ALSO forms a PUT-shaped
-invitation DOCUMENT pair at the SAME `(uriCollection, uriId)` —
+invitation DOCUMENT message pair at the SAME `(uriCollection, uriId)` —
 body `{organization_id, identity_id, at}`, the entity minus
 `id`, so the wire NEVER carries the invitee's email (already
 resolved to `identity_id` at the gate). There is no live PUT
@@ -2638,7 +2653,7 @@ response is hand-built to the stored-row shape (`{id,
 ...body}`) rather than consulting a `WRITE_RESPONSE_SPECS`
 entry — the synthesized-only class, like the human-members
 detail document (§5.10) has no live-PUT twin either. A
-duplicate (idempotent-echo) grant's operation pair sits at the
+duplicate (idempotent-echo) grant's operation message pair sits at the
 DUPLICATE's own submitted id, but `deriveDocumentsAt`'s
 `DOCUMENT_METHODS` filter excludes POST — only a PUT/DELETE
 pair is ever a document head — so even if a document WERE
@@ -2648,13 +2663,14 @@ all for that outcome, belt-and-suspenders. Every conflict path
 appends nothing, unchanged.
 
 **Accept: the seat document — same Operation-ID.**
-`acceptInvitation` forms a PUT-shaped seat document pair
+`acceptInvitation` forms a PUT-shaped seat document message pair
 pre-tx — address
 `PUT /organizations/:organization-id/members/:identity-id`
 at the INVITATION's organization (never the caller's
 active org), `uriId` = the invitee's identity, body
 `{type: 'member', at}`, same Operation-ID as the accept
-op pair. Response via `WRITE_RESPONSE_SPECS` for that
+operation message pair. Response via
+`WRITE_RESPONSE_SPECS` for that
 seat pattern — the SAME spec a live admin `PUT` of a
 seat resolves. Formed pre-tx (crypto cannot run inside a
 transaction body) but appended ONLY inside the
@@ -2682,14 +2698,14 @@ op-address PAIR PRESENCE instead — 'accepted' iff any
 likewise 'declined'/'revoked', else 'pending'. This is the E13
 FULL-SCAN NAMED CLASS: no index serves "every request whose
 `uri_collection` has the shape `/invitations/<id>/<op>/`" for an
-arbitrary id, so this ONE reduction reads `db.pairs.getAll()`
+arbitrary id, so this ONE reduction reads `db.messagePairs.getAll()`
 in full, regardless of invitation count; its measured cost is
 recorded at the Task 9 CLI leg, not here. Mutual exclusivity of
 the three terminal states is the domain gate's OWN covenant
 (accept/decline/revoke each require 'pending' to succeed; a
 409 conflict appends nothing), never re-derived in this
 module — an id accumulates repeat pairs of only ONE op kind.
-Reads `db.pairs` ONLY; domain readers call
+Reads `db.messagePairs` ONLY; domain readers call
 it (Task 8 done). Author gate 2 still holds (no `route()`).
 
 **The gate-resolve settlement needs zero code change.** Today's
@@ -2716,11 +2732,11 @@ Phase 10 Task 3 gives `identities/:id/pii` (§2.2) the message
 plane's ONE sanctioned exception to the append-only covenant
 every other family honors. `replacePiiSlot`
 (`api/pii-hard-delete.ts`) is THE ONLY code path that deletes
-rows from `pairs` — grep-provable. Its two
+rows from `message_pairs` — grep-provable. Its two
 callers (`postIdentityPiiDocumentOp`'s PUT,
 the `identities/:id/pii` DELETE closure — both `api/routes.ts`)
 open only `MESSAGE_TABLES` (Phase Final Task 2
-stripped the `identity_pii` ROW half — pair-plane only). The
+stripped the `identity_pii` ROW half — message-plane only). The
 zone rides that SAME transaction, never a second one
 (Commandment X — wrap the indivisible in the platform's
 existing primitive).
@@ -2728,7 +2744,7 @@ existing primitive).
 **The single-slot register.** Every write at the address —
 PUT or DELETE — enumerates whatever pair(s) currently occupy it
 by ONE scan (`pairs.getAllWhere('uri_collection', ...)`), deletes
-THAT id-set from `pairs`, then appends its own pair. A PUT
+THAT id-set from `message_pairs`, then appends its own pair. A PUT
 leaves a PUT pair (the PII document); a DELETE leaves a DELETE
 pair (a bodyless erasure tombstone — evidence of erasure without
 erased content). Supersession and erasure are the SAME
@@ -2769,7 +2785,7 @@ append-only exemption.
 1-4, scoped to the STORED SERVER PLANE.** Because gate 1 confines
 every PII byte to the /pii address alone, and gates 2-4 keep
 that ONE address chainless and single-slot, erasing it (DELETE)
-leaves zero PII bytes anywhere `pairs` can
+leaves zero PII bytes anywhere `message_pairs` can
 be scanned (no `identity_pii` table remains) — proven end to
 end by a real
 grant → accept → human-member create → edit → erase chain
@@ -2986,7 +3002,7 @@ by construction (the type system, not a runtime check, closes
 the gap).
 
 **The identity-create bundle (person 1 → 2, service 1 → 3).**
-`postIdentityCreationOp` appends the operation pair, the
+`postIdentityCreationOp` appends the operation message pair, the
 synthesized `identityDocument` pair (+ `credentialDocument` for
 service) LAST, bundle-or-nothing — forming ALL pairs pre-tx
 before the transaction opens means a mid-formation failure (an
@@ -2998,8 +3014,9 @@ bundle inline pre-tx:
   able from a live `PUT /identities/:id` body — at the identity's
   own `identities/:id` address. `createBodyIdField` collapses
   `POST /identities` and `PUT /identities/:id` onto the SAME
-  address (§5.13), so `identityDocument` shares the operation
-  pair's own address and becomes its new head, appended after it
+  address (§5.13), so `identityDocument` shares the
+  operation message pair's own address and becomes its
+  new head, appended after it
   — the ai-members/detail-document create-address-collapse
   precedent (§3.1–§3.4).
 - The credential document body (service only) is the create
@@ -3059,7 +3076,7 @@ the wire was unchanged — the bundles are storage-only. **As of
 Phase Final:** that fingerprint oracle and the states-911 pin
 are RETIRED; standing absolutes are
 `EXPECTED_PAIR_COUNT = 1498` / bootstrap 12
-(`tests/mock-data-pairs.test.ts`); pair-plane spot-checks only.
+(`tests/mock-data-pairs.test.ts`); message-plane spot-checks only.
 
 ### 5.15 Gate-seeding the remaining spine slices: AI/system
 identities, credentials, role grants (Phase 10 Task 6)
@@ -3097,7 +3114,7 @@ strips the ROW half (pair-only seed/read; absolute 1498 / 12).
 
 **The credential seed transaction (present-tense).**
 Phase Final stripped the `identity_credentials` ROW half.
-`seedHumanCredentials` now opens a pair-plane-only
+`seedHumanCredentials` now opens a message-plane-only
 `adapter.transaction(MESSAGE_TABLES, ...)` and
 calls `postIdentityCredentialDocumentOp` inside it — the SAME
 op every live `PUT identities/:id/credentials/:cid` rides.
@@ -3146,8 +3163,8 @@ place the org-stamp bug surfaces, not a mere key-set check; the
 bootstrap count 7 → 11. One PRE-EXISTING assertion also needed a
 disambiguating fix, not a re-pin: the ai-member create-pair
 lookup matched by `uri_id` alone, which the new identities-
-document pair (sharing that SAME `uri_id`) now makes ambiguous —
-fixed by filtering on the operation pair's OWN 204 response, the
+document message pair (sharing that SAME `uri_id`) now makes ambiguous —
+fixed by filtering on the operation message pair's OWN 204 response, the
 SAME technique the ai-member detail-document test already uses
 (the H7/arrival-order hazard class) — the assertion itself is
 unchanged.
@@ -3160,7 +3177,7 @@ wrote the SAME row content the raw puts did; only the message
 plane (excluded from that fingerprint) grew. **As of Phase
 Final:** that fingerprint oracle is RETIRED (file absent);
 standing absolutes are `EXPECTED_PAIR_COUNT = 1498` /
-bootstrap 12 (`tests/mock-data-pairs.test.ts`); pair-plane
+bootstrap 12 (`tests/mock-data-pairs.test.ts`); message-plane
 spot-checks only. Reseed marginal cost measured ~2 ms for the
 +29 pairs (order-of-magnitude consistent with the ~0.144
 ms/pair baseline; within this harness's run-to-run noise
@@ -3265,7 +3282,7 @@ the entity-table / clients era (file absent).
 **Contract (as of Phase Final).** Absolute pair count is
 `EXPECTED_PAIR_COUNT = 1498` with bootstrap 12. Historical
 Path A dual-write (`appendMessagePair` beside row puts) is
-gone — only `pairs` remain; formerly
+gone — only `message_pairs` remain; formerly
 this task touches. Reseed marginal cost measured ~125 ms for the
 +868 `postMockDataLoad`-side pairs (baseline ~351 ms → ~478 ms,
 5 runs each; ≈0.144 ms/pair, consistent with §5.15's own baseline)
@@ -3324,7 +3341,7 @@ token, once per boot.
 **The gate-seed (+11).** The `identity_default_organizations`
 family is pair-only as of Phase Final Task 2 (ROW half stripped —
 no `adapter.identityDefaultOrganizations.put`; `TABLE_NAMES` is
-`pairs` only), closing the LAST family Phase 10
+`message_pairs` only), closing the LAST family Phase 10
 Task 6 (§5.15) deferred WHOLE: each forms its own message pair
 through a dedicated former (`formDefaultOrganizationSeedPair`,
 `api/mock-data/seed-message-pairs.ts`) that mirrors the live PUT's
@@ -3368,9 +3385,9 @@ through `handleRequest` (`tests/api-identity-default-organization.
 test.ts`, `tests/api-shadow-ledger-default-organization.test.ts`) —
 those already form genuine pairs alongside their raw rows and
 needed no change. `tests/api.test.ts`'s 500-fallback fault-injection
-test narrows its blanket `db.pairs.getAllWhere` override to the
+test narrows its blanket `db.messagePairs.getAllWhere` override to the
 `/ideas` domain-read prefix alone, since the fence's own fallback
-now ALSO reads `db.pairs` — an unrelated widened dependency
+now ALSO reads `db.messagePairs` — an unrelated widened dependency
 surface, not a weakened assertion.
 
 **Contract.** `identity_default_organizations` 11/`ab3efde4` HOLDS
@@ -3410,7 +3427,7 @@ does not flip a read by itself.
 
 **The seed pairs (Task 3).** Both seeded organizations (Stark
 Industries, Wayne Enterprises) form their OWN
-`organizations/:id` document pairs on the message plane.
+`organizations/:id` document message pairs on the message plane.
 Phase Final deleted the organizations row store; the live
 absolute is **EXPECTED_PAIR_COUNT = 1498** with bootstrap
 **12** (see `tests/mock-data-pairs.test.ts`). The retired
@@ -3464,8 +3481,8 @@ removed:**
   `GET /identities/:id/organizations/`.
 
 **What stayed old-plane (at Task 5's own close).** The
-`organizations` is pair-plane only after Phase Final —
-writes append document pairs at `organizations/:id`; there
+`organizations` is message-plane only after Phase Final —
+writes append document message pairs at `organizations/:id`; there
 is no dual-write row half. `PUT /organizations/:id` remains
 hand-written on the message plane.
 `callerOrganizationIds`'s membership filter and

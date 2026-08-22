@@ -19,7 +19,7 @@ import {
     postRecordDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     nowUtc,
     SYSTEM_MEMBER_ID,
@@ -117,7 +117,7 @@ async function seedRecordTypeBelowGate(
     const routeSegments =
         RECORD_TYPE_DETAIL_PATTERN.split('/');
     const pathSegments = pathname.slice(1).split('/');
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname,
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
@@ -140,7 +140,7 @@ async function seedRecordTypeBelowGate(
         operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+        db, id, body, SYSTEM_MEMBER_ID, messagePair,
     );
 }
 
@@ -428,7 +428,7 @@ test('stored PUT body equals recordTypeEntityOf of the'
     const expected = recordTypeEntityOf(
         {
             uriId: id,
-            pairId: id,
+            messagePairId: id,
             method: 'PUT',
             body,
         },

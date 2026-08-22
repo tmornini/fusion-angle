@@ -28,7 +28,7 @@ import {
     postWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import {
     apiRequest, TEST_OPERATION_ID,
@@ -45,7 +45,7 @@ const FV_M = generateIdentifier();
 // Phase Final Task 2: state_field_values dual-write stripped.
 // This file no longer compares derive vs row-plane oracles —
 // the SFV table is empty after live transitions. Coverage
-// re-homes to pair-plane derive + wire-byte handleRequest
+// re-homes to message-plane derive + wire-byte handleRequest
 // assertions. Leaf PUT/DELETE routes retired Phase 15 Task 7;
 // GET states/:id/field-values retired (states-URI elimination
 // C4) — product reads fold field values on work-order
@@ -79,7 +79,7 @@ function graphJson(): Record<string, unknown> {
     };
 }
 
-// Seed via REAL PUT so the WO carries a document pair.
+// Seed via REAL PUT so the WO carries a document message pair.
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
@@ -124,7 +124,7 @@ async function appendLegacyTransition(
         'organizations', STARK_ORGANIZATION,
         'work-orders', 'yNSSnbrpacodQTzUEcdEVA', 'transition',
     ];
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: TRANSITION_PATTERN,
@@ -141,7 +141,7 @@ async function appendLegacyTransition(
     });
     await postWorkOrderTransitionOp(
         db, 'yNSSnbrpacodQTzUEcdEVA', body, SYSTEM_MEMBER_ID,
-        undefined, [], pair,
+        undefined, [], messagePair,
     );
 }
 

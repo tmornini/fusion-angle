@@ -6,7 +6,7 @@ import {
 } from '../api/db-memory.ts';
 import { handleRequest } from '../api/api.ts';
 import { decodeAccessToken } from '../api/access-token.ts';
-import { documentPairsAt } from '../api/derive-documents.ts';
+import { documentMessagePairsAt } from '../api/derive-documents.ts';
 import { membershipExistsFor } from
     '../api/derive-memberships.ts';
 import { writeAuthorizerFor } from
@@ -17,7 +17,7 @@ import {
     postMembershipDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import { nowUtc, SYSTEM_MEMBER_ID } from
     '../api/types.ts';
 import { organizationToken, devToken } from
@@ -97,15 +97,15 @@ test('accept writes the seat at the invitation'
 
     const prefix = seatsPrefix(ORGANIZATION_TWO);
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere(
+        db.messagePairs.getAllWhere(
             'uri_collection', prefix),
-        db.pairs.getAllWhere(
+        db.messagePairs.getAllWhere(
             'uri_collection', prefix),
     ]);
-    const seats = documentPairsAt(
+    const seats = documentMessagePairsAt(
         requests, prefix,
-    ).filter((pair) => pair.uriId === SARAH_ID
-        && pair.method === 'PUT');
+    ).filter((messagePair) => messagePair.uriId === SARAH_ID
+        && messagePair.method === 'PUT');
     assert.equal(seats.length, 1);
     assert.deepEqual(seats[0]!.body, {
         type: 'member',
@@ -131,7 +131,7 @@ test('mint bakes claim roles from a seat, not a'
     await db.postSchemaCreation();
     await seedOrganizationDocument(db, 'AjdvjuECVZEgZoFajaIEkg', 'Stark');
     const body = { type: 'admin', at: AT };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/members/'
             + 'XXZruirZyAOoRpNxaDnpSA',
@@ -156,7 +156,8 @@ test('mint bakes claim roles from a seat, not a'
         operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
-        db, 'XXZruirZyAOoRpNxaDnpSA', body, SYSTEM_MEMBER_ID, pair,
+        db, 'XXZruirZyAOoRpNxaDnpSA', body, SYSTEM_MEMBER_ID,
+        messagePair,
     );
 
     const tokenRequest = new Request(

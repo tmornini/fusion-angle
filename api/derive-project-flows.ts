@@ -54,10 +54,10 @@ export async function deriveProjectFlows(
     projectId: Id,
 ): Promise<ProjectFlowEntity[]> {
     const prefix = projectFlowsUriPrefix(organization, projectId);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    const documents = deriveDocumentsAt(pairs, prefix);
+    const documents = deriveDocumentsAt(messagePairs, prefix);
     const rows: ProjectFlowEntity[] = [];
     for (const document of documents.values()) {
         rows.push(projectFlowEntityOf(document));

@@ -291,7 +291,7 @@ async function createFlow(
 }
 
 // Wire-byte GET helper: handleRequest text must equal
-// JSON.stringify(derive) for pair-plane oracles.
+// JSON.stringify(derive) for message-plane oracles.
 async function wireFlowText(
     db: MemoryDbAdapter,
     organization: string,
@@ -364,18 +364,18 @@ function assertWireEqualsDerived(
 // documents.ts's deriveDocumentsAt), exposed here so case 11 can
 // assert the Follows-chain terminal reaches EXACTLY this pair
 // id, not merely "a flow that looks right".
-async function derivedHeadPairId(
+async function derivedHeadMessagePairId(
     db: MemoryDbAdapter, organization: string, flowId: string,
 ): Promise<string> {
     const prefix = canonicalUriCollection(organization, '/flows/');
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
     const documents = deriveDocumentsAt(requests, prefix);
     const document = documents.get(flowId);
     assert.ok(document, 'no derived document for ' + flowId);
-    return document!.pairId;
+    return document!.messagePairId;
 }
 
 // Every seeded flow's own id, paired with the org the seed
@@ -678,7 +678,7 @@ test('live-write chain: create, save, node delete, undo, '
         (derived.graph as { nodes: { id: string }[] })
             .nodes.some((n) => n.id === n2),
         true,
-        'the revived node must be visible on the pair plane',
+        'the revived node must be visible on the message plane',
     );
 
     // Redo-as-save: re-apply the node deletion.
@@ -839,7 +839,7 @@ async () => {
     assert.equal(second.status, 201);
 
     // ONE flow head on wire/derive — the derived head is the
-    // (at, id) winner, the second create's own document pair.
+    // (at, id) winner, the second create's own document message pair.
     const derivedFlow = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
     );
@@ -878,8 +878,9 @@ async () => {
 
 // -- 9. the create-op POST pair is never the derived head -----
 
-test('the create-op POST pair is not read as a document pair '
-+ '(the method-filter proof at drift altitude)', async () => {
+test('the create-op POST pair is not read as a document'
++ ' message pair (the method-filter proof at drift altitude)',
+async () => {
     const db = await seededDb();
     const token = await organizationToken();
     const flowId = FLOW_DRIFT_METHOD_FILTER;
@@ -890,7 +891,7 @@ test('the create-op POST pair is not read as a document pair '
     );
     assert.equal(created.status, 201);
 
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const atAddress = requests.filter(
         (r) => r.uri_collection === '/organizations/AjdvjuECVZEgZoFajaIEkg/'
             + 'flows/'
@@ -1017,10 +1018,10 @@ test('the lock-head terminal reaches exactly the derived '
         headId = saved.headers.get('Response-ID')!;
     }
 
-    const headPairId = await derivedHeadPairId(
+    const headMessagePairId = await derivedHeadMessagePairId(
         db, STARK_ORGANIZATION, flowId,
     );
-    assert.equal(headId, headPairId);
+    assert.equal(headId, headMessagePairId);
 
     const derived = await deriveFlow(
         db, STARK_ORGANIZATION, flowId,
@@ -1102,7 +1103,7 @@ async () => {
     assertWireEqualsDerived(wireText, derived);
     // Graph content preserves both members/attrs regardless
     // of insertion order (normalizedGraph order-independence
-    // still applies on the pair plane).
+    // still applies on the message plane).
     const nodes = (derived.graph as {
         nodes: {
             id: string;
@@ -1159,7 +1160,7 @@ test('same-join-id retry: two different flow creates reusing '
         '/organizations/AjdvjuECVZEgZoFajaIEkg/projects/' + projectId
             + '/flows/',
     );
-    const joinResponses = await db.pairs.getAllAtAddress(
+    const joinResponses = await db.messagePairs.getAllAtAddress(
         joinPrefix, sharedPfid,
     );
     assert.equal(joinResponses.length, 2);

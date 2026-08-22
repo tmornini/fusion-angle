@@ -25,7 +25,7 @@ async function freshDb() {
 // Below-facade pair formation (the member-fixtures.ts idiom):
 // identityDefaultOrganization's primary-membership fallback (this
 // file's own motivating case) and the deny-by-default role check
-// both derive from the pair plane once role_grants/memberships
+// both derive from the message plane once role_grants/memberships
 // flip, so a raw row here would go derivation-invisible. Every
 // id/field value stays IDENTICAL to the raw puts these replace —
 // only the write mechanism changes.

@@ -21,7 +21,7 @@ import {
     identityDocumentEntityOf,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
 } from '../api/message-pair.ts';
 import {
@@ -141,7 +141,7 @@ async () => {
     const db = memoryDbAdapter();
     await db.postSchemaCreation();
     const body = identityFields();
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/identities/gTMDzYjclgPKfPUYsUdtoQ',
         routePattern: 'identities/:id',
@@ -155,12 +155,13 @@ async () => {
         operationId: TEST_OPERATION_ID,
     });
     const written = await postIdentityDocumentOp(
-        db, 'gTMDzYjclgPKfPUYsUdtoQ', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
+        db, 'gTMDzYjclgPKfPUYsUdtoQ', body,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.deepEqual(written, body);
     // Phase Final Stage B: identity spine tables retired.
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the E6 fast-path sibling pin) --
@@ -178,8 +179,8 @@ test('a byte-identical PUT resend to identities/:id converges'
         db, 'identities/' + id, body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.pairs.getAll()).length, 3);
-    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 4. below-route via the generic handlers (the drift-file
@@ -192,13 +193,13 @@ test('a byte-identical PUT resend to identities/:id converges'
 // runs, exactly as the members/ai-members/human-members
 // precedent established. -------------------------------------
 
-async function putDocumentPair(
+async function putDocumentMessagePair(
     db: MemoryDbAdapter,
     id: string,
     body: Record<string, unknown>,
     requestAt: string,
 ): Promise<string> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/identities/' + id,
         routePattern: 'identities/:id',
@@ -213,17 +214,17 @@ async function putDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
-    return pair.id;
+    return messagePair.id;
 }
 
-async function deleteDocumentPair(
+async function deleteDocumentMessagePair(
     db: MemoryDbAdapter,
     id: string,
     requestAt: string,
 ): Promise<void> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'DELETE',
         pathname: '/identities/' + id,
         routePattern: 'identities/:id',
@@ -238,7 +239,7 @@ async function deleteDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
 }
 
@@ -250,7 +251,7 @@ test('a PUT chain Supersedes-chains and the head derives the'
     const wiring = documentFamilyWiring('identities')!;
     const first = identityFields();
     const id = generateIdentifier();
-    const firstId = await putDocumentPair(
+    const firstId = await putDocumentMessagePair(
         db, id, first,
         '2026-02-01T00:00:00.000000Z',
     );
@@ -262,11 +263,11 @@ test('a PUT chain Supersedes-chains and the head derives the'
     });
 
     const second = { kind: 'service' as const };
-    const secondId = await putDocumentPair(
+    const secondId = await putDocumentMessagePair(
         db, id, second,
         '2026-02-02T00:00:00.000000Z', firstId,
     );
-    const secondResponse = await db.pairs.getById(secondId);
+    const secondResponse = await db.messagePairs.getById(secondId);
     assert.equal('supersedes' in secondResponse, false);
 
     const headAfterSecond = await documentGetHandler(wiring)(
@@ -283,11 +284,11 @@ test('a DELETE-head derives absent through the generic document'
     await db.postSchemaCreation();
     const wiring = documentFamilyWiring('identities')!;
     const id = generateIdentifier();
-    await putDocumentPair(
+    await putDocumentMessagePair(
         db, id, identityFields(),
         '2026-02-01T00:00:00.000000Z',
     );
-    await deleteDocumentPair(
+    await deleteDocumentMessagePair(
         db, id, '2026-02-02T00:00:00.000000Z',
     );
     await assert.rejects(
@@ -356,7 +357,7 @@ async () => {
         identityDocumentEntityOf(
             {
                 uriId: id,
-                pairId: id,
+                messagePairId: id,
                 method: 'PUT',
                 body,
             },

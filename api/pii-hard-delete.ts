@@ -27,7 +27,7 @@ import { appendMessagePair } from './message-pair.ts';
 // identity_pii ROW half). Formed pre-tx — crypto, hashing,
 // and timers never run inside an open transaction
 // (AGENTS.md § Transaction bodies await only row ops) —
-// `pair` arrives fully formed, all crypto done pre-tx
+// `messagePair` arrives fully formed, all crypto done pre-tx
 // (message-pair.ts).
 //
 // Concurrency note: under a genuinely concurrent byte-identical
@@ -41,13 +41,13 @@ import { appendMessagePair } from './message-pair.ts';
 export async function replacePiiSlot(
     view: DbAdapter,
     uriCollection: string,
-    pair: MessagePair,
+    messagePair: MessagePair,
 ): Promise<void> {
-    const prior = await view.pairs.getAllWhere(
+    const prior = await view.messagePairs.getAllWhere(
         'uri_collection', uriCollection,
     );
     for (const row of prior) {
-        await view.pairs.delete(row.id);
+        await view.messagePairs.delete(row.id);
     }
-    await appendMessagePair(view, pair);
+    await appendMessagePair(view, messagePair);
 }

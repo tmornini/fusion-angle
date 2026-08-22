@@ -18,7 +18,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
     strongEtagOf,
     IF_MATCH_HEADER,
@@ -208,7 +208,7 @@ async function appendInstancePair(
     const pathname = '/organizations/' + organization
         + '/record-types/' + typeId
         + '/instances/' + instanceId;
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method,
         pathname,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -225,9 +225,9 @@ async function appendInstancePair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
-    return pair.id;
+    return messagePair.id;
 }
 
 interface HistoryEntry {

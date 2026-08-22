@@ -101,10 +101,10 @@ type FenceResult =
 // logout-everywhere bite at the next mint/refresh/exchange
 // or access-token expiry — ≤ ACCESS_TTL_SECONDS (15 min) —
 // not on the very next request. Ownership fences
-// (write authorizer / resolveGlobalOwner) remain pair-plane
-// reads. Phase Final Task 5 retired the store decorator:
-// handlers receive ctx.base; pair-plane tenancy rides
-// uri_collection.
+// (write authorizer / resolveGlobalOwner) remain
+// message-plane reads. Phase Final Task 5 retired the
+// store decorator: handlers receive ctx.base;
+// message-plane tenancy rides uri_collection.
 export async function fenceRequest(
     ctx: AuthenticatedContext,
 ): Promise<FenceResult> {

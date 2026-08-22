@@ -13,14 +13,14 @@ import {
 } from '../api/types.ts';
 import type {
     WorkOrderFlowGraph,
-    PairEntity,
+    MessagePairEntity,
 } from '../api/types.ts';
 import { ValidationError } from '../api/types.ts';
 import {
     validateWorkOrderDocumentBody,
 } from '../api/validators.ts';
 import { postWorkOrderDocumentOp } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import { parseWire } from '../shared/http-message/wire-codec.ts';
 import { HttpMessage } from '../shared/http-message/http-message.ts';
 import {
@@ -157,7 +157,7 @@ test('postWorkOrderDocumentOp returns the entity and the'
         ...documentFields(),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
             + 'yAhMcJGxllmQkLemOQjCmA',
@@ -172,15 +172,16 @@ test('postWorkOrderDocumentOp returns the entity and the'
         operationId: TEST_OPERATION_ID,
     });
     const written = await postWorkOrderDocumentOp(
-        db, 'yAhMcJGxllmQkLemOQjCmA', body, 'XXZruirZyAOoRpNxaDnpSA', pair,
+        db, 'yAhMcJGxllmQkLemOQjCmA', body,
+        'XXZruirZyAOoRpNxaDnpSA', messagePair,
     );
     assert.deepEqual(written, {
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
         ...documentFields(),
     });
     // Phase Final Stage B: work_orders table retired.
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -208,17 +209,18 @@ test('a byte-identical PUT resend to'
             , body, DEV_TOKEN,
     );
     assert.deepEqual(first, second);
-    assert.equal((await db.pairs.getAll()).length, 3);
-    assert.equal((await db.pairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
+    assert.equal((await db.messagePairs.getAll()).length, 3);
 });
 
 // -- 4. postWorkOrderCreationOp's synthesized create pairs
 // (Phase 5 Task 3, the flow-creation-triple precedent): a live
 // POST /work-orders now forms THREE pairs pre-tx — the gate's
-// own operation pair (shares the WO's document address, per
-// the registry-driven create-address override), a synthesized
-// document pair (PUT-shaped, at the WO's own address), and a
-// synthesized join pair (PUT-shaped, at the
+// own operation message pair (shares the WO's document
+// address, per the registry-driven create-address override),
+// a synthesized document message pair (PUT-shaped, at the
+// WO's own address), and a synthesized join pair
+// (PUT-shaped, at the
 // organizations/:id/flows/:id/work-orders/:woid address).
 // ----------------------
 
@@ -240,12 +242,12 @@ function req(
 // The workOrder facet reuses documentFields() — the SAME
 // {display_id, flow_graph, position} shape section 1 above
 // already validates — so the create body and the synthesized
-// document pair's expected body are ONE construction, never
-// two divergent literals. `displayId` defaults to
+// document message pair's expected body are ONE construction,
+// never two divergent literals. `displayId` defaults to
 // documentFields()'s own value; a duplicate-create test
 // overrides it so the SECOND create's document sub-body
-// genuinely differs from the first's — the document pair's
-// hash covers ONLY {display_id, flow_graph, position}
+// genuinely differs from the first's — the document message
+// pair's hash covers ONLY {display_id, flow_graph, position}
 // (workOrderCreateDocumentBody's own three picked keys), so
 // two creates sharing that sub-body would collide on
 // appendMessagePair's concurrent-retry guard and the second
@@ -319,12 +321,12 @@ function decodeRequestMessage(message: string): {
 // arrival-order dependency, the H7 hazard class): filter by
 // address AND method instead.
 function documentRowAt(
-    pairs: readonly PairEntity[],
+    messagePairs: readonly MessagePairEntity[],
     prefix: string,
     uriId: string,
     excludeId?: string,
-): PairEntity | undefined {
-    return pairs.find(
+): MessagePairEntity | undefined {
+    return messagePairs.find(
         r => r.uri_collection === prefix
             && r.uri_id === uriId
             && r.id !== excludeId
@@ -335,9 +337,10 @@ function documentRowAt(
 
 const ENTITY_PREFIX = '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/';
 
-test('a work-order create appends a PUT-shaped document pair'
-+ ' at the WO address and a PUT-shaped join pair at the join'
-+ ' address, all three sharing one requestAt', async () => {
+test('a work-order create appends a PUT-shaped document'
++ ' message pair at the WO address and a PUT-shaped join pair'
++ ' at the join address, all three sharing one requestAt',
+async () => {
     const db = await freshDb();
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -345,12 +348,14 @@ test('a work-order create appends a PUT-shaped document pair'
         workOrderCreateBody(WO_C1, WO_C1_FWO, 'aNoIDzecmwfawmsLSsDsPw'),
     ));
     assert.equal(res.status, 201);
-    const pairs = await db.pairs.getAll();
-    assert.equal(pairs.length, 6);
+    const messagePairs = await db.messagePairs.getAll();
+    assert.equal(messagePairs.length, 6);
 
     const documentRow =
-        documentRowAt(pairs, ENTITY_PREFIX, WO_C1);
-    assert.ok(documentRow, 'no document pair at the WO address');
+        documentRowAt(messagePairs, ENTITY_PREFIX, WO_C1);
+    assert.ok(
+        documentRow, 'no document message pair at the WO address',
+    );
     assert.deepEqual(
         validateWorkOrderDocumentBody(
             decodeRequestMessage(documentRow!.request).body,
@@ -362,20 +367,20 @@ test('a work-order create appends a PUT-shaped document pair'
         '/organizations/AjdvjuECVZEgZoFajaIEkg/flows/aNoIDzecmwfawmsLSsDsPw/'
             + 'work-orders/';
     const joinRow =
-        documentRowAt(pairs, joinPrefix, WO_C1_FWO);
+        documentRowAt(messagePairs, joinPrefix, WO_C1_FWO);
     assert.ok(joinRow, 'no join pair at the join address');
 
     // slice(3): the fixture's own root-admin pairs (organization
     // document + role grant + membership, Phase 13 Tasks 1 and 3)
     // precede every test write and carry their OWN requestAt.
     const requestAts = new Set(
-        pairs.slice(3).map(r => r.request_at),
+        messagePairs.slice(3).map(r => r.request_at),
     );
     assert.equal(requestAts.size, 1);
 });
 
 test('a duplicate work-order create (same WO id) records'
-+ ' Supersedes on its NEW document pair, never Follows',
++ ' Supersedes on its NEW document message pair, never Follows',
 async () => {
     const db = await freshDb();
     const first = await handleRequest(db, req(
@@ -385,10 +390,10 @@ async () => {
     ));
     assert.equal(first.status, 201);
     const firstDocumentRow = documentRowAt(
-        await db.pairs.getAll(), ENTITY_PREFIX, WO_C2,
+        await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C2,
     );
     assert.ok(
-        firstDocumentRow, 'no document pair on first create',
+        firstDocumentRow, 'no document message pair on first create',
     );
     const firstDocumentId = firstDocumentRow!.id;
 
@@ -401,18 +406,18 @@ async () => {
     ));
     assert.equal(second.status, 201);
     const secondDocumentRow = documentRowAt(
-        await db.pairs.getAll(), ENTITY_PREFIX, WO_C2,
+        await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C2,
         firstDocumentId,
     );
-    assert.ok(secondDocumentRow, 'no second document pair');
-    const secondDocumentResponse = await db.pairs.getById(
+    assert.ok(secondDocumentRow, 'no second document message pair');
+    const secondDocumentResponse = await db.messagePairs.getById(
         secondDocumentRow!.id,
     );
     assert.equal(
         'supersedes' in secondDocumentResponse, false,
     );
 
-    for (const response of await db.pairs.getAll()) {
+    for (const response of await db.messagePairs.getAll()) {
         assert.equal('follows' in response, false);
     }
 });
@@ -427,7 +432,7 @@ test('a duplicate work-order create\'s own OPERATION pair'
     ));
     assert.equal(first.status, 201);
     const firstDocumentRow = documentRowAt(
-        await db.pairs.getAll(), ENTITY_PREFIX, WO_C3,
+        await db.messagePairs.getAll(), ENTITY_PREFIX, WO_C3,
     );
     assert.ok(firstDocumentRow);
     const firstDocumentId = firstDocumentRow!.id;
@@ -440,7 +445,7 @@ test('a duplicate work-order create\'s own OPERATION pair'
     assert.equal(second.status, 201);
     const secondOperationId = second.headers.get('Response-ID');
     assert.ok(secondOperationId);
-    const secondOperationResponse = await db.pairs.getById(
+    const secondOperationResponse = await db.messagePairs.getById(
         secondOperationId!,
     );
     assert.equal(
@@ -453,7 +458,7 @@ test('a work-order create ignores a raw colliding states'
     const db = await freshDb();
     const flowWorkOrderId = WO_C4_FWO;
     // Phase Final Task 2: states ROW half stripped — raw
-    // collision no longer aborts the pair-plane create.
+    // collision no longer aborts the message-plane create.
     // Phase Final Stage B: states table retired.
     const res = await handleRequest(db, req(
         'POST', '/organizations/AjdvjuECVZEgZoFajaIEkg/work-orders/'
@@ -465,6 +470,6 @@ test('a work-order create ignores a raw colliding states'
     assert.equal(res.status, 201);
     // 2 seed pairs (org+membership) + 4 create pairs
     // (operation, document, join, genesis claim).
-    assert.equal((await db.pairs.getAll()).length, 6);
-    assert.equal((await db.pairs.getAll()).length, 6);
+    assert.equal((await db.messagePairs.getAll()).length, 6);
+    assert.equal((await db.messagePairs.getAll()).length, 6);
 });

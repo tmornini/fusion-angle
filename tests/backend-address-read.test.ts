@@ -72,9 +72,9 @@ async () => {
 test('getAllAtAddress delegates to Tx.getAddress',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['pairs']);
+    await backend.ensureTables(['message_pairs']);
     const store = new HistoryEntityStore<Row>(
-        'pairs',
+        'message_pairs',
         backendRunner(backend),
         (body) => body as Omit<Row, 'id'>,
     );
@@ -98,11 +98,11 @@ async () => {
 test('getAddressVersion is address+version, ordered',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['pairs']);
+    await backend.ensureTables(['message_pairs']);
     await backend.transaction(
-        ['pairs'], 'readwrite',
+        ['message_pairs'], 'readwrite',
         async (tx) => {
-            await tx.put('pairs', {
+            await tx.put('message_pairs', {
                 id: 'old',
                 uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + '',
@@ -110,7 +110,7 @@ async () => {
                 response_at: '2026-01-01T00:00:00.000001Z',
                 version: 'aa',
             });
-            await tx.put('pairs', {
+            await tx.put('message_pairs', {
                 id: 'new',
                 uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + '',
@@ -118,7 +118,7 @@ async () => {
                 response_at: '2026-01-01T00:00:00.000002Z',
                 version: 'aa',
             });
-            await tx.put('pairs', {
+            await tx.put('message_pairs', {
                 id: 'other',
                 uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + '',
@@ -129,9 +129,9 @@ async () => {
         },
     );
     const got = await backend.transaction(
-        ['pairs'], 'readonly',
+        ['message_pairs'], 'readonly',
         (tx) => tx.getAddressVersion(
-            'pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
+            'message_pairs', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                 , 'AjdvjuECVZEgZoFajaIEkg', 'aa',
         ),
     );
@@ -164,25 +164,25 @@ function jsonWire(body: unknown): string {
 test('getWhereBody is collection + JSON containment',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['pairs']);
+    await backend.ensureTables(['message_pairs']);
     await backend.transaction(
-        ['pairs'], 'readwrite',
+        ['message_pairs'], 'readwrite',
         async (tx) => {
-            await tx.put('pairs', {
+            await tx.put('message_pairs', {
                 id: 'hit',
                 uri_collection: '/authentication/authorize/',
                 uri_id: '',
                 response_at: '2026-01-01T00:00:00.000001Z',
                 response: jsonWire({ code: 'abc' }),
             });
-            await tx.put('pairs', {
+            await tx.put('message_pairs', {
                 id: 'miss',
                 uri_collection: '/authentication/authorize/',
                 uri_id: '',
                 response_at: '2026-01-01T00:00:00.000002Z',
                 response: jsonWire({ code: 'zzz' }),
             });
-            await tx.put('pairs', {
+            await tx.put('message_pairs', {
                 id: 'other',
                 uri_collection: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
                     + '',
@@ -193,9 +193,9 @@ async () => {
         },
     );
     const got = await backend.transaction(
-        ['pairs'], 'readonly',
+        ['message_pairs'], 'readonly',
         (tx) => tx.getWhereBody(
-            'pairs',
+            'message_pairs',
             '/authentication/authorize/',
             { code: 'abc' },
         ),
@@ -205,13 +205,13 @@ async () => {
 
 test('memory getWhere refuses uri_id', async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['pairs']);
+    await backend.ensureTables(['message_pairs']);
     await assert.rejects(
         () => backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'pairs', 'uri_id', 'AjdvjuECVZEgZoFajaIEkg',
+                'message_pairs', 'uri_id', 'AjdvjuECVZEgZoFajaIEkg',
             ),
         ),
         (error: unknown) =>
@@ -223,13 +223,13 @@ test('memory getWhere refuses uri_id', async () => {
 
 test('memory getWhere refuses version', async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['pairs']);
+    await backend.ensureTables(['message_pairs']);
     await assert.rejects(
         () => backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'pairs', 'version', 'ab',
+                'message_pairs', 'version', 'ab',
             ),
         ),
         (error: unknown) =>
@@ -242,13 +242,13 @@ test('memory getWhere refuses version', async () => {
 test('memory getWhere refuses operation_id',
 async () => {
     const backend = new MemoryStorageBackend();
-    await backend.ensureTables(['pairs']);
+    await backend.ensureTables(['message_pairs']);
     await assert.rejects(
         () => backend.transaction(
-            ['pairs'],
+            ['message_pairs'],
             'readonly',
             (tx) => tx.getWhere(
-                'pairs', 'operation_id', 'x',
+                'message_pairs', 'operation_id', 'x',
             ),
         ),
         (error: unknown) =>

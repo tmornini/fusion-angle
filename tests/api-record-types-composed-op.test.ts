@@ -22,7 +22,7 @@ import {
     postWorkOrderTransitionOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     nowUtc,
     SYSTEM_MEMBER_ID,
@@ -199,7 +199,7 @@ async function seedFieldValueReferrer(
         'work-orders', WORK_ORDER_ID, 'transition',
     ];
     const pattern = 'organizations/:id/work-orders/:id/transition';
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: pattern,
@@ -216,7 +216,7 @@ async function seedFieldValueReferrer(
     });
     await postWorkOrderTransitionOp(
         db, WORK_ORDER_ID, body, SYSTEM_MEMBER_ID,
-        undefined, [], pair,
+        undefined, [], messagePair,
     );
 }
 
@@ -262,7 +262,7 @@ async () => {
     assert.equal(attrRow.record_type_id, TYPE_ID);
     assert.equal(attrRow.name, 'Priority');
 
-    const requests = await db.pairs.getAll();
+    const requests = await db.messagePairs.getAll();
     const typePrefix =
         '/organizations/' + ORGANIZATION
         + '/record-types/';
@@ -274,14 +274,14 @@ async () => {
             && r.uri_collection === typePrefix
             && r.method === 'POST',
     );
-    assert.ok(opPair, 'operation pair missing');
+    assert.ok(opPair, 'operation message pair missing');
 
     const documentPair = requests.find(
         r => r.uri_id === TYPE_ID
             && r.uri_collection === typePrefix
             && r.method === 'PUT',
     );
-    assert.ok(documentPair, 'document pair missing');
+    assert.ok(documentPair, 'document message pair missing');
 
     const attrPair = requests.find(
         r => r.uri_id === ATTR_ID
@@ -304,8 +304,8 @@ async () => {
         db, adminToken, ATTR_ID,
     );
 
-    const requestsBefore = await db.pairs.getAll();
-    const responsesBefore = await db.pairs.getAll();
+    const requestsBefore = await db.messagePairs.getAll();
+    const responsesBefore = await db.messagePairs.getAll();
     const edit = await handleRequest(db, req(
         'POST', COLLECTION, adminToken,
         editBody(TYPE_ID, 'Renamed', [ATTR_ID]),
@@ -329,11 +329,11 @@ async () => {
     assert.equal(attrGet.status, 200);
 
     assert.equal(
-        (await db.pairs.getAll()).length,
+        (await db.messagePairs.getAll()).length,
         requestsBefore.length,
     );
     assert.equal(
-        (await db.pairs.getAll()).length,
+        (await db.messagePairs.getAll()).length,
         responsesBefore.length,
     );
 });

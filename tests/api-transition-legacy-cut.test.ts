@@ -21,7 +21,7 @@ import {
     postWorkOrderTransitionOp,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
 } from '../api/message-pair.ts';
 import {
     nowUtc,
@@ -203,7 +203,7 @@ async () => {
         'organizations', ORGANIZATION,
         'work-orders', WO_ID, 'transition',
     ];
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'POST',
         pathname: '/' + pathSegments.join('/'),
         routePattern: TRANSITION_PATTERN,
@@ -225,12 +225,12 @@ async () => {
         SYSTEM_MEMBER_ID,
         undefined,
         [],
-        pair,
+        messagePair,
     );
     // Below-facade appends the pair; lifecycle derives from
     // the stored body (seed tier dual-tolerant).
-    const requests = await db.pairs.getAll();
-    const hit = requests.some((r) => r.id === pair.id);
+    const requests = await db.messagePairs.getAll();
+    const hit = requests.some((r) => r.id === messagePair.id);
     assert.equal(hit, true);
 });
 

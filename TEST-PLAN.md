@@ -239,8 +239,8 @@ Master never re-dispatches a hunter to retry.
   `drag-reorder.ts`, which uses native HTML5 drag-and-drop
   on the `.drag-handle`, NOT pointer-capture, so they are
   driveable. Work around the gesture cases by
-  validating end-state via pair-plane fixtures (PUT a
-  flow document pair through the gate, or GET the
+  validating end-state via message-plane fixtures (PUT a
+  flow document message pair through the gate, or GET the
   flow document / its pair history for the flow's
   `uri_prefix`/`uri_id`), then reloading and verifying
   render. When the fixture succeeds and the SVG renders
@@ -300,7 +300,7 @@ Master never re-dispatches a hunter to retry.
   `getBoundingClientRect` (its larger CSS-px values miss).
 - **List pages populate slowly (5–14s)**: org-scoped list
   reads re-derive each entity's lifecycle from the
-  message-plane pair ledger (`pairs`), so
+  message-plane pair ledger (`message_pairs`), so
   cards can take 5–14s to paint (Flows is slowest). Wait
   ≥14s and assert the container's `childCount` /
   `data-*-card` count — never an early screenshot, which
@@ -416,7 +416,7 @@ mutation domains disjoint:
 
 #### Entity mutation domain scoping
 
-Phase 2 agents share one Postgres (`pairs`);
+Phase 2 agents share one Postgres (`message_pairs`);
 every product write appends pairs only. There
 is no per-agent private ledger.
 Agents own **disjoint pair-address families**
@@ -428,9 +428,9 @@ agent mutates:
 |---|---|
 | Agent-B | creates one human member via signup (identity + PII + seat at `organizations/:id/members`) |
 | Agent-D | `ideas` document + idea lifecycle state pairs |
-| Agent-E | `projects` document pairs (plus one flow via the project-detail New Flow path) |
-| Agent-F | `flows` document + undo operation pairs (graphDelta/revivals live in the flow document body) |
-| Agent-F2 | `work-orders` (claim/transition ops), work-order state pairs, field-values folded into transitions, plus its own private flow document pairs |
+| Agent-E | `projects` document message pairs (plus one flow via the project-detail New Flow path) |
+| Agent-F | `flows` document + undo operation message pairs (graphDelta/revivals live in the flow document body) |
+| Agent-F2 | `work-orders` (claim/transition ops), work-order state pairs, field-values folded into transitions, plus its own private flow document message pairs |
 | Agent-G | roster + identity spine + tenancy addresses: seats (`organizations/:id/members`), `ai-agents`, `invitations`, `organizations`, `identities` (+ credentials / pii / registration / token-revocations / default-organization). All GETs derive from the message ledger; invitation accept writes a seat; WP8 self-revoke still inside this agent |
 | Agent-CH | none (read-only) |
 
@@ -655,7 +655,7 @@ in order.
   form appears. Fill Name, pick a Model, fill
   Description and Skill Focus. PASS: Create is blocked
   until a Model is chosen; once chosen, click Create →
-  toast confirms and the AI is written as a pair-plane
+  toast confirms and the AI is written as a message-plane
   AI agent document (`PUT /ai-agents/:id`); it appears in
   the AIs group (agents are global, not seated).
   Repeat for 4 AIs matching mock data (Claude Opus 4.8,
@@ -786,7 +786,7 @@ in order.
   (Properties panel double-click is BLOCKED per the
   MCP pointer-capture limitation; validate end-state
   via pair fixture on the flow document address
-  (`pairs`) per the protocol workaround.)
+  (`message_pairs`) per the protocol workaround.)
 - [ ] **AA29** Edit the state name in the
   properties panel to "Data Capture". PASS: the
   node label updates on the canvas immediately
@@ -944,7 +944,7 @@ depends: A
 
 ### Zero-membership landing (org gate)
 
-> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, so create the zero-membership state via pair fixtures (the B21 precedent): sign in as a single-org seeded member, then append a DELETE-shaped membership document pair (and clear any default-organization pairs) for that identity through the gate or by inserting matching `pairs` rows — do NOT poke a retired `memberships` table. `getOrganizations` is fenced to the derived membership ledger, so the identity now reaches no org. Their login credential is untouched.
+> Setup for B25–B29: these exercise the boot/login org gate that lands a ZERO-membership identity on its pending invitations (accepting one grants the first membership and unblocks every org-scoped route). The seed gives every login-capable identity a membership, so create the zero-membership state via pair fixtures (the B21 precedent): sign in as a single-org seeded member, then append a DELETE-shaped membership document message pair (and clear any default-organization pairs) for that identity through the gate or by inserting matching `message_pairs` rows — do NOT poke a retired `memberships` table. `getOrganizations` is fenced to the derived membership ledger, so the identity now reaches no org. Their login credential is untouched.
 
 - [ ] **B25** From the zero-membership state, sign out, then sign in again with that member's credentials. PASS: lands directly on `invitations/index.html` — NOT the `?return=` target and NOT the dashboard "Something went wrong" card; no flash of the dashboard shell (the auth-page short-circuit decides before the first navigation). Sidebar renders the member chip from token claims with NO org switcher.
 - [ ] **B26** From the zero-membership state while signed in, open `dashboard/index.html` (or any org-gated page) directly and reload (Cmd-R). PASS: redirected to `invitations/index.html` by the boot org gate — no dashboard error card, no retry loop (the returning-user path, not just fresh login).
@@ -1411,7 +1411,7 @@ opens and renders.)
 
 (Undo is undo-as-replay (Phase 14 Task 8): the server
 resolves the restore target by replaying the flow's own
-document-pair history against its own undo operation-pair
+document-message-pair history against its own undo operation-message-pair
 history (stack+pointer — a second consecutive undo goes
 FURTHER back rather than oscillating; a save after an
 undo-undo truncates the abandoned branch). This cursor
@@ -1421,7 +1421,7 @@ an undo are covered by `tests/flow-undo-cursor.test.ts` and
 `tests/flow-operations.test.ts` (`performUndo` /
 `performRedo`). `flow_versions` routes were RETIRED
 (Phase 15 Task 7; router 404) and the table is DELETED
-(Phase Final); undo walks the flow's own document-pair
+(Phase Final); undo walks the flow's own document-message-pair
 history only. The cases below verify the toolbar buttons,
 the keyboard shortcuts, the disabled states, and that the
 canvas re-renders after each step.)
@@ -1524,10 +1524,10 @@ canvas re-renders after each step.)
   Undo 11 times in a row. PASS: every one of the 11 edits
   reverts in order — undo history is NO LONGER capped at 10
   (Phase 14 Task 8 retired the `FLOW_VERSION_CAP` trim from the
-  live path; undo now walks the flow's own full document-pair
+  live path; undo now walks the flow's own full document-message-pair
   history). The `flow_versions` store is DELETED (Phase
   Final) — there is nothing to inspect; the flow's own
-  document-pair history in `pairs` is the
+  document-message-pair history in `message_pairs` is the
   sole undo source.
 - [ ] **F46** Edit a flow (rename a state), let auto-save complete.
   Navigate away from the designer to `flows/index.html`. Re-open the
@@ -1599,7 +1599,7 @@ designer "tag current" action lands.)
 - [ ] **F59** Tick one human checkbox. Reload the page
   and reopen the same node panel. PASS: that human
   checkbox is still ticked. Inspect the flow's head
-  document pair — the stored graph body carries
+  document message pair — the stored graph body carries
   `memberIds: [<humanId>]`. AI checkboxes are
   display-only (`data-ai-member-id`): they reflect
   stored `agentIds` and do not write. A seeded
@@ -1627,7 +1627,7 @@ designer "tag current" action lands.)
 - [ ] **F66** MOOT (Phase Final). The `flow_versions` table is
   DELETED; there is nothing to inspect.
   Member assignment is captured only in the flow's own
-  document-pair history (`pairs`). Confirm
+  document-message-pair history (`message_pairs`). Confirm
   via pair fixtures or F67: a `memberIds` change is still
   undoable through that history.
 - [ ] **F67** Tick one checkbox in the Members fieldset,
@@ -1643,7 +1643,7 @@ designer "tag current" action lands.)
   the picker lists available record attributes
   pre-defined on the bound record-type (loaded via
   `getRecordAttributesByRecord` from the nested
-  `record-types/:id/attributes` collection on the pair
+  `record-types/:id/attributes` collection on the message
   plane).
   (Regression for the captured-presenter bug in the
   attribute-picker handler: this exact click used to do
@@ -1834,13 +1834,13 @@ depends: A
   caller's claim. Click "Release Work Order"
   (unclaim via DELETE claim). PASS: back on the
   Active tab unclaimed. Click the row a third time
-  (reclaim). PASS: claim succeeds again; the pair
+  (reclaim). PASS: claim succeeds again; the message
   plane carries the sequence
   `claimed` → `claim_released` → `claimed` under
   the `(at, id)` order for this work order's
   `entity_id` (inspect via
   `GET work-orders/:id/history` or the matching
-  op pairs). No shared event-append write is involved.
+  operation message pairs). No shared event-append write is involved.
 
 ### Workbox — Completion
 
@@ -1858,14 +1858,14 @@ depends: A
 
 - [ ] **WB16** After binding an instance and
   transitioning with value changes, inspect
-  `pairs` (or derived
+  `message_pairs` (or derived
   `GET work-orders/:id/history` and the instance
-  head). PASS: the work-order document pair head
+  head). PASS: the work-order document message pair head
   carries `display_id` and `flow_graph` JSON; the
   binding PUT is at `work-orders/:id/binding` with
   `{instance_id, record_type_id}`; value-bearing
-  transitions are `work-orders/:id/transition` op
-  pairs whose body is the **instance shape**
+  transitions are `work-orders/:id/transition` operation
+  message pairs whose body is the **instance shape**
   (`targetState`, `instance_id`, `record_type_id`,
   `set`/`clear` delta, `release`, `transitionAt` —
   no `fieldValues` bag) and carry strong If-Match
@@ -1888,17 +1888,17 @@ depends: A
 - [ ] **WB18** Open the same unclaimed work order in two browser
   tabs. In tab 1, click the row to claim it. In tab 2, attempt the
   same. PASS: tab 2 either navigates to a read-only/already-claimed
-  view or the claim is rejected — and the pair plane carries at
+  view or the claim is rejected — and the message plane carries at
   most one live `'claimed'` event for this work order's
   `entity_id` under the `(at, id)` reduction (a stale prior claim
   is superseded by a `'claim_expired'` event, never overwritten
-  in place). Inspect via `pairs` or derived
+  in place). Inspect via `message_pairs` or derived
   `GET work-orders/:id/history` (DESC; claim rows carry
   `field_values: []`).
 - [ ] **WB19** After transitioning a work order through at
   least two states, read the derived history
   (`GET work-orders/:id/history` or the matching pairs in
-  `pairs`) for this work order's id. PASS:
+  `message_pairs`) for this work order's id. PASS:
   rows are `(at, id)` DESC (index 0 = current); each
   non-claim event has the immutable shape `{id, entity_id,
   state, member_id, at, field_values}`, with `state`
@@ -2163,7 +2163,7 @@ depends: A
   toast "Model is required" fires and no POST happens.
   Pick a Model, fill the other AI fields, click Create.
   PASS: toast confirms and the AI is written as a
-  pair-plane AI agent document (`PUT /ai-agents/:id`);
+  message-plane AI agent document (`PUT /ai-agents/:id`);
   it appears in the AIs group (agents are global, not
   seated).
 
@@ -2245,8 +2245,8 @@ depends: A
   org and Stark. Accept is idempotent — a re-accept is a 204
   no-op, no duplicate seat. Source:
   `postInvitationAcceptance`, `acceptInvitation` (atomic
-  seat document pair + invitations/:id/acceptance
-  op pair via `appendMessagePair`).
+  seat document message pair + invitations/:id/acceptance
+  operation message pair via `appendMessagePair`).
 - [ ] **V5 — Decline appends declined, writes no seat**
   As an invitee with a fresh pending invitation, on
   `invitations/` click Decline. PASS: an "Invitation declined"
@@ -2341,7 +2341,7 @@ depends: A
 - [ ] **G43** Navigate to `identities/index.html` (or click "Identities" in the sidebar). PASS: the header reads "Identities" with an "Add Identity" button (`#add-identity-btn`); `#identity-list` renders one `.card[data-identity-id]` per identity — a person row shows an initials avatar + name + email sub-line + a "Person" badge; a service row shows a shield avatar plus "Service account" + "—" (agents are not identities), then a "Service" badge. Serial (A3 `--mock-data`, demo admin's active organization Stark): the nested PII fence (viaMembership, need-to-know) hides the five org-2-only persons: the list renders 6 named person rows (Emily Rodriguez, Sarah Chen, Lisa Wang, Marcus Johnson, Tony Stark, Jessica Park), 5 "Identity without PII" person rows (the org-2-only members: David Martinez, Alex Kim, Mike Thompson, David Kim, James), and 1 service row (the system service identity). Parallel (A3 `--test-plan-slices`): `identities/` is global (`organizationNested: false`) and the seed is one DB for all 14 slices, so the hunter sees bootstrap current + the system service identity + every slice admin + the B/G/SV extras — not a five-name closed G roster. `getIdentityRoster` GETs identities only — the G extras AI agent is `ai-agents/:id`, not an identity row, so no agent appears on the list. Named G people: G admin, `G Member`, `G Unseated`, plus the system service identity; other-slice people often render as "Identity without PII" (PII 403). An empty roster renders "No identities yet." Source: `web-app/identities/index.ts`, `web-app/app/presenters/identity-list.ts` (`IdentityRosterPresenter`).
 - [ ] **G44** Click "Add Identity". PASS: the `add-identity` dialog opens with a Kind toggle (Person checked by default / Service). With Person selected, the person form (`#add-identity-person-form`) shows Name/Email/Phone/Bio inputs; fill Name + Email, click "Create" (`#add-identity-submit`) → two sequential requests (POST `identities` `{id, kind}`, then PUT `identities/:id/pii` carrying the PII fields), an "Identity added" toast, the dialog closes, and the new person appears in the roster (name + email); a second-hop failure toasts a partial-state message naming the PII-less identity rather than a blanket create failure. Re-open the dialog and click the "Service" radio → the person form hides and the service form (`#svc-secret`, "Client Secret") shows; enter a secret, Create → a "Service identity added" toast, the dialog closes, and a new "Service"-badged row appears. Submitting Person with an empty Name or Email shows "Name and email are required" and keeps the dialog open. Source: `web-app/identities/index.ts` (`handleAddIdentitySubmit` / `submitPersonForm` / `submitServiceForm`).
 - [ ] **G45** From the roster, click a person row (`.card[data-identity-id]`). PASS: navigates to `identities/detail.html?identityId=<id>`, which renders the back button (`#identity-back-btn`), the name + a kind badge + the id, a "Personal Information" card (Name/Email/Phone/Bio — each empty field rendered as "—" via `DISPLAY_ABSENT`), a "Connections" card (Identity Providers / Tokens buttons), and — for a person — an "Erase PII" button (`#identity-erase-btn`). A service identity instead shows a "Credentials" card and NO erase button (only persons carry erasable PII). Source: `web-app/identities/index.ts` (`onListClick`), `web-app/identities/detail.ts`, `web-app/app/presenters/identity-detail.ts`.
-- [ ] **G46** On `G Member`'s identity detail (parallel — never the G admin; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `pairs` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the caller's own access token, held in memory for its lifetime (≤ 15 min), and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
+- [ ] **G46** On `G Member`'s identity detail (parallel — never the G admin; serial: any person row that is not the signed-in admin), click "Erase PII" (`#identity-erase-btn`) to open the native `<dialog id="confirm-erase-dialog">` (`role="alertdialog"`, title "Erase personal information?", body "The identity itself survives; only its personal information is erased."); confirm via the `data-action="confirm-erase"` button. PASS: `deleteIdentityPii` runs, a "Personal information erased" toast appears, and the view re-renders in place — the name becomes "Identity without PII" (`IDENTITY_WITHOUT_PII_NAME`) and Email/Phone/Bio all read "—" (`DISPLAY_ABSENT`); the identity row still exists in the roster (erasure splices `identity_pii` only, leaving the identity and every `member_id` reference intact). The erasure is ledger-deep: the erased name/email/phone/bio values now appear in zero stored `message_pairs` messages and zero `identity_pii` rows — `/pii` is the message plane's single-slot hard-delete zone, where supersession and erasure alike physically remove prior pairs, and the surviving pair at the address is the bodyless DELETE tombstone. Named residuals outside this guarantee: pre-phase pairs in existing databases, exported snapshots, the caller's own access token, held in memory for its lifetime (≤ 15 min), and replay resurrection of a retained pre-erasure PUT. Cancel/Escape (`data-dialog-cancel="confirm-erase"`) leaves the PII unchanged. Source: `web-app/identities/detail.ts` (`performErase` → `deleteIdentityPii`). MCP note: drive the native `<dialog>` directly — no `window.confirm` stub needed.
 - [ ] **G47** On the system service identity's detail page (admin session), a "Client registration" card renders before Credentials showing "Not registered." and a "Register client" button (`data-identity-action="registration"`). Click it → the `client-registration-dialog` opens; fill Grant types `client_credentials`, Audience `fusion-angle`, JWKS `{"keys":[]}`, leave Status Active, Save (`#client-registration-submit`) → "Client registration saved" toast, dialog closes, the card shows an `active` pill (`data-tone="success"`) plus Grant types / Redirect URIs / Audience / JWKS fields, and the button reads "Manage registration". Re-open, change JWKS, Save → the card reflects the new JWKS (rotate = same PUT-overwrite). Re-open, set Status Disabled, Save → `disabled` pill (`data-tone="warning"`). Re-open → a "Deregister" button (`#client-registration-deregister`, hidden while unregistered) is visible; click it → "Client registration removed" toast and the card returns to "Not registered." Empty Grant types / Audience / JWKS shows "Grant types, audience, and JWKS are required" and keeps the dialog open. Cancel (`data-dialog-cancel="client-registration"`) discards edits. Source: `web-app/identities/detail.ts` (`saveRegistration` / `deregisterClient`), `web-app/app/presenters/identity-detail.ts` (`buildRegistrationCard`). Wire: PUT|GET|DELETE `identities/:id/registration` (admin realm; kind gate 404/400).
 
 ### Identity tokens & providers (`identity-tokens/`, `identity-providers/`)
@@ -2352,7 +2352,7 @@ depends: A
 ### Sidebar org-switcher
 
 - [ ] **G36 — Sidebar org-switcher (multi-org user)** A3 mock-data seeds two orgs and Tony Stark (`current`) is the multi-org admin. Sign in as Tony. The SIDEBAR FOOTER (not the top bar) shows an inline native org `<select>` (`.org-switcher`, inside `#sidebar-org-switcher` / `#mobile-sidebar-org-switcher`) next to the member chip — it appears ONLY because the user can reach ≥2 orgs (`shouldShowOrganizationSwitcher`). PASS: the select lists "Stark Industries" and "Wayne Enterprises" with Stark active; the plain org-name text line in the chip is cleared so the org is not named twice. Note the Members and Ideas lists for Stark. Select "Wayne Enterprises" → the page does a FULL reload and re-scopes: Members shows Wayne's roster and Ideas shows Wayne's ideas (org-fenced — Stark's rows are no longer visible). Reload the page again WITHOUT changing the select → the selection persists (Wayne stays active; the choice is stored under `fusion-angle:active-organization-id` and boot re-exchanges a scoped token from it). A single-org seeded user, by contrast, sees NO `<select>` in the sidebar — just the org name as PLAIN TEXT in the chip. The top bar shows neither the switcher nor a greeting; its only org-aware affordance is the pending-invitations bell (V3). Source of truth: `web-app/app/organization-switcher.ts`, `web-app/app/sidebar-member.ts`, `web-app/app/adapters/organization-session.ts`, `web-app/app/core.ts::scopeBootToActiveOrganization`.
-- [ ] **G41** Person and agent writes land on the pair
+- [ ] **G41** Person and agent writes land on the message
   plane. On a human detail page, click Edit, change
   Title or Bio, and Save. PASS: `PUT /identities/:id`
   (and PII when contact fields change) persists the
@@ -2395,8 +2395,8 @@ feature is implemented.
   values. Reload the page. PASS: new values
   persist (round-tripped through
   `PUT /organizations/<id>`). Inspect the
-  `organizations/:id` document pairs on the message
-  plane (`pairs`): the latest head
+  `organizations/:id` document message pairs on the message
+  plane (`message_pairs`): the latest head
   body carries the updated `name` and `domain`
   alongside the unchanged `seats`,
   `projects_limit`, `ideas_limit`, and
@@ -2510,7 +2510,7 @@ domain delta:
   trio — no shared `states` log; revision history is
   message-plane pairs at `objectives/:id/revisions/`)
 - Agent-E adds: `projects/:id/objective-baseline-scores`
-  and `projects/:id/objective-actual-scores` (pair-plane;
+  and `projects/:id/objective-actual-scores` (message-plane;
   adapters `postProjectBaselineScoring` /
   `postProjectActualMeasurement`)
 - Agent-CH stays read-only
@@ -2720,7 +2720,7 @@ PASS if:
   collapsed)
 
 **K7.** After K30 has run AND Agent-G's K3 has executed
-(verify via `objectives/:id/revisions/` document pairs on
+(verify via `objectives/:id/revisions/` document message pairs on
 the message plane — or the history UI — that ≥1 revision
 with a `name` change exists, confirming K3 ran), reopen
 the project's history modal. PASS if events that predate
@@ -2745,7 +2745,7 @@ panel, and the property-test gate.
 
 Owner agent: Agent-F2 (Phase 2). The property-test gate
 (R13–R14a) rides Agent-F2's own work orders, and the record
-CRUD mutates pair-plane document/join families —
+CRUD mutates message-plane document/join families —
 `record-types` (+ nested attributes), `flows/:id/records`
 bindings, and `record-types/:id/instances` — disjoint from
 every other agent, so no write-domain collision.

@@ -5,14 +5,14 @@ import { pickString, pickNumber } from './validators.ts';
 import { canonicalUriCollection } from './message-pair.ts';
 import {
     deriveDocumentsAt,
-    documentPairsAt,
+    documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
     currentLifecycleEvent,
     DELETED_STATE,
     type DerivedDocument,
-    type DocumentPair,
+    type DocumentMessagePair,
 } from './derive-documents.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
@@ -78,19 +78,21 @@ export function projectEntityOf(
 // never arrival order and never the envelope's `at`
 // (postProjectDocumentOp's genesis-wins-under-skew guarantee).
 
-async function fetchProjectPairs(
+async function fetchProjectMessagePairs(
     db: DbAdapter,
     prefix: string,
 ): Promise<{
     readonly documents: Map<string, DerivedDocument>;
-    readonly pairs: readonly DocumentPair[];
+    readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     return {
-        documents: deriveDocumentsAt(pairs, prefix),
-        pairs: documentPairsAt(pairs, prefix),
+        documents: deriveDocumentsAt(messagePairs, prefix),
+        messagePairs: documentMessagePairsAt(
+            messagePairs, prefix,
+        ),
     };
 }
 
@@ -104,22 +106,27 @@ export async function deriveProjects(
     organization: Id,
 ): Promise<ProjectEntity[]> {
     const prefix = projectsUriPrefix(organization);
-    const { documents, pairs } =
-        await fetchProjectPairs(db, prefix);
-    const pairsByProjectId = new Map<Id, DocumentPair[]>();
-    for (const pair of pairs) {
-        const list = pairsByProjectId.get(pair.uriId);
+    const { documents, messagePairs } =
+        await fetchProjectMessagePairs(db, prefix);
+    const messagePairsByProjectId =
+        new Map<Id, DocumentMessagePair[]>();
+    for (const messagePair of messagePairs) {
+        const list = messagePairsByProjectId.get(
+            messagePair.uriId,
+        );
         if (list === undefined) {
-            pairsByProjectId.set(pair.uriId, [pair]);
+            messagePairsByProjectId.set(
+                messagePair.uriId, [messagePair],
+            );
         } else {
-            list.push(pair);
+            list.push(messagePair);
         }
     }
     const byId = new Map<Id, ProjectEntity>();
     for (const [projectId, document] of documents) {
         const history = stateHistoryFrom(
             documentLifecycleEvents(
-                pairsByProjectId.get(projectId) ?? [],
+                messagePairsByProjectId.get(projectId) ?? [],
             ),
             projectId,
         );
@@ -149,8 +156,8 @@ export async function deriveProject(
     projectId: Id,
 ): Promise<ProjectEntity> {
     const prefix = projectsUriPrefix(organization);
-    const { documents, pairs } =
-        await fetchProjectPairs(db, prefix);
+    const { documents, messagePairs } =
+        await fetchProjectMessagePairs(db, prefix);
     const document = documents.get(projectId);
     if (document === undefined) {
         throw await missedReadError(
@@ -159,7 +166,8 @@ export async function deriveProject(
     }
     const history = stateHistoryFrom(
         documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === projectId),
+            messagePairs.filter((messagePair) =>
+                messagePair.uriId === projectId),
         ),
         projectId,
     );
@@ -185,10 +193,12 @@ export async function deriveProjectStateHistory(
     projectId: Id,
 ): Promise<StateEntity[]> {
     const prefix = projectsUriPrefix(organization);
-    const { pairs } = await fetchProjectPairs(db, prefix);
+    const { messagePairs } =
+        await fetchProjectMessagePairs(db, prefix);
     return stateHistoryFrom(
         documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === projectId),
+            messagePairs.filter((messagePair) =>
+                messagePair.uriId === projectId),
         ),
         projectId,
     );

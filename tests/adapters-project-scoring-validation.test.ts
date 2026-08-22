@@ -31,7 +31,7 @@ const OBJECTIVE_ID = generateIdentifier();
 
 // Phase Final Stage B: score tables retired — the store-gate
 // pins re-home to the pure validators; wire + adapter pins
-// stay on the pair plane.
+// stay on the message plane.
 
 test('baseline validator accepts valid boundary scores',
     () => {

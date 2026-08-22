@@ -17,7 +17,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     IF_MATCH_HEADER,
     strongEtagOf,
     parseIfMatch,
@@ -34,7 +34,7 @@ import {
     deriveInstanceHead,
 } from '../api/derive-record-instances.ts';
 import {
-    documentPairsAt,
+    documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import {
     nowUtc,
@@ -86,7 +86,7 @@ function req(
     });
 }
 
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -107,7 +107,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -184,13 +184,13 @@ async function putInstance(
     ));
 }
 
-async function countInstancePairs(
+async function countInstanceMessagePairs(
     db: MemoryDbAdapter,
 ): Promise<number> {
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
-    const responses = await db.pairs.getAllWhere(
+    const responses = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     return responses.filter(
@@ -198,21 +198,21 @@ async function countInstancePairs(
     ).length;
 }
 
-async function countDeletePairs(
+async function countDeleteMessagePairs(
     db: MemoryDbAdapter,
 ): Promise<number> {
     const prefix = instancesUriPrefix(
         ORGANIZATION, TYPE_ID,
     );
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
-    return documentPairsAt(
+    return documentMessagePairsAt(
         requests, prefix,
     ).filter(
-        (pair) => pair.uriId === INSTANCE_ID
-            && pair.method === 'DELETE',
+        (messagePair) => messagePair.uriId === INSTANCE_ID
+            && messagePair.method === 'DELETE',
     ).length;
 }
 
@@ -228,16 +228,16 @@ async () => {
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
     assert.equal(put.status, 201);
-    const before = await countInstancePairs(db);
+    const before = await countInstanceMessagePairs(db);
     const del = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(del.status, 204);
     assert.equal(
-        await countInstancePairs(db),
+        await countInstanceMessagePairs(db),
         before + 1,
     );
-    assert.equal(await countDeletePairs(db), 1);
+    assert.equal(await countDeleteMessagePairs(db), 1);
 
     const list = await handleRequest(db, req(
         'GET', INSTANCES, memberToken,
@@ -304,19 +304,19 @@ async () => {
 
     // New bytes: different Authorization → not a replay.
     // Already-gone DELETE is 204 and does not append.
-    const pairsBeforeSecond = await countInstancePairs(db);
-    const deletesBefore = await countDeletePairs(db);
+    const messagePairsBeforeSecond = await countInstanceMessagePairs(db);
+    const deletesBefore = await countDeleteMessagePairs(db);
     const del2 = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, adminToken,
     ));
     assert.equal(del2.status, 204);
     assert.equal(
-        await countInstancePairs(db),
-        pairsBeforeSecond,
+        await countInstanceMessagePairs(db),
+        messagePairsBeforeSecond,
         'already-gone DELETE does not append',
     );
     assert.equal(
-        await countDeletePairs(db),
+        await countDeleteMessagePairs(db),
         deletesBefore,
     );
     const head = await deriveInstanceHead(
@@ -337,7 +337,7 @@ async () => {
     assert.deepEqual(await res.json(), {
         error: 'Not found: ' + INSTANCE_DETAIL,
     });
-    assert.equal(await countInstancePairs(db), 0);
+    assert.equal(await countInstanceMessagePairs(db), 0);
 });
 
 test('DELETE byte-identical replay → 204 (replay fast path)',
@@ -350,13 +350,13 @@ async () => {
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(first.status, 204);
-    const afterFirst = await countInstancePairs(db);
+    const afterFirst = await countInstanceMessagePairs(db);
     const second = await handleRequest(db, req(
         'DELETE', INSTANCE_DETAIL, memberToken,
     ));
     assert.equal(second.status, 204);
     assert.equal(
-        await countInstancePairs(db),
+        await countInstanceMessagePairs(db),
         afterFirst,
         'byte-identical replay does not append',
     );
@@ -433,7 +433,7 @@ async () => {
             },
         ],
     };
-    const stalePair = await formWritePair({
+    const staleMessagePair = await formWriteMessagePair({
         method: 'PATCH',
         pathname: INSTANCE_DETAIL,
         routePattern: INSTANCE_DETAIL_PATTERN,
@@ -481,7 +481,7 @@ async () => {
             [ORGANIZATION, TYPE_ID, INSTANCE_ID],
             patchBody,
             'nkgaOHZISTQrILTfPThWCA',
-            stalePair,
+            staleMessagePair,
             ORGANIZATION,
             ['member'],
         ),

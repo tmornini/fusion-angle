@@ -14,14 +14,14 @@ import { normalizedStoredGraph } from
     './flow-graph-relations.ts';
 import {
     deriveDocumentsAt,
-    documentPairsAt,
+    documentMessagePairsAt,
     documentLifecycleEvents,
     stateHistoryFrom,
     currentDocumentState,
     byIdAscending,
     DELETED_STATE,
     type DerivedDocument,
-    type DocumentPair,
+    type DocumentMessagePair,
 } from './derive-documents.ts';
 import { liveHeadId, messageStore } from
     './message-store.ts';
@@ -42,19 +42,19 @@ import { liveHeadId, messageStore } from
 // THREE HEAD notions coexist over a flow's message-plane rows
 // and must never be conflated (IV Logic):
 //   - The LOCK head: the latest pair at the address by envelope
-//     (at, id), ANY method — headPairIdAt's own reduction
-//     (message-pair.ts), serving Supersedes/Follows provenance
-//     for the locked class. A DAG under races; provenance-only,
-//     never consulted here.
+//     (at, id), ANY method — headMessagePairIdAt's own
+//     reduction (message-pair.ts), serving Supersedes/Follows
+//     provenance for the locked class. A DAG under races;
+//     provenance-only, never consulted here.
 //   - The DOCUMENT head: the latest PUT/DELETE pair by envelope
-//     (at, id) — documentPairsAt/deriveDocumentsAt's own
+//     (at, id) — documentMessagePairsAt/deriveDocumentsAt's own
 //     reduction (derive-documents.ts). THIS is what `graph`
 //     tracks below: the client-authored working snapshot the
 //     most recently successful PUT actually carried, never the
 //     lifecycle-current pair's own snapshot when the two
 //     diverge.
 //   - The LIFECYCLE-current event: the (state_at,
-//     state_event_id) reduction over EVERY document pair's own
+//     state_event_id) reduction over EVERY document message pair's own
 //     trio — never arrival order, never the envelope `at`s
 //     (currentDocumentState, derive-documents.ts). Decides
 //     visibility (a 'deleted' current state excludes/404s)
@@ -80,19 +80,20 @@ function flowsUriPrefix(organization: Id): string {
 // shared normalizer — derivation reads ONLY the document's own
 // fields, never the graphDelta/revivals sidecars (Internal
 // Defense: tests/drift-flows.test.ts's sidecar-insensitivity
-// case proves this, not just asserts it). `pairCount` is this
-// flow's OWN document-pair count (Phase 14 Task 8) — the cheap
-// hasUndoHistory approximation; deriveFlow/deriveFlows (below)
-// supply it, since both already group pairs per flow for their
-// own lifecycle walk (no second pass here). OPTIONAL only so
-// this function keeps satisfying DocumentFamilyWiring's fixed
-// 2-arg `entityOf` contract in FLOWS_WIRING (api/routes.ts).
-// Live GET stays on deriveFlow/deriveFlows (pairCount supplied)
-// so a state-'deleted' head 404s; stored PUT omits the stamp.
+// case proves this, not just asserts it). `messagePairCount`
+// is this flow's OWN document-pair count (Phase 14 Task 8) —
+// the cheap hasUndoHistory approximation; deriveFlow/
+// deriveFlows (below) supply it, since both already group
+// pairs per flow for their own lifecycle walk (no second
+// pass here). OPTIONAL only so this function keeps satisfying
+// DocumentFamilyWiring's fixed 2-arg `entityOf` contract in
+// FLOWS_WIRING (api/routes.ts). Live GET stays on deriveFlow/
+// deriveFlows (messagePairCount supplied) so a state-'deleted'
+// head 404s; stored PUT omits the stamp.
 export function flowEntityOf(
     document: DerivedDocument,
     organization: Id,
-    pairCount?: number,
+    messagePairCount?: number,
 ): FlowWithGraph {
     const body = document.body;
     return {
@@ -104,7 +105,7 @@ export function flowEntityOf(
         is_auto_fit: pickBoolean(body, 'is_auto_fit'),
         lock_timeout: pickNumber(body, 'lock_timeout'),
         graph: normalizedStoredGraph(body['graph']),
-        hasUndoHistory: (pairCount ?? 0) > 1,
+        hasUndoHistory: (messagePairCount ?? 0) > 1,
     };
 }
 
@@ -123,19 +124,21 @@ export function flowStoredEntityOf(
     return stored;
 }
 
-async function fetchFlowPairs(
+async function fetchFlowMessagePairs(
     db: DbAdapter,
     prefix: string,
 ): Promise<{
     readonly documents: Map<string, DerivedDocument>;
-    readonly pairs: readonly DocumentPair[];
+    readonly messagePairs: readonly DocumentMessagePair[];
 }> {
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     return {
-        documents: deriveDocumentsAt(pairs, prefix),
-        pairs: documentPairsAt(pairs, prefix),
+        documents: deriveDocumentsAt(messagePairs, prefix),
+        messagePairs: documentMessagePairsAt(
+            messagePairs, prefix,
+        ),
     };
 }
 
@@ -151,21 +154,27 @@ export async function deriveFlows(
     organization: Id,
 ): Promise<FlowWithGraph[]> {
     const prefix = flowsUriPrefix(organization);
-    const { documents, pairs } = await fetchFlowPairs(db, prefix);
-    const pairsByFlowId = new Map<Id, DocumentPair[]>();
-    for (const pair of pairs) {
-        const list = pairsByFlowId.get(pair.uriId);
+    const { documents, messagePairs } =
+        await fetchFlowMessagePairs(db, prefix);
+    const messagePairsByFlowId =
+        new Map<Id, DocumentMessagePair[]>();
+    for (const messagePair of messagePairs) {
+        const list = messagePairsByFlowId.get(
+            messagePair.uriId,
+        );
         if (list === undefined) {
-            pairsByFlowId.set(pair.uriId, [pair]);
+            messagePairsByFlowId.set(
+                messagePair.uriId, [messagePair],
+            );
         } else {
-            list.push(pair);
+            list.push(messagePair);
         }
     }
     const byId = new Map<Id, FlowWithGraph>();
     for (const [flowId, document] of documents) {
         const history = stateHistoryFrom(
             documentLifecycleEvents(
-                pairsByFlowId.get(flowId) ?? [],
+                messagePairsByFlowId.get(flowId) ?? [],
             ),
             flowId,
         );
@@ -174,7 +183,7 @@ export async function deriveFlows(
         }
         byId.set(flowId, flowEntityOf(
             document, organization,
-            pairsByFlowId.get(flowId)?.length ?? 0,
+            messagePairsByFlowId.get(flowId)?.length ?? 0,
         ));
     }
     const live = await messageStore(db).getCollection(prefix);
@@ -192,18 +201,19 @@ export async function deriveFlow(
     flowId: Id,
 ): Promise<FlowWithGraph> {
     const prefix = flowsUriPrefix(organization);
-    const { documents, pairs } = await fetchFlowPairs(db, prefix);
+    const { documents, messagePairs } =
+        await fetchFlowMessagePairs(db, prefix);
     const document = documents.get(flowId);
     if (document === undefined) {
         throw await missedReadError(
             db, flowId, organization, FLOWS_TABLE,
         );
     }
-    const ownPairs = pairs.filter(
-        (pair) => pair.uriId === flowId,
+    const ownMessagePairs = messagePairs.filter(
+        (messagePair) => messagePair.uriId === flowId,
     );
     const history = stateHistoryFrom(
-        documentLifecycleEvents(ownPairs),
+        documentLifecycleEvents(ownMessagePairs),
         flowId,
     );
     if (currentDocumentState(history) === DELETED_STATE) {
@@ -211,37 +221,41 @@ export async function deriveFlow(
             db, flowId, organization, FLOWS_TABLE,
         );
     }
-    return flowEntityOf(document, organization, ownPairs.length);
+    return flowEntityOf(
+        document, organization, ownMessagePairs.length,
+    );
 }
 
 // Undo-as-replay's own resolution (Phase 14 Task 8): given this
 // flow's OWN undo-operation-pair address prefix (the route's
-// own `pair.uriCollection` — already flow-specific, since `undo` is
-// a literal final route segment, so messageAddress folds the
-// real id into the PREFIX rather than a separate uriId), walks
-// this flow's flows/:id document-pair history and replays it as
-// a stack with a pointer: a GENUINE pair (no correlated undo
-// call) truncates any abandoned branch to `[0..pointer]` then
-// pushes; an UNDO-correlated pair only moves the pointer back —
-// it never adds a new logical state (the fix that makes
-// undo-save-undo target the SAVE's own baseline, never a
-// discarded future — see the PINNED Step 0 trace,
-// .superpowers/sdd/phase14-task-8-report.md). Correlation is by
-// the STORED REQUEST `at` (never the response `at` —
+// own `messagePair.uriCollection` — already flow-specific,
+// since `undo` is a literal final route segment, so
+// messageAddress folds the real id into the PREFIX rather
+// than a separate uriId), walks this flow's flows/:id
+// document-pair history and replays it as a stack with a
+// pointer: a GENUINE pair (no correlated undo call)
+// truncates any abandoned branch to `[0..pointer]` then
+// pushes; an UNDO-correlated pair only moves the pointer
+// back — it never adds a new logical state (the fix that
+// makes undo-save-undo target the SAVE's own baseline,
+// never a discarded future — see the PINNED Step 0 trace,
+// .superpowers/sdd/phase14-task-8-report.md). Correlation is
+// by the STORED REQUEST `at` (never the response `at` —
 // appendMessagePair mints each pair's own response `at`
-// independently via nowUtc(), so two pairs written in the SAME
-// transaction do not share it; the request `at` DOES, since
-// both the operation pair and its synthesized document pair
-// carry the identical `pair.requestAt`). `target: undefined`
-// means exhaustion (no pair exists before the current head); an
-// undefined RETURN means the flow has no document pairs at all
-// at this address (should never happen for a routed request
-// against a real flow id — this derivation trusts nothing
-// beyond what it reads, same posture as deriveFlow's own
-// EntityNotFoundError guard).
+// independently via nowUtc(), so two pairs written in the
+// SAME transaction do not share it; the request `at` DOES,
+// since both the operation message pair and its synthesized
+// document message pair carry the identical
+// `messagePair.requestAt`). `target: undefined` means
+// exhaustion (no pair exists before the current head); an
+// undefined RETURN means the flow has no document message pairs at
+// all at this address (should never happen for a routed
+// request against a real flow id — this derivation trusts
+// nothing beyond what it reads, same posture as
+// deriveFlow's own EntityNotFoundError guard).
 export interface FlowUndoResolution {
-    readonly current: DocumentPair;
-    readonly target: DocumentPair | undefined;
+    readonly current: DocumentMessagePair;
+    readonly target: DocumentMessagePair | undefined;
 }
 
 export async function resolveFlowUndoTarget(
@@ -251,32 +265,37 @@ export async function resolveFlowUndoTarget(
     undoUriPrefix: string,
 ): Promise<FlowUndoResolution | undefined> {
     const prefix = flowsUriPrefix(organization);
-    const [stored, undoPairs] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere(
+    const [stored, undoMessagePairs] = await Promise.all([
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere(
             'uri_collection', undoUriPrefix,
         ),
     ]);
-    const pairs = documentPairsAt(stored, prefix)
-        .filter((pair) => pair.uriId === flowId);
-    const current = pairs.at(-1);
+    const messagePairs = documentMessagePairsAt(
+        stored, prefix,
+    ).filter(
+        (messagePair) => messagePair.uriId === flowId,
+    );
+    const current = messagePairs.at(-1);
     if (current === undefined) return undefined;
     const undoRequestAts = new Set(
-        undoPairs.map((pair) => pair.request_at),
+        undoMessagePairs.map(
+            (messagePair) => messagePair.request_at,
+        ),
     );
     const storedById = new Map(
         stored.map((row) => [row.id, row]),
     );
-    const stack: DocumentPair[] = [];
+    const stack: DocumentMessagePair[] = [];
     let pointer = -1;
-    for (const pair of pairs) {
+    for (const messagePair of messagePairs) {
         if (undoRequestAts.has(
-            storedById.get(pair.id)!.request_at,
+            storedById.get(messagePair.id)!.request_at,
         )) {
             pointer -= 1;
         } else {
             stack.length = Math.max(pointer + 1, 0);
-            stack.push(pair);
+            stack.push(messagePair);
             pointer = stack.length - 1;
         }
     }
@@ -290,7 +309,7 @@ export async function resolveFlowUndoTarget(
 // sequence IS the history, (state_at, id) ascending. Matches
 // states.getAllFor(flowId): node-level 'deleted'/'restored'
 // events carry NODE entity_ids, never the flow's own, so they
-// never appear in a flow's own document pairs either — absent
+// never appear in a flow's own document message pairs either — absent
 // from BOTH sides. NOT routed — drift-proof only.
 export async function deriveFlowStateHistory(
     db: DbAdapter,
@@ -298,17 +317,20 @@ export async function deriveFlowStateHistory(
     flowId: Id,
 ): Promise<StateEntity[]> {
     const prefix = flowsUriPrefix(organization);
-    const { pairs } = await fetchFlowPairs(db, prefix);
+    const { messagePairs } =
+        await fetchFlowMessagePairs(db, prefix);
     return stateHistoryFrom(
         documentLifecycleEvents(
-            pairs.filter((pair) => pair.uriId === flowId),
+            messagePairs.filter(
+                (messagePair) => messagePair.uriId === flowId,
+            ),
         ),
         flowId,
     );
 }
 
-// ---- flowGraphBindingsFromPairs — RESTRICT graph-leg core ----
-// ---- (Phase 15 Task 1, Author gate 5) ------------------------
+// ---- flowGraphBindingsFromMessagePairs — RESTRICT
+// ---- graph-leg core (Phase 15 Task 1, Author gate 5) ----
 
 // Replays every graphDelta.attributeEvents / memberEvents
 // entry across this organization's flow document-pair history
@@ -321,16 +343,17 @@ export async function deriveFlowStateHistory(
 // nodeFlowIds is the CURRENT flow_id stamp per node id —
 // graphDelta.nodes upserts set it, graphDelta.deletions drop
 // it when the entityId is still mapped (soft-deleted nodes
-// are no longer current). Pair-plane successor of
+// are no longer current). Message-plane successor of
 // flowNodes.getById(flowNodeId).flow_id that RESTRICT uses to
 // name referring flows. A later pair that re-upserts the
-// node restores the map entry (documentPairsAt ascending).
+// node restores the map entry (documentMessagePairsAt
+// ascending).
 //
 // Do NOT use the client-authored document `graph` snapshot
 // (unvalidated against the relation ledgers). dbOrView-shaped
 // and opens no nested transaction — callable from WITHIN an
 // already-open write-gate transaction (ATTRIBUTE_RESTRICT_
-// TABLES already lists the pair plane).
+// TABLES already lists the message plane).
 export interface FlowGraphBindingLedgers {
     readonly attributeEvents:
         readonly FlowNodeAttributeEntity[];
@@ -358,19 +381,21 @@ function memberEventOf(
     };
 }
 
-export async function flowGraphBindingsFromPairs(
+export async function flowGraphBindingsFromMessagePairs(
     dbOrView: DbAdapter,
     organization: Id,
 ): Promise<FlowGraphBindingLedgers> {
     const prefix = flowsUriPrefix(organization);
-    const stored = await dbOrView.pairs.getAllWhere(
+    const stored = await dbOrView.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     const attributeEvents: FlowNodeAttributeEntity[] = [];
     const memberEvents: FlowNodeMemberEntity[] = [];
     const nodeFlowIds = new Map<Id, Id>();
-    for (const pair of documentPairsAt(stored, prefix)) {
-        const delta = pair.body['graphDelta'];
+    for (const messagePair of documentMessagePairsAt(
+        stored, prefix,
+    )) {
+        const delta = messagePair.body['graphDelta'];
         if (typeof delta !== 'object' || delta === null) {
             continue;
         }
@@ -392,7 +417,7 @@ export async function flowGraphBindingsFromPairs(
                     && typeof flowId === 'string'
                 ) {
                     // Later pairs win — full-history walk is
-                    // (at, id) ascending (documentPairsAt).
+                    // (at, id) ascending (documentMessagePairsAt).
                     nodeFlowIds.set(nodeId, flowId);
                 }
             }

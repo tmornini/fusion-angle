@@ -91,8 +91,8 @@ function snapToSave(
 // Undo-as-replay (Phase 14 Task 8): no longer archives the
 // PRE-edit state through postFlowVersion first — that archive
 // existed solely to give the OLD undo mechanism a flow_versions
-// row to consume. putFlow's own document pair (written on every
-// call, always) is now what a LATER undo's pair-plane walk finds
+// row to consume. putFlow's own document message pair (written on every
+// call, always) is now what a LATER undo's message-plane walk finds
 // as "the state before this edit," so the archive write is dead.
 // Routed through enqueueFlowSave (same per-flowId chain as the
 // designer's #queueSave) so graph-edit commits cannot race
@@ -671,11 +671,11 @@ function applyServerGraph(
 const MAX_UNDO_ATTEMPTS = 3;
 
 // Drive POST /flows/:id/undo with its own jittered 412-absorb:
-// the undo op's synthesized document pair takes the LOCKED
+// the undo op's synthesized document message pair takes the LOCKED
 // family's lock head, so a save racing this undo for the SAME
 // head 412s the whole transaction (the in-tx head re-read).
 // Undo-as-replay (Phase 14 Task 8)
-// resolves the restore target SERVER-SIDE from the pair plane
+// resolves the restore target SERVER-SIDE from the message plane
 // (api/derive-flows.ts's resolveFlowUndoTarget), so this loop
 // carries no baseline of its own — a 412 just means the head
 // moved; the server re-resolves fresh against the NEW head on
@@ -734,7 +734,7 @@ export async function performUndo(
     // .superpowers/sdd/phase14-task-8-report.md). A direct-API
     // caller that bypasses this gate still gets a graceful
     // server-side no-op — the route performs zero domain writes
-    // when its own pair-plane walk finds no target.
+    // when its own message-plane walk finds no target.
     if (!history.hasUndoHistory) {
         return {
             kind: 'ok',
@@ -814,9 +814,9 @@ export async function performRedo(
     // this used to make (postFlowVersion, archiving the
     // pre-redo state so a LATER undo could consume it): undo no
     // longer consumes flow_versions at all — it resolves its
-    // target from the flows/:id document-pair history, and THIS
-    // putFlow's own document pair (every redo already wrote one)
-    // is exactly what a later undo's pair-plane walk finds as
+    // target from the flows/:id document-message-pair history, and THIS
+    // putFlow's own document message pair (every redo already wrote one)
+    // is exactly what a later undo's message-plane walk finds as
     // "the state before the redo," with no archive needed. A
     // failure here — putFlow's own exhausted retry or a non-412
     // error — degrades to the same visible failOp, mirroring

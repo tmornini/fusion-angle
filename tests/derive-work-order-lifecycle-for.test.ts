@@ -49,7 +49,7 @@ const WORKORDERID_FV2 = generateIdentifier();
 // the SAME pure replay core (replayWorkOrderOperations, private
 // to api/derive-states.ts) over INDEXED reads scoped to ONE
 // known (organization, workOrderId) pair — uri_id for the
-// create/document pairs (they share ONE uriId at the work-orders
+// create/document message pairs (they share ONE uriId at the work-orders
 // collection address), uri_collection for the claim/transition
 // sub-resource addresses, and the organization's own states/:id
 // prefix (filtered locally to this entity) for gate 5a's rows —
@@ -330,7 +330,7 @@ async () => {
 });
 
 // Named unclaim via POST organizations/:id/work-orders/:id/release — an
-// op-pair
+// operation-message-pair
 // leg of deriveWorkOrderLifecycle's own replay (applyReleasePair),
 // so workOrderLifecycleStatesFor INCLUDES the claim_released
 // event and matches the bulk subset. Claim history sees the

@@ -1,26 +1,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-    documentPairsAt,
+    documentMessagePairsAt,
     deriveDocumentsAt,
 } from '../api/derive-documents.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import type {
-    PairEntity,
+    MessagePairEntity,
 } from '../api/types.ts';
 import { TEST_OPERATION_ID } from './http-fixtures.ts';
 
 const AT = '2026-01-01T00:00:00.000000Z';
 
 // A stored pair for a given method, built through the SAME
-// formWritePair every live write uses — never hand-assembled
-// JSON — so the fixture's message shape stays truthful to
-// what appendMessagePair actually persists.
-async function storedPairAt(
+// formWriteMessagePair every live write uses — never
+// hand-assembled JSON — so the fixture's message shape stays
+// truthful to what appendMessagePair actually persists.
+async function storedMessagePairAt(
     method: string,
     status: number,
-): Promise<PairEntity> {
-    const pair = await formWritePair({
+): Promise<MessagePairEntity> {
+    const messagePair = await formWriteMessagePair({
         method,
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
             + 'XufQcWIKhZshfJYOVNeUSw',
@@ -37,18 +37,18 @@ async function storedPairAt(
         operationId: TEST_OPERATION_ID,
     });
     return {
-        id: pair.id,
-        uri_collection: pair.uriCollection,
-        uri_id: pair.uriId,
-        requester_identity_id: pair.requesterIdentityId,
-        method: pair.method,
+        id: messagePair.id,
+        uri_collection: messagePair.uriCollection,
+        uri_id: messagePair.uriId,
+        requester_identity_id: messagePair.requesterIdentityId,
+        method: messagePair.method,
         request_at: AT,
-        request_hash: pair.requestHash,
-        request: pair.requestMessage,
+        request_hash: messagePair.requestHash,
+        request: messagePair.requestMessage,
         response_at: AT,
-        version: pair.responseEtag,
-        response: pair.responseMessage,
-        operation_id: pair.operationId,
+        version: messagePair.responseEtag,
+        response: messagePair.responseMessage,
+        operation_id: messagePair.operationId,
     };
 }
 
@@ -61,55 +61,57 @@ async function storedPairAt(
 // load-bearing once a family's create pair shares the
 // document address (flows).
 
-test('2-arg documentPairsAt decodes a PUT pair',
+test('2-arg documentMessagePairsAt decodes a PUT pair',
 async () => {
-    const pair = await storedPairAt('PUT', 200);
+    const messagePair = await storedMessagePairAt('PUT', 200);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/';
-    const fromOne = documentPairsAt([pair], prefix);
+    const fromOne = documentMessagePairsAt(
+        [messagePair], prefix,
+    );
     assert.equal(fromOne.length, 1);
     assert.equal(fromOne[0]!.method, 'PUT');
-    assert.equal(fromOne[0]!.at, pair.response_at);
+    assert.equal(fromOne[0]!.at, messagePair.response_at);
 });
 
-test('documentPairsAt excludes a POST pair at a document'
-+ ' address', async () => {
-    const pair = await storedPairAt('POST', 200);
-    const pairs = documentPairsAt(
-        [pair],
+test('documentMessagePairsAt excludes a POST pair at a'
++ ' document address', async () => {
+    const messagePair = await storedMessagePairAt('POST', 200);
+    const messagePairs = documentMessagePairsAt(
+        [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(pairs.length, 0);
+    assert.equal(messagePairs.length, 0);
 });
 
-test('documentPairsAt includes a PUT pair at a document'
-+ ' address', async () => {
-    const pair = await storedPairAt('PUT', 200);
-    const pairs = documentPairsAt(
-        [pair],
+test('documentMessagePairsAt includes a PUT pair at a'
++ ' document address', async () => {
+    const messagePair = await storedMessagePairAt('PUT', 200);
+    const messagePairs = documentMessagePairsAt(
+        [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(pairs.length, 1);
-    assert.equal(pairs[0]!.method, 'PUT');
+    assert.equal(messagePairs.length, 1);
+    assert.equal(messagePairs[0]!.method, 'PUT');
 });
 
-test('documentPairsAt includes a DELETE pair at a document'
-+ ' address', async () => {
-    const pair = await storedPairAt(
+test('documentMessagePairsAt includes a DELETE pair at a'
++ ' document address', async () => {
+    const messagePair = await storedMessagePairAt(
         'DELETE', 204,
     );
-    const pairs = documentPairsAt(
-        [pair],
+    const messagePairs = documentMessagePairsAt(
+        [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
-    assert.equal(pairs.length, 1);
-    assert.equal(pairs[0]!.method, 'DELETE');
+    assert.equal(messagePairs.length, 1);
+    assert.equal(messagePairs[0]!.method, 'DELETE');
 });
 
 test('deriveDocumentsAt never sees a POST-only address',
 async () => {
-    const pair = await storedPairAt('POST', 200);
+    const messagePair = await storedMessagePairAt('POST', 200);
     const documents = deriveDocumentsAt(
-        [pair],
+        [messagePair],
         '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/',
     );
     assert.equal(documents.size, 0);

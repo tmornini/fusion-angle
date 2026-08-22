@@ -9,7 +9,7 @@ import {
 } from './derive-documents.ts';
 import { missedReadError } from './derive-states.ts';
 
-// Flow tags: the codebase's FIRST pair-plane-ONLY document
+// Flow tags: the codebase's FIRST message-plane-ONLY document
 // family (Phase 14 Task 9) — no backing table, derived entirely
 // from message pairs at /flows/:id/tags/:name. Structurally
 // mirrors deriveFlowRecord (derive-flow-records.ts), re-nested
@@ -58,11 +58,11 @@ export async function deriveFlowTag(
     name: Id,
 ): Promise<FlowTagEntity> {
     const prefix = flowTagsUriPrefix(organization, flowId);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     const document = deriveDocumentsAt(
-        pairs, prefix,
+        messagePairs, prefix,
     ).get(name);
     if (document === undefined) {
         // Probe the parent flow: a foreign flow's tag 403s;

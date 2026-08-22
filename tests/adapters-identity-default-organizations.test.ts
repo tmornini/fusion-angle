@@ -3,7 +3,7 @@ import { strict as assert } from 'node:assert';
 import { TABLE_NAMES } from '../api/db.ts';
 
 // Phase Final Stage B: identity_default_organizations
-// table retired — pair-plane pins live elsewhere.
+// table retired — message-plane pins live elsewhere.
 test(
     'TABLE_NAMES drops identity_default_organizations',
     () => {

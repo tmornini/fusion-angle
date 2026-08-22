@@ -14,7 +14,7 @@ import {
 } from '../api/validators.ts';
 import { postRecordAttributeDocumentOp } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     appendMessagePair,
 } from '../api/message-pair.ts';
 import {
@@ -130,7 +130,7 @@ test('postRecordAttributeDocumentOp writes exactly the'
         ...documentFields(),
         organization_id: 'AjdvjuECVZEgZoFajaIEkg',
     };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + RECORD_ID + '/attributes/' + ATTRIBUTE_ID,
@@ -149,10 +149,10 @@ test('postRecordAttributeDocumentOp writes exactly the'
         operationId: TEST_OPERATION_ID,
     });
     // Phase Final Task 2: record_attributes ROW half stripped
-    // — pair plane + op return are the oracles.
+    // — message plane + op return are the oracles.
     const written = await postRecordAttributeDocumentOp(
         db, ATTRIBUTE_ID, body, 'XXZruirZyAOoRpNxaDnpSA',
-        pair,
+        messagePair,
     );
     assert.deepEqual(written, {
         id: ATTRIBUTE_ID,
@@ -162,8 +162,8 @@ test('postRecordAttributeDocumentOp writes exactly the'
         write_roles: ['member', 'admin'],
     });
     // Phase Final Stage B: record_attributes table retired.
-    assert.equal((await db.pairs.getAll()).length, 1);
-    assert.equal((await db.pairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
+    assert.equal((await db.messagePairs.getAll()).length, 1);
 });
 
 // -- 3. byte-identical resend (the shadow-ledger pin's sibling
@@ -207,8 +207,8 @@ async () => {
     );
     assert.deepEqual(first, second);
     // seedAdminSchema + parent type + 2 attribute PUTs
-    assert.equal((await db.pairs.getAll()).length, 4);
-    assert.equal((await db.pairs.getAll()).length, 4);
+    assert.equal((await db.messagePairs.getAll()).length, 4);
+    assert.equal((await db.messagePairs.getAll()).length, 4);
 });
 
 // -- 4. the DELETE-head derives absent — below-route via the
@@ -218,7 +218,7 @@ async () => {
 // returns undefined until RECORD_ATTRIBUTES_WIRING registers,
 // so this case stays red until that commit lands). ------------
 
-async function putDocumentPair(
+async function putDocumentMessagePair(
     db: MemoryDbAdapter,
     id: string,
     body: Record<string, unknown>,
@@ -226,7 +226,7 @@ async function putDocumentPair(
     // Nested storage under type (Task 8); type id from
     // body.record_id.
     const typeId = body['record_id'] as string;
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + typeId + '/attributes/' + id,
@@ -252,16 +252,16 @@ async function putDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
 }
 
-async function deleteDocumentPair(
+async function deleteDocumentMessagePair(
     db: MemoryDbAdapter,
     id: string,
     typeId: string,
 ): Promise<void> {
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'DELETE',
         pathname: '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
             + typeId + '/attributes/' + id,
@@ -287,7 +287,7 @@ async function deleteDocumentPair(
     });
     await db.transaction(
         MESSAGE_TABLES,
-        (view) => appendMessagePair(view, pair),
+        (view) => appendMessagePair(view, messagePair),
     );
 }
 
@@ -297,13 +297,13 @@ test('a DELETE-head derives absent on the nested attributes'
     await db.postSchemaCreation();
     const typeId = documentFields().record_id;
     const deletedId = generateIdentifier();
-    await putDocumentPair(db, deletedId, documentFields());
-    await deleteDocumentPair(db, deletedId, typeId);
+    await putDocumentMessagePair(db, deletedId, documentFields());
+    await deleteDocumentMessagePair(db, deletedId, typeId);
     const prefix = '/organizations/AjdvjuECVZEgZoFajaIEkg/record-types/'
         + typeId + '/attributes/';
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere('uri_collection', prefix),
-        db.pairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
+        db.messagePairs.getAllWhere('uri_collection', prefix),
     ]);
     const head = deriveDocumentsAt(requests, prefix).get(
         deletedId,

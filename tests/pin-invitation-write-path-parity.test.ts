@@ -51,9 +51,10 @@ const ID_GRANT = generateIdentifier();
 // `already`-membership gate now calls membershipExistsFor
 // in-tx (api/invitations-domain.ts), so this file's own
 // ACCEPT_TX_TABLES list is the flipped check's REAL table set,
-// not a stand-in — the parity test below proves the pair-plane
-// derive is honest under acceptInvitation's own transaction
-// shape, both before a membership exists and after one lands.
+// not a stand-in — the parity test below proves the
+// message-plane derive is honest under acceptInvitation's own
+// transaction shape, both before a membership exists and after
+// one lands.
 
 const BASE = 'http://localhost';
 
@@ -365,7 +366,7 @@ test('membershipExistsFor: pre-tx vs in-tx (acceptInvitation\'s'
 
     const seatPrefix = '/organizations/'
         + ORGANIZATION_TWO + '/members/';
-    const seatRows = await db.pairs.getAllWhere(
+    const seatRows = await db.messagePairs.getAllWhere(
         'uri_collection', seatPrefix,
     );
     assert.equal(

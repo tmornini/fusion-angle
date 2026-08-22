@@ -265,7 +265,7 @@ async function flowVersionCount(
 // relation tables hold exactly this state — the read source
 // GET /organizations/:id/flows/:id reassembles from, and (Phase 14 Task 8)
 // the
-// SAME document pair undo-as-replay's own server-side diff
+// SAME document message pair undo-as-replay's own server-side diff
 // reads as either the current head or a resolved target. Undo/
 // redo diff current vs target graphs; that diff only applies
 // correctly when the relations already carry the snap's graph.
@@ -308,8 +308,9 @@ test(
         // Undo-as-replay (Phase 14 Task 8): commitFlowMutation
         // no longer archives the pre-edit state through
         // postFlowVersion — undo resolves its target from the
-        // organizations/:id/flows/:id document-pair history instead, so this
-        // save's own putFlow document pair is now sufficient;
+        // organizations/:id/flows/:id document-message-pair
+        // history instead, so this save's own putFlow
+        // document message pair is now sufficient;
         // flow_versions stays untouched.
         assert.equal(
             await flowVersionCount(db), 0,
@@ -1250,8 +1251,9 @@ test(
 
 // NAMED REWRITE (Phase 14 Task 8, undo-as-replay): the target
 // is no longer a flow_versions row the client seeds and the
-// route consumes — it is the organizations/:id/flows/:id document-pair
-// immediately BEFORE the current head, resolved server-side.
+// route consumes — it is the organizations/:id/flows/:id
+// document message pair immediately BEFORE the current
+// head, resolved server-side.
 // The setup swaps the raw versions PUT for a genuine
 // seedCurrentGraph save (the 2-node baseline, undo's own
 // target), followed by the 3-node "current" save.
@@ -1282,7 +1284,7 @@ test(
         assert.equal(
             op.freshSnap.nodes.length, 2,
         );
-        // Genesis is a THIRD document pair still further back —
+        // Genesis is a THIRD document message pair still further back —
         // there is more to undo, unlike the old flow_versions
         // count (which hit zero after consuming its one row).
         assert.equal(
@@ -1385,7 +1387,7 @@ test(
         // Undo-as-replay (Phase 14 Task 8): redo no longer
         // archives the pre-redo state through postFlowVersion —
         // its own putFlow write is what a LATER undo's
-        // pair-plane walk would find instead. flow_versions
+        // message-plane walk would find instead. flow_versions
         // stays untouched by the live redo path.
         assert.equal(
             await flowVersionCount(db), 0,

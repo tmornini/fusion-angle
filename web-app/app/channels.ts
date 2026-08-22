@@ -100,7 +100,7 @@ export function createSubscriptionChannel(
                 principalFromToken(getSessionToken());
             // Active org claim wins when present
             // (post-exchange). A flat login token has only
-            // `organizations`; the pair-plane fence still
+            // `organizations`; the message-plane fence still
             // serves the default org, so match any
             // reachable org the event names.
             const organizationHit =

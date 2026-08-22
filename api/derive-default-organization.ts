@@ -5,7 +5,7 @@ import type {
 import { pickString } from './validators.ts';
 import {
     deriveDocumentsAt,
-    documentPairsAt,
+    documentMessagePairsAt,
 } from './derive-documents.ts';
 
 // Task 53: the SET default-organization document lives at
@@ -26,16 +26,17 @@ export async function deriveDefaultOrganization(
     identityId: Id,
 ): Promise<IdentityDefaultOrganizationEntity[]> {
     const prefix = defaultOrganizationPrefix(identityId);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     const document = deriveDocumentsAt(
-        pairs, prefix,
+        messagePairs, prefix,
     ).get('');
     if (document === undefined) return [];
-    const head = documentPairsAt(
-        pairs, prefix,
-    ).find((pair) => pair.id === document.pairId);
+    const head = documentMessagePairsAt(
+        messagePairs, prefix,
+    ).find((messagePair) =>
+        messagePair.id === document.messagePairId);
     return [{
         id: identityId,
         identity_id: identityId,

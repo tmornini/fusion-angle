@@ -46,7 +46,7 @@ test(
         );
 
         // Phase Final Task 2: members/human_members ROW
-        // halves stripped — parent via pair-plane GET.
+        // halves stripped — parent via message-plane GET.
         const row = await ctx.GET<{
             id: string; kind: string; title: string;
         }>('identities/xdaJyuuPyHfffCGLhqDrOQ');

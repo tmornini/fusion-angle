@@ -26,7 +26,8 @@ import {
 } from '../shared/identifier.ts';
 
 export const POSTGRES_DROP_SCHEMA =
-    'DROP TABLE IF EXISTS pairs;\n'
+    'DROP TABLE IF EXISTS message_pairs;\n'
+    + 'DROP TABLE IF EXISTS pairs;\n'
     + 'DROP TABLE IF EXISTS responses;\n'
     + 'DROP TABLE IF EXISTS requests;\n'
     + 'DROP TABLE IF EXISTS schema_marker;\n'
@@ -245,7 +246,7 @@ function postgresTx(
         },
         async lockHead(id: string): Promise<void> {
             await sql.query`
-                SELECT id FROM pairs
+                SELECT id FROM message_pairs
                 WHERE id = ${uuidTextOfIdentifier(id)}
                 FOR UPDATE
             `;
@@ -262,7 +263,7 @@ function postgresTx(
                 method: string;
             }>`
                 SELECT id, method
-                FROM pairs
+                FROM message_pairs
                 WHERE uri_collection = ${collection}
                   AND uri_id = ${uriId}
                   AND method IN ('PUT', 'DELETE')
@@ -318,15 +319,15 @@ async function advisoryLock(
 
 function assertMessageTable(
     table: string,
-): 'pairs' {
-    if (table === 'pairs') {
+): 'message_pairs' {
+    if (table === 'message_pairs') {
         return table;
     }
     throw new Error('unknown table: ' + table);
 }
 
 function assertIndexedColumn(
-    table: 'pairs',
+    table: 'message_pairs',
     column: string,
 ): void {
     assertGetWhereColumn(table, column);
@@ -415,41 +416,41 @@ function textField(
 
 async function selectById(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
     id: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM pairs
+        SELECT * FROM message_pairs
         WHERE id = ${uuidTextOfIdentifier(id)}
     `;
 }
 
 async function selectAll(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM pairs
+        SELECT * FROM message_pairs
         ORDER BY response_at, id
     `;
 }
 
 async function selectWhere(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
     column: string,
     key: string,
 ): Promise<Record<string, unknown>[]> {
     if (column === 'uri_collection') {
         return sql.query`
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE uri_collection = ${key}
             ORDER BY response_at, id
         `;
     }
     if (column === 'request_hash') {
         return sql.query`
-            SELECT * FROM pairs
+            SELECT * FROM message_pairs
             WHERE request_hash = ${key}
             ORDER BY response_at, id
         `;
@@ -461,12 +462,12 @@ async function selectWhere(
 
 async function selectAddress(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
     collection: string,
     uriId: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM pairs
+        SELECT * FROM message_pairs
         WHERE uri_collection = ${collection}
           AND uri_id = ${uriId}
         ORDER BY response_at, id
@@ -475,13 +476,13 @@ async function selectAddress(
 
 async function selectAddressVersion(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
     collection: string,
     uriId: string,
     version: string,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM pairs
+        SELECT * FROM message_pairs
         WHERE uri_collection = ${collection}
           AND uri_id = ${uriId}
           AND version = ${version}
@@ -491,12 +492,12 @@ async function selectAddressVersion(
 
 async function selectWhereBody(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
     collection: string,
     containment: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
     return sql.query`
-        SELECT * FROM pairs
+        SELECT * FROM message_pairs
         WHERE uri_collection = ${collection}
           AND message_body(response) @>
               ${containment}::jsonb
@@ -506,25 +507,25 @@ async function selectWhereBody(
 
 async function deleteById(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
     id: string,
 ): Promise<void> {
     await sql.query`
-        DELETE FROM pairs
+        DELETE FROM message_pairs
         WHERE id = ${uuidTextOfIdentifier(id)}
     `;
 }
 
 async function deleteAll(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
 ): Promise<void> {
-    await sql.query`DELETE FROM pairs`;
+    await sql.query`DELETE FROM message_pairs`;
 }
 
 async function upsertRow(
     sql: SqlClient,
-    _table: 'pairs',
+    _table: 'message_pairs',
     row: Record<string, unknown>,
 ): Promise<void> {
     const id = uuidTextOfIdentifier(
@@ -546,7 +547,7 @@ async function upsertRow(
         textField(row, 'operation_id'),
     );
     await sql.query`
-        INSERT INTO pairs (
+        INSERT INTO message_pairs (
             id, uri_collection, uri_id,
             requester_identity_id, method,
             request_at, request_hash, request,

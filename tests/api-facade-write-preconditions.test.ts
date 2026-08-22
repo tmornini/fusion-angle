@@ -56,7 +56,7 @@ async () => {
         ideaPutBody(ideaId, 'Headers'), token,
         [['if-match', '"probe-value-123"']],
     );
-    const stored = (await db.pairs.getAll())
+    const stored = (await db.messagePairs.getAll())
         .find(r => r.uri_id === ideaId);
     assert.ok(stored, 'a request row was stored');
     assert.ok(

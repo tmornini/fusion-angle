@@ -28,7 +28,7 @@ async function setup() {
 
 // Phase Final Task 2: identities / identity_pii /
 // identity_credentials ROW halves stripped — oracles are the
-// pair plane (GET + derive).
+// message plane (GET + derive).
 
 test('postIdentityCreation mints a person identity'
     + ' with PII', async () => {
@@ -62,7 +62,7 @@ test('postIdentityCreation mints a service identity'
     assert.equal(identity.kind, 'service');
     const creds = await deriveCredentialsFor(db, 'syWUUcdBSbBgMwBiCrgbDw');
     const cred = creds.find(r => r.kind === 'client_secret');
-    assert.ok(cred, 'credential exists on pair plane');
+    assert.ok(cred, 'credential exists on message plane');
     assert.equal(cred.status, 'set');
     assert.notEqual(cred.secret, 'top-secret');
     assert.equal(
@@ -85,7 +85,7 @@ async () => {
     };
     await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', spec);
     await postIdentityCreation(ctx, 'fndCYAsXazdzMUlEGMNIZw', spec);
-    // Pair-plane document at identities/:id is one head.
+    // Message-plane document at identities/:id is one head.
     const identity = await GET<{ kind: string }>(
         db, 'identities/fndCYAsXazdzMUlEGMNIZw', DEV_TOKEN,
     );

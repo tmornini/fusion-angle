@@ -1,6 +1,6 @@
 import type {
     Id,
-    PairEntity,
+    MessagePairEntity,
     StateEntity,
 } from './types.ts';
 import { pickString } from './validators.ts';
@@ -25,11 +25,12 @@ const DELETE_METHOD = 'DELETE';
 // projects (neither ever POSTs at its own document address);
 // load-bearing once a family's create-shaped genesis pair
 // shares its document address (the flows family: POST
-// 'flows' mints the create op pair at the SAME uriId a
-// subsequent PUT 'flows/:id' revisits). Defense-in-depth, not
-// the deciding mechanism — appendMessagePair's nowUtc() `at`
-// already orders a synthesized document pair strictly after
-// its sibling operation pair.
+// 'flows' mints the create operation message pair at the
+// SAME uriId a subsequent PUT 'flows/:id' revisits).
+// Defense-in-depth, not the deciding mechanism —
+// appendMessagePair's nowUtc() `at` already orders a
+// synthesized document message pair strictly after its
+// sibling operation message pair.
 const DOCUMENT_METHODS: ReadonlySet<string> =
     new Set([PUT_METHOD, DELETE_METHOD]);
 
@@ -51,7 +52,7 @@ export function requestBodyOf(
 // reduction below and a family's own lifecycle reduction over
 // the SAME pairs, grouped and compared by fields the family
 // alone knows (api/derive-ideas.ts's state trio).
-export interface DocumentPair {
+export interface DocumentMessagePair {
     readonly id: Id;
     readonly at: string;
     readonly uriId: string;
@@ -63,37 +64,38 @@ export interface DocumentPair {
 
 // Every PUT/DELETE pair at `uriCollection`, decoded once —
 // ascending by the envelope (at, id), the SAME arrival order
-// headPairIdAt (message-pair.ts) picks a single head from.
-// That shared mechanism is ordering ONLY: headPairIdAt
-// filters by uri_id/uri_collection alone — every method,
-// since it serves Supersedes/Follows provenance (the LOCK
-// head) — while this function excludes every method but
-// PUT/DELETE (the DOCUMENT head — design decision 6).
+// headMessagePairIdAt (message-pair.ts) picks a single
+// head from. That shared mechanism is ordering ONLY:
+// headMessagePairIdAt filters by uri_id/uri_collection
+// alone — every method, since it serves
+// Supersedes/Follows provenance (the LOCK head) — while
+// this function excludes every method but PUT/DELETE
+// (the DOCUMENT head — design decision 6).
 // POST/PATCH rows at the same address are not heads. Only
 // successful writes are stored, so there is no status
 // filter. Method comes from the pair's `method` column.
-// DocumentPair.at is the response stamp.
-export function documentPairsAt(
-    pairs: readonly PairEntity[],
+// DocumentMessagePair.at is the response stamp.
+export function documentMessagePairsAt(
+    messagePairs: readonly MessagePairEntity[],
     uriCollection: string,
-): readonly DocumentPair[] {
-    const out: DocumentPair[] = [];
-    for (const pair of pairs) {
-        if (pair.uri_collection !== uriCollection) {
+): readonly DocumentMessagePair[] {
+    const out: DocumentMessagePair[] = [];
+    for (const messagePair of messagePairs) {
+        if (messagePair.uri_collection !== uriCollection) {
             continue;
         }
-        if (!DOCUMENT_METHODS.has(pair.method)) {
+        if (!DOCUMENT_METHODS.has(messagePair.method)) {
             continue;
         }
         out.push({
-            id: pair.id,
-            at: pair.response_at,
-            uriId: pair.uri_id,
-            method: pair.method,
-            body: requestBodyOf(pair.request),
+            id: messagePair.id,
+            at: messagePair.response_at,
+            uriId: messagePair.uri_id,
+            method: messagePair.method,
+            body: requestBodyOf(messagePair.request),
             requesterIdentityId:
-                pair.requester_identity_id,
-            version: pair.version,
+                messagePair.requester_identity_id,
+            version: messagePair.version,
         });
     }
     return out.sort((left, right) =>
@@ -108,9 +110,9 @@ export function documentPairsAt(
 // shape.
 export interface DerivedDocument {
     readonly uriId: string;
-    readonly pairId: string;        // head pair (== the
-                                     // advertisable
-                                     // Response-ID)
+    readonly messagePairId: string; // head pair (== the
+                                    // advertisable
+                                    // Response-ID)
     readonly method: string;        // head method; DELETE
                                      // head == absent
     readonly body: Record<string, unknown>;
@@ -121,21 +123,21 @@ export interface DerivedDocument {
 // Supersedes is NEVER walked (provenance-only — a DAG
 // under races; only the reduction decides currency).
 export function deriveDocumentsAt(
-    pairs: readonly PairEntity[],
+    messagePairs: readonly MessagePairEntity[],
     uriCollection: string,
 ): Map<string, DerivedDocument> {
-    const documentPairs = documentPairsAt(
-        pairs, uriCollection,
+    const documentMessagePairs = documentMessagePairsAt(
+        messagePairs, uriCollection,
     );
     const heads = latestByKey(
-        documentPairs, (pair) => pair.uriId,
+        documentMessagePairs, (messagePair) => messagePair.uriId,
     );
     const documents = new Map<string, DerivedDocument>();
     for (const [uriId, head] of heads) {
         if (head.method === DELETE_METHOD) continue;
         documents.set(uriId, {
             uriId,
-            pairId: head.id,
+            messagePairId: head.id,
             method: head.method,
             body: head.body,
         });
@@ -182,33 +184,35 @@ export interface DocumentLifecycleEvent {
 // ideas/projects/flows, none of which has a DELETE at its own
 // document address.
 export function documentLifecycleEvents(
-    pairs: readonly DocumentPair[],
+    messagePairs: readonly DocumentMessagePair[],
 ): DocumentLifecycleEvent[] {
     const seen = new Set<Id>();
     const events: DocumentLifecycleEvent[] = [];
     let afterDelete = false;
-    for (const pair of pairs) {
-        if (pair.method === DELETE_METHOD) {
+    for (const messagePair of messagePairs) {
+        if (messagePair.method === DELETE_METHOD) {
             afterDelete = true;
             continue;
         }
-        if ('state_event_id' in pair.body) {
+        if ('state_event_id' in messagePair.body) {
             const stateEventId = pickString(
-                pair.body, 'state_event_id',
+                messagePair.body, 'state_event_id',
             );
             if (seen.has(stateEventId)) continue;
             seen.add(stateEventId);
             events.push({
                 stateEventId,
-                state: pickString(pair.body, 'state'),
-                stateAt: pickString(pair.body, 'state_at'),
-                memberId: pair.requesterIdentityId,
-                version: pair.version,
+                state: pickString(messagePair.body, 'state'),
+                stateAt: pickString(
+                    messagePair.body, 'state_at',
+                ),
+                memberId: messagePair.requesterIdentityId,
+                version: messagePair.version,
             });
             afterDelete = false;
             continue;
         }
-        const state = pickString(pair.body, 'state');
+        const state = pickString(messagePair.body, 'state');
         const last = events[events.length - 1];
         if (
             !afterDelete
@@ -219,11 +223,11 @@ export function documentLifecycleEvents(
         }
         afterDelete = false;
         events.push({
-            stateEventId: pair.id,
+            stateEventId: messagePair.id,
             state,
-            stateAt: pair.at,
-            memberId: pair.requesterIdentityId,
-            version: pair.version,
+            stateAt: messagePair.at,
+            memberId: messagePair.requesterIdentityId,
+            version: messagePair.version,
         });
     }
     return events;

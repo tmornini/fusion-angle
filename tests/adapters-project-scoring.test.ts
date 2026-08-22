@@ -405,7 +405,7 @@ test('postProjectBaselineScoring appends via GET scores',
             { objectiveId: generateIdentifier(), score: -30 },
         ]);
         // Phase Final Task 2: score row half stripped —
-        // adapter read derives from the pair plane.
+        // adapter read derives from the message plane.
         const rows = await getBaselineScoresForProject(
             ctx, 'pnXmXrxOWayANgDLdCjuBw',
         );

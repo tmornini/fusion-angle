@@ -17,7 +17,7 @@ import {
     postRecordDocumentOp,
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
-import { formWritePair } from '../api/message-pair.ts';
+import { formWriteMessagePair } from '../api/message-pair.ts';
 import {
     RECORD_TYPE_DETAIL_PATTERN,
 } from '../api/family-registry.ts';
@@ -28,7 +28,7 @@ import { seedSeat } from './root-admin-fixture.ts';
 
 // Nested record-types READ surface (Task 2): collection,
 // detail, lifecycle history, member tier, and the shared
-// org-match fence arm. Seeds via below-gate formWritePair +
+// org-match fence arm. Seeds via below-gate formWriteMessagePair +
 // postRecordDocumentOp at the nested detail address.
 
 const BASE = 'http://localhost';
@@ -100,7 +100,7 @@ async function seedRecordTypePair(
     const routeSegments =
         RECORD_TYPE_DETAIL_PATTERN.split('/');
     const pathSegments = pathname.slice(1).split('/');
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname,
         routePattern: RECORD_TYPE_DETAIL_PATTERN,
@@ -120,9 +120,9 @@ async function seedRecordTypePair(
         operationId: TEST_OPERATION_ID,
     });
     await postRecordDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+        db, id, body, SYSTEM_MEMBER_ID, messagePair,
     );
-    return pair.id;
+    return messagePair.id;
 }
 
 async function seedOrganizationWithMember(

@@ -106,7 +106,7 @@ test(
         assert.equal(flow.organization_id, 'AjdvjuECVZEgZoFajaIEkg');
 
         // Phase Final Task 2: project_flows row half stripped —
-        // join derives from the pair plane.
+        // join derives from the message plane.
         const links = await GET<{
             id: string;
             project_id: string;
@@ -138,7 +138,7 @@ test(
         const db = await freshDb();
         // Phase Final Task 2: states ROW half stripped —
         // a raw colliding states row no longer aborts the
-        // pair-plane create (immutability is pair-plane only
+        // message-plane create (immutability is message-plane only
         // on states/:id PUT).
     // Phase Final Stage B: states table retired.
         await POST(db, 'organizations/AjdvjuECVZEgZoFajaIEkg/flows/'

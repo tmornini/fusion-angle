@@ -24,10 +24,10 @@ import { deriveIdeaStateHistory } from
 import { deriveObjectiveStateHistory } from
     '../api/derive-objectives.ts';
 import {
-    documentPairsAt,
+    documentMessagePairsAt,
 } from '../api/derive-documents.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     canonicalUriCollection,
 } from '../api/message-pair.ts';
 import {
@@ -50,7 +50,7 @@ import { generateIdentifier } from
 // A hand-built multi-family fixture drives ONE representative
 // event through each surviving source — idea, objective, AI
 // member, work order, flow-node delete/restore sidecars on
-// the pair plane, invitation grant/accept — across TWO
+// the message plane, invitation grant/accept — across TWO
 // organizations. Bulk deriveStates / fence union RETIRED with
 // C3; fence force lives on resolveOwningOrganization + family
 // history routes.
@@ -92,17 +92,17 @@ function req(
 // Below-facade pair formation (the member-fixtures.ts idiom,
 // the derive-states-events.test.ts precedent): every write below
 // authorizes through organizationToken, whose gate check derives
-// from the role_grants/memberships pair plane once they flip, so
+// from the role_grants/memberships message plane once they flip, so
 // a raw row here would go derivation-invisible. Every id/field
 // value stays IDENTICAL to the raw puts these replace — only the
 // write mechanism changes.
-async function leftoverMembershipPair(
+async function leftoverMembershipMessagePair(
     db: MemoryDbAdapter,
     id: string,
     body: Record<string, unknown>,
 ): Promise<void> {
     const organization = body.organization_id as string;
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/memberships/' + id,
         routePattern: 'memberships/:id',
@@ -118,7 +118,7 @@ async function leftoverMembershipPair(
         operationId: TEST_OPERATION_ID,
     });
     await postMembershipDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+        db, id, body, SYSTEM_MEMBER_ID, messagePair,
     );
 }
 
@@ -132,7 +132,7 @@ async function leftoverMemberParent(
         state_at: AT,
         state_event_id: generateIdentifier(),
     };
-    const pair = await formWritePair({
+    const messagePair = await formWriteMessagePair({
         method: 'PUT',
         pathname: '/members/' + id,
         routePattern: 'members/:id',
@@ -148,11 +148,11 @@ async function leftoverMemberParent(
         operationId: TEST_OPERATION_ID,
     });
     await postMemberDocumentOp(
-        db, id, body, SYSTEM_MEMBER_ID, pair,
+        db, id, body, SYSTEM_MEMBER_ID, messagePair,
     );
 }
 
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -189,11 +189,11 @@ async function seed(): Promise<{
     // enumerate-then-probe (via deriveOrganizations).
     await seedOrganizationDocument(db, organizationA, 'Acme');
     await seedOrganizationDocument(db, organizationB, 'Beta');
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: organizationA, identity_id: adminA,
         type: 'admin', at: AT,
     });
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: organizationB, identity_id: adminB,
         type: 'admin', at: AT,
     });
@@ -517,7 +517,7 @@ async function buildUnionFixture(): Promise<UnionFixture> {
     // (b) an AI member's document-trio genesis — membered into
     // org A so the fence resolves it there rather than as an
     // orphan (members are GLOBAL plane; ownership rides the
-    // membership pair plane).
+    // membership message plane).
     const aiMemberId = generateIdentifier();
     await createAiMember(
         db, tokenA, aiMemberId, 'active',
@@ -600,7 +600,7 @@ async () => {
     const ghost = generateIdentifier();
     await db.postSchemaCreation();
     await seedOrganizationDocument(db, organizationA, 'Acme');
-    await leftoverMembershipPair(db, generateIdentifier(), {
+    await leftoverMembershipMessagePair(db, generateIdentifier(), {
         organization_id: organizationA, identity_id: ghost,
         type: 'member', at: AT,
     });
@@ -619,7 +619,7 @@ async () => {
     await db.postSchemaCreation();
     await seedOrganizationDocument(db, organizationA, 'Acme');
     await leftoverMemberParent(db, ghost);
-    await leftoverMembershipPair(db, generateIdentifier(), {
+    await leftoverMembershipMessagePair(db, generateIdentifier(), {
         organization_id: organizationA, identity_id: ghost,
         type: 'member', at: AT,
     });
@@ -711,14 +711,16 @@ async () => {
         )).map((row) => row.id),
         [...fx.workOrderEventIds],
     );
-    // Graph sidecars on the flow document pairs (C3).
+    // Graph sidecars on the flow document message pairs (C3).
     const prefix = canonicalUriCollection(fx.organizationA, '/flows/');
-    const stored = await fx.db.pairs.getAllWhere(
+    const stored = await fx.db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
     const sidecarIds: string[] = [];
-    for (const pair of documentPairsAt(stored, prefix)) {
-        const delta = pair.body['graphDelta'];
+    for (const messagePair of documentMessagePairsAt(
+        stored, prefix,
+    )) {
+        const delta = messagePair.body['graphDelta'];
         const deletions =
             typeof delta === 'object' && delta !== null
                 ? (delta as Record<string, unknown>)[
@@ -741,7 +743,7 @@ async () => {
                 }
             }
         }
-        const revivals = pair.body['revivals'];
+        const revivals = messagePair.body['revivals'];
         if (Array.isArray(revivals)) {
             for (const entry of revivals) {
                 if (
@@ -777,11 +779,12 @@ async () => {
 // ---- 3. invitation phantom-pair regressions (gate 5f) -----------
 
 // deriveInvitationStates cross-references the invitation
-// DOCUMENT plane to exclude a duplicate grant's own operation
-// pair (which forms but writes neither a document nor a states
-// event), and takes only the EARLIEST pair per answering-op
-// address to exclude an idempotent resend's own operation pair
-// (which forms but posts no second lifecycle event). Both
+// DOCUMENT plane to exclude a duplicate grant's own
+// operation message pair (which forms but writes neither a
+// document nor a states event), and takes only the EARLIEST
+// pair per answering-op address to exclude an idempotent
+// resend's own operation message pair (which forms but
+// posts no second lifecycle event). Both
 // exclusions are hand-trace-verified in deriveInvitationStates'
 // own header comment above but had no regression coverage before
 // this section — these three tests drive each phantom shape

@@ -124,7 +124,7 @@ test(
         const db = await freshDb();
         // Phase Final Task 2: states ROW half stripped —
         // a raw colliding states row no longer aborts the
-        // pair-plane genesis PUT.
+        // message-plane genesis PUT.
     // Phase Final Stage B: states table retired.
         const res = await handleRequest(db, req(
             'PUT', '/organizations/AjdvjuECVZEgZoFajaIEkg/ideas/'
@@ -180,8 +180,8 @@ test(
             db, 'AjdvjuECVZEgZoFajaIEkg', 'hJeymLqQwgpIHWgKlcHWNA',
         );
         assert.equal(events.length, 1);
-        assert.equal((await db.pairs.getAll()).length, 3);
-        assert.equal((await db.pairs.getAll()).length, 3);
+        assert.equal((await db.messagePairs.getAll()).length, 3);
+        assert.equal((await db.messagePairs.getAll()).length, 3);
     },
 );
 
@@ -199,6 +199,6 @@ test(
         ));
         assert.equal(res.status, 405);
         // seedRootAdmin only (org + membership); no write pair.
-        assert.equal((await db.pairs.getAll()).length, 2);
+        assert.equal((await db.messagePairs.getAll()).length, 2);
     },
 );

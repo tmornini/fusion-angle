@@ -167,17 +167,17 @@ async function seed() {
     return { db: await seededMockDb() };
 }
 
-// Phase Final Task 2: every membership document on the pair
-// plane (both orgs), keyed by identity. Identities ROW half
-// stripped — parents alone enumerate directory ids.
+// Phase Final Task 2: every membership document on the
+// message plane (both orgs), keyed by identity. Identities
+// ROW half stripped — parents alone enumerate directory ids.
 async function liveIdentityIds(
     db: MemoryDbAdapter,
 ): Promise<string[]> {
     const [requests, responses] = await Promise.all([
-        db.pairs.getAllWhere(
+        db.messagePairs.getAllWhere(
             'uri_collection', '/identities/',
         ),
-        db.pairs.getAllWhere(
+        db.messagePairs.getAllWhere(
             'uri_collection', '/identities/',
         ),
     ]);
@@ -205,7 +205,7 @@ async function membershipsByIdentity(
 test('current is a member of exactly orgs 1 and 2',
 async () => {
     const { db } = await seed();
-    // Phase Final Task 2: memberships on the pair plane.
+    // Phase Final Task 2: memberships on the message plane.
     const organizations = (
         await deriveMembershipsForIdentity(db, 'XXZruirZyAOoRpNxaDnpSA')
     )
@@ -251,7 +251,7 @@ test('each org owns at least one of every org-scoped'
     + ' entity', async () => {
     const { db } = await seed();
     // Phase Final Task 2: ideas + projects + flows derive
-    // from the pair plane (row halves stripped).
+    // from the message plane (row halves stripped).
     for (const organization of [
         ORGANIZATION_ONE, ORGANIZATION_TWO,
     ]) {
@@ -274,7 +274,7 @@ test('each org owns at least one of every org-scoped'
         );
     }
     // Phase Final Task 2: records + objectives from the
-    // pair plane.
+    // message plane.
     for (const organization of [
         ORGANIZATION_ONE, ORGANIZATION_TWO,
     ]) {
@@ -298,7 +298,7 @@ test('each org owns at least one of every org-scoped'
 
 test('every work order belongs to org 1', async () => {
     const { db } = await seed();
-    // Phase Final Task 2: work orders from the pair plane.
+    // Phase Final Task 2: work orders from the message plane.
     const token = await organizationToken(
         'XXZruirZyAOoRpNxaDnpSA', ORGANIZATION_ONE,
     );
@@ -342,7 +342,8 @@ test('every work order belongs to org 1', async () => {
 test('every record attribute matches its parent record org',
 async () => {
     const { db } = await seed();
-    // Phase Final Task 2: records + attributes on pair plane.
+    // Phase Final Task 2: records + attributes on
+    // message plane.
     const recordOrganization = new Map<string, string>();
     const allAttrs: RecordAttributeEntity[] = [];
     for (const organization of [
@@ -378,7 +379,7 @@ async () => {
     const { db } = await seed();
     const byIdentity = await membershipsByIdentity(db);
     // Phase Final Task 2: identities ROW half stripped —
-    // human parents from the pair plane.
+    // human parents from the message plane.
     const persons = (await liveIdentityIds(db))
         .filter(id => id !== SYSTEM_MEMBER_ID);
     for (const id of persons) {
@@ -394,7 +395,7 @@ test('every flow_records join binds same-org flow and'
     + ' record', async () => {
     const { db } = await seed();
     // Phase Final Task 2: flows + records + joins on the
-    // pair plane.
+    // message plane.
     const flowOrganization = new Map<string, string>();
     const recordOrganization = new Map<string, string>();
     const bindings: {
@@ -439,7 +440,7 @@ test('every idea submission names a submitter in its'
             idea.id, assignOrganization(index),
         ]),
     );
-    // Phase Final Task 2: memberships on the pair plane.
+    // Phase Final Task 2: memberships on the message plane.
     const memberOrganizations = await membershipsByIdentity(db);
     const violations: string[] = [];
     for (const [ideaId, organization] of ideaOrganization) {
@@ -465,7 +466,8 @@ test('every idea submission names a submitter in its'
 test('every project score names an author in its'
     + " project's org", async () => {
     const { db } = await seed();
-    // Phase Final Task 2: projects + scores from pair plane.
+    // Phase Final Task 2: projects + scores from
+    // message plane.
     const projectOrganization = new Map<string, string>();
     const scores: {
         id: string;
@@ -490,7 +492,7 @@ test('every project score names an author in its'
             );
         }
     }
-    // Phase Final Task 2: memberships on the pair plane.
+    // Phase Final Task 2: memberships on the message plane.
     const memberOrganizations = await membershipsByIdentity(db);
     assert.ok(scores.length > 0, 'scores exist');
     const violations: string[] = [];
@@ -519,7 +521,7 @@ test('every seeded human gets a password credential',
 async () => {
     const { db } = await seed();
     // Phase Final Task 2: identity_credentials ROW half
-    // stripped — pair-plane secrets; plaintext reveal is
+    // stripped — message-plane secrets; plaintext reveal is
     // only on the postMockDataLoad return (production pin
     // lives in credential-surfacing). Here assert PHC seed.
     const ids = await liveIdentityIds(db);

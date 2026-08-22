@@ -16,7 +16,7 @@ import {
     WRITE_RESPONSE_SPECS,
 } from '../api/routes.ts';
 import {
-    formWritePair,
+    formWriteMessagePair,
     IF_MATCH_HEADER,
     HEX64,
 } from '../api/message-pair.ts';
@@ -74,7 +74,7 @@ function req(
     });
 }
 
-async function seedMembershipPair(
+async function seedMembershipMessagePair(
     db: MemoryDbAdapter,
     _id: string,
     body: Record<string, unknown>,
@@ -95,7 +95,7 @@ async function adminDb(): Promise<{
 }> {
     const db = memoryDbAdapter();
     await seedAdminSchema(db);
-    await seedMembershipPair(db, generateIdentifier(), {
+    await seedMembershipMessagePair(db, generateIdentifier(), {
         organization_id: ORGANIZATION,
         identity_id: 'nkgaOHZISTQrILTfPThWCA',
         type: 'member',
@@ -554,7 +554,7 @@ async () => {
         { attribute_id: ATTR_ID, value: 'Hello' },
     ]);
     assert.equal(put.status, 201);
-    const pairId = put.headers.get('Response-ID')!;
+    const messagePairId = put.headers.get('Response-ID')!;
     const res = await handleRequest(db, req(
         'GET', INSTANCE_DETAIL, memberToken,
     ));
@@ -562,7 +562,7 @@ async () => {
     const header = res.headers.get('ETag');
     assert.ok(header !== null);
     assert.match(header.slice(1, -1), HEX64);
-    const stored = await db.pairs.getById(pairId);
+    const stored = await db.messagePairs.getById(messagePairId);
     assert.ok(stored !== undefined);
     assert.match(stored.version, HEX64);
     assert.notEqual(
@@ -570,7 +570,7 @@ async () => {
         stored.version,
         'instance projected ETag is not stored version',
     );
-    assert.notEqual(pairId, stored.version);
+    assert.notEqual(messagePairId, stored.version);
 });
 
 test('list-row etag == detail ETag validator sans quotes',

@@ -64,10 +64,10 @@ async function fetchFlowRecordDocuments(
     flowId: Id,
 ): Promise<Map<string, DerivedDocument>> {
     const prefix = flowRecordsUriPrefix(organization, flowId);
-    const pairs = await db.pairs.getAllWhere(
+    const messagePairs = await db.messagePairs.getAllWhere(
         'uri_collection', prefix,
     );
-    return deriveDocumentsAt(pairs, prefix);
+    return deriveDocumentsAt(messagePairs, prefix);
 }
 
 // id-lex ordered (byIdAscending — the derivation's own

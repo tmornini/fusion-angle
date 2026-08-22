@@ -57,7 +57,8 @@ function graphJson(): Record<string, unknown> {
 
 // yNSSnbrpacodQTzUEcdEVA is seeded via a REAL PUT (never a raw
 // db.workOrders.put)
-// so it carries a genuine organizations/:id/work-orders/:id document pair —
+// so it carries a genuine organizations/:id/work-orders/:id
+// document message pair —
 // same fixture posture as api-work-order-claim.test.ts.
 async function seededDb(): Promise<MemoryDbAdapter> {
     const db = memoryDbAdapter();
